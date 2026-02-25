@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -222,7 +221,6 @@ function HeroSection() {
       cleanupRef.current?.();
       if (document.head.contains(script)) document.head.removeChild(script);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function initScene() {
@@ -620,10 +618,8 @@ function AboutSection() {
       </Reveal>
       <Reveal className="reveal-right" style={{ position:"relative", minHeight:400 }}>
         <div style={{ position:"absolute", top:"8%", left:"22%", right:0, bottom:0, background:"#fff", borderRadius:30, boxShadow:"0 4px 4px rgba(0,0,0,0.25)" }} />
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={IMG_L300_VAN} alt="Delivery van" style={{ position:"absolute", top:"2%", right:"2%", width:"58%", height:"auto", objectFit:"contain", transform:"scaleY(-1) rotate(180deg)", zIndex:2, filter:"drop-shadow(0 8px 20px rgba(0,0,0,0.4))" }} />
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={IMG_CARGO_TRUCK} alt="Cargo truck" style={{ position:"absolute", bottom:"-8%", left:"-8%", width:"72%", height:"auto", objectFit:"contain", zIndex:3, filter:"drop-shadow(0 8px 24px rgba(0,0,0,0.5))" }} />
+        <Image src={IMG_L300_VAN} alt="Delivery van" style={{ position:"absolute", top:"2%", right:"2%", width:"58%", height:"auto", objectFit:"contain", transform:"scaleY(-1) rotate(180deg)", zIndex:2, filter:"drop-shadow(0 8px 20px rgba(0,0,0,0.4))" }} />
+        <Image src={IMG_CARGO_TRUCK} alt="Cargo truck" style={{ position:"absolute", bottom:"-8%", left:"-8%", width:"72%", height:"auto", objectFit:"contain", zIndex:3, filter:"drop-shadow(0 8px 24px rgba(0,0,0,0.5))" }} />
         <p style={{ position:"absolute", bottom:"6%", right:0, fontFamily:"'Aboreto',serif", color:"#fff", fontSize:"clamp(22px,3.5vw,62px)", lineHeight:1.1, margin:0, zIndex:4, mixBlendMode:"difference", textShadow:"0 4px 6px rgba(0,0,0,0.3)", maxWidth:"60%", textAlign:"right" }}>
           Effortless logistics, real results
         </p>
@@ -651,16 +647,14 @@ function BrandsSection() {
           <div style={{ overflow:"hidden", marginBottom:36 }}>
             <div className="marquee-fwd" style={{ display:"flex", gap:64, width:"max-content" }}>
               {[...BRAND_LOGOS,...BRAND_LOGOS,...BRAND_LOGOS].map((l,i) => (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img key={i} src={l.src} alt={l.alt} style={{ height:l.h, width:"auto", objectFit:"contain", opacity:.85, flexShrink:0 }} />
+                <Image key={i} src={l.src} alt={l.alt} style={{ height:l.h, width:"auto", objectFit:"contain", opacity:.85, flexShrink:0 }} />
               ))}
             </div>
           </div>
           <div style={{ overflow:"hidden" }}>
             <div className="marquee-rev" style={{ display:"flex", gap:64, width:"max-content" }}>
               {[...BRAND_LOGOS,...BRAND_LOGOS,...BRAND_LOGOS].map((l,i) => (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img key={i} src={l.src} alt={l.alt} style={{ height:l.h, width:"auto", objectFit:"contain", opacity:.85, flexShrink:0 }} />
+                <Image key={i} src={l.src} alt={l.alt} style={{ height:l.h, width:"auto", objectFit:"contain", opacity:.85, flexShrink:0 }} />
               ))}
             </div>
           </div>
