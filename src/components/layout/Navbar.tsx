@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence, useScroll, useSpring } from 'framer-motion';
+import { ASSETS } from '@/app/lib/data';
+import Image from 'next/image';
 
 const NAV_LINKS = [
   { label: 'Home',     href: '#hero' },
@@ -75,23 +77,14 @@ export default function Navbar() {
           h-[76px] flex items-center justify-between">
 
           {/* ── Logo ── */}
-          <a href="#hero" className="flex items-center gap-3 no-underline group shrink-0">
-            <div
-              className="w-11 h-11 rounded-xl flex items-center justify-center text-xl
-                bg-white/[0.07] border border-white/[0.12]
-                group-hover:border-[#4df9ed]/40 group-hover:bg-[#4df9ed]/[0.07]
-                transition-all duration-200"
-            >
-              📦
-            </div>
-            <div className="leading-none">
-              <p className="font-body text-white text-[0.85rem] tracking-[0.12em] uppercase font-bold">
-                8338 LOGISTICS
-              </p>
-              <p className="font-body text-[#818181] text-[0.55rem] tracking-[0.18em] uppercase mt-0.5">
-                Services
-              </p>
-            </div>
+          <a href="#hero" className="flex items-center no-underline shrink-0">
+            <Image
+              src={ASSETS.logo}
+              alt="8338 Logistics"
+              width={140}
+              height={40}
+              className="object-contain"
+            />
           </a>
 
           {/* ── Desktop nav links ── */}
@@ -188,13 +181,15 @@ export default function Navbar() {
               {/* Drawer header */}
               <div className="flex justify-between items-center p-6 pb-5
                 border-b border-white/[0.07]">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-white/[0.07] border border-white/[0.12]
-                    flex items-center justify-center text-sm">📦</div>
-                  <span className="font-body text-white text-sm tracking-widest font-bold uppercase">
-                    8338 Logistics
-                  </span>
-                </div>
+                <a href="#hero" className="flex items-center no-underline shrink-0">
+                  <Image
+                    src={ASSETS.logo}
+                    alt="8338 Logistics"
+                    width={140}
+                    height={40}
+                    className="object-contain"
+                  />
+                </a>
                 <button
                   onClick={closeMenu}
                   className="w-8 h-8 rounded-lg border border-white/10 flex items-center justify-center

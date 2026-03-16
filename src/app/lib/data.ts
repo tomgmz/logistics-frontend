@@ -1,5 +1,9 @@
 // ─── Figma MCP Asset URLs (fetched from the real design) ────────────────────
 export const ASSETS = {
+
+  //logo
+  logo: '/final-logo.png',
+
   // Hero – Section 1
   heroContainers: 'https://www.figma.com/api/mcp/asset/53e8bb06-708b-4f54-8fca-444544e245b8',
   heroEllipse:    'https://www.figma.com/api/mcp/asset/5d4ec182-6dfb-498c-879d-6e3ad7ee5f4f',

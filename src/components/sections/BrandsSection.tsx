@@ -72,12 +72,6 @@ export default function BrandsSection() {
             animate={inView ? { opacity: 1, x: 0 } : {}}
             transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
           >
-            {/* Eyebrow */}
-            <div className="pill-cyan mb-7">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#4df9ed] animate-pulse" />
-              Trusted Partners
-            </div>
-
             {/* Headline */}
             <h2 className="font-display-italic text-white leading-[1.0] mb-6
               text-[2.6rem] md:text-[4rem] lg:text-[5rem]">
@@ -90,36 +84,8 @@ export default function BrandsSection() {
             {/* Sub-copy */}
             <p className="font-body text-[#818181] text-lg md:text-xl leading-relaxed
               tracking-wide max-w-[340px] mb-10">
-              Trusted by the country&apos;s leading e-commerce and retail brands to
-              move nationwide with unmatched precision.
+              Move nationwide with unmatched precision
             </p>
-
-            {/* Divider + Stats row */}
-            <div className="pt-8 border-t border-white/[0.07]
-              grid grid-cols-3 gap-4">
-              {[
-                { val: '5+',   label: 'Brand Partners' },
-                { val: '100%', label: 'Satisfaction'   },
-                { val: '24/7', label: 'Operations'     },
-              ].map(({ val, label }, i) => (
-                <motion.div
-                  key={label}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={inView ? { opacity: 1, y: 0 } : {}}
-                  transition={{ delay: 0.3 + i * 0.09, duration: 0.5 }}
-                >
-                  <p className="font-display text-white text-3xl md:text-4xl
-                    leading-none mb-1 not-italic"
-                    style={{ fontStyle: 'normal' }}>
-                    {val}
-                  </p>
-                  <p className="font-body text-[#818181] text-[0.62rem]
-                    tracking-[0.15em] uppercase leading-snug">
-                    {label}
-                  </p>
-                </motion.div>
-              ))}
-            </div>
           </motion.div>
 
           {/* ── Right col: marquee tracks ── */}
