@@ -17,6 +17,9 @@ export const ASSETS = {
   svcDelivery:    'https://www.figma.com/api/mcp/asset/5f22acc7-5bd7-467b-9542-1dc0c452b9b1',
   svcTracking:    'https://www.figma.com/api/mcp/asset/808a5761-39ed-4de0-b84b-067d7fd4f6bf',
   sectionEllipse: 'https://www.figma.com/api/mcp/asset/45a4b0aa-e20c-487e-a19c-8ad60f56d1a7',
+
+  // Metrics
+  metricsBg:      '/landingpage/metrics-section/metricsbg.png',
 };
 
 export const BRANDS = [
