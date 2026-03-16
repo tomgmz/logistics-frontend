@@ -10,10 +10,10 @@ export default function AboutSection() {
   const inView = useInView(ref, { once: true, margin: '-100px' });
 
   return (
-    <section id="about" className="relative w-full bg-[#1b1b1b] overflow-hidden">
+    <section ref={ref} id="about" className="relative w-full bg-[#1b1b1b] overflow-hidden">
 
       {/* ── MOBILE LAYOUT (below md) ── */}
-      <div ref={ref} className="md:hidden flex flex-col px-5 pt-16 pb-12 gap-8">
+      <div className="md:hidden flex flex-col px-5 pt-16 pb-12 gap-8">
 
         {/* Body text */}
         <motion.p
