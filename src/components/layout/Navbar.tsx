@@ -65,7 +65,7 @@ export default function Navbar() {
       <motion.div
         style={{ scaleX, transformOrigin: '0%' }}
         className="fixed top-0 left-0 right-0 h-[2px] z-[100]
-          bg-gradient-to-r from-[#4df9ed] via-[#3af626] to-[#4df9ed]"
+          bg-[#4df9ed]"
       />
 
       {/* ── Main nav bar ── */}
