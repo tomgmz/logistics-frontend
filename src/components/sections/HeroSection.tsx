@@ -22,14 +22,14 @@ export default function HeroSection() {
       </div>
 
       {/* Glowing ellipse */}
-      <div className="absolute left-[39%] top-[18%] w-[340px] h-[340px] z-0 pointer-events-none hidden lg:block">
+      {/* <div className="absolute left-[39%] top-[18%] w-[340px] h-[340px] z-0 pointer-events-none hidden lg:block">
         <Image 
           src={ASSETS.heroEllipse} 
           alt="" 
           fill
           className="object-contain opacity-55" 
         />
-      </div>
+      </div> */}
 
       {/* Content */}
       <div className="relative z-10 w-full max-w-[1600px] mx-auto px-6 md:px-12 lg:px-[60px] pt-36 pb-24">
