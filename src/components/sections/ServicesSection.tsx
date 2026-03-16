@@ -116,14 +116,14 @@ export default function ServicesSection() {
     <section id="services" className="relative w-full bg-[#1b1b1b] overflow-hidden py-24">
 
       {/* Ellipse glow */}
-      <div className="absolute left-1/2 -translate-x-1/2 top-[28%] w-[340px] h-[340px] pointer-events-none z-0">
+      {/* <div className="absolute left-1/2 -translate-x-1/2 top-[28%] w-[340px] h-[340px] pointer-events-none z-0">
         <Image 
           src={ASSETS.sectionEllipse} 
           alt="" 
           fill
           className="object-contain opacity-35" 
         />
-      </div>
+      </div> */}
 
       <div className="relative z-10 max-w-[1600px] mx-auto px-6 md:px-12 lg:px-16">
 
