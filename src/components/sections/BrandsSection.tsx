@@ -79,7 +79,7 @@ export default function BrandsSection() {
             </div>
 
             {/* Headline */}
-            <h2 className="font-display text-white leading-[1.0] mb-6
+            <h2 className="font-display-italic text-white leading-[1.0] mb-6
               text-[2.6rem] md:text-[4rem] lg:text-[5rem]">
               BRANDS THAT{' '}
               <span className="text-[#3af626]">MOVE</span>

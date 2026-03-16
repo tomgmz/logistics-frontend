@@ -1,31 +1,72 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { motion, useInView, AnimatePresence } from 'framer-motion';
+import { motion, useInView } from 'framer-motion';
 import Image from 'next/image';
 import { SERVICES, CYCLING_WORDS, ASSETS } from '@/app/lib/data';
 
+// Color palette for cycling words
+const WORD_COLORS = [
+  '#4df9ed', // Cyan
+  '#3af626', // Green
+  '#a855f7', // Purple
+  '#ef4444', // Red
+  '#f97316', // Orange
+  '#84cc16', // Yellow-green
+];
+
 function CyclingWord() {
-  const [idx, setIdx] = useState(0);
+  const [wordIndex, setWordIndex] = useState(0);
+  const [displayText, setDisplayText] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+  
+  const currentWord = CYCLING_WORDS[wordIndex];
+  const currentColor = WORD_COLORS[wordIndex % WORD_COLORS.length];
+
   useEffect(() => {
-    const t = setInterval(() => setIdx((i) => (i + 1) % CYCLING_WORDS.length), 2200);
-    return () => clearInterval(t);
-  }, []);
+    const typeSpeed = isDeleting ? 50 : 100; // Faster when deleting
+    const pauseTime = isDeleting ? 500 : 2000; // Pause before deleting
+
+    const timer = setTimeout(() => {
+      if (!isDeleting) {
+        // Typing phase
+        if (displayText.length < currentWord.length) {
+          setDisplayText(currentWord.substring(0, displayText.length + 1));
+        } else {
+          // Finished typing, wait then start deleting
+          setTimeout(() => setIsDeleting(true), pauseTime);
+        }
+      } else {
+        // Deleting phase
+        if (displayText.length > 0) {
+          setDisplayText(displayText.substring(0, displayText.length - 1));
+        } else {
+          // Finished deleting, move to next word
+          setIsDeleting(false);
+          setWordIndex((prev) => (prev + 1) % CYCLING_WORDS.length);
+        }
+      }
+    }, typeSpeed);
+
+    return () => clearTimeout(timer);
+  }, [displayText, isDeleting, currentWord, wordIndex]);
 
   return (
-    <span className="inline-block overflow-hidden align-bottom" style={{ height: '1.1em' }}>
-      <AnimatePresence mode="wait">
-        <motion.span
-          key={CYCLING_WORDS[idx]}
-          initial={{ y: '110%', opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: '-110%', opacity: 0 }}
-          transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-          className="inline-block text-[#4df9ed]"
-        >
-          {CYCLING_WORDS[idx]}
-        </motion.span>
-      </AnimatePresence>
+    <span 
+      className="inline-block align-bottom font-display-italic"
+      style={{ 
+        minWidth: '3ch',
+        color: currentColor,
+      }}
+    >
+      {displayText}
+      <motion.span
+        animate={{ opacity: [1, 0, 1] }}
+        transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
+        className="inline-block ml-1"
+      >
+        |
+      </motion.span>
     </span>
   );
 }
@@ -59,8 +100,7 @@ function ServiceCard({ img, label, index }: { img: string; label: string; index:
         group-hover:border-[#4df9ed]/40 transition-all duration-300 pointer-events-none z-10" />
       {/* Label */}
       <p
-        className="absolute bottom-4 left-3 right-3 text-white text-[1.375rem] leading-snug tracking-wide z-10"
-        style={{ fontFamily: 'Aboreto, cursive', fontWeight: 400 }}
+        className="absolute bottom-4 left-3 right-3 text-white text-[1.375rem] leading-snug tracking-wide z-10 font-card"
       >
         {label}
       </p>
