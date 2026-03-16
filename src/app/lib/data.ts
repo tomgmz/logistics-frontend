@@ -11,11 +11,11 @@ export const ASSETS = {
   cargoTruck:     'https://www.figma.com/api/mcp/asset/c7896bf5-1325-41a3-9531-fbc4f9971c65',
   l300Van:        'https://www.figma.com/api/mcp/asset/ff058f69-265f-4707-a72e-378a5e04661c',
   // Brands – Section 3
-  airspeed:       'https://www.figma.com/api/mcp/asset/1c28598a-db52-4672-9792-6b8fabeb20ff',
-  shopee:         'https://www.figma.com/api/mcp/asset/274d43c9-a084-4d02-ad38-80c99d078dad',
-  lazada:         'https://www.figma.com/api/mcp/asset/fbccaf3d-7271-4c8b-a286-2c9a6ec0977a',
-  shein:          'https://www.figma.com/api/mcp/asset/c849f8fc-9c95-4e0c-8428-c49b2fe4312a',
-  temu:           'https://www.figma.com/api/mcp/asset/bba597bf-1daf-4d6f-b6e4-b09da4541dcd',
+  airspeed:       '/logos/airspeed.png',
+  shopee:         '/logos/shopee.png',
+  lazada:         '/logos/lazada.png',
+  shein:          '/logos/shein.png',
+  temu:           '/logos/temu.png',
   // Services – Section 4
   svcContainers:  'https://www.figma.com/api/mcp/asset/8d8a12a7-5abb-4816-baaf-1c3c3a4abb0b',
   svcDelivery:    'https://www.figma.com/api/mcp/asset/5f22acc7-5bd7-467b-9542-1dc0c452b9b1',

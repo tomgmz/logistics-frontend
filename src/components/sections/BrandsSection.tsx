@@ -5,7 +5,6 @@ import Image from 'next/image';
 import { motion, useInView } from 'framer-motion';
 import { BRANDS } from '@/app/lib/data';
 
-/* ─── Single logo card ─────────────────────────────────────────────────────── */
 function LogoCard({ brand }: { brand: typeof BRANDS[number] }) {
   return (
     <div
@@ -15,15 +14,14 @@ function LogoCard({ brand }: { brand: typeof BRANDS[number] }) {
         transition-all duration-300 group cursor-default"
       style={{ minWidth: 140 }}
     >
-      {/* Wrapper sized by brand.className; Image fills it via fill */}
+      {/* Use relative positioning with defined dimensions */}
       <div className={`relative ${brand.className}`}>
         <Image
           src={brand.src}
           alt={brand.alt}
-          fill
-          className="object-contain grayscale brightness-[1.4] opacity-55
-            group-hover:grayscale-0 group-hover:opacity-100 group-hover:brightness-100
-            transition-all duration-400"
+          width={140}
+          height={80}
+          className="object-contain transition-all duration-400"
           sizes="140px"
         />
       </div>
@@ -73,7 +71,7 @@ export default function BrandsSection() {
             transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
           >
             {/* Headline */}
-            <h2 className="font-display-italic text-white leading-[1.0] mb-6
+            <h2 className="font-display-italic text-white leading-[1.0] mb-6 
               text-[2.6rem] md:text-[4rem] lg:text-[5rem]">
               BRANDS THAT{' '}
               <span className="text-[#3af626]">MOVE</span>
