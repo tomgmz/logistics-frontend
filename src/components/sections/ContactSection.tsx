@@ -29,8 +29,7 @@ export default function ContactSection() {
             transition={{ duration: 0.6 }}
             className="text-center mb-4 sm:mb-5"
           >
-            <h2 className="font-display-italic text-white leading-[1.0]
-              text-[1.5rem] xs:text-[1.5rem] sm:text-[2.4rem] md:text-[3rem] lg:text-[5rem]">
+            <h2 className="font-display-italic text-white leading-[1.0]">
               CONTACT OUR
               <br />
               <span className="font-display-italic text-[#4df9ed]">LOGISTICS EXPERTS</span>
@@ -41,7 +40,7 @@ export default function ContactSection() {
             initial={{ opacity: 0, y: 20 }}
             animate={inView ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="font-body text-[#818181] text-sm sm:text-sm md:text-base lg:text-2xl
+            className="font-'Alegreysa Sans SC, sans-serif' text-[#818181]
               text-center tracking-widest uppercase mb-10 sm:mb-14 max-w-2xl mx-auto leading-relaxed"
           >
             Be our partner by sending us a message. Our team is here to assist you with any logistics
@@ -58,55 +57,54 @@ export default function ContactSection() {
 
             <div className="p-6 sm:p-8 md:p-10">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                {/* First Name */}
                 <div>
-                  <label className="font-body text-white/60 text-[0.65rem] tracking-widest uppercase mb-1.5 block">
+                  <label className="font-'Alegreysa Sans SC, sans-serif' text-white/60 text-[0.65rem] tracking-widest uppercase mb-1.5 block">
                     First Name
                   </label>
                   <input
                     type="text"
                     className="w-full bg-[#1a1a1a] border border-white/[0.10] rounded-[8px]
-                      px-3 py-2.5 text-white text-sm font-body
+                      px-3 py-2.5 text-white text-sm font-'Alegreysa Sans SC, sans-serif'
                       focus:outline-none focus:border-[#4df9ed]/40 transition-colors"
                   />
                 </div>
                 <div>
-                  <label className="font-body text-white/60 text-[0.65rem] tracking-widest uppercase mb-1.5 block">
+                  <label className="font-'Alegreysa Sans SC, sans-serif' text-white/60 text-[0.65rem] tracking-widest uppercase mb-1.5 block">
                     Last Name
                   </label>
                   <input
                     type="text"
                     className="w-full bg-[#1a1a1a] border border-white/[0.10] rounded-[8px]
-                      px-3 py-2.5 text-white text-sm font-body
+                      px-3 py-2.5 text-white text-sm font-'Alegreysa Sans SC, sans-serif'
                       focus:outline-none focus:border-[#4df9ed]/40 transition-colors"
                   />
                 </div>
                 <div>
-                  <label className="font-body text-white/60 text-[0.65rem] tracking-widest uppercase mb-1.5 block">
+                  <label className="font-'Alegreysa Sans SC, sans-serif' text-white/60 text-[0.65rem] tracking-widest uppercase mb-1.5 block">
                     Email
                   </label>
                   <input
                     type="email"
                     className="w-full bg-[#1a1a1a] border border-white/[0.10] rounded-[8px]
-                      px-3 py-2.5 text-white text-sm font-body
+                      px-3 py-2.5 text-white text-sm font-'Alegreysa Sans SC, sans-serif'
                       focus:outline-none focus:border-[#4df9ed]/40 transition-colors"
                   />
                 </div>
                 <div>
-                  <label className="font-body text-white/60 text-[0.65rem] tracking-widest uppercase mb-1.5 block">
+                  <label className="font-'Alegreysa Sans SC, sans-serif' text-white/60 text-[0.65rem] tracking-widest uppercase mb-1.5 block">
                     Phone
                   </label>
                   <input
                     type="tel"
                     className="w-full bg-[#1a1a1a] border border-white/[0.10] rounded-[8px]
-                      px-3 py-2.5 text-white text-sm font-body
+                      px-3 py-2.5 text-white text-sm font-'Alegreysa Sans SC, sans-serif'
                       focus:outline-none focus:border-[#4df9ed]/40 transition-colors"
                   />
                 </div>
               </div>
 
               <div className="mb-4">
-                <label className="font-body text-white/60 text-[0.65rem] tracking-widest uppercase mb-2 block">
+                <label className="font-'Alegreysa Sans SC, sans-serif' text-white/60 text-[0.65rem] tracking-widest uppercase mb-2 block">
                   Your Role or Company
                 </label>
                 <div className="flex flex-wrap gap-x-5 gap-y-2">
@@ -120,7 +118,7 @@ export default function ContactSection() {
                             : 'border-white/30 group-hover:border-white/60'
                           }`}
                       />
-                      <span className="font-body text-white/70 text-xs tracking-wider uppercase">
+                      <span className="font-'Alegreysa Sans SC, sans-serif' text-white/70 text-xs tracking-wider uppercase">
                         {r}
                       </span>
                     </label>
@@ -129,19 +127,19 @@ export default function ContactSection() {
               </div>
 
               <div className="mb-6">
-                <label className="font-body text-white/60 text-[0.65rem] tracking-widest uppercase mb-1.5 block">
+                <label className="font-'Alegreysa Sans SC, sans-serif' text-white/60 text-[0.65rem] tracking-widest uppercase mb-1.5 block">
                   Message
                 </label>
                 <textarea
                   rows={4}
                   className="w-full bg-[#1a1a1a] border border-white/[0.10] rounded-[8px]
-                    px-3 py-2.5 text-white text-sm font-body resize-none
+                    px-3 py-2.5 text-white text-sm font-'Alegreysa Sans SC, sans-serif' resize-none
                     focus:outline-none focus:border-[#4df9ed]/40 transition-colors"
                 />
               </div>
 
               <button
-                className="font-body bg-white text-[#0a0a0a] px-7 py-2.5 rounded-[8px]
+                className="font-'Alegreysa Sans SC, sans-serif' bg-white text-[#0a0a0a] px-7 py-2.5 rounded-[8px]
                   text-sm tracking-wider font-semibold
                   hover:bg-white/90 transition-all duration-300 cursor-pointer w-full sm:w-auto"
               >
@@ -151,29 +149,29 @@ export default function ContactSection() {
 
             <div className="border-t lg:border-t-0 lg:border-l border-white/[0.08]
               p-6 sm:p-8 md:p-10 bg-[#0f0f0f]">
-              <h3 className="font-body text-white text-sm tracking-widest uppercase mb-1">
+              <h3 className="font-'Alegreysa Sans SC, sans-serif' text-white text-sm tracking-widest uppercase mb-1">
                 Contact Details
               </h3>
-              <p className="font-body text-white/40 text-xs tracking-wide mb-8 leading-relaxed">
+              <p className="font-'Alegreysa Sans SC, sans-serif' text-white/40 text-xs tracking-wide mb-8 leading-relaxed">
                 For direct support or partnership inquiries.
               </p>
 
               <div className="flex flex-col gap-5">
                 <div className="flex items-start gap-3">
                   <span className="text-[#4df9ed] text-base mt-0.5">📞</span>
-                  <span className="font-body text-white/70 text-sm leading-relaxed">
+                  <span className="font-'Alegreysa Sans SC, sans-serif' text-white/70 text-sm leading-relaxed">
                     +63 9685 536 8975
                   </span>
                 </div>
                 <div className="flex items-start gap-3">
                   <span className="text-[#4df9ed] text-base mt-0.5">✉️</span>
-                  <span className="font-body text-white/70 text-sm leading-relaxed break-all">
+                  <span className="font-'Alegreysa Sans SC, sans-serif' text-white/70 text-sm leading-relaxed break-all">
                     8383LogisticsServices@gmail.com
                   </span>
                 </div>
                 <div className="flex items-start gap-3">
                   <span className="text-[#4df9ed] text-base mt-0.5">📍</span>
-                  <span className="font-body text-white/70 text-sm leading-relaxed">
+                  <span className="font-'Alegreysa Sans SC, sans-serif' text-white/70 text-sm leading-relaxed">
                     Blk. 6 Lot 8 Lynville Enclave,
                     Mamatid, City of Cabuyao, Laguna
                   </span>
@@ -188,10 +186,10 @@ export default function ContactSection() {
       <footer className="w-full bg-[#0a0a0a] border-t border-white/[0.07]">
         <div className="max-w-[1100px] mx-auto px-5 sm:px-8 md:px-12 py-5
           flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span className="font-body text-white/30 text-xs tracking-widest uppercase">
+          <span className="font-'Alegreysa Sans SC, sans-serif' text-white/30 text-xs tracking-widest uppercase">
             8338 Logistic Services
           </span>
-          <span className="font-body text-white/30 text-xs tracking-widest uppercase text-center">
+          <span className="font-'Alegreysa Sans SC, sans-serif' text-white/30 text-xs tracking-widest uppercase text-center">
             © 2026 Logistics Services. All Rights Reserved.
           </span>
         </div>

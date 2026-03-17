@@ -48,10 +48,15 @@ function CyclingWord() {
 
   return (
     <span
-      className="inline-block align-bottom font-display-italic"
-      style={{ minWidth: '3ch', color: currentColor }}
+      className="inline-block align-bottom max-w-full overflow-hidden"
+      style={{ 
+        fontFamily: "'Eurostile Extended', sans-serif",
+        color: currentColor 
+      }}
     >
-      {displayText}
+      <span className="inline-block break-words">
+        {displayText}
+      </span>
       <motion.span
         animate={{ opacity: [1, 0, 1] }}
         transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
@@ -108,7 +113,7 @@ export default function ServicesSection() {
           transition={{ duration: 0.6 }}
           className="text-center mb-10 sm:mb-14 md:mb-16"
         >
-          <h2 className="font-display-italic text-white text-[1.5rem] xs:text-[1.5rem] sm:text-[2.4rem] md:text-[3rem] lg:text-[5rem] leading-[1.05]">
+          <h2 className="font-display-italic text-white leading-[1.05]">
             LOGISTICS
             <br />
             BUILT FOR

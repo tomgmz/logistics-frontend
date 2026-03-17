@@ -43,15 +43,15 @@ function StatCard({ value, label, index }: { value: string; label: string; index
       initial={{ opacity: 0, y: 28, scale: 0.97 }}
       animate={inView ? { opacity: 1, y: 0, scale: 1 } : {}}
       transition={{ duration: 0.55, delay: index * 0.08, ease: [0.22, 1, 0.36, 1] }}
-      className="relative rounded-[18px] border border-white/10 p-6 sm:p-8
+      className="relative rounded-[18px] border border-white/10 p-4 sm:p-6
         flex flex-col justify-center items-center text-center
         bg-white cursor-default overflow-hidden"
     >
-      <span className="font-display-italic text-[#0a0a0a] text-4xl sm:text-5xl md:text-[3.5rem] leading-none mb-2 sm:mb-3">
+      <span className="font-display-italic text-[#0a0a0a] leading-none mb-1 sm:mb-2">
         <AnimatedValue raw={value} />
       </span>
 
-      <span className="font-body text-[#555] text-xs sm:text-sm md:text-base
+      <span className="font-body text-[#555]
         tracking-wider leading-snug uppercase">
         {label}
       </span>
@@ -97,14 +97,14 @@ export default function MetricsSection() {
           initial={{ opacity: 0, y: 20 }}
           animate={inView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6, delay: 0.12 }}
-          className="font-body text-[#818181] text-sm sm:text-sm md:text-base lg:text-2xl
+          className="font-body text-[#818181]
             text-center max-w-2xl mx-auto mb-10 sm:mb-14 md:mb-16 tracking-wide leading-relaxed"
         >
           See how our logistics solutions deliver speed, reliability, and satisfaction for every shipment.
         </motion.p>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4
-          auto-rows-[160px] sm:auto-rows-[180px] md:auto-rows-[200px]">
+          auto-rows-[120px] sm:auto-rows-[160px]">
 
           <motion.div
             initial={{ opacity: 0, x: -40 }}

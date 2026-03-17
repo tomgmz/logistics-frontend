@@ -26,7 +26,7 @@ export default function HeroSection() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.1 }}
-          className="font-body text-[#9f9c9c] text-sm sm:text-sm md:text-base lg:text-2xl mb-2 tracking-wide justify-center sm:justify-start"
+          className="font-body text-[#9f9c9c] mb-2 tracking-wide justify-center sm:justify-start"
         >
           Premium logistics. Industrial precision.
         </motion.p>
@@ -37,10 +37,10 @@ export default function HeroSection() {
           transition={{ duration: 0.7, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
           className="flex flex-wrap items-baseline gap-2 sm:gap-3 md:gap-5 justify-center sm:justify-start"
         >
-          <span className="font-display-italic text-white text-[1.5rem] xs:text-[1.5rem] sm:text-[2.4rem] md:text-[3rem] lg:text-[5rem] leading-none">
+          <span className="font-display-italic text-white leading-none">
             MINIMIZE
           </span>
-          <span className="font-display-italic text-stroke text-[1.5rem] xs:text-[1.5rem] sm:text-[2.4rem] md:text-[3rem] lg:text-[5rem] leading-none [color:#1b1b1b]">
+          <span className="font-display-italic text-stroke leading-none [color:#1b1b1b]">
             COSTS.
           </span>
         </motion.div>
@@ -51,10 +51,10 @@ export default function HeroSection() {
           transition={{ duration: 0.7, delay: 0.32, ease: [0.22, 1, 0.36, 1] }}
           className="flex flex-wrap items-baseline gap-2 sm:gap-3 md:gap-5 mb-5 sm:mb-7 justify-center sm:justify-start"
         >
-          <span className="font-display-italic text-white text-[1.5rem] xs:text-[1.5rem] sm:text-[2.4rem] md:text-[3rem] lg:text-[5rem] leading-none">
+          <span className="font-display-italic text-white leading-none">
             TRANSPORT
           </span>
-          <span className="font-display-italic text-[#4df9ed] text-[1.5rem] xs:text-[1.5rem] sm:text-[2.4rem] md:text-[3rem] lg:text-[5rem] leading-none">
+          <span className="font-display-italic text-[#4df9ed] leading-none">
             GOODS.
           </span>
         </motion.div>
@@ -63,7 +63,7 @@ export default function HeroSection() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.5 }}
-          className="font-body text-white text-sm sm:text-sm md:text-base lg:text-2xl max-w-[90%] sm:max-w-xl md:max-w-2xl lg:max-w-3xl leading-relaxed mb-8 sm:mb-10 tracking-wide justify-self-center sm:justify-self-start"
+          className="font-body text-white max-w-[90%] sm:max-w-xl md:max-w-2xl lg:max-w-3xl leading-relaxed mb-8 sm:mb-10 tracking-wide justify-self-center sm:justify-self-start"
         >
           Book, track, and manage deliveries in one place. Real-time updates,
           seamless booking, and efficient support for all your logistics needs.

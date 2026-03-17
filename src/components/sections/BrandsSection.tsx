@@ -65,15 +65,14 @@ export default function BrandsSection() {
             transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
             className='text-center sm:text-start'
           >
-            <h2 className="font-display-italic text-white leading-[1.0] mb-6 
-              text-[1.5rem] xs:text-[1.5rem] sm:text-[2.4rem] md:text-[3rem] lg:text-[5rem]">
+            <h2 className="font-display-italic text-white leading-[1.0] mb-6">
               BRANDS THAT{' '}
               <span className="text-[#3af626]">MOVE</span>
               <br />
               WITH US
             </h2>
 
-            <p className="font-body text-[#818181] text-sm sm:text-sm md:text-base lg:text-2xl leading-relaxed
+            <p className="font-body text-[#818181] leading-relaxed
               tracking-wide max-w-[340px] mb-10">
               Move nationwide with unmatched precision
             </p>

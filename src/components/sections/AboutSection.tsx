@@ -18,7 +18,7 @@ export default function AboutSection() {
           initial={{ opacity: 0, y: 20 }}
           animate={inView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6 }}
-          className="font-body text-white text-sm sm:text-sm md:text-base lg:text-2xl leading-relaxed tracking-wide"
+          className="font-body text-white leading-relaxed tracking-wide"
         >
           Discover powerful tools for fast, transparent, and reliable logistics.
           Manage every step with ease and confidence.
@@ -80,7 +80,7 @@ export default function AboutSection() {
           initial={{ opacity: 0, y: 30 }}
           animate={inView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.7, delay: 0.35, ease: [0.22, 1, 0.36, 1] }}
-          className="font-display-italic text-white sm:text-[2.4rem] md:text-[3rem] lg:text-[5rem] leading-[0.92] tracking-tight"
+          className="font-display-italic text-white leading-[0.92] tracking-tight"
         >
           EFFORTLESS LOGISTICS, REAL RESULT
         </motion.h2>
@@ -136,7 +136,7 @@ export default function AboutSection() {
           className="absolute right-[-4%] bottom-[28%] w-[48%] z-30"
           style={{ mixBlendMode: 'difference' }}
         >
-          <h2 className="font-display-italic text-white text-[2.4rem] sm:text-[2.4rem] md:text-[3rem] lg:text-[5rem] leading-[0.92] tracking-tight">
+          <h2 className="font-display-italic text-white leading-[0.92] tracking-tight">
             EFFORTLESS LOGISTICS, REAL RESULT
           </h2>
         </motion.div>
@@ -147,7 +147,7 @@ export default function AboutSection() {
           transition={{ duration: 0.6, delay: 0.18 }}
           className="relative z-30 max-w-[26%] min-w-[240px] pt-4"
         >
-          <p className="font-body text-white text-lg md:text-xl lg:text-[1.6rem] leading-relaxed tracking-wide">
+          <p className="font-body text-white leading-relaxed tracking-wide">
             Discover powerful tools for fast, transparent, and reliable logistics.
             Manage every step with ease and confidence.
           </p>

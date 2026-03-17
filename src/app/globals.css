@@ -54,10 +54,48 @@
     text-transform: uppercase;
     text-shadow: 0 4px 6px rgba(0, 0, 0, 0.4);
     letter-spacing: 0.02em;
+    font-size: 2.3rem;
+  }
+
+  @media (min-width: 640px) {
+    .font-display-italic {
+      font-size: 2.5rem;
+    }
+  }
+
+  @media (min-width: 768px) {
+    .font-display-italic {
+      font-size: 3rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .font-display-italic {
+      font-size: 5rem;
+    }
   }
 
   .font-body {
     font-family: var(--font-alegreya), 'Alegreya Sans SC', sans-serif;
+    font-size: 0.875rem;
+  }
+
+  @media (min-width: 640px) {
+    .font-body {
+      font-size: 0.875rem;
+    }
+  }
+
+  @media (min-width: 768px) {
+    .font-body {
+      font-size: 1rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .font-body {
+      font-size: 1.5rem;
+    }
   }
 
   .font-card {
