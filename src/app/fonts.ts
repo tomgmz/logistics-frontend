@@ -38,11 +38,6 @@ export const leagueSpartan = League_Spartan({
 export const eurostile = localFont({
   src: [
     {
-      path: '../../public/fonts/EurostileExtendedBlack.ttf',
-      weight: '900',
-      style: 'normal',
-    },
-    {
       path: '../../public/fonts/Eurostile_Extd_Black_Italic.otf',
       weight: '900',
       style: 'italic',
@@ -50,4 +45,5 @@ export const eurostile = localFont({
   ],
   variable: '--font-eurostile',
   display: 'swap',
+  fallback: ['Arial Black', 'Impact', 'sans-serif'],
 });
