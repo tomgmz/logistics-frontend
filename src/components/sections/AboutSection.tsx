@@ -80,7 +80,7 @@ export default function AboutSection() {
           initial={{ opacity: 0, y: 30 }}
           animate={inView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.7, delay: 0.35, ease: [0.22, 1, 0.36, 1] }}
-          className="font-display-italic text-white leading-[0.92] tracking-tight"
+          className="font-display-italic text-white leading-[0.92] tracking-tight text-center sm:text-start"
         >
           EFFORTLESS LOGISTICS, REAL RESULT
         </motion.h2>
@@ -133,11 +133,14 @@ export default function AboutSection() {
           initial={{ opacity: 0, y: 50 }}
           animate={inView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.7, delay: 0.38, ease: [0.22, 1, 0.36, 1] }}
-          className="absolute right-[-4%] bottom-[28%] w-[48%] z-30"
+          className="absolute right-[2%] bottom-[28%] w-[45%] max-w-[700px] z-30 pr-4"
           style={{ mixBlendMode: 'difference' }}
         >
-          <h2 className="font-display-italic text-white leading-[0.92] tracking-tight">
-            EFFORTLESS LOGISTICS, REAL RESULT
+          <h2 className="font-display-italic text-white leading-[0.92] tracking-tight text-left">
+            EFFORTLESS LOGISTICS,
+          </h2>
+          <h2 className="font-display-italic text-white leading-[0.92] tracking-tight text-left">
+            REAL RESULT
           </h2>
         </motion.div>
 
