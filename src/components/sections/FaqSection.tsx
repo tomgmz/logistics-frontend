@@ -100,7 +100,7 @@ export default function FaqSection() {
         >
           <h2 className="font-display-italic text-white leading-[1.0]
             text-[1.5rem] xs:text-[1.5rem] sm:text-[2.4rem] md:text-[3rem] lg:text-[5rem]">
-            FREQUENTLY ASK
+            FREQUENTLY ASKED
             <br />
             <span className="font-display-italic text-[#f5c518]">QUESTIONS</span>
           </h2>
