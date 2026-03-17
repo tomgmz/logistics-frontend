@@ -29,7 +29,7 @@ export default function HeroSection() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.1 }}
-          className="font-body text-[#9f9c9c] text-sm sm:text-lg md:text-2xl lg:text-[2.375rem] mb-2 tracking-wide"
+          className="font-body text-[#9f9c9c] text-sm sm:text-sm md:text-lg lg:text-2xl mb-2 tracking-wide"
         >
           Premium logistics. Industrial precision.
         </motion.p>
@@ -41,10 +41,10 @@ export default function HeroSection() {
           transition={{ duration: 0.7, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
           className="flex flex-wrap items-baseline gap-2 sm:gap-3 md:gap-5"
         >
-          <span className="font-display-italic text-white text-[2.4rem] sm:text-[3.8rem] md:text-[5rem] lg:text-[6.25rem] leading-none">
+          <span className="font-display-italic text-white text-[2.4rem] sm:text-[3rem] md:text-[4rem] lg:text-[5rem] leading-none">
             MINIMIZE
           </span>
-          <span className="font-display-italic text-stroke text-[2.4rem] sm:text-[3.8rem] md:text-[5rem] lg:text-[6.25rem] leading-none [color:#1b1b1b]">
+          <span className="font-display-italic text-stroke text-[2.4rem] sm:text-[3rem] md:text-[4rem] lg:text-[5rem] leading-none [color:#1b1b1b]">
             COSTS.
           </span>
         </motion.div>
@@ -56,10 +56,10 @@ export default function HeroSection() {
           transition={{ duration: 0.7, delay: 0.32, ease: [0.22, 1, 0.36, 1] }}
           className="flex flex-wrap items-baseline gap-2 sm:gap-3 md:gap-5 mb-5 sm:mb-7"
         >
-          <span className="font-display-italic text-white text-[2.4rem] sm:text-[3.8rem] md:text-[5rem] lg:text-[6.25rem] leading-none">
+          <span className="font-display-italic text-white text-[2.4rem] sm:text-[3rem] md:text-[4rem] lg:text-[5rem] leading-none">
             TRANSPORT
           </span>
-          <span className="font-display-italic text-[#4df9ed] text-[2.4rem] sm:text-[3.8rem] md:text-[5rem] lg:text-[6.25rem] leading-none">
+          <span className="font-display-italic text-[#4df9ed] text-[2.4rem] sm:text-[3rem] md:text-[4rem] lg:text-[5rem] leading-none">
             GOODS.
           </span>
         </motion.div>
@@ -69,7 +69,7 @@ export default function HeroSection() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.5 }}
-          className="font-body text-white text-sm sm:text-base md:text-xl lg:text-[2.375rem] max-w-[90%] sm:max-w-xl md:max-w-2xl lg:max-w-3xl leading-relaxed mb-8 sm:mb-10 tracking-wide"
+          className="font-body text-white text-sm sm:text-sm md:text-lg lg:text-2xl max-w-[90%] sm:max-w-xl md:max-w-2xl lg:max-w-3xl leading-relaxed mb-8 sm:mb-10 tracking-wide"
         >
           Book, track, and manage deliveries in one place. Real-time updates,
           seamless booking, and efficient support for all your logistics needs.
@@ -85,14 +85,14 @@ export default function HeroSection() {
           <a
             href="#contact"
             className="font-body glass border border-white/30 text-white px-5 sm:px-8 py-3 sm:py-4 rounded-[12px] sm:rounded-[15px]
-              text-sm sm:text-base md:text-xl lg:text-[2rem] tracking-wider
+             text-sm sm:text-sm md:text-lg lg:text-2xl tracking-wider
               hover:bg-white/[0.15] hover:border-white/60 transition-all duration-300 no-underline inline-block"
           >
             Be our partner
           </a>
           <button
             className="font-body bg-white text-[#0a0a0a] px-5 sm:px-8 py-3 sm:py-4 rounded-[12px] sm:rounded-[15px]
-              text-sm sm:text-base md:text-xl lg:text-[2rem] tracking-wider font-semibold
+              text-sm sm:text-sm md:text-lg lg:text-2xl tracking-wider font-semibold
               hover:bg-white/90 transition-all duration-300 cursor-pointer"
           >
             Sign in
