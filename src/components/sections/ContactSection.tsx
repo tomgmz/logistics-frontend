@@ -156,7 +156,7 @@ export default function ContactSection() {
               <button
                 className="font-body bg-white text-[#0a0a0a] px-7 py-2.5 rounded-[8px]
                   text-sm tracking-wider font-semibold
-                  hover:bg-white/90 transition-all duration-300 cursor-pointer"
+                  hover:bg-white/90 transition-all duration-300 cursor-pointer w-full sm:w-auto"
               >
                 Submit
               </button>
