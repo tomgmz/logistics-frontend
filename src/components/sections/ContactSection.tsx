@@ -34,7 +34,7 @@ export default function ContactSection() {
             className="text-center mb-4 sm:mb-5"
           >
             <h2 className="font-display-italic text-white leading-[1.0]
-              text-[2rem] sm:text-[2.8rem] md:text-[4rem] lg:text-[5rem]">
+              text-[1.5rem] xs:text-[1.5rem] sm:text-[2.4rem] md:text-[3rem] lg:text-[5rem]">
               CONTACT OUR
               <br />
               <span className="font-display-italic text-[#4df9ed]">LOGISTICS EXPERTS</span>
@@ -46,7 +46,7 @@ export default function ContactSection() {
             initial={{ opacity: 0, y: 20 }}
             animate={inView ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="font-body text-[#818181] text-xs sm:text-sm
+            className="font-body text-[#818181] text-sm sm:text-sm md:text-base lg:text-2xl
               text-center tracking-widest uppercase mb-10 sm:mb-14 max-w-2xl mx-auto leading-relaxed"
           >
             Be our partner by sending us a message. Our team is here to assist you with any logistics

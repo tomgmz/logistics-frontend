@@ -99,7 +99,7 @@ export default function FaqSection() {
           className="text-center mb-4 sm:mb-5"
         >
           <h2 className="font-display-italic text-white leading-[1.0]
-            text-[2rem] sm:text-[2.8rem] md:text-[3.8rem] lg:text-[4.5rem]">
+            text-[1.5rem] xs:text-[1.5rem] sm:text-[2.4rem] md:text-[3rem] lg:text-[5rem]">
             FREQUENTLY ASK
             <br />
             <span className="font-display-italic text-[#f5c518]">QUESTIONS</span>
@@ -111,7 +111,7 @@ export default function FaqSection() {
           initial={{ opacity: 0, y: 20 }}
           animate={inView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6, delay: 0.1 }}
-          className="font-body text-[#818181] text-xs sm:text-sm md:text-base
+          className="font-body text-[#818181] text-sm sm:text-sm md:text-base lg:text-2xl
             text-center tracking-widest uppercase mb-10 sm:mb-14"
         >
           Find quick answers to common question about our efficient logistics

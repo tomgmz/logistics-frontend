@@ -41,10 +41,10 @@ export default function HeroSection() {
           transition={{ duration: 0.7, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
           className="flex flex-wrap items-baseline gap-2 sm:gap-3 md:gap-5 justify-center sm:justify-start"
         >
-          <span className="font-display-italic text-white text-[2.4rem] sm:text-[2.4rem] md:text-[3rem] lg:text-[5rem] leading-none">
+          <span className="font-display-italic text-white text-[1.5rem] xs:text-[1.5rem] sm:text-[2.4rem] md:text-[3rem] lg:text-[5rem] leading-none">
             MINIMIZE
           </span>
-          <span className="font-display-italic text-stroke text-[2.4rem] sm:text-[2.4rem] md:text-[3rem] lg:text-[5rem] leading-none [color:#1b1b1b]">
+          <span className="font-display-italic text-stroke text-[1.5rem] xs:text-[1.5rem] sm:text-[2.4rem] md:text-[3rem] lg:text-[5rem] leading-none [color:#1b1b1b]">
             COSTS.
           </span>
         </motion.div>
@@ -56,10 +56,10 @@ export default function HeroSection() {
           transition={{ duration: 0.7, delay: 0.32, ease: [0.22, 1, 0.36, 1] }}
           className="flex flex-wrap items-baseline gap-2 sm:gap-3 md:gap-5 mb-5 sm:mb-7 justify-center sm:justify-start"
         >
-          <span className="font-display-italic text-white text-[2.4rem] sm:text-[2.4rem] md:text-[3rem] lg:text-[5rem] leading-none">
+          <span className="font-display-italic text-white text-[1.5rem] xs:text-[1.5rem] sm:text-[2.4rem] md:text-[3rem] lg:text-[5rem] leading-none">
             TRANSPORT
           </span>
-          <span className="font-display-italic text-[#4df9ed] text-[2.4rem] sm:text-[2.4rem] md:text-[3rem] lg:text-[5rem] leading-none">
+          <span className="font-display-italic text-[#4df9ed] text-[1.5rem] xs:text-[1.5rem] sm:text-[2.4rem] md:text-[3rem] lg:text-[5rem] leading-none">
             GOODS.
           </span>
         </motion.div>

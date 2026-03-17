@@ -92,7 +92,7 @@ export default function MetricsSection() {
           className="text-center mb-4 sm:mb-6"
         >
           <h2 className="font-display-italic text-white leading-[1.05]
-            text-[2rem] sm:text-[2.8rem] md:text-[4rem] lg:text-[5.5rem]">
+            text-[1.5rem] xs:text-[1.5rem] sm:text-[2.4rem] md:text-[3rem] lg:text-[5rem]">
             <span className="text-[#f97316] font-display-italic">METRICS</span>{' '}
             THAT MOVE
             <br />
@@ -105,7 +105,7 @@ export default function MetricsSection() {
           initial={{ opacity: 0, y: 20 }}
           animate={inView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6, delay: 0.12 }}
-          className="font-body text-[#818181] text-sm sm:text-base md:text-lg
+          className="font-body text-[#818181] text-sm sm:text-sm md:text-base lg:text-2xl
             text-center max-w-2xl mx-auto mb-10 sm:mb-14 md:mb-16 tracking-wide leading-relaxed"
         >
           See how our logistics solutions deliver speed, reliability, and satisfaction for every shipment.

@@ -109,7 +109,7 @@ export default function ServicesSection() {
           transition={{ duration: 0.6 }}
           className="text-center mb-10 sm:mb-14 md:mb-16"
         >
-          <h2 className="font-display-italic text-white text-[2.4rem] sm:text-[3.5rem] md:text-[5rem] lg:text-[6.25rem] leading-[1.05]">
+          <h2 className="font-display-italic text-white text-[1.5rem] xs:text-[1.5rem] sm:text-[2.4rem] md:text-[3rem] lg:text-[5rem] leading-[1.05]">
             LOGISTICS
             <br />
             BUILT FOR
@@ -119,7 +119,7 @@ export default function ServicesSection() {
         </motion.div>
 
         {/* Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-5 text-center sm:text-start">
           {SERVICES.map((svc, i) => (
             <ServiceCard key={`${svc.label}-${i}`} img={svc.img} label={svc.label} index={i} />
           ))}

@@ -69,10 +69,11 @@ export default function BrandsSection() {
             initial={{ opacity: 0, x: -50 }}
             animate={inView ? { opacity: 1, x: 0 } : {}}
             transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+            className='text-center sm:text-start'
           >
             {/* Headline */}
             <h2 className="font-display-italic text-white leading-[1.0] mb-6 
-              text-[2.6rem] md:text-[4rem] lg:text-[5rem]">
+              text-[1.5rem] xs:text-[1.5rem] sm:text-[2.4rem] md:text-[3rem] lg:text-[5rem]">
               BRANDS THAT{' '}
               <span className="text-[#3af626]">MOVE</span>
               <br />
@@ -80,7 +81,7 @@ export default function BrandsSection() {
             </h2>
 
             {/* Sub-copy */}
-            <p className="font-body text-[#818181] text-lg md:text-xl leading-relaxed
+            <p className="font-body text-[#818181] text-sm sm:text-sm md:text-base lg:text-2xl leading-relaxed
               tracking-wide max-w-[340px] mb-10">
               Move nationwide with unmatched precision
             </p>
