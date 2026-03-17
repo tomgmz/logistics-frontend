@@ -90,7 +90,7 @@ export default function Navbar() {
               >
                 <a
                   href={item.href}
-                  className={`font-body text-[0.84rem] tracking-wider px-4 py-2.5 rounded-xl
+                  className={`font-"'Alegreya Sans DC', 'sans-serif'" text-[0.84rem] tracking-wider px-4 py-2.5 rounded-xl
                     no-underline transition-all duration-200 block relative
                     ${activeIdx === i
                       ? 'text-[#4df9ed] bg-[#4df9ed]/[0.07]'
@@ -112,7 +112,7 @@ export default function Navbar() {
 
           <div className="hidden md:flex items-center gap-3 shrink-0">
             <button
-              className="font-body text-white/70 text-[0.84rem] tracking-wider
+              className="font-'Alegreya Sans DC, sans-serif' text-white/70 text-[0.84rem] tracking-wider
                 px-5 py-2.5 rounded-[15px] border border-white/15
                 hover:border-[#4df9ed]/50 hover:text-[#4df9ed]
                 transition-all duration-200 bg-transparent cursor-pointer"
@@ -121,7 +121,7 @@ export default function Navbar() {
             </button>
             <a
               href="#contact"
-              className="font-body text-[0.84rem] tracking-wider px-5 py-2.5 rounded-[15px]
+              className="font-'Alegreya Sans DC, sans-serif' text-[0.84rem] tracking-wider px-5 py-2.5 rounded-[15px]
                 bg-white/[0.08] border border-white/[0.14] text-white no-underline
                 hover:bg-[#4df9ed]/[0.12] hover:border-[#4df9ed]/40 hover:text-[#4df9ed]
                 transition-all duration-200"
@@ -198,7 +198,7 @@ export default function Navbar() {
                     <a
                       href={item.href}
                       onClick={closeMenu}
-                      className={`font-body text-[1rem] py-3 px-4 rounded-xl
+                      className={`font-'Alegreya Sans DC, sans-serif' text-[1rem] py-3 px-4 rounded-xl
                         transition-colors tracking-wider no-underline block
                         ${activeIdx === i
                           ? 'bg-[#4df9ed]/[0.08] text-[#4df9ed]'
@@ -217,7 +217,7 @@ export default function Navbar() {
 
               <div className="p-6 pt-4 flex flex-col gap-3 border-t border-white/[0.07]">
                 <button
-                  className="font-body w-full py-3.5 rounded-[15px] border border-white/15
+                  className="font-'Alegreya Sans DC, sans-serif' w-full py-3.5 rounded-[15px] border border-white/15
                     text-white tracking-wider bg-transparent text-sm cursor-pointer
                     hover:border-white/30 transition-colors"
                 >
@@ -226,7 +226,7 @@ export default function Navbar() {
                 <a
                   href="#contact"
                   onClick={closeMenu}
-                  className="font-body w-full py-3.5 rounded-[15px]
+                  className="font-'Alegreya Sans DC, sans-serif' w-full py-3.5 rounded-[15px]
                     bg-[#4df9ed]/[0.1] border border-[#4df9ed]/30 text-[#4df9ed]
                     text-center tracking-wider no-underline text-sm
                     hover:bg-[#4df9ed]/20 transition-colors block"
