@@ -12,10 +12,8 @@ export default function AboutSection() {
   return (
     <section ref={ref} id="about" className="relative w-full bg-[#1b1b1b] overflow-hidden">
 
-      {/* ── MOBILE LAYOUT (below md) ── */}
       <div className="md:hidden flex flex-col px-5 pt-16 pb-12 gap-8">
 
-        {/* Body text */}
         <motion.p
           initial={{ opacity: 0, y: 20 }}
           animate={inView ? { opacity: 1, y: 0 } : {}}
@@ -26,7 +24,6 @@ export default function AboutSection() {
           Manage every step with ease and confidence.
         </motion.p>
 
-        {/* White card with van on top */}
         <div className="relative w-full">
           <motion.div
             initial={{ opacity: 0, scale: 0.94 }}
@@ -53,7 +50,6 @@ export default function AboutSection() {
           </motion.div>
         </div>
 
-        {/* Cargo truck */}
         <div className="relative w-full">
           <motion.div
             initial={{ opacity: 0, scale: 0.94 }}
@@ -80,7 +76,6 @@ export default function AboutSection() {
           </motion.div>
         </div>
 
-        {/* Headline */}
         <motion.h2
           initial={{ opacity: 0, y: 30 }}
           animate={inView ? { opacity: 1, y: 0 } : {}}
@@ -91,10 +86,8 @@ export default function AboutSection() {
         </motion.h2>
       </div>
 
-      {/* ── DESKTOP LAYOUT (md and above) ── */}
       <div className="hidden md:block relative w-full max-w-[1600px] mx-auto px-12 lg:px-16 py-28 min-h-screen">
 
-        {/* White rounded card */}
         <motion.div
           initial={{ opacity: 0, scale: 0.94 }}
           animate={inView ? { opacity: 1, scale: 1 } : {}}
@@ -102,7 +95,6 @@ export default function AboutSection() {
           className="absolute left-[28%] top-[15%] w-[44%] h-[60%] bg-white rounded-[30px] shadow-[0_4px_60px_rgba(0,0,0,0.5)] z-0"
         />
 
-        {/* L300 Van — top right */}
         <motion.div
           initial={{ opacity: 0, x: 100 }}
           animate={inView ? { opacity: 1, x: 0 } : {}}
@@ -120,7 +112,6 @@ export default function AboutSection() {
           </div>
         </motion.div>
 
-        {/* Cargo Truck — bottom left */}
         <motion.div
           initial={{ opacity: 0, x: -100 }}
           animate={inView ? { opacity: 1, x: 0 } : {}}
@@ -138,7 +129,6 @@ export default function AboutSection() {
           </div>
         </motion.div>
 
-        {/* Headline — bottom right */}
         <motion.div
           initial={{ opacity: 0, y: 50 }}
           animate={inView ? { opacity: 1, y: 0 } : {}}
@@ -151,7 +141,6 @@ export default function AboutSection() {
           </h2>
         </motion.div>
 
-        {/* Body text — top left */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={inView ? { opacity: 1, y: 0 } : {}}
@@ -164,7 +153,6 @@ export default function AboutSection() {
           </p>
         </motion.div>
 
-        {/* Spacer */}
         <div className="h-[500px] md:h-[620px]" />
       </div>
 

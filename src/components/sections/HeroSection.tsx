@@ -8,7 +8,6 @@ export default function HeroSection() {
   return (
     <section id="hero" className="relative w-full min-h-screen bg-[#0a0a0a] overflow-hidden flex items-center">
 
-      {/* BG: shipping containers photo */}
       <div className="absolute inset-0 z-0">
         <Image
           src={ASSETS.heroContainers}
@@ -21,10 +20,8 @@ export default function HeroSection() {
         <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-transparent to-transparent" />
       </div>
 
-      {/* Content */}
       <div className="relative z-10 w-full max-w-[1600px] mx-auto px-5 sm:px-8 md:px-12 lg:px-[60px] pt-28 sm:pt-32 pb-16 sm:pb-24 text-center sm:text-left">
 
-        {/* Eyebrow */}
         <motion.p
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -34,7 +31,6 @@ export default function HeroSection() {
           Premium logistics. Industrial precision.
         </motion.p>
 
-        {/* Headline row 1 */}
         <motion.div
           initial={{ opacity: 0, x: -60 }}
           animate={{ opacity: 1, x: 0 }}
@@ -49,7 +45,6 @@ export default function HeroSection() {
           </span>
         </motion.div>
 
-        {/* Headline row 2 */}
         <motion.div
           initial={{ opacity: 0, x: -60 }}
           animate={{ opacity: 1, x: 0 }}
@@ -64,7 +59,6 @@ export default function HeroSection() {
           </span>
         </motion.div>
 
-        {/* Body copy */}
         <motion.p
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -75,7 +69,6 @@ export default function HeroSection() {
           seamless booking, and efficient support for all your logistics needs.
         </motion.p>
 
-        {/* CTA Buttons */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -100,7 +93,6 @@ export default function HeroSection() {
         </motion.div>
       </div>
 
-      {/* Bottom fade */}
       <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[#0a0a0a] to-transparent z-0 pointer-events-none" />
     </section>
   );

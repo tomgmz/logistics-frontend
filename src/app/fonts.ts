@@ -1,5 +1,3 @@
-// src/app/fonts.ts
-
 import { Aboreto, Fredoka, League_Spartan, Alegreya_Sans_SC } from 'next/font/google';
 import localFont from 'next/font/local';
 
@@ -36,7 +34,7 @@ export const leagueSpartan = League_Spartan({
   variable: '--font-league-spartan',
 });
 
-// Eurostile Extended Black - Your uploaded font!
+// Eurostile Extended Black 
 export const eurostile = localFont({
   src: [
     {

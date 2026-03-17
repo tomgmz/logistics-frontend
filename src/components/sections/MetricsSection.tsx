@@ -5,7 +5,6 @@ import { motion, useInView, animate } from 'framer-motion';
 import { METRICS, ASSETS } from '@/app/lib/data';
 import Image from 'next/image';
 
-/* ─── Animated number counter ─────────────────────────────────────────────── */
 function AnimatedValue({ raw }: { raw: string }) {
   const [display, setDisplay] = useState(raw);
   const ref = useRef<HTMLSpanElement>(null);
@@ -34,7 +33,6 @@ function AnimatedValue({ raw }: { raw: string }) {
   return <span ref={ref}>{display}</span>;
 }
 
-/* ─── Stat card — white bg, dark text ─────────────────────────────────────── */
 function StatCard({ value, label, index }: { value: string; label: string; index: number }) {
   const ref    = useRef<HTMLDivElement>(null);
   const inView = useInView(ref as React.RefObject<Element>, { once: true, margin: '-40px' });
@@ -49,12 +47,10 @@ function StatCard({ value, label, index }: { value: string; label: string; index
         flex flex-col justify-center items-center text-center
         bg-white cursor-default overflow-hidden"
     >
-      {/* Value */}
       <span className="font-display-italic text-[#0a0a0a] text-4xl sm:text-5xl md:text-[3.5rem] leading-none mb-2 sm:mb-3">
         <AnimatedValue raw={value} />
       </span>
 
-      {/* Label */}
       <span className="font-body text-[#555] text-xs sm:text-sm md:text-base
         tracking-wider leading-snug uppercase">
         {label}
@@ -63,7 +59,6 @@ function StatCard({ value, label, index }: { value: string; label: string; index
   );
 }
 
-/* ─── Section ──────────────────────────────────────────────────────────────── */
 export default function MetricsSection() {
   const ref    = useRef<HTMLDivElement>(null);
   const inView = useInView(ref as React.RefObject<Element>, { once: true, margin: '-80px' });
@@ -71,7 +66,6 @@ export default function MetricsSection() {
   return (
     <section id="metrics" className="relative w-full bg-[#0a0a0a] py-16 sm:py-20 md:py-28 overflow-hidden">
 
-      {/* Subtle grid lines */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
@@ -83,7 +77,6 @@ export default function MetricsSection() {
 
       <div className="max-w-[1600px] mx-auto px-5 sm:px-8 md:px-12 lg:px-16 relative z-10">
 
-        {/* ── Centered headline ── */}
         <motion.div
           ref={ref}
           initial={{ opacity: 0, y: 30 }}
@@ -100,7 +93,6 @@ export default function MetricsSection() {
           </h2>
         </motion.div>
 
-        {/* ── Subtitle ── */}
         <motion.p
           initial={{ opacity: 0, y: 20 }}
           animate={inView ? { opacity: 1, y: 0 } : {}}
@@ -111,11 +103,9 @@ export default function MetricsSection() {
           See how our logistics solutions deliver speed, reliability, and satisfaction for every shipment.
         </motion.p>
 
-        {/* ── Bento grid ── */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4
           auto-rows-[160px] sm:auto-rows-[180px] md:auto-rows-[200px]">
 
-          {/* Dark image card — spans 2 rows, 1 col */}
           <motion.div
             initial={{ opacity: 0, x: -40 }}
             animate={inView ? { opacity: 1, x: 0 } : {}}
@@ -132,7 +122,6 @@ export default function MetricsSection() {
             <div className="absolute inset-0 bg-[#0a0a0a]/50" />
           </motion.div>
 
-          {/* 6 stat cards */}
           {METRICS.map((m, i) => (
             <StatCard key={m.label} value={m.value} label={m.label} index={i + 1} />
           ))}

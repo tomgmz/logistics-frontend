@@ -11,10 +11,7 @@ export default function ContactSection() {
 
   return (
     <>
-      {/* ── CONTACT SECTION ── */}
       <section id="contact" className="relative w-full bg-[#0a0a0a] py-16 sm:py-20 md:py-28 overflow-hidden">
-
-        {/* Subtle grid */}
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
@@ -26,7 +23,6 @@ export default function ContactSection() {
 
         <div ref={ref} className="relative z-10 max-w-[1100px] mx-auto px-5 sm:px-8 md:px-12">
 
-          {/* ── Headline ── */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={inView ? { opacity: 1, y: 0 } : {}}
@@ -41,7 +37,6 @@ export default function ContactSection() {
             </h2>
           </motion.div>
 
-          {/* ── Subtitle ── */}
           <motion.p
             initial={{ opacity: 0, y: 20 }}
             animate={inView ? { opacity: 1, y: 0 } : {}}
@@ -53,7 +48,6 @@ export default function ContactSection() {
             inquiries or service requests. Fast, direct, and reliable.
           </motion.p>
 
-          {/* ── Card ── */}
           <motion.div
             initial={{ opacity: 0, y: 40 }}
             animate={inView ? { opacity: 1, y: 0 } : {}}
@@ -62,7 +56,6 @@ export default function ContactSection() {
               grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-0 overflow-hidden"
           >
 
-            {/* Left — form */}
             <div className="p-6 sm:p-8 md:p-10">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                 {/* First Name */}
@@ -77,7 +70,6 @@ export default function ContactSection() {
                       focus:outline-none focus:border-[#4df9ed]/40 transition-colors"
                   />
                 </div>
-                {/* Last Name */}
                 <div>
                   <label className="font-body text-white/60 text-[0.65rem] tracking-widest uppercase mb-1.5 block">
                     Last Name
@@ -89,7 +81,6 @@ export default function ContactSection() {
                       focus:outline-none focus:border-[#4df9ed]/40 transition-colors"
                   />
                 </div>
-                {/* Email */}
                 <div>
                   <label className="font-body text-white/60 text-[0.65rem] tracking-widest uppercase mb-1.5 block">
                     Email
@@ -101,7 +92,6 @@ export default function ContactSection() {
                       focus:outline-none focus:border-[#4df9ed]/40 transition-colors"
                   />
                 </div>
-                {/* Phone */}
                 <div>
                   <label className="font-body text-white/60 text-[0.65rem] tracking-widest uppercase mb-1.5 block">
                     Phone
@@ -115,7 +105,6 @@ export default function ContactSection() {
                 </div>
               </div>
 
-              {/* Role */}
               <div className="mb-4">
                 <label className="font-body text-white/60 text-[0.65rem] tracking-widest uppercase mb-2 block">
                   Your Role or Company
@@ -139,7 +128,6 @@ export default function ContactSection() {
                 </div>
               </div>
 
-              {/* Message */}
               <div className="mb-6">
                 <label className="font-body text-white/60 text-[0.65rem] tracking-widest uppercase mb-1.5 block">
                   Message
@@ -152,7 +140,6 @@ export default function ContactSection() {
                 />
               </div>
 
-              {/* Submit */}
               <button
                 className="font-body bg-white text-[#0a0a0a] px-7 py-2.5 rounded-[8px]
                   text-sm tracking-wider font-semibold
@@ -162,7 +149,6 @@ export default function ContactSection() {
               </button>
             </div>
 
-            {/* Right — contact details */}
             <div className="border-t lg:border-t-0 lg:border-l border-white/[0.08]
               p-6 sm:p-8 md:p-10 bg-[#0f0f0f]">
               <h3 className="font-body text-white text-sm tracking-widest uppercase mb-1">
@@ -173,21 +159,18 @@ export default function ContactSection() {
               </p>
 
               <div className="flex flex-col gap-5">
-                {/* Phone */}
                 <div className="flex items-start gap-3">
                   <span className="text-[#4df9ed] text-base mt-0.5">📞</span>
                   <span className="font-body text-white/70 text-sm leading-relaxed">
                     +63 9685 536 8975
                   </span>
                 </div>
-                {/* Email */}
                 <div className="flex items-start gap-3">
                   <span className="text-[#4df9ed] text-base mt-0.5">✉️</span>
                   <span className="font-body text-white/70 text-sm leading-relaxed break-all">
                     8383LogisticsServices@gmail.com
                   </span>
                 </div>
-                {/* Address */}
                 <div className="flex items-start gap-3">
                   <span className="text-[#4df9ed] text-base mt-0.5">📍</span>
                   <span className="font-body text-white/70 text-sm leading-relaxed">
@@ -202,7 +185,6 @@ export default function ContactSection() {
         </div>
       </section>
 
-      {/* ── FOOTER ── */}
       <footer className="w-full bg-[#0a0a0a] border-t border-white/[0.07]">
         <div className="max-w-[1100px] mx-auto px-5 sm:px-8 md:px-12 py-5
           flex flex-col sm:flex-row items-center justify-between gap-2">

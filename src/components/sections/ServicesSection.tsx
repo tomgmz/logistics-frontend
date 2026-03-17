@@ -101,7 +101,6 @@ export default function ServicesSection() {
     <section id="services" className="relative w-full bg-[#1b1b1b] overflow-hidden py-14 sm:py-20 md:py-24">
       <div className="relative z-10 max-w-[1600px] mx-auto px-5 sm:px-8 md:px-12 lg:px-16">
 
-        {/* Headline */}
         <motion.div
           ref={ref}
           initial={{ opacity: 0, y: 30 }}

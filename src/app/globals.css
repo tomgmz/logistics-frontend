@@ -1,5 +1,3 @@
-/* REMOVE THE OLD @import LINE - Next.js will handle fonts via layout.tsx */
-
 @import "tailwindcss";
 
 @layer base {
@@ -20,33 +18,27 @@
   body {
     background-color: #0a0a0a;
     color: #ffffff;
-    /* Font is now applied via layout.tsx className */
     overflow-x: hidden;
   }
 
-  /* Text selection */
   ::selection {
     background: rgba(77, 249, 237, 0.2);
     color: #4df9ed;
   }
 
-  /* Scrollbar */
   ::-webkit-scrollbar        { width: 5px; }
   ::-webkit-scrollbar-track  { background: #0a0a0a; }
   ::-webkit-scrollbar-thumb  { background: #2a2a2a; border-radius: 4px; }
   ::-webkit-scrollbar-thumb:hover { background: #4df9ed; }
 
-  /* Focus ring */
   *:focus-visible {
     outline: 2px solid rgba(77, 249, 237, 0.5);
     outline-offset: 2px;
   }
 }
 
-/* ─── Component utilities ──────────────────────────────────────────────────── */
 @layer utilities {
 
-  /* ── Typography ── */
   .font-display {
     font-family: var(--font-eurostile), 'Eurostile Extended', 'Franklin Gothic Heavy', sans-serif;
     font-weight: 900;
@@ -86,7 +78,6 @@
     letter-spacing: 0.02em;
   }
 
-  /* ── Text stroke effects ── */
   .text-stroke {
     -webkit-text-stroke: 1px rgba(255, 255, 255, 0.8);
     -webkit-text-fill-color: #1b1b1b;
@@ -105,7 +96,6 @@
     color: transparent;
   }
 
-  /* ── Glass morphism ── */
   .glass {
     background: rgba(255, 255, 255, 0.06);
     backdrop-filter: blur(16px);
@@ -127,7 +117,6 @@
     border: 1px solid rgba(255, 255, 255, 0.06);
   }
 
-  /* ── Marquee tracks ── */
   .marquee-track {
     display: flex;
     width: max-content;
@@ -140,13 +129,11 @@
     animation: marquee-reverse 26s linear infinite;
   }
 
-  /* Pause on hover */
   .marquee-track:hover,
   .marquee-track-reverse:hover {
     animation-play-state: paused;
   }
 
-  /* ── Gradient borders ── */
   .border-gradient-cyan {
     position: relative;
   }
@@ -164,7 +151,6 @@
     pointer-events: none;
   }
 
-  /* ── Glow effects ── */
   .glow-cyan {
     box-shadow: 0 0 30px rgba(77, 249, 237, 0.15),
                 0 0 60px rgba(77, 249, 237, 0.06);
@@ -179,7 +165,6 @@
                  0 0 40px rgba(77, 249, 237, 0.2);
   }
 
-  /* ── Card hover lift ── */
   .card-hover {
     transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
   }
@@ -188,7 +173,6 @@
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
   }
 
-  /* ── Noise texture overlay ── */
   .noise::after {
     content: '';
     position: absolute;
@@ -200,7 +184,6 @@
     border-radius: inherit;
   }
 
-  /* ── Grid pattern background ── */
   .bg-grid {
     background-image:
       linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
@@ -208,7 +191,6 @@
     background-size: 80px 80px;
   }
 
-  /* ── Scanline ── */
   .bg-scanlines {
     background-image: repeating-linear-gradient(
       0deg,
@@ -219,7 +201,6 @@
     );
   }
 
-  /* ── Separator lines ── */
   .sep-x {
     height: 1px;
     background: linear-gradient(90deg, transparent, rgba(255,255,255,0.07), transparent);
@@ -230,7 +211,6 @@
     background: linear-gradient(90deg, transparent, rgba(77,249,237,0.2), transparent);
   }
 
-  /* ── Pill / tag badge ── */
   .pill-cyan {
     display: inline-flex;
     align-items: center;
@@ -246,7 +226,6 @@
     color: #4df9ed;
   }
 
-  /* ── Number counter ── */
   .stat-number {
     font-family: 'Arial Black', 'Impact', 'Franklin Gothic Heavy', sans-serif;
     font-weight: 900;
@@ -255,7 +234,6 @@
   }
 }
 
-/* ─── Keyframe animations ──────────────────────────────────────────────────── */
 @keyframes marquee {
   0%   { transform: translateX(0); }
   100% { transform: translateX(-50%); }
@@ -296,7 +274,6 @@
   50%       { box-shadow: 0 0 0 8px rgba(77, 249, 237, 0); }
 }
 
-/* ─── Shimmer text ─────────────────────────────────────────────────────────── */
 .shimmer-text {
   background: linear-gradient(
     90deg,

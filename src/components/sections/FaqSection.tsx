@@ -4,7 +4,6 @@ import { useState, useRef } from 'react';
 import { motion, useInView, AnimatePresence } from 'framer-motion';
 import { FAQS } from '@/app/lib/data';
 
-/* ─── Accordion item ───────────────────────────────────────────────────────── */
 function FaqItem({ q, a, index }: { q: string; a: string; index: number }) {
   const [open, setOpen] = useState(false);
   const ref    = useRef<HTMLDivElement>(null);
@@ -22,13 +21,11 @@ function FaqItem({ q, a, index }: { q: string; a: string; index: number }) {
           : 'border-white/[0.10] bg-[#141414] hover:border-white/20'
         }`}
     >
-      {/* Question row */}
       <button
         onClick={() => setOpen(o => !o)}
         className="w-full flex items-center justify-between gap-4 px-5 sm:px-7 py-5 sm:py-6 text-left
           cursor-pointer bg-transparent border-0 group"
       >
-        {/* Question */}
         <span
           className={`font-body flex-1 text-sm sm:text-base md:text-lg lg:text-[1.1rem]
             tracking-wide transition-colors duration-200
@@ -37,7 +34,6 @@ function FaqItem({ q, a, index }: { q: string; a: string; index: number }) {
           {q}
         </span>
 
-        {/* Toggle button */}
         <span
           className={`shrink-0 w-8 h-8 sm:w-9 sm:h-9 rounded-full border
             flex items-center justify-center text-xl leading-none
@@ -51,7 +47,6 @@ function FaqItem({ q, a, index }: { q: string; a: string; index: number }) {
         </span>
       </button>
 
-      {/* Answer panel */}
       <AnimatePresence initial={false}>
         {open && (
           <motion.div
@@ -74,7 +69,6 @@ function FaqItem({ q, a, index }: { q: string; a: string; index: number }) {
   );
 }
 
-/* ─── Section ──────────────────────────────────────────────────────────────── */
 export default function FaqSection() {
   const ref    = useRef<HTMLDivElement>(null);
   const inView = useInView(ref as React.RefObject<Element>, { once: true, margin: '-80px' });
@@ -82,7 +76,6 @@ export default function FaqSection() {
   return (
     <section id="faq" className="relative w-full bg-[#0a0a0a] py-16 sm:py-20 md:py-28 overflow-hidden">
 
-      {/* Background glow */}
       <div className="absolute left-1/2 -translate-x-1/2 top-[40%] -translate-y-1/2
         w-[500px] h-[500px] pointer-events-none z-0">
         <div className="w-full h-full rounded-full bg-[#f5c518]/[0.03] blur-[120px]" />
@@ -90,7 +83,6 @@ export default function FaqSection() {
 
       <div className="relative z-10 max-w-[860px] mx-auto px-5 sm:px-8 md:px-12">
 
-        {/* ── Centered headline ── */}
         <motion.div
           ref={ref}
           initial={{ opacity: 0, y: 30 }}
@@ -106,7 +98,6 @@ export default function FaqSection() {
           </h2>
         </motion.div>
 
-        {/* ── Subtitle ── */}
         <motion.p
           initial={{ opacity: 0, y: 20 }}
           animate={inView ? { opacity: 1, y: 0 } : {}}
@@ -117,7 +108,6 @@ export default function FaqSection() {
           Find quick answers to common question about our efficient logistics
         </motion.p>
 
-        {/* ── Accordion ── */}
         <div className="flex flex-col gap-3">
           {FAQS.map((faq, i) => (
             <FaqItem key={i} q={faq.q} a={faq.a} index={i} />

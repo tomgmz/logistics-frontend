@@ -19,24 +19,20 @@ export default function Navbar() {
   const [menuOpen,  setMenuOpen]  = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);
 
-  /* Scroll progress bar */
   const { scrollYProgress } = useScroll();
   const scaleX = useSpring(scrollYProgress, { stiffness: 200, damping: 30 });
 
-  /* Scroll state */
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 60);
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  /* Lock body scroll when menu open */
   useEffect(() => {
     document.body.style.overflow = menuOpen ? 'hidden' : '';
     return () => { document.body.style.overflow = ''; };
   }, [menuOpen]);
 
-  /* Active section tracker */
   useEffect(() => {
     const ids = NAV_LINKS.map(l => l.href.slice(1));
     const observer = new IntersectionObserver(
@@ -61,14 +57,12 @@ export default function Navbar() {
 
   return (
     <>
-      {/* ── Scroll progress bar ── */}
       <motion.div
         style={{ scaleX, transformOrigin: '0%' }}
         className="fixed top-0 left-0 right-0 h-[2px] z-[100]
           bg-[#4df9ed]"
       />
 
-      {/* ── Main nav bar ── */}
       <nav
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500
           ${scrolled ? 'glass-dark shadow-[0_1px_0_rgba(255,255,255,0.05)]' : 'bg-transparent'}`}
@@ -76,7 +70,6 @@ export default function Navbar() {
         <div className="max-w-[1600px] mx-auto px-6 md:px-12 lg:px-16
           h-[76px] flex items-center justify-between">
 
-          {/* ── Logo ── */}
           <a href="#hero" className="flex items-center no-underline shrink-0">
             <Image
               src={ASSETS.logo}
@@ -87,7 +80,6 @@ export default function Navbar() {
             />
           </a>
 
-          {/* ── Desktop nav links ── */}
           <ul className="hidden md:flex items-center gap-1 list-none m-0 p-0">
             {NAV_LINKS.map((item, i) => (
               <motion.li
@@ -118,7 +110,6 @@ export default function Navbar() {
             ))}
           </ul>
 
-          {/* ── Desktop CTAs ── */}
           <div className="hidden md:flex items-center gap-3 shrink-0">
             <button
               className="font-body text-white/70 text-[0.84rem] tracking-wider
@@ -139,7 +130,6 @@ export default function Navbar() {
             </a>
           </div>
 
-          {/* ── Mobile hamburger ── */}
           <button
             className="md:hidden flex flex-col gap-[5px] items-end w-10 h-10 justify-center
               hover:opacity-70 transition-opacity"
@@ -153,11 +143,9 @@ export default function Navbar() {
         </div>
       </nav>
 
-      {/* ── Mobile drawer ── */}
       <AnimatePresence>
         {menuOpen && (
           <>
-            {/* Backdrop */}
             <motion.div
               key="backdrop"
               initial={{ opacity: 0 }}
@@ -168,7 +156,6 @@ export default function Navbar() {
               onClick={closeMenu}
             />
 
-            {/* Drawer panel */}
             <motion.div
               key="drawer"
               initial={{ x: '100%' }}
@@ -178,7 +165,6 @@ export default function Navbar() {
               className="fixed top-0 right-0 bottom-0 z-[70] w-[300px]
                 bg-[#0a0a0a] border-l border-white/[0.07] flex flex-col"
             >
-              {/* Drawer header */}
               <div className="flex justify-between items-center p-6 pb-5
                 border-b border-white/[0.07]">
                 <a href="#hero" className="flex items-center no-underline shrink-0">
@@ -201,7 +187,6 @@ export default function Navbar() {
                 </button>
               </div>
 
-              {/* Nav links */}
               <ul className="list-none m-0 p-4 flex flex-col gap-1 flex-1 overflow-y-auto">
                 {NAV_LINKS.map((item, i) => (
                   <motion.li
@@ -230,7 +215,6 @@ export default function Navbar() {
                 ))}
               </ul>
 
-              {/* CTA buttons */}
               <div className="p-6 pt-4 flex flex-col gap-3 border-t border-white/[0.07]">
                 <button
                   className="font-body w-full py-3.5 rounded-[15px] border border-white/15

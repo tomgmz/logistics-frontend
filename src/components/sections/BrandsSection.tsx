@@ -14,7 +14,6 @@ function LogoCard({ brand }: { brand: typeof BRANDS[number] }) {
         transition-all duration-300 group cursor-default"
       style={{ minWidth: 140 }}
     >
-      {/* Use relative positioning with defined dimensions */}
       <div className={`relative ${brand.className}`}>
         <Image
           src={brand.src}
@@ -29,7 +28,6 @@ function LogoCard({ brand }: { brand: typeof BRANDS[number] }) {
   );
 }
 
-/* ─── Marquee row (CSS-driven, no Framer loop) ─────────────────────────────── */
 function MarqueeRow({ reverse = false }: { reverse?: boolean }) {
   // 4× duplication ensures seamless infinite loop at any screen width
   const items = [...BRANDS, ...BRANDS, ...BRANDS, ...BRANDS];
@@ -44,7 +42,6 @@ function MarqueeRow({ reverse = false }: { reverse?: boolean }) {
   );
 }
 
-/* ─── Section ──────────────────────────────────────────────────────────────── */
 export default function BrandsSection() {
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, margin: '-80px' });
@@ -52,11 +49,9 @@ export default function BrandsSection() {
   return (
     <section className="relative w-full bg-[#0a0a0a] overflow-hidden py-28">
 
-      {/* Top / bottom hairlines */}
       <div className="absolute top-0    inset-x-0 sep-x" />
       <div className="absolute bottom-0 inset-x-0 sep-x" />
 
-      {/* Right-side ambient glow */}
       <div className="absolute right-[-100px] top-1/2 -translate-y-1/2 w-[500px] h-[500px] pointer-events-none">
         <div className="w-full h-full rounded-full bg-[#4df9ed]/[0.04] blur-[130px]" />
       </div>
@@ -64,14 +59,12 @@ export default function BrandsSection() {
       <div ref={ref} className="max-w-[1600px] mx-auto px-6 md:px-12 lg:px-16">
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-14 lg:gap-20 items-center">
 
-          {/* ── Left col: headline + stats ── */}
           <motion.div
             initial={{ opacity: 0, x: -50 }}
             animate={inView ? { opacity: 1, x: 0 } : {}}
             transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
             className='text-center sm:text-start'
           >
-            {/* Headline */}
             <h2 className="font-display-italic text-white leading-[1.0] mb-6 
               text-[1.5rem] xs:text-[1.5rem] sm:text-[2.4rem] md:text-[3rem] lg:text-[5rem]">
               BRANDS THAT{' '}
@@ -80,21 +73,18 @@ export default function BrandsSection() {
               WITH US
             </h2>
 
-            {/* Sub-copy */}
             <p className="font-body text-[#818181] text-sm sm:text-sm md:text-base lg:text-2xl leading-relaxed
               tracking-wide max-w-[340px] mb-10">
               Move nationwide with unmatched precision
             </p>
           </motion.div>
 
-          {/* ── Right col: marquee tracks ── */}
           <motion.div
             initial={{ opacity: 0, x: 50 }}
             animate={inView ? { opacity: 1, x: 0 } : {}}
             transition={{ duration: 0.7, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
             className="relative overflow-hidden"
           >
-            {/* Edge fade masks */}
             <div className="absolute left-0 top-0 bottom-0 w-20 z-10 pointer-events-none
               bg-gradient-to-r from-[#0a0a0a] to-transparent" />
             <div className="absolute right-0 top-0 bottom-0 w-20 z-10 pointer-events-none
