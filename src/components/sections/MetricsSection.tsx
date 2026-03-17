@@ -47,11 +47,11 @@ function StatCard({ value, label, index }: { value: string; label: string; index
         flex flex-col justify-center items-center text-center
         bg-white cursor-default overflow-hidden"
     >
-      <span className="font-display-italic text-[#0a0a0a] leading-none mb-1 sm:mb-2">
+      <span className="font-eurostile text-[2.1rem] sm:text-[2.5rem] md:text-[3rem] lg:text-[2.5rem] text-[#0a0a0a] leading-none mb-1 sm:mb-2">
         <AnimatedValue raw={value} />
       </span>
 
-      <span className="font-body text-[#555]
+      <span className="font-alegreya text-[#555]
         tracking-wider leading-snug uppercase">
         {label}
       </span>
