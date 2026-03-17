@@ -90,10 +90,10 @@ export default function FaqSection() {
           transition={{ duration: 0.6 }}
           className="text-center mb-4 sm:mb-5"
         >
-          <h2 className="font-display-italic text-white leading-[1.0]">
+          <h2 className="font-eurostile text-[2.1rem] sm:text-[2.5rem] md:text-[3rem] lg:text-[5rem] text-white leading-[1.0]">
             FREQUENTLY ASKED
             <br />
-            <span className="font-display-italic text-[#f5c518]">QUESTIONS</span>
+            <span className="font-eurostile text-[#f5c518]">QUESTIONS</span>
           </h2>
         </motion.div>
 
