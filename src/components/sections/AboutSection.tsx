@@ -133,7 +133,7 @@ export default function AboutSection() {
           initial={{ opacity: 0, y: 50 }}
           animate={inView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.7, delay: 0.38, ease: [0.22, 1, 0.36, 1] }}
-          className="absolute right-[4%] bottom-[28%] w-[48%] z-30"
+          className="absolute lg:right-[-4%] xl:right-[-7.5%] bottom-[28%] w-[48%] z-30"
           style={{ mixBlendMode: 'difference' }}
         >
           <h2 className="font-display-italic text-white leading-[0.92] tracking-tight text-center sm:text-start max-w-6">
