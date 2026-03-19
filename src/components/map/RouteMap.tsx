@@ -10,6 +10,12 @@ import {
 } from '@vis.gl/react-google-maps'
 import { OptimizedStop, OptimizeRouteResponse } from '@/app/types/route.types'
 import { motion, AnimatePresence } from 'framer-motion'
+import SearchIcon from '@mui/icons-material/Search'
+import LocalShippingIcon from '@mui/icons-material/LocalShipping'
+import AccessTimeIcon from '@mui/icons-material/AccessTime'
+import PlaceIcon from '@mui/icons-material/Place'
+import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked'
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward'
 
 const GOOGLE_MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!
 
@@ -18,22 +24,18 @@ interface DirectionsRendererProps {
   stops: OptimizedStop[]
 }
 
-interface DirectionsPanelProps {
-  origin: { latitude: number; longitude: number }
-  stop: OptimizedStop | null
-  onClose: () => void
+interface Booking {
+  id: string
+  vehicle: string
+  date: string
+  status: 'BOOKED' | 'IN TRANSIT' | 'ARRIVED' | 'CANCELED'
+  origin: string
+  destination: string
+  time?: string
+  plateNumber?: string
 }
 
-interface StopCardProps {
-  stop: OptimizedStop
-  isActive: boolean
-  onMarkDelivered: (id: string) => void
-  onMarkFailed: (id: string) => void
-  onNavigate: (stop: OptimizedStop) => void
-  onClick: () => void
-}
-
-// ─── Full Route Directions Renderer ──────────────────────────────────────────
+// ─── Directions Renderer ──────────────────────────────────────────────────────
 
 function DirectionsRenderer({ origin, stops }: DirectionsRendererProps) {
   const map = useMap()
@@ -41,29 +43,23 @@ function DirectionsRenderer({ origin, stops }: DirectionsRendererProps) {
 
   useEffect(() => {
     if (!map || stops.length === 0) return
-
     const directionsService = new google.maps.DirectionsService()
-
     if (!rendererRef.current) {
       rendererRef.current = new google.maps.DirectionsRenderer({
         suppressMarkers: true,
         polylineOptions: {
-          strokeColor: '#3B82F6',
-          strokeWeight: 5,
-          strokeOpacity: 0.8,
+          strokeColor: '#06b6d4',
+          strokeWeight: 4,
+          strokeOpacity: 0.9,
         },
       })
     }
-
     rendererRef.current.setMap(map)
-
     const waypoints = stops.slice(0, -1).map((stop) => ({
       location: new google.maps.LatLng(stop.latitude, stop.longitude),
       stopover: true,
     }))
-
     const lastStop = stops[stops.length - 1]
-
     directionsService.route(
       {
         origin: new google.maps.LatLng(origin.latitude, origin.longitude),
@@ -78,233 +74,248 @@ function DirectionsRenderer({ origin, stops }: DirectionsRendererProps) {
         }
       }
     )
-
-    return () => {
-      rendererRef.current?.setMap(null)
-    }
+    return () => { rendererRef.current?.setMap(null) }
   }, [map, origin, stops])
 
   return null
 }
 
-// ─── Single Stop Directions Panel ────────────────────────────────────────────
+// ─── Status Badge ─────────────────────────────────────────────────────────────
 
-function DirectionsPanel({ origin, stop, onClose }: DirectionsPanelProps) {
-  const map = useMap()
-  const panelRef = useRef<HTMLDivElement>(null)
-  const rendererRef = useRef<google.maps.DirectionsRenderer | null>(null)
-  const [duration, setDuration] = useState<string | null>(null)
-  const [distance, setDistance] = useState<string | null>(null)
+function StatusBadge({ status }: { status: Booking['status'] }) {
+  const config = {
+    'BOOKED':     { bg: 'bg-yellow-500/20', text: 'text-yellow-400', border: 'border-yellow-500/40', dot: 'bg-yellow-400' },
+    'IN TRANSIT': { bg: 'bg-cyan-500/20',   text: 'text-cyan-400',   border: 'border-cyan-500/40',   dot: 'bg-cyan-400' },
+    'ARRIVED':    { bg: 'bg-green-500/20',  text: 'text-green-400',  border: 'border-green-500/40',  dot: 'bg-green-400' },
+    'CANCELED':   { bg: 'bg-red-500/20',    text: 'text-red-400',    border: 'border-red-500/40',    dot: 'bg-red-400' },
+  }
+  const c = config[status]
+  return (
+    <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold tracking-wider px-2.5 py-1 rounded-full border ${c.bg} ${c.text} ${c.border}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${c.dot} animate-pulse`} />
+      {status}
+    </span>
+  )
+}
 
-  useEffect(() => {
-    if (!map || !stop) return
+// ─── Booking List Item ────────────────────────────────────────────────────────
 
-    const directionsService = new google.maps.DirectionsService()
-
-    // clean up previous renderer
-    if (rendererRef.current) {
-      rendererRef.current.setMap(null)
-      rendererRef.current = null
-    }
-
-    rendererRef.current = new google.maps.DirectionsRenderer({
-      suppressMarkers: true,
-      panel: panelRef.current ?? undefined,
-      polylineOptions: {
-        strokeColor: '#F59E0B',
-        strokeWeight: 6,
-        strokeOpacity: 1,
-      },
-    })
-
-    rendererRef.current.setMap(map)
-
-    directionsService.route(
-      {
-        origin: new google.maps.LatLng(origin.latitude, origin.longitude),
-        destination: new google.maps.LatLng(stop.latitude, stop.longitude),
-        travelMode: google.maps.TravelMode.DRIVING,
-      },
-      (result, status) => {
-        if (status === 'OK' && result) {
-          rendererRef.current?.setDirections(result)
-          map.fitBounds(result.routes[0].bounds)
-          const leg = result.routes[0].legs[0]
-          setDuration(leg.duration?.text ?? null)
-          setDistance(leg.distance?.text ?? null)
-        }
-      }
-    )
-
-    return () => {
-      rendererRef.current?.setMap(null)
-      rendererRef.current = null
-    }
-  }, [map, stop, origin])
-
-  if (!stop) return null
-
+function BookingItem({ booking, isActive, onClick }: {
+  booking: Booking
+  isActive: boolean
+  onClick: () => void
+}) {
   return (
     <motion.div
-      initial={{ height: 0, opacity: 0 }}
-      animate={{ height: 'auto', opacity: 1 }}
-      exit={{ height: 0, opacity: 0 }}
-      className="bg-white border-t-2 border-amber-400 flex flex-col"
-      style={{ maxHeight: '40vh' }}
+      layout
+      initial={{ opacity: 0, x: -16 }}
+      animate={{ opacity: 1, x: 0 }}
+      whileHover={{ x: 3 }}
+      onClick={onClick}
+      className={`
+        relative px-4 py-3.5 cursor-pointer transition-all duration-200 group
+        border-b border-gray-800/60
+        ${isActive
+          ? 'bg-gray-800/80 border-l-2 border-l-cyan-500'
+          : 'border-l-2 border-l-transparent hover:bg-gray-800/40'
+        }
+      `}
     >
-      {/* Panel Header */}
-      <div className="flex items-center justify-between px-4 py-2 bg-amber-50 border-b border-amber-200 flex-shrink-0">
+      <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="text-amber-600 text-base">🧭</span>
+          <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${isActive ? 'bg-cyan-500/20' : 'bg-gray-700/60'}`}>
+            <LocalShippingIcon sx={{ fontSize: 14, color: isActive ? '#06b6d4' : '#9ca3af' }} />
+          </div>
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-amber-800 truncate">
-              Stop {stop.optimized_sequence_order}: {stop.address}
-            </p>
-            {duration && distance && (
-              <p className="text-xs text-amber-600">{duration} · {distance}</p>
-            )}
+            <p className="text-white text-xs font-semibold truncate">{booking.origin}</p>
+            <p className="text-gray-500 text-[10px] truncate">{booking.date}</p>
           </div>
         </div>
-        <button
-          onClick={onClose}
-          className="flex-shrink-0 ml-2 w-7 h-7 flex items-center justify-center rounded-full hover:bg-amber-200 text-amber-700 font-bold text-lg transition-colors"
-        >
-          ×
-        </button>
+        <StatusBadge status={booking.status} />
       </div>
 
-      {/* Turn-by-turn steps rendered by Google */}
-      <div
-        ref={panelRef}
-        className="overflow-y-auto px-3 py-2 text-sm flex-1
-          [&_.adp-directions]:w-full
-          [&_table]:w-full [&_table]:border-collapse
-          [&_tr]:border-b [&_tr]:border-gray-100
-          [&_td]:py-1.5 [&_td]:px-1 [&_td]:align-top [&_td]:text-gray-700
-          [&_img]:inline [&_img]:mr-1
-        "
-      />
+      <div className="flex items-center gap-1.5 pl-9">
+        <span className="text-gray-500 text-[10px] truncate flex-1">{booking.origin}</span>
+        <ArrowForwardIcon sx={{ fontSize: 10, color: '#4b5563' }} />
+        <span className="text-gray-400 text-[10px] truncate flex-1 text-right">{booking.destination}</span>
+        {booking.time && (
+          <span className="text-cyan-400 text-[10px] font-medium ml-1 flex-shrink-0">{booking.time}</span>
+        )}
+      </div>
+
+      {/* Progress dots */}
+      <div className="flex gap-1 pl-9 mt-2">
+        {(['BOOKED', 'IN TRANSIT', 'ARRIVED'] as const).map((s) => {
+          const statuses: Booking['status'][] = ['BOOKED', 'IN TRANSIT', 'ARRIVED', 'CANCELED']
+          const currentIdx = statuses.indexOf(booking.status)
+          const thisIdx = statuses.indexOf(s)
+          return (
+            <div
+              key={s}
+              className={`h-0.5 w-6 rounded-full transition-all ${
+                thisIdx <= currentIdx && booking.status !== 'CANCELED'
+                  ? 'bg-cyan-500'
+                  : 'bg-gray-700'
+              }`}
+            />
+          )
+        })}
+      </div>
     </motion.div>
   )
 }
 
-// ─── Stop Card ────────────────────────────────────────────────────────────────
+// ─── Route Timeline Stop ──────────────────────────────────────────────────────
 
-function StopCard({
-  stop,
-  isActive,
-  onMarkDelivered,
-  onMarkFailed,
-  onNavigate,
-  onClick,
-}: StopCardProps) {
-  const statusColor: Record<string, string> = {
-    pending:   'bg-yellow-100 text-yellow-800 border-yellow-300',
-    delivered: 'bg-green-100  text-green-800  border-green-300',
-    failed:    'bg-red-100    text-red-800    border-red-300',
-  }
-
+function RouteStop({
+  label,
+  address,
+  city,
+  time,
+  isOrigin,
+  isLast,
+  isLate,
+  deliveryDate,
+  totalCost,
+}: {
+  label?: string
+  address: string
+  city: string
+  time?: string
+  isOrigin?: boolean
+  isLast?: boolean
+  isLate?: boolean
+  deliveryDate?: string
+  totalCost?: string
+}) {
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className={`
-        rounded-xl border-2 p-4 cursor-pointer transition-all
-        ${isActive ? 'border-blue-500 bg-blue-50 shadow-lg' : 'border-gray-200 bg-white'}
-      `}
-      onClick={onClick}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className={`
-            w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0
-            ${stop.status === 'delivered' ? 'bg-green-500' :
-              stop.status === 'failed'    ? 'bg-red-500'   : 'bg-blue-500'}
-          `}>
-            {stop.optimized_sequence_order}
-          </div>
-          <div>
-            <p className="font-medium text-gray-800 text-sm">{stop.address}</p>
-            {stop.notes && (
-              <p className="text-xs text-gray-500 mt-0.5">📝 {stop.notes}</p>
-            )}
-          </div>
+    <div className="flex gap-3">
+      {/* Timeline line */}
+      <div className="flex flex-col items-center flex-shrink-0">
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${
+          isOrigin
+            ? 'bg-gray-700 border-gray-600'
+            : isLast
+            ? 'bg-red-500 border-red-400'
+            : 'bg-cyan-500/20 border-cyan-500/60'
+        }`}>
+          <PlaceIcon sx={{ fontSize: 14, color: isLast ? '#fff' : isOrigin ? '#9ca3af' : '#06b6d4' }} />
         </div>
-        <span className={`text-xs px-2 py-1 rounded-full border font-medium flex-shrink-0 ${statusColor[stop.status]}`}>
-          {stop.status}
-        </span>
+        {!isLast && (
+          <div className="w-px flex-1 min-h-[60px] border-l-2 border-dashed border-gray-700 my-1" />
+        )}
       </div>
 
-      <AnimatePresence>
-        {isActive && stop.status === 'pending' && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="mt-3 flex flex-col gap-2"
-          >
-            <button
-              onClick={(e: React.MouseEvent) => { e.stopPropagation(); onNavigate(stop) }}
-              className="w-full bg-amber-500 hover:bg-amber-600 text-white text-sm py-2 px-3 rounded-lg font-medium transition-colors text-center"
-            >
-              🧭 Navigate to this stop
-            </button>
-            <div className="flex gap-2">
-              <button
-                onClick={(e: React.MouseEvent) => { e.stopPropagation(); onMarkDelivered(stop.destination_id) }}
-                className="flex-1 bg-green-500 hover:bg-green-600 text-white text-sm py-2 px-3 rounded-lg font-medium transition-colors"
-              >
-                ✅ Delivered
-              </button>
-              <button
-                onClick={(e: React.MouseEvent) => { e.stopPropagation(); onMarkFailed(stop.destination_id) }}
-                className="flex-1 bg-red-500 hover:bg-red-600 text-white text-sm py-2 px-3 rounded-lg font-medium transition-colors"
-              >
-                ❌ Failed
-              </button>
+      {/* Content */}
+      <div className="flex-1 pb-2">
+        <div className="flex items-start justify-between mb-1">
+          <div>
+            <p className="text-white font-semibold text-sm">{address}</p>
+            <p className="text-gray-500 text-xs">{city}</p>
+          </div>
+          {time && <span className="text-gray-400 text-xs">{time}</span>}
+        </div>
+
+        {/* Middle segment info (only shown between stops) */}
+        {!isLast && deliveryDate && (
+          <div className="mt-2 space-y-1.5">
+            {isLate && (
+              <div className="flex items-center gap-1.5">
+                <AccessTimeIcon sx={{ fontSize: 12, color: '#ef4444' }} />
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-900/40 text-red-400 border border-red-800/50 font-medium">
+                  Late
+                </span>
+              </div>
+            )}
+            <div className="bg-[#1a1a1a] rounded-lg px-3 py-2 border border-gray-800">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-500 text-[10px]">Estimated Delivery</span>
+                <span className="text-white text-xs font-medium">{deliveryDate}</span>
+              </div>
             </div>
-          </motion.div>
+            {totalCost && (
+              <div className="bg-[#1a1a1a] rounded-lg px-3 py-2 border border-gray-800">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-500 text-[10px]">Total Cost</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-white text-xs font-medium">{totalCost}</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-900/40 text-green-400 border border-green-800/50 font-medium">
+                      Paid
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         )}
-      </AnimatePresence>
-    </motion.div>
+      </div>
+    </div>
   )
 }
 
 // ─── Main RouteMap Component ──────────────────────────────────────────────────
 
 export default function RouteMap({ bookingId }: { bookingId: string }) {
-  const [routeData, setRouteData]     = useState<OptimizeRouteResponse | null>(null)
-  const [stops, setStops]             = useState<OptimizedStop[]>([])
-  const [activeStopId, setActiveStopId] = useState<string | null>(null)
-  const [navStop, setNavStop]         = useState<OptimizedStop | null>(null)
-  const [loading, setLoading]         = useState(true)
-  const [error, setError]             = useState<string | null>(null)
+  const [routeData, setRouteData] = useState<OptimizeRouteResponse | null>(null)
+  const [stops, setStops] = useState<OptimizedStop[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedBooking, setSelectedBooking] = useState<string>(bookingId)
+
+  const bookings: Booking[] = [
+    {
+      id: '1',
+      vehicle: 'Quezon City',
+      date: 'February 2, 2026',
+      status: 'IN TRANSIT',
+      origin: 'Quezon City',
+      destination: 'Manila',
+      time: '02:45 PM',
+      plateNumber: 'CJK 0856',
+    },
+    {
+      id: '2',
+      vehicle: 'Carluvao',
+      date: 'February 2, 2026',
+      status: 'ARRIVED',
+      origin: 'Carluvao',
+      destination: 'Maharlika',
+    },
+    {
+      id: '3',
+      vehicle: 'Quezon City',
+      date: 'February 2, 2026',
+      status: 'CANCELED',
+      origin: 'Quezon City',
+      destination: 'Makati',
+    },
+  ]
+
+  const filteredBookings = bookings.filter(
+    (b) =>
+      b.origin.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      b.destination.toLowerCase().includes(searchQuery.toLowerCase())
+  )
 
   useEffect(() => {
     async function loadRoute() {
       try {
         setLoading(true)
-
-        // 1. Try existing optimized route first
         const existingRes = await fetch(
           `${process.env.NEXT_PUBLIC_API_URL}/route-optimization/${bookingId}`
         )
         const existingJson = await existingRes.json()
-
         const hasOptimizedRoute =
           existingJson.data?.optimized_stops?.length > 0 &&
           existingJson.data.optimized_stops.every(
             (s: OptimizedStop) => s.latitude && s.longitude
           )
-
         if (hasOptimizedRoute) {
           setRouteData(existingJson.data)
           setStops(existingJson.data.optimized_stops)
           return
         }
-
-        // 2. Not yet optimized — call optimization API
         const optimizeRes = await fetch(
           `${process.env.NEXT_PUBLIC_API_URL}/route-optimization/optimize/${bookingId}`,
           { method: 'POST' }
@@ -323,30 +334,6 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
     loadRoute()
   }, [bookingId])
 
-  // ─── Navigate full route (external) ────────────────────────────────────────
-  const handleStartNavigation = () => {
-    if (!routeData) return
-
-    const pendingStops = stops
-      .filter((s) => s.status === 'pending')
-      .sort((a, b) => a.optimized_sequence_order - b.optimized_sequence_order)
-
-    if (pendingStops.length === 0) {
-      alert('All stops are already delivered!')
-      return
-    }
-
-    const origin = `${routeData.origin.latitude},${routeData.origin.longitude}`
-    const destination = `${pendingStops[pendingStops.length - 1].latitude},${pendingStops[pendingStops.length - 1].longitude}`
-    const waypoints = pendingStops
-      .slice(0, -1)
-      .map((s) => `${s.latitude},${s.longitude}`)
-      .join('|')
-
-    const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}${waypoints ? `&waypoints=${waypoints}` : ''}&travelmode=driving`
-    window.open(url, '_blank')
-  }
-
   const handleMarkDelivered = async (destinationId: string) => {
     try {
       await fetch(
@@ -354,10 +341,7 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
         {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            status: 'delivered',
-            delivered_at: new Date().toISOString(),
-          }),
+          body: JSON.stringify({ status: 'delivered', delivered_at: new Date().toISOString() }),
         }
       )
       setStops((prev) =>
@@ -365,180 +349,380 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
           s.destination_id === destinationId ? { ...s, status: 'delivered' as const } : s
         )
       )
-      setActiveStopId(null)
-      if (navStop?.destination_id === destinationId) setNavStop(null)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Something went wrong'
       alert(`Failed to update: ${message}`)
     }
   }
-
-  const handleMarkFailed = async (destinationId: string) => {
-    try {
-      await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/booking/destinations/${destinationId}/status`,
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'failed' }),
-        }
-      )
-      setStops((prev) =>
-        prev.map((s) =>
-          s.destination_id === destinationId ? { ...s, status: 'failed' as const } : s
-        )
-      )
-      setActiveStopId(null)
-      if (navStop?.destination_id === destinationId) setNavStop(null)
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Something went wrong'
-      alert(`Failed to update: ${message}`)
-    }
-  }
-
-  const handleNavigate = (stop: OptimizedStop) => {
-    setNavStop((prev) =>
-      prev?.destination_id === stop.destination_id ? null : stop
-    )
-    setActiveStopId(null)
-  }
-
-  const completedCount = stops.filter((s) => s.status === 'delivered').length
-  const pendingCount   = stops.filter((s) => s.status === 'pending').length
-  const failedCount    = stops.filter((s) => s.status === 'failed').length
 
   if (loading) return (
-    <div className="flex items-center justify-center h-screen bg-gray-50">
-      <div className="text-center">
-        <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-        <p className="text-gray-600 font-medium">Optimizing your route...</p>
-      </div>
+    <div className="flex items-center justify-center h-screen bg-[#0f0f0f]">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.8 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="text-center"
+      >
+        <div className="relative w-16 h-16 mx-auto mb-4">
+          <div className="w-16 h-16 border-4 border-gray-800 rounded-full" />
+          <div className="absolute inset-0 w-16 h-16 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+        <p className="text-gray-400 text-sm font-medium tracking-wide">Optimizing route...</p>
+      </motion.div>
     </div>
   )
 
   if (error) return (
-    <div className="flex items-center justify-center h-screen bg-gray-50">
-      <div className="text-center text-red-500">
-        <p className="text-xl font-bold mb-2">Error</p>
-        <p>{error}</p>
+    <div className="flex items-center justify-center h-screen bg-[#0f0f0f]">
+      <div className="text-center">
+        <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-3">
+          <span className="text-red-400 text-xl">!</span>
+        </div>
+        <p className="text-white font-semibold mb-1">Something went wrong</p>
+        <p className="text-gray-400 text-sm">{error}</p>
       </div>
     </div>
   )
 
   if (!routeData) return null
 
+  const totalDuration = '2 hr 13 min'
+  const activeBooking = bookings.find((b) => b.id === selectedBooking)
+
   return (
     <APIProvider apiKey={GOOGLE_MAPS_KEY}>
-      <div className="flex flex-col h-screen bg-gray-50">
+      <div className="flex h-screen bg-[#0f0f0f] overflow-hidden font-sans">
 
-        {/* ─── Header ─────────────────────────────────────────── */}
-        <div className="bg-white shadow-sm px-4 py-3 flex items-center justify-between z-10">
-          <div>
-            <h1 className="font-bold text-gray-800 text-lg">Today&apos;s Route</h1>
-            <p className="text-xs text-gray-500">{routeData.origin.address}</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="flex gap-2 text-xs font-medium">
-              <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full">✅ {completedCount}</span>
-              <span className="bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full">⏳ {pendingCount}</span>
-              <span className="bg-red-100 text-red-700 px-2 py-1 rounded-full">❌ {failedCount}</span>
+        {/* ── SIDEBAR: Bookings ─────────────────────────────────────── */}
+        <motion.aside
+          initial={{ x: -320, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+          className="w-72 bg-[#0a0a0a] border-r border-gray-800/80 flex flex-col flex-shrink-0"
+        >
+          {/* Header */}
+          <div className="px-4 pt-5 pb-3 border-b border-gray-800/60">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-7 h-7 rounded-lg bg-cyan-500/20 flex items-center justify-center">
+                <LocalShippingIcon sx={{ fontSize: 14, color: '#06b6d4' }} />
+              </div>
+              <span className="text-white font-semibold text-sm tracking-wide">8338 Logistics</span>
             </div>
-            <button
-              onClick={handleStartNavigation}
-              className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1 transition-colors"
-            >
-              🗺️ Full Route
-            </button>
-          </div>
-        </div>
 
-        {/* ─── Map ─────────────────────────────────────────────── */}
-        <div className="flex-1 relative min-h-0">
+            {/* Search */}
+            <div className="relative">
+              <SearchIcon sx={{ fontSize: 15, color: '#4b5563', position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
+              <input
+                type="text"
+                placeholder="Search bookings..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-[#1a1a1a] border border-gray-800 rounded-xl pl-8 pr-3 py-2 text-xs text-gray-300 placeholder-gray-600 outline-none focus:border-cyan-500/50 transition-colors"
+              />
+            </div>
+          </div>
+
+          {/* Booking count */}
+          <div className="px-4 py-2.5 flex items-center justify-between">
+            <span className="text-gray-600 text-[10px] font-semibold uppercase tracking-widest">Active Bookings</span>
+            <span className="text-[10px] bg-cyan-500/20 text-cyan-400 px-2 py-0.5 rounded-full font-bold">
+              {filteredBookings.length}
+            </span>
+          </div>
+
+          {/* List */}
+          <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-800">
+            <AnimatePresence>
+              {filteredBookings.map((booking, i) => (
+                <motion.div
+                  key={booking.id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.05 }}
+                >
+                  <BookingItem
+                    booking={booking}
+                    isActive={selectedBooking === booking.id}
+                    onClick={() => setSelectedBooking(booking.id)}
+                  />
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+        </motion.aside>
+
+        {/* ── CENTER: Booking Detail ────────────────────────────────── */}
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15, duration: 0.4 }}
+          className="w-[420px] bg-[#111111] border-r border-gray-800/80 flex flex-col overflow-y-auto flex-shrink-0 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-800"
+        >
+          {/* Vehicle header */}
+          <div className="p-5 border-b border-gray-800/60">
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-2">
+                {/* Icon avatars */}
+                {[0, 1].map((i) => (
+                  <div key={i} className="w-8 h-8 rounded-lg bg-gray-800 border border-gray-700 flex items-center justify-center">
+                    <LocalShippingIcon sx={{ fontSize: 14, color: '#6b7280' }} />
+                  </div>
+                ))}
+                {[0, 1].map((i) => (
+                  <div key={i} className="w-8 h-8 rounded-lg bg-gray-800 border border-gray-700 flex items-center justify-center">
+                    <PlaceIcon sx={{ fontSize: 14, color: '#6b7280' }} />
+                  </div>
+                ))}
+              </div>
+              <div className="flex items-center gap-2">
+                <StatusBadge status="IN TRANSIT" />
+                <span className="text-cyan-400 text-xs font-medium">02:45 PM</span>
+              </div>
+            </div>
+
+            {/* Vehicle visual */}
+            <div className="text-center mb-4">
+              <p className="text-gray-500 text-xs font-medium tracking-widest uppercase mb-1">Vehicle Type</p>
+              <h2 className="text-4xl font-black text-white tracking-tight mb-4">L300</h2>
+              <div className="relative bg-gradient-to-b from-gray-800/60 to-gray-900/60 rounded-2xl border border-gray-700/50 p-6 mb-3 overflow-hidden">
+                {/* Subtle grid bg */}
+                <div
+                  className="absolute inset-0 opacity-[0.04]"
+                  style={{
+                    backgroundImage: 'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)',
+                    backgroundSize: '20px 20px',
+                  }}
+                />
+                <LocalShippingIcon sx={{ fontSize: 100, color: '#374151' }} className="relative z-10" />
+              </div>
+              <div className="flex items-center justify-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                <p className="text-white font-bold text-lg tracking-widest">CJK 0856</p>
+              </div>
+            </div>
+
+            {/* Origin / Destination cards */}
+            <div className="grid grid-cols-2 gap-2">
+              <div className="bg-[#1a1a1a] rounded-xl p-3 border border-gray-800/80">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                  <span className="text-gray-500 text-[9px] font-semibold uppercase tracking-widest">Origin</span>
+                </div>
+                <p className="text-white font-bold text-sm mb-0.5">CABUYAO</p>
+                <p className="text-gray-500 text-[10px] mb-2">Laguna City</p>
+                <div className="space-y-1 pt-2 border-t border-gray-800">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600 text-[9px]">Scheduled</span>
+                    <span className="text-gray-300 text-[10px] font-medium">12:15 PM</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600 text-[9px]">Actual</span>
+                    <span className="text-red-400 text-[10px] font-medium">1:40 PM</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-[#1a1a1a] rounded-xl p-3 border border-gray-800/80">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-red-400" />
+                  <span className="text-gray-500 text-[9px] font-semibold uppercase tracking-widest">Destination</span>
+                </div>
+                <p className="text-white font-bold text-sm mb-0.5">MAHARLIKA</p>
+                <p className="text-gray-500 text-[10px] mb-2">Quezon City</p>
+                <div className="space-y-1 pt-2 border-t border-gray-800">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600 text-[9px]">ETA</span>
+                    <span className="text-green-400 text-[10px] font-medium">03:05 PM</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Route section */}
+          <div className="p-5 border-b border-gray-800/60">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-gray-400 text-xs font-bold uppercase tracking-widest">Route</span>
+              <div className="flex items-center gap-2 bg-gray-800/60 rounded-full px-3 py-1 border border-gray-700/50">
+                <AccessTimeIcon sx={{ fontSize: 12, color: '#06b6d4' }} />
+                <span className="text-cyan-400 text-xs font-semibold">1 HR 6 MINS</span>
+              </div>
+            </div>
+
+            <RouteStop
+              address="8338 Logistics Parking"
+              city="Cabuyao, Laguna City"
+              time="12:15 PM"
+              isOrigin
+              isLate
+              deliveryDate="FEBRUARY 2, 2026"
+              totalCost="$180"
+            />
+            <RouteStop
+              address="MTR Port"
+              city="Maharlika, Quezon City"
+              time="03:05 PM"
+              isLast
+            />
+          </div>
+
+          {/* Cargo details */}
+          <div className="p-5">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-gray-400 text-xs font-bold uppercase tracking-widest">Cargo Details</span>
+              <div className="flex items-center gap-1.5 bg-gray-800/60 rounded-full px-3 py-1 border border-gray-700/50">
+                <span className="text-gray-500 text-[9px] uppercase tracking-wide">Total Weight</span>
+                <span className="text-white text-xs font-bold">186 KG</span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              {[
+                { label: 'Type of Goods', value: 'General Cargo' },
+                { label: 'Packages', value: '24 units' },
+                { label: 'Fragile', value: 'No' },
+              ].map(({ label, value }) => (
+                <div key={label} className="flex items-center justify-between bg-[#1a1a1a] rounded-lg px-3 py-2.5 border border-gray-800/60">
+                  <span className="text-gray-500 text-xs">{label}</span>
+                  <span className="text-gray-200 text-xs font-medium">{value}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Mark stops as delivered */}
+            {stops.filter((s) => s.status === 'pending').length > 0 && (
+              <div className="mt-4">
+                <p className="text-gray-600 text-[10px] uppercase tracking-widest mb-2">Pending Stops</p>
+                <div className="space-y-1.5">
+                  {stops
+                    .filter((s) => s.status === 'pending')
+                    .map((stop) => (
+                      <div key={stop.destination_id} className="flex items-center justify-between bg-[#1a1a1a] rounded-lg px-3 py-2 border border-gray-800">
+                        <div className="flex items-center gap-2">
+                          <RadioButtonUncheckedIcon sx={{ fontSize: 14, color: '#4b5563' }} />
+                          <span className="text-gray-400 text-xs truncate max-w-[140px]">{stop.address}</span>
+                        </div>
+                        <button
+                          onClick={() => handleMarkDelivered(stop.destination_id)}
+                          className="text-[10px] text-cyan-400 hover:text-cyan-300 font-medium transition-colors"
+                        >
+                          Mark Done
+                        </button>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </motion.section>
+
+        {/* ── MAP ──────────────────────────────────────────────────── */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3, duration: 0.5 }}
+          className="flex-1 relative"
+        >
           <Map
             mapId="logistics-driver-map"
             defaultCenter={{ lat: routeData.origin.latitude, lng: routeData.origin.longitude }}
-            defaultZoom={12}
+            defaultZoom={11}
             gestureHandling="greedy"
             disableDefaultUI={false}
             className="w-full h-full"
+            styles={[
+              { elementType: 'geometry',            stylers: [{ color: '#141e2b' }] },
+              { elementType: 'labels.text.stroke',  stylers: [{ color: '#141e2b' }] },
+              { elementType: 'labels.text.fill',    stylers: [{ color: '#6b7280' }] },
+              { featureType: 'road',                elementType: 'geometry', stylers: [{ color: '#1f2d3d' }] },
+              { featureType: 'road',                elementType: 'geometry.stroke', stylers: [{ color: '#0f1822' }] },
+              { featureType: 'road.highway',        elementType: 'geometry', stylers: [{ color: '#263c52' }] },
+              { featureType: 'water',               elementType: 'geometry', stylers: [{ color: '#0a0f18' }] },
+              { featureType: 'water',               elementType: 'labels.text.fill', stylers: [{ color: '#374151' }] },
+              { featureType: 'poi',                 elementType: 'geometry', stylers: [{ color: '#1a2433' }] },
+              { featureType: 'poi.park',            elementType: 'geometry', stylers: [{ color: '#1a2633' }] },
+              { featureType: 'transit',             elementType: 'geometry', stylers: [{ color: '#1a2433' }] },
+              { featureType: 'administrative',      elementType: 'geometry.stroke', stylers: [{ color: '#2d3d52' }] },
+            ]}
           >
-            {/* origin marker */}
+            {/* Origin */}
             <AdvancedMarker
               position={{ lat: routeData.origin.latitude, lng: routeData.origin.longitude }}
               title="Origin"
             >
-              <div className="bg-blue-600 text-white text-xs font-bold px-2 py-1 rounded-full shadow-lg">
-                🏭 Start
-              </div>
+              <motion.div
+                initial={{ scale: 0, y: -10 }}
+                animate={{ scale: 1, y: 0 }}
+                transition={{ delay: 0.6, type: 'spring', stiffness: 300 }}
+                className="bg-cyan-500 text-white text-[10px] font-black px-3 py-1.5 rounded-full shadow-lg shadow-cyan-500/40 flex items-center gap-1.5 border border-cyan-400"
+              >
+                <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                START
+              </motion.div>
             </AdvancedMarker>
 
-            {/* stop markers */}
-            {stops.map((stop) => (
+            {/* Stop markers */}
+            {stops.map((stop, i) => (
               <AdvancedMarker
                 key={stop.destination_id}
                 position={{ lat: stop.latitude, lng: stop.longitude }}
                 title={stop.address}
-                onClick={() => setActiveStopId(
-                  activeStopId === stop.destination_id ? null : stop.destination_id
-                )}
               >
                 <Pin
                   background={
-                    navStop?.destination_id === stop.destination_id ? '#F59E0B' :
                     stop.status === 'delivered' ? '#22C55E' :
                     stop.status === 'failed'    ? '#EF4444' : '#3B82F6'
                   }
                   glyphColor="#fff"
-                  borderColor="#fff"
+                  borderColor="transparent"
                   glyph={String(stop.optimized_sequence_order)}
                 />
               </AdvancedMarker>
             ))}
 
-            {/* full route line — hidden when navigating a single stop */}
-            {!navStop && (
-              <DirectionsRenderer
-                origin={routeData.origin}
-                stops={stops.filter((s) => s.status === 'pending')}
-              />
-            )}
-          </Map>
-        </div>
-
-        {/* ─── Directions Panel ────────────────────────────────── */}
-        <AnimatePresence>
-          {navStop && (
-            <DirectionsPanel
+            {/* Route line */}
+            <DirectionsRenderer
               origin={routeData.origin}
-              stop={navStop}
-              onClose={() => setNavStop(null)}
+              stops={stops.filter((s) => s.status === 'pending')}
             />
-          )}
-        </AnimatePresence>
+          </Map>
 
-        {/* ─── Stop List ───────────────────────────────────────── */}
-        {!navStop && (
-          <div className="bg-white border-t border-gray-200 max-h-64 overflow-y-auto">
-            <div className="p-3 space-y-2">
-              <p className="text-xs text-gray-500 font-medium uppercase tracking-wide px-1">
-                {routeData.total_stops} Stops
-              </p>
-              {stops.map((stop) => (
-                <StopCard
-                  key={stop.destination_id}
-                  stop={stop}
-                  isActive={activeStopId === stop.destination_id}
-                  onMarkDelivered={handleMarkDelivered}
-                  onMarkFailed={handleMarkFailed}
-                  onNavigate={handleNavigate}
-                  onClick={() => setActiveStopId(
-                    activeStopId === stop.destination_id ? null : stop.destination_id
-                  )}
-                />
-              ))}
+          {/* Duration overlay */}
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ delay: 0.7, type: 'spring', stiffness: 200 }}
+            className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3"
+          >
+            <div className="bg-[#111] border border-gray-700/80 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-3 backdrop-blur-sm">
+              <div className="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center border border-cyan-500/30">
+                <AccessTimeIcon sx={{ fontSize: 16, color: '#06b6d4' }} />
+              </div>
+              <div>
+                <p className="text-gray-500 text-[9px] uppercase tracking-widest">Total Duration</p>
+                <p className="text-white font-bold text-base leading-none">{totalDuration}</p>
+              </div>
+              <div className="w-px h-8 bg-gray-800 mx-1" />
+              <div>
+                <p className="text-gray-500 text-[9px] uppercase tracking-widest">Stops</p>
+                <p className="text-white font-bold text-base leading-none">{stops.length}</p>
+              </div>
             </div>
-          </div>
-        )}
+          </motion.div>
+
+          {/* Top-right: live status pill */}
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.8 }}
+            className="absolute top-4 right-4 bg-[#111]/90 border border-cyan-500/30 rounded-xl px-4 py-2.5 flex items-center gap-2.5 backdrop-blur-sm shadow-xl"
+          >
+            <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+            <div>
+              <p className="text-[9px] text-gray-500 uppercase tracking-widest">Live Tracking</p>
+              <p className="text-cyan-400 text-xs font-bold">CJK 0856 — Active</p>
+            </div>
+          </motion.div>
+        </motion.div>
 
       </div>
     </APIProvider>
