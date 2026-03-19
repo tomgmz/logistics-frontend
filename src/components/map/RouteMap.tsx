@@ -14,8 +14,8 @@ import SearchIcon from '@mui/icons-material/Search'
 import LocalShippingIcon from '@mui/icons-material/LocalShipping'
 import AccessTimeIcon from '@mui/icons-material/AccessTime'
 import PlaceIcon from '@mui/icons-material/Place'
-import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked'
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward'
+import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 
 const GOOGLE_MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!
 
@@ -168,23 +168,21 @@ function BookingItem({ booking, isActive, onClick }: {
 // ─── Route Timeline Stop ──────────────────────────────────────────────────────
 
 function RouteStop({
-  label,
   address,
   city,
   time,
   isOrigin,
   isLast,
-  isLate,
+  status,
   deliveryDate,
   totalCost,
 }: {
-  label?: string
   address: string
   city: string
   time?: string
   isOrigin?: boolean
   isLast?: boolean
-  isLate?: boolean
+  status?: 'pending' | 'delivered' | 'failed'
   deliveryDate?: string
   totalCost?: string
 }) {
@@ -197,9 +195,15 @@ function RouteStop({
             ? 'bg-gray-700 border-gray-600'
             : isLast
             ? 'bg-red-500 border-red-400'
+            : status === 'delivered'
+            ? 'bg-green-500 border-green-400'
             : 'bg-cyan-500/20 border-cyan-500/60'
         }`}>
-          <PlaceIcon sx={{ fontSize: 14, color: isLast ? '#fff' : isOrigin ? '#9ca3af' : '#06b6d4' }} />
+          {status === 'delivered' ? (
+            <CheckCircleIcon sx={{ fontSize: 14, color: '#fff' }} />
+          ) : (
+            <PlaceIcon sx={{ fontSize: 14, color: isLast ? '#fff' : isOrigin ? '#9ca3af' : '#06b6d4' }} />
+          )}
         </div>
         {!isLast && (
           <div className="w-px flex-1 min-h-[60px] border-l-2 border-dashed border-gray-700 my-1" />
@@ -216,17 +220,19 @@ function RouteStop({
           {time && <span className="text-gray-400 text-xs">{time}</span>}
         </div>
 
-        {/* Middle segment info (only shown between stops) */}
-        {!isLast && deliveryDate && (
+        {/* Status indicator for delivered stops */}
+        {status === 'delivered' && (
+          <div className="mt-2">
+            <div className="inline-flex items-center gap-1.5 bg-green-900/30 border border-green-700/50 text-green-400 px-2.5 py-1 rounded-lg">
+              <CheckCircleIcon sx={{ fontSize: 12 }} />
+              <span className="text-xs font-medium">Delivered</span>
+            </div>
+          </div>
+        )}
+
+        {/* Delivery info (only shown for in-transit) */}
+        {!isLast && deliveryDate && status !== 'delivered' && (
           <div className="mt-2 space-y-1.5">
-            {isLate && (
-              <div className="flex items-center gap-1.5">
-                <AccessTimeIcon sx={{ fontSize: 12, color: '#ef4444' }} />
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-900/40 text-red-400 border border-red-800/50 font-medium">
-                  Late
-                </span>
-              </div>
-            )}
             <div className="bg-[#1a1a1a] rounded-lg px-3 py-2 border border-gray-800">
               <div className="flex items-center justify-between">
                 <span className="text-gray-500 text-[10px]">Estimated Delivery</span>
@@ -253,7 +259,7 @@ function RouteStop({
   )
 }
 
-// ─── Main RouteMap Component ──────────────────────────────────────────────────
+// ─── Main RouteMap Component (CLIENT VIEW) ────────────────────────────────────
 
 export default function RouteMap({ bookingId }: { bookingId: string }) {
   const [routeData, setRouteData] = useState<OptimizeRouteResponse | null>(null)
@@ -263,10 +269,11 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedBooking, setSelectedBooking] = useState<string>(bookingId)
 
+  // Mock bookings - replace with real API call
   const bookings: Booking[] = [
     {
       id: '1',
-      vehicle: 'Quezon City',
+      vehicle: 'L300',
       date: 'February 2, 2026',
       status: 'IN TRANSIT',
       origin: 'Quezon City',
@@ -276,7 +283,7 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
     },
     {
       id: '2',
-      vehicle: 'Carluvao',
+      vehicle: 'L300',
       date: 'February 2, 2026',
       status: 'ARRIVED',
       origin: 'Carluvao',
@@ -284,18 +291,19 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
     },
     {
       id: '3',
-      vehicle: 'Quezon City',
-      date: 'February 2, 2026',
-      status: 'CANCELED',
-      origin: 'Quezon City',
-      destination: 'Makati',
+      vehicle: 'L300',
+      date: 'February 1, 2026',
+      status: 'BOOKED',
+      origin: 'Makati',
+      destination: 'Quezon City',
     },
   ]
 
   const filteredBookings = bookings.filter(
     (b) =>
       b.origin.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      b.destination.toLowerCase().includes(searchQuery.toLowerCase())
+      b.destination.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      b.plateNumber?.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
   useEffect(() => {
@@ -334,27 +342,6 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
     loadRoute()
   }, [bookingId])
 
-  const handleMarkDelivered = async (destinationId: string) => {
-    try {
-      await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/booking/destinations/${destinationId}/status`,
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'delivered', delivered_at: new Date().toISOString() }),
-        }
-      )
-      setStops((prev) =>
-        prev.map((s) =>
-          s.destination_id === destinationId ? { ...s, status: 'delivered' as const } : s
-        )
-      )
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Something went wrong'
-      alert(`Failed to update: ${message}`)
-    }
-  }
-
   if (loading) return (
     <div className="flex items-center justify-center h-screen bg-[#0f0f0f]">
       <motion.div
@@ -366,7 +353,7 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
           <div className="w-16 h-16 border-4 border-gray-800 rounded-full" />
           <div className="absolute inset-0 w-16 h-16 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin" />
         </div>
-        <p className="text-gray-400 text-sm font-medium tracking-wide">Optimizing route...</p>
+        <p className="text-gray-400 text-sm font-medium tracking-wide">Loading tracking information...</p>
       </motion.div>
     </div>
   )
@@ -377,7 +364,7 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
         <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-3">
           <span className="text-red-400 text-xl">!</span>
         </div>
-        <p className="text-white font-semibold mb-1">Something went wrong</p>
+        <p className="text-white font-semibold mb-1">Unable to load tracking data</p>
         <p className="text-gray-400 text-sm">{error}</p>
       </div>
     </div>
@@ -387,12 +374,17 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
 
   const totalDuration = '2 hr 13 min'
   const activeBooking = bookings.find((b) => b.id === selectedBooking)
+  
+  // Calculate delivery progress
+  const completedStops = stops.filter((s) => s.status === 'delivered').length
+  const totalStops = stops.length
+  const progressPercentage = totalStops > 0 ? (completedStops / totalStops) * 100 : 0
 
   return (
     <APIProvider apiKey={GOOGLE_MAPS_KEY}>
       <div className="flex h-screen bg-[#0f0f0f] overflow-hidden font-sans">
 
-        {/* ── SIDEBAR: Bookings ─────────────────────────────────────── */}
+        {/* SIDEBAR */}
         <motion.aside
           initial={{ x: -320, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
@@ -405,7 +397,7 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
               <div className="w-7 h-7 rounded-lg bg-cyan-500/20 flex items-center justify-center">
                 <LocalShippingIcon sx={{ fontSize: 14, color: '#06b6d4' }} />
               </div>
-              <span className="text-white font-semibold text-sm tracking-wide">8338 Logistics</span>
+              <span className="text-white font-semibold text-sm tracking-wide">My Bookings</span>
             </div>
 
             {/* Search */}
@@ -423,7 +415,7 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
 
           {/* Booking count */}
           <div className="px-4 py-2.5 flex items-center justify-between">
-            <span className="text-gray-600 text-[10px] font-semibold uppercase tracking-widest">Active Bookings</span>
+            <span className="text-gray-600 text-[10px] font-semibold uppercase tracking-widest">Your Shipments</span>
             <span className="text-[10px] bg-cyan-500/20 text-cyan-400 px-2 py-0.5 rounded-full font-bold">
               {filteredBookings.length}
             </span>
@@ -450,7 +442,7 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
           </div>
         </motion.aside>
 
-        {/* ── CENTER: Booking Detail ────────────────────────────────── */}
+        {/* BOOKING DETAILS */}
         <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -481,10 +473,9 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
 
             {/* Vehicle visual */}
             <div className="text-center mb-4">
-              <p className="text-gray-500 text-xs font-medium tracking-widest uppercase mb-1">Vehicle Type</p>
+              <p className="text-gray-500 text-xs font-medium tracking-widest uppercase mb-1">Vehicle</p>
               <h2 className="text-4xl font-black text-white tracking-tight mb-4">L300</h2>
               <div className="relative bg-gradient-to-b from-gray-800/60 to-gray-900/60 rounded-2xl border border-gray-700/50 p-6 mb-3 overflow-hidden">
-                {/* Subtle grid bg */}
                 <div
                   className="absolute inset-0 opacity-[0.04]"
                   style={{
@@ -500,12 +491,28 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
               </div>
             </div>
 
+            {/* Delivery Progress */}
+            <div className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800/80 mb-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-gray-500 text-xs">Delivery Progress</span>
+                <span className="text-white text-sm font-bold">{completedStops}/{totalStops} stops</span>
+              </div>
+              <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${progressPercentage}%` }}
+                  transition={{ duration: 1, ease: 'easeOut' }}
+                  className="h-full bg-gradient-to-r from-cyan-500 to-green-500"
+                />
+              </div>
+            </div>
+
             {/* Origin / Destination cards */}
             <div className="grid grid-cols-2 gap-2">
               <div className="bg-[#1a1a1a] rounded-xl p-3 border border-gray-800/80">
                 <div className="flex items-center gap-1.5 mb-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
-                  <span className="text-gray-500 text-[9px] font-semibold uppercase tracking-widest">Origin</span>
+                  <span className="text-gray-500 text-[9px] font-semibold uppercase tracking-widest">Pickup</span>
                 </div>
                 <p className="text-white font-bold text-sm mb-0.5">CABUYAO</p>
                 <p className="text-gray-500 text-[10px] mb-2">Laguna City</p>
@@ -514,17 +521,13 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
                     <span className="text-gray-600 text-[9px]">Scheduled</span>
                     <span className="text-gray-300 text-[10px] font-medium">12:15 PM</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600 text-[9px]">Actual</span>
-                    <span className="text-red-400 text-[10px] font-medium">1:40 PM</span>
-                  </div>
                 </div>
               </div>
 
               <div className="bg-[#1a1a1a] rounded-xl p-3 border border-gray-800/80">
                 <div className="flex items-center gap-1.5 mb-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-red-400" />
-                  <span className="text-gray-500 text-[9px] font-semibold uppercase tracking-widest">Destination</span>
+                  <span className="text-gray-500 text-[9px] font-semibold uppercase tracking-widest">Delivery</span>
                 </div>
                 <p className="text-white font-bold text-sm mb-0.5">MAHARLIKA</p>
                 <p className="text-gray-500 text-[10px] mb-2">Quezon City</p>
@@ -541,7 +544,7 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
           {/* Route section */}
           <div className="p-5 border-b border-gray-800/60">
             <div className="flex items-center justify-between mb-4">
-              <span className="text-gray-400 text-xs font-bold uppercase tracking-widest">Route</span>
+              <span className="text-gray-400 text-xs font-bold uppercase tracking-widest">Route Details</span>
               <div className="flex items-center gap-2 bg-gray-800/60 rounded-full px-3 py-1 border border-gray-700/50">
                 <AccessTimeIcon sx={{ fontSize: 12, color: '#06b6d4' }} />
                 <span className="text-cyan-400 text-xs font-semibold">1 HR 6 MINS</span>
@@ -553,7 +556,7 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
               city="Cabuyao, Laguna City"
               time="12:15 PM"
               isOrigin
-              isLate
+              status="delivered"
               deliveryDate="FEBRUARY 2, 2026"
               totalCost="$180"
             />
@@ -562,15 +565,16 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
               city="Maharlika, Quezon City"
               time="03:05 PM"
               isLast
+              status="pending"
             />
           </div>
 
           {/* Cargo details */}
           <div className="p-5">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-gray-400 text-xs font-bold uppercase tracking-widest">Cargo Details</span>
+              <span className="text-gray-400 text-xs font-bold uppercase tracking-widest">Shipment Details</span>
               <div className="flex items-center gap-1.5 bg-gray-800/60 rounded-full px-3 py-1 border border-gray-700/50">
-                <span className="text-gray-500 text-[9px] uppercase tracking-wide">Total Weight</span>
+                <span className="text-gray-500 text-[9px] uppercase tracking-wide">Weight</span>
                 <span className="text-white text-xs font-bold">186 KG</span>
               </div>
             </div>
@@ -579,7 +583,7 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
               {[
                 { label: 'Type of Goods', value: 'General Cargo' },
                 { label: 'Packages', value: '24 units' },
-                { label: 'Fragile', value: 'No' },
+                { label: 'Tracking ID', value: 'TRK-2026-001' },
               ].map(({ label, value }) => (
                 <div key={label} className="flex items-center justify-between bg-[#1a1a1a] rounded-lg px-3 py-2.5 border border-gray-800/60">
                   <span className="text-gray-500 text-xs">{label}</span>
@@ -588,34 +592,17 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
               ))}
             </div>
 
-            {/* Mark stops as delivered */}
-            {stops.filter((s) => s.status === 'pending').length > 0 && (
-              <div className="mt-4">
-                <p className="text-gray-600 text-[10px] uppercase tracking-widest mb-2">Pending Stops</p>
-                <div className="space-y-1.5">
-                  {stops
-                    .filter((s) => s.status === 'pending')
-                    .map((stop) => (
-                      <div key={stop.destination_id} className="flex items-center justify-between bg-[#1a1a1a] rounded-lg px-3 py-2 border border-gray-800">
-                        <div className="flex items-center gap-2">
-                          <RadioButtonUncheckedIcon sx={{ fontSize: 14, color: '#4b5563' }} />
-                          <span className="text-gray-400 text-xs truncate max-w-[140px]">{stop.address}</span>
-                        </div>
-                        <button
-                          onClick={() => handleMarkDelivered(stop.destination_id)}
-                          className="text-[10px] text-cyan-400 hover:text-cyan-300 font-medium transition-colors"
-                        >
-                          Mark Done
-                        </button>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            )}
+            {/* Support section */}
+            <div className="mt-5 pt-4 border-t border-gray-800">
+              <p className="text-gray-500 text-xs mb-3">Need help with your delivery?</p>
+              <button className="w-full bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 text-sm font-medium py-2.5 rounded-lg transition-colors">
+                Contact Support
+              </button>
+            </div>
           </div>
         </motion.section>
 
-        {/* ── MAP ──────────────────────────────────────────────────── */}
+        {/* MAP */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -623,7 +610,7 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
           className="flex-1 relative"
         >
           <Map
-            mapId="logistics-driver-map"
+            mapId="logistics-client-map"
             defaultCenter={{ lat: routeData.origin.latitude, lng: routeData.origin.longitude }}
             defaultZoom={11}
             gestureHandling="greedy"
@@ -647,7 +634,7 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
             {/* Origin */}
             <AdvancedMarker
               position={{ lat: routeData.origin.latitude, lng: routeData.origin.longitude }}
-              title="Origin"
+              title="Pickup Location"
             >
               <motion.div
                 initial={{ scale: 0, y: -10 }}
@@ -656,12 +643,12 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
                 className="bg-cyan-500 text-white text-[10px] font-black px-3 py-1.5 rounded-full shadow-lg shadow-cyan-500/40 flex items-center gap-1.5 border border-cyan-400"
               >
                 <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                START
+                PICKUP
               </motion.div>
             </AdvancedMarker>
 
             {/* Stop markers */}
-            {stops.map((stop, i) => (
+            {stops.map((stop) => (
               <AdvancedMarker
                 key={stop.destination_id}
                 position={{ lat: stop.latitude, lng: stop.longitude }}
@@ -682,34 +669,34 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
             {/* Route line */}
             <DirectionsRenderer
               origin={routeData.origin}
-              stops={stops.filter((s) => s.status === 'pending')}
+              stops={stops}
             />
           </Map>
 
-          {/* Duration overlay */}
+          {/* Duration & Progress overlay */}
           <motion.div
             initial={{ opacity: 0, y: 20, scale: 0.9 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ delay: 0.7, type: 'spring', stiffness: 200 }}
-            className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3"
+            className="absolute bottom-6 left-1/2 -translate-x-1/2"
           >
             <div className="bg-[#111] border border-gray-700/80 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-3 backdrop-blur-sm">
               <div className="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center border border-cyan-500/30">
                 <AccessTimeIcon sx={{ fontSize: 16, color: '#06b6d4' }} />
               </div>
               <div>
-                <p className="text-gray-500 text-[9px] uppercase tracking-widest">Total Duration</p>
+                <p className="text-gray-500 text-[9px] uppercase tracking-widest">ETA</p>
                 <p className="text-white font-bold text-base leading-none">{totalDuration}</p>
               </div>
               <div className="w-px h-8 bg-gray-800 mx-1" />
               <div>
-                <p className="text-gray-500 text-[9px] uppercase tracking-widest">Stops</p>
-                <p className="text-white font-bold text-base leading-none">{stops.length}</p>
+                <p className="text-gray-500 text-[9px] uppercase tracking-widest">Progress</p>
+                <p className="text-white font-bold text-base leading-none">{completedStops}/{totalStops}</p>
               </div>
             </div>
           </motion.div>
 
-          {/* Top-right: live status pill */}
+          {/* Live tracking indicator */}
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -719,7 +706,7 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
             <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
             <div>
               <p className="text-[9px] text-gray-500 uppercase tracking-widest">Live Tracking</p>
-              <p className="text-cyan-400 text-xs font-bold">CJK 0856 — Active</p>
+              <p className="text-cyan-400 text-xs font-bold">In Transit</p>
             </div>
           </motion.div>
         </motion.div>
