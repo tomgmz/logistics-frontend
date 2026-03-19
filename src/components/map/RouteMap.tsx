@@ -18,6 +18,7 @@ import ArrowForwardIcon from '@mui/icons-material/ArrowForward'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 
 const GOOGLE_MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!
+const GOOGLE_MAPS_MAP_ID = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID!
 
 interface DirectionsRendererProps {
   origin: { latitude: number; longitude: number }
@@ -35,7 +36,7 @@ interface Booking {
   plateNumber?: string
 }
 
-// ─── Directions Renderer ──────────────────────────────────────────────────────
+// DIRECTIONS
 
 function DirectionsRenderer({ origin, stops }: DirectionsRendererProps) {
   const map = useMap()
@@ -80,7 +81,7 @@ function DirectionsRenderer({ origin, stops }: DirectionsRendererProps) {
   return null
 }
 
-// ─── Status Badge ─────────────────────────────────────────────────────────────
+// STATUS BADGE
 
 function StatusBadge({ status }: { status: Booking['status'] }) {
   const config = {
@@ -98,7 +99,7 @@ function StatusBadge({ status }: { status: Booking['status'] }) {
   )
 }
 
-// ─── Booking List Item ────────────────────────────────────────────────────────
+// BOOKING LIST
 
 function BookingItem({ booking, isActive, onClick }: {
   booking: Booking
@@ -165,7 +166,7 @@ function BookingItem({ booking, isActive, onClick }: {
   )
 }
 
-// ─── Route Timeline Stop ──────────────────────────────────────────────────────
+// ROUTE TIMELINE
 
 function RouteStop({
   address,
@@ -259,7 +260,7 @@ function RouteStop({
   )
 }
 
-// ─── Main RouteMap Component (CLIENT VIEW) ────────────────────────────────────
+// MAIN ROUTEMAP
 
 export default function RouteMap({ bookingId }: { bookingId: string }) {
   const [routeData, setRouteData] = useState<OptimizeRouteResponse | null>(null)
@@ -269,7 +270,7 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedBooking, setSelectedBooking] = useState<string>(bookingId)
 
-  // Mock bookings - replace with real API call
+  // Mock bookings 
   const bookings: Booking[] = [
     {
       id: '1',
@@ -610,26 +611,12 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
           className="flex-1 relative"
         >
           <Map
-            mapId="logistics-client-map"
+            mapId={GOOGLE_MAPS_MAP_ID}
             defaultCenter={{ lat: routeData.origin.latitude, lng: routeData.origin.longitude }}
             defaultZoom={11}
             gestureHandling="greedy"
             disableDefaultUI={false}
             className="w-full h-full"
-            styles={[
-              { elementType: 'geometry',            stylers: [{ color: '#141e2b' }] },
-              { elementType: 'labels.text.stroke',  stylers: [{ color: '#141e2b' }] },
-              { elementType: 'labels.text.fill',    stylers: [{ color: '#6b7280' }] },
-              { featureType: 'road',                elementType: 'geometry', stylers: [{ color: '#1f2d3d' }] },
-              { featureType: 'road',                elementType: 'geometry.stroke', stylers: [{ color: '#0f1822' }] },
-              { featureType: 'road.highway',        elementType: 'geometry', stylers: [{ color: '#263c52' }] },
-              { featureType: 'water',               elementType: 'geometry', stylers: [{ color: '#0a0f18' }] },
-              { featureType: 'water',               elementType: 'labels.text.fill', stylers: [{ color: '#374151' }] },
-              { featureType: 'poi',                 elementType: 'geometry', stylers: [{ color: '#1a2433' }] },
-              { featureType: 'poi.park',            elementType: 'geometry', stylers: [{ color: '#1a2633' }] },
-              { featureType: 'transit',             elementType: 'geometry', stylers: [{ color: '#1a2433' }] },
-              { featureType: 'administrative',      elementType: 'geometry.stroke', stylers: [{ color: '#2d3d52' }] },
-            ]}
           >
             {/* Origin */}
             <AdvancedMarker
