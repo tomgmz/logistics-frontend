@@ -16,6 +16,12 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime'
 import PlaceIcon from '@mui/icons-material/Place'
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
+import MenuIcon from '@mui/icons-material/Menu'
+import CloseIcon from '@mui/icons-material/Close'
+import MapIcon from '@mui/icons-material/Map'
+import ListIcon from '@mui/icons-material/List'
+import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp'
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown'
 
 const GOOGLE_MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!
 const GOOGLE_MAPS_MAP_ID = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID!
@@ -99,7 +105,7 @@ function StatusBadge({ status }: { status: Booking['status'] }) {
   )
 }
 
-// BOOKING LIST
+// BOOKING LIST ITEM
 
 function BookingItem({ booking, isActive, onClick }: {
   booking: Booking
@@ -144,7 +150,6 @@ function BookingItem({ booking, isActive, onClick }: {
         )}
       </div>
 
-      {/* Progress dots */}
       <div className="flex gap-1 pl-9 mt-2">
         {(['BOOKED', 'IN TRANSIT', 'ARRIVED'] as const).map((s) => {
           const statuses: Booking['status'][] = ['BOOKED', 'IN TRANSIT', 'ARRIVED', 'CANCELED']
@@ -166,17 +171,10 @@ function BookingItem({ booking, isActive, onClick }: {
   )
 }
 
-// ROUTE TIMELINE
+// ROUTE STOP
 
 function RouteStop({
-  address,
-  city,
-  time,
-  isOrigin,
-  isLast,
-  status,
-  deliveryDate,
-  totalCost,
+  address, city, time, isOrigin, isLast, status, deliveryDate, totalCost,
 }: {
   address: string
   city: string
@@ -189,16 +187,12 @@ function RouteStop({
 }) {
   return (
     <div className="flex gap-3">
-      {/* Timeline line */}
       <div className="flex flex-col items-center flex-shrink-0">
         <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${
-          isOrigin
-            ? 'bg-gray-700 border-gray-600'
-            : isLast
-            ? 'bg-red-500 border-red-400'
-            : status === 'delivered'
-            ? 'bg-green-500 border-green-400'
-            : 'bg-cyan-500/20 border-cyan-500/60'
+          isOrigin ? 'bg-gray-700 border-gray-600'
+          : isLast ? 'bg-red-500 border-red-400'
+          : status === 'delivered' ? 'bg-green-500 border-green-400'
+          : 'bg-cyan-500/20 border-cyan-500/60'
         }`}>
           {status === 'delivered' ? (
             <CheckCircleIcon sx={{ fontSize: 14, color: '#fff' }} />
@@ -211,7 +205,6 @@ function RouteStop({
         )}
       </div>
 
-      {/* Content */}
       <div className="flex-1 pb-2">
         <div className="flex items-start justify-between mb-1">
           <div>
@@ -221,7 +214,6 @@ function RouteStop({
           {time && <span className="text-gray-400 text-xs">{time}</span>}
         </div>
 
-        {/* Status indicator for delivered stops */}
         {status === 'delivered' && (
           <div className="mt-2">
             <div className="inline-flex items-center gap-1.5 bg-green-900/30 border border-green-700/50 text-green-400 px-2.5 py-1 rounded-lg">
@@ -231,7 +223,6 @@ function RouteStop({
           </div>
         )}
 
-        {/* Delivery info (only shown for in-transit) */}
         {!isLast && deliveryDate && status !== 'delivered' && (
           <div className="mt-2 space-y-1.5">
             <div className="bg-[#1a1a1a] rounded-lg px-3 py-2 border border-gray-800">
@@ -246,9 +237,7 @@ function RouteStop({
                   <span className="text-gray-500 text-[10px]">Total Cost</span>
                   <div className="flex items-center gap-2">
                     <span className="text-white text-xs font-medium">{totalCost}</span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-900/40 text-green-400 border border-green-800/50 font-medium">
-                      Paid
-                    </span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-900/40 text-green-400 border border-green-800/50 font-medium">Paid</span>
                   </div>
                 </div>
               </div>
@@ -257,6 +246,170 @@ function RouteStop({
         )}
       </div>
     </div>
+  )
+}
+
+// DETAILS PANEL CONTENT (shared between desktop sidebar and mobile sheet)
+
+function DetailsPanelContent({
+  stops,
+  completedStops,
+  totalStops,
+  progressPercentage,
+}: {
+  stops: OptimizedStop[]
+  completedStops: number
+  totalStops: number
+  progressPercentage: number
+}) {
+  return (
+    <>
+      {/* Vehicle header */}
+      <div className="p-5 border-b border-gray-800/60">
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2">
+            {[0, 1].map((i) => (
+              <div key={i} className="w-8 h-8 rounded-lg bg-gray-800 border border-gray-700 flex items-center justify-center">
+                <LocalShippingIcon sx={{ fontSize: 14, color: '#6b7280' }} />
+              </div>
+            ))}
+            {[0, 1].map((i) => (
+              <div key={i} className="w-8 h-8 rounded-lg bg-gray-800 border border-gray-700 flex items-center justify-center">
+                <PlaceIcon sx={{ fontSize: 14, color: '#6b7280' }} />
+              </div>
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
+            <StatusBadge status="IN TRANSIT" />
+            <span className="text-cyan-400 text-xs font-medium">02:45 PM</span>
+          </div>
+        </div>
+
+        {/* Vehicle visual */}
+        <div className="text-center mb-4">
+          <p className="text-gray-500 text-xs font-medium tracking-widest uppercase mb-1">Vehicle</p>
+          <h2 className="text-4xl font-black text-white tracking-tight mb-4">L300</h2>
+          <div className="relative bg-gradient-to-b from-gray-800/60 to-gray-900/60 rounded-2xl border border-gray-700/50 p-6 mb-3 overflow-hidden">
+            <div
+              className="absolute inset-0 opacity-[0.04]"
+              style={{
+                backgroundImage: 'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)',
+                backgroundSize: '20px 20px',
+              }}
+            />
+            <LocalShippingIcon sx={{ fontSize: 100, color: '#374151' }} className="relative z-10" />
+          </div>
+          <div className="flex items-center justify-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+            <p className="text-white font-bold text-lg tracking-widest">CJK 0856</p>
+          </div>
+        </div>
+
+        {/* Delivery Progress */}
+        <div className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800/80 mb-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-gray-500 text-xs">Delivery Progress</span>
+            <span className="text-white text-sm font-bold">{completedStops}/{totalStops} stops</span>
+          </div>
+          <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
+            <motion.div
+              initial={{ width: 0 }}
+              animate={{ width: `${progressPercentage}%` }}
+              transition={{ duration: 1, ease: 'easeOut' }}
+              className="h-full bg-gradient-to-r from-cyan-500 to-green-500"
+            />
+          </div>
+        </div>
+
+        {/* Origin / Destination */}
+        <div className="grid grid-cols-2 gap-2">
+          <div className="bg-[#1a1a1a] rounded-xl p-3 border border-gray-800/80">
+            <div className="flex items-center gap-1.5 mb-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+              <span className="text-gray-500 text-[9px] font-semibold uppercase tracking-widest">Pickup</span>
+            </div>
+            <p className="text-white font-bold text-sm mb-0.5">CABUYAO</p>
+            <p className="text-gray-500 text-[10px] mb-2">Laguna City</p>
+            <div className="space-y-1 pt-2 border-t border-gray-800">
+              <div className="flex justify-between">
+                <span className="text-gray-600 text-[9px]">Scheduled</span>
+                <span className="text-gray-300 text-[10px] font-medium">12:15 PM</span>
+              </div>
+            </div>
+          </div>
+          <div className="bg-[#1a1a1a] rounded-xl p-3 border border-gray-800/80">
+            <div className="flex items-center gap-1.5 mb-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-red-400" />
+              <span className="text-gray-500 text-[9px] font-semibold uppercase tracking-widest">Delivery</span>
+            </div>
+            <p className="text-white font-bold text-sm mb-0.5">MAHARLIKA</p>
+            <p className="text-gray-500 text-[10px] mb-2">Quezon City</p>
+            <div className="space-y-1 pt-2 border-t border-gray-800">
+              <div className="flex justify-between">
+                <span className="text-gray-600 text-[9px]">ETA</span>
+                <span className="text-green-400 text-[10px] font-medium">03:05 PM</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Route section */}
+      <div className="p-5 border-b border-gray-800/60">
+        <div className="flex items-center justify-between mb-4">
+          <span className="text-gray-400 text-xs font-bold uppercase tracking-widest">Route Details</span>
+          <div className="flex items-center gap-2 bg-gray-800/60 rounded-full px-3 py-1 border border-gray-700/50">
+            <AccessTimeIcon sx={{ fontSize: 12, color: '#06b6d4' }} />
+            <span className="text-cyan-400 text-xs font-semibold">1 HR 6 MINS</span>
+          </div>
+        </div>
+        <RouteStop
+          address="8338 Logistics Parking"
+          city="Cabuyao, Laguna City"
+          time="12:15 PM"
+          isOrigin
+          status="delivered"
+          deliveryDate="FEBRUARY 2, 2026"
+          totalCost="$180"
+        />
+        <RouteStop
+          address="MTR Port"
+          city="Maharlika, Quezon City"
+          time="03:05 PM"
+          isLast
+          status="pending"
+        />
+      </div>
+
+      {/* Shipment details */}
+      <div className="p-5">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-gray-400 text-xs font-bold uppercase tracking-widest">Shipment Details</span>
+          <div className="flex items-center gap-1.5 bg-gray-800/60 rounded-full px-3 py-1 border border-gray-700/50">
+            <span className="text-gray-500 text-[9px] uppercase tracking-wide">Weight</span>
+            <span className="text-white text-xs font-bold">186 KG</span>
+          </div>
+        </div>
+        <div className="space-y-2">
+          {[
+            { label: 'Type of Goods', value: 'General Cargo' },
+            { label: 'Packages', value: '24 units' },
+            { label: 'Tracking ID', value: 'TRK-2026-001' },
+          ].map(({ label, value }) => (
+            <div key={label} className="flex items-center justify-between bg-[#1a1a1a] rounded-lg px-3 py-2.5 border border-gray-800/60">
+              <span className="text-gray-500 text-xs">{label}</span>
+              <span className="text-gray-200 text-xs font-medium">{value}</span>
+            </div>
+          ))}
+        </div>
+        <div className="mt-5 pt-4 border-t border-gray-800">
+          <p className="text-gray-500 text-xs mb-3">Need help with your delivery?</p>
+          <button className="w-full bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 text-sm font-medium py-2.5 rounded-lg transition-colors">
+            Contact Support
+          </button>
+        </div>
+      </div>
+    </>
   )
 }
 
@@ -270,33 +423,23 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedBooking, setSelectedBooking] = useState<string>(bookingId)
 
-  // Mock bookings 
+  // Mobile UI state
+  const [mobileTab, setMobileTab] = useState<'map' | 'bookings'>('map')
+  const [sheetExpanded, setSheetExpanded] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+
   const bookings: Booking[] = [
     {
-      id: '1',
-      vehicle: 'L300',
-      date: 'February 2, 2026',
-      status: 'IN TRANSIT',
-      origin: 'Quezon City',
-      destination: 'Manila',
-      time: '02:45 PM',
-      plateNumber: 'CJK 0856',
+      id: '1', vehicle: 'L300', date: 'February 2, 2026', status: 'IN TRANSIT',
+      origin: 'Quezon City', destination: 'Manila', time: '02:45 PM', plateNumber: 'CJK 0856',
     },
     {
-      id: '2',
-      vehicle: 'L300',
-      date: 'February 2, 2026',
-      status: 'ARRIVED',
-      origin: 'Carluvao',
-      destination: 'Maharlika',
+      id: '2', vehicle: 'L300', date: 'February 2, 2026', status: 'ARRIVED',
+      origin: 'Carluvao', destination: 'Maharlika',
     },
     {
-      id: '3',
-      vehicle: 'L300',
-      date: 'February 1, 2026',
-      status: 'BOOKED',
-      origin: 'Makati',
-      destination: 'Quezon City',
+      id: '3', vehicle: 'L300', date: 'February 1, 2026', status: 'BOOKED',
+      origin: 'Makati', destination: 'Quezon City',
     },
   ]
 
@@ -374,25 +517,68 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
   if (!routeData) return null
 
   const totalDuration = '2 hr 13 min'
-  const activeBooking = bookings.find((b) => b.id === selectedBooking)
-  
-  // Calculate delivery progress
   const completedStops = stops.filter((s) => s.status === 'delivered').length
   const totalStops = stops.length
   const progressPercentage = totalStops > 0 ? (completedStops / totalStops) * 100 : 0
 
+  // Shared map JSX
+  const mapContent = (
+    <Map
+      mapId={GOOGLE_MAPS_MAP_ID}
+      defaultCenter={{ lat: routeData.origin.latitude, lng: routeData.origin.longitude }}
+      defaultZoom={11}
+      gestureHandling="greedy"
+      disableDefaultUI={false}
+      className="w-full h-full"
+    >
+      <AdvancedMarker
+        position={{ lat: routeData.origin.latitude, lng: routeData.origin.longitude }}
+        title="Pickup Location"
+      >
+        <motion.div
+          initial={{ scale: 0, y: -10 }}
+          animate={{ scale: 1, y: 0 }}
+          transition={{ delay: 0.6, type: 'spring', stiffness: 300 }}
+          className="bg-cyan-500 text-white text-[10px] font-black px-3 py-1.5 rounded-full shadow-lg shadow-cyan-500/40 flex items-center gap-1.5 border border-cyan-400"
+        >
+          <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+          PICKUP
+        </motion.div>
+      </AdvancedMarker>
+
+      {stops.map((stop) => (
+        <AdvancedMarker
+          key={stop.destination_id}
+          position={{ lat: stop.latitude, lng: stop.longitude }}
+          title={stop.address}
+        >
+          <Pin
+            background={
+              stop.status === 'delivered' ? '#22C55E' :
+              stop.status === 'failed' ? '#EF4444' : '#3B82F6'
+            }
+            glyphColor="#fff"
+            borderColor="transparent"
+            glyph={String(stop.optimized_sequence_order)}
+          />
+        </AdvancedMarker>
+      ))}
+
+      <DirectionsRenderer origin={routeData.origin} stops={stops} />
+    </Map>
+  )
+
   return (
     <APIProvider apiKey={GOOGLE_MAPS_KEY}>
-      <div className="flex h-screen bg-[#0f0f0f] overflow-hidden font-sans">
-
-        {/* SIDEBAR */}
+      {/* ─── DESKTOP LAYOUT (lg+) ─── */}
+      <div className="hidden lg:flex h-screen bg-[#0f0f0f] overflow-hidden font-sans">
+        {/* Sidebar */}
         <motion.aside
           initial={{ x: -320, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
           transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
           className="w-72 bg-[#0a0a0a] border-r border-gray-800/80 flex flex-col flex-shrink-0"
         >
-          {/* Header */}
           <div className="px-4 pt-5 pb-3 border-b border-gray-800/60">
             <div className="flex items-center gap-2 mb-4">
               <div className="w-7 h-7 rounded-lg bg-cyan-500/20 flex items-center justify-center">
@@ -400,8 +586,6 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
               </div>
               <span className="text-white font-semibold text-sm tracking-wide">My Bookings</span>
             </div>
-
-            {/* Search */}
             <div className="relative">
               <SearchIcon sx={{ fontSize: 15, color: '#4b5563', position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
               <input
@@ -413,254 +597,45 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
               />
             </div>
           </div>
-
-          {/* Booking count */}
           <div className="px-4 py-2.5 flex items-center justify-between">
             <span className="text-gray-600 text-[10px] font-semibold uppercase tracking-widest">Your Shipments</span>
-            <span className="text-[10px] bg-cyan-500/20 text-cyan-400 px-2 py-0.5 rounded-full font-bold">
-              {filteredBookings.length}
-            </span>
+            <span className="text-[10px] bg-cyan-500/20 text-cyan-400 px-2 py-0.5 rounded-full font-bold">{filteredBookings.length}</span>
           </div>
-
-          {/* List */}
           <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-800">
             <AnimatePresence>
               {filteredBookings.map((booking, i) => (
-                <motion.div
-                  key={booking.id}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.05 }}
-                >
-                  <BookingItem
-                    booking={booking}
-                    isActive={selectedBooking === booking.id}
-                    onClick={() => setSelectedBooking(booking.id)}
-                  />
+                <motion.div key={booking.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
+                  <BookingItem booking={booking} isActive={selectedBooking === booking.id} onClick={() => setSelectedBooking(booking.id)} />
                 </motion.div>
               ))}
             </AnimatePresence>
           </div>
         </motion.aside>
 
-        {/* BOOKING DETAILS */}
+        {/* Details panel */}
         <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15, duration: 0.4 }}
           className="w-[420px] bg-[#111111] border-r border-gray-800/80 flex flex-col overflow-y-auto flex-shrink-0 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-800"
         >
-          {/* Vehicle header */}
-          <div className="p-5 border-b border-gray-800/60">
-            <div className="flex items-center justify-between mb-5">
-              <div className="flex items-center gap-2">
-                {/* Icon avatars */}
-                {[0, 1].map((i) => (
-                  <div key={i} className="w-8 h-8 rounded-lg bg-gray-800 border border-gray-700 flex items-center justify-center">
-                    <LocalShippingIcon sx={{ fontSize: 14, color: '#6b7280' }} />
-                  </div>
-                ))}
-                {[0, 1].map((i) => (
-                  <div key={i} className="w-8 h-8 rounded-lg bg-gray-800 border border-gray-700 flex items-center justify-center">
-                    <PlaceIcon sx={{ fontSize: 14, color: '#6b7280' }} />
-                  </div>
-                ))}
-              </div>
-              <div className="flex items-center gap-2">
-                <StatusBadge status="IN TRANSIT" />
-                <span className="text-cyan-400 text-xs font-medium">02:45 PM</span>
-              </div>
-            </div>
-
-            {/* Vehicle visual */}
-            <div className="text-center mb-4">
-              <p className="text-gray-500 text-xs font-medium tracking-widest uppercase mb-1">Vehicle</p>
-              <h2 className="text-4xl font-black text-white tracking-tight mb-4">L300</h2>
-              <div className="relative bg-gradient-to-b from-gray-800/60 to-gray-900/60 rounded-2xl border border-gray-700/50 p-6 mb-3 overflow-hidden">
-                <div
-                  className="absolute inset-0 opacity-[0.04]"
-                  style={{
-                    backgroundImage: 'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)',
-                    backgroundSize: '20px 20px',
-                  }}
-                />
-                <LocalShippingIcon sx={{ fontSize: 100, color: '#374151' }} className="relative z-10" />
-              </div>
-              <div className="flex items-center justify-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                <p className="text-white font-bold text-lg tracking-widest">CJK 0856</p>
-              </div>
-            </div>
-
-            {/* Delivery Progress */}
-            <div className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800/80 mb-3">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-gray-500 text-xs">Delivery Progress</span>
-                <span className="text-white text-sm font-bold">{completedStops}/{totalStops} stops</span>
-              </div>
-              <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${progressPercentage}%` }}
-                  transition={{ duration: 1, ease: 'easeOut' }}
-                  className="h-full bg-gradient-to-r from-cyan-500 to-green-500"
-                />
-              </div>
-            </div>
-
-            {/* Origin / Destination cards */}
-            <div className="grid grid-cols-2 gap-2">
-              <div className="bg-[#1a1a1a] rounded-xl p-3 border border-gray-800/80">
-                <div className="flex items-center gap-1.5 mb-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
-                  <span className="text-gray-500 text-[9px] font-semibold uppercase tracking-widest">Pickup</span>
-                </div>
-                <p className="text-white font-bold text-sm mb-0.5">CABUYAO</p>
-                <p className="text-gray-500 text-[10px] mb-2">Laguna City</p>
-                <div className="space-y-1 pt-2 border-t border-gray-800">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600 text-[9px]">Scheduled</span>
-                    <span className="text-gray-300 text-[10px] font-medium">12:15 PM</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-[#1a1a1a] rounded-xl p-3 border border-gray-800/80">
-                <div className="flex items-center gap-1.5 mb-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-red-400" />
-                  <span className="text-gray-500 text-[9px] font-semibold uppercase tracking-widest">Delivery</span>
-                </div>
-                <p className="text-white font-bold text-sm mb-0.5">MAHARLIKA</p>
-                <p className="text-gray-500 text-[10px] mb-2">Quezon City</p>
-                <div className="space-y-1 pt-2 border-t border-gray-800">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600 text-[9px]">ETA</span>
-                    <span className="text-green-400 text-[10px] font-medium">03:05 PM</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Route section */}
-          <div className="p-5 border-b border-gray-800/60">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-gray-400 text-xs font-bold uppercase tracking-widest">Route Details</span>
-              <div className="flex items-center gap-2 bg-gray-800/60 rounded-full px-3 py-1 border border-gray-700/50">
-                <AccessTimeIcon sx={{ fontSize: 12, color: '#06b6d4' }} />
-                <span className="text-cyan-400 text-xs font-semibold">1 HR 6 MINS</span>
-              </div>
-            </div>
-
-            <RouteStop
-              address="8338 Logistics Parking"
-              city="Cabuyao, Laguna City"
-              time="12:15 PM"
-              isOrigin
-              status="delivered"
-              deliveryDate="FEBRUARY 2, 2026"
-              totalCost="$180"
-            />
-            <RouteStop
-              address="MTR Port"
-              city="Maharlika, Quezon City"
-              time="03:05 PM"
-              isLast
-              status="pending"
-            />
-          </div>
-
-          {/* Cargo details */}
-          <div className="p-5">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-gray-400 text-xs font-bold uppercase tracking-widest">Shipment Details</span>
-              <div className="flex items-center gap-1.5 bg-gray-800/60 rounded-full px-3 py-1 border border-gray-700/50">
-                <span className="text-gray-500 text-[9px] uppercase tracking-wide">Weight</span>
-                <span className="text-white text-xs font-bold">186 KG</span>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              {[
-                { label: 'Type of Goods', value: 'General Cargo' },
-                { label: 'Packages', value: '24 units' },
-                { label: 'Tracking ID', value: 'TRK-2026-001' },
-              ].map(({ label, value }) => (
-                <div key={label} className="flex items-center justify-between bg-[#1a1a1a] rounded-lg px-3 py-2.5 border border-gray-800/60">
-                  <span className="text-gray-500 text-xs">{label}</span>
-                  <span className="text-gray-200 text-xs font-medium">{value}</span>
-                </div>
-              ))}
-            </div>
-
-            {/* Support section */}
-            <div className="mt-5 pt-4 border-t border-gray-800">
-              <p className="text-gray-500 text-xs mb-3">Need help with your delivery?</p>
-              <button className="w-full bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 text-sm font-medium py-2.5 rounded-lg transition-colors">
-                Contact Support
-              </button>
-            </div>
-          </div>
+          <DetailsPanelContent
+            stops={stops}
+            completedStops={completedStops}
+            totalStops={totalStops}
+            progressPercentage={progressPercentage}
+          />
         </motion.section>
 
-        {/* MAP */}
+        {/* Map */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.3, duration: 0.5 }}
           className="flex-1 relative"
         >
-          <Map
-            mapId={GOOGLE_MAPS_MAP_ID}
-            defaultCenter={{ lat: routeData.origin.latitude, lng: routeData.origin.longitude }}
-            defaultZoom={11}
-            gestureHandling="greedy"
-            disableDefaultUI={false}
-            className="w-full h-full"
-          >
-            {/* Origin */}
-            <AdvancedMarker
-              position={{ lat: routeData.origin.latitude, lng: routeData.origin.longitude }}
-              title="Pickup Location"
-            >
-              <motion.div
-                initial={{ scale: 0, y: -10 }}
-                animate={{ scale: 1, y: 0 }}
-                transition={{ delay: 0.6, type: 'spring', stiffness: 300 }}
-                className="bg-cyan-500 text-white text-[10px] font-black px-3 py-1.5 rounded-full shadow-lg shadow-cyan-500/40 flex items-center gap-1.5 border border-cyan-400"
-              >
-                <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                PICKUP
-              </motion.div>
-            </AdvancedMarker>
-
-            {/* Stop markers */}
-            {stops.map((stop) => (
-              <AdvancedMarker
-                key={stop.destination_id}
-                position={{ lat: stop.latitude, lng: stop.longitude }}
-                title={stop.address}
-              >
-                <Pin
-                  background={
-                    stop.status === 'delivered' ? '#22C55E' :
-                    stop.status === 'failed'    ? '#EF4444' : '#3B82F6'
-                  }
-                  glyphColor="#fff"
-                  borderColor="transparent"
-                  glyph={String(stop.optimized_sequence_order)}
-                />
-              </AdvancedMarker>
-            ))}
-
-            {/* Route line */}
-            <DirectionsRenderer
-              origin={routeData.origin}
-              stops={stops}
-            />
-          </Map>
-
-          {/* Duration & Progress overlay */}
+          {mapContent}
+          {/* ETA overlay */}
           <motion.div
             initial={{ opacity: 0, y: 20, scale: 0.9 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -682,8 +657,7 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
               </div>
             </div>
           </motion.div>
-
-          {/* Live tracking indicator */}
+          {/* Live tracking */}
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -697,8 +671,300 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
             </div>
           </motion.div>
         </motion.div>
-
       </div>
+
+      {/* ─── TABLET LAYOUT (md–lg) ─── */}
+      <div className="hidden md:flex lg:hidden h-screen bg-[#0f0f0f] overflow-hidden font-sans flex-col">
+        {/* Top bar */}
+        <div className="flex items-center justify-between px-4 py-3 bg-[#0a0a0a] border-b border-gray-800/80 flex-shrink-0 z-10">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-cyan-500/20 flex items-center justify-center">
+              <LocalShippingIcon sx={{ fontSize: 14, color: '#06b6d4' }} />
+            </div>
+            <span className="text-white font-semibold text-sm">My Bookings</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <StatusBadge status="IN TRANSIT" />
+            <div className="flex items-center gap-1.5 bg-[#111]/90 border border-cyan-500/30 rounded-lg px-3 py-1.5">
+              <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+              <span className="text-cyan-400 text-xs font-bold">Live</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Map fills most of screen */}
+        <div className="flex-1 relative min-h-0">
+          {mapContent}
+          {/* ETA pill */}
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
+            <div className="bg-[#111] border border-gray-700/80 text-white px-4 py-2.5 rounded-2xl shadow-2xl flex items-center gap-3 backdrop-blur-sm">
+              <AccessTimeIcon sx={{ fontSize: 14, color: '#06b6d4' }} />
+              <span className="text-white font-bold text-sm">{totalDuration}</span>
+              <div className="w-px h-5 bg-gray-800" />
+              <span className="text-gray-400 text-xs">{completedStops}/{totalStops} stops</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom sheet */}
+        <motion.div
+          animate={{ height: sheetExpanded ? '60vh' : '140px' }}
+          transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+          className="bg-[#111111] border-t border-gray-800/80 flex-shrink-0 overflow-hidden flex flex-col"
+        >
+          {/* Handle */}
+          <button
+            onClick={() => setSheetExpanded(!sheetExpanded)}
+            className="flex items-center justify-between px-5 py-3 border-b border-gray-800/60 flex-shrink-0 w-full"
+          >
+            <span className="text-gray-400 text-xs font-bold uppercase tracking-widest">Shipment Details</span>
+            <div className="flex items-center gap-2">
+              <span className="text-cyan-400 text-xs">CJK 0856</span>
+              {sheetExpanded
+                ? <KeyboardArrowDownIcon sx={{ fontSize: 18, color: '#6b7280' }} />
+                : <KeyboardArrowUpIcon sx={{ fontSize: 18, color: '#6b7280' }} />
+              }
+            </div>
+          </button>
+
+          {/* Quick stats row */}
+          <div className="flex items-center gap-3 px-5 py-3 border-b border-gray-800/60 flex-shrink-0">
+            <div className="flex-1 bg-[#1a1a1a] rounded-xl p-3 border border-gray-800/80">
+              <p className="text-gray-500 text-[9px] uppercase tracking-widest mb-1">Pickup</p>
+              <p className="text-white font-bold text-sm">CABUYAO</p>
+              <p className="text-gray-500 text-[10px]">12:15 PM</p>
+            </div>
+            <ArrowForwardIcon sx={{ fontSize: 16, color: '#4b5563', flexShrink: 0 }} />
+            <div className="flex-1 bg-[#1a1a1a] rounded-xl p-3 border border-gray-800/80">
+              <p className="text-gray-500 text-[9px] uppercase tracking-widest mb-1">Delivery</p>
+              <p className="text-white font-bold text-sm">MAHARLIKA</p>
+              <p className="text-green-400 text-[10px]">ETA 03:05 PM</p>
+            </div>
+          </div>
+
+          {/* Scrollable expanded content */}
+          {sheetExpanded && (
+            <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-800">
+              <DetailsPanelContent
+                stops={stops}
+                completedStops={completedStops}
+                totalStops={totalStops}
+                progressPercentage={progressPercentage}
+              />
+            </div>
+          )}
+        </motion.div>
+      </div>
+
+      {/* ─── MOBILE LAYOUT (<md) ─── */}
+      <div className="flex md:hidden h-screen bg-[#0f0f0f] overflow-hidden font-sans flex-col">
+        {/* Top bar */}
+        <div className="flex items-center justify-between px-4 py-3 bg-[#0a0a0a] border-b border-gray-800/80 flex-shrink-0 z-20">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-cyan-500/20 flex items-center justify-center">
+              <LocalShippingIcon sx={{ fontSize: 14, color: '#06b6d4' }} />
+            </div>
+            <div>
+              <p className="text-white font-semibold text-xs leading-none">CJK 0856</p>
+              <p className="text-gray-500 text-[10px]">L300 · In Transit</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 bg-cyan-500/10 border border-cyan-500/30 rounded-lg px-2.5 py-1.5">
+              <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+              <span className="text-cyan-400 text-[10px] font-bold">LIVE</span>
+            </div>
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="w-8 h-8 rounded-lg bg-gray-800 border border-gray-700 flex items-center justify-center"
+            >
+              <MenuIcon sx={{ fontSize: 16, color: '#9ca3af' }} />
+            </button>
+          </div>
+        </div>
+
+        {/* Tab bar */}
+        <div className="flex bg-[#0a0a0a] border-b border-gray-800/80 flex-shrink-0 z-10">
+          {[
+            { key: 'map', label: 'Map', icon: MapIcon },
+            { key: 'bookings', label: 'Bookings', icon: ListIcon },
+          ].map(({ key, label, icon: Icon }) => (
+            <button
+              key={key}
+              onClick={() => setMobileTab(key as 'map' | 'bookings')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-semibold transition-colors border-b-2 ${
+                mobileTab === key
+                  ? 'text-cyan-400 border-cyan-500'
+                  : 'text-gray-500 border-transparent'
+              }`}
+            >
+              <Icon sx={{ fontSize: 14 }} />
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Content area */}
+        <div className="flex-1 relative min-h-0">
+          {/* MAP TAB */}
+          <AnimatePresence mode="wait">
+            {mobileTab === 'map' && (
+              <motion.div
+                key="map"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 flex flex-col"
+              >
+                {/* Map */}
+                <div className="flex-1 relative">
+                  {mapContent}
+                </div>
+
+                {/* Bottom sheet */}
+                <motion.div
+                  animate={{ height: sheetExpanded ? '65vh' : '120px' }}
+                  transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                  className="bg-[#111111] border-t border-gray-800/80 flex-shrink-0 overflow-hidden flex flex-col absolute bottom-0 left-0 right-0 z-10"
+                >
+                  {/* Drag handle */}
+                  <button
+                    onClick={() => setSheetExpanded(!sheetExpanded)}
+                    className="flex flex-col items-center pt-2 pb-1 flex-shrink-0 w-full"
+                  >
+                    <div className="w-8 h-1 bg-gray-700 rounded-full mb-2" />
+                    <div className="flex items-center justify-between w-full px-5 pb-1">
+                      <div className="flex items-center gap-2">
+                        <StatusBadge status="IN TRANSIT" />
+                        <span className="text-white text-xs font-bold">02:45 PM</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-400 text-xs">{totalDuration}</span>
+                        {sheetExpanded
+                          ? <KeyboardArrowDownIcon sx={{ fontSize: 16, color: '#6b7280' }} />
+                          : <KeyboardArrowUpIcon sx={{ fontSize: 16, color: '#6b7280' }} />
+                        }
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Quick route strip */}
+                  <div className="flex items-center gap-2 px-4 pb-3 flex-shrink-0">
+                    <div className="flex-1 bg-[#1a1a1a] rounded-lg px-3 py-2 border border-gray-800/60">
+                      <p className="text-[9px] text-gray-500 uppercase tracking-widest">From</p>
+                      <p className="text-white text-xs font-bold">CABUYAO</p>
+                    </div>
+                    <ArrowForwardIcon sx={{ fontSize: 14, color: '#4b5563', flexShrink: 0 }} />
+                    <div className="flex-1 bg-[#1a1a1a] rounded-lg px-3 py-2 border border-gray-800/60">
+                      <p className="text-[9px] text-gray-500 uppercase tracking-widest">To</p>
+                      <p className="text-white text-xs font-bold">MAHARLIKA</p>
+                    </div>
+                  </div>
+
+                  {/* Expanded content */}
+                  {sheetExpanded && (
+                    <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-800">
+                      <DetailsPanelContent
+                        stops={stops}
+                        completedStops={completedStops}
+                        totalStops={totalStops}
+                        progressPercentage={progressPercentage}
+                      />
+                    </div>
+                  )}
+                </motion.div>
+              </motion.div>
+            )}
+
+            {/* BOOKINGS TAB */}
+            {mobileTab === 'bookings' && (
+              <motion.div
+                key="bookings"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="absolute inset-0 flex flex-col bg-[#0a0a0a] overflow-hidden"
+              >
+                <div className="px-4 pt-4 pb-3 border-b border-gray-800/60 flex-shrink-0">
+                  <div className="relative">
+                    <SearchIcon sx={{ fontSize: 15, color: '#4b5563', position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
+                    <input
+                      type="text"
+                      placeholder="Search bookings..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full bg-[#1a1a1a] border border-gray-800 rounded-xl pl-8 pr-3 py-2.5 text-xs text-gray-300 placeholder-gray-600 outline-none focus:border-cyan-500/50 transition-colors"
+                    />
+                  </div>
+                </div>
+                <div className="px-4 py-2.5 flex items-center justify-between flex-shrink-0">
+                  <span className="text-gray-600 text-[10px] font-semibold uppercase tracking-widest">Your Shipments</span>
+                  <span className="text-[10px] bg-cyan-500/20 text-cyan-400 px-2 py-0.5 rounded-full font-bold">{filteredBookings.length}</span>
+                </div>
+                <div className="flex-1 overflow-y-auto">
+                  <AnimatePresence>
+                    {filteredBookings.map((booking, i) => (
+                      <motion.div
+                        key={booking.id}
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.05 }}
+                      >
+                        <BookingItem
+                          booking={booking}
+                          isActive={selectedBooking === booking.id}
+                          onClick={() => {
+                            setSelectedBooking(booking.id)
+                            setMobileTab('map')
+                          }}
+                        />
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+
+      {/* ─── MOBILE SIDEBAR DRAWER ─── */}
+      <AnimatePresence>
+        {sidebarOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSidebarOpen(false)}
+              className="fixed inset-0 bg-black/60 z-40 md:hidden"
+            />
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="fixed right-0 top-0 bottom-0 w-80 bg-[#111111] border-l border-gray-800/80 z-50 flex flex-col md:hidden overflow-y-auto"
+            >
+              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800/60 flex-shrink-0">
+                <span className="text-white font-semibold text-sm">Shipment Details</span>
+                <button
+                  onClick={() => setSidebarOpen(false)}
+                  className="w-8 h-8 rounded-lg bg-gray-800 border border-gray-700 flex items-center justify-center"
+                >
+                  <CloseIcon sx={{ fontSize: 16, color: '#9ca3af' }} />
+                </button>
+              </div>
+              <DetailsPanelContent
+                stops={stops}
+                completedStops={completedStops}
+                totalStops={totalStops}
+                progressPercentage={progressPercentage}
+              />
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </APIProvider>
   )
 }
