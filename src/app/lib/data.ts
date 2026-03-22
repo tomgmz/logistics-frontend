@@ -54,19 +54,19 @@ export const CYCLING_WORDS = ['MOVING', 'PERFORMANCE', 'EFFICIENCY', 'TRACKING',
 
 export const FAQS = [
   {
-    q: 'What types of shipments do you handle?',
-    a: 'We handle everything from small parcels to full truckload freight — domestic and international. Our fleet includes motorcycles, L300 vans, closed vans, wing vans, and 10-wheeler trucks.',
+    q: 'How can I book as shipment?',
+    a: 'Booking online or in our app. Enter the transit details, choose a service, and confirm to schedule your delivery.',
   },
   {
-    q: 'Do you offer real-time tracking?',
-    a: 'Yes. Every shipment gets a live tracking number with status updates from pickup to final delivery. Monitor via our web portal or contact our 24/7 support line.',
+    q: 'Is real-time tracking available?',
+    a: 'Track every shipment live using yuour tracking number for instant updates.',
   },
   {
-    q: 'How do I get a quote or start a partnership?',
-    a: 'Fill out our contact form or reach us directly by phone or email. Our team typically responds within 15 minutes during business hours for all logistics inquiries.',
+    q: 'Which cargo types are supported?',
+    a: 'FCL & LCL. Special handling available on request.',
   },
   {
-    q: 'What areas do you service?',
-    a: 'We operate nationwide across the Philippines — with hubs in Metro Manila, Laguna, Cebu, and Davao. We also offer international freight forwarding across Southeast Asia.',
+    q: 'Where is my transaction history?',
+    a: 'Access your account to view all past and current deliveries and payments',
   },
 ];
