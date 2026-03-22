@@ -4,8 +4,19 @@ import { useState, useRef } from 'react';
 import { motion, useInView, AnimatePresence } from 'framer-motion';
 import { FAQS } from '@/app/lib/data';
 
-function FaqItem({ q, a, index }: { q: string; a: string; index: number }) {
-  const [open, setOpen] = useState(false);
+function FaqItem({ 
+  q, 
+  a, 
+  index, 
+  isOpen, 
+  onToggle 
+}: { 
+  q: string; 
+  a: string; 
+  index: number;
+  isOpen: boolean;
+  onToggle: () => void;
+}) {
   const ref    = useRef<HTMLDivElement>(null);
   const inView = useInView(ref as React.RefObject<Element>, { once: true, margin: '-40px' });
 
@@ -16,20 +27,20 @@ function FaqItem({ q, a, index }: { q: string; a: string; index: number }) {
       animate={inView ? { opacity: 1, y: 0 } : {}}
       transition={{ duration: 0.48, delay: index * 0.08 }}
       className={`rounded-[14px] border transition-all duration-300 overflow-hidden
-        ${open
+        ${isOpen
           ? 'border-white/20 bg-[#1a1a1a]'
           : 'border-white/[0.10] bg-[#141414] hover:border-white/20'
         }`}
     >
       <button
-        onClick={() => setOpen(o => !o)}
+        onClick={onToggle}
         className="w-full flex items-center justify-between gap-4 px-5 sm:px-7 py-5 sm:py-6 text-left
           cursor-pointer bg-transparent border-0 group"
       >
         <span
           className={`font-'Alegreysa Sans SC, sans-serif'flex-1 text-sm sm:text-base md:text-lg lg:text-[1.1rem]
             tracking-wide transition-colors duration-200
-            ${open ? 'text-white' : 'text-white/80 group-hover:text-white'}`}
+            ${isOpen ? 'text-white' : 'text-white/80 group-hover:text-white'}`}
         >
           {q}
         </span>
@@ -38,7 +49,7 @@ function FaqItem({ q, a, index }: { q: string; a: string; index: number }) {
           className={`shrink-0 w-8 h-8 sm:w-9 sm:h-9 rounded-full border
             flex items-center justify-center text-xl leading-none
             transition-all duration-300
-            ${open
+            ${isOpen
               ? 'rotate-45 border-white/40 text-white'
               : 'border-white/20 text-white/50 group-hover:border-white/40 group-hover:text-white/80'
             }`}
@@ -48,7 +59,7 @@ function FaqItem({ q, a, index }: { q: string; a: string; index: number }) {
       </button>
 
       <AnimatePresence initial={false}>
-        {open && (
+        {isOpen && (
           <motion.div
             key="answer"
             initial={{ height: 0, opacity: 0 }}
@@ -70,6 +81,7 @@ function FaqItem({ q, a, index }: { q: string; a: string; index: number }) {
 }
 
 export default function FaqSection() {
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
   const ref    = useRef<HTMLDivElement>(null);
   const inView = useInView(ref as React.RefObject<Element>, { once: true, margin: '-80px' });
 
@@ -109,7 +121,14 @@ export default function FaqSection() {
 
         <div className="flex flex-col gap-3">
           {FAQS.map((faq, i) => (
-            <FaqItem key={i} q={faq.q} a={faq.a} index={i} />
+            <FaqItem 
+              key={i} 
+              q={faq.q} 
+              a={faq.a} 
+              index={i}
+              isOpen={openIndex === i}
+              onToggle={() => setOpenIndex(openIndex === i ? null : i)}
+            />
           ))}
         </div>
 
