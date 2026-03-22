@@ -1,15 +1,13 @@
-// ─── Figma MCP Asset URLs (fetched from the real design) ────────────────────
 export const ASSETS = {
 
   //logo
   logo: '/final-logo.png',
 
   // Hero – Section 1
-  heroContainers: 'https://www.figma.com/api/mcp/asset/53e8bb06-708b-4f54-8fca-444544e245b8',
-  heroEllipse:    'https://www.figma.com/api/mcp/asset/5d4ec182-6dfb-498c-879d-6e3ad7ee5f4f',
+  heroContainers: '/landingpage/heroSection/hero-section-bg.png',
   // Trucks – Section 2
-  cargoTruck:     'https://www.figma.com/api/mcp/asset/c7896bf5-1325-41a3-9531-fbc4f9971c65',
-  l300Van:        'https://www.figma.com/api/mcp/asset/ff058f69-265f-4707-a72e-378a5e04661c',
+  cargoTruck:     '/landingpage/aboutSection/cargo-truck.png',
+  l300Van:        '/landingpage/aboutSection/l300-van.png',
   // Brands – Section 3
   airspeed:       '/logos/airspeed.png',
   shopee:         '/logos/shopee.png',
@@ -17,10 +15,10 @@ export const ASSETS = {
   shein:          '/logos/shein.png',
   temu:           '/logos/temu.png',
   // Services – Section 4
-  svcContainers:  'https://www.figma.com/api/mcp/asset/8d8a12a7-5abb-4816-baaf-1c3c3a4abb0b',
-  svcDelivery:    'https://www.figma.com/api/mcp/asset/5f22acc7-5bd7-467b-9542-1dc0c452b9b1',
-  svcTracking:    'https://www.figma.com/api/mcp/asset/808a5761-39ed-4de0-b84b-067d7fd4f6bf',
-  sectionEllipse: 'https://www.figma.com/api/mcp/asset/45a4b0aa-e20c-487e-a19c-8ad60f56d1a7',
+  svcContainers:  '/landingpage/servicesSection/svc-containers.jpg',
+  svcDelivery:    '/landingpage/servicesSection/svc-delivery.jpg',
+  svcTracking:    '/landingpage/servicesSection/svc-tracking.jpg',
+  sectionEllipse: '/landingpage/servicesSection/section-ellipse.svg',
 
   // Metrics
   metricsBg:      '/landingpage/metrics-section/metricsbg.png',
