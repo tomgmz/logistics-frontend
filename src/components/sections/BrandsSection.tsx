@@ -47,7 +47,7 @@ export default function BrandsSection() {
   const inView = useInView(ref, { once: true, margin: '-80px' });
 
   return (
-    <section className="relative w-full bg-[#0a0a0a] overflow-hidden py-28">
+    <section className="relative w-full h-screen bg-[#0a0a0a] overflow-hidden flex flex-col items-center justify-center">
 
       <div className="absolute top-0    inset-x-0 sep-x" />
       <div className="absolute bottom-0 inset-x-0 sep-x" />

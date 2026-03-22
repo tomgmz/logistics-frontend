@@ -103,8 +103,8 @@ export default function ServicesSection() {
   const inView = useInView(ref, { once: true, margin: '-80px' });
 
   return (
-    <section id="services" className="relative w-full bg-[#1b1b1b] overflow-hidden py-14 sm:py-20 md:py-24">
-      <div className="relative z-10 max-w-[1600px] mx-auto px-5 sm:px-8 md:px-12 lg:px-16">
+    <section id="services" className="relative w-full min-h-screen bg-[#1b1b1b] overflow-hidden py-14 sm:py-20 md:py-24 flex items-center justify-center">
+  <div className="relative z-10 max-w-[1600px] w-full mx-auto px-5 sm:px-8 md:px-12 lg:px-16">
 
         <motion.div
           ref={ref}
