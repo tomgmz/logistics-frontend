@@ -29,7 +29,7 @@ export default function ClientDashboard() {
           setSidebarOpen={setSidebarOpen}
         />
 
-        <main className="flex-1 overflow-auto bg-[var(--color-surface)]">
+        <main className="flex-1 overflow-auto bg-[var(--color-surface)] pb-6 sm:pb-10">
           {activePage === 'booking'  && <BookingWizard />}
           {activePage === 'overview' && <Placeholder title="Overview" />}
           {activePage === 'tracking' && <Placeholder title="Tracking" />}

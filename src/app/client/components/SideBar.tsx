@@ -2,17 +2,14 @@
 
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  LayoutGrid,
-  Package,
-  Truck,
-  CreditCard,
-  History,
   Settings,
   LogOut,
   PanelLeftClose,
   PanelLeft,
 } from 'lucide-react'
 import { ActivePage } from './ClientDasboard'
+import { ASSETS } from '../constants/icon'
+import Image from 'next/image'
 
 const SIDEBAR_COLLAPSED = 56
 const SIDEBAR_EXPANDED  = 260
@@ -24,12 +21,12 @@ interface SidebarProps {
   setSidebarOpen: (v: boolean) => void
 }
 
-const NAV: { id: ActivePage; label: string; icon: React.ElementType }[] = [
-  { id: 'overview', label: 'Overview', icon: LayoutGrid  },
-  { id: 'booking',  label: 'Booking',  icon: Package     },
-  { id: 'tracking', label: 'Tracking', icon: Truck       },
-  { id: 'billing',  label: 'Billing',  icon: CreditCard  },
-  { id: 'history',  label: 'History',  icon: History     },
+const NAV: { id: ActivePage; label: string; icon: React.ReactNode }[] = [
+  { id: 'overview', label: 'Overview', icon: <Image src={ASSETS.svcOverview} alt='overview' width={24} height={24}/>  },
+  { id: 'booking',  label: 'Booking',  icon: <Image src={ASSETS.svcBooking} alt='booking' width={24} height={24}/> },
+  { id: 'tracking', label: 'Tracking', icon: <Image src={ASSETS.svcTracking} alt='tracking' width={24} height={24}/> },
+  { id: 'billing',  label: 'Billing',  icon: <Image src={ASSETS.svcBilling} alt='billing' width={24} height={24}/> },
+  { id: 'history',  label: 'History',  icon: <Image src={ASSETS.svcHistory} alt='history' width={24} height={24}/> },
 ]
 
 export default function Sidebar({
@@ -114,7 +111,7 @@ export default function Sidebar({
             {/*  Bottom items  */}
             <div className="px-2 space-y-0.5 pt-4 border-t border-white/[0.07]">
               <NavItem
-                item={{ id: 'settings', label: 'Settings', icon: Settings }}
+                item={{ id: 'settings', label: 'Settings', icon: <Settings size={17} /> }}
                 isActive={activePage === 'settings'}
                 index={0}
                 expanded={sidebarOpen}
@@ -171,9 +168,8 @@ export default function Sidebar({
   )
 }
 
-/* ── Nav item ── */
 interface NavItemProps {
-  item: { id: string; label: string; icon: React.ElementType }
+  item: { id: string; label: string; icon: React.ReactNode }
   isActive: boolean
   index: number
   expanded: boolean
@@ -181,8 +177,6 @@ interface NavItemProps {
 }
 
 function NavItem({ item, isActive, index, expanded, onClick }: NavItemProps) {
-  const Icon = item.icon
-
   return (
     <motion.button
       initial={{ opacity: 0, x: -18 }}
@@ -212,11 +206,7 @@ function NavItem({ item, isActive, index, expanded, onClick }: NavItemProps) {
         className="relative z-10 shrink-0 flex items-center justify-center"
         style={{ width: SIDEBAR_COLLAPSED - 32 }}
       >
-        <Icon
-          size={17}
-          className={`transition-colors
-            ${isActive ? 'text-[var(--color-cyan)]' : 'group-hover:text-white'}`}
-        />
+        {item.icon}
       </span>
 
       <motion.span
