@@ -8,7 +8,7 @@ import {
   PanelLeft,
 } from 'lucide-react'
 import { ActivePage } from './ClientDasboard'
-import { ASSETS } from '../constants/icon'
+import { ASSETS } from '../../../constants/icon'
 import Image from 'next/image'
 
 const SIDEBAR_COLLAPSED = 56
