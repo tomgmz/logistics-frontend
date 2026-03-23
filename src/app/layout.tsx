@@ -1,5 +1,3 @@
-// src/app/layout.tsx
-
 import type { Metadata, Viewport } from 'next';
 import ThemeRegistry from '@/components/ui/ThemeRegistry';
 import { alegreyaSansSC, aboreto, fredoka, leagueSpartan, eurostile } from '@/app/fonts';

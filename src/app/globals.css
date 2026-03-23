@@ -76,7 +76,7 @@
   }
 
   .font-body {
-    font-family: var(--font-alegreya), 'Alegreya Sans SC', sans-serif;
+    font-family: var(--font-alegreya), 'Alegreya Sans', sans-serif;
     font-size: 0.875rem;
   }
 
