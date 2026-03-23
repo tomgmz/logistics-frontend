@@ -5,5 +5,3 @@ export const ASSETS = {
   svcBilling: '/clientside/billing.png',
   svcHistory: '/clientside/history.png',
 }
-
-export default ASSETS
