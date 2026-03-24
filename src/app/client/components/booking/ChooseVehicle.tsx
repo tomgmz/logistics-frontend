@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion'
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react'
-import { useSessionState } from '../hooks/UseSessionState'
+import { useSessionState } from '../../hooks/UseSessionState'
 
 interface Props {
   onNext: () => void

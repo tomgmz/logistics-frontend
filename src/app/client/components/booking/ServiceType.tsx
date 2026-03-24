@@ -4,7 +4,7 @@ import Image from 'next/image'
 import { motion, Variants } from 'framer-motion'
 import { ArrowRight, Check } from 'lucide-react'
 import { ServiceType } from './BookingWizard'
-import { SERVICE_TYPES } from '../../../constants/serviceTypeData'
+import { SERVICE_TYPES } from '../../../../constants/serviceTypeData'
 
 interface Props {
   selected: ServiceType

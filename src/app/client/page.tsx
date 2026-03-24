@@ -1,5 +1,5 @@
-import ClientDashboard from "./components/ClientDasboard";
+import { redirect } from 'next/navigation'
 
-export default function ClientPage(){
-  return <ClientDashboard/>
+export default function ClientPage() {
+  redirect('/client/overview')
 }

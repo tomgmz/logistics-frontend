@@ -7,7 +7,7 @@ import StepServiceType from './ServiceType'
 import StepBookingDetails from './BookingDetails'
 import StepVehicle from './ChooseVehicle'
 import StepReview from './StepReview'
-import { useSessionState } from '../hooks/UseSessionState'
+import { useSessionState } from '../../hooks/UseSessionState'
 
 export type ServiceType = 'ecommerce' | 'fmcg' | null
 

@@ -7,7 +7,7 @@ import {
   CalendarDays, MapPin, Package,
   Truck, Plus, X, Check,
 } from 'lucide-react'
-import { useSessionState } from '../hooks/UseSessionState'
+import { useSessionState } from '../../hooks/UseSessionState'
 import PlacesInput from './PlacesInput'
 import './BookingDetails.css'
 
@@ -150,7 +150,6 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
           className="bg-[#2A2828] rounded-2xl border border-white/[0.07] p-4 flex flex-col gap-3"
         >
           <SectionHeader icon={<Truck size={16} />} title="Pick Up Point" />
-          {/* ↓ wrap in a div with the same underline style as each dropoff row */}
           <div className="flex items-center gap-2 border-b border-white/[0.07] pb-2">
             <PlacesInput
               value={pickup}
@@ -162,7 +161,7 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
           </div>
         </motion.div>
 
-        {/* ── Drop Off Points — Google Autocomplete ── */}
+        {/* Drop Off Points — Google Autocomplete */}
         <motion.div variants={fadeUp}
           className="bg-[#2A2828] rounded-2xl border border-white/[0.07] p-4 flex flex-col gap-2"
         >
@@ -172,14 +171,12 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
               <div key={i}
                 className="flex items-center gap-2 border-b border-white/[0.07] pb-2 last:border-0 last:pb-0"
               >
-                {/* Each row gets its own PlacesInput with a stable setter */}
                 <PlacesInput
                   value={d}
                   onChange={makeDropoffSetter(i)}
                   placeholder="Enter drop-off location"
                   showIcon={false}
                 />
-                {/* Remove button — not shown on the first entry */}
                 {i > 0 && (
                   <button
                     onClick={() => setDropoffs(dropoffs.filter((_, j) => j !== i))}
@@ -204,7 +201,7 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
         </motion.div>
       </motion.div>
 
-      {/* ── Row 2: Product ── */}
+      {/* Row 2: Product */}
       <motion.div variants={fadeUp} initial="hidden" animate="show"
         className="bg-[#2A2828] rounded-2xl border border-white/[0.07] p-4"
       >
@@ -296,7 +293,7 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
         </div>
       </motion.div>
 
-      {/* ── Row 3: Cargo Capacity + Summary ── */}
+      {/* Row 3: Cargo Capacity + Summary */}
       <motion.div variants={stagger} initial="hidden" animate="show"
         className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start"
       >
@@ -456,8 +453,6 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
     </div>
   )
 }
-
-/* ── Sub-components ── */
 
 function SectionHeader({ icon, title }: { icon: React.ReactNode; title: string }) {
   return (

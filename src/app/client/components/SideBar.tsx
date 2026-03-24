@@ -1,5 +1,7 @@
 'use client'
 
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Settings,
@@ -7,7 +9,6 @@ import {
   PanelLeftClose,
   PanelLeft,
 } from 'lucide-react'
-import { ActivePage } from './ClientDasboard'
 import { ASSETS } from '../../../constants/icon'
 import Image from 'next/image'
 
@@ -15,26 +16,21 @@ const SIDEBAR_COLLAPSED = 56
 const SIDEBAR_EXPANDED  = 260
 
 interface SidebarProps {
-  activePage: ActivePage
-  setActivePage: (p: ActivePage) => void
   sidebarOpen: boolean
   setSidebarOpen: (v: boolean) => void
 }
 
-const NAV: { id: ActivePage; label: string; icon: React.ReactNode }[] = [
-  { id: 'overview', label: 'Overview', icon: <Image src={ASSETS.svcOverview} alt='overview' width={24} height={24}/>  },
-  { id: 'booking',  label: 'Booking',  icon: <Image src={ASSETS.svcBooking} alt='booking' width={24} height={24}/> },
-  { id: 'tracking', label: 'Tracking', icon: <Image src={ASSETS.svcTracking} alt='tracking' width={24} height={24}/> },
-  { id: 'billing',  label: 'Billing',  icon: <Image src={ASSETS.svcBilling} alt='billing' width={24} height={24}/> },
-  { id: 'history',  label: 'History',  icon: <Image src={ASSETS.svcHistory} alt='history' width={24} height={24}/> },
+const NAV: { href: string; label: string; icon: React.ReactNode }[] = [
+  { href: '/client',  label: 'Overview', icon: <Image src={ASSETS.svcOverview} alt='overview'  width={24} height={24} /> },
+  { href: '/client/booking',   label: 'Booking',  icon: <Image src={ASSETS.svcBooking}  alt='booking'   width={24} height={24} /> },
+  { href: '/client/tracking',  label: 'Tracking', icon: <Image src={ASSETS.svcTracking} alt='tracking'  width={24} height={24} /> },
+  { href: '/client/billing',   label: 'Billing',  icon: <Image src={ASSETS.svcBilling}  alt='billing'   width={24} height={24} /> },
+  { href: '/client/history',   label: 'History',  icon: <Image src={ASSETS.svcHistory}  alt='history'   width={24} height={24} /> },
 ]
 
-export default function Sidebar({
-  activePage,
-  setActivePage,
-  sidebarOpen,
-  setSidebarOpen,
-}: SidebarProps) {
+export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
+  const pathname = usePathname()
+
   return (
     <>
       {/* Mobile overlay */}
@@ -72,7 +68,7 @@ export default function Sidebar({
             style={{ width: SIDEBAR_EXPANDED }}
             className="h-full flex flex-col py-5"
           >
-            {/*  Company row  */}
+            {/* Company row */}
             <div className="flex items-center gap-3 px-4 mb-7 overflow-hidden">
               <div className="w-8 h-8 rounded-full bg-[var(--color-cyan)] glow-cyan
                               flex items-center justify-center shrink-0">
@@ -89,17 +85,16 @@ export default function Sidebar({
 
             <div className="sep-x-cyan mx-4 mb-4" />
 
-            {/*  Nav items  */}
+            {/* Nav items */}
             <nav className="flex-1 px-2 space-y-0.5">
               {NAV.map((item, i) => (
                 <NavItem
-                  key={item.id}
+                  key={item.href}
                   item={item}
-                  isActive={activePage === item.id}
+                  isActive={pathname === item.href || pathname.startsWith(item.href + '/')}
                   index={i}
                   expanded={sidebarOpen}
-                  onClick={() => {
-                    setActivePage(item.id)
+                  onNavigate={() => {
                     if (typeof window !== 'undefined' && window.innerWidth < 1024) {
                       setSidebarOpen(false)
                     }
@@ -108,15 +103,14 @@ export default function Sidebar({
               ))}
             </nav>
 
-            {/*  Bottom items  */}
+            {/* Bottom items */}
             <div className="px-2 space-y-0.5 pt-4 border-t border-white/[0.07]">
               <NavItem
-                item={{ id: 'settings', label: 'Settings', icon: <Settings size={17} /> }}
-                isActive={activePage === 'settings'}
+                item={{ href: '/dashboard/settings', label: 'Settings', icon: <Settings size={17} /> }}
+                isActive={pathname === '/dashboard/settings'}
                 index={0}
                 expanded={sidebarOpen}
-                onClick={() => {
-                  setActivePage('settings')
+                onNavigate={() => {
                   if (typeof window !== 'undefined' && window.innerWidth < 1024) {
                     setSidebarOpen(false)
                   }
@@ -169,66 +163,67 @@ export default function Sidebar({
 }
 
 interface NavItemProps {
-  item: { id: string; label: string; icon: React.ReactNode }
+  item: { href: string; label: string; icon: React.ReactNode }
   isActive: boolean
   index: number
   expanded: boolean
-  onClick: () => void
+  onNavigate: () => void
 }
 
-function NavItem({ item, isActive, index, expanded, onClick }: NavItemProps) {
+function NavItem({ item, isActive, index, expanded, onNavigate }: NavItemProps) {
   return (
-    <motion.button
-      initial={{ opacity: 0, x: -18 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: index * 0.06, duration: 0.3 }}
-      onClick={onClick}
-      whileHover={{ x: expanded ? 3 : 0 }}
-      whileTap={{ scale: 0.97 }}
-      title={!expanded ? item.label : undefined}
-      className={`relative w-full flex items-center gap-3 rounded-xl text-left
-                  transition-colors group py-3 px-2
-                  ${isActive
-                    ? 'text-[var(--color-cyan)]'
-                    : 'text-[var(--color-muted)] hover:text-white'
-                  }`}
-    >
-      {isActive && (
-        <motion.div
-          layoutId="activeNav"
-          className="absolute inset-0 rounded-xl glass-surface
-                     border border-[var(--color-cyan)]/20"
-          transition={{ type: 'spring', stiffness: 320, damping: 32 }}
-        />
-      )}
-
-      <span
-        className="relative z-10 shrink-0 flex items-center justify-center"
-        style={{ width: SIDEBAR_COLLAPSED - 32 }}
+    <Link href={item.href} onClick={onNavigate} prefetch={false}>
+      <motion.div
+        initial={{ opacity: 0, x: -18 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: index * 0.06, duration: 0.3 }}
+        whileHover={{ x: expanded ? 3 : 0 }}
+        whileTap={{ scale: 0.97 }}
+        title={!expanded ? item.label : undefined}
+        className={`relative w-full flex items-center gap-3 rounded-xl text-left
+                    transition-colors group py-3 px-2 cursor-pointer
+                    ${isActive
+                      ? 'text-[var(--color-cyan)]'
+                      : 'text-[var(--color-muted)] hover:text-white'
+                    }`}
       >
-        {item.icon}
-      </span>
-
-      <motion.span
-        animate={{ opacity: expanded ? 1 : 0, width: expanded ? 'auto' : 0 }}
-        transition={{ duration: 0.2 }}
-        className="relative z-10 font-body text-[15px] whitespace-nowrap overflow-hidden"
-      >
-        {item.label}
-      </motion.span>
-
-      <AnimatePresence>
-        {isActive && expanded && (
-          <motion.span
-            key="dot"
-            initial={{ opacity: 0, scale: 0 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0 }}
-            layoutId="activeDot"
-            className="relative z-10 ml-auto w-1.5 h-1.5 rounded-full bg-[var(--color-cyan)] shrink-0"
+        {isActive && (
+          <motion.div
+            layoutId="activeNav"
+            className="absolute inset-0 rounded-xl glass-surface
+                       border border-[var(--color-cyan)]/20"
+            transition={{ type: 'spring', stiffness: 320, damping: 32 }}
           />
         )}
-      </AnimatePresence>
-    </motion.button>
+
+        <span
+          className="relative z-10 shrink-0 flex items-center justify-center"
+          style={{ width: SIDEBAR_COLLAPSED - 32 }}
+        >
+          {item.icon}
+        </span>
+
+        <motion.span
+          animate={{ opacity: expanded ? 1 : 0, width: expanded ? 'auto' : 0 }}
+          transition={{ duration: 0.2 }}
+          className="relative z-10 font-body text-[15px] whitespace-nowrap overflow-hidden"
+        >
+          {item.label}
+        </motion.span>
+
+        <AnimatePresence>
+          {isActive && expanded && (
+            <motion.span
+              key="dot"
+              initial={{ opacity: 0, scale: 0 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0 }}
+              layoutId="activeDot"
+              className="relative z-10 ml-auto w-1.5 h-1.5 rounded-full bg-[var(--color-cyan)] shrink-0"
+            />
+          )}
+        </AnimatePresence>
+      </motion.div>
+    </Link>
   )
 }

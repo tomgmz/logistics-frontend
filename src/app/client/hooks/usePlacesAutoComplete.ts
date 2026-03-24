@@ -21,7 +21,6 @@ function loadGoogleMapsScript(): Promise<void> {
     script.async = true
     script.defer = true
 
-    // Google calls the global callback instead of script.onload
     ;(window as unknown as Record<string, () => void>)['__gmapsInit'] = () => {
       resolve()
       delete (window as unknown as Record<string, unknown>)['__gmapsInit']

@@ -2,7 +2,7 @@
 
 import { useRef, useCallback } from 'react'
 import { MapPin } from 'lucide-react'
-import { usePlacesAutocomplete } from '../hooks/usePlacesAutoComplete'
+import { usePlacesAutocomplete } from '../../hooks/usePlacesAutoComplete'
 
 interface PlacesInputProps {
   value: string
