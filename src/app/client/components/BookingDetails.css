@@ -1,0 +1,22 @@
+.booking-text {
+  font-family: var(--font-alegreya), 'Alegreya Sans', sans-serif;
+  font-size: 0.75rem;
+}
+
+@media (min-width: 640px) {
+  .booking-text {
+    font-size: 0.8rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .booking-text {
+    font-size: 0.9rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .booking-text {
+    font-size: 1.1rem;
+  }
+}

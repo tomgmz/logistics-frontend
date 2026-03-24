@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react'
+import { useSessionState } from '../hooks/UseSessionState'
 
 interface Props {
   onNext: () => void
@@ -25,7 +25,7 @@ const fadeUp  = {
 }
 
 export default function StepVehicle({ onNext, onBack }: Props) {
-  const [selected, setSelected] = useState<string | null>(null)
+  const [selected, setSelected] = useSessionState<string | null>('booking:vehicle', null)
 
   return (
     <div className="flex flex-col h-full p-5 lg:p-10">

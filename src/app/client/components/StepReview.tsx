@@ -152,8 +152,6 @@ export default function StepReview({ selectedService, onBack }: Props) {
   )
 }
 
-/*  Sub-components  */
-
 function ReviewRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
     <motion.div

@@ -40,7 +40,7 @@ export default function StepServiceType({ selected, setSelected, onNext }: Props
         <motion.h2 variants={fadeUp} className="font-body text-white text-2xl lg:text-4xl mb-1 lg:mb-2">
           SELECT SERVICE TYPE
         </motion.h2>
-        <motion.p variants={fadeUp} className="font-['Alegreya Sans,sans-serif'] sm:!text-lg text-[var(--color-muted)]">
+        <motion.p variants={fadeUp} className="font-body sm:!text-lg text-[var(--color-muted)]">
           Choose the delivery method for this booking
         </motion.p>
       </motion.div>

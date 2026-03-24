@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
 import Sidebar from './SideBar'
 import Header from './Header'
 import BookingWizard from './BookingWizard'
+import { useSessionState } from '../hooks/UseSessionState'
 
 export type ActivePage =
   | 'overview'
@@ -14,8 +14,8 @@ export type ActivePage =
   | 'settings'
 
 export default function ClientDashboard() {
-  const [activePage, setActivePage] = useState<ActivePage>('booking')
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [activePage, setActivePage]   = useSessionState<ActivePage>('client:activePage', 'booking')
+  const [sidebarOpen, setSidebarOpen] = useSessionState<boolean>('client:sidebarOpen', true)
 
   return (
     <div className="flex flex-col h-screen bg-[var(--color-bg)] overflow-hidden">
@@ -29,7 +29,7 @@ export default function ClientDashboard() {
           setSidebarOpen={setSidebarOpen}
         />
 
-        <main className="flex-1 overflow-auto bg-[var(--color-surface)] pb-6 sm:pb-10">
+        <main className="flex-1 overflow-auto bg-[var(--color-surface)]">
           {activePage === 'booking'  && <BookingWizard />}
           {activePage === 'overview' && <Placeholder title="Overview" />}
           {activePage === 'tracking' && <Placeholder title="Tracking" />}

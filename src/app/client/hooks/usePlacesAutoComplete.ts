@@ -1,0 +1,66 @@
+import { useEffect, useRef, useState } from 'react'
+
+const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? ''
+
+let scriptPromise: Promise<void> | null = null
+
+function loadGoogleMapsScript(): Promise<void> {
+  if (scriptPromise) return scriptPromise
+  if (typeof window === 'undefined') return Promise.resolve()
+
+  // Already loaded
+  if (window.google?.maps?.places) return Promise.resolve()
+
+  scriptPromise = new Promise((resolve, reject) => {
+    const script = document.createElement('script')
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places`
+    script.async = true
+    script.defer = true
+    script.onload  = () => resolve()
+    script.onerror = () => reject(new Error('Failed to load Google Maps'))
+    document.head.appendChild(script)
+  })
+
+  return scriptPromise
+}
+
+interface UsePlacesAutocompleteOptions {
+  /** Called when the user selects a suggestion */
+  onSelect: (value: string) => void
+  /** Restrict results — defaults to Philippines */
+  componentRestrictions?: google.maps.places.ComponentRestrictions
+}
+
+export function usePlacesAutocomplete(
+  inputRef: React.RefObject<HTMLInputElement | null>,
+  { onSelect, componentRestrictions = { country: 'ph' } }: UsePlacesAutocompleteOptions,
+) {
+  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null)
+  const [ready, setReady] = useState(false)
+
+  useEffect(() => {
+    loadGoogleMapsScript()
+      .then(() => setReady(true))
+      .catch(console.error)
+  }, [])
+
+  useEffect(() => {
+    if (!ready || !inputRef.current) return
+    if (autocompleteRef.current) return // already initialised
+
+    const ac = new window.google.maps.places.Autocomplete(inputRef.current, {
+      componentRestrictions,
+      fields: ['formatted_address', 'name'],
+    })
+
+    ac.addListener('place_changed', () => {
+      const place = ac.getPlace()
+      const value = place.formatted_address ?? place.name ?? ''
+      onSelect(value)
+    })
+
+    autocompleteRef.current = ac
+  }, [ready, inputRef, onSelect, componentRestrictions])
+
+  return { ready }
+}
