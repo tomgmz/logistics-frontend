@@ -145,16 +145,21 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
           </div>
         </motion.div>
 
-        {/* ── Pick Up Point — Google Autocomplete ── */}
+        {/* PICKUP LOCATION */}
         <motion.div variants={fadeUp}
           className="bg-[#2A2828] rounded-2xl border border-white/[0.07] p-4 flex flex-col gap-3"
         >
           <SectionHeader icon={<Truck size={16} />} title="Pick Up Point" />
-          <PlacesInput
-            value={pickup}
-            onChange={setPickup}
-            placeholder="Enter pickup location"
-          />
+          {/* ↓ wrap in a div with the same underline style as each dropoff row */}
+          <div className="flex items-center gap-2 border-b border-white/[0.07] pb-2">
+            <PlacesInput
+              value={pickup}
+              onChange={setPickup}
+              placeholder="Enter pickup location"
+              showIcon={false}
+            />
+            <MapPin size={15} className="text-[var(--color-muted)] shrink-0" />
+          </div>
         </motion.div>
 
         {/* ── Drop Off Points — Google Autocomplete ── */}
