@@ -111,7 +111,7 @@ export default function StepServiceType({ selected, setSelected, onNext }: Props
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.38 }}
-        className="flex justify-end mt-7 lg:mt-10 w-full"
+        className="flex justify-end mt-7 lg:mt-10 w-full pb-5"
       >
         <NextBtn
           disabled={!canProceed}

@@ -96,12 +96,13 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
   const removeTag    = (label: string) =>
     setShcTags(shcTags.filter((x) => x.label !== label))
 
-  // Stable per-index dropoff setters so PlacesInput doesn't re-register on every render
   const makeDropoffSetter = useCallback(
-    (index: number) => (val: string) =>
-      setDropoffs(dropoffs.map((x, j) => j === index ? val : x)),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [dropoffs],
+    (index: number) => (val: string) => {
+      setDropoffs((prevDropoffs) =>
+        prevDropoffs.map((x, j) => (j === index ? val : x))
+      )
+    },
+    [setDropoffs]
   )
 
   const isValid = pickup.trim() !== '' && dropoffs[0]?.trim() !== '' && date.trim() !== ''
@@ -119,7 +120,7 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
         >
           <SectionHeader icon={<CalendarDays size={16} />} title="Transit Schedule" />
           <div className="flex flex-col gap-1">
-            <span className="font-body booking-text text-[var(--color-muted)] text-xs">Date</span>
+            <span className="font-body booking-text text-xs">Date</span>
             <div className="flex items-center justify-between gap-2">
               <input
                 type="text"
@@ -129,11 +130,11 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
                 className="bg-transparent font-body booking-text text-white text-sm lg:text-base
                            focus:outline-none w-full placeholder-white/20"
               />
-              <CalendarDays size={18} className="text-[var(--color-muted)] shrink-0" />
+              <CalendarDays size={18} className="shrink-0" />
             </div>
           </div>
           <div className="flex flex-col gap-1">
-            <span className="font-body booking-text text-[var(--color-muted)] text-xs">Time</span>
+            <span className="font-body booking-text text-xs">Time</span>
             <input
               type="text"
               value={time}
@@ -157,7 +158,7 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
               placeholder="Enter pickup location"
               showIcon={false}
             />
-            <MapPin size={15} className="text-[var(--color-muted)] shrink-0" />
+            <MapPin size={15} className=" shrink-0" />
           </div>
         </motion.div>
 
@@ -180,12 +181,12 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
                 {i > 0 && (
                   <button
                     onClick={() => setDropoffs(dropoffs.filter((_, j) => j !== i))}
-                    className="text-[var(--color-muted)] hover:text-red-400 transition-colors cursor-pointer shrink-0"
+                    className=" hover:text-red-400 transition-colors cursor-pointer shrink-0"
                   >
                     <X size={13} />
                   </button>
                 )}
-                <MapPin size={15} className="text-[var(--color-muted)] shrink-0" />
+                <MapPin size={15} className="shrink-0" />
               </div>
             ))}
             {dropoffs.length < 3 && (
@@ -218,7 +219,7 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
             >
               {dangerous && <Check size={11} strokeWidth={3} className="text-[var(--color-bg)]" />}
             </div>
-            <span className="font-body booking-text text-[var(--color-muted)] text-xs lg:text-sm">
+            <span className="font-body booking-text text-xs lg:text-sm">
               Dangerous Goods
             </span>
           </label>
@@ -226,7 +227,7 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 items-end">
           <div className="flex flex-col gap-1">
-            <label className="font-body booking-text text-[var(--color-muted)] text-xs">Commodity</label>
+            <label className="font-body booking-text text-xs">Commodity</label>
             <input value={commodity} onChange={(e) => setCommodity(e.target.value)}
               placeholder="e.g. Accessories"
               className="bg-[#2A2828] rounded-sm px-3 py-2.5 font-body booking-text text-white text-sm
@@ -234,7 +235,7 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
                          transition-all placeholder-white/20" />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="font-body booking-text text-[var(--color-muted)] text-xs">Product</label>
+            <label className="font-body booking-text text-xs">Product</label>
             <input value={product} onChange={(e) => setProduct(e.target.value)}
               placeholder="e.g. General Cargo"
               className="bg-[#2A2828] rounded-sm px-3 py-2.5 font-body booking-text text-white text-sm
@@ -242,7 +243,7 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
                          transition-all placeholder-white/20" />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="font-body booking-text text-[var(--color-muted)] text-xs">SHC</label>
+            <label className="font-body booking-text text-xs">SHC</label>
             <div className="relative">
               <select value={shc} onChange={(e) => setShc(e.target.value)}
                 className="w-full bg-[#2A2828] rounded-sm px-3 py-2.5 font-body booking-text text-white text-sm
@@ -254,11 +255,11 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
                 <option value="EAT">EAT</option>
                 <option value="HEA">HEA</option>
               </select>
-              <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-muted)] text-xs">▼</div>
+              <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs">▼</div>
             </div>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="font-body text-[var(--color-muted)] text-xs">Additional SHC</label>
+            <label className="font-body text-xs">Additional SHC</label>
             <div className="relative">
               <select value={addShc} onChange={(e) => setAddShc(e.target.value)}
                 className="w-full bg-[#2A2828] rounded-sm px-3 py-2.5 font-body booking-text text-white text-sm
@@ -269,7 +270,7 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
                 <option value="PERISHABLE">PERISHABLE</option>
                 <option value="HAZMAT">HAZMAT</option>
               </select>
-              <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-muted)] text-xs">▼</div>
+              <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs">▼</div>
             </div>
           </div>
         </div>
@@ -326,7 +327,7 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
                 >
                   <div className="grid grid-cols-[90px_1fr] gap-x-2 gap-y-3 lg:flex lg:items-end lg:gap-2">
                     <div className="flex flex-col gap-1">
-                      <label className="font-body booking-text text-[var(--color-muted)] text-xs whitespace-nowrap">Pieces</label>
+                      <label className="font-body booking-text text-xs whitespace-nowrap">Pieces</label>
                       <input value={g.pieces} onChange={(e) => updateGroup(g.id, { pieces: e.target.value })}
                         placeholder="0"
                         className="bg-[#424242] rounded-lg px-3 py-2 font-body booking-text text-white text-sm
@@ -334,7 +335,7 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
                                    w-full placeholder-white/20" />
                     </div>
                     <div className="flex flex-col gap-1 min-w-0">
-                      <label className="font-body booking-text text-[var(--color-muted)] text-xs whitespace-nowrap">
+                      <label className="font-body booking-text text-xs whitespace-nowrap">
                         Dimensions <span className="text-white/20">(cm)</span>
                       </label>
                       <div className="flex gap-1.5">
@@ -349,7 +350,7 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
                       </div>
                     </div>
                     <div className="flex flex-col gap-1 col-span-2 lg:col-span-1 lg:shrink-0">
-                      <label className="font-body booking-text text-[var(--color-muted)] text-xs whitespace-nowrap">Weight</label>
+                      <label className="font-body booking-text text-xs whitespace-nowrap">Weight</label>
                       <div className="flex gap-1.5">
                         <input value={g.weight} onChange={(e) => updateGroup(g.id, { weight: e.target.value })}
                           placeholder="0"
@@ -382,7 +383,7 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
                     {idx > 0 && (
                       <button onClick={() => removeGroup(g.id)}
                         className="ml-auto flex items-center justify-center w-7 h-7 rounded-full
-                                   border border-white/10 text-[var(--color-muted)]
+                                   border border-white/10
                                    hover:border-red-400/40 hover:text-red-400 transition-colors cursor-pointer">
                         <X size={13} />
                       </button>
@@ -395,7 +396,7 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
             <div className="flex justify-center">
               <motion.button onClick={addGroup} whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.93 }}
                 className="flex items-center justify-center w-8 h-8 rounded-full
-                           border border-white/20 text-[var(--color-muted)]
+                           border border-white/20
                            hover:border-[var(--color-cyan)]/40 hover:text-[var(--color-cyan)]
                            transition-colors cursor-pointer">
                 <Plus size={16} />
@@ -471,7 +472,7 @@ function CheckRow({ checked, onChange, label }: { checked: boolean; onChange: (v
           ${checked ? 'bg-[var(--color-cyan)] border-[var(--color-cyan)]' : 'bg-transparent border-white/30 hover:border-white/60'}`}>
         {checked && <Check size={10} strokeWidth={3} className="text-[var(--color-bg)]" />}
       </div>
-      <span className="font-body booking-text text-[var(--color-muted)] text-xs lg:text-sm">{label}</span>
+      <span className="font-body booking-text text-xs lg:text-sm">{label}</span>
     </label>
   )
 }
@@ -502,7 +503,7 @@ function WizBtn({ onClick, children, variant, disabled }: {
                     ? 'glass text-white/20 border border-white/[0.06] cursor-not-allowed'
                     : variant === 'next'
                       ? 'glass text-white border border-white/20 hover:border-[var(--color-cyan)]/40 cursor-pointer'
-                      : 'bg-transparent text-[var(--color-muted)] border border-white/10 hover:text-white hover:border-white/20 cursor-pointer'
+                      : 'bg-transparent border border-white/10 hover:text-white hover:border-white/20 cursor-pointer'
                   }`}>
       {children}
     </motion.button>

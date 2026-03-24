@@ -91,7 +91,11 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
                 <NavItem
                   key={item.href}
                   item={item}
-                  isActive={pathname === item.href || pathname.startsWith(item.href + '/')}
+                  isActive={
+                    item.href === '/client'
+                      ? pathname === '/client'
+                      : pathname.startsWith(item.href)
+                  }
                   index={i}
                   expanded={sidebarOpen}
                   onNavigate={() => {
@@ -121,7 +125,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
                 whileHover={{ x: sidebarOpen ? 2 : 0 }}
                 whileTap={{ scale: 0.97 }}
                 className="w-full flex items-center gap-3 rounded-xl
-                           text-[var(--color-muted)] hover:text-red-400
+                           hover:text-red-400
                            transition-colors group py-3 px-2"
               >
                 <span className="shrink-0 flex items-center justify-center"
@@ -154,8 +158,8 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
            hidden sm:flex"
         >
           {sidebarOpen
-            ? <PanelLeftClose size={12} className="text-[var(--color-muted)]" />
-            : <PanelLeft      size={12} className="text-[var(--color-muted)]" />}
+            ? <PanelLeftClose size={12} />
+            : <PanelLeft      size={12} />}
         </motion.button>
       </div>
     </>
@@ -184,7 +188,7 @@ function NavItem({ item, isActive, index, expanded, onNavigate }: NavItemProps) 
                     transition-colors group py-3 px-2 cursor-pointer
                     ${isActive
                       ? 'text-[var(--color-cyan)]'
-                      : 'text-[var(--color-muted)] hover:text-white'
+                      : 'hover:[var(--color-cyan)]'
                     }`}
       >
         {isActive && (
@@ -210,19 +214,6 @@ function NavItem({ item, isActive, index, expanded, onNavigate }: NavItemProps) 
         >
           {item.label}
         </motion.span>
-
-        <AnimatePresence>
-          {isActive && expanded && (
-            <motion.span
-              key="dot"
-              initial={{ opacity: 0, scale: 0 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0 }}
-              layoutId="activeDot"
-              className="relative z-10 ml-auto w-1.5 h-1.5 rounded-full bg-[var(--color-cyan)] shrink-0"
-            />
-          )}
-        </AnimatePresence>
       </motion.div>
     </Link>
   )

@@ -34,12 +34,12 @@ export default function Header({ sidebarOpen, setSidebarOpen }: HeaderProps) {
 
         {/* Chat */}
         <IconBtn>
-          <MessageCircle size={16} className="text-[var(--color-muted)]" />
+          <MessageCircle size={16} />
         </IconBtn>
 
         {/* Notifications */}
         <IconBtn>
-          <Bell size={16} className="text-[var(--color-muted)]" />
+          <Bell size={16} />
           <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-[var(--color-cyan)]" />
         </IconBtn>
 

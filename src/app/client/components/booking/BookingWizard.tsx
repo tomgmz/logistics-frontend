@@ -66,7 +66,7 @@ export default function BookingWizard() {
           </div>
         </div>
 
-        <span className="sm:hidden ml-auto font-body text-[var(--color-muted)] text-sm whitespace-nowrap">
+        <span className="sm:hidden ml-auto font-body text-sm whitespace-nowrap">
           Step {step} / {STEPS.length}
         </span>
       </div>
