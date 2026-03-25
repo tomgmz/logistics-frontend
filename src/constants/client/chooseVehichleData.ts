@@ -13,7 +13,7 @@ export interface Vehicle {
 export const VEHICLE_IMAGES: Record<Vehicle['id'], string> = {
   sedan:      '/images/vehicles/sedan.png',
   l300:    '/landingpage/aboutSection/l300-van.png',
-  truck4w:    '/images/vehicles/truck-4w.png',
+  truck4w:    '/landingpage/aboutSection/cargo-truck.png',
   wingvan:    '/images/vehicles/wing-van.png',
   trailer:    '/images/vehicles/trailer.png',
 }

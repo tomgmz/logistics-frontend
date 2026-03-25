@@ -116,7 +116,7 @@ export default function StepServiceType({ selected, setSelected, onNext }: Props
         <NextBtn
           disabled={!canProceed}
           onClick={() => canProceed && onNext()}
-          className="w-full sm:w-auto"
+          className="font-body booking-text w-full sm:w-auto"
         >
           NEXT <ArrowRight size={17} />
         </NextBtn>
