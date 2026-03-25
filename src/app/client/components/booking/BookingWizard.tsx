@@ -43,10 +43,16 @@ export default function BookingWizard() {
 
         <h1 className="font-body booking-text text-white text-base lg:text-xl tracking-wider whitespace-nowrap">
           New Booking
+          {service && (
+            <>
+              <span className="text-white/30 mx-1.5">/</span>
+              <span className="uppercase">{service}</span>
+            </>
+          )}
         </h1>
 
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="hidden sm:flex items-center gap-1 pointer-events-auto">
+          <div className="hidden sm:flex items-center gap-12 pointer-events-auto">
             {STEPS.map((s, i) => (
               <div key={s.id} className="flex items-center">
                 <StepPip
@@ -67,8 +73,8 @@ export default function BookingWizard() {
           </div>
         </div>
 
-        <span className="sm:hidden ml-auto font-body text-sm whitespace-nowrap">
-          Step {step} / {STEPS.length}
+        <span className="sm:hidden ml-auto font-body text-sm whitespace-nowrap text-white">
+          {STEPS.find((s) => s.id === step)?.label}
         </span>
       </div>
 

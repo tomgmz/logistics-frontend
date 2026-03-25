@@ -137,11 +137,11 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
   const isValid = pickup.trim() !== '' && dropoffs[0]?.trim() !== '' && date.trim() !== ''
 
   return (
-    <div className="flex flex-col h-full p-4 lg:p-6 gap-10 overflow-auto">
+    <div className="flex flex-col h-full p-4 lg:p-6 gap-3 sm:gap-6 overflow-auto">
 
       {/* Row 1: Transit / Pickup / Dropoff */}
       <motion.div variants={stagger} initial="hidden" animate="show"
-        className="grid grid-cols-1 md:grid-cols-3 gap-6"
+        className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-6"
       >
         {/* Transit Schedule */}
         <motion.div variants={fadeUp}
@@ -325,7 +325,7 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
 
       {/* Row 3 */}
       <motion.div variants={stagger} initial="hidden" animate="show"
-        className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start"
+        className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-3 sm:gap-6 items-start"
       >
         <motion.div variants={fadeUp}
           className="bg-[#2A2828] rounded-2xl border border-white/[0.07] p-4 flex flex-col gap-4"
