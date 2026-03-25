@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { ASSETS } from '../../../constants/client/icon'
 import Image from 'next/image'
+import '../components/booking/BookingDetails.css'
 
 const SIDEBAR_COLLAPSED = 56
 const SIDEBAR_EXPANDED  = 260
@@ -138,7 +139,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
                 <motion.span
                   animate={{ opacity: sidebarOpen ? 1 : 0, width: sidebarOpen ? 'auto' : 0 }}
                   transition={{ duration: 0.2 }}
-                  className="font-body text-[15px] whitespace-nowrap overflow-hidden"
+                  className="font-body booking-text text-[15px] whitespace-nowrap overflow-hidden"
                 >
                   Sign out
                 </motion.span>
@@ -210,7 +211,7 @@ function NavItem({ item, isActive, index, expanded, onNavigate }: NavItemProps) 
         <motion.span
           animate={{ opacity: expanded ? 1 : 0, width: expanded ? 'auto' : 0 }}
           transition={{ duration: 0.2 }}
-          className="relative z-10 font-body text-[15px] whitespace-nowrap overflow-hidden"
+          className="relative z-10 font-body booking-text text-[15px] whitespace-nowrap overflow-hidden"
         >
           {item.label}
         </motion.span>

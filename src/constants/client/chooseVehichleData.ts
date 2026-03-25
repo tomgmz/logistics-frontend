@@ -10,8 +10,7 @@ export interface Vehicle {
   maxLengthCM: number
 }
 
-export const VEHICLE_IMAGES: Record<string, string> = {
-  motorcycle: '/images/vehicles/motorcycle.png',
+export const VEHICLE_IMAGES: Record<Vehicle['id'], string> = {
   sedan:      '/images/vehicles/sedan.png',
   l300:    '/landingpage/aboutSection/l300-van.png',
   truck4w:    '/images/vehicles/truck-4w.png',
@@ -20,17 +19,6 @@ export const VEHICLE_IMAGES: Record<string, string> = {
 }
 
 export const VEHICLES: Vehicle[] = [
-  {
-    id: 'motorcycle',
-    name: 'Motorcycle',
-    bodyType: 'Open',
-    dimension: '— × — × — MM',
-    suitableFor: 'Small parcels & documents',
-    stackableFriendly: false,
-    maxVolumeCBM: 0.05,
-    maxWeightKG: 10,
-    maxLengthCM: 0,
-  },
   {
     id: 'sedan',
     name: 'Sedan / Car',

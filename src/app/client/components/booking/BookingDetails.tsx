@@ -53,19 +53,48 @@ function makeGroup(): ItemGroup {
 }
 
 function calcSummary(groups: ItemGroup[]) {
-  let totalPieces = 0, grossWeight = 0, volume = 0
-  groups.forEach((g) => {
-    const p  = parseInt(g.pieces)  || 0
-    const w  = parseFloat(g.weight) || 0
-    const l  = parseFloat(g.length) || 0
-    const wi = parseFloat(g.width)  || 0
-    const h  = parseFloat(g.height) || 0
-    totalPieces += p
-    grossWeight += p * w
-    volume      += p * (l * wi * h) / 1_000_000
-  })
+  let totalPieces = 0
+  let grossWeight = 0
+  let volume = 0
+
+  for (const g of groups) {
+    const pieces = Number(g.pieces)
+    const length = Number(g.length)
+    const width  = Number(g.width)
+    const height = Number(g.height)
+    const weight = Number(g.weight)
+
+    if (!Number.isFinite(pieces) || pieces <= 0) continue
+    if (!Number.isFinite(length) || !Number.isFinite(width) || !Number.isFinite(height)) continue
+    if (!Number.isFinite(weight) || weight < 0) continue
+
+    totalPieces += pieces
+
+    // normalize weight → KG
+    const weightKG = g.weightUnit === 'lbs'
+      ? weight * 0.453592
+      : weight
+
+    // respect perItem vs total
+    if (g.perItem === 'Per Item') {
+      grossWeight += pieces * weightKG
+    } else {
+      grossWeight += weightKG
+    }
+
+    // cm³ → m³
+    const volumePerItem = (length * width * height) / 1_000_000
+    volume += pieces * volumePerItem
+  }
+
   const density = volume > 0 ? grossWeight / volume : 0
-  return { totalPieces, grossWeight, volume, density }
+
+  return {
+    totalPieces,
+    grossWeight,
+    volume,
+    density,
+  }
 }
 
 export default function StepBookingDetails({ onNext, onBack }: Props) {
@@ -110,7 +139,7 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
   return (
     <div className="flex flex-col h-full p-4 lg:p-6 gap-10 overflow-auto">
 
-      {/* ── Row 1: Transit / Pickup / Dropoff ── */}
+      {/* Row 1: Transit / Pickup / Dropoff */}
       <motion.div variants={stagger} initial="hidden" animate="show"
         className="grid grid-cols-1 md:grid-cols-3 gap-6"
       >
@@ -162,7 +191,7 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
           </div>
         </motion.div>
 
-        {/* Drop Off Points — Google Autocomplete */}
+        {/* Drop Off Point */}
         <motion.div variants={fadeUp}
           className="bg-[#2A2828] rounded-2xl border border-white/[0.07] p-4 flex flex-col gap-2"
         >
@@ -202,7 +231,7 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
         </motion.div>
       </motion.div>
 
-      {/* Row 2: Product */}
+      {/* Product */}
       <motion.div variants={fadeUp} initial="hidden" animate="show"
         className="bg-[#2A2828] rounded-2xl border border-white/[0.07] p-4"
       >
@@ -294,7 +323,7 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
         </div>
       </motion.div>
 
-      {/* Row 3: Cargo Capacity + Summary */}
+      {/* Row 3 */}
       <motion.div variants={stagger} initial="hidden" animate="show"
         className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start"
       >
@@ -425,7 +454,7 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
             <StatCard label="Total Piece"  value={summary.totalPieces > 0 ? String(summary.totalPieces)            : '—'} />
             <StatCard label="Gross Weight" value={summary.grossWeight > 0 ? `${summary.grossWeight.toFixed(1)} KG` : '—'} />
             <StatCard label="Volume"       value={summary.volume      > 0 ? `${summary.volume.toFixed(2)} CBM`     : '—'} />
-            <StatCard label="Density"      value={summary.density     > 0 ? `${summary.density.toFixed(0)} KG/CBM` : '—'} />
+            <StatCard label="Density"      value={summary.density     > 0 ? `${summary.density.toFixed(2)} KG/CBM` : '—'} />
           </div>
           <div className="flex flex-col gap-1 mt-2">
             {groups.some((g) => g.nonTiltable) && (
