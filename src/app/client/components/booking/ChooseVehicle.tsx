@@ -15,6 +15,7 @@ interface Props {
 
 interface ItemGroup {
   id: number
+  // loose fields
   pieces: string
   length: string
   width: string
@@ -24,22 +25,42 @@ interface ItemGroup {
   perItem: 'Per Item' | 'Total'
   nonTiltable: boolean
   nonStackable: boolean
+  // palletized fields
+  numPallets: string
+  palletType: 'Standard' | 'Euro' | 'Custom'
+  grossWeightPerPallet: string
+  netWeightPerPallet: string
+  stackable: boolean
+  oversize: boolean
 }
 
-function calcSummary(groups: ItemGroup[]) {
-  let totalPieces = 0, grossWeight = 0, volume = 0
+type CargoMode = 'loose' | 'palletized'
+
+function calcSummary(groups: ItemGroup[], mode: CargoMode) {
+  let totalPieces = 0, grossWeight = 0, netWeight = 0, volume = 0
+
   groups.forEach((g) => {
-    const p  = parseInt(g.pieces)   || 0
-    const w  = parseFloat(g.weight) || 0
-    const l  = parseFloat(g.length) || 0
-    const wi = parseFloat(g.width)  || 0
-    const h  = parseFloat(g.height) || 0
-    totalPieces += p
-    grossWeight += p * w
-    volume      += p * (l * wi * h) / 1_000_000
+    if (mode === 'palletized') {
+      const pallets = Number(g.numPallets)           || 0
+      const gross   = Number(g.grossWeightPerPallet) || 0
+      const net     = Number(g.netWeightPerPallet)   || 0
+      totalPieces += pallets
+      grossWeight += pallets * gross
+      netWeight   += pallets * net
+    } else {
+      const p  = parseInt(g.pieces)   || 0
+      const w  = parseFloat(g.weight) || 0
+      const l  = parseFloat(g.length) || 0
+      const wi = parseFloat(g.width)  || 0
+      const h  = parseFloat(g.height) || 0
+      totalPieces += p
+      grossWeight += p * w
+      volume      += p * (l * wi * h) / 1_000_000
+    }
   })
+
   const density = volume > 0 ? grossWeight / volume : 0
-  return { totalPieces, grossWeight, volume, density }
+  return { totalPieces, grossWeight, netWeight, volume, density }
 }
 
 function getStatus(v: { maxWeightKG: number; maxVolumeCBM: number }, grossWeight: number, volume: number) {
@@ -70,11 +91,11 @@ const slideV = {
 export default function StepVehicle({ onNext, onBack }: Props) {
   const [, setSelectedId] = useSessionState<string | null>('booking:vehicle', null)
   const [groups]          = useSessionState<ItemGroup[]>('booking:groups', [])
-  const [mode]            = useSessionState<string>('booking:mode', 'loose')
+  const [mode]            = useSessionState<CargoMode>('booking:mode', 'loose')
   const [idx, setIdx]     = useState(0)
   const [dir, setDir]     = useState(1)
 
-  const summary = useMemo(() => calcSummary(groups), [groups])
+  const summary = useMemo(() => calcSummary(groups, mode), [groups, mode])
 
   const navigate = (delta: number) => {
     setDir(delta)
@@ -95,13 +116,13 @@ export default function StepVehicle({ onNext, onBack }: Props) {
 
       <div className="flex flex-col lg:flex-row gap-3 sm:gap-4 lg:flex-1 lg:min-h-0">
 
-        {/* LEFT CARD */}
+        {/* LEFT CARD — Product Details */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35 }}
           className="
-            lg:w-[300px] xl:w-[340px] shrink-0
+            lg:w-[360px] xl:w-[400px] shrink-0
             rounded-2xl bg-[#2A2828]
             border border-white/[0.07]
             border-t-[3px] border-t-[var(--color-cyan)]
@@ -124,34 +145,72 @@ export default function StepVehicle({ onNext, onBack }: Props) {
 
           <p className="font-body booking-text text-[10px] sm:text-xs uppercase tracking-[0.14em] text-white/70">
             {summary.totalPieces > 0
-              ? `${summary.totalPieces} pieces across ${groups.length} item group${groups.length !== 1 ? 's' : ''}`
+              ? mode === 'palletized'
+                ? `${summary.totalPieces} pallet${summary.totalPieces !== 1 ? 's' : ''} across ${groups.length} group${groups.length !== 1 ? 's' : ''}`
+                : `${summary.totalPieces} pieces across ${groups.length} item group${groups.length !== 1 ? 's' : ''}`
               : 'No pieces added yet'}
           </p>
 
           <div className="sep-x" />
 
           <div className="grid grid-cols-2 gap-2">
-            <StatCard label="Total Piece"  value={summary.totalPieces > 0 ? String(summary.totalPieces)             : '—'} />
-            <StatCard label="Gross Weight" value={summary.grossWeight  > 0 ? `${summary.grossWeight.toFixed(1)} KG` : '—'} />
-            <StatCard label="Volume"       value={summary.volume       > 0 ? `${summary.volume.toFixed(2)} CBM`     : '—'} />
-            <StatCard label="Density"      value={summary.density      > 0 ? `${summary.density.toFixed(0)} KG/CBM` : '—'} />
+            <StatCard
+              label={mode === 'palletized' ? 'Total Pallets' : 'Total Piece'}
+              value={summary.totalPieces > 0 ? String(summary.totalPieces) : '—'}
+            />
+            <StatCard
+              label="Gross Weight"
+              value={summary.grossWeight > 0 ? `${summary.grossWeight.toFixed(1)} KG` : '—'}
+            />
+            <StatCard
+              label="Volume"
+              value={summary.volume > 0 ? `${summary.volume.toFixed(2)} CBM` : '—'}
+            />
+            {mode === 'palletized' ? (
+              <StatCard
+                label="Net Weight"
+                value={summary.netWeight > 0 ? `${summary.netWeight.toFixed(1)} KG` : '—'}
+              />
+            ) : (
+              <StatCard
+                label="Density"
+                value={summary.density > 0 ? `${summary.density.toFixed(0)} KG/CBM` : '—'}
+              />
+            )}
           </div>
 
           <div className="flex flex-col gap-1 mt-1">
-            {groups.some((g) => g.nonTiltable) && (
-              <p className="font-body booking-text text-[10px] sm:text-xs uppercase tracking-[0.12em] text-white/60">
-                · Non-tiltable items present
-              </p>
-            )}
-            {groups.some((g) => g.nonStackable) && (
-              <p className="font-body booking-text text-[10px] sm:text-xs uppercase tracking-[0.12em] text-white/60">
-                · Non-stackable items present
-              </p>
+            {mode === 'loose' ? (
+              <>
+                {groups.some((g) => g.nonTiltable) && (
+                  <p className="font-body booking-text text-[10px] sm:text-xs uppercase tracking-[0.12em] text-white/60">
+                    · Non-tiltable items present
+                  </p>
+                )}
+                {groups.some((g) => g.nonStackable) && (
+                  <p className="font-body booking-text text-[10px] sm:text-xs uppercase tracking-[0.12em] text-white/60">
+                    · Non-stackable items present
+                  </p>
+                )}
+              </>
+            ) : (
+              <>
+                {groups.some((g) => g.stackable) && (
+                  <p className="font-body booking-text text-[10px] sm:text-xs uppercase tracking-[0.12em] text-white/60">
+                    · Stackable pallets
+                  </p>
+                )}
+                {groups.some((g) => g.oversize) && (
+                  <p className="font-body booking-text text-[10px] sm:text-xs uppercase tracking-[0.12em] text-white/60">
+                    · Oversize pallets
+                  </p>
+                )}
+              </>
             )}
           </div>
         </motion.div>
 
-        {/*RIGHT CARD */}
+        {/* RIGHT CARD — Transit Vehicle */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -195,7 +254,7 @@ export default function StepVehicle({ onNext, onBack }: Props) {
                     initial="enter"
                     animate="center"
                     exit="exit"
-                    transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] as [number,number,number,number] }}
+                    transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] as [number, number, number, number] }}
                     className="absolute inset-0 flex items-center justify-center p-4 sm:p-6"
                   >
                     <div className="relative w-full h-full">

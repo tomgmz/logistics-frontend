@@ -20,6 +20,7 @@ type CargoMode = 'loose' | 'palletized'
 
 interface ItemGroup {
   id: number
+  // loose fields
   pieces: string
   length: string
   width: string
@@ -29,6 +30,13 @@ interface ItemGroup {
   perItem: 'Per Item' | 'Total'
   nonTiltable: boolean
   nonStackable: boolean
+  // palletized fields
+  numPallets: string
+  palletType: 'Standard' | 'Euro' | 'Custom'
+  grossWeightPerPallet: string
+  netWeightPerPallet: string
+  stackable: boolean
+  oversize: boolean
 }
 
 interface SHCTag { label: string }
@@ -49,89 +57,91 @@ function makeGroup(): ItemGroup {
     pieces: '', length: '', width: '', height: '',
     weight: '', weightUnit: 'kg', perItem: 'Per Item',
     nonTiltable: false, nonStackable: false,
+    numPallets: '', palletType: 'Standard',
+    grossWeightPerPallet: '', netWeightPerPallet: '',
+    stackable: false, oversize: false,
   }
 }
 
-function calcSummary(groups: ItemGroup[]) {
+function calcSummary(groups: ItemGroup[], mode: CargoMode) {
   let totalPieces = 0
   let grossWeight = 0
-  let volume = 0
+  let netWeight   = 0
+  let volume      = 0
 
   for (const g of groups) {
-    const pieces = Number(g.pieces)
-    const length = Number(g.length)
-    const width  = Number(g.width)
-    const height = Number(g.height)
-    const weight = Number(g.weight)
-
-    if (!Number.isFinite(pieces) || pieces <= 0) continue
-    if (!Number.isFinite(length) || !Number.isFinite(width) || !Number.isFinite(height)) continue
-    if (!Number.isFinite(weight) || weight < 0) continue
-
-    totalPieces += pieces
-
-    // normalize weight → KG
-    const weightKG = g.weightUnit === 'lbs'
-      ? weight * 0.453592
-      : weight
-
-    // respect perItem vs total
-    if (g.perItem === 'Per Item') {
-      grossWeight += pieces * weightKG
+    if (mode === 'palletized') {
+      const pallets = Number(g.numPallets)            || 0
+      const gross   = Number(g.grossWeightPerPallet)  || 0
+      const net     = Number(g.netWeightPerPallet)    || 0
+      totalPieces += pallets
+      grossWeight += pallets * gross
+      netWeight   += pallets * net
     } else {
-      grossWeight += weightKG
-    }
+      const pieces = Number(g.pieces)
+      const length = Number(g.length)
+      const width  = Number(g.width)
+      const height = Number(g.height)
+      const weight = Number(g.weight)
 
-    // cm³ → m³
-    const volumePerItem = (length * width * height) / 1_000_000
-    volume += pieces * volumePerItem
+      if (!Number.isFinite(pieces) || pieces <= 0) continue
+      if (!Number.isFinite(length) || !Number.isFinite(width) || !Number.isFinite(height)) continue
+      if (!Number.isFinite(weight) || weight < 0) continue
+
+      totalPieces += pieces
+      const weightKG = g.weightUnit === 'lbs' ? weight * 0.453592 : weight
+      grossWeight += g.perItem === 'Per Item' ? pieces * weightKG : weightKG
+      volume += pieces * (length * width * height) / 1_000_000
+    }
   }
 
   const density = volume > 0 ? grossWeight / volume : 0
-
-  return {
-    totalPieces,
-    grossWeight,
-    volume,
-    density,
-  }
+  return { totalPieces, grossWeight, netWeight, volume, density }
 }
 
 export default function StepBookingDetails({ onNext, onBack }: Props) {
-  const [date,           setDate]           = useSessionState('booking:date', '')
-  const [time,           setTime]           = useSessionState('booking:time', '')
-  const [pickup,         setPickup]         = useSessionState('booking:pickup', '')
-  const [dropoffs,       setDropoffs]       = useSessionState<string[]>('booking:dropoffs', [''])
-  const [commodity,      setCommodity]      = useSessionState('booking:commodity', '')
-  const [product,        setProduct]        = useSessionState('booking:product', '')
-  const [shc,            setShc]            = useSessionState('booking:shc', '')
-  const [addShc,         setAddShc]         = useSessionState('booking:addShc', '')
-  const [dangerous,      setDangerous]      = useSessionState('booking:dangerous', false)
-  const [shcTags,        setShcTags]        = useSessionState<SHCTag[]>('booking:shcTags', [])
-  const [mode,           setMode]           = useSessionState<CargoMode>('booking:mode', 'loose')
-  const [allNonTiltable, setAllNonTiltable] = useSessionState('booking:allNonTiltable', false)
-  const [allNonStackable,setAllNonStackable]= useSessionState('booking:allNonStackable', false)
-  const [groups,         setGroups]         = useSessionState<ItemGroup[]>('booking:groups', [
-    { id: 1, pieces: '', length: '', width: '', height: '', weight: '', weightUnit: 'kg', perItem: 'Per Item', nonTiltable: false, nonStackable: false },
+  const [date,            setDate]            = useSessionState('booking:date', '')
+  const [time,            setTime]            = useSessionState('booking:time', '')
+  const [pickup,          setPickup]          = useSessionState('booking:pickup', '')
+  const [dropoffs,        setDropoffs]        = useSessionState<string[]>('booking:dropoffs', [''])
+  const [commodity,       setCommodity]       = useSessionState('booking:commodity', '')
+  const [product,         setProduct]         = useSessionState('booking:product', '')
+  const [shc,             setShc]             = useSessionState('booking:shc', '')
+  const [addShc,          setAddShc]          = useSessionState('booking:addShc', '')
+  const [dangerous,       setDangerous]       = useSessionState('booking:dangerous', false)
+  const [shcTags,         setShcTags]         = useSessionState<SHCTag[]>('booking:shcTags', [])
+  const [mode,            setMode]            = useSessionState<CargoMode>('booking:mode', 'loose')
+  const [allNonTiltable,  setAllNonTiltable]  = useSessionState('booking:allNonTiltable', false)
+  const [allNonStackable, setAllNonStackable] = useSessionState('booking:allNonStackable', false)
+  const [allStackable,    setAllStackable]    = useSessionState('booking:allStackable', false)
+  const [allOversize,     setAllOversize]     = useSessionState('booking:allOversize', false)
+  const [groups,          setGroups]          = useSessionState<ItemGroup[]>('booking:groups', [
+    {
+      id: 1,
+      pieces: '', length: '', width: '', height: '',
+      weight: '', weightUnit: 'kg', perItem: 'Per Item',
+      nonTiltable: false, nonStackable: false,
+      numPallets: '', palletType: 'Standard',
+      grossWeightPerPallet: '', netWeightPerPallet: '',
+      stackable: false, oversize: false,
+    },
   ])
 
-  const summary = useMemo(() => calcSummary(groups), [groups])
+  const summary = useMemo(() => calcSummary(groups, mode), [groups, mode])
 
-  const updateGroup  = (id: number, patch: Partial<ItemGroup>) =>
+  const updateGroup = (id: number, patch: Partial<ItemGroup>) =>
     setGroups(groups.map((g) => g.id === id ? { ...g, ...patch } : g))
-  const removeGroup  = (id: number) =>
+  const removeGroup = (id: number) =>
     setGroups(groups.filter((g) => g.id !== id))
-  const addGroup     = () => setGroups([...groups, makeGroup()])
-  const removeTag    = (label: string) =>
+  const addGroup    = () => setGroups([...groups, makeGroup()])
+  const removeTag   = (label: string) =>
     setShcTags(shcTags.filter((x) => x.label !== label))
 
   const makeDropoffSetter = useCallback(
     (index: number) => (val: string) => {
-      setDropoffs((prevDropoffs) =>
-        prevDropoffs.map((x, j) => (j === index ? val : x))
-      )
+      setDropoffs((prev) => prev.map((x, j) => (j === index ? val : x)))
     },
-    [setDropoffs]
+    [setDropoffs],
   )
 
   const isValid = pickup.trim() !== '' && dropoffs[0]?.trim() !== '' && date.trim() !== ''
@@ -175,7 +185,7 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
           </div>
         </motion.div>
 
-        {/* PICKUP LOCATION */}
+        {/* Pickup Location */}
         <motion.div variants={fadeUp}
           className="bg-[#2A2828] rounded-2xl border border-white/[0.07] p-4 flex flex-col gap-3"
         >
@@ -187,7 +197,7 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
               placeholder="Enter pickup location"
               showIcon={false}
             />
-            <MapPin size={15} className=" shrink-0" />
+            <MapPin size={15} className="shrink-0" />
           </div>
         </motion.div>
 
@@ -210,7 +220,7 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
                 {i > 0 && (
                   <button
                     onClick={() => setDropoffs(dropoffs.filter((_, j) => j !== i))}
-                    className=" hover:text-red-400 transition-colors cursor-pointer shrink-0"
+                    className="hover:text-red-400 transition-colors cursor-pointer shrink-0"
                   >
                     <X size={13} />
                   </button>
@@ -248,9 +258,7 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
             >
               {dangerous && <Check size={11} strokeWidth={3} className="text-[var(--color-bg)]" />}
             </div>
-            <span className="font-body booking-text text-xs lg:text-sm">
-              Dangerous Goods
-            </span>
+            <span className="font-body booking-text text-xs lg:text-sm">Dangerous Goods</span>
           </label>
         </div>
 
@@ -323,7 +331,7 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
         </div>
       </motion.div>
 
-      {/* Row 3 */}
+      {/* Row 3: Cargo Capacity + Summary */}
       <motion.div variants={stagger} initial="hidden" animate="show"
         className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-3 sm:gap-6 items-start"
       >
@@ -332,21 +340,36 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
         >
           <SectionHeader icon={<Truck size={16} />} title="Cargo Capacity" />
 
+          {/* Mode tabs */}
           <div className="flex items-center gap-6 border-b border-white/[0.07]">
             {(['loose', 'palletized'] as CargoMode[]).map((m) => (
               <button key={m} onClick={() => setMode(m)}
                 className={`pb-2 font-body booking-text text-sm capitalize transition-colors cursor-pointer
-                  ${mode === m ? 'text-white border-b-2 border-white -mb-px' : 'text-[var(--color-muted)] hover:text-white'}`}>
+                  ${mode === m
+                    ? 'text-white border-b-2 border-white -mb-px'
+                    : 'text-[var(--color-muted)] hover:text-white'
+                  }`}>
                 {m.charAt(0).toUpperCase() + m.slice(1)}
               </button>
             ))}
           </div>
 
+          {/* Global checkboxes — differ by mode */}
           <div className="flex items-center gap-6 justify-end">
-            <CheckRow checked={allNonTiltable}  onChange={setAllNonTiltable}  label="All Non-tiltable"  />
-            <CheckRow checked={allNonStackable} onChange={setAllNonStackable} label="All Non-stackable" />
+            {mode === 'loose' ? (
+              <>
+                <CheckRow checked={allNonTiltable}  onChange={setAllNonTiltable}  label="All Non-tiltable"  />
+                <CheckRow checked={allNonStackable} onChange={setAllNonStackable} label="All Non-stackable" />
+              </>
+            ) : (
+              <>
+                <CheckRow checked={allStackable} onChange={setAllStackable} label="All Stackable" />
+                <CheckRow checked={allOversize}  onChange={setAllOversize}  label="All Oversize"  />
+              </>
+            )}
           </div>
 
+          {/* Item groups */}
           <div className="flex flex-col gap-3">
             <AnimatePresence>
               {groups.map((g, idx) => (
@@ -354,66 +377,184 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
                   initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}
                   className="bg-[#424242] rounded-xl p-3 lg:p-4 border border-white/[0.07]"
                 >
-                  <div className="grid grid-cols-[90px_1fr] gap-x-2 gap-y-3 lg:flex lg:items-end lg:gap-2">
-                    <div className="flex flex-col gap-1">
-                      <label className="font-body booking-text text-xs whitespace-nowrap">Pieces</label>
-                      <input value={g.pieces} onChange={(e) => updateGroup(g.id, { pieces: e.target.value })}
-                        placeholder="0"
-                        className="bg-[#424242] rounded-lg px-3 py-2 font-body booking-text text-white text-sm
-                                   border border-[#333333] focus:outline-none focus:border-[var(--color-cyan)]/40
-                                   w-full placeholder-white/20" />
-                    </div>
-                    <div className="flex flex-col gap-1 min-w-0">
-                      <label className="font-body booking-text text-xs whitespace-nowrap">
-                        Dimensions <span className="text-white/20">(cm)</span>
-                      </label>
-                      <div className="flex gap-1.5">
-                        {(['length', 'width', 'height'] as const).map((dim) => (
-                          <input key={dim} value={g[dim]}
-                            onChange={(e) => updateGroup(g.id, { [dim]: e.target.value })}
-                            placeholder={dim.charAt(0).toUpperCase()}
+                  {/* ── LOOSE row ── */}
+                  {mode === 'loose' && (
+                    <div className="grid grid-cols-[90px_1fr] gap-x-2 gap-y-3 lg:flex lg:items-end lg:gap-2">
+                      <div className="flex flex-col gap-1">
+                        <label className="font-body booking-text text-xs whitespace-nowrap">Pieces</label>
+                        <input value={g.pieces} onChange={(e) => updateGroup(g.id, { pieces: e.target.value })}
+                          placeholder="0"
+                          className="bg-[#424242] rounded-lg px-3 py-2 font-body booking-text text-white text-sm
+                                     border border-[#333333] focus:outline-none focus:border-[var(--color-cyan)]/40
+                                     w-full placeholder-white/20" />
+                      </div>
+                      <div className="flex flex-col gap-1 min-w-0">
+                        <label className="font-body booking-text text-xs whitespace-nowrap">
+                          Dimensions <span className="text-white/20">(cm)</span>
+                        </label>
+                        <div className="flex gap-1.5">
+                          {(['length', 'width', 'height'] as const).map((dim) => (
+                            <input key={dim} value={g[dim]}
+                              onChange={(e) => updateGroup(g.id, { [dim]: e.target.value })}
+                              placeholder={dim.charAt(0).toUpperCase()}
+                              className="bg-[#424242] rounded-lg px-2 py-2 font-body booking-text text-white text-sm
+                                         border border-[#333333] focus:outline-none focus:border-[var(--color-cyan)]/40
+                                         w-full placeholder-white/20 min-w-0" />
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-1 col-span-2 lg:col-span-1 lg:shrink-0">
+                        <label className="font-body booking-text text-xs whitespace-nowrap">Weight</label>
+                        <div className="flex gap-1.5">
+                          <input value={g.weight} onChange={(e) => updateGroup(g.id, { weight: e.target.value })}
+                            placeholder="0"
                             className="bg-[#424242] rounded-lg px-2 py-2 font-body booking-text text-white text-sm
                                        border border-[#333333] focus:outline-none focus:border-[var(--color-cyan)]/40
-                                       w-full placeholder-white/20 min-w-0" />
-                        ))}
+                                       w-14 placeholder-white/20" />
+                          <select value={g.weightUnit}
+                            onChange={(e) => updateGroup(g.id, { weightUnit: e.target.value as 'kg' | 'lbs' })}
+                            className="bg-[#424242] rounded-lg px-2 py-2 font-body booking-text text-white text-sm
+                                       border border-[#333333] focus:outline-none appearance-none [color-scheme:dark] cursor-pointer w-14">
+                            <option value="kg">kg</option>
+                            <option value="lbs">lbs</option>
+                          </select>
+                          <select value={g.perItem}
+                            onChange={(e) => updateGroup(g.id, { perItem: e.target.value as 'Per Item' | 'Total' })}
+                            className="bg-[#424242] rounded-lg px-2 py-2 font-body booking-text text-white text-sm
+                                       border border-[#333333] focus:outline-none appearance-none [color-scheme:dark] cursor-pointer flex-1">
+                            <option value="Per Item">Per Item</option>
+                            <option value="Total">Total</option>
+                          </select>
+                        </div>
                       </div>
                     </div>
-                    <div className="flex flex-col gap-1 col-span-2 lg:col-span-1 lg:shrink-0">
-                      <label className="font-body booking-text text-xs whitespace-nowrap">Weight</label>
-                      <div className="flex gap-1.5">
-                        <input value={g.weight} onChange={(e) => updateGroup(g.id, { weight: e.target.value })}
-                          placeholder="0"
-                          className="bg-[#424242] rounded-lg px-2 py-2 font-body booking-text text-white text-sm
-                                     border border-[#333333] focus:outline-none focus:border-[var(--color-cyan)]/40
-                                     w-14 placeholder-white/20" />
-                        <select value={g.weightUnit}
-                          onChange={(e) => updateGroup(g.id, { weightUnit: e.target.value as 'kg'|'lbs' })}
-                          className="bg-[#424242] rounded-lg px-2 py-2 font-body booking-text text-white text-sm
-                                     border border-[#333333] focus:outline-none appearance-none [color-scheme:dark] cursor-pointer w-14">
-                          <option value="kg">kg</option>
-                          <option value="lbs">lbs</option>
-                        </select>
-                        <select value={g.perItem}
-                          onChange={(e) => updateGroup(g.id, { perItem: e.target.value as 'Per Item'|'Total' })}
-                          className="bg-[#424242] rounded-lg px-2 py-2 font-body booking-text text-white text-sm
-                                     border border-[#333333] focus:outline-none appearance-none [color-scheme:dark] cursor-pointer flex-1">
-                          <option value="Per Item">Per Item</option>
-                          <option value="Total">Total</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
+                  )}
 
+                  {/* ── PALLETIZED row ── */}
+                  {mode === 'palletized' && (
+                    <div className="grid grid-cols-2 gap-x-2 gap-y-3 lg:flex lg:items-end lg:gap-2">
+
+                      {/* No. of Pallets */}
+                      <div className="flex flex-col gap-1">
+                        <label className="font-body booking-text text-xs whitespace-nowrap">No. of Pallets</label>
+                        <input value={g.numPallets} onChange={(e) => updateGroup(g.id, { numPallets: e.target.value })}
+                          placeholder="0"
+                          className="bg-[#424242] rounded-lg px-3 py-2 font-body booking-text text-white text-sm
+                                    border border-[#333333] focus:outline-none focus:border-[var(--color-cyan)]/40
+                                    w-full lg:w-20 placeholder-white/20" />
+                      </div>
+
+                      {/* Pallet Type */}
+                      <div className="flex flex-col gap-1">
+                        <label className="font-body booking-text text-xs whitespace-nowrap">Pallet Type</label>
+                        <div className="relative">
+                          <select value={g.palletType}
+                            onChange={(e) => updateGroup(g.id, { palletType: e.target.value as 'Standard' | 'Euro' | 'Custom' })}
+                            className="w-full bg-[#424242] rounded-lg px-2 py-2 pr-6 font-body booking-text text-white text-sm
+                                      border border-[#333333] focus:outline-none appearance-none [color-scheme:dark] cursor-pointer">
+                            <option value="Standard">Standard</option>
+                            <option value="Euro">Euro</option>
+                            <option value="Custom">Custom</option>
+                          </select>
+                          <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px]">▼</div>
+                        </div>
+                      </div>
+
+                      {/* Dimensions + kg unit */}
+                      <div className="flex flex-col gap-1 col-span-2 lg:col-span-1 min-w-0">
+                        <label className="font-body booking-text text-xs whitespace-nowrap">
+                          Dimensions <span className="text-white/20">(cm)</span>
+                        </label>
+                        <div className="flex gap-1.5 items-center">
+                          {(['length', 'width', 'height'] as const).map((dim) => (
+                            <input key={dim} value={g[dim]}
+                              onChange={(e) => updateGroup(g.id, { [dim]: e.target.value })}
+                              placeholder={dim.charAt(0).toUpperCase()}
+                              className="bg-[#424242] rounded-lg px-2 py-2 font-body booking-text text-white text-sm
+                                        border border-[#333333] focus:outline-none focus:border-[var(--color-cyan)]/40
+                                        w-full placeholder-white/20 min-w-0" />
+                          ))}
+                          {/* kg unit sits here, matching the Figma layout */}
+                          <select value={g.weightUnit}
+                            onChange={(e) => updateGroup(g.id, { weightUnit: e.target.value as 'kg' | 'lbs' })}
+                            className="bg-[#424242] rounded-lg px-2 py-2 font-body booking-text text-white text-sm
+                                      border border-[#333333] focus:outline-none appearance-none [color-scheme:dark] cursor-pointer w-14 shrink-0">
+                            <option value="kg">kg</option>
+                            <option value="lbs">lbs</option>
+                          </select>
+                        </div>
+                      </div>
+
+                        {/* Gross weight per pallet */}
+                        <div className="flex flex-col gap-1 lg:shrink-0">
+                          <label className="font-body booking-text text-xs whitespace-nowrap">Gross weight per pallet</label>
+                          <div className="relative inline-flex">
+                            <input value={g.grossWeightPerPallet}
+                              onChange={(e) => updateGroup(g.id, { grossWeightPerPallet: e.target.value })}
+                              placeholder="0"
+                              className="bg-[#424242] rounded-lg pl-3 pr-8 py-2 font-body booking-text text-white text-sm
+                                        border border-[#333333] focus:outline-none focus:border-[var(--color-cyan)]/40
+                                        w-full placeholder-white/20" />
+                            <div className="absolute right-0 top-0 bottom-0 flex flex-col border-l border-[#333333]">
+                              <button onClick={() => updateGroup(g.id, { grossWeightPerPallet: String((Number(g.grossWeightPerPallet) || 0) + 1) })}
+                                className="flex-1 px-1.5 flex items-center justify-center text-white/40 hover:text-white
+                                          hover:bg-white/5 rounded-tr-lg transition-colors cursor-pointer text-[9px] leading-none">▲</button>
+                              <button onClick={() => updateGroup(g.id, { grossWeightPerPallet: String(Math.max(0, (Number(g.grossWeightPerPallet) || 0) - 1)) })}
+                                className="flex-1 px-1.5 flex items-center justify-center text-white/40 hover:text-white
+                                          hover:bg-white/5 rounded-br-lg border-t border-[#333333] transition-colors cursor-pointer text-[9px] leading-none">▼</button>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Net weight per pallet */}
+                        <div className="flex flex-col gap-1 lg:shrink-0">
+                          <label className="font-body booking-text text-xs whitespace-nowrap">Net weight per pallet</label>
+                          <div className="relative inline-flex">
+                            <input value={g.netWeightPerPallet}
+                              onChange={(e) => updateGroup(g.id, { netWeightPerPallet: e.target.value })}
+                              placeholder="0"
+                              className="bg-[#424242] rounded-lg pl-3 pr-8 py-2 font-body booking-text text-white text-sm
+                                        border border-[#333333] focus:outline-none focus:border-[var(--color-cyan)]/40
+                                        w-full placeholder-white/20" />
+                            <div className="absolute right-0 top-0 bottom-0 flex flex-col border-l border-[#333333]">
+                              <button onClick={() => updateGroup(g.id, { netWeightPerPallet: String((Number(g.netWeightPerPallet) || 0) + 1) })}
+                                className="flex-1 px-1.5 flex items-center justify-center text-white/40 hover:text-white
+                                          hover:bg-white/5 rounded-tr-lg transition-colors cursor-pointer text-[9px] leading-none">▲</button>
+                              <button onClick={() => updateGroup(g.id, { netWeightPerPallet: String(Math.max(0, (Number(g.netWeightPerPallet) || 0) - 1)) })}
+                                className="flex-1 px-1.5 flex items-center justify-center text-white/40 hover:text-white
+                                          hover:bg-white/5 rounded-br-lg border-t border-[#333333] transition-colors cursor-pointer text-[9px] leading-none">▼</button>
+                            </div>
+                          </div>
+                        </div>
+
+                    </div>
+                  )}
+
+                  {/* Per-row checkboxes */}
                   <div className="flex items-center mt-3">
                     <div className="flex items-center gap-4">
-                      <CheckRow checked={g.nonTiltable}  onChange={(v) => updateGroup(g.id, { nonTiltable: v })}  label="Non-tiltable"  />
-                      <CheckRow checked={g.nonStackable} onChange={(v) => updateGroup(g.id, { nonStackable: v })} label="Non-stackable" />
+                      {mode === 'loose' ? (
+                        <>
+                          <CheckRow checked={g.nonTiltable}  onChange={(v) => updateGroup(g.id, { nonTiltable: v })}  label="Non-tiltable"  />
+                          <CheckRow checked={g.nonStackable} onChange={(v) => updateGroup(g.id, { nonStackable: v })} label="Non-stackable" />
+                        </>
+                      ) : (
+                        <>
+                          <CheckRow checked={g.stackable} onChange={(v) => updateGroup(g.id, { stackable: v })} label="Stackable" />
+                          <CheckRow checked={g.oversize}  onChange={(v) => updateGroup(g.id, { oversize: v })}  label="Oversize"  />
+                          {g.oversize && (
+                            <span className="font-body booking-text text-xs text-[var(--color-cyan)]">
+                              Oversize may incur extra charges
+                            </span>
+                          )}
+                        </>
+                      )}
                     </div>
                     {idx > 0 && (
                       <button onClick={() => removeGroup(g.id)}
                         className="ml-auto flex items-center justify-center w-7 h-7 rounded-full
-                                   border border-white/10
-                                   hover:border-red-400/40 hover:text-red-400 transition-colors cursor-pointer">
+                                   border border-white/10 hover:border-red-400/40 hover:text-red-400
+                                   transition-colors cursor-pointer">
                         <X size={13} />
                       </button>
                     )}
@@ -422,14 +563,13 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
               ))}
             </AnimatePresence>
 
-            <div className="flex justify-center">
-              <motion.button onClick={addGroup} whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
-                className="w-full flex items-center justify-center gap-2 py-2 rounded-xl
-                          border border-white/10 font-body booking-text text-sm text-white/50
-                          hover:border-white/20 hover:text-white/80 transition-all cursor-pointer">
-                Add Item
-              </motion.button>
-            </div>
+            {/* Add Item button */}
+            <motion.button onClick={addGroup} whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
+              className="w-full flex items-center justify-center gap-2 py-2 rounded-xl
+                         border border-white/10 font-body booking-text text-sm text-white/50
+                         hover:border-white/20 hover:text-white/80 transition-all cursor-pointer">
+              <Plus size={15} /> Add Item
+            </motion.button>
           </div>
         </motion.div>
 
@@ -446,25 +586,63 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
           </div>
           <p className="font-body booking-text text-[11px] lg:!text-[0.9rem] uppercase tracking-[0.15em]">
             {summary.totalPieces > 0
-              ? `${summary.totalPieces} pieces across ${groups.length} item group${groups.length !== 1 ? 's' : ''}`
+              ? mode === 'palletized'
+                ? `${summary.totalPieces} pallet${summary.totalPieces !== 1 ? 's' : ''} across ${groups.length} group${groups.length !== 1 ? 's' : ''}`
+                : `${summary.totalPieces} pieces across ${groups.length} item group${groups.length !== 1 ? 's' : ''}`
               : 'No pieces added yet'}
           </p>
           <div className="grid grid-cols-2 gap-2 mt-1">
-            <StatCard label="Total Piece"  value={summary.totalPieces > 0 ? String(summary.totalPieces)            : '—'} />
-            <StatCard label="Gross Weight" value={summary.grossWeight > 0 ? `${summary.grossWeight.toFixed(1)} KG` : '—'} />
-            <StatCard label="Volume"       value={summary.volume      > 0 ? `${summary.volume.toFixed(2)} CBM`     : '—'} />
-            <StatCard label="Density"      value={summary.density     > 0 ? `${summary.density.toFixed(2)} KG/CBM` : '—'} />
+            <StatCard
+              label={mode === 'palletized' ? 'Total Pallets' : 'Total Piece'}
+              value={summary.totalPieces > 0 ? String(summary.totalPieces) : '—'}
+            />
+            <StatCard
+              label="Gross Weight"
+              value={summary.grossWeight > 0 ? `${summary.grossWeight.toFixed(1)} KG` : '—'}
+            />
+            <StatCard
+              label="Volume"
+              value={summary.volume > 0 ? `${summary.volume.toFixed(2)} CBM` : '—'}
+            />
+            {mode === 'palletized' ? (
+              <StatCard
+                label="Net Weight"
+                value={summary.netWeight > 0 ? `${summary.netWeight.toFixed(1)} KG` : '—'}
+              />
+            ) : (
+              <StatCard
+                label="Density"
+                value={summary.density > 0 ? `${summary.density.toFixed(2)} KG/CBM` : '—'}
+              />
+            )}
           </div>
           <div className="flex flex-col gap-1 mt-2">
-            {groups.some((g) => g.nonTiltable) && (
-              <p className="font-body booking-text text-[11px] lg:!text-[1rem] uppercase tracking-[0.12em]">
-                · Non-tiltable items present
-              </p>
-            )}
-            {groups.some((g) => g.nonStackable) && (
-              <p className="font-body booking-text text-[11px] lg:!text-[1rem] uppercase tracking-[0.12em]">
-                · Non-stackable items present
-              </p>
+            {mode === 'loose' ? (
+              <>
+                {groups.some((g) => g.nonTiltable) && (
+                  <p className="font-body booking-text text-[11px] lg:!text-[1rem] uppercase tracking-[0.12em]">
+                    · Non-tiltable items present
+                  </p>
+                )}
+                {groups.some((g) => g.nonStackable) && (
+                  <p className="font-body booking-text text-[11px] lg:!text-[1rem] uppercase tracking-[0.12em]">
+                    · Non-stackable items present
+                  </p>
+                )}
+              </>
+            ) : (
+              <>
+                {groups.some((g) => g.stackable) && (
+                  <p className="font-body booking-text text-[11px] lg:!text-[1rem] uppercase tracking-[0.12em]">
+                    · Stackable pallets
+                  </p>
+                )}
+                {groups.some((g) => g.oversize) && (
+                  <p className="font-body booking-text text-[11px] lg:!text-[1rem] uppercase tracking-[0.12em]">
+                    · Oversize pallets
+                  </p>
+                )}
+              </>
             )}
           </div>
         </motion.div>
@@ -497,7 +675,10 @@ function CheckRow({ checked, onChange, label }: { checked: boolean; onChange: (v
     <label className="flex items-center gap-2 cursor-pointer select-none">
       <div onClick={() => onChange(!checked)}
         className={`w-4 h-4 rounded flex items-center justify-center border transition-all
-          ${checked ? 'bg-[var(--color-cyan)] border-[var(--color-cyan)]' : 'bg-transparent border-white/30 hover:border-white/60'}`}>
+          ${checked
+            ? 'bg-[var(--color-cyan)] border-[var(--color-cyan)]'
+            : 'bg-transparent border-white/30 hover:border-white/60'
+          }`}>
         {checked && <Check size={10} strokeWidth={3} className="text-[var(--color-bg)]" />}
       </div>
       <span className="font-body booking-text text-xs lg:text-sm">{label}</span>
@@ -519,7 +700,10 @@ function StatCard({ label, value }: { label: string; value: string }) {
 }
 
 function WizBtn({ onClick, children, variant, disabled }: {
-  onClick: () => void; children: React.ReactNode; variant: 'next' | 'back'; disabled?: boolean
+  onClick: () => void
+  children: React.ReactNode
+  variant: 'next' | 'back'
+  disabled?: boolean
 }) {
   return (
     <motion.button onClick={onClick}
