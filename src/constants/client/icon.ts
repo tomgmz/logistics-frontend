@@ -1,3 +1,5 @@
+
+// client icons
 export const ASSETS = {
   svcOverview: '/clientside/overview.png',
   svcBooking: '/clientside/booking.png',

@@ -25,7 +25,7 @@ export default function StepReview({ selectedService, onBack }: Props) {
   }
 
   return (
-    <div className="flex flex-col h-full p-5 lg:p-10">
+    <div className="flex flex-col h-full overflow-auto p-5 lg:p-10">
       <AnimatePresence mode="wait">
         {submitted ? (
           <SuccessView key="success" />

@@ -9,7 +9,7 @@ import {
   PanelLeftClose,
   PanelLeft,
 } from 'lucide-react'
-import { ASSETS } from '../../../constants/icon'
+import { ASSETS } from '../../../constants/client/icon'
 import Image from 'next/image'
 
 const SIDEBAR_COLLAPSED = 56

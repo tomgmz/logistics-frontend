@@ -4,7 +4,7 @@ import Image from 'next/image'
 import { motion, Variants } from 'framer-motion'
 import { ArrowRight, Check } from 'lucide-react'
 import { ServiceType } from './BookingWizard'
-import { SERVICE_TYPES } from '../../../../constants/serviceTypeData'
+import { SERVICE_TYPES } from '../../../../constants/client/serviceTypeData'
 
 interface Props {
   selected: ServiceType
@@ -33,7 +33,7 @@ export default function StepServiceType({ selected, setSelected, onNext }: Props
   const canProceed = !!selected
 
   return (
-    <div className="flex flex-col h-full p-5 lg:p-10 items-center">
+    <div className="flex flex-col h-full overflow-auto p-5 lg:p-10 items-center">
 
       {/* Heading */}
       <motion.div variants={stagger} initial="hidden" animate="show" className="mb-7 lg:mb-10 self-start">

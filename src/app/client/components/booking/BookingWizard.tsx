@@ -6,7 +6,7 @@ import { Check } from 'lucide-react'
 import StepServiceType from './ServiceType'
 import StepBookingDetails from './BookingDetails'
 import StepVehicle from './ChooseVehicle'
-import StepReview from './StepReview'
+import StepReview from './ReviewBooking'
 import { useSessionState } from '../../hooks/UseSessionState'
 
 export type ServiceType = 'ecommerce' | 'fmcg' | null
@@ -82,7 +82,7 @@ export default function BookingWizard() {
             animate="center"
             exit="exit"
             transition={{ duration: 0.38, ease: [0.4, 0, 0.2, 1] as [number, number, number, number] }}
-            className="absolute inset-0 overflow-auto"
+            className="absolute inset-0"
           >
             {step === 1 && (
               <StepServiceType selected={service} setSelected={setService} onNext={goNext} />

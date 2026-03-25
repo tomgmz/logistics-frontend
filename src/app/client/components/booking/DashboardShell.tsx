@@ -8,7 +8,7 @@ export default function DashboardShell({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useSessionState<boolean>('client:sidebarOpen', true)
 
   return (
-    <div className="flex flex-col h-screen bg-[var(--color-bg)] overflow-hidden">
+    <div suppressHydrationWarning className="flex flex-col h-screen bg-[var(--color-bg)] overflow-hidden">
       <Header sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
       <div className="flex flex-1 overflow-hidden">
@@ -17,7 +17,7 @@ export default function DashboardShell({ children }: { children: ReactNode }) {
           setSidebarOpen={setSidebarOpen}
         />
 
-        <main className="flex-1 overflow-auto bg-[var(--color-surface)]">
+        <main className="flex-1 overflow-hidden bg-[var(--color-surface)]">
           {children}
         </main>
       </div>
