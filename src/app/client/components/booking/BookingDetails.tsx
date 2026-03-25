@@ -331,7 +331,7 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
         </div>
       </motion.div>
 
-      {/* Row 3: Cargo Capacity + Summary */}
+      {/* Row 3 */}
       <motion.div variants={stagger} initial="hidden" animate="show"
         className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-3 sm:gap-6 items-start"
       >
@@ -354,7 +354,7 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
             ))}
           </div>
 
-          {/* Global checkboxes — differ by mode */}
+          {/* Global checkboxes */}
           <div className="flex items-center gap-6 justify-end">
             {mode === 'loose' ? (
               <>
@@ -430,7 +430,7 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
                     </div>
                   )}
 
-                  {/* ── PALLETIZED row ── */}
+                  {/*PALLETIZED */}
                   {mode === 'palletized' && (
                     <div className="grid grid-cols-2 gap-x-2 gap-y-3 lg:flex lg:items-end lg:gap-2">
 
@@ -441,7 +441,7 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
                           placeholder="0"
                           className="bg-[#424242] rounded-lg px-3 py-2 font-body booking-text text-white text-sm
                                     border border-[#333333] focus:outline-none focus:border-[var(--color-cyan)]/40
-                                    w-full lg:w-20 placeholder-white/20" />
+                                    w-full placeholder-white/20" />
                       </div>
 
                       {/* Pallet Type */}
@@ -474,7 +474,6 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
                                         border border-[#333333] focus:outline-none focus:border-[var(--color-cyan)]/40
                                         w-full placeholder-white/20 min-w-0" />
                           ))}
-                          {/* kg unit sits here, matching the Figma layout */}
                           <select value={g.weightUnit}
                             onChange={(e) => updateGroup(g.id, { weightUnit: e.target.value as 'kg' | 'lbs' })}
                             className="bg-[#424242] rounded-lg px-2 py-2 font-body booking-text text-white text-sm
