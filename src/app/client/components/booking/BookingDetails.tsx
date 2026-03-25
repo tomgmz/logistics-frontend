@@ -325,7 +325,7 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
 
       {/* Row 3 */}
       <motion.div variants={stagger} initial="hidden" animate="show"
-        className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-3 sm:gap-6 items-start"
+        className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-3 sm:gap-6 items-start"
       >
         <motion.div variants={fadeUp}
           className="bg-[#2A2828] rounded-2xl border border-white/[0.07] p-4 flex flex-col gap-4"
@@ -423,12 +423,11 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
             </AnimatePresence>
 
             <div className="flex justify-center">
-              <motion.button onClick={addGroup} whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.93 }}
-                className="flex items-center justify-center w-8 h-8 rounded-full
-                           border border-white/20
-                           hover:border-[var(--color-cyan)]/40 hover:text-[var(--color-cyan)]
-                           transition-colors cursor-pointer">
-                <Plus size={16} />
+              <motion.button onClick={addGroup} whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
+                className="w-full flex items-center justify-center gap-2 py-2 rounded-xl
+                          border border-white/10 font-body booking-text text-sm text-white/50
+                          hover:border-white/20 hover:text-white/80 transition-all cursor-pointer">
+                Add Item
               </motion.button>
             </div>
           </div>
