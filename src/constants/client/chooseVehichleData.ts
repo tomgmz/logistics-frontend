@@ -13,23 +13,11 @@ export interface Vehicle {
 export const VEHICLE_IMAGES: Record<Vehicle['id'], string> = {
   sedan:      '/images/vehicles/sedan.png',
   l300:    '/landingpage/aboutSection/l300-van.png',
-  truck4w:    '/landingpage/aboutSection/cargo-truck.png',
-  wingvan:    '/images/vehicles/wing-van.png',
-  trailer:    '/images/vehicles/trailer.png',
+  wingvan:    '/landingpage/aboutSection/wingvan.png',
+  cargotruck: '/landingpage/aboutSection/cargo-truck.png',
 }
 
 export const VEHICLES: Vehicle[] = [
-  {
-    id: 'sedan',
-    name: 'Sedan / Car',
-    bodyType: 'Closed',
-    dimension: '1200 × 900 × 700 MM',
-    suitableFor: 'Small packages',
-    stackableFriendly: true,
-    maxVolumeCBM: 0.8,
-    maxWeightKG: 200,
-    maxLengthCM: 120,
-  },
   {
     id: 'l300',
     name: 'L300',
@@ -40,17 +28,6 @@ export const VEHICLES: Vehicle[] = [
     maxVolumeCBM: 5.5,
     maxWeightKG: 1000,
     maxLengthCM: 0,
-  },
-  {
-    id: 'truck4w',
-    name: 'Truck (4W)',
-    bodyType: 'Closed Van',
-    dimension: '4200 × 2100 × 2100 MM',
-    suitableFor: 'Medium to large cargo',
-    stackableFriendly: true,
-    maxVolumeCBM: 18.5,
-    maxWeightKG: 3000,
-    maxLengthCM: 420,
   },
   {
     id: 'wingvan',
@@ -64,8 +41,8 @@ export const VEHICLES: Vehicle[] = [
     maxLengthCM: 850,
   },
   {
-    id: 'trailer',
-    name: 'Trailer Truck',
+    id: 'cargotruck',
+    name: 'Cargo Truck',
     bodyType: 'Flatbed / Closed',
     dimension: '12000 × 2400 × 2600 MM',
     suitableFor: 'Extra-large freight',

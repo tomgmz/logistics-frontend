@@ -12,6 +12,7 @@ import {
 import { ASSETS } from '../../../constants/client/icon'
 import Image from 'next/image'
 import '../components/booking/BookingDetails.css'
+import { useEffect, useState } from 'react'
 
 const SIDEBAR_COLLAPSED = 56
 const SIDEBAR_EXPANDED  = 260
@@ -29,8 +30,27 @@ const NAV: { href: string; label: string; icon: React.ReactNode }[] = [
   { href: '/client/history',   label: 'History',  icon: <Image src={ASSETS.svcHistory}  alt='history'   width={24} height={24} /> },
 ]
 
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 1024)
+    check()
+
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
+
+  return isMobile
+}
+
 export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
   const pathname = usePathname()
+  const isMobile = useIsMobile()
+
+  useEffect(() => {
+    if (isMobile) setSidebarOpen(false)
+  }, [pathname, isMobile, setSidebarOpen])
 
   return (
     <>
@@ -58,7 +78,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
           animate={{
             width: sidebarOpen
               ? SIDEBAR_EXPANDED
-              : typeof window !== 'undefined' && window.innerWidth < 1024
+              : isMobile
                 ? 0
                 : SIDEBAR_COLLAPSED,
           }}
@@ -100,7 +120,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
                   index={i}
                   expanded={sidebarOpen}
                   onNavigate={() => {
-                    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+                    if (isMobile) {
                       setSidebarOpen(false)
                     }
                   }}
@@ -116,7 +136,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
                 index={0}
                 expanded={sidebarOpen}
                 onNavigate={() => {
-                  if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+                  if (isMobile) {
                     setSidebarOpen(false)
                   }
                 }}
@@ -148,20 +168,22 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
           </div>
         </motion.aside>
 
-        {/* Toggle button */}
-        <motion.button
-          onClick={() => setSidebarOpen(!sidebarOpen)}
-          whileHover={{ scale: 1.12 }}
-          whileTap={{ scale: 0.9 }}
-          className="absolute top-17 -right-3.5 items-center justify-center
-           w-7 h-7 rounded-full glass border border-white/10
-           hover:border-[var(--color-cyan)]/40 transition-colors
-           hidden sm:flex"
-        >
-          {sidebarOpen
-            ? <PanelLeftClose size={12} />
-            : <PanelLeft      size={12} />}
-        </motion.button>
+        {/* Toggle button (hidden on mobile) */}
+        {!isMobile && (
+          <motion.button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            whileHover={{ scale: 1.12 }}
+            whileTap={{ scale: 0.9 }}
+            className="absolute top-17 -right-3.5 items-center justify-center
+             w-7 h-7 rounded-full glass border border-white/10
+             hover:border-[var(--color-cyan)]/40 transition-colors
+             hidden sm:flex"
+          >
+            {sidebarOpen
+              ? <PanelLeftClose size={12} />
+              : <PanelLeft      size={12} />}
+          </motion.button>
+        )}
       </div>
     </>
   )

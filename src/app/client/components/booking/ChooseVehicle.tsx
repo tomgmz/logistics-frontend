@@ -138,12 +138,12 @@ export default function StepVehicle({ onNext, onBack }: Props) {
           <span className="
             inline-flex w-fit items-center px-3 py-1 rounded-sm
             bg-[var(--color-cyan)] text-[var(--color-bg)]
-            font-body booking-text text-[10px] sm:text-xs font-bold uppercase tracking-widest
+            font-body booking-text !text-[10px] sm:!text-xs lg:!text-sm font-bold uppercase tracking-widest
           ">
             {mode} Cargo
           </span>
 
-          <p className="font-body booking-text text-[10px] sm:text-xs uppercase tracking-[0.14em] text-white/70">
+          <p className="font-body booking-text !text-[10px] sm:!text-xs lg:!text-sm uppercase tracking-[0.14em] text-white/70">
             {summary.totalPieces > 0
               ? mode === 'palletized'
                 ? `${summary.totalPieces} pallet${summary.totalPieces !== 1 ? 's' : ''} across ${groups.length} group${groups.length !== 1 ? 's' : ''}`
@@ -183,12 +183,12 @@ export default function StepVehicle({ onNext, onBack }: Props) {
             {mode === 'loose' ? (
               <>
                 {groups.some((g) => g.nonTiltable) && (
-                  <p className="font-body booking-text text-[10px] sm:text-xs uppercase tracking-[0.12em] text-white/60">
+                  <p className="font-body booking-text !text-[10px] sm:!text-xs lg:!text-sm uppercase tracking-[0.12em] text-white/60">
                     · Non-tiltable items present
                   </p>
                 )}
                 {groups.some((g) => g.nonStackable) && (
-                  <p className="font-body booking-text text-[10px] sm:text-xs uppercase tracking-[0.12em] text-white/60">
+                  <p className="font-body booking-text !text-[10px] sm:!text-xs lg:!text-sm uppercase tracking-[0.12em] text-white/60">
                     · Non-stackable items present
                   </p>
                 )}
@@ -196,12 +196,12 @@ export default function StepVehicle({ onNext, onBack }: Props) {
             ) : (
               <>
                 {groups.some((g) => g.stackable) && (
-                  <p className="font-body booking-text text-[10px] sm:text-xs uppercase tracking-[0.12em] text-white/60">
+                  <p className="font-body booking-text !text-[10px] sm:!text-xs lg:!text-sm uppercase tracking-[0.12em] text-white/60">
                     · Stackable pallets
                   </p>
                 )}
                 {groups.some((g) => g.oversize) && (
-                  <p className="font-body booking-text text-[10px] sm:text-xs uppercase tracking-[0.12em] text-white/60">
+                  <p className="font-body booking-text !text-[10px] sm:!text-xs lg:!text-sm uppercase tracking-[0.12em] text-white/60">
                     · Oversize pallets
                   </p>
                 )}
@@ -287,7 +287,7 @@ export default function StepVehicle({ onNext, onBack }: Props) {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.2 }}
-                className="font-body booking-text text-white text-2xl sm:text-3xl lg:text-4xl text-center tracking-widest"
+                className="font-body booking-text text-white text-center tracking-widest"
               >
                 {vehicle.name}
               </motion.h2>
@@ -312,7 +312,7 @@ export default function StepVehicle({ onNext, onBack }: Props) {
                   <motion.span
                     key="suggested"
                     initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.8, opacity: 0 }}
-                    className="px-3 py-1 rounded-md bg-[var(--color-cyan)] text-[var(--color-bg)] font-body booking-text text-[10px] sm:text-xs font-bold uppercase tracking-widest"
+                    className="px-3 py-1 rounded-md bg-[var(--color-cyan)] text-[var(--color-bg)] font-body booking-text !text-[10px] sm:!text-xs lg:!text-sm font-bold uppercase tracking-widest"
                   >
                     Suggested
                   </motion.span>
@@ -321,14 +321,14 @@ export default function StepVehicle({ onNext, onBack }: Props) {
                   <motion.span
                     key="overloaded"
                     initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.8, opacity: 0 }}
-                    className="px-3 py-1 rounded-md bg-red-500 text-white font-body booking-text text-[10px] sm:text-xs font-bold uppercase tracking-widest"
+                    className="px-3 py-1 rounded-md bg-red-500 text-white font-body booking-text !text-[10px] sm:!text-xs lg:!text-sm font-bold uppercase tracking-widest"
                   >
                     Overloaded
                   </motion.span>
                 )}
               </AnimatePresence>
               {status.isOverloaded && status.tripsNeeded > 1 && (
-                <p className="font-body booking-text text-[10px] sm:text-xs uppercase tracking-[0.10em] text-white/50">
+                <p className="font-body booking-text !text-[10px] sm:!text-xs lg:!text-sm uppercase tracking-[0.10em] text-white/50">
                   · {status.tripsNeeded} trips needed for this cargo volume
                 </p>
               )}
@@ -419,7 +419,7 @@ export default function StepVehicle({ onNext, onBack }: Props) {
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-[#4DF9ED] bg-white p-2.5 sm:p-3 lg:p-4 flex flex-col gap-1">
-      <p className="font-body booking-text text-[#818181] text-[9px] sm:text-[10px] lg:text-xs uppercase tracking-widest leading-none">
+      <p className="font-body text-[#818181] !text-[10px] sm:!text-xs lg:!text-sm uppercase tracking-widest leading-none">
         {label}
       </p>
       <p className="font-body booking-text text-black text-base sm:text-lg lg:text-2xl leading-none tracking-wide font-bold whitespace-nowrap truncate">
@@ -433,7 +433,7 @@ function CapCard({ label, value, overloaded }: { label: string; value: string; o
   return (
     <div className={`rounded-xl border p-2.5 sm:p-3 lg:p-4 flex flex-col gap-1 bg-white transition-colors
       ${overloaded ? 'border-red-400' : 'border-[#4DF9ED]'}`}>
-      <p className={`font-body booking-text text-[9px] sm:text-[10px] lg:text-xs uppercase tracking-widest leading-tight
+      <p className={`font-body !text-[10px] sm:!text-xs lg:!text-sm uppercase tracking-widest leading-tight
         ${overloaded ? 'text-red-500' : 'text-[#818181]'}`}>
         {label}
       </p>
@@ -448,10 +448,10 @@ function CapCard({ label, value, overloaded }: { label: string; value: string; o
 function SpecRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between px-0 py-2 sm:py-2.5">
-      <span className="font-body booking-text uppercase tracking-wider">
+      <span className="font-body !text-[10px] sm:!text-xs lg:!text-base uppercase tracking-wider">
         {label}
       </span>
-      <span className="font-body booking-text text-white text-right">
+      <span className="font-body !text-[10px] sm:!text-xs lg:!text-base text-white text-right">
         {value}
       </span>
     </div>

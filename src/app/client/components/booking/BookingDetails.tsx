@@ -431,103 +431,143 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
                   )}
 
                   {/*PALLETIZED */}
-                  {mode === 'palletized' && (
-                    <div className="grid grid-cols-2 gap-x-2 gap-y-3 lg:flex lg:items-end lg:gap-2">
+{mode === 'palletized' && (
+  <div className="flex flex-wrap items-end gap-2">
 
-                      {/* No. of Pallets */}
-                      <div className="flex flex-col gap-1">
-                        <label className="font-body booking-text text-xs whitespace-nowrap">No. of Pallets</label>
-                        <input value={g.numPallets} onChange={(e) => updateGroup(g.id, { numPallets: e.target.value })}
-                          placeholder="0"
-                          className="bg-[#424242] rounded-lg px-3 py-2 font-body booking-text text-white text-sm
-                                    border border-[#333333] focus:outline-none focus:border-[var(--color-cyan)]/40
-                                    w-full placeholder-white/20" />
-                      </div>
+    {/* No. of Pallets */}
+    <div className="flex flex-col gap-1 w-full sm:w-[140px]">
+      <label className="font-body booking-text text-xs whitespace-nowrap">No. of Pallets</label>
+      <input
+        value={g.numPallets}
+        onChange={(e) => updateGroup(g.id, { numPallets: e.target.value })}
+        placeholder="0"
+        className="bg-[#424242] rounded-lg px-3 py-2 font-body booking-text text-white text-sm
+                   border border-[#333333] focus:outline-none focus:border-[var(--color-cyan)]/40
+                   w-full placeholder-white/20"
+      />
+    </div>
 
-                      {/* Pallet Type */}
-                      <div className="flex flex-col gap-1">
-                        <label className="font-body booking-text text-xs whitespace-nowrap">Pallet Type</label>
-                        <div className="relative">
-                          <select value={g.palletType}
-                            onChange={(e) => updateGroup(g.id, { palletType: e.target.value as 'Standard' | 'Euro' | 'Custom' })}
-                            className="w-full bg-[#424242] rounded-lg px-2 py-2 pr-6 font-body booking-text text-white text-sm
-                                      border border-[#333333] focus:outline-none appearance-none [color-scheme:dark] cursor-pointer">
-                            <option value="Standard">Standard</option>
-                            <option value="Euro">Euro</option>
-                            <option value="Custom">Custom</option>
-                          </select>
-                          <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px]">▼</div>
-                        </div>
-                      </div>
+    {/* Pallet Type */}
+    <div className="flex flex-col gap-1 w-full sm:w-[160px]">
+      <label className="font-body booking-text text-xs whitespace-nowrap">Pallet Type</label>
+      <div className="relative">
+        <select
+          value={g.palletType}
+          onChange={(e) => updateGroup(g.id, { palletType: e.target.value as 'Standard' | 'Euro' | 'Custom' })}
+          className="w-full bg-[#424242] rounded-lg px-2 py-2 pr-6 font-body booking-text text-white text-sm
+                     border border-[#333333] focus:outline-none appearance-none [color-scheme:dark] cursor-pointer"
+        >
+          <option value="Standard">Standard</option>
+          <option value="Euro">Euro</option>
+          <option value="Custom">Custom</option>
+        </select>
+        <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px]">▼</div>
+      </div>
+    </div>
 
-                      {/* Dimensions + kg unit */}
-                      <div className="flex flex-col gap-1 col-span-2 lg:col-span-1 min-w-0">
-                        <label className="font-body booking-text text-xs whitespace-nowrap">
-                          Dimensions <span className="text-white/20">(cm)</span>
-                        </label>
-                        <div className="flex gap-1.5 items-center">
-                          {(['length', 'width', 'height'] as const).map((dim) => (
-                            <input key={dim} value={g[dim]}
-                              onChange={(e) => updateGroup(g.id, { [dim]: e.target.value })}
-                              placeholder={dim.charAt(0).toUpperCase()}
-                              className="bg-[#424242] rounded-lg px-2 py-2 font-body booking-text text-white text-sm
-                                        border border-[#333333] focus:outline-none focus:border-[var(--color-cyan)]/40
-                                        w-full placeholder-white/20 min-w-0" />
-                          ))}
-                          <select value={g.weightUnit}
-                            onChange={(e) => updateGroup(g.id, { weightUnit: e.target.value as 'kg' | 'lbs' })}
-                            className="bg-[#424242] rounded-lg px-2 py-2 font-body booking-text text-white text-sm
-                                      border border-[#333333] focus:outline-none appearance-none [color-scheme:dark] cursor-pointer w-14 shrink-0">
-                            <option value="kg">kg</option>
-                            <option value="lbs">lbs</option>
-                          </select>
-                        </div>
-                      </div>
+    {/* Dimensions + weight unit */}
+    <div className="flex flex-col gap-1 w-full min-w-[220px] flex-1">
+      <label className="font-body booking-text text-xs whitespace-nowrap">
+        Dimensions <span className="text-white/20">(cm)</span>
+      </label>
+      <div className="flex gap-1.5 items-center">
+        {(['length', 'width', 'height'] as const).map((dim) => (
+          <input
+            key={dim}
+            value={g[dim]}
+            onChange={(e) => updateGroup(g.id, { [dim]: e.target.value })}
+            placeholder={dim.charAt(0).toUpperCase()}
+            className="bg-[#424242] rounded-lg px-2 py-2 font-body booking-text text-white text-sm
+                       border border-[#333333] focus:outline-none focus:border-[var(--color-cyan)]/40
+                       w-full placeholder-white/20 min-w-0"
+          />
+        ))}
+        <select
+          value={g.weightUnit}
+          onChange={(e) => updateGroup(g.id, { weightUnit: e.target.value as 'kg' | 'lbs' })}
+          className="bg-[#424242] rounded-lg px-2 py-2 font-body booking-text text-white text-sm
+                     border border-[#333333] focus:outline-none appearance-none [color-scheme:dark] cursor-pointer w-14 shrink-0"
+        >
+          <option value="kg">kg</option>
+          <option value="lbs">lbs</option>
+        </select>
+      </div>
+    </div>
 
-                        {/* Gross weight per pallet */}
-                        <div className="flex flex-col gap-1 lg:shrink-0">
-                          <label className="font-body booking-text text-xs whitespace-nowrap">Gross weight per pallet</label>
-                          <div className="relative inline-flex">
-                            <input value={g.grossWeightPerPallet}
-                              onChange={(e) => updateGroup(g.id, { grossWeightPerPallet: e.target.value })}
-                              placeholder="0"
-                              className="bg-[#424242] rounded-lg pl-3 pr-8 py-2 font-body booking-text text-white text-sm
-                                        border border-[#333333] focus:outline-none focus:border-[var(--color-cyan)]/40
-                                        w-full placeholder-white/20" />
-                            <div className="absolute right-0 top-0 bottom-0 flex flex-col border-l border-[#333333]">
-                              <button onClick={() => updateGroup(g.id, { grossWeightPerPallet: String((Number(g.grossWeightPerPallet) || 0) + 1) })}
-                                className="flex-1 px-1.5 flex items-center justify-center text-white/40 hover:text-white
-                                          hover:bg-white/5 rounded-tr-lg transition-colors cursor-pointer text-[9px] leading-none">▲</button>
-                              <button onClick={() => updateGroup(g.id, { grossWeightPerPallet: String(Math.max(0, (Number(g.grossWeightPerPallet) || 0) - 1)) })}
-                                className="flex-1 px-1.5 flex items-center justify-center text-white/40 hover:text-white
-                                          hover:bg-white/5 rounded-br-lg border-t border-[#333333] transition-colors cursor-pointer text-[9px] leading-none">▼</button>
-                            </div>
-                          </div>
-                        </div>
+    {/* Gross weight per pallet */}
+    <div className="flex flex-col gap-1 w-full sm:w-[180px]">
+      <label className="font-body booking-text text-xs whitespace-nowrap">Gross weight per pallet</label>
+      <div className="relative inline-flex">
+        <input
+          value={g.grossWeightPerPallet}
+          onChange={(e) => updateGroup(g.id, { grossWeightPerPallet: e.target.value })}
+          placeholder="0"
+          className="bg-[#424242] rounded-lg pl-3 pr-8 py-2 font-body booking-text text-white text-sm
+                     border border-[#333333] focus:outline-none focus:border-[var(--color-cyan)]/40
+                     w-full placeholder-white/20"
+        />
+        <div className="absolute right-0 top-0 bottom-0 flex flex-col border-l border-[#333333]">
+          <button
+            onClick={() =>
+              updateGroup(g.id, { grossWeightPerPallet: String((Number(g.grossWeightPerPallet) || 0) + 1) })
+            }
+            className="flex-1 px-1.5 flex items-center justify-center text-white/40 hover:text-white
+                       hover:bg-white/5 rounded-tr-lg transition-colors cursor-pointer text-[9px] leading-none"
+          >
+            ▲
+          </button>
+          <button
+            onClick={() =>
+              updateGroup(g.id, {
+                grossWeightPerPallet: String(Math.max(0, (Number(g.grossWeightPerPallet) || 0) - 1)),
+              })
+            }
+            className="flex-1 px-1.5 flex items-center justify-center text-white/40 hover:text-white
+                       hover:bg-white/5 rounded-br-lg border-t border-[#333333] transition-colors cursor-pointer text-[9px] leading-none"
+          >
+            ▼
+          </button>
+        </div>
+      </div>
+    </div>
 
-                        {/* Net weight per pallet */}
-                        <div className="flex flex-col gap-1 lg:shrink-0">
-                          <label className="font-body booking-text text-xs whitespace-nowrap">Net weight per pallet</label>
-                          <div className="relative inline-flex">
-                            <input value={g.netWeightPerPallet}
-                              onChange={(e) => updateGroup(g.id, { netWeightPerPallet: e.target.value })}
-                              placeholder="0"
-                              className="bg-[#424242] rounded-lg pl-3 pr-8 py-2 font-body booking-text text-white text-sm
-                                        border border-[#333333] focus:outline-none focus:border-[var(--color-cyan)]/40
-                                        w-full placeholder-white/20" />
-                            <div className="absolute right-0 top-0 bottom-0 flex flex-col border-l border-[#333333]">
-                              <button onClick={() => updateGroup(g.id, { netWeightPerPallet: String((Number(g.netWeightPerPallet) || 0) + 1) })}
-                                className="flex-1 px-1.5 flex items-center justify-center text-white/40 hover:text-white
-                                          hover:bg-white/5 rounded-tr-lg transition-colors cursor-pointer text-[9px] leading-none">▲</button>
-                              <button onClick={() => updateGroup(g.id, { netWeightPerPallet: String(Math.max(0, (Number(g.netWeightPerPallet) || 0) - 1)) })}
-                                className="flex-1 px-1.5 flex items-center justify-center text-white/40 hover:text-white
-                                          hover:bg-white/5 rounded-br-lg border-t border-[#333333] transition-colors cursor-pointer text-[9px] leading-none">▼</button>
-                            </div>
-                          </div>
-                        </div>
+    {/* Net weight per pallet */}
+    <div className="flex flex-col gap-1 w-full sm:w-[180px]">
+      <label className="font-body booking-text text-xs whitespace-nowrap">Net weight per pallet</label>
+      <div className="relative inline-flex">
+        <input
+          value={g.netWeightPerPallet}
+          onChange={(e) => updateGroup(g.id, { netWeightPerPallet: e.target.value })}
+          placeholder="0"
+          className="bg-[#424242] rounded-lg pl-3 pr-8 py-2 font-body booking-text text-white text-sm
+                     border border-[#333333] focus:outline-none focus:border-[var(--color-cyan)]/40
+                     w-full placeholder-white/20"
+        />
+        <div className="absolute right-0 top-0 bottom-0 flex flex-col border-l border-[#333333]">
+          <button
+            onClick={() =>
+              updateGroup(g.id, { netWeightPerPallet: String((Number(g.netWeightPerPallet) || 0) + 1) })
+            }
+            className="flex-1 px-1.5 flex items-center justify-center text-white/40 hover:text-white
+                       hover:bg-white/5 rounded-tr-lg transition-colors cursor-pointer text-[9px] leading-none"
+          >
+            ▲
+          </button>
+          <button
+            onClick={() =>
+              updateGroup(g.id, { netWeightPerPallet: String(Math.max(0, (Number(g.netWeightPerPallet) || 0) - 1)) })
+            }
+            className="flex-1 px-1.5 flex items-center justify-center text-white/40 hover:text-white
+                       hover:bg-white/5 rounded-br-lg border-t border-[#333333] transition-colors cursor-pointer text-[9px] leading-none"
+          >
+            ▼
+          </button>
+        </div>
+      </div>
+    </div>
 
-                    </div>
-                  )}
+  </div>
+)}
 
                   {/* Per-row checkboxes */}
                   <div className="flex items-center mt-3">
