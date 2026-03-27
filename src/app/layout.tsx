@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import ThemeRegistry from '@/components/ui/ThemeRegistry';
+import CsrfInit from '@/components/CsrfInit';
 import { alegreyaSansSC, aboreto, fredoka, leagueSpartan, eurostile } from '@/app/fonts';
 import './globals.css';
 
@@ -28,6 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`scroll-smooth ${alegreyaSansSC.variable} ${aboreto.variable} ${fredoka.variable} ${leagueSpartan.variable} ${eurostile.variable}`}
     >
       <body suppressHydrationWarning className={`bg-[#0a0a0a] text-white overflow-x-hidden ${alegreyaSansSC.className}`}>
+        <CsrfInit />
         <ThemeRegistry>{children}</ThemeRegistry>
       </body>
     </html>

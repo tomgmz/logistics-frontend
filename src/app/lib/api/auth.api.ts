@@ -8,21 +8,34 @@ const authApi: AxiosInstance = axios.create({
   withCredentials: true,
 })
 
-//get csrf tokjen from cookie
+// ── CSRF ────────────────────────────────────────────────────────────────────
+
 function getCsrfToken(): string | null {
   if (typeof document === 'undefined') return null
-
   const match = document.cookie.match(/csrf_token=([^;]+)/)
-  return match ? match[1] : null
+  return match ? decodeURIComponent(match[1]) : null
 }
 
-// Add CSRF token to all state-changing requests
+// Fetch (or refresh) the CSRF cookie from the server
+let csrfInitialized = false
+export async function initCsrf(): Promise<void> {
+  if (csrfInitialized) return
+  try {
+    await authApi.get('/auth/csrf')
+    csrfInitialized = true
+  } catch {
+    // Non-fatal — requests will proceed without the CSRF header
+  }
+}
+
+// Attach CSRF header to every mutating request
 authApi.interceptors.request.use(
   (config) => {
-    if (['post', 'put', 'patch', 'delete'].includes(config.method?.toLowerCase() || '')) {
-      const csrfToken = getCsrfToken()
-      if (csrfToken) {
-        config.headers['X-CSRF-Token'] = csrfToken
+    const method = config.method?.toLowerCase() ?? ''
+    if (['post', 'put', 'patch', 'delete'].includes(method)) {
+      const token = getCsrfToken()
+      if (token) {
+        config.headers['X-CSRF-Token'] = token
       }
     }
     return config
@@ -30,40 +43,49 @@ authApi.interceptors.request.use(
   (error: AxiosError) => Promise.reject(error)
 )
 
+// ── Token refresh + queue ───────────────────────────────────────────────────
+
 let isRefreshing = false
 
 interface QueueEntry {
-  resolve: (value?: unknown) => void
-  reject: (reason?: unknown) => void
+  resolve: () => void
+  reject: (reason: unknown) => void
 }
 
 let failedQueue: QueueEntry[] = []
 
-const processQueue = (error: AxiosError | null, token: string | null = null) => {
-  failedQueue.forEach(prom => {
+function processQueue(error: unknown): void {
+  failedQueue.forEach((entry) => {
     if (error) {
-      prom.reject(error)
+      entry.reject(error)
     } else {
-      prom.resolve(token)
+      entry.resolve()
     }
   })
-
   failedQueue = []
 }
 
-//refresh access tokens on 401 errors
 authApi.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const originalRequest = error.config as typeof error.config & { _retry?: boolean }
 
-    if (error.response?.status === 401 && !originalRequest?._retry) {
+    // Only attempt refresh on 401, and never on the refresh/login endpoints themselves
+    const url = originalRequest?.url ?? ''
+    const isAuthEndpoint =
+      url.includes('/auth/refresh') ||
+      url.includes('/auth/verify-otp') ||
+      url.includes('/auth/request-otp') ||
+      url.includes('/auth/csrf')
+
+    if (error.response?.status === 401 && !originalRequest?._retry && !isAuthEndpoint) {
+      // Queue concurrent requests while refresh is in flight
       if (isRefreshing) {
-        return new Promise((resolve, reject) => {
+        return new Promise<void>((resolve, reject) => {
           failedQueue.push({ resolve, reject })
         })
           .then(() => authApi(originalRequest!))
-          .catch(err => Promise.reject(err))
+          .catch((err) => Promise.reject(err))
       }
 
       originalRequest!._retry = true
@@ -72,14 +94,16 @@ authApi.interceptors.response.use(
       try {
         await authApi.post('/auth/refresh')
 
+        processQueue(null)
         isRefreshing = false
-        processQueue(null, 'success')
 
         return authApi(originalRequest!)
       } catch (refreshError) {
+        processQueue(refreshError)
         isRefreshing = false
-        processQueue(refreshError as AxiosError, null)
+        failedQueue = []
 
+        // Redirect to login — let the page unmount cleanly
         if (typeof window !== 'undefined') {
           window.location.href = '/login'
         }
@@ -91,6 +115,8 @@ authApi.interceptors.response.use(
     return Promise.reject(error)
   }
 )
+
+// ── Exports ─────────────────────────────────────────────────────────────────
 
 export interface AuthUser {
   user_id: string
@@ -107,12 +133,10 @@ export interface AuthResponse {
   expiresAt: string
 }
 
-//request otp
 export async function requestOtp(email: string): Promise<void> {
   await authApi.post('/auth/request-otp', { email })
 }
 
-//verify otp and login
 export async function verifyOtp(
   email: string,
   code: string,
@@ -126,28 +150,26 @@ export async function verifyOtp(
   return data.data as AuthResponse
 }
 
-//refresh token
 export async function refreshAccessToken(): Promise<void> {
   await authApi.post('/auth/refresh')
 }
 
-//logout and clear cookies server side
 export async function logout(): Promise<void> {
   await authApi.post('/auth/logout')
 }
 
-//logout from all devices
 export async function logoutAll(): Promise<void> {
   await authApi.post('/auth/logout-all')
 }
-//get current user info
+
 export async function getMe(): Promise<AuthUser> {
   const { data } = await authApi.get('/auth/me')
   return data.data as AuthUser
 }
-//helpers
 
 function getDeviceInfo(): string {
   if (typeof navigator === 'undefined') return 'Unknown'
   return `${navigator.platform} — ${navigator.userAgent.split(' ').slice(-1)[0]}`
 }
+
+export default authApi
