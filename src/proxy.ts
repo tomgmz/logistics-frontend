@@ -9,7 +9,7 @@ const ROLE_ROUTES: Record<string, string> = {
   subcontractor: '/subcontractor',
 }
 
-const PUBLIC_PATHS = ['/login', '/favicon.ico', '/_next', '/api']
+const PUBLIC_PATHS = ['/login', '/favicon.ico', '/_next', '/api', '/proxy']
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some((p) => pathname.startsWith(p))
