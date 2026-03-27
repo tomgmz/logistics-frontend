@@ -36,12 +36,14 @@ function getRoleFromToken(token: string): string | null {
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
 
+  // Always allow public paths
   if (isPublicPath(pathname)) {
     return NextResponse.next()
   }
 
   const token = req.cookies.get('access_token')?.value
 
+  // No token → redirect to login
   if (!token) {
     const loginUrl = req.nextUrl.clone()
     loginUrl.pathname = '/login'
@@ -51,6 +53,7 @@ export function proxy(req: NextRequest) {
 
   const role = getRoleFromToken(token)
 
+  // Invalid or expired token → clear cookies and redirect to login
   if (!role) {
     const loginUrl = req.nextUrl.clone()
     loginUrl.pathname = '/login'
@@ -62,10 +65,12 @@ export function proxy(req: NextRequest) {
 
   const allowedPrefix = ROLE_ROUTES[role]
 
+  // Unknown role
   if (!allowedPrefix) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
+  // Wrong role path → silently redirect to their own dashboard
   if (!pathname.startsWith(allowedPrefix)) {
     const dashboardUrl = req.nextUrl.clone()
     dashboardUrl.pathname = allowedPrefix
