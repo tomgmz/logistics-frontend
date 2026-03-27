@@ -9,7 +9,7 @@ const ROLE_ROUTES: Record<string, string> = {
   subcontractor: '/subcontractor',
 }
 
-const PUBLIC_PATHS = ['/login', '/favicon.ico', '/_next', '/api', '/proxy']
+const PUBLIC_PATHS = ['/login', '/favicon.ico', '/_next', '/api']
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some((p) => pathname.startsWith(p))
@@ -42,7 +42,7 @@ export function proxy(req: NextRequest) {
 
   const token = req.cookies.get('access_token')?.value
 
-    console.log('MIDDLEWARE DEBUG:', {
+  console.log('MIDDLEWARE DEBUG:', {
     pathname,
     hasToken: !!token,
     tokenPreview: token?.slice(0, 20),
@@ -83,5 +83,7 @@ export function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|proxy|.*\\.png$|.*\\.jpg$|.*\\.jpeg$|.*\\.gif$|.*\\.svg$|.*\\.ico$|.*\\.webp$).*)',
+  ],
 }
