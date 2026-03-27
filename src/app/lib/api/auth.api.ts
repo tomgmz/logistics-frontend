@@ -9,7 +9,7 @@ const authApi: AxiosInstance = axios.create({
   withCredentials: true,
 })
 
-// ── CSRF ────────────────────────────────────────────────────────────────────
+//csrf
 
 function getCsrfToken(): string | null {
   if (typeof document === 'undefined') return null
@@ -25,7 +25,7 @@ export async function initCsrf(): Promise<void> {
     await authApi.get('/auth/csrf')
     csrfInitialized = true
   } catch {
-    // Non-fatal — requests will proceed without the CSRF header
+
   }
 }
 
@@ -44,7 +44,7 @@ authApi.interceptors.request.use(
   (error: AxiosError) => Promise.reject(error)
 )
 
-// ── Token refresh + queue ───────────────────────────────────────────────────
+//token refresh and queue
 
 let isRefreshing = false
 
@@ -104,7 +104,6 @@ authApi.interceptors.response.use(
         isRefreshing = false
         failedQueue = []
 
-        // Redirect to login — let the page unmount cleanly
         if (typeof window !== 'undefined') {
           window.location.href = '/login'
         }
@@ -116,8 +115,6 @@ authApi.interceptors.response.use(
     return Promise.reject(error)
   }
 )
-
-// ── Exports ─────────────────────────────────────────────────────────────────
 
 export interface AuthUser {
   user_id: string
