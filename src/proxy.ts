@@ -33,8 +33,7 @@ function getRoleFromToken(token: string): string | null {
   }
 }
 
-// Must be exported as `middleware` for Next.js to pick it up
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
 
   if (isPublicPath(pathname)) {
