@@ -112,6 +112,7 @@ export default function Navbar() {
 
           <div className="hidden md:flex items-center gap-3 shrink-0">
             <button
+              onClick={() => { window.location.href = '/login' }}
               className="font-'Alegreya Sans DC, sans-serif' text-white/70 text-[0.84rem] tracking-wider
                 px-5 py-2.5 rounded-[15px] border border-white/15
                 hover:border-[#4df9ed]/50 hover:text-[#4df9ed]
@@ -217,6 +218,10 @@ export default function Navbar() {
 
               <div className="p-6 pt-4 flex flex-col gap-3 border-t border-white/[0.07]">
                 <button
+                  onClick={() => {
+                    closeMenu()
+                    window.location.href = '/login'
+                  }}
                   className="font-'Alegreya Sans DC, sans-serif' w-full py-3.5 rounded-[15px] border border-white/15
                     text-white tracking-wider bg-transparent text-sm cursor-pointer
                     hover:border-white/30 transition-colors"

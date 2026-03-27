@@ -13,6 +13,7 @@ import { ASSETS } from '../../../constants/client/icon'
 import Image from 'next/image'
 import '../components/booking/BookingDetails.css'
 import { useEffect, useState } from 'react'
+import { logout } from '@/app/lib/api/auth.api'
 
 const SIDEBAR_COLLAPSED = 56
 const SIDEBAR_EXPANDED  = 260
@@ -42,6 +43,17 @@ function useIsMobile() {
   }, [])
 
   return isMobile
+}
+
+const handleLogout = async () => {
+  try {
+    await logout()
+  } catch {
+  } finally {
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login'
+    }
+  }
 }
 
 export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
@@ -141,21 +153,24 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
                   }
                 }}
               />
-
               <motion.button
+                onClick={handleLogout}
                 whileHover={{ x: sidebarOpen ? 2 : 0 }}
                 whileTap={{ scale: 0.97 }}
                 className="w-full flex items-center gap-3 rounded-xl
-                           hover:text-red-400
-                           transition-colors group py-3 px-2"
+                          hover:text-red-400
+                          transition-colors group py-3 px-2"
               >
-                <span className="shrink-0 flex items-center justify-center"
-                      style={{ width: SIDEBAR_COLLAPSED - 32 }}>
+                <span
+                  className="shrink-0 flex items-center justify-center"
+                  style={{ width: SIDEBAR_COLLAPSED - 32 }}
+                >
                   <LogOut
                     size={17}
                     className="group-hover:text-red-400 transition-colors"
                   />
                 </span>
+
                 <motion.span
                   animate={{ opacity: sidebarOpen ? 1 : 0, width: sidebarOpen ? 'auto' : 0 }}
                   transition={{ duration: 0.2 }}
