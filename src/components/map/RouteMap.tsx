@@ -455,7 +455,10 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
       try {
         setLoading(true)
         const existingRes = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/route-optimization/${bookingId}`
+          `${process.env.NEXT_PUBLIC_API_URL}/route-optimization/${bookingId}`,{
+            method: 'GET',
+            credentials: 'include',
+          }
         )
         const existingJson = await existingRes.json()
         const hasOptimizedRoute =
