@@ -42,6 +42,13 @@ export function proxy(req: NextRequest) {
 
   const token = req.cookies.get('access_token')?.value
 
+    console.log('MIDDLEWARE DEBUG:', {
+    pathname,
+    hasToken: !!token,
+    tokenPreview: token?.slice(0, 20),
+    allCookies: req.cookies.getAll().map(c => c.name),
+  })
+
   if (!token) {
     const loginUrl = req.nextUrl.clone()
     loginUrl.pathname = '/login'
