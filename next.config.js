@@ -1,10 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  images: {
-    remotePatterns: [
-      { protocol: "https", hostname: "www.figma.com" },
-    ],
+  async rewrites() {
+    return [
+      {
+        source: '/proxy/:path*',
+        destination: 'https://logistics-backend.up.railway.app/api/:path*',
+      },
+    ]
   },
-};
+}
 
-module.exports = nextConfig;
+module.exports = nextConfig

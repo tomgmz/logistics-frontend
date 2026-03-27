@@ -1,7 +1,9 @@
 import axios, { AxiosInstance, AxiosError } from 'axios'
 
 const authApi: AxiosInstance = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api',
+  baseURL: typeof window !== 'undefined' && process.env.NODE_ENV === 'production'
+    ? '/proxy'
+    : process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api',
   headers: {
     'Content-Type': 'application/json',
   },
