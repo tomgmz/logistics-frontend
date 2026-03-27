@@ -473,7 +473,13 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
         }
         const optimizeRes = await fetch(
           `${process.env.NEXT_PUBLIC_API_URL}/route-optimization/optimize/${bookingId}`,
-          { method: 'POST' }
+          {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+          }
         )
         const optimizeJson = await optimizeRes.json()
         if (!optimizeRes.ok) throw new Error(optimizeJson.message as string)
