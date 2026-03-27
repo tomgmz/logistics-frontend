@@ -22,6 +22,7 @@ import MapIcon from '@mui/icons-material/Map'
 import ListIcon from '@mui/icons-material/List'
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp'
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown'
+import { getApiUrl } from '@/app/lib/api/api-url'
 
 const GOOGLE_MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!
 const GOOGLE_MAPS_MAP_ID = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID!
@@ -249,7 +250,7 @@ function RouteStop({
   )
 }
 
-// DETAILS PANEL CONTENT (shared between desktop sidebar and mobile sheet)
+// DETAILS PANEL CONTENT
 
 function DetailsPanelContent({
   stops,
@@ -264,7 +265,6 @@ function DetailsPanelContent({
 }) {
   return (
     <>
-      {/* Vehicle header */}
       <div className="p-5 border-b border-gray-800/60">
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-2">
@@ -285,7 +285,6 @@ function DetailsPanelContent({
           </div>
         </div>
 
-        {/* Vehicle visual */}
         <div className="text-center mb-4">
           <p className="text-gray-500 text-xs font-medium tracking-widest uppercase mb-1">Vehicle</p>
           <h2 className="text-4xl font-black text-white tracking-tight mb-4">L300</h2>
@@ -305,7 +304,6 @@ function DetailsPanelContent({
           </div>
         </div>
 
-        {/* Delivery Progress */}
         <div className="bg-[#1a1a1a] rounded-xl p-4 border border-gray-800/80 mb-3">
           <div className="flex items-center justify-between mb-2">
             <span className="text-gray-500 text-xs">Delivery Progress</span>
@@ -321,7 +319,6 @@ function DetailsPanelContent({
           </div>
         </div>
 
-        {/* Origin / Destination */}
         <div className="grid grid-cols-2 gap-2">
           <div className="bg-[#1a1a1a] rounded-xl p-3 border border-gray-800/80">
             <div className="flex items-center gap-1.5 mb-2">
@@ -354,7 +351,6 @@ function DetailsPanelContent({
         </div>
       </div>
 
-      {/* Route section */}
       <div className="p-5 border-b border-gray-800/60">
         <div className="flex items-center justify-between mb-4">
           <span className="text-gray-400 text-xs font-bold uppercase tracking-widest">Route Details</span>
@@ -381,7 +377,6 @@ function DetailsPanelContent({
         />
       </div>
 
-      {/* Shipment details */}
       <div className="p-5">
         <div className="flex items-center justify-between mb-3">
           <span className="text-gray-400 text-xs font-bold uppercase tracking-widest">Shipment Details</span>
@@ -423,7 +418,6 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedBooking, setSelectedBooking] = useState<string>(bookingId)
 
-  // Mobile UI state
   const [mobileTab, setMobileTab] = useState<'map' | 'bookings'>('map')
   const [sheetExpanded, setSheetExpanded] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -454,11 +448,11 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
     async function loadRoute() {
       try {
         setLoading(true)
+        const baseUrl = getApiUrl()
+
         const existingRes = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/route-optimization/${bookingId}`,{
-            method: 'GET',
-            credentials: 'include',
-          }
+          `${baseUrl}/route-optimization/${bookingId}`,
+          { method: 'GET', credentials: 'include' }
         )
         const existingJson = await existingRes.json()
         const hasOptimizedRoute =
@@ -471,14 +465,13 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
           setStops(existingJson.data.optimized_stops)
           return
         }
+
         const optimizeRes = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/route-optimization/optimize/${bookingId}`,
+          `${baseUrl}/route-optimization/optimize/${bookingId}`,
           {
             method: 'POST',
             credentials: 'include',
-            headers: {
-              'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
           }
         )
         const optimizeJson = await optimizeRes.json()
@@ -530,7 +523,6 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
   const totalStops = stops.length
   const progressPercentage = totalStops > 0 ? (completedStops / totalStops) * 100 : 0
 
-  // Shared map JSX
   const mapContent = (
     <Map
       mapId={GOOGLE_MAPS_MAP_ID}
@@ -581,7 +573,6 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
     <APIProvider apiKey={GOOGLE_MAPS_KEY}>
       {/* ─── DESKTOP LAYOUT (lg+) ─── */}
       <div className="hidden lg:flex h-screen bg-[#0f0f0f] overflow-hidden font-sans">
-        {/* Sidebar */}
         <motion.aside
           initial={{ x: -320, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
@@ -621,7 +612,6 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
           </div>
         </motion.aside>
 
-        {/* Details panel */}
         <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -636,7 +626,6 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
           />
         </motion.section>
 
-        {/* Map */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -644,7 +633,6 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
           className="flex-1 relative"
         >
           {mapContent}
-          {/* ETA overlay */}
           <motion.div
             initial={{ opacity: 0, y: 20, scale: 0.9 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -666,7 +654,6 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
               </div>
             </div>
           </motion.div>
-          {/* Live tracking */}
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -684,7 +671,6 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
 
       {/* ─── TABLET LAYOUT (md–lg) ─── */}
       <div className="hidden md:flex lg:hidden h-screen bg-[#0f0f0f] overflow-hidden font-sans flex-col">
-        {/* Top bar */}
         <div className="flex items-center justify-between px-4 py-3 bg-[#0a0a0a] border-b border-gray-800/80 flex-shrink-0 z-10">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-lg bg-cyan-500/20 flex items-center justify-center">
@@ -701,10 +687,8 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
           </div>
         </div>
 
-        {/* Map fills most of screen */}
         <div className="flex-1 relative min-h-0">
           {mapContent}
-          {/* ETA pill */}
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
             <div className="bg-[#111] border border-gray-700/80 text-white px-4 py-2.5 rounded-2xl shadow-2xl flex items-center gap-3 backdrop-blur-sm">
               <AccessTimeIcon sx={{ fontSize: 14, color: '#06b6d4' }} />
@@ -715,13 +699,11 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
           </div>
         </div>
 
-        {/* Bottom sheet */}
         <motion.div
           animate={{ height: sheetExpanded ? '60vh' : '140px' }}
           transition={{ type: 'spring', damping: 25, stiffness: 200 }}
           className="bg-[#111111] border-t border-gray-800/80 flex-shrink-0 overflow-hidden flex flex-col"
         >
-          {/* Handle */}
           <button
             onClick={() => setSheetExpanded(!sheetExpanded)}
             className="flex items-center justify-between px-5 py-3 border-b border-gray-800/60 flex-shrink-0 w-full"
@@ -736,7 +718,6 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
             </div>
           </button>
 
-          {/* Quick stats row */}
           <div className="flex items-center gap-3 px-5 py-3 border-b border-gray-800/60 flex-shrink-0">
             <div className="flex-1 bg-[#1a1a1a] rounded-xl p-3 border border-gray-800/80">
               <p className="text-gray-500 text-[9px] uppercase tracking-widest mb-1">Pickup</p>
@@ -751,7 +732,6 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
             </div>
           </div>
 
-          {/* Scrollable expanded content */}
           {sheetExpanded && (
             <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-800">
               <DetailsPanelContent
@@ -767,7 +747,6 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
 
       {/* ─── MOBILE LAYOUT (<md) ─── */}
       <div className="flex md:hidden h-screen bg-[#0f0f0f] overflow-hidden font-sans flex-col">
-        {/* Top bar */}
         <div className="flex items-center justify-between px-4 py-3 bg-[#0a0a0a] border-b border-gray-800/80 flex-shrink-0 z-20">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-lg bg-cyan-500/20 flex items-center justify-center">
@@ -792,7 +771,6 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
           </div>
         </div>
 
-        {/* Tab bar */}
         <div className="flex bg-[#0a0a0a] border-b border-gray-800/80 flex-shrink-0 z-10">
           {[
             { key: 'map', label: 'Map', icon: MapIcon },
@@ -813,9 +791,7 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
           ))}
         </div>
 
-        {/* Content area */}
         <div className="flex-1 relative min-h-0">
-          {/* MAP TAB */}
           <AnimatePresence mode="wait">
             {mobileTab === 'map' && (
               <motion.div
@@ -825,18 +801,15 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
                 exit={{ opacity: 0 }}
                 className="absolute inset-0 flex flex-col"
               >
-                {/* Map */}
                 <div className="flex-1 relative">
                   {mapContent}
                 </div>
 
-                {/* Bottom sheet */}
                 <motion.div
                   animate={{ height: sheetExpanded ? '65vh' : '120px' }}
                   transition={{ type: 'spring', damping: 25, stiffness: 200 }}
                   className="bg-[#111111] border-t border-gray-800/80 flex-shrink-0 overflow-hidden flex flex-col absolute bottom-0 left-0 right-0 z-10"
                 >
-                  {/* Drag handle */}
                   <button
                     onClick={() => setSheetExpanded(!sheetExpanded)}
                     className="flex flex-col items-center pt-2 pb-1 flex-shrink-0 w-full"
@@ -857,7 +830,6 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
                     </div>
                   </button>
 
-                  {/* Quick route strip */}
                   <div className="flex items-center gap-2 px-4 pb-3 flex-shrink-0">
                     <div className="flex-1 bg-[#1a1a1a] rounded-lg px-3 py-2 border border-gray-800/60">
                       <p className="text-[9px] text-gray-500 uppercase tracking-widest">From</p>
@@ -870,7 +842,6 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
                     </div>
                   </div>
 
-                  {/* Expanded content */}
                   {sheetExpanded && (
                     <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-800">
                       <DetailsPanelContent
@@ -885,7 +856,6 @@ export default function RouteMap({ bookingId }: { bookingId: string }) {
               </motion.div>
             )}
 
-            {/* BOOKINGS TAB */}
             {mobileTab === 'bookings' && (
               <motion.div
                 key="bookings"

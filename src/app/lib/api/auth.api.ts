@@ -1,9 +1,8 @@
 import axios, { AxiosInstance, AxiosError } from 'axios'
+import { getApiUrl } from './api-url'
 
 const authApi: AxiosInstance = axios.create({
-  baseURL: process.env.NODE_ENV === 'production'
-    ? '/proxy'
-    : process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api',
+  baseURL: getApiUrl(),
   headers: {
     'Content-Type': 'application/json',
   },
