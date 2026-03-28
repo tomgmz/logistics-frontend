@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Check } from 'lucide-react'
 import StepServiceType from './ServiceType'
@@ -30,53 +30,77 @@ export default function BookingWizard() {
   const [service, setService] = useSessionState<ServiceType>('wizard:service', null)
 
   const [dir, setDir] = useState(1)
+  const [hasClash, setHasClash] = useState(false)
+
+  const titleRef = useRef<HTMLHeadingElement>(null)
+  const stepperRef = useRef<HTMLDivElement>(null)
 
   const goNext = () => { setDir(1);  setStep((s) => Math.min(s + 1, 4)) }
   const goBack = () => { setDir(-1); setStep((s) => Math.max(s - 1, 1)) }
 
+  // Detect collision
+  useEffect(() => {
+    const checkCollision = () => {
+      if (!titleRef.current || !stepperRef.current) return
+
+      const titleRect = titleRef.current.getBoundingClientRect()
+      const stepperRect = stepperRef.current.getBoundingClientRect()
+
+      // Check if they overlap (with 16px buffer)
+      const collision = titleRect.right + 16 > stepperRect.left
+
+      setHasClash(collision)
+    }
+
+    checkCollision()
+    window.addEventListener('resize', checkCollision)
+    return () => window.removeEventListener('resize', checkCollision)
+  }, [service, step]) // Re-check when service or step changes
+
   return (
     <div className="flex flex-col h-full min-h-0">
 
-    {/* Stepper bar */}
-    <div className="relative shrink-0 bg-[var(--color-bg)] border-b border-white/[0.07]
-                    px-4 lg:px-6 h-auto py-3 lg:py-0 lg:h-[62px] flex items-center">
+      {/* Stepper bar */}
+      <div className="relative shrink-0 bg-[var(--color-bg)] border-b border-white/[0.07]
+                      px-4 lg:px-6 h-auto py-3 lg:py-0 lg:h-[62px] flex items-center">
 
-      <h1 className="font-body booking-text text-white text-base lg:text-xl tracking-wider whitespace-nowrap">
-        New Booking
-        {service && (
-          <span className="hidden lg:inline">
-            <span className="text-white/30 mx-1.5">/</span>
-            <span className="uppercase">{service}</span>
-          </span>
-        )}
-      </h1>
+        <h1 ref={titleRef} className="font-body booking-text text-white text-base lg:text-xl tracking-wider whitespace-nowrap">
+          New Booking
+          {service && !hasClash && (
+            <>
+              <span className="text-white/30 mx-1.5">/</span>
+              <span className="uppercase">{service}</span>
+            </>
+          )}
+        </h1>
 
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <div className="hidden sm:flex items-center gap-12 pointer-events-auto">
-          {STEPS.map((s, i) => (
-            <div key={s.id} className="flex items-center">
-              <StepPip
-                step={s}
-                isActive={step === s.id}
-                isDone={step > s.id}
-                onClick={() => {
-                  if (s.id < step) { setDir(-1); setStep(s.id) }
-                }}
-              />
-              {i < STEPS.length - 1 && (
-                <div className={`w-10 lg:w-16 h-px mx-1 transition-colors duration-500
-                  ${step > s.id ? 'bg-[var(--color-cyan)]' : 'bg-white/10'}`}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div ref={stepperRef} className="hidden sm:flex items-center gap-12 pointer-events-auto">
+            {STEPS.map((s, i) => (
+              <div key={s.id} className="flex items-center">
+                <StepPip
+                  step={s}
+                  isActive={step === s.id}
+                  isDone={step > s.id}
+                  onClick={() => {
+                    if (s.id < step) { setDir(-1); setStep(s.id) }
+                  }}
                 />
-              )}
-            </div>
-          ))}
+                {i < STEPS.length - 1 && (
+                  <div className={`w-10 lg:w-16 h-px mx-1 transition-colors duration-500
+                    ${step > s.id ? 'bg-[var(--color-cyan)]' : 'bg-white/10'}`}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
 
-      <span className="sm:hidden ml-auto font-body text-sm whitespace-nowrap text-white">
-        {STEPS.find((s) => s.id === step)?.label}
-      </span>
-    </div>
+        <span className={`ml-auto font-body text-sm whitespace-nowrap text-white transition-opacity
+          ${hasClash ? 'sm:opacity-100' : 'sm:opacity-0 sm:pointer-events-none'} lg:opacity-0 lg:pointer-events-none`}>
+          {STEPS.find((s) => s.id === step)?.label}
+        </span>
+      </div>
 
       {/* Step content */}
       <div className="flex-1 overflow-hidden relative">
