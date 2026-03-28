@@ -37,10 +37,12 @@ export default function BookingWizard() {
   return (
     <div className="flex flex-col h-full min-h-0">
 
-      {/* Stepper bar */}
-      <div className="relative shrink-0 bg-[var(--color-bg)] border-b border-white/[0.07]
-                      px-4 lg:px-6 h-auto py-3 lg:py-0 lg:h-[62px] flex items-center">
+      {/* Stepper bar - Grid Layout */}
+      <div className="shrink-0 bg-[var(--color-bg)] border-b border-white/[0.07]
+                      px-4 lg:px-6 h-auto py-3 lg:py-0 lg:h-[62px]
+                      grid grid-cols-[1fr_auto_1fr] items-center gap-4">
 
+        {/* Left: Title */}
         <h1 className="font-body booking-text text-white text-base lg:text-xl tracking-wider whitespace-nowrap">
           New Booking
           {service && (
@@ -51,31 +53,34 @@ export default function BookingWizard() {
           )}
         </h1>
 
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="hidden sm:flex items-center gap-12 pointer-events-auto">
-            {STEPS.map((s, i) => (
-              <div key={s.id} className="flex items-center">
-                <StepPip
-                  step={s}
-                  isActive={step === s.id}
-                  isDone={step > s.id}
-                  onClick={() => {
-                    if (s.id < step) { setDir(-1); setStep(s.id) }
-                  }}
+        {/* Center: Stepper */}
+        <div className="hidden sm:flex items-center gap-8 lg:gap-12 justify-self-center">
+          {STEPS.map((s, i) => (
+            <div key={s.id} className="flex items-center">
+              <StepPip
+                step={s}
+                isActive={step === s.id}
+                isDone={step > s.id}
+                onClick={() => {
+                  if (s.id < step) { setDir(-1); setStep(s.id) }
+                }}
+              />
+              {i < STEPS.length - 1 && (
+                <div className={`w-8 lg:w-12 h-px mx-1 transition-colors duration-500
+                  ${step > s.id ? 'bg-[var(--color-cyan)]' : 'bg-white/10'}`}
                 />
-                {i < STEPS.length - 1 && (
-                  <div className={`w-10 lg:w-16 h-px mx-1 transition-colors duration-500
-                    ${step > s.id ? 'bg-[var(--color-cyan)]' : 'bg-white/10'}`}
-                  />
-                )}
-              </div>
-            ))}
-          </div>
+              )}
+            </div>
+          ))}
         </div>
 
-        <span className="sm:hidden ml-auto font-body text-sm whitespace-nowrap text-white">
+        {/* Right: Current step (mobile only) */}
+        <span className="sm:hidden justify-self-end font-body text-sm whitespace-nowrap text-white">
           {STEPS.find((s) => s.id === step)?.label}
         </span>
+
+        {/* Empty spacer for desktop to maintain centering */}
+        <div className="hidden sm:block" />
       </div>
 
       {/* Step content */}
@@ -136,7 +141,7 @@ function StepPip({
           </span>
         )}
       </motion.div>
-      <span className={`font-body booking-text sm:!text-[0.5rem] lg:text-sm transition-colors whitespace-nowrap
+      <span className={`font-body booking-text text-xs lg:text-sm transition-colors whitespace-nowrap
         ${isActive ? 'text-white' : isDone ? 'text-[var(--color-cyan)]' : 'text-[var(--color-muted)]'}`}>
         {step.label}
       </span>
