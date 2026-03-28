@@ -136,7 +136,7 @@ function StepPip({
           </span>
         )}
       </motion.div>
-      <span className={`font-body booking-text sm:!text-xs lg:text-sm transition-colors whitespace-nowrap
+      <span className={`font-body booking-text sm:!text-base lg:text-sm transition-colors whitespace-nowrap
         ${isActive ? 'text-white' : isDone ? 'text-[var(--color-cyan)]' : 'text-[var(--color-muted)]'}`}>
         {step.label}
       </span>
