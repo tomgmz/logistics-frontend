@@ -37,46 +37,46 @@ export default function BookingWizard() {
   return (
     <div className="flex flex-col h-full min-h-0">
 
-      {/* Stepper bar */}
-      <div className="relative shrink-0 bg-[var(--color-bg)] border-b border-white/[0.07]
-                      px-4 lg:px-6 h-auto py-3 lg:py-0 lg:h-[62px] flex items-center">
+    {/* Stepper bar */}
+    <div className="relative shrink-0 bg-[var(--color-bg)] border-b border-white/[0.07]
+                    px-4 lg:px-6 h-auto py-3 lg:py-0 lg:h-[62px] flex items-center">
 
-        <h1 className="font-body booking-text text-white text-base lg:text-xl tracking-wider whitespace-nowrap">
-          New Booking
-          {service && (
-            <>
-              <span className="text-white/30 mx-1.5">/</span>
-              <span className="uppercase">{service}</span>
-            </>
-          )}
-        </h1>
+      <h1 className="font-body booking-text text-white text-base lg:text-xl tracking-wider whitespace-nowrap">
+        New Booking
+        {service && (
+          <span className="hidden lg:inline">
+            <span className="text-white/30 mx-1.5">/</span>
+            <span className="uppercase">{service}</span>
+          </span>
+        )}
+      </h1>
 
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="hidden sm:flex items-center gap-12 pointer-events-auto">
-            {STEPS.map((s, i) => (
-              <div key={s.id} className="flex items-center">
-                <StepPip
-                  step={s}
-                  isActive={step === s.id}
-                  isDone={step > s.id}
-                  onClick={() => {
-                    if (s.id < step) { setDir(-1); setStep(s.id) }
-                  }}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div className="hidden sm:flex items-center gap-12 pointer-events-auto">
+          {STEPS.map((s, i) => (
+            <div key={s.id} className="flex items-center">
+              <StepPip
+                step={s}
+                isActive={step === s.id}
+                isDone={step > s.id}
+                onClick={() => {
+                  if (s.id < step) { setDir(-1); setStep(s.id) }
+                }}
+              />
+              {i < STEPS.length - 1 && (
+                <div className={`w-10 lg:w-16 h-px mx-1 transition-colors duration-500
+                  ${step > s.id ? 'bg-[var(--color-cyan)]' : 'bg-white/10'}`}
                 />
-                {i < STEPS.length - 1 && (
-                  <div className={`w-10 lg:w-16 h-px mx-1 transition-colors duration-500
-                    ${step > s.id ? 'bg-[var(--color-cyan)]' : 'bg-white/10'}`}
-                  />
-                )}
-              </div>
-            ))}
-          </div>
+              )}
+            </div>
+          ))}
         </div>
-
-        <span className="sm:hidden ml-auto font-body text-sm whitespace-nowrap text-white">
-          {STEPS.find((s) => s.id === step)?.label}
-        </span>
       </div>
+
+      <span className="sm:hidden ml-auto font-body text-sm whitespace-nowrap text-white">
+        {STEPS.find((s) => s.id === step)?.label}
+      </span>
+    </div>
 
       {/* Step content */}
       <div className="flex-1 overflow-hidden relative">
