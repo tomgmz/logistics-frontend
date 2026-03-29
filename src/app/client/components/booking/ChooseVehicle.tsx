@@ -1,12 +1,12 @@
 'use client'
 
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowLeft, ChevronLeft, ChevronRight, Truck } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, ChevronRight, Truck, Loader2 } from 'lucide-react'
 import Image from 'next/image'
 import { useSessionState } from '../../hooks/UseSessionState'
 import { useMemo, useState } from 'react'
 import './BookingDetails.css'
-import { VEHICLES, VEHICLE_IMAGES } from '@/constants/client/chooseVehichleData'
+import { useTrucks, VehicleData } from '../../hooks/useTrucks'
 
 interface Props {
   onNext: () => void
@@ -15,7 +15,6 @@ interface Props {
 
 interface ItemGroup {
   id: number
-  // loose fields
   pieces: string
   length: string
   width: string
@@ -25,7 +24,6 @@ interface ItemGroup {
   perItem: 'Per Item' | 'Total'
   nonTiltable: boolean
   nonStackable: boolean
-  // palletized fields
   numPallets: string
   palletType: 'Standard' | 'Euro' | 'Custom'
   grossWeightPerPallet: string
@@ -89,31 +87,92 @@ const slideV = {
 }
 
 export default function StepVehicle({ onNext, onBack }: Props) {
-  const [, setSelectedId] = useSessionState<string | null>('booking:vehicle', null)
-  const [groups]          = useSessionState<ItemGroup[]>('booking:groups', [])
-  const [mode]            = useSessionState<CargoMode>('booking:mode', 'loose')
-  const [idx, setIdx]     = useState(0)
-  const [dir, setDir]     = useState(1)
+  const { vehicles, loading, error } = useTrucks()
+
+  // ✅ Store full VehicleData object in session
+  const [, setSelectedVehicle] = useSessionState<VehicleData | null>('booking:vehicle', null)
+  const [groups]               = useSessionState<ItemGroup[]>('booking:groups', [])
+  const [mode]                 = useSessionState<CargoMode>('booking:mode', 'loose')
+  const [idx, setIdx]          = useState(0)
+  const [dir, setDir]          = useState(1)
 
   const summary = useMemo(() => calcSummary(groups, mode), [groups, mode])
 
   const navigate = (delta: number) => {
+    if (vehicles.length === 0) return
     setDir(delta)
-    setIdx((i) => (i + delta + VEHICLES.length) % VEHICLES.length)
+    setIdx((i) => (i + delta + vehicles.length) % vehicles.length)
   }
-  const goTo = (i: number) => { setDir(i > idx ? 1 : -1); setIdx(i) }
 
-  const vehicle = VEHICLES[idx]
-  const status  = getStatus(vehicle, summary.grossWeight, summary.volume)
+  const goTo = (i: number) => {
+    setDir(i > idx ? 1 : -1)
+    setIdx(i)
+  }
+
+  const vehicle = vehicles[idx]
+  const status  = vehicle ? getStatus(vehicle, summary.grossWeight, summary.volume) : null
 
   const handleReviewBooking = () => {
-    setSelectedId(vehicle.id)
+    if (!vehicle) return
+    setSelectedVehicle(vehicle) // ✅ store full object, not just id
     onNext()
+  }
+
+  if (loading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-12 h-12 text-[var(--color-cyan)] animate-spin" />
+          <p className="font-body booking-text text-white/70">Loading available vehicles...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="h-full flex items-center justify-center p-8">
+        <div className="text-center max-w-md">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-500/10 flex items-center justify-center">
+            <Truck className="w-8 h-8 text-red-500" />
+          </div>
+          <h3 className="font-body booking-text text-white text-xl mb-2">Failed to Load Vehicles</h3>
+          <p className="font-body text-white/60 mb-6">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-6 py-3 rounded-xl bg-[var(--color-cyan)] text-[var(--color-bg)] font-body booking-text font-bold uppercase tracking-wider hover:opacity-90 transition-opacity"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (vehicles.length === 0) {
+    return (
+      <div className="h-full flex items-center justify-center p-8">
+        <div className="text-center max-w-md">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-white/5 flex items-center justify-center">
+            <Truck className="w-8 h-8 text-white/40" />
+          </div>
+          <h3 className="font-body booking-text text-white text-xl mb-2">No Vehicles Available</h3>
+          <p className="font-body text-white/60 mb-6">
+            There are currently no vehicles available for booking. Please try again later or contact support.
+          </p>
+          <button
+            onClick={onBack}
+            className="px-6 py-3 rounded-xl bg-white/10 text-white font-body booking-text font-bold uppercase tracking-wider hover:bg-white/20 transition-colors"
+          >
+            Go Back
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (
     <div className="h-full flex flex-col overflow-y-auto lg:overflow-hidden p-3 sm:p-4 lg:p-5 gap-3 sm:gap-4">
-
       <div className="flex flex-col lg:flex-row gap-3 sm:gap-4 lg:flex-1 lg:min-h-0">
 
         {/* LEFT CARD — Product Details */}
@@ -259,7 +318,7 @@ export default function StepVehicle({ onNext, onBack }: Props) {
                   >
                     <div className="relative w-full h-full">
                       <Image
-                        src={VEHICLE_IMAGES[vehicle.id]}
+                        src={vehicle.imageUrl || '/images/vehicles/default-truck.png'}
                         alt={vehicle.name}
                         fill
                         className="object-contain drop-shadow-2xl"
@@ -295,7 +354,7 @@ export default function StepVehicle({ onNext, onBack }: Props) {
 
             {/* Dot indicators */}
             <div className="flex justify-center items-center gap-1.5">
-              {VEHICLES.map((v, i) => (
+              {vehicles.map((v, i) => (
                 <button
                   key={v.id}
                   onClick={() => goTo(i)}
@@ -306,33 +365,35 @@ export default function StepVehicle({ onNext, onBack }: Props) {
             </div>
 
             {/* Status badges */}
-            <div className="flex flex-wrap items-center gap-2 min-h-[28px]">
-              <AnimatePresence>
-                {status.isSuggested && (
-                  <motion.span
-                    key="suggested"
-                    initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.8, opacity: 0 }}
-                    className="px-3 py-1 rounded-md bg-[var(--color-cyan)] text-[var(--color-bg)] font-body booking-text !text-[10px] sm:!text-xs lg:!text-sm font-bold uppercase tracking-widest"
-                  >
-                    Suggested
-                  </motion.span>
+            {status && (
+              <div className="flex flex-wrap items-center gap-2 min-h-[28px]">
+                <AnimatePresence>
+                  {status.isSuggested && (
+                    <motion.span
+                      key="suggested"
+                      initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.8, opacity: 0 }}
+                      className="px-3 py-1 rounded-md bg-[var(--color-cyan)] text-[var(--color-bg)] font-body booking-text !text-[10px] sm:!text-xs lg:!text-sm font-bold uppercase tracking-widest"
+                    >
+                      Suggested
+                    </motion.span>
+                  )}
+                  {status.isOverloaded && (
+                    <motion.span
+                      key="overloaded"
+                      initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.8, opacity: 0 }}
+                      className="px-3 py-1 rounded-md bg-red-500 text-white font-body booking-text !text-[10px] sm:!text-xs lg:!text-sm font-bold uppercase tracking-widest"
+                    >
+                      Overloaded
+                    </motion.span>
+                  )}
+                </AnimatePresence>
+                {status.isOverloaded && status.tripsNeeded > 1 && (
+                  <p className="font-body booking-text !text-[10px] sm:!text-xs lg:!text-sm uppercase tracking-[0.10em] text-white/50">
+                    · {status.tripsNeeded} trips needed for this cargo volume
+                  </p>
                 )}
-                {status.isOverloaded && (
-                  <motion.span
-                    key="overloaded"
-                    initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.8, opacity: 0 }}
-                    className="px-3 py-1 rounded-md bg-red-500 text-white font-body booking-text !text-[10px] sm:!text-xs lg:!text-sm font-bold uppercase tracking-widest"
-                  >
-                    Overloaded
-                  </motion.span>
-                )}
-              </AnimatePresence>
-              {status.isOverloaded && status.tripsNeeded > 1 && (
-                <p className="font-body booking-text !text-[10px] sm:!text-xs lg:!text-sm uppercase tracking-[0.10em] text-white/50">
-                  · {status.tripsNeeded} trips needed for this cargo volume
-                </p>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* Capacity cards */}
             <AnimatePresence mode="wait">
@@ -369,8 +430,8 @@ export default function StepVehicle({ onNext, onBack }: Props) {
                 className="flex flex-col divide-y divide-white/[0.06]"
               >
                 <SpecRow label="Body type"         value={vehicle.bodyType} />
-                <SpecRow label="Dimention"          value={vehicle.dimension} />
-                <SpecRow label="Sutable for"        value={vehicle.suitableFor} />
+                <SpecRow label="Dimension"          value={vehicle.dimension} />
+                <SpecRow label="Suitable for"       value={vehicle.suitableFor} />
                 <SpecRow label="Stackable friendly" value={vehicle.stackableFriendly ? 'Yes' : 'No'} />
               </motion.div>
             </AnimatePresence>
@@ -408,7 +469,6 @@ export default function StepVehicle({ onNext, onBack }: Props) {
                 Review Booking
               </motion.button>
             </div>
-
           </div>
         </motion.div>
       </div>
@@ -419,12 +479,8 @@ export default function StepVehicle({ onNext, onBack }: Props) {
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-[#4DF9ED] bg-white p-2.5 sm:p-3 lg:p-4 flex flex-col gap-1">
-      <p className="font-body text-[#818181] !text-[10px] sm:!text-xs lg:!text-sm uppercase tracking-widest leading-none">
-        {label}
-      </p>
-      <p className="font-body booking-text text-black text-base sm:text-lg lg:text-2xl leading-none tracking-wide font-bold whitespace-nowrap truncate">
-        {value}
-      </p>
+      <p className="font-body text-[#818181] !text-[10px] sm:!text-xs lg:!text-sm uppercase tracking-widest leading-none">{label}</p>
+      <p className="font-body booking-text text-black text-base sm:text-lg lg:text-2xl leading-none tracking-wide font-bold whitespace-nowrap truncate">{value}</p>
     </div>
   )
 }
@@ -434,13 +490,9 @@ function CapCard({ label, value, overloaded }: { label: string; value: string; o
     <div className={`rounded-xl border p-2.5 sm:p-3 lg:p-4 flex flex-col gap-1 bg-white transition-colors
       ${overloaded ? 'border-red-400' : 'border-[#4DF9ED]'}`}>
       <p className={`font-body !text-[10px] sm:!text-xs lg:!text-sm uppercase tracking-widest leading-tight
-        ${overloaded ? 'text-red-500' : 'text-[#818181]'}`}>
-        {label}
-      </p>
+        ${overloaded ? 'text-red-500' : 'text-[#818181]'}`}>{label}</p>
       <p className={`font-body booking-text text-sm sm:text-base lg:text-xl leading-none font-bold whitespace-nowrap truncate
-        ${overloaded ? 'text-red-500' : 'text-black'}`}>
-        {value}
-      </p>
+        ${overloaded ? 'text-red-500' : 'text-black'}`}>{value}</p>
     </div>
   )
 }
@@ -448,12 +500,8 @@ function CapCard({ label, value, overloaded }: { label: string; value: string; o
 function SpecRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between px-0 py-2 sm:py-2.5">
-      <span className="font-body !text-[10px] sm:!text-xs lg:!text-base uppercase tracking-wider">
-        {label}
-      </span>
-      <span className="font-body !text-[10px] sm:!text-xs lg:!text-base text-white text-right">
-        {value}
-      </span>
+      <span className="font-body !text-[10px] sm:!text-xs lg:!text-base uppercase tracking-wider">{label}</span>
+      <span className="font-body !text-[10px] sm:!text-xs lg:!text-base text-white text-right">{value}</span>
     </div>
   )
 }

@@ -6,7 +6,7 @@ import { CheckCircle2, Truck } from 'lucide-react'
 import Image from 'next/image'
 import { ServiceType } from './BookingWizard'
 import { useSessionState } from '../../hooks/UseSessionState'
-import { VEHICLES, VEHICLE_IMAGES } from '@/constants/client/chooseVehichleData'
+import type { VehicleData } from '../../hooks/useTrucks'
 import './BookingDetails.css'
 
 interface Props {
@@ -48,20 +48,19 @@ export default function StepReview({ selectedService, onBack }: Props) {
   const [loading,   setLoading]   = useState(false)
   const [submitted, setSubmitted] = useState(false)
 
-  // Pull all session state
-  const [date]      = useSessionState('booking:date', '')
-  const [time]      = useSessionState('booking:time', '')
-  const [pickup]    = useSessionState('booking:pickup', '')
+  const [date]      = useSessionState('booking:date',      '')
+  const [time]      = useSessionState('booking:time',      '')
+  const [pickup]    = useSessionState('booking:pickup',    '')
   const [dropoffs]  = useSessionState<string[]>('booking:dropoffs', [''])
   const [commodity] = useSessionState('booking:commodity', '')
-  const [product]   = useSessionState('booking:product', '')
-  const [shc]       = useSessionState('booking:shc', '')
-  const [addShc]    = useSessionState('booking:addShc', '')
+  const [product]   = useSessionState('booking:product',   '')
+  const [shc]       = useSessionState('booking:shc',       '')
+  const [addShc]    = useSessionState('booking:addShc',    '')
   const [mode]      = useSessionState<CargoMode>('booking:mode', 'loose')
   const [groups]    = useSessionState<ItemGroup[]>('booking:groups', [])
-  const [vehicleId] = useSessionState<string | null>('booking:vehicle', null)
 
-  const vehicle = VEHICLES.find((v) => v.id === vehicleId) ?? VEHICLES[0]
+  // ✅ Read full vehicle object directly from session — no API call needed
+  const [vehicle] = useSessionState<VehicleData | null>('booking:vehicle', null)
 
   const confirm = async () => {
     setLoading(true)
@@ -88,7 +87,6 @@ export default function StepReview({ selectedService, onBack }: Props) {
             animate="show"
             className="flex flex-col gap-4 lg:gap-6 pb-4"
           >
-            {/* Page heading */}
             <motion.div variants={fadeUp} className="flex items-center gap-2">
               <Truck size={18} className="text-white" />
               <div>
@@ -101,16 +99,13 @@ export default function StepReview({ selectedService, onBack }: Props) {
               </div>
             </motion.div>
 
-            {/* ── CARD 1: Schedule + Vehicle ── */}
+            {/* CARD 1: Schedule + Vehicle */}
             <motion.div variants={fadeUp}
               className="rounded-2xl bg-[#2A2828] border border-white/[0.07]
-                        border-t-[3px] border-t-[var(--color-cyan)] p-5 lg:p-6"
+                         border-t-[3px] border-t-[var(--color-cyan)] p-5 lg:p-6"
             >
               <div className="flex flex-col lg:flex-row gap-6">
-
-                {/* Left: Schedule / Pickup / Dropoff / Service */}
                 <div className="flex flex-col gap-4 w-full lg:w-1/2">
-                  {/* Schedule */}
                   <div>
                     <SectionLabel>Schedule</SectionLabel>
                     <div className="flex gap-3 mt-2">
@@ -118,14 +113,10 @@ export default function StepReview({ selectedService, onBack }: Props) {
                       <InfoBox label="Time" value={time || '—'} className="w-[120px] sm:min-w-[250px]" />
                     </div>
                   </div>
-
-                  {/* Pickup */}
                   <div>
                     <SectionLabel>Pick-Up Point</SectionLabel>
-                    <InfoBox value={pickup || '—'} className="full" />
+                    <InfoBox value={pickup || '—'} className="w-full" />
                   </div>
-
-                  {/* Drop-offs */}
                   <div>
                     <SectionLabel>Drop-Off Point</SectionLabel>
                     <div className="flex flex-col gap-2 mt-2">
@@ -134,48 +125,48 @@ export default function StepReview({ selectedService, onBack }: Props) {
                       ))}
                     </div>
                   </div>
-
-                  {/* Service Type */}
                   <div>
                     <SectionLabel>Service Type</SectionLabel>
                     <InfoBox value={serviceLabel} className="mt-2 w-full" />
                   </div>
                 </div>
 
-                {/* Right: Vehicle */}
                 <div className="flex flex-col items-center lg:items-end gap-3 w-full lg:w-1/2">
                   <SectionLabel className="self-start lg:self-end">Transit Vehicle</SectionLabel>
-                  <div className="relative w-full h-[180px] lg:h-[220px]">
-                    <Image
-                      src={VEHICLE_IMAGES[vehicle.id]}
-                      alt={vehicle.name}
-                      fill
-                      className="object-contain drop-shadow-2xl"
-                    />
-                  </div>
-                  <p className="font-body booking-text text-white text-2xl lg:text-3xl tracking-widest text-center">
-                    {vehicle.name}
-                  </p>
+                  {vehicle ? (
+                    <>
+                      <div className="relative w-full h-[180px] lg:h-[220px]">
+                        <Image
+                          src={vehicle.imageUrl || '/images/vehicles/default-truck.png'}
+                          alt={vehicle.name}
+                          fill
+                          className="object-contain drop-shadow-2xl"
+                        />
+                      </div>
+                      <p className="font-body booking-text text-white text-2xl lg:text-3xl tracking-widest text-center">
+                        {vehicle.name}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="font-body booking-text text-white/40 text-sm">No vehicle selected</p>
+                  )}
                 </div>
               </div>
             </motion.div>
 
-            {/* ── CARD 2: Product Details ── */}
+            {/* CARD 2: Product Details */}
             <motion.div variants={fadeUp}
               className="rounded-2xl bg-[#2A2828] border border-white/[0.07]
                          border-t-[3px] border-t-[var(--color-cyan)] p-5 lg:p-6"
             >
               <SectionLabel className="mb-4 text-base lg:text-lg">Product Details</SectionLabel>
-
-              {/* Commodity / Product / SHC rows */}
               <div className="flex flex-col divide-y divide-white/[0.06]">
-                <DetailRow label="Commodity"                    value={commodity || '—'} />
-                <DetailRow label="Product"                      value={product   || '—'} />
-                <DetailRow label="Special Handling Code"        value={shc       || '—'} />
-                <DetailRow label="Additional Special Handling Code" value={addShc || '—'} />
+                <DetailRow label="Commodity"                        value={commodity || '—'} />
+                <DetailRow label="Product"                          value={product   || '—'} />
+                <DetailRow label="Special Handling Code"            value={shc       || '—'} />
+                <DetailRow label="Additional Special Handling Code" value={addShc    || '—'} />
               </div>
 
-              {/* Item groups */}
               {groups.length > 0 && (
                 <div className="flex flex-col gap-3 mt-4">
                   {groups.map((g, i) => (
@@ -186,51 +177,28 @@ export default function StepReview({ selectedService, onBack }: Props) {
                       transition={{ delay: i * 0.06 }}
                       className="flex flex-col gap-1"
                     >
-                      {/* Product number above the group */}
                       <span className="font-body booking-text text-white text-xs lg:text-sm uppercase tracking-widest px-2">
                         {mode === 'palletized' ? `Pallet Group #${i + 1}` : `Product #${i + 1}`}
                       </span>
-
-                      {/* Group rows (table) */}
                       <div className="rounded-xl border border-white/[0.07] overflow-hidden">
                         <div className="flex flex-col divide-y bg-[#424242] divide-white/[0.06] p-2 sm:p-10">
                           {mode === 'loose' ? (
                             <>
-                              <DetailRow label="Pieces" value={g.pieces || '—'} />
-                              <DetailRow
-                                label="Dimensions"
-                                value={
-                                  g.length && g.width && g.height
-                                    ? `${g.length} × ${g.width} × ${g.height}`
-                                    : '—'
-                                }
-                              />
-                              <DetailRow label="Weight" value={g.weight ? `${g.weight} ${g.weightUnit}` : '—'} />
-                              {g.nonTiltable && <DetailRow label="Non-tiltable" value="Yes" />}
+                              <DetailRow label="Pieces"     value={g.pieces || '—'} />
+                              <DetailRow label="Dimensions" value={g.length && g.width && g.height ? `${g.length} × ${g.width} × ${g.height}` : '—'} />
+                              <DetailRow label="Weight"     value={g.weight ? `${g.weight} ${g.weightUnit}` : '—'} />
+                              {g.nonTiltable  && <DetailRow label="Non-tiltable"  value="Yes" />}
                               {g.nonStackable && <DetailRow label="Non-stackable" value="Yes" />}
                             </>
                           ) : (
                             <>
-                              <DetailRow label="No. of Pallets" value={g.numPallets || '—'} />
-                              <DetailRow label="Pallet Type" value={g.palletType || '—'} />
-                              <DetailRow
-                                label="Dimensions"
-                                value={
-                                  g.length && g.width && g.height
-                                    ? `${g.length} × ${g.width} × ${g.height}`
-                                    : '—'
-                                }
-                              />
-                              <DetailRow
-                                label="Gross Weight / Pallet"
-                                value={g.grossWeightPerPallet ? `${g.grossWeightPerPallet} ${g.weightUnit}` : '—'}
-                              />
-                              <DetailRow
-                                label="Net Weight / Pallet"
-                                value={g.netWeightPerPallet ? `${g.netWeightPerPallet} ${g.weightUnit}` : '—'}
-                              />
+                              <DetailRow label="No. of Pallets"        value={g.numPallets || '—'} />
+                              <DetailRow label="Pallet Type"           value={g.palletType || '—'} />
+                              <DetailRow label="Dimensions"            value={g.length && g.width && g.height ? `${g.length} × ${g.width} × ${g.height}` : '—'} />
+                              <DetailRow label="Gross Weight / Pallet" value={g.grossWeightPerPallet ? `${g.grossWeightPerPallet} ${g.weightUnit}` : '—'} />
+                              <DetailRow label="Net Weight / Pallet"   value={g.netWeightPerPallet   ? `${g.netWeightPerPallet} ${g.weightUnit}`   : '—'} />
                               {g.stackable && <DetailRow label="Stackable" value="Yes" />}
-                              {g.oversize && <DetailRow label="Oversize" value="Yes" />}
+                              {g.oversize  && <DetailRow label="Oversize"  value="Yes" />}
                             </>
                           )}
                         </div>
@@ -241,10 +209,8 @@ export default function StepReview({ selectedService, onBack }: Props) {
               )}
             </motion.div>
 
-            {/* ── Action row ── */}
-            <motion.div variants={fadeUp}
-              className="flex justify-between items-center pt-2"
-            >
+            {/* Action row */}
+            <motion.div variants={fadeUp} className="flex justify-between items-center pt-2">
               <motion.button
                 onClick={onBack}
                 whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
@@ -256,7 +222,6 @@ export default function StepReview({ selectedService, onBack }: Props) {
               >
                 BACK
               </motion.button>
-
               <motion.button
                 onClick={confirm}
                 disabled={loading}
@@ -279,13 +244,9 @@ export default function StepReview({ selectedService, onBack }: Props) {
   )
 }
 
-/* ── Sub-components ── */
-
 function SectionLabel({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
-    <h3 className={`font-body booking-text text-white font-bold tracking-wide ${className}`}>
-      {children}
-    </h3>
+    <h3 className={`font-body booking-text text-white font-bold tracking-wide ${className}`}>{children}</h3>
   )
 }
 
@@ -297,9 +258,7 @@ function InfoBox({ label, value, className = '' }: { label?: string; value: stri
           {label}
         </p>
       )}
-      <p className="font-body booking-text text-white text-sm lg:text-base leading-snug">
-        {value}
-      </p>
+      <p className="font-body booking-text text-white text-sm lg:text-base leading-snug">{value}</p>
     </div>
   )
 }
@@ -307,12 +266,8 @@ function InfoBox({ label, value, className = '' }: { label?: string; value: stri
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between px-4 py-2.5">
-      <span className="font-body booking-text text-xs lg:text-sm uppercase tracking-wider">
-        {label}
-      </span>
-      <span className="font-body booking-text text-white text-sm lg:text-base text-right">
-        {value}
-      </span>
+      <span className="font-body booking-text text-xs lg:text-sm uppercase tracking-wider">{label}</span>
+      <span className="font-body booking-text text-white text-sm lg:text-base text-right">{value}</span>
     </div>
   )
 }
@@ -322,8 +277,7 @@ function Spinner() {
     <motion.div
       animate={{ rotate: 360 }}
       transition={{ duration: 0.75, repeat: Infinity, ease: 'linear' }}
-      className="w-4 h-4 rounded-full border-2
-                 border-[var(--color-bg)]/30 border-t-[var(--color-bg)]"
+      className="w-4 h-4 rounded-full border-2 border-[var(--color-bg)]/30 border-t-[var(--color-bg)]"
     />
   )
 }
@@ -343,12 +297,7 @@ function SuccessView() {
       >
         <CheckCircle2 size={84} className="text-[var(--color-cyan)]" strokeWidth={1.2} />
       </motion.div>
-
-      <motion.div
-        initial={{ opacity: 0, y: 18 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.35 }}
-      >
+      <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}>
         <h2 className="font-body booking-text text-white text-3xl lg:text-5xl font-bold mb-3 uppercase tracking-widest">
           Booking Confirmed!
         </h2>
@@ -359,7 +308,6 @@ function SuccessView() {
           Booking ID: #ACS-2026-00142
         </p>
       </motion.div>
-
       <motion.button
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
@@ -369,8 +317,7 @@ function SuccessView() {
         onClick={() => window.location.reload()}
         className="mt-2 px-8 py-3 rounded-xl font-body booking-text font-bold uppercase tracking-widest
                    text-base lg:text-lg text-[var(--color-bg)]
-                   bg-[var(--color-cyan)] cursor-pointer
-                   hover:opacity-90 transition-opacity"
+                   bg-[var(--color-cyan)] cursor-pointer hover:opacity-90 transition-opacity"
       >
         New Booking
       </motion.button>

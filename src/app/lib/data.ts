@@ -57,11 +57,11 @@ export const FAQS = [
   },
   {
     q: 'Is real-time tracking available?',
-    a: 'Track every shipment live using yuour tracking number for instant updates.',
+    a: 'Track every shipment live using your tracking number for instant updates.',
   },
   {
     q: 'Which cargo types are supported?',
-    a: 'FCL & LCL. Special handling available on request.',
+    a: 'FCL and LCL. Special handling available on request.',
   },
   {
     q: 'Where is my transaction history?',
