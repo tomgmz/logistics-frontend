@@ -469,7 +469,7 @@ export default function LoginPage() {
       `}</style>
 
       <div
-        className="min-h-screen min-h-dvh flex items-center justify-center relative overflow-hidden px-4 py-8 sm:py-12"
+        className="min-h-screen flex items-center justify-center relative overflow-hidden px-4 py-8 sm:py-12"
         style={{ background: '#050d0d', fontFamily: "'Sora', sans-serif" }}
       >
         {/* Grid background */}

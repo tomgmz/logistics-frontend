@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence, useScroll, useSpring } from 'framer-motion';
 import { ASSETS } from '@/app/lib/data';
 import Image from 'next/image';
+import SignInModal from '../SignInModal';
 
 const NAV_LINKS = [
   { label: 'Home',     href: '#hero' },
@@ -15,9 +16,10 @@ const NAV_LINKS = [
 ];
 
 export default function Navbar() {
-  const [scrolled,  setScrolled]  = useState(false);
-  const [menuOpen,  setMenuOpen]  = useState(false);
-  const [activeIdx, setActiveIdx] = useState(0);
+  const [scrolled,    setScrolled]    = useState(false);
+  const [menuOpen,    setMenuOpen]    = useState(false);
+  const [activeIdx,   setActiveIdx]   = useState(0);
+  const [signInOpen,  setSignInOpen]  = useState(false);
 
   const { scrollYProgress } = useScroll();
   const scaleX = useSpring(scrollYProgress, { stiffness: 200, damping: 30 });
@@ -59,8 +61,7 @@ export default function Navbar() {
     <>
       <motion.div
         style={{ scaleX, transformOrigin: '0%' }}
-        className="fixed top-0 left-0 right-0 h-[2px] z-[100]
-          bg-[#4df9ed]"
+        className="fixed top-0 left-0 right-0 h-[2px] z-[100] bg-[#4df9ed]"
       />
 
       <nav
@@ -68,8 +69,9 @@ export default function Navbar() {
           ${scrolled ? 'glass-dark shadow-[0_1px_0_rgba(255,255,255,0.05)]' : 'bg-transparent'}`}
       >
         <div className="max-w-[1600px] mx-auto px-6 md:px-12 lg:px-16
-          h-[76px] flex items-center justify-between">
+          h-[76px] flex items-center relative">
 
+          {/* Logo — left-anchored */}
           <a href="#hero" className="flex items-center no-underline shrink-0">
             <Image
               src={ASSETS.logo}
@@ -80,7 +82,9 @@ export default function Navbar() {
             />
           </a>
 
-          <ul className="hidden md:flex items-center gap-1 list-none m-0 p-0">
+          {/* Nav links — absolutely centered */}
+          <ul className="hidden md:flex items-center gap-1 list-none m-0 p-0
+            absolute left-1/2 -translate-x-1/2">
             {NAV_LINKS.map((item, i) => (
               <motion.li
                 key={item.label}
@@ -90,7 +94,7 @@ export default function Navbar() {
               >
                 <a
                   href={item.href}
-                  className={`font-"'Alegreya Sans DC', 'sans-serif'" text-[0.84rem] tracking-wider px-4 py-2.5 rounded-xl
+                  className={`text-[0.84rem] tracking-wider px-4 py-2.5 rounded-xl
                     no-underline transition-all duration-200 block relative
                     ${activeIdx === i
                       ? 'text-[#4df9ed] bg-[#4df9ed]/[0.07]'
@@ -110,31 +114,38 @@ export default function Navbar() {
             ))}
           </ul>
 
-          <div className="hidden md:flex items-center gap-3 shrink-0">
-            <button
-              onClick={() => { window.location.href = '/login' }}
-              className="font-'Alegreya Sans DC, sans-serif' text-white/70 text-[0.84rem] tracking-wider
-                px-5 py-2.5 rounded-[15px] border border-white/15
-                hover:border-[#4df9ed]/50 hover:text-[#4df9ed]
-                transition-all duration-200 bg-transparent cursor-pointer"
+          {/* Right side — Sign In button + mobile hamburger */}
+          <div className="ml-auto flex items-center gap-3">
+            {/* Sign In button — desktop */}
+            <motion.button
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4, duration: 0.4 }}
+              onClick={() => setSignInOpen(true)}
+              className="hidden md:flex items-center gap-2 text-[0.84rem] tracking-wider
+                px-4 py-2 rounded-xl border border-[#4df9ed]/30 text-[#4df9ed]
+                hover:bg-[#4df9ed]/[0.08] hover:border-[#4df9ed]/60
+                transition-all duration-200 cursor-pointer bg-transparent"
             >
               Sign In
+            </motion.button>
+
+            {/* Mobile hamburger */}
+            <button
+              className="md:hidden flex flex-col gap-[5px] items-end w-10 h-10 justify-center
+                hover:opacity-70 transition-opacity"
+              onClick={() => setMenuOpen(true)}
+              aria-label="Open menu"
+            >
+              <span className="w-6 h-[2px] bg-white block rounded-full" />
+              <span className="w-4 h-[2px] bg-white block rounded-full" />
+              <span className="w-6 h-[2px] bg-white block rounded-full" />
             </button>
           </div>
-
-          <button
-            className="md:hidden flex flex-col gap-[5px] items-end w-10 h-10 justify-center
-              hover:opacity-70 transition-opacity"
-            onClick={() => setMenuOpen(true)}
-            aria-label="Open menu"
-          >
-            <span className="w-6 h-[2px] bg-white block rounded-full" />
-            <span className="w-4 h-[2px] bg-white block rounded-full" />
-            <span className="w-6 h-[2px] bg-white block rounded-full" />
-          </button>
         </div>
       </nav>
 
+      {/* Mobile drawer */}
       <AnimatePresence>
         {menuOpen && (
           <>
@@ -190,15 +201,14 @@ export default function Navbar() {
                     <a
                       href={item.href}
                       onClick={closeMenu}
-                      className={`font-'Alegreya Sans DC, sans-serif' text-[1rem] py-3 px-4 rounded-xl
+                      className={`text-[1rem] py-3 px-4 rounded-xl
                         transition-colors tracking-wider no-underline block
                         ${activeIdx === i
                           ? 'bg-[#4df9ed]/[0.08] text-[#4df9ed]'
                           : 'text-white/65 hover:bg-white/[0.05] hover:text-white'
                         }`}
                     >
-                      <span className="text-white/20 text-xs mr-3 font-display not-italic normal-case"
-                        style={{ fontStyle: 'normal', textTransform: 'none', fontFamily: 'monospace' }}>
+                      <span className="text-white/20 text-xs mr-3" style={{ fontFamily: 'monospace' }}>
                         {String(i + 1).padStart(2, '0')}
                       </span>
                       {item.label}
@@ -207,16 +217,19 @@ export default function Navbar() {
                 ))}
               </ul>
 
-              <div className="p-6 pt-4 flex flex-col gap-3 border-t border-white/[0.07]">
+              {/* Sign In inside mobile drawer */}
+              <div className="p-4 border-t border-white/[0.07]">
                 <button
-                  onClick={() => {
-                    closeMenu()
-                    window.location.href = '/login'
-                  }}
-                  className="font-'Alegreya Sans DC, sans-serif' w-full py-3.5 rounded-[15px] border border-white/15
-                    text-white tracking-wider bg-transparent text-sm cursor-pointer
-                    hover:border-white/30 transition-colors"
+                  onClick={() => { closeMenu(); setTimeout(() => setSignInOpen(true), 300); }}
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl
+                    border border-[#4df9ed]/30 text-[#4df9ed] text-[0.9rem] tracking-wider
+                    hover:bg-[#4df9ed]/[0.08] transition-all duration-200 cursor-pointer bg-transparent"
                 >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+                    <polyline points="10 17 15 12 10 7"/>
+                    <line x1="15" y1="12" x2="3" y2="12"/>
+                  </svg>
                   Sign In
                 </button>
               </div>
@@ -224,6 +237,9 @@ export default function Navbar() {
           </>
         )}
       </AnimatePresence>
+
+      {/* Sign In Modal */}
+      <SignInModal isOpen={signInOpen} onClose={() => setSignInOpen(false)} />
     </>
   );
 }

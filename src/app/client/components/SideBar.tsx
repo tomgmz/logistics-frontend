@@ -56,7 +56,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
     } finally {
       clearUser() // ← add
       if (typeof window !== 'undefined') {
-        window.location.href = '/login'
+        window.location.href = '/'
       }
     }
   }
