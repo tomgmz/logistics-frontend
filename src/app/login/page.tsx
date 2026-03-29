@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { AxiosError } from 'axios'
 import { requestOtp, verifyOtp } from '@/app/lib/api/auth.api'
 import { AuthUser } from '@/app/lib/api/auth.api'
+import { useAuthStore } from '../lib/store/auth.store'
 
 const ROLE_ROUTES: Record<string, string> = {
   super_admin: '/superadmin',
@@ -443,6 +444,7 @@ export default function LoginPage() {
   }
 
   const handleOtpSuccess = (user: AuthUser) => {
+    useAuthStore.getState().setUser(user)
     setStep('success')
     const targetRoute = getRoleRoute(user.role)
     setTimeout(() => {

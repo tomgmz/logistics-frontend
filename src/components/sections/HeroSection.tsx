@@ -83,14 +83,6 @@ export default function HeroSection() {
           >
             Be our partner
           </a>
-          <button
-            onClick={() => { window.location.href = '/login' }}
-            className="font-body bg-white text-[#0a0a0a] px-5 sm:px-8 py-3 sm:py-4 rounded-[12px] sm:rounded-[15px]
-              text-sm sm:text-sm md:text-base lg:text-xl tracking-wider font-semibold
-              hover:bg-white/90 transition-all duration-300 cursor-pointer"
-          >
-            Sign in
-          </button>
         </motion.div>
       </div>
 

@@ -120,15 +120,6 @@ export default function Navbar() {
             >
               Sign In
             </button>
-            <a
-              href="#contact"
-              className="font-'Alegreya Sans DC, sans-serif' text-[0.84rem] tracking-wider px-5 py-2.5 rounded-[15px]
-                bg-white/[0.08] border border-white/[0.14] text-white no-underline
-                hover:bg-[#4df9ed]/[0.12] hover:border-[#4df9ed]/40 hover:text-[#4df9ed]
-                transition-all duration-200"
-            >
-              Be Our Partner
-            </a>
           </div>
 
           <button
@@ -228,16 +219,6 @@ export default function Navbar() {
                 >
                   Sign In
                 </button>
-                <a
-                  href="#contact"
-                  onClick={closeMenu}
-                  className="font-'Alegreya Sans DC, sans-serif' w-full py-3.5 rounded-[15px]
-                    bg-[#4df9ed]/[0.1] border border-[#4df9ed]/30 text-[#4df9ed]
-                    text-center tracking-wider no-underline text-sm
-                    hover:bg-[#4df9ed]/20 transition-colors block"
-                >
-                  Be Our Partner
-                </a>
               </div>
             </motion.div>
           </>

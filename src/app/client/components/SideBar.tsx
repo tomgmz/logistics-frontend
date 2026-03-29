@@ -14,6 +14,7 @@ import Image from 'next/image'
 import '../components/booking/BookingDetails.css'
 import { useEffect, useState } from 'react'
 import { logout } from '@/app/lib/api/auth.api'
+import { useAuthStore } from '@/app/lib/store/auth.store'
 
 const SIDEBAR_COLLAPSED = 56
 const SIDEBAR_EXPANDED  = 260
@@ -33,32 +34,32 @@ const NAV: { href: string; label: string; icon: React.ReactNode }[] = [
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(false)
-
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 1024)
     check()
-
     window.addEventListener('resize', check)
     return () => window.removeEventListener('resize', check)
   }, [])
-
   return isMobile
-}
-
-const handleLogout = async () => {
-  try {
-    await logout()
-  } catch {
-  } finally {
-    if (typeof window !== 'undefined') {
-      window.location.href = '/login'
-    }
-  }
 }
 
 export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
   const pathname = usePathname()
   const isMobile = useIsMobile()
+  const user = useAuthStore(state => state.user)
+  const clearUser = useAuthStore(state => state.clearUser)
+
+  const handleLogout = async () => {
+    try {
+      await logout()
+    } catch {
+    } finally {
+      clearUser() // ← add
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login'
+      }
+    }
+  }
 
   useEffect(() => {
     if (isMobile) setSidebarOpen(false)
@@ -66,7 +67,6 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
 
   return (
     <>
-      {/* Mobile overlay */}
       <AnimatePresence>
         {sidebarOpen && (
           <motion.div
@@ -84,41 +84,44 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
         className="relative shrink-0 z-40
                    max-lg:fixed max-lg:left-0 max-lg:top-[70px] max-lg:h-[calc(100vh-70px)]"
       >
-        {/* Sidebar panel */}
         <motion.aside
           initial={false}
           animate={{
             width: sidebarOpen
               ? SIDEBAR_EXPANDED
-              : isMobile
-                ? 0
-                : SIDEBAR_COLLAPSED,
+              : isMobile ? 0 : SIDEBAR_COLLAPSED,
           }}
           transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] as [number, number, number, number] }}
           className="h-full border-r border-white/[0.07] bg-[var(--color-bg)] overflow-hidden"
         >
-          <div
-            style={{ width: SIDEBAR_EXPANDED }}
-            className="h-full flex flex-col py-5"
-          >
-            {/* Company row */}
+          <div style={{ width: SIDEBAR_EXPANDED }} className="h-full flex flex-col py-5">
+
+            {/* Company / user row */}
             <div className="flex items-center gap-3 px-4 mb-7 overflow-hidden">
               <div className="w-8 h-8 rounded-full bg-[var(--color-cyan)] glow-cyan
                               flex items-center justify-center shrink-0">
-                <span className="font-card text-[var(--color-bg)] text-xs font-bold">A</span>
+                <span className="font-card sm:!text-[0.8rem] md:!text-[0.9rem] lg:!text-[1.1rem] text-[var(--color-bg)] text-xs font-bold">
+                  {user?.first_name?.[0]?.toUpperCase() ?? 'A'}
+                </span>
               </div>
-              <motion.span
+              <motion.div
                 animate={{ opacity: sidebarOpen ? 1 : 0, x: sidebarOpen ? 0 : -8 }}
                 transition={{ duration: 0.2 }}
-                className="font-body text-white text-[17px] whitespace-nowrap overflow-hidden"
+                className="overflow-hidden"
               >
-                Airspeed Corp.
-              </motion.span>
+                <p className="font-body sm:!text-[0.8rem] md:!text-[0.9rem] lg:!text-[1.1rem] text-white whitespace-nowrap">
+                  {user?.first_name && user?.last_name
+                    ? `${user.first_name} ${user.last_name}`
+                    : user?.username ?? 'User'}
+                </p>
+                <p className="font-body sm:!text-[0.8rem] md:!text-[0.9rem] lg:!text-[1.1rem] text-white/40 whitespace-nowrap capitalize">
+                  {user?.role ?? ''}
+                </p>
+              </motion.div>
             </div>
 
             <div className="sep-x-cyan mx-4 mb-4" />
 
-            {/* Nav items */}
             <nav className="flex-1 px-2 space-y-0.5">
               {NAV.map((item, i) => (
                 <NavItem
@@ -131,27 +134,18 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
                   }
                   index={i}
                   expanded={sidebarOpen}
-                  onNavigate={() => {
-                    if (isMobile) {
-                      setSidebarOpen(false)
-                    }
-                  }}
+                  onNavigate={() => { if (isMobile) setSidebarOpen(false) }}
                 />
               ))}
             </nav>
 
-            {/* Bottom items */}
             <div className="px-2 space-y-0.5 pt-4 border-t border-white/[0.07]">
               <NavItem
                 item={{ href: '/dashboard/settings', label: 'Settings', icon: <Settings size={17} /> }}
                 isActive={pathname === '/dashboard/settings'}
                 index={0}
                 expanded={sidebarOpen}
-                onNavigate={() => {
-                  if (isMobile) {
-                    setSidebarOpen(false)
-                  }
-                }}
+                onNavigate={() => { if (isMobile) setSidebarOpen(false) }}
               />
               <motion.button
                 onClick={handleLogout}
@@ -165,12 +159,8 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
                   className="shrink-0 flex items-center justify-center"
                   style={{ width: SIDEBAR_COLLAPSED - 32 }}
                 >
-                  <LogOut
-                    size={17}
-                    className="group-hover:text-red-400 transition-colors"
-                  />
+                  <LogOut size={17} className="group-hover:text-red-400 transition-colors" />
                 </span>
-
                 <motion.span
                   animate={{ opacity: sidebarOpen ? 1 : 0, width: sidebarOpen ? 'auto' : 0 }}
                   transition={{ duration: 0.2 }}
@@ -183,7 +173,6 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
           </div>
         </motion.aside>
 
-        {/* Toggle button (hidden on mobile) */}
         {!isMobile && (
           <motion.button
             onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -194,9 +183,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
              hover:border-[var(--color-cyan)]/40 transition-colors
              hidden sm:flex"
           >
-            {sidebarOpen
-              ? <PanelLeftClose size={12} />
-              : <PanelLeft      size={12} />}
+            {sidebarOpen ? <PanelLeftClose size={12} /> : <PanelLeft size={12} />}
           </motion.button>
         )}
       </div>
@@ -224,27 +211,21 @@ function NavItem({ item, isActive, index, expanded, onNavigate }: NavItemProps) 
         title={!expanded ? item.label : undefined}
         className={`relative w-full flex items-center gap-3 rounded-xl text-left
                     transition-colors group py-3 px-2 cursor-pointer
-                    ${isActive
-                      ? 'text-[var(--color-cyan)]'
-                      : 'hover:[var(--color-cyan)]'
-                    }`}
+                    ${isActive ? 'text-[var(--color-cyan)]' : 'hover:[var(--color-cyan)]'}`}
       >
         {isActive && (
           <motion.div
             layoutId="activeNav"
-            className="absolute inset-0 rounded-xl glass-surface
-                       border border-[var(--color-cyan)]/20"
+            className="absolute inset-0 rounded-xl glass-surface border border-[var(--color-cyan)]/20"
             transition={{ type: 'spring', stiffness: 320, damping: 32 }}
           />
         )}
-
         <span
           className="relative z-10 shrink-0 flex items-center justify-center"
           style={{ width: SIDEBAR_COLLAPSED - 32 }}
         >
           {item.icon}
         </span>
-
         <motion.span
           animate={{ opacity: expanded ? 1 : 0, width: expanded ? 'auto' : 0 }}
           transition={{ duration: 0.2 }}
