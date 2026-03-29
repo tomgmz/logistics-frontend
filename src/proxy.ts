@@ -9,10 +9,11 @@ const ROLE_ROUTES: Record<string, string> = {
   subcontractor: '/subcontractor',
 }
 
-const PUBLIC_PATHS = ['/', '/login', '/favicon.ico', '/_next', '/api']
+// '/' is the login modal page now — no separate /login route needed
+const PUBLIC_PATHS = ['/', '/favicon.ico', '/_next', '/api']
 
 function isPublicPath(pathname: string): boolean {
-  return PUBLIC_PATHS.some((p) => pathname.startsWith(p))
+  return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'))
 }
 
 function getRoleFromToken(token: string): string | null {
@@ -36,6 +37,7 @@ function getRoleFromToken(token: string): string | null {
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
 
+  // Always allow public paths through
   if (isPublicPath(pathname)) {
     return NextResponse.next()
   }
@@ -46,22 +48,25 @@ export function proxy(req: NextRequest) {
     pathname,
     hasToken: !!token,
     tokenPreview: token?.slice(0, 20),
-    allCookies: req.cookies.getAll().map(c => c.name),
+    allCookies: req.cookies.getAll().map((c) => c.name),
   })
 
+  // No token — redirect to landing page
   if (!token) {
-    const loginUrl = req.nextUrl.clone()
-    loginUrl.pathname = '/login'
-    loginUrl.searchParams.set('redirect', pathname)
-    return NextResponse.redirect(loginUrl)
+    const homeUrl = req.nextUrl.clone()
+    homeUrl.pathname = '/'
+    homeUrl.search = ''
+    return NextResponse.redirect(homeUrl)
   }
 
   const role = getRoleFromToken(token)
 
+  // Invalid or expired token — clear cookies and redirect to landing page
   if (!role) {
-    const loginUrl = req.nextUrl.clone()
-    loginUrl.pathname = '/login'
-    const res = NextResponse.redirect(loginUrl)
+    const homeUrl = req.nextUrl.clone()
+    homeUrl.pathname = '/'
+    homeUrl.search = ''
+    const res = NextResponse.redirect(homeUrl)
     res.cookies.delete('access_token')
     res.cookies.delete('refresh_token')
     return res
@@ -69,10 +74,12 @@ export function proxy(req: NextRequest) {
 
   const allowedPrefix = ROLE_ROUTES[role]
 
+  // Role exists but has no mapped route — block access
   if (!allowedPrefix) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
+  // Role is trying to access a route they're not allowed — redirect to their dashboard
   if (!pathname.startsWith(allowedPrefix)) {
     const dashboardUrl = req.nextUrl.clone()
     dashboardUrl.pathname = allowedPrefix

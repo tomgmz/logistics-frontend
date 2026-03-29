@@ -173,7 +173,7 @@ function EmailStep({ onSuccess }: { onSuccess: (email: string) => void }) {
             <span className="inline-block w-4 h-4 border-2 border-black/20
               border-t-black/70 rounded-full animate-spin" />
           ) : (
-            'Send Login Code'
+            'Send Sign In Code'
           )}
         </button>
       </form>

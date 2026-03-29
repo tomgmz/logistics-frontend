@@ -105,7 +105,7 @@ authApi.interceptors.response.use(
         failedQueue = []
 
         if (typeof window !== 'undefined') {
-          window.location.href = '/login'
+          window.location.href = '/'
         }
 
         return Promise.reject(refreshError)
