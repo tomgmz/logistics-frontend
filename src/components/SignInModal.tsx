@@ -340,7 +340,7 @@ function OtpStep({
       <button
         onClick={handleSubmit}
         disabled={loading || code.length !== OTP_LENGTH}
-        className="w-full py-4 font-body tracking-[0.2em] uppercase text-[0.82rem]
+        className="w-full py-4 font-body tracking-[0.2em] uppercase !text-[0.82rem]
           rounded-2xl transition-all duration-200 cursor-pointer
           hover:bg-[#e0e0e0] active:scale-[0.98]
           disabled:opacity-40 disabled:cursor-not-allowed"
