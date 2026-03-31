@@ -37,12 +37,10 @@ export default function BookingWizard() {
   return (
     <div className="flex flex-col h-full min-h-0">
 
-      {/* Stepper bar - Grid Layout */}
       <div className="shrink-0 bg-[var(--color-bg)] border-b border-white/[0.07]
                       px-4 lg:px-6 h-auto py-3 lg:py-0 lg:h-[62px]
                       grid grid-cols-[1fr_auto_1fr] items-center gap-4">
 
-        {/* Left: Title */}
         <h1 className="font-body booking-text text-white text-base lg:text-xl tracking-wider whitespace-nowrap">
           New Booking
           {service && (
@@ -53,7 +51,6 @@ export default function BookingWizard() {
           )}
         </h1>
 
-        {/* Center: Stepper */}
         <div className="hidden sm:flex items-center gap-8 lg:gap-12 justify-self-center">
           {STEPS.map((s, i) => (
             <div key={s.id} className="flex items-center">
@@ -74,12 +71,10 @@ export default function BookingWizard() {
           ))}
         </div>
 
-        {/* Right: Current step (mobile only) */}
         <span className="sm:hidden justify-self-end font-body text-sm whitespace-nowrap text-white">
           {STEPS.find((s) => s.id === step)?.label}
         </span>
 
-        {/* Empty spacer for desktop to maintain centering */}
         <div className="hidden sm:block" />
       </div>
 
@@ -109,7 +104,6 @@ export default function BookingWizard() {
   )
 }
 
-/* Step pip */
 function StepPip({
   step, isActive, isDone, onClick,
 }: {
