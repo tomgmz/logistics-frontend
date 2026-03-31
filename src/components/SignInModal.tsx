@@ -64,7 +64,6 @@ function IconClose() {
   )
 }
 
-// Glassmorphism input wrapper
 function GlassInput({
   icon,
   label,
@@ -97,7 +96,6 @@ function GlassInput({
   )
 }
 
-// Email step
 function EmailStep({ onSuccess }: { onSuccess: (email: string) => void }) {
   const [email,   setEmail]   = useState('')
   const [loading, setLoading] = useState(false)
@@ -181,7 +179,6 @@ function EmailStep({ onSuccess }: { onSuccess: (email: string) => void }) {
   )
 }
 
-// OTP step
 function OtpStep({
   email,
   onSuccess,
@@ -291,7 +288,6 @@ function OtpStep({
         </p>
       </div>
 
-      {/* OTP boxes — glassmorphism style */}
       <div className="flex gap-2" onPaste={handlePaste}>
         {otp.map((digit, i) => (
           <motion.input
@@ -482,7 +478,7 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.3 }}
-              className="fixed inset-0 z-[80] bg-black/50 backdrop-blur-[1px]"
+              className="fixed inset-0 z-[80] bg-black/50"
               onClick={handleClose}
             />
 
@@ -506,7 +502,6 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
 
               <div className="relative flex flex-col h-full px-8 sm:px-12 py-10 overflow-y-auto">
 
-                {/* close */}
                 <button
                   onClick={handleClose}
                   aria-label="Close"
@@ -517,7 +512,6 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
                   <IconClose />
                 </button>
 
-                {/* heading */}
                 <div className="mb-10">
                   <h2
                     className="text-white font-body tracking-[0.15em] uppercase leading-tight"

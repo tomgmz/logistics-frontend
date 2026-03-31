@@ -21,7 +21,7 @@ export function useSessionState<T>(key: string, initialValue: T) {
     try {
       sessionStorage.setItem(key, JSON.stringify(state))
     } catch {
-      // sessionStorage full or unavailable — fail silently
+      // sessionStorage full or unavailable fail silently
     }
   }, [key, state])
 
