@@ -12,7 +12,7 @@ export interface VehicleData {
   dimension: string
   suitableFor: string
   stackableFriendly: boolean
-  imageUrl?: string
+  imageUrl: string
 }
 
 export function useTrucks() {

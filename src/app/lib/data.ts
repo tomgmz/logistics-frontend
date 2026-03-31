@@ -3,18 +3,18 @@ export const ASSETS = {
   //logo
   logo: '/final-logo.png',
 
-  // Hero – Section 1
+  // Hero
   heroContainers: '/landingpage/heroSection/hero-section-bg.png',
-  // Trucks – Section 2
+  // Trucks
   cargoTruck:     '/landingpage/aboutSection/cargo-truck.png',
   l300Van:        '/landingpage/aboutSection/l300-van.png',
-  // Brands – Section 3
+  // Brands
   airspeed:       '/logos/airspeed.png',
   shopee:         '/logos/shopee.png',
   lazada:         '/logos/lazada.png',
   shein:          '/logos/shein.png',
   temu:           '/logos/temu.png',
-  // Services – Section 4
+  // Services
   svcContainers:  '/landingpage/servicesSection/svc-containers.jpg',
   svcDelivery:    '/landingpage/servicesSection/svc-delivery.jpg',
   svcTracking:    '/landingpage/servicesSection/svc-tracking.jpg',

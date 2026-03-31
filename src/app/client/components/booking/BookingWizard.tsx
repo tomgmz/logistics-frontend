@@ -7,10 +7,10 @@ import StepServiceType from './ServiceType'
 import StepBookingDetails from './BookingDetails'
 import StepVehicle from './ChooseVehicle'
 import StepReview from './ReviewBooking'
-import { useSessionState } from '../../hooks/UseSessionState'
+import { useAppDispatch, useAppSelector } from '@/app/lib/store/hooks'
+import { setStep, setService } from '@/app/lib/store/bookingSlice'
+import type { ServiceType } from '@/app/lib/store/bookingSlice'
 import './BookingDetails.css'
-
-export type ServiceType = 'ecommerce' | 'fmcg' | null
 
 const STEPS = [
   { id: 1, label: 'Service Type'    },
@@ -26,13 +26,20 @@ const slideVariants = {
 }
 
 export default function BookingWizard() {
-  const [step,    setStep]    = useSessionState<number>('wizard:step',    1)
-  const [service, setService] = useSessionState<ServiceType>('wizard:service', null)
+  const dispatch = useAppDispatch()
+  const step     = useAppSelector((s) => s.booking.step)
+  const service  = useAppSelector((s) => s.booking.service)
 
   const [dir, setDir] = useState(1)
 
-  const goNext = () => { setDir(1);  setStep((s) => Math.min(s + 1, 4)) }
-  const goBack = () => { setDir(-1); setStep((s) => Math.max(s - 1, 1)) }
+  const goNext = () => {
+    setDir(1)
+    dispatch(setStep(step + 1))
+  }
+  const goBack = () => {
+    setDir(-1)
+    dispatch(setStep(step - 1))
+  }
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -59,7 +66,10 @@ export default function BookingWizard() {
                 isActive={step === s.id}
                 isDone={step > s.id}
                 onClick={() => {
-                  if (s.id < step) { setDir(-1); setStep(s.id) }
+                  if (s.id < step) {
+                    setDir(-1)
+                    dispatch(setStep(s.id))
+                  }
                 }}
               />
               {i < STEPS.length - 1 && (
@@ -92,7 +102,11 @@ export default function BookingWizard() {
             className="absolute inset-0"
           >
             {step === 1 && (
-              <StepServiceType selected={service} setSelected={setService} onNext={goNext} />
+              <StepServiceType
+                selected={service}
+                setSelected={(val: ServiceType) => dispatch(setService(val))}
+                onNext={goNext}
+              />
             )}
             {step === 2 && <StepBookingDetails onNext={goNext} onBack={goBack} />}
             {step === 3 && <StepVehicle        onNext={goNext} onBack={goBack} />}
