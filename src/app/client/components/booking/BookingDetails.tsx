@@ -1,10 +1,10 @@
 'use client'
 
 import { motion, Variants, AnimatePresence } from 'framer-motion'
-import { useEffect, useCallback } from 'react'
+import { useEffect, useCallback, useRef } from 'react'
 import {
   ArrowRight, ArrowLeft,
-  CalendarDays, MapPin, Package,
+  CalendarDays, Clock, MapPin, Package,
   Truck, Plus, X, Check,
 } from 'lucide-react'
 import { useSessionState } from '../../hooks/UseSessionState'
@@ -14,6 +14,7 @@ import './BookingDetails.css'
 import TextField from '@mui/material/TextField'
 import Select, { SelectChangeEvent } from '@mui/material/Select'
 import MenuItem from '@mui/material/MenuItem'
+import InputAdornment from '@mui/material/InputAdornment'
 import { SxProps, Theme } from '@mui/material/styles'
 
 interface Props {
@@ -183,7 +184,7 @@ function calcSummary(sections: DropoffSection[], mode: CargoMode) {
         const width  = Number(g.looseWidth)
         const height = Number(g.looseHeight)
         const weight = Number(g.weight)
-        // Guard: skip incomplete/invalid rows
+
         if (!Number.isFinite(pieces) || pieces <= 0) continue
         if (!Number.isFinite(length) || !Number.isFinite(width) || !Number.isFinite(height)) continue
         if (!Number.isFinite(weight) || weight < 0) continue
@@ -327,6 +328,9 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
   const summary = calcSummary(syncedSections, mode)
 
   const allGroups = syncedSections.flatMap((s) => s.groups)
+  const dateInputRef = useRef<HTMLInputElement>(null)
+  const timeInputRef = useRef<HTMLInputElement>(null)
+
   const isValid = pickup.trim() !== '' && dropoffs[0]?.trim() !== '' && date.trim() !== ''
 
   return (
@@ -343,27 +347,56 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
           <SectionHeader icon={<CalendarDays size={16} />} title="Transit Schedule" />
           <div className="flex flex-col gap-1">
             <span className="font-body booking-text text-xs">Date</span>
-            <div className="flex items-center gap-2">
-              <TextField
-                fullWidth
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                placeholder="MM/DD/YYYY"
-                variant="outlined"
-                sx={fieldSx(INPUT_BG_PANEL, BORDER_PANEL)}
-              />
-              <CalendarDays size={18} className="shrink-0" />
-            </div>
+            <TextField
+              fullWidth
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              variant="outlined"
+              inputRef={dateInputRef}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <CalendarDays
+                      size={16}
+                      className="cursor-pointer text-white/40 hover:text-white transition-colors"
+                      onClick={() => dateInputRef.current?.showPicker()}
+                    />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{
+                ...fieldSx(INPUT_BG_PANEL, BORDER_PANEL),
+                '& input[type="date"]::-webkit-calendar-picker-indicator': { display: 'none' },
+                '& .MuiInputBase-input': { padding: '0 0 0 12px', height: 36, boxSizing: 'border-box', colorScheme: 'dark' },
+              }}
+            />
           </div>
           <div className="flex flex-col gap-1">
             <span className="font-body booking-text text-xs">Time</span>
             <TextField
               fullWidth
+              type="time"
               value={time}
               onChange={(e) => setTime(e.target.value)}
-              placeholder="HH:MM AM"
               variant="outlined"
-              sx={fieldSx(INPUT_BG_PANEL, BORDER_PANEL)}
+              inputRef={timeInputRef}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <Clock
+                      size={16}
+                      className="cursor-pointer text-white/40 hover:text-white transition-colors"
+                      onClick={() => timeInputRef.current?.showPicker()}
+                    />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{
+                ...fieldSx(INPUT_BG_PANEL, BORDER_PANEL),
+                '& input[type="time"]::-webkit-calendar-picker-indicator': { display: 'none' },
+                '& .MuiInputBase-input': { padding: '0 0 0 12px', height: 36, boxSizing: 'border-box', colorScheme: 'dark' },
+              }}
             />
           </div>
         </motion.div>
@@ -832,7 +865,6 @@ function ProductFieldsRow({
     </div>
   )
 }
-
 
 function SectionHeader({ icon, title }: { icon: React.ReactNode; title: string }) {
   return (
