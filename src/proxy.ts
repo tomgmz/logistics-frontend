@@ -9,7 +9,6 @@ const ROLE_ROUTES: Record<string, string> = {
   subcontractor: '/subcontractor',
 }
 
-// '/' is the login modal page now — no separate /login route needed
 const PUBLIC_PATHS = ['/', '/favicon.ico', '/_next', '/api']
 
 function isPublicPath(pathname: string): boolean {
@@ -51,7 +50,7 @@ export function proxy(req: NextRequest) {
     allCookies: req.cookies.getAll().map((c) => c.name),
   })
 
-  // No token — redirect to landing page
+  // No tokenredirect to landing page
   if (!token) {
     const homeUrl = req.nextUrl.clone()
     homeUrl.pathname = '/'
@@ -61,7 +60,7 @@ export function proxy(req: NextRequest) {
 
   const role = getRoleFromToken(token)
 
-  // Invalid or expired token — clear cookies and redirect to landing page
+  // Invalid or expired token clear cookies and redirect to landing page
   if (!role) {
     const homeUrl = req.nextUrl.clone()
     homeUrl.pathname = '/'
@@ -74,12 +73,12 @@ export function proxy(req: NextRequest) {
 
   const allowedPrefix = ROLE_ROUTES[role]
 
-  // Role exists but has no mapped route — block access
+  // Role exists but has no mapped route block access
   if (!allowedPrefix) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  // Role is trying to access a route they're not allowed — redirect to their dashboard
+  // Role is trying to access a route they're not allowed redirect to their dashboard
   if (!pathname.startsWith(allowedPrefix)) {
     const dashboardUrl = req.nextUrl.clone()
     dashboardUrl.pathname = allowedPrefix
