@@ -59,7 +59,6 @@ export default function StepReview({ selectedService, onBack }: Props) {
   const [mode]      = useSessionState<CargoMode>('booking:mode', 'loose')
   const [groups]    = useSessionState<ItemGroup[]>('booking:groups', [])
 
-  // ✅ Read full vehicle object directly from session — no API call needed
   const [vehicle] = useSessionState<VehicleData | null>('booking:vehicle', null)
 
   const confirm = async () => {

@@ -16,6 +16,7 @@ import Select, { SelectChangeEvent } from '@mui/material/Select'
 import MenuItem from '@mui/material/MenuItem'
 import InputAdornment from '@mui/material/InputAdornment'
 import { SxProps, Theme } from '@mui/material/styles'
+import WizBtn from '../WizButton'
 
 interface Props {
   onNext: () => void
@@ -894,24 +895,5 @@ function StatCard({ label, value }: { label: string; value: string }) {
       <p className="font-body booking-text text-[#818181] text-[10px] lg:!text-[0.9rem] uppercase tracking-widest leading-none">{label}</p>
       <p className="font-body booking-text text-black text-2xl lg:text-3xl leading-none tracking-wide whitespace-nowrap truncate">{value}</p>
     </div>
-  )
-}
-
-function WizBtn({ onClick, children, variant, disabled }: {
-  onClick: () => void; children: React.ReactNode; variant: 'next' | 'back'; disabled?: boolean
-}) {
-  return (
-    <motion.button onClick={onClick}
-      whileHover={!disabled ? { scale: 1.04 } : {}}
-      whileTap={!disabled  ? { scale: 0.96 } : {}}
-      className={`flex items-center gap-2 px-6 lg:px-8 py-3 rounded-xl font-body booking-text text-base lg:text-lg transition-all duration-300
-        ${disabled
-          ? 'glass text-white/20 border border-white/[0.06] cursor-not-allowed pointer-events-none'
-          : variant === 'next'
-            ? 'glass text-white border border-white/20 hover:border-[var(--color-cyan)]/40 cursor-pointer'
-            : 'bg-transparent border border-white/10 hover:text-white hover:border-white/20 cursor-pointer'
-        }`}>
-      {children}
-    </motion.button>
   )
 }

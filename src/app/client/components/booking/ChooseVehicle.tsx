@@ -7,6 +7,7 @@ import { useSessionState } from '../../hooks/UseSessionState'
 import { useMemo, useState } from 'react'
 import './BookingDetails.css'
 import { useTrucks, VehicleData } from '../../hooks/useTrucks'
+import WizBtn from '../WizButton'
 
 interface Props {
   onNext: () => void
@@ -114,7 +115,7 @@ export default function StepVehicle({ onNext, onBack }: Props) {
 
   const handleReviewBooking = () => {
     if (!vehicle) return
-    setSelectedVehicle(vehicle) // ✅ store full object, not just id
+    setSelectedVehicle(vehicle)
     onNext()
   }
 
@@ -269,7 +270,6 @@ export default function StepVehicle({ onNext, onBack }: Props) {
           </div>
         </motion.div>
 
-        {/* RIGHT CARD — Transit Vehicle */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -438,36 +438,13 @@ export default function StepVehicle({ onNext, onBack }: Props) {
 
             {/* Bottom action row */}
             <div className="flex justify-between items-center pt-2">
-              <motion.button
-                onClick={onBack}
-                whileHover={{ scale: 1.04 }}
-                whileTap={{ scale: 0.96 }}
-                className="
-                  flex items-center gap-2
-                  px-5 sm:px-6 lg:px-8 py-2.5 sm:py-3 rounded-xl
-                  font-body booking-text
-                  bg-transparent border border-white/10
-                  hover:text-white hover:border-white/20
-                  transition-all duration-300 cursor-pointer
-                "
-              >
+              <WizBtn onClick={onBack} variant="back">
                 <ArrowLeft size={14} /> BACK
-              </motion.button>
+              </WizBtn>
 
-              <motion.button
-                onClick={handleReviewBooking}
-                whileHover={{ scale: 1.03 }}
-                whileTap={{ scale: 0.97 }}
-                className="
-                  px-6 sm:px-8 lg:px-10 py-2.5 sm:py-3 rounded-xl cursor-pointer
-                  font-body booking-text font-bold uppercase tracking-[0.15em]
-                  bg-white text-[var(--color-bg)]
-                  hover:bg-[var(--color-cyan)]
-                  transition-colors duration-300 text-xs sm:text-sm lg:text-base
-                "
-              >
+              <WizBtn onClick={handleReviewBooking} variant="next">
                 Review Booking
-              </motion.button>
+              </WizBtn>
             </div>
           </div>
         </motion.div>
