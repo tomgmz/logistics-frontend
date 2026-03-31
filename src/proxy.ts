@@ -42,7 +42,7 @@ export function proxy(req: NextRequest) {
   }
 
   const token = req.cookies.get('access_token')?.value
-
+ 
   console.log('MIDDLEWARE DEBUG:', {
     pathname,
     hasToken: !!token,
