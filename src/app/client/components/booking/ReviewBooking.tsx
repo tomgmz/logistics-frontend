@@ -1,9 +1,5 @@
 'use client'
 
-// ReviewBooking.tsx
-// CHANGED: replaced all 7 useSessionState reads with Redux selectors.
-// On successful booking, dispatch resetBooking() instead of window.location.reload().
-
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { CheckCircle2, Truck } from 'lucide-react'
