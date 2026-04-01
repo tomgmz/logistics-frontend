@@ -276,7 +276,7 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
           className="bg-[#2A2828] rounded-2xl border border-white/[0.07] p-4 flex flex-col gap-3"
         >
           <SectionHeader icon={<Truck size={16} />} title="Pick Up Point" />
-          <div className="flex items-center gap-2 border-b border-white/[0.07] pb-2">
+          <div className="flex items-center gap-2">
             <PlacesInput
               value={pickup}
               onChange={(val) => dispatch(setPickup(val))}
@@ -295,7 +295,7 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
           <div className="flex flex-col gap-2 mt-1">
             {dropoffs.map((d, i) => (
               <div key={i}
-                className="flex items-center gap-2 border-b border-white/[0.07] pb-2 last:border-0 last:pb-0"
+                className="flex items-center gap-2 pb-2 last:border-0 last:pb-0"
               >
                 <PlacesInput
                   value={d}

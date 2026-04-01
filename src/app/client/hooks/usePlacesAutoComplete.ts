@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? ''
 
@@ -15,8 +15,8 @@ function loadGoogleMapsScript(): Promise<void> {
       'https://maps.googleapis.com/maps/api/js',
       `?key=${GOOGLE_MAPS_API_KEY}`,
       '&libraries=places',
-      '&loading=async', 
-      '&callback=__gmapsInit', 
+      '&loading=async',
+      '&callback=__gmapsInit',
     ].join('')
     script.async = true
     script.defer = true
@@ -37,41 +37,80 @@ function loadGoogleMapsScript(): Promise<void> {
   return scriptPromise
 }
 
-interface UsePlacesAutocompleteOptions {
-  onSelect: (value: string) => void
-  componentRestrictions?: google.maps.places.ComponentRestrictions
+export interface PlaceSuggestion {
+  label: string
+  placeId: string
 }
 
-export function usePlacesAutocomplete(
-  inputRef: React.RefObject<HTMLInputElement | null>,
-  { onSelect, componentRestrictions = { country: 'ph' } }: UsePlacesAutocompleteOptions,
-) {
-  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null)
-  const [ready, setReady] = useState(false)
+interface UsePlacesAutocompleteOptions {
+  componentRestrictions?: { country: string | string[] }
+  debounceMs?: number
+}
 
-  useEffect(() => {
-    loadGoogleMapsScript()
-      .then(() => setReady(true))
-      .catch(console.error)
+export function usePlacesAutocomplete({
+  componentRestrictions = { country: 'ph' },
+  debounceMs = 300,
+}: UsePlacesAutocompleteOptions = {}) {
+  const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([])
+  const [loading, setLoading] = useState(false)
+  const sessionTokenRef = useRef<google.maps.places.AutocompleteSessionToken | null>(null)
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const fetchSuggestions = useCallback(
+    async (input: string) => {
+      if (!input) {
+        setSuggestions([])
+        return
+      }
+
+      await loadGoogleMapsScript()
+
+      if (!sessionTokenRef.current) {
+        sessionTokenRef.current = new google.maps.places.AutocompleteSessionToken()
+      }
+
+      setLoading(true)
+      try {
+        const { suggestions: raw } = await google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions({
+          input,
+          sessionToken: sessionTokenRef.current,
+          includedRegionCodes: Array.isArray(componentRestrictions.country)
+            ? componentRestrictions.country
+            : [componentRestrictions.country],
+        })
+
+        setSuggestions(
+          raw.map(s => ({
+            label: s.placePrediction?.text?.toString() ?? '',
+            placeId: s.placePrediction?.placeId ?? '',
+          }))
+        )
+      } catch (e) {
+        console.error(e)
+        setSuggestions([])
+      } finally {
+        setLoading(false)
+      }
+    },
+    [componentRestrictions]
+  )
+
+  const onInputChange = useCallback(
+    (input: string) => {
+      if (debounceTimer.current) clearTimeout(debounceTimer.current)
+      debounceTimer.current = setTimeout(() => fetchSuggestions(input), debounceMs)
+    },
+    [fetchSuggestions, debounceMs]
+  )
+
+  const resolvePlace = useCallback(async (placeId: string): Promise<string> => {
+    await loadGoogleMapsScript()
+    const place = new google.maps.places.Place({ id: placeId })
+    await place.fetchFields({ fields: ['displayName', 'formattedAddress'] })
+    // Reset session token after selection
+    sessionTokenRef.current = null
+    return place.formattedAddress ?? place.displayName ?? ''
   }, [])
 
-  useEffect(() => {
-    if (!ready || !inputRef.current) return
-    if (autocompleteRef.current) return
-
-    const ac = new window.google.maps.places.Autocomplete(inputRef.current, {
-      componentRestrictions,
-      fields: ['formatted_address', 'name'],
-    })
-
-    ac.addListener('place_changed', () => {
-      const place = ac.getPlace()
-      const value = place.formatted_address ?? place.name ?? ''
-      onSelect(value)
-    })
-
-    autocompleteRef.current = ac
-  }, [ready, inputRef, onSelect, componentRestrictions])
-
-  return { ready }
+  return { suggestions, loading, onInputChange, resolvePlace }
 }

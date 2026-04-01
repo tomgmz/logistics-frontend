@@ -1,110 +1,82 @@
 'use client'
 
-import { useRef, useCallback } from 'react'
-import { MapPin } from 'lucide-react'
-import { usePlacesAutocomplete } from '../../hooks/usePlacesAutoComplete'
+import { useState, useCallback } from 'react'
+import MuiAutocomplete from '@mui/material/Autocomplete'
+import TextField, { TextFieldProps } from '@mui/material/TextField'
+import CircularProgress from '@mui/material/CircularProgress'
+import { usePlacesAutocomplete, PlaceSuggestion } from '../../hooks/usePlacesAutoComplete'
 
-interface PlacesInputProps {
+type PlacesInputProps = Omit<TextFieldProps, 'onChange'> & {
   value: string
-  onChange: (v: string) => void
-  placeholder?: string
-  className?: string
-  /** Show the map pin icon on the right — default true */
-  showIcon?: boolean
+  onChange: (value: string) => void
+  showIcon?: boolean 
 }
 
-export default function PlacesInput({
-  value,
-  onChange,
-  placeholder = 'Enter location',
-  className = '',
-  showIcon = true,
-}: PlacesInputProps) {
-  const inputRef = useRef<HTMLInputElement>(null)
+export default function PlacesInput({ value, onChange, ...textFieldProps }: PlacesInputProps) {
+  const [inputValue, setInputValue] = useState(value)
+  const { suggestions, loading, onInputChange, resolvePlace } = usePlacesAutocomplete()
 
-  const handleSelect = useCallback(
-    (selected: string) => onChange(selected),
-    [onChange],
+  const handleInputChange = useCallback(
+    (_: unknown, newInput: string) => {
+      setInputValue(newInput)
+      onInputChange(newInput)
+    },
+    [onInputChange]
   )
 
-  usePlacesAutocomplete(inputRef, { onSelect: handleSelect })
+  const handleSelect = useCallback(
+    async (_: unknown, selected: string | PlaceSuggestion | null) => {
+      if (!selected || typeof selected === 'string') return
+      const address = await resolvePlace(selected.placeId)
+      setInputValue(address)
+      onChange(address)
+    },
+    [resolvePlace, onChange]
+  )
 
   return (
-    <>
-      <style>{`
-        /* Container */
-        .pac-container {
-          background-color: #1b1b1b !important;
-          border: 1px solid rgba(255,255,255,0.08) !important;
-          border-top: none !important;
-          border-radius: 0 0 12px 12px !important;
-          box-shadow: 0 16px 40px rgba(0,0,0,0.6) !important;
-          font-family: inherit !important;
-          margin-top: 2px !important;
-        }
-
-        /* Hide the Google logo */
-        .pac-container::after {
-          display: none !important;
-          height: 0 !important;
-        }
-
-        /* Each suggestion row */
-        .pac-item {
-          background-color: #1b1b1b !important;
-          border-top: 1px solid rgba(255,255,255,0.05) !important;
-          color: #818181 !important;
-          padding: 10px 14px !important;
-          cursor: pointer !important;
-          transition: background 0.15s ease !important;
-          font-size: 0.8rem !important;
-          line-height: 1.4 !important;
-        }
-
-        .pac-item:first-child {
-          border-top: none !important;
-        }
-
-        /* Hovered / keyboard-selected row */
-        .pac-item:hover,
-        .pac-item-selected {
-          background-color: rgba(77,249,237,0.07) !important;
-        }
-
-        /* Main text (place name) */
-        .pac-item-query {
-          color: #ffffff !important;
-          font-size: 0.85rem !important;
-        }
-
-        /* Matched portion highlight */
-        .pac-matched {
-          color: #4df9ed !important;
-          font-weight: 600 !important;
-        }
-
-        /* The little pin/location icon */
-        .pac-icon {
-          filter: invert(1) brightness(0.5) !important;
-          margin-top: 2px !important;
-        }
-      `}</style>
-
-      <div className={`flex items-center gap-2 w-full ${className}`}>
-        <input
-          ref={inputRef}
-          type="text"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          autoComplete="off"
-          className="bg-transparent font-body booking-text text-white text-sm lg:text-base
-                     focus:outline-none w-full placeholder-white/20 caret-[var(--color-cyan)]"
+    <MuiAutocomplete<PlaceSuggestion, false, false, true>
+      fullWidth 
+      freeSolo
+      options={suggestions}
+      getOptionLabel={o => (typeof o === 'string' ? o : o.label)}
+      inputValue={inputValue}
+      onInputChange={handleInputChange}
+      onChange={handleSelect}
+      loading={loading}
+      filterOptions={x => x}
+      renderInput={(params) => (
+        <TextField
+          {...params}
+          {...textFieldProps}
+          fullWidth
+          variant="standard"
+          InputProps={{
+            ...params.InputProps,
+            disableUnderline: false,
+            endAdornment: (
+              <>
+                {loading && <CircularProgress size={16} />}
+                {params.InputProps.endAdornment}
+              </>
+            ),
+          }}
+          sx={{
+            '& .MuiInputBase-root': {
+              color: '#fff',
+            },
+            '& .MuiInput-underline:before': {
+              borderBottomColor: 'rgba(255,255,255,0.2)',
+            },
+            '& .MuiInput-underline:hover:before': {
+              borderBottomColor: '#4DF9ED',
+            },
+            '& .MuiInput-underline:after': {
+              borderBottomColor: '#4DF9ED',
+            },
+          }}
         />
-        {showIcon && (
-          <MapPin size={16} className="text-[var(--color-muted)] shrink-0" />
-        )}
-      </div>
-    </>
+      )}
+    />
   )
 }
