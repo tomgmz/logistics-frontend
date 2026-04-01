@@ -4,13 +4,12 @@ import { motion } from 'framer-motion'
 import { Bell, MessageCircle, Menu } from 'lucide-react'
 import Image from 'next/image'
 import { ASSETS } from '@/app/lib/data'
+import { useAppDispatch, useAppSelector } from '@/app/lib/store/hooks'
+import { setSidebarOpen } from '@/app/lib/store/bookingSlice'
 
-interface HeaderProps {
-  sidebarOpen: boolean
-  setSidebarOpen: (v: boolean) => void
-}
-
-export default function Header({ sidebarOpen, setSidebarOpen }: HeaderProps) {
+export default function Header() {
+  const dispatch    = useAppDispatch()
+  const sidebarOpen = useAppSelector((s) => s.booking.sidebarOpen)
 
   return (
     <motion.header
@@ -22,7 +21,7 @@ export default function Header({ sidebarOpen, setSidebarOpen }: HeaderProps) {
     >
       <div className="flex items-center gap-3">
         <button
-          onClick={() => setSidebarOpen(!sidebarOpen)}
+          onClick={() => dispatch(setSidebarOpen(!sidebarOpen))}
           className="lg:hidden p-2 rounded-lg hover:bg-white/5 text-white transition-colors"
         >
           <Menu size={20} />
@@ -31,19 +30,15 @@ export default function Header({ sidebarOpen, setSidebarOpen }: HeaderProps) {
       </div>
 
       <div className="flex items-center gap-2 lg:gap-3">
-
-        {/* Chat */}
         <IconBtn>
           <MessageCircle size={16} />
         </IconBtn>
 
-        {/* Notifications */}
         <IconBtn>
           <Bell size={16} />
           <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-[var(--color-cyan)]" />
         </IconBtn>
 
-        {/* Avatar */}
         <motion.div
           whileHover={{ scale: 1.06 }}
           whileTap={{ scale: 0.94 }}
@@ -74,13 +69,13 @@ function IconBtn({ children }: { children: React.ReactNode }) {
 function LogoMark() {
   return (
     <div className="flex items-center gap-2">
-        <Image
-          src={ASSETS.logo}
-          alt="8338 Logistics"
-          width={140}
-          height={40}
-          className="object-contain w-24 sm:w-28 lg:w-[140px]"
-         />
+      <Image
+        src={ASSETS.logo}
+        alt="8338 Logistics"
+        width={140}
+        height={40}
+        className="object-contain w-24 sm:w-28 lg:w-[140px]"
+      />
     </div>
   )
 }

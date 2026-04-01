@@ -81,6 +81,7 @@ export default function StepVehicle({ onNext, onBack }: Props) {
   const [dir, setDir] = useState(1)
 
   const allGroups = sections.flatMap((s) => s.groups)
+  
   const summary   = useMemo(() => calcSummary(sections, mode), [sections, mode])
 
   const navigate = (delta: number) => {

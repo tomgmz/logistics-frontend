@@ -42,9 +42,9 @@ export default function BookingWizard() {
   }
 
   return (
-    <div className="flex flex-col h-full min-h-0">
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
 
-      <div className="shrink-0 bg-[var(--color-bg)] border-b border-white/[0.07]
+      <div className="sticky top-0 z-10 shrink-0 border-b border-white/[0.07] bg-[var(--color-bg)]
                       px-4 lg:px-6 h-auto py-3 lg:py-0 lg:h-[62px]
                       grid grid-cols-[1fr_auto_1fr] items-center gap-4">
 
@@ -89,7 +89,7 @@ export default function BookingWizard() {
       </div>
 
       {/* Step content */}
-      <div className="flex-1 overflow-hidden relative">
+      <div className="flex-1 min-h-0 relative overflow-hidden">
         <AnimatePresence mode="wait" custom={dir}>
           <motion.div
             key={step}
@@ -99,7 +99,7 @@ export default function BookingWizard() {
             animate="center"
             exit="exit"
             transition={{ duration: 0.38, ease: [0.4, 0, 0.2, 1] as [number, number, number, number] }}
-            className="absolute inset-0"
+            className="absolute inset-0 overflow-y-auto"
           >
             {step === 1 && (
               <StepServiceType
