@@ -1,7 +1,7 @@
 'use client'
 
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowLeft, ChevronLeft, ChevronRight, Truck, Loader2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Truck, Loader2 } from 'lucide-react'
 import Image from 'next/image'
 import { useMemo, useState } from 'react'
 import { useAppDispatch, useAppSelector } from '@/app/lib/store/hooks'
@@ -28,16 +28,18 @@ function calcSummary(sections: DropoffSection[], mode: CargoMode) {
         grossWeight += pallets * gross
         netWeight   += pallets * net
       } else {
-        const pieces = Number(g.pieces)      || 0
-        const length = Number(g.looseLength) || 0
-        const width  = Number(g.looseWidth)  || 0
-        const height = Number(g.looseHeight) || 0
-        const weight = Number(g.weight)      || 0
-        if (pieces <= 0) continue
-        const weightKG = g.weightUnit === 'lbs' ? weight * 0.453592 : weight
+        const pieces = Number(g.pieces)
+        const length = Number(g.looseLength)
+        const width  = Number(g.looseWidth)
+        const height = Number(g.looseHeight)
+        const weight = Number(g.weight)
+        if (!Number.isFinite(pieces) || pieces <= 0) continue
+        if (!Number.isFinite(length) || !Number.isFinite(width) || !Number.isFinite(height)) continue
+        if (!Number.isFinite(weight) || weight < 0) continue
         totalPieces += pieces
+        const weightKG = g.weightUnit === 'lbs' ? weight * 0.453592 : weight
         grossWeight += g.perItem === 'Per Item' ? pieces * weightKG : weightKG
-        volume      += pieces * (length * width * height) / 1_000_000
+        volume += pieces * (length * width * height) / 1_000_000
       }
     }
   }

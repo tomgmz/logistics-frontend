@@ -3,7 +3,6 @@
 import { motion, Variants, AnimatePresence } from 'framer-motion'
 import { useCallback } from 'react'
 import {
-  ArrowRight, ArrowLeft,
   CalendarDays, Clock, MapPin, Package,
   Truck, Plus, X, Check,
 } from 'lucide-react'
