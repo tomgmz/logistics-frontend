@@ -2,7 +2,7 @@
 
 import Image from 'next/image'
 import { motion, Variants } from 'framer-motion'
-import { ArrowRight, Check } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import { ServiceType } from '@/app/lib/store/bookingSlice'
 import { SERVICE_TYPES } from '../../../../constants/client/serviceTypeData'
 
@@ -30,8 +30,6 @@ const fadeUp: Variants = {
 }
 
 export default function StepServiceType({ selected, setSelected, onNext }: Props) {
-  const canProceed = !!selected
-
   return (
     <div className="flex flex-col h-full overflow-auto p-5 lg:p-10 items-center">
 
@@ -87,18 +85,27 @@ export default function StepServiceType({ selected, setSelected, onNext }: Props
                     </p>
                   </div>
 
-                  {/* Check */}
                   <div className="flex justify-end mt-4">
-                    <motion.div
+                    <motion.button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (isSelected) onNext()
+                      }}
                       animate={{
-                        backgroundColor: isSelected ? '#4df9ed' : 'rgba(255,255,255,0.12)',
-                        scale: isSelected ? 1.1 : 1,
+                        opacity: isSelected ? 1 : 0,
+                        y: isSelected ? 0 : 6,
+                        pointerEvents: isSelected ? 'auto' : 'none',
                       }}
                       transition={{ duration: 0.25 }}
-                      className="w-9 h-9 lg:w-10 lg:h-10 rounded-full flex items-center justify-center"
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="flex items-center gap-2 px-4 py-2 rounded-xl
+                                 bg-[var(--color-cyan)] text-[var(--color-bg)]
+                                 font-body text-sm lg:text-base font-semibold
+                                 shadow-[0_0_16px_rgba(77,249,237,0.35)] cursor-pointer"
                     >
-                      <Check size={16} strokeWidth={3} className={isSelected ? 'text-[var(--color-bg)]' : 'text-white'} />
-                    </motion.div>
+                      Proceed <ArrowRight size={15} strokeWidth={2.5} />
+                    </motion.button>
                   </div>
                 </div>
               </motion.div>
@@ -106,49 +113,6 @@ export default function StepServiceType({ selected, setSelected, onNext }: Props
           })}
         </motion.div>
       </div>
-
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.38 }}
-        className="flex justify-end mt-7 lg:mt-10 w-full pb-5"
-      >
-        <NextBtn
-          disabled={!canProceed}
-          onClick={() => canProceed && onNext()}
-          className="font-body booking-text w-full sm:w-auto"
-        >
-          NEXT <ArrowRight size={17} />
-        </NextBtn>
-      </motion.div>
     </div>
-  )
-}
-
-function NextBtn({
-  disabled,
-  onClick,
-  children,
-  className = '',
-}: {
-  disabled: boolean
-  onClick: () => void
-  children: React.ReactNode
-  className?: string
-}) {
-  return (
-    <motion.button
-      onClick={onClick}
-      whileHover={!disabled ? { scale: 1.04 } : {}}
-      whileTap={!disabled ? { scale: 0.96 } : {}}
-      className={`flex items-center justify-center gap-2 px-7 py-3 rounded-xl font-body
-                  transition-all duration-300 text-base lg:text-lg
-                  ${disabled
-                    ? 'glass text-white/20 border border-white/[0.06] cursor-not-allowed'
-                    : 'glass text-white border border-white/20 hover:border-[var(--color-cyan)]/40 cursor-pointer'
-                  } ${className}`}
-    >
-      {children}
-    </motion.button>
   )
 }
