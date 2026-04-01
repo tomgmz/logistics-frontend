@@ -320,8 +320,8 @@ export default function StepVehicle({ onNext, onBack }: Props) {
               </motion.div>
             </AnimatePresence>
 
-            <div className="flex justify-between items-center pt-2">
-              <WizBtn onClick={onBack} variant="back"><ArrowLeft size={14} /> BACK</WizBtn>
+            <div className="flex justify-between items-center gap-3 pt-2">
+              <WizBtn onClick={onBack} variant="back"> BACK</WizBtn>
               <WizBtn onClick={handleReviewBooking} variant="next">Review Booking</WizBtn>
             </div>
           </div>

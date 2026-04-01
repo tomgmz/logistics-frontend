@@ -652,11 +652,11 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
 
       {/* Nav buttons */}
       <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5 }} className="flex justify-between pt-2"
+        transition={{ delay: 0.5 }} className="flex justify-between gap-3 pt-2"
       >
-        <WizBtn onClick={onBack} variant="back"><ArrowLeft size={16} /> BACK</WizBtn>
+        <WizBtn onClick={onBack} variant="back"> BACK</WizBtn>
         <WizBtn onClick={() => isValid && onNext()} variant="next" disabled={!isValid}>
-          NEXT <ArrowRight size={16} />
+          NEXT
         </WizBtn>
       </motion.div>
     </div>

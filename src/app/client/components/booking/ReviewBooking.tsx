@@ -205,20 +205,20 @@ export default function StepReview({ selectedService, onBack }: Props) {
             </motion.div>
 
             {/* Action row */}
-            <motion.div variants={fadeUp} className="flex justify-between items-center pt-2">
+            <motion.div variants={fadeUp} className="flex justify-between items-center gap-3 pt-2">
               <motion.button onClick={onBack} whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
-                className="flex items-center gap-2 px-6 lg:px-8 py-3 rounded-xl font-body booking-text text-base lg:text-lg
-                           bg-transparent border border-white/10 hover:text-white hover:border-white/20
-                           transition-all duration-300 cursor-pointer">
+                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 lg:px-8 py-3 rounded-xl font-body booking-text text-base lg:text-lg
+                          bg-transparent border border-white/10 hover:text-white hover:border-white/20
+                          transition-all duration-300 cursor-pointer">
                 BACK
               </motion.button>
               <motion.button onClick={confirm} disabled={loading}
                 whileHover={!loading ? { scale: 1.03 } : {}} whileTap={!loading ? { scale: 0.97 } : {}}
-                className="flex items-center gap-2 px-8 lg:px-12 py-3 rounded-xl cursor-pointer
-                           font-body booking-text font-bold uppercase tracking-[0.15em]
-                           bg-white text-[var(--color-bg)] hover:bg-[var(--color-cyan)]
-                           disabled:opacity-50 disabled:cursor-not-allowed
-                           transition-colors duration-300 text-sm lg:text-base">
+                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-8 lg:px-12 py-3 rounded-xl cursor-pointer
+                          font-body booking-text font-bold uppercase tracking-[0.15em]
+                          bg-white text-[var(--color-bg)] hover:bg-[var(--color-cyan)]
+                          disabled:opacity-50 disabled:cursor-not-allowed
+                          transition-colors duration-300 text-sm lg:text-base">
                 {loading ? <><Spinner /> Processing...</> : 'Book Transit'}
               </motion.button>
             </motion.div>
