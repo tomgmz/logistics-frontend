@@ -124,6 +124,12 @@ export interface AuthUser {
   last_name: string | null
   role: string
   status: string
+  clients?: {
+    client_id: string
+    company_name: string | null
+    billing_address: string | null
+    payment_terms: number | null
+  } | null
 }
 
 export interface AuthResponse {

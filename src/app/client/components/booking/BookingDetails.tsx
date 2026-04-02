@@ -10,7 +10,8 @@ import { useRef } from 'react'
 import { useAppDispatch, useAppSelector } from '@/app/lib/store/hooks'
 import {
   setDate, setTime, setPickup,
-  updateDropoff, addDropoff, removeDropoff,
+  setPickupCoords,
+  updateDropoff, updateDropoffCoords,addDropoff, removeDropoff,
   setMode, setSections,
   updateGroup as updateGroupAction,
   addGroup as addGroupAction,
@@ -157,7 +158,6 @@ export function makeDefaultGroup(): ItemGroup {
   }
 }
 
-
 export default function StepBookingDetails({ onNext, onBack }: Props) {
   const dispatch = useAppDispatch()
 
@@ -212,6 +212,13 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
   const dateInputRef = useRef<HTMLInputElement>(null)
   const timeInputRef = useRef<HTMLInputElement>(null)
   const isValid = pickup.trim() !== '' && dropoffs[0]?.trim() !== '' && date.trim() !== ''
+
+  const makeDropoffResolver = useCallback(
+    (index: number) => (resolved: { latitude: number | null; longitude: number | null }) => {
+      dispatch(updateDropoffCoords({ index, lat: resolved.latitude, lng: resolved.longitude }))
+    },
+    [dispatch],
+  )
 
   return (
     <div className="flex flex-col h-full p-4 lg:p-6 gap-3 sm:gap-6 overflow-auto">
@@ -280,6 +287,9 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
             <PlacesInput
               value={pickup}
               onChange={(val) => dispatch(setPickup(val))}
+              onResolve={(resolved) =>
+                dispatch(setPickupCoords({ lat: resolved.latitude, lng: resolved.longitude }))
+              }
               placeholder="Enter pickup location"
               showIcon={false}
             />
@@ -300,6 +310,7 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
                 <PlacesInput
                   value={d}
                   onChange={makeDropoffSetter(i)}
+                  onResolve={makeDropoffResolver(i)}
                   placeholder="Enter drop-off location"
                   showIcon={false}
                 />

@@ -58,7 +58,10 @@ interface BookingState {
   date: string
   time: string
   pickup: string
+  pickupLat: number | null
+  pickupLng: number | null
   dropoffs: string[]
+  dropoffCoords: { lat: number | null; lng: number | null }[]
   mode: CargoMode
   sections: DropoffSection[]
   allNonTiltable: boolean
@@ -75,7 +78,10 @@ const initialState: BookingState = {
   date: '',
   time: '',
   pickup: '',
+  pickupLat: null,
+  pickupLng: null,
   dropoffs: [''],
+  dropoffCoords: [{ lat: null, lng: null }],
   mode: 'loose',
   sections: [],
   allNonTiltable: false,
@@ -107,17 +113,31 @@ const bookingSlice = createSlice({
     setPickup(state, action: PayloadAction<string>) {
       state.pickup = action.payload
     },
+    setPickupCoords(state, action: PayloadAction<{ lat: number | null; lng: number | null }>) {
+      state.pickupLat = action.payload.lat
+      state.pickupLng = action.payload.lng
+    },
     setDropoffs(state, action: PayloadAction<string[]>) {
       state.dropoffs = action.payload
     },
     updateDropoff(state, action: PayloadAction<{ index: number; value: string }>) {
       state.dropoffs[action.payload.index] = action.payload.value
     },
+    updateDropoffCoords(state, action: PayloadAction<{ index: number; lat: number | null; lng: number | null }>) {
+      state.dropoffCoords[action.payload.index] = {
+        lat: action.payload.lat,
+        lng: action.payload.lng,
+      }
+    },
     addDropoff(state) {
-      if (state.dropoffs.length < 3) state.dropoffs.push('')
+      if (state.dropoffs.length < 3) {
+        state.dropoffs.push('')
+        state.dropoffCoords.push({ lat: null, lng: null })
+      }
     },
     removeDropoff(state, action: PayloadAction<number>) {
-      state.dropoffs = state.dropoffs.filter((_, i) => i !== action.payload)
+      state.dropoffs      = state.dropoffs.filter((_, i) => i !== action.payload)
+      state.dropoffCoords = state.dropoffCoords.filter((_, i) => i !== action.payload)
       state.sections = state.sections
         .filter((s) => s.dropoffIndex !== action.payload)
         .map((s, newIndex) => ({ ...s, dropoffIndex: newIndex }))
@@ -176,8 +196,10 @@ export const {
   setDate,
   setTime,
   setPickup,
+  setPickupCoords,
   setDropoffs,
   updateDropoff,
+  updateDropoffCoords,
   addDropoff,
   removeDropoff,
   setMode,

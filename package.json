@@ -15,7 +15,7 @@
     "@mui/material": "^7.3.9",
     "@mui/x-date-pickers": "^8.27.2",
     "@reduxjs/toolkit": "^2.11.2",
-    "@vis.gl/react-google-maps": "^1.7.1",
+    "@vis.gl/react-google-maps": "^1.8.2",
     "axios": "^1.13.6",
     "dayjs": "^1.11.20",
     "framer-motion": "^12.36.0",

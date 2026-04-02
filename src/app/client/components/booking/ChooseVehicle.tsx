@@ -24,6 +24,7 @@ function calcSummary(sections: DropoffSection[], mode: CargoMode) {
         const pallets = Number(g.numPallets)           || 0
         const gross   = Number(g.grossWeightPerPallet) || 0
         const net     = Number(g.netWeightPerPallet)   || 0
+        if (pallets <= 0) continue
         totalPieces += pallets
         grossWeight += pallets * gross
         netWeight   += pallets * net
@@ -33,9 +34,12 @@ function calcSummary(sections: DropoffSection[], mode: CargoMode) {
         const width  = Number(g.looseWidth)
         const height = Number(g.looseHeight)
         const weight = Number(g.weight)
+        // skip entirely if any required field is missing or zero
         if (!Number.isFinite(pieces) || pieces <= 0) continue
-        if (!Number.isFinite(length) || !Number.isFinite(width) || !Number.isFinite(height)) continue
-        if (!Number.isFinite(weight) || weight < 0) continue
+        if (!Number.isFinite(length) || length <= 0 ||
+            !Number.isFinite(width)  || width  <= 0 ||
+            !Number.isFinite(height) || height <= 0) continue
+        if (!Number.isFinite(weight) || weight <= 0) continue
         totalPieces += pieces
         const weightKG = g.weightUnit === 'lbs' ? weight * 0.453592 : weight
         grossWeight += g.perItem === 'Per Item' ? pieces * weightKG : weightKG

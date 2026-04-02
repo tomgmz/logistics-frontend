@@ -2,6 +2,12 @@ import { useCallback, useRef, useState } from 'react'
 
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? ''
 
+export interface ResolvedPlace {
+  address: string
+  latitude: number | null
+  longitude: number | null
+}
+
 let scriptPromise: Promise<void> | null = null
 
 function loadGoogleMapsScript(): Promise<void> {
@@ -103,13 +109,16 @@ export function usePlacesAutocomplete({
     [fetchSuggestions, debounceMs]
   )
 
-  const resolvePlace = useCallback(async (placeId: string): Promise<string> => {
+  const resolvePlace = useCallback(async (placeId: string): Promise<ResolvedPlace> => {
     await loadGoogleMapsScript()
     const place = new google.maps.places.Place({ id: placeId })
-    await place.fetchFields({ fields: ['displayName', 'formattedAddress'] })
-    // Reset session token after selection
+    await place.fetchFields({ fields: ['displayName', 'formattedAddress', 'location'] })
     sessionTokenRef.current = null
-    return place.formattedAddress ?? place.displayName ?? ''
+    return {
+      address:   place.formattedAddress ?? place.displayName ?? '',
+      latitude:  place.location?.lat() ?? null,
+      longitude: place.location?.lng() ?? null,
+    }
   }, [])
 
   return { suggestions, loading, onInputChange, resolvePlace }

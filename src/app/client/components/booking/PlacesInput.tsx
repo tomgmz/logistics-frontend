@@ -4,15 +4,16 @@ import { useState, useCallback } from 'react'
 import MuiAutocomplete from '@mui/material/Autocomplete'
 import TextField, { TextFieldProps } from '@mui/material/TextField'
 import CircularProgress from '@mui/material/CircularProgress'
-import { usePlacesAutocomplete, PlaceSuggestion } from '../../hooks/usePlacesAutoComplete'
+import { usePlacesAutocomplete, PlaceSuggestion, ResolvedPlace } from '../../hooks/usePlacesAutoComplete'
 
 type PlacesInputProps = Omit<TextFieldProps, 'onChange'> & {
   value: string
   onChange: (value: string) => void
-  showIcon?: boolean 
+  onResolve?: (resolved: ResolvedPlace) => void
+  showIcon?: boolean
 }
 
-export default function PlacesInput({ value, onChange, ...textFieldProps }: PlacesInputProps) {
+export default function PlacesInput({ value, onChange, onResolve, ...textFieldProps }: PlacesInputProps) {
   const [inputValue, setInputValue] = useState(value)
   const { suggestions, loading, onInputChange, resolvePlace } = usePlacesAutocomplete()
 
@@ -27,16 +28,17 @@ export default function PlacesInput({ value, onChange, ...textFieldProps }: Plac
   const handleSelect = useCallback(
     async (_: unknown, selected: string | PlaceSuggestion | null) => {
       if (!selected || typeof selected === 'string') return
-      const address = await resolvePlace(selected.placeId)
-      setInputValue(address)
-      onChange(address)
+      const resolved = await resolvePlace(selected.placeId)
+      setInputValue(resolved.address)
+      onChange(resolved.address)
+      onResolve?.(resolved)
     },
-    [resolvePlace, onChange]
+    [resolvePlace, onChange, onResolve]
   )
 
   return (
     <MuiAutocomplete<PlaceSuggestion, false, false, true>
-      fullWidth 
+      fullWidth
       freeSolo
       options={suggestions}
       getOptionLabel={o => (typeof o === 'string' ? o : o.label)}
@@ -62,18 +64,10 @@ export default function PlacesInput({ value, onChange, ...textFieldProps }: Plac
             ),
           }}
           sx={{
-            '& .MuiInputBase-root': {
-              color: '#fff',
-            },
-            '& .MuiInput-underline:before': {
-              borderBottomColor: 'rgba(255,255,255,0.2)',
-            },
-            '& .MuiInput-underline:hover:before': {
-              borderBottomColor: '#4DF9ED',
-            },
-            '& .MuiInput-underline:after': {
-              borderBottomColor: '#4DF9ED',
-            },
+            '& .MuiInputBase-root': { color: '#fff' },
+            '& .MuiInput-underline:before': { borderBottomColor: 'rgba(255,255,255,0.2)' },
+            '& .MuiInput-underline:hover:before': { borderBottomColor: '#4DF9ED' },
+            '& .MuiInput-underline:after': { borderBottomColor: '#4DF9ED' },
           }}
         />
       )}
