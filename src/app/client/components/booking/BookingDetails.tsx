@@ -404,9 +404,11 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
         <motion.div variants={fadeUp}
           className="bg-[#2A2828] rounded-2xl border border-white/[0.07] p-4 flex flex-col gap-3"
         >
-          <SectionHeader icon={<Truck size={16} />} title="Pick Up Point" />
+          <div className="flex items-center">
+            <SectionHeader icon={<Truck size={16} />} title="Pick Up Point" />
+            <Req />
+          </div>
           <div className="flex flex-col gap-1">
-            <span className="font-body booking-text text-xs">Location<Req /></span>
             <LocationField
               value={pickup}
               placeholder="Click to set on map"
@@ -422,7 +424,10 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
         <motion.div variants={fadeUp}
           className="bg-[#2A2828] rounded-2xl border border-white/[0.07] p-4 flex flex-col gap-2"
         >
-          <SectionHeader icon={<MapPin size={16} />} title="Drop Off Point" />
+          <div className="flex items-center">
+            <SectionHeader icon={<MapPin size={16} />} title="Drop Off Point" />
+            <Req />
+          </div>
           <div className="flex flex-col gap-2 mt-1">
             {dropoffs.map((d, i) => (
               <div key={i} className="flex flex-col gap-0.5">
