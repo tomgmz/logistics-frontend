@@ -13,7 +13,7 @@ const RED   = '#f87171'
 const BG    = '#0b0b14'
 const PANEL = 'rgba(13,13,22,0.96)'
 
-const DEFAULT_CENTER = { lat: 14.5995, lng: 120.9842 } // Metro Manila
+const DEFAULT_CENTER = { lat: 14.5995, lng: 120.9842 } // Metro Manila ang fallback kapag hindi makuha ang current location
 
 const DARK_MAP_STYLES = [
   { elementType: 'geometry',            stylers: [{ color: '#0d0d1c' }] },
@@ -247,67 +247,59 @@ export default function MapLocationPicker({
 
         {/* Header */}
         <div className="flex items-center gap-2">
-          {onClose && (
+        {onClose && (
             <button
               onClick={onClose}
               className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0
-                         text-white transition-opacity hover:opacity-70 active:opacity-50"
+                        text-white transition-opacity hover:opacity-70 active:opacity-50"
               style={{ background: PANEL, border: '1px solid rgba(255,255,255,0.08)' }}
             >
               <ArrowLeftIcon />
             </button>
           )}
-          <div
-            className="flex-1 flex items-center gap-2.5 px-4 py-2.5 rounded-2xl"
-            style={{ background: PANEL, border: `1px solid ${pinColor}30` }}
-          >
+
+          {/* Search bar */}
+          <div ref={searchRef} className="relative flex-1">
             <div
-              className="w-2 h-2 rounded-full flex-shrink-0"
-              style={{ backgroundColor: pinColor, boxShadow: `0 0 6px ${pinColor}` }}
-            />
-            <p className="text-sm font-semibold" style={{ color: pinColor }}>
-              Set {label} Location
-            </p>
-          </div>
-        </div>
-
-        {/* Search bar */}
-        <div ref={searchRef} className="relative">
-          <div
-            className="flex items-center gap-2.5 px-3.5 py-3 rounded-2xl transition-all"
-            style={{
-              background: PANEL,
-              border: `1px solid ${showSugg ? `${pinColor}50` : 'rgba(255,255,255,0.08)'}`,
-            }}
-          >
-            <span style={{ flexShrink: 0 }}>
-              <LocationIcon color={showSugg ? pinColor : 'rgba(255,255,255,0.3)'} />
-            </span>
-            <input
-              className="flex-1 bg-transparent text-sm font-medium outline-none"
-              style={{ color: '#fff', caretColor: pinColor }}
-              placeholder={placeholder}
-              value={searchQuery}
-              onChange={e => {
-                setSearchQuery(e.target.value)
-                onInputChange(e.target.value)
-                setShowSugg(true)
+              className="flex items-center gap-2.5 px-3.5 py-3 rounded-2xl transition-all w-full"
+              style={{
+                background: PANEL,
+                border: `1px solid ${showSugg ? `${pinColor}50` : 'rgba(255,255,255,0.08)'}`,
               }}
-              onFocus={() => suggestions.length > 0 && setShowSugg(true)}
-            />
-            {searchQuery && (
-              <button
-                className="text-lg leading-none transition-opacity hover:opacity-70 flex-shrink-0"
-                style={{ color: 'rgba(255,255,255,0.35)' }}
-                onClick={() => {
-                  setSearchQuery('')
-                  onInputChange('')
-                  setShowSugg(false)
-                }}
-              >×</button>
-            )}
-          </div>
+            >
+              <span style={{ flexShrink: 0 }}>
+                <LocationIcon color={showSugg ? pinColor : 'rgba(255,255,255,0.3)'} />
+              </span>
 
+              <input
+                className="flex-1 bg-transparent text-sm font-medium outline-none"
+                style={{ color: '#fff', caretColor: pinColor }}
+                placeholder={placeholder}
+                value={searchQuery}
+                onChange={e => {
+                  setSearchQuery(e.target.value)
+                  onInputChange(e.target.value)
+                  setShowSugg(true)
+                }}
+                onFocus={() => suggestions.length > 0 && setShowSugg(true)}
+              />
+
+              {searchQuery && (
+                <button
+                  className="text-lg leading-none transition-opacity hover:opacity-70 flex-shrink-0"
+                  style={{ color: 'rgba(255,255,255,0.35)' }}
+                  onClick={() => {
+                    setSearchQuery('')
+                    onInputChange('')
+                    setShowSugg(false)
+                  }}
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          </div>
+        
           {/* Suggestions dropdown */}
           {showSugg && suggestions.length > 0 && (
             <div
