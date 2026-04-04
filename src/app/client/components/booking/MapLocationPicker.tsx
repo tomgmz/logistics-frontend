@@ -134,10 +134,11 @@ export default function MapLocationPicker({
         pos => {
           const c = { lat: pos.coords.latitude, lng: pos.coords.longitude }
           map.setCenter(c)
-          reverseGeocode(c.lat, c.lng)
+          // reverseGeocode(c.lat, c.lng)
         },
         () => {
-          reverseGeocode(DEFAULT_CENTER.lat, DEFAULT_CENTER.lng)
+          // reverseGeocode(DEFAULT_CENTER.lat, DEFAULT_CENTER.lng)
+          map.setCenter(DEFAULT_CENTER)
         }
       )
 

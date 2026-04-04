@@ -12,7 +12,7 @@ export default function DashboardShell({ children }: { children: ReactNode }) {
       <div className="flex flex-1 min-h-0 overflow-hidden">
         <Sidebar />
 
-        <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto bg-[var(--color-surface)]">
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[var(--color-surface)]">
           {children}
         </main>
       </div>
