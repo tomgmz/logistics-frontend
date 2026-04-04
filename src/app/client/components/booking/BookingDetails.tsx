@@ -1,7 +1,7 @@
 'use client'
 
 import { motion, Variants, AnimatePresence } from 'framer-motion'
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import {
   CalendarDays, Clock, MapPin, Package,
   Truck, Plus, X, Check,
@@ -11,7 +11,7 @@ import { useAppDispatch, useAppSelector } from '@/app/lib/store/hooks'
 import {
   setDate, setTime, setPickup,
   setPickupCoords,
-  updateDropoff, updateDropoffCoords,addDropoff, removeDropoff,
+  updateDropoff, updateDropoffCoords, addDropoff, removeDropoff,
   setMode, setSections,
   updateGroup as updateGroupAction,
   addGroup as addGroupAction,
@@ -20,20 +20,35 @@ import {
   setAllStackable, setAllOversize,
 } from '@/app/lib/store/bookingSlice'
 import type { CargoMode, ItemGroup, DropoffSection } from '@/app/lib/store/bookingSlice'
-import PlacesInput from './PlacesInput'
+import MapLocationPicker from './MapLocationPicker'
 import './BookingDetails.css'
 
 import TextField from '@mui/material/TextField'
 import Select, { SelectChangeEvent } from '@mui/material/Select'
 import MenuItem from '@mui/material/MenuItem'
 import InputAdornment from '@mui/material/InputAdornment'
+import FormHelperText from '@mui/material/FormHelperText'
 import { SxProps, Theme } from '@mui/material/styles'
 import WizBtn from '../WizButton'
+
+import {
+  validateBooking,
+  hasAnyErrors,
+  getGroupErrors,
+  type GroupErrors,
+} from '@/app/lib/validation/bookingValidation'
+
+import type { ResolvedPlace } from '@/app/lib/hooks/usePlacesAutoComplete'
 
 interface Props {
   onNext: () => void
   onBack: () => void
 }
+
+type MapPickerTarget =
+  | { kind: 'pickup' }
+  | { kind: 'dropoff'; index: number }
+  | null
 
 const PALLET_DIMENSIONS: Record<
   ItemGroup['palletType'],
@@ -50,9 +65,13 @@ const INPUT_BG_PANEL = '#2A2828'
 const BORDER_CARD    = '#333333'
 const BORDER_PANEL   = 'rgba(255,255,255,0.12)'
 const CYAN           = '#4DF9ED'
+const RED            = '#f87171'
+const ERROR_COLOR    = '#f87171'
 const RADIUS         = '8px'
 
-function fieldSx(bg: string, borderColor: string): SxProps<Theme> {
+function fieldSx(bg: string, borderColor: string, hasError = false): SxProps<Theme> {
+  const activeBorder = hasError ? ERROR_COLOR : `${CYAN}66`
+  const idleBorder   = hasError ? `${ERROR_COLOR}99` : borderColor
   return {
     '& .MuiInputBase-root': {
       height: 36, borderRadius: RADIUS, backgroundColor: bg,
@@ -62,16 +81,18 @@ function fieldSx(bg: string, borderColor: string): SxProps<Theme> {
       padding: '0 12px', height: 36, boxSizing: 'border-box',
       '&::placeholder': { color: 'rgba(255,255,255,0.2)', opacity: 1 },
     },
-    '& .MuiOutlinedInput-notchedOutline': { borderColor, borderRadius: RADIUS },
-    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: `${CYAN}66` },
-    '& .Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: `${CYAN}66`, borderWidth: 1 },
+    '& .MuiOutlinedInput-notchedOutline': { borderColor: idleBorder, borderRadius: RADIUS },
+    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: activeBorder },
+    '& .Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: activeBorder, borderWidth: 1 },
     '& .MuiInputLabel-root': { display: 'none' },
     '& legend': { display: 'none' },
     '& fieldset': { top: 0 },
   }
 }
 
-function selectSx(bg: string, borderColor: string): SxProps<Theme> {
+function selectSx(bg: string, borderColor: string, hasError = false): SxProps<Theme> {
+  const activeBorder = hasError ? ERROR_COLOR : `${CYAN}66`
+  const idleBorder   = hasError ? `${ERROR_COLOR}99` : borderColor
   return {
     height: 36, borderRadius: RADIUS, backgroundColor: bg,
     color: '#fff', fontSize: '0.875rem', fontFamily: 'inherit',
@@ -79,13 +100,18 @@ function selectSx(bg: string, borderColor: string): SxProps<Theme> {
       padding: '0 32px 0 10px !important', height: '36px !important',
       display: 'flex', alignItems: 'center',
     },
-    '& .MuiOutlinedInput-notchedOutline': { borderColor, borderRadius: RADIUS },
-    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: `${CYAN}66` },
-    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: `${CYAN}66`, borderWidth: 1 },
+    '& .MuiOutlinedInput-notchedOutline': { borderColor: idleBorder, borderRadius: RADIUS },
+    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: activeBorder },
+    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: activeBorder, borderWidth: 1 },
     '& .MuiSvgIcon-root': { color: 'rgba(255,255,255,0.5)' },
     '& legend': { display: 'none' },
     '& fieldset': { top: 0 },
   }
+}
+
+const HELPER_SX: SxProps<Theme> = {
+  color: ERROR_COLOR, fontSize: '0.7rem', marginTop: '3px',
+  marginLeft: '2px', fontFamily: 'inherit', lineHeight: 1.3,
 }
 
 const MENU_PROPS = {
@@ -120,6 +146,7 @@ function calcSummary(sections: DropoffSection[], mode: CargoMode) {
         const pallets = Number(g.numPallets) || 0
         const gross   = Number(g.grossWeightPerPallet) || 0
         const net     = Number(g.netWeightPerPallet)   || 0
+        if (pallets <= 0) continue
         totalPieces += pallets
         grossWeight += pallets * gross
         netWeight   += pallets * net
@@ -130,8 +157,10 @@ function calcSummary(sections: DropoffSection[], mode: CargoMode) {
         const height = Number(g.looseHeight)
         const weight = Number(g.weight)
         if (!Number.isFinite(pieces) || pieces <= 0) continue
-        if (!Number.isFinite(length) || !Number.isFinite(width) || !Number.isFinite(height)) continue
-        if (!Number.isFinite(weight) || weight < 0) continue
+        if (!Number.isFinite(length) || length <= 0 ||
+            !Number.isFinite(width)  || width  <= 0 ||
+            !Number.isFinite(height) || height <= 0) continue
+        if (!Number.isFinite(weight) || weight <= 0) continue
         totalPieces += pieces
         const weightKG = g.weightUnit === 'lbs' ? weight * 0.453592 : weight
         grossWeight += g.perItem === 'Per Item' ? pieces * weightKG : weightKG
@@ -158,19 +187,71 @@ export function makeDefaultGroup(): ItemGroup {
   }
 }
 
+function Req() {
+  return <span style={{ color: ERROR_COLOR, marginLeft: 2 }}>*</span>
+}
+
+function LocationField({
+  value,
+  placeholder,
+  hasError,
+  errorMsg,
+  accentColor,
+  onClick,
+}: {
+  value: string
+  placeholder: string
+  hasError?: boolean
+  errorMsg?: string
+  accentColor: string
+  onClick: () => void
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <button
+        type="button"
+        onClick={onClick}
+        className="w-full flex items-center gap-2 px-3 text-left transition-all
+                   hover:opacity-90 active:scale-[0.99] cursor-pointer"
+        style={{
+          height: 36,
+          background: INPUT_BG_PANEL,
+          border: `1px solid ${hasError ? `${ERROR_COLOR}99` : BORDER_PANEL}`,
+          borderRadius: RADIUS,
+          outline: 'none',
+        }}
+      >
+        <MapPin size={13} style={{ color: accentColor, flexShrink: 0 }} />
+        <span
+          className="flex-1 text-sm truncate"
+          style={{ color: value ? '#fff' : 'rgba(255,255,255,0.3)' }}
+        >
+          {value || placeholder}
+        </span>
+      </button>
+      {hasError && errorMsg && (
+        <FormHelperText sx={HELPER_SX}>{errorMsg}</FormHelperText>
+      )}
+    </div>
+  )
+}
+
 export default function StepBookingDetails({ onNext, onBack }: Props) {
   const dispatch = useAppDispatch()
 
-  const date           = useAppSelector((s) => s.booking.date)
-  const time           = useAppSelector((s) => s.booking.time)
-  const pickup         = useAppSelector((s) => s.booking.pickup)
-  const dropoffs       = useAppSelector((s) => s.booking.dropoffs)
-  const mode           = useAppSelector((s) => s.booking.mode)
-  const sections       = useAppSelector((s) => s.booking.sections)
-  const allNonTiltable = useAppSelector((s) => s.booking.allNonTiltable)
-  const allNonStackable= useAppSelector((s) => s.booking.allNonStackable)
-  const allStackable   = useAppSelector((s) => s.booking.allStackable)
-  const allOversize    = useAppSelector((s) => s.booking.allOversize)
+  const date            = useAppSelector((s) => s.booking.date)
+  const time            = useAppSelector((s) => s.booking.time)
+  const pickup          = useAppSelector((s) => s.booking.pickup)
+  const dropoffs        = useAppSelector((s) => s.booking.dropoffs)
+  const mode            = useAppSelector((s) => s.booking.mode)
+  const sections        = useAppSelector((s) => s.booking.sections)
+  const allNonTiltable  = useAppSelector((s) => s.booking.allNonTiltable)
+  const allNonStackable = useAppSelector((s) => s.booking.allNonStackable)
+  const allStackable    = useAppSelector((s) => s.booking.allStackable)
+  const allOversize     = useAppSelector((s) => s.booking.allOversize)
+
+  const [touched,     setTouched]     = useState(false)
+  const [mapTarget,   setMapTarget]   = useState<MapPickerTarget>(null)
 
   const syncedSections: DropoffSection[] = dropoffs.map((_, i) => {
     const existing = sections.find((s) => s.dropoffIndex === i)
@@ -181,6 +262,14 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
     dispatch(setSections(syncedSections))
   }
 
+  const rawErrors = validateBooking(date, time, pickup, dropoffs, syncedSections, mode)
+  const errors    = touched ? rawErrors : { schedule: {}, route: { dropoffs: {} }, sections: [] }
+
+  const handleNext = () => {
+    setTouched(true)
+    if (hasAnyErrors(rawErrors)) return
+    onNext()
+  }
 
   const handleAddDropoff = () => {
     dispatch(addDropoff())
@@ -190,16 +279,8 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
     ]))
   }
 
-  const makeDropoffSetter = useCallback(
-    (index: number) => (val: string) => dispatch(updateDropoff({ index, value: val })),
-    [dispatch],
-  )
-
-  const handleUpdateGroup = (
-    dropoffIndex: number,
-    groupId: string,
-    patch: Partial<ItemGroup>,
-  ) => dispatch(updateGroupAction({ dropoffIndex, groupId, patch }))
+  const handleUpdateGroup = (dropoffIndex: number, groupId: string, patch: Partial<ItemGroup>) =>
+    dispatch(updateGroupAction({ dropoffIndex, groupId, patch }))
 
   const handleRemoveGroup = (dropoffIndex: number, groupId: string) =>
     dispatch(removeGroupAction({ dropoffIndex, groupId }))
@@ -207,37 +288,74 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
   const handleAddGroup = (dropoffIndex: number) =>
     dispatch(addGroupAction({ dropoffIndex, newGroup: makeDefaultGroup() }))
 
-  const summary  = calcSummary(syncedSections, mode)
-  const allGroups = syncedSections.flatMap((s) => s.groups)
-  const dateInputRef = useRef<HTMLInputElement>(null)
-  const timeInputRef = useRef<HTMLInputElement>(null)
-  const isValid = pickup.trim() !== '' && dropoffs[0]?.trim() !== '' && date.trim() !== ''
-
-  const makeDropoffResolver = useCallback(
-    (index: number) => (resolved: { latitude: number | null; longitude: number | null }) => {
-      dispatch(updateDropoffCoords({ index, lat: resolved.latitude, lng: resolved.longitude }))
+  const handleMapConfirm = useCallback(
+    (place: ResolvedPlace) => {
+      if (!mapTarget) return
+      if (mapTarget.kind === 'pickup') {
+        dispatch(setPickup(place.address))
+        dispatch(setPickupCoords({ lat: place.latitude, lng: place.longitude }))
+      } else {
+        dispatch(updateDropoff({ index: mapTarget.index, value: place.address }))
+        dispatch(updateDropoffCoords({ index: mapTarget.index, lat: place.latitude, lng: place.longitude }))
+      }
+      setMapTarget(null)
     },
-    [dispatch],
+    [dispatch, mapTarget],
   )
 
-  return (
-    <div className="flex flex-col h-full p-4 lg:p-6 gap-3 sm:gap-6 overflow-auto">
+  const summary      = calcSummary(syncedSections, mode)
+  const allGroups    = syncedSections.flatMap((s) => s.groups)
+  const dateInputRef = useRef<HTMLInputElement>(null)
+  const timeInputRef = useRef<HTMLInputElement>(null)
 
-      {/* Row 1 */}
+  const mapInitialValue = mapTarget
+    ? mapTarget.kind === 'pickup'
+      ? pickup
+      : dropoffs[mapTarget.index] ?? ''
+    : ''
+
+  const mapPickerMode: 'pickup' | 'dropoff' =
+    mapTarget?.kind === 'pickup' ? 'pickup' : 'dropoff'
+
+  return (
+    <div className="relative flex flex-col h-full p-4 lg:p-6 gap-3 sm:gap-6 overflow-auto">
+
+      <AnimatePresence>
+        {mapTarget && (
+          <motion.div
+            key="map-picker"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="absolute inset-0 z-50"
+          >
+            <MapLocationPicker
+              mode={mapPickerMode}
+              onConfirm={handleMapConfirm}
+              onClose={() => setMapTarget(null)}
+              initialValue={mapInitialValue}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <motion.div variants={stagger} initial="hidden" animate="show"
         className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-6"
       >
-        {/* Transit Schedule */}
+        {/* Transit Sched */}
         <motion.div variants={fadeUp}
           className="bg-[#2A2828] rounded-2xl border border-white/[0.07] p-4 flex flex-col gap-3"
         >
           <SectionHeader icon={<CalendarDays size={16} />} title="Transit Schedule" />
+
           <div className="flex flex-col gap-1">
-            <span className="font-body booking-text text-xs">Date</span>
+            <span className="font-body booking-text text-xs">Date<Req /></span>
             <TextField
               fullWidth type="date" value={date}
               onChange={(e) => dispatch(setDate(e.target.value))}
               variant="outlined" inputRef={dateInputRef}
+              error={!!errors.schedule.date}
               InputProps={{
                 endAdornment: (
                   <InputAdornment position="end">
@@ -248,18 +366,21 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
                 ),
               }}
               sx={{
-                ...fieldSx(INPUT_BG_PANEL, BORDER_PANEL),
+                ...fieldSx(INPUT_BG_PANEL, BORDER_PANEL, !!errors.schedule.date),
                 '& input[type="date"]::-webkit-calendar-picker-indicator': { display: 'none' },
                 '& .MuiInputBase-input': { padding: '0 0 0 12px', height: 36, boxSizing: 'border-box', colorScheme: 'dark' },
               }}
             />
+            {errors.schedule.date && <FormHelperText sx={HELPER_SX}>{errors.schedule.date}</FormHelperText>}
           </div>
+
           <div className="flex flex-col gap-1">
-            <span className="font-body booking-text text-xs">Time</span>
+            <span className="font-body booking-text text-xs">Time<Req /></span>
             <TextField
               fullWidth type="time" value={time}
               onChange={(e) => dispatch(setTime(e.target.value))}
               variant="outlined" inputRef={timeInputRef}
+              error={!!errors.schedule.time}
               InputProps={{
                 endAdornment: (
                   <InputAdornment position="end">
@@ -270,11 +391,12 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
                 ),
               }}
               sx={{
-                ...fieldSx(INPUT_BG_PANEL, BORDER_PANEL),
+                ...fieldSx(INPUT_BG_PANEL, BORDER_PANEL, !!errors.schedule.time),
                 '& input[type="time"]::-webkit-calendar-picker-indicator': { display: 'none' },
                 '& .MuiInputBase-input': { padding: '0 0 0 12px', height: 36, boxSizing: 'border-box', colorScheme: 'dark' },
               }}
             />
+            {errors.schedule.time && <FormHelperText sx={HELPER_SX}>{errors.schedule.time}</FormHelperText>}
           </div>
         </motion.div>
 
@@ -283,17 +405,16 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
           className="bg-[#2A2828] rounded-2xl border border-white/[0.07] p-4 flex flex-col gap-3"
         >
           <SectionHeader icon={<Truck size={16} />} title="Pick Up Point" />
-          <div className="flex items-center gap-2">
-            <PlacesInput
+          <div className="flex flex-col gap-1">
+            <span className="font-body booking-text text-xs">Location<Req /></span>
+            <LocationField
               value={pickup}
-              onChange={(val) => dispatch(setPickup(val))}
-              onResolve={(resolved) =>
-                dispatch(setPickupCoords({ lat: resolved.latitude, lng: resolved.longitude }))
-              }
-              placeholder="Enter pickup location"
-              showIcon={false}
+              placeholder="Click to set on map"
+              hasError={!!errors.route.pickup}
+              errorMsg={errors.route.pickup}
+              accentColor={CYAN}
+              onClick={() => setMapTarget({ kind: 'pickup' })}
             />
-            <MapPin size={15} className="shrink-0" />
           </div>
         </motion.div>
 
@@ -304,23 +425,27 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
           <SectionHeader icon={<MapPin size={16} />} title="Drop Off Point" />
           <div className="flex flex-col gap-2 mt-1">
             {dropoffs.map((d, i) => (
-              <div key={i}
-                className="flex items-center gap-2 pb-2 last:border-0 last:pb-0"
-              >
-                <PlacesInput
-                  value={d}
-                  onChange={makeDropoffSetter(i)}
-                  onResolve={makeDropoffResolver(i)}
-                  placeholder="Enter drop-off location"
-                  showIcon={false}
-                />
-                {i > 0 && (
-                  <button onClick={() => dispatch(removeDropoff(i))}
-                    className="hover:text-red-400 transition-colors cursor-pointer shrink-0">
-                    <X size={13} />
-                  </button>
-                )}
-                <MapPin size={15} className="shrink-0" />
+              <div key={i} className="flex flex-col gap-0.5">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <LocationField
+                      value={d}
+                      placeholder="Click to set on map"
+                      hasError={!!errors.route.dropoffs[i]}
+                      errorMsg={errors.route.dropoffs[i]}
+                      accentColor={RED}
+                      onClick={() => setMapTarget({ kind: 'dropoff', index: i })}
+                    />
+                  </div>
+                  {i > 0 && (
+                    <button
+                      onClick={() => dispatch(removeDropoff(i))}
+                      className="hover:text-red-400 transition-colors cursor-pointer shrink-0"
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
             {dropoffs.length < 3 && (
@@ -334,15 +459,12 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
         </motion.div>
       </motion.div>
 
-      {/* Product and Cargo Capacity */}
+      {/* Productand Cargo Capacity */}
       <motion.div variants={fadeUp} initial="hidden" animate="show"
         className="bg-[#2A2828] rounded-2xl border border-white/[0.07] p-4 flex flex-col gap-4"
       >
-        <div className="flex items-center justify-between">
-          <SectionHeader icon={<Package size={16} />} title="Product & Cargo Capacity" />
-        </div>
+        <SectionHeader icon={<Package size={16} />} title="Product & Cargo Capacity" />
 
-        {/* Mode tabs */}
         <div className="flex items-center gap-6 border-b border-white/[0.07]">
           {(['loose', 'palletized'] as CargoMode[]).map((m) => (
             <button key={m} onClick={() => dispatch(setMode(m))}
@@ -366,7 +488,6 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
           </div>
         </div>
 
-        {/* Per-dropoff sections */}
         <div className="flex flex-col gap-6">
           <AnimatePresence>
             {syncedSections.map((section) => {
@@ -379,192 +500,100 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
                   <div className="flex flex-col gap-1">
                     <div className="flex items-center gap-2">
                       <MapPin size={13} className="text-white/40 shrink-0" />
-                      <span className="font-body booking-text text-sm text-white/80 truncate">
-                        {dropoffLabel}
-                      </span>
+                      <span className="font-body booking-text text-sm text-white/80 truncate">{dropoffLabel}</span>
                     </div>
                     <div className="border-b border-white/[0.12] w-full" />
                   </div>
 
                   <div className="flex flex-col gap-3">
                     <AnimatePresence>
-                      {section.groups.map((g, idx) => (
-                        <motion.div key={g.id}
-                          initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}
-                          className="bg-[#424242] rounded-xl p-3 lg:p-4 border border-white/[0.07]"
-                        >
-                          <div className="flex items-center justify-between mb-3">
-                            <span className="font-body booking-text text-sm font-bold text-[var(--color-cyan)]">
-                              Product #{idx + 1}
-                            </span>
-                            {idx > 0 && (
-                              <button onClick={() => handleRemoveGroup(section.dropoffIndex, g.id)}
-                                className="flex items-center justify-center w-6 h-6 rounded-full
-                                           border border-white/10 hover:border-red-400/40 hover:text-red-400
-                                           transition-colors cursor-pointer">
-                                <X size={12} />
-                              </button>
-                            )}
-                          </div>
-
-                          <ProductFieldsRow
-                            group={g}
-                            onUpdate={(patch) => handleUpdateGroup(section.dropoffIndex, g.id, patch)}
-                          />
-
-                          <div className="border-t border-white/[0.07] my-3" />
-
-                          {/* LOOSE */}
-                          {mode === 'loose' && (
-                            <div className="grid grid-cols-[90px_1fr] gap-x-2 gap-y-3 lg:flex lg:items-end lg:gap-2">
-                              <div className="flex flex-col gap-1">
-                                <label className="font-body booking-text text-xs whitespace-nowrap">Pieces</label>
-                                <TextField value={g.pieces}
-                                  onChange={(e) => handleUpdateGroup(section.dropoffIndex, g.id, { pieces: e.target.value })}
-                                  placeholder="0" variant="outlined"
-                                  sx={{ ...fieldSx(INPUT_BG_CARD, BORDER_CARD), width: 90 }} />
-                              </div>
-                              <div className="flex flex-col gap-1 min-w-0">
-                                <label className="font-body booking-text text-xs whitespace-nowrap">
-                                  Dimensions <span className="text-white/20">(cm)</span>
-                                </label>
-                                <div className="flex gap-1.5">
-                                  {(['looseLength', 'looseWidth', 'looseHeight'] as const).map((dim) => (
-                                    <TextField key={dim} value={g[dim]}
-                                      onChange={(e) => handleUpdateGroup(section.dropoffIndex, g.id, { [dim]: e.target.value })}
-                                      placeholder={dim === 'looseLength' ? 'L' : dim === 'looseWidth' ? 'W' : 'H'}
-                                      variant="outlined"
-                                      sx={{ ...fieldSx(INPUT_BG_CARD, BORDER_CARD), flex: 1, minWidth: 0 }} />
-                                  ))}
-                                </div>
-                              </div>
-                              <div className="flex flex-col gap-1 col-span-2 lg:col-span-1 lg:shrink-0">
-                                <label className="font-body booking-text text-xs whitespace-nowrap">Weight</label>
-                                <div className="flex gap-1.5">
-                                  <TextField value={g.weight}
-                                    onChange={(e) => handleUpdateGroup(section.dropoffIndex, g.id, { weight: e.target.value })}
-                                    placeholder="0" variant="outlined"
-                                    sx={{ ...fieldSx(INPUT_BG_CARD, BORDER_CARD), width: 64 }} />
-                                  <Select value={g.weightUnit}
-                                    onChange={(e: SelectChangeEvent) =>
-                                      handleUpdateGroup(section.dropoffIndex, g.id, { weightUnit: e.target.value as 'kg' | 'lbs' })}
-                                    sx={{ ...selectSx(INPUT_BG_CARD, BORDER_CARD), width: 64 }} MenuProps={MENU_PROPS}>
-                                    <MenuItem value="kg">kg</MenuItem>
-                                    <MenuItem value="lbs">lbs</MenuItem>
-                                  </Select>
-                                  <Select value={g.perItem}
-                                    onChange={(e: SelectChangeEvent) =>
-                                      handleUpdateGroup(section.dropoffIndex, g.id, { perItem: e.target.value as 'Per Item' | 'Total' })}
-                                    sx={{ ...selectSx(INPUT_BG_CARD, BORDER_CARD), flex: 1 }} MenuProps={MENU_PROPS}>
-                                    <MenuItem value="Per Item">Per Item</MenuItem>
-                                    <MenuItem value="Total">Total</MenuItem>
-                                  </Select>
-                                </div>
-                              </div>
-                              <div className="hidden lg:flex flex-row items-end gap-4 pb-0.5 ml-2 shrink-0">
-                                <CheckRow checked={g.nonTiltable}
-                                  onChange={(v) => handleUpdateGroup(section.dropoffIndex, g.id, { nonTiltable: v })}
-                                  label="Non-tiltable" />
-                                <CheckRow checked={g.nonStackable}
-                                  onChange={(v) => handleUpdateGroup(section.dropoffIndex, g.id, { nonStackable: v })}
-                                  label="Non-stackable" />
-                              </div>
+                      {section.groups.map((g, idx) => {
+                        const gErr = touched
+                          ? getGroupErrors(rawErrors.sections, section.dropoffIndex, g.id)
+                          : {}
+                        return (
+                          <motion.div key={g.id}
+                            initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}
+                            className="bg-[#424242] rounded-xl p-3 lg:p-4 border border-white/[0.07]"
+                          >
+                            <div className="flex items-center justify-between mb-3">
+                              <span className="font-body booking-text text-sm font-bold text-[var(--color-cyan)]">
+                                Product #{idx + 1}
+                              </span>
+                              {idx > 0 && (
+                                <button onClick={() => handleRemoveGroup(section.dropoffIndex, g.id)}
+                                  className="flex items-center justify-center w-6 h-6 rounded-full
+                                             border border-white/10 hover:border-red-400/40 hover:text-red-400
+                                             transition-colors cursor-pointer">
+                                  <X size={12} />
+                                </button>
+                              )}
                             </div>
-                          )}
 
-                          {/* PALLETIZED */}
-                          {mode === 'palletized' && (
-                            <div className="flex flex-wrap items-end gap-2">
-                              <div className="flex flex-col gap-1 w-full sm:w-[140px]">
-                                <label className="font-body booking-text text-xs whitespace-nowrap">No. of Pallets</label>
-                                <TextField fullWidth value={g.numPallets}
-                                  onChange={(e) => handleUpdateGroup(section.dropoffIndex, g.id, { numPallets: e.target.value })}
-                                  placeholder="0" variant="outlined" sx={fieldSx(INPUT_BG_CARD, BORDER_CARD)} />
-                              </div>
-                              <div className="flex flex-col gap-1 w-full sm:w-[180px]">
-                                <label className="font-body booking-text text-xs whitespace-nowrap">Pallet Type</label>
-                                <Select value={g.palletType}
-                                  onChange={(e: SelectChangeEvent) => {
-                                    const type = e.target.value as ItemGroup['palletType']
-                                    handleUpdateGroup(section.dropoffIndex, g.id, { palletType: type, ...PALLET_DIMENSIONS[type] })
-                                  }}
-                                  sx={{ ...selectSx(INPUT_BG_CARD, BORDER_CARD), width: '100%' }} MenuProps={MENU_PROPS}>
-                                  <MenuItem value="Standard">Standard (120×100)</MenuItem>
-                                  <MenuItem value="Euro">Euro (120×80)</MenuItem>
-                                  <MenuItem value="Half">Half (60×80)</MenuItem>
-                                  <MenuItem value="Custom">Custom</MenuItem>
-                                </Select>
-                              </div>
-                              <div className="flex flex-col gap-1 w-full min-w-[220px] flex-1">
-                                <label className="font-body booking-text text-xs whitespace-nowrap">
-                                  Dimensions <span className="text-white/20">(cm)</span>
-                                </label>
-                                <div className="flex gap-1.5 items-center">
-                                  {(['palletLength', 'palletWidth', 'palletHeight'] as const).map((dim) => (
-                                    <TextField key={dim} value={g[dim]}
-                                      onChange={(e) => handleUpdateGroup(section.dropoffIndex, g.id, { [dim]: e.target.value })}
-                                      placeholder={dim === 'palletLength' ? 'L' : dim === 'palletWidth' ? 'W' : 'H'}
-                                      variant="outlined"
-                                      sx={{ ...fieldSx(INPUT_BG_CARD, BORDER_CARD), flex: 1, minWidth: 0 }} />
-                                  ))}
-                                  <Select value={g.palletWeightUnit}
-                                    onChange={(e: SelectChangeEvent) =>
-                                      handleUpdateGroup(section.dropoffIndex, g.id, { palletWeightUnit: e.target.value as 'kg' | 'lbs' })}
-                                    sx={{ ...selectSx(INPUT_BG_CARD, BORDER_CARD), width: 64, flexShrink: 0 }} MenuProps={MENU_PROPS}>
-                                    <MenuItem value="kg">kg</MenuItem>
-                                    <MenuItem value="lbs">lbs</MenuItem>
-                                  </Select>
+                            <ProductFieldsRow
+                              group={g} errors={gErr}
+                              onUpdate={(patch) => handleUpdateGroup(section.dropoffIndex, g.id, patch)}
+                            />
+
+                            <div className="border-t border-white/[0.07] my-3" />
+
+                            {mode === 'loose' && (
+                              <div className="grid grid-cols-[90px_1fr] gap-x-2 gap-y-3 lg:flex lg:items-start lg:gap-2">
+                                <div className="flex flex-col gap-1">
+                                  <label className="font-body booking-text text-xs whitespace-nowrap">Pieces<Req /></label>
+                                  <TextField value={g.pieces}
+                                    onChange={(e) => handleUpdateGroup(section.dropoffIndex, g.id, { pieces: e.target.value })}
+                                    placeholder="0" variant="outlined" error={!!gErr.pieces}
+                                    sx={{ ...fieldSx(INPUT_BG_CARD, BORDER_CARD, !!gErr.pieces), width: 90 }} />
+                                  {gErr.pieces && <FormHelperText sx={HELPER_SX}>{gErr.pieces}</FormHelperText>}
                                 </div>
-                              </div>
-                              <div className="flex flex-col gap-1 w-full sm:w-[180px]">
-                                <label className="font-body booking-text text-xs whitespace-nowrap">Gross weight per pallet</label>
-                                <div className="relative inline-flex">
-                                  <TextField fullWidth value={g.grossWeightPerPallet}
-                                    onChange={(e) => handleUpdateGroup(section.dropoffIndex, g.id, { grossWeightPerPallet: e.target.value })}
-                                    placeholder="0" variant="outlined"
-                                    sx={{
-                                      ...fieldSx(INPUT_BG_CARD, BORDER_CARD),
-                                      '& .MuiInputBase-input': {
-                                        padding: '0 36px 0 12px', height: 36, boxSizing: 'border-box',
-                                        '&::placeholder': { color: 'rgba(255,255,255,0.2)', opacity: 1 },
-                                      },
-                                    }} />
-                                  <div className="absolute right-0 top-0 bottom-0 flex flex-col border-l border-[#333333]">
-                                    <button onClick={() => handleUpdateGroup(section.dropoffIndex, g.id, { grossWeightPerPallet: String((Number(g.grossWeightPerPallet) || 0) + 1) })}
-                                      className="flex-1 px-1.5 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/5 rounded-tr-lg transition-colors cursor-pointer text-[9px] leading-none">▲</button>
-                                    <button onClick={() => handleUpdateGroup(section.dropoffIndex, g.id, { grossWeightPerPallet: String(Math.max(0, (Number(g.grossWeightPerPallet) || 0) - 1)) })}
-                                      className="flex-1 px-1.5 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/5 rounded-br-lg border-t border-[#333333] transition-colors cursor-pointer text-[9px] leading-none">▼</button>
+
+                                <div className="flex flex-col gap-1 min-w-0">
+                                  <label className="font-body booking-text text-xs whitespace-nowrap">
+                                    Dimensions <span className="text-white/20">(cm)</span><Req />
+                                  </label>
+                                  <div className="flex gap-1.5">
+                                    {(['looseLength', 'looseWidth', 'looseHeight'] as const).map((dim) => (
+                                      <div key={dim} className="flex flex-col gap-0.5 flex-1 min-w-0">
+                                        <TextField value={g[dim]}
+                                          onChange={(e) => handleUpdateGroup(section.dropoffIndex, g.id, { [dim]: e.target.value })}
+                                          placeholder={dim === 'looseLength' ? 'L' : dim === 'looseWidth' ? 'W' : 'H'}
+                                          variant="outlined" error={!!gErr[dim]}
+                                          sx={{ ...fieldSx(INPUT_BG_CARD, BORDER_CARD, !!gErr[dim]), width: '100%' }} />
+                                        {gErr[dim] && <FormHelperText sx={HELPER_SX}>{gErr[dim]}</FormHelperText>}
+                                      </div>
+                                    ))}
                                   </div>
                                 </div>
-                              </div>
-                              <div className="flex flex-col gap-1 w-full sm:w-[180px]">
-                                <label className="font-body booking-text text-xs whitespace-nowrap">Net weight per pallet</label>
-                                <div className="relative inline-flex">
-                                  <TextField fullWidth value={g.netWeightPerPallet}
-                                    onChange={(e) => handleUpdateGroup(section.dropoffIndex, g.id, { netWeightPerPallet: e.target.value })}
-                                    placeholder="0" variant="outlined"
-                                    sx={{
-                                      ...fieldSx(INPUT_BG_CARD, BORDER_CARD),
-                                      '& .MuiInputBase-input': {
-                                        padding: '0 36px 0 12px', height: 36, boxSizing: 'border-box',
-                                        '&::placeholder': { color: 'rgba(255,255,255,0.2)', opacity: 1 },
-                                      },
-                                    }} />
-                                  <div className="absolute right-0 top-0 bottom-0 flex flex-col border-l border-[#333333]">
-                                    <button onClick={() => handleUpdateGroup(section.dropoffIndex, g.id, { netWeightPerPallet: String((Number(g.netWeightPerPallet) || 0) + 1) })}
-                                      className="flex-1 px-1.5 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/5 rounded-tr-lg transition-colors cursor-pointer text-[9px] leading-none">▲</button>
-                                    <button onClick={() => handleUpdateGroup(section.dropoffIndex, g.id, { netWeightPerPallet: String(Math.max(0, (Number(g.netWeightPerPallet) || 0) - 1)) })}
-                                      className="flex-1 px-1.5 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/5 rounded-br-lg border-t border-[#333333] transition-colors cursor-pointer text-[9px] leading-none">▼</button>
+
+                                <div className="flex flex-col gap-1 col-span-2 lg:col-span-1 lg:shrink-0">
+                                  <label className="font-body booking-text text-xs whitespace-nowrap">Weight<Req /></label>
+                                  <div className="flex gap-1.5">
+                                    <div className="flex flex-col gap-0.5">
+                                      <TextField value={g.weight}
+                                        onChange={(e) => handleUpdateGroup(section.dropoffIndex, g.id, { weight: e.target.value })}
+                                        placeholder="0" variant="outlined" error={!!gErr.weight}
+                                        sx={{ ...fieldSx(INPUT_BG_CARD, BORDER_CARD, !!gErr.weight), width: 64 }} />
+                                      {gErr.weight && <FormHelperText sx={HELPER_SX}>{gErr.weight}</FormHelperText>}
+                                    </div>
+                                    <Select value={g.weightUnit}
+                                      onChange={(e: SelectChangeEvent) =>
+                                        handleUpdateGroup(section.dropoffIndex, g.id, { weightUnit: e.target.value as 'kg' | 'lbs' })}
+                                      sx={{ ...selectSx(INPUT_BG_CARD, BORDER_CARD), width: 64 }} MenuProps={MENU_PROPS}>
+                                      <MenuItem value="kg">kg</MenuItem>
+                                      <MenuItem value="lbs">lbs</MenuItem>
+                                    </Select>
+                                    <Select value={g.perItem}
+                                      onChange={(e: SelectChangeEvent) =>
+                                        handleUpdateGroup(section.dropoffIndex, g.id, { perItem: e.target.value as 'Per Item' | 'Total' })}
+                                      sx={{ ...selectSx(INPUT_BG_CARD, BORDER_CARD), flex: 1 }} MenuProps={MENU_PROPS}>
+                                      <MenuItem value="Per Item">Per Item</MenuItem>
+                                      <MenuItem value="Total">Total</MenuItem>
+                                    </Select>
                                   </div>
                                 </div>
-                              </div>
-                            </div>
-                          )}
 
-                          <div className="flex items-center mt-3">
-                            <div className="flex items-center gap-4">
-                              {mode === 'loose' ? (
-                                <div className="flex items-center gap-4 lg:hidden">
+                                <div className="hidden lg:flex flex-row items-end gap-4 pb-0.5 ml-2 shrink-0">
                                   <CheckRow checked={g.nonTiltable}
                                     onChange={(v) => handleUpdateGroup(section.dropoffIndex, g.id, { nonTiltable: v })}
                                     label="Non-tiltable" />
@@ -572,25 +601,135 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
                                     onChange={(v) => handleUpdateGroup(section.dropoffIndex, g.id, { nonStackable: v })}
                                     label="Non-stackable" />
                                 </div>
-                              ) : (
-                                <>
-                                  <CheckRow checked={g.stackable}
-                                    onChange={(v) => handleUpdateGroup(section.dropoffIndex, g.id, { stackable: v })}
-                                    label="Stackable" />
-                                  <CheckRow checked={g.oversize}
-                                    onChange={(v) => handleUpdateGroup(section.dropoffIndex, g.id, { oversize: v })}
-                                    label="Oversize" />
-                                  {g.oversize && (
-                                    <span className="font-body booking-text text-xs text-[var(--color-cyan)]">
-                                      Oversize may incur extra charges
-                                    </span>
-                                  )}
-                                </>
-                              )}
+                              </div>
+                            )}
+
+                            {mode === 'palletized' && (
+                              <div className="flex flex-wrap items-start gap-2">
+                                <div className="flex flex-col gap-1 w-full sm:w-[140px]">
+                                  <label className="font-body booking-text text-xs whitespace-nowrap">No. of Pallets<Req /></label>
+                                  <TextField fullWidth value={g.numPallets}
+                                    onChange={(e) => handleUpdateGroup(section.dropoffIndex, g.id, { numPallets: e.target.value })}
+                                    placeholder="0" variant="outlined" error={!!gErr.numPallets}
+                                    sx={fieldSx(INPUT_BG_CARD, BORDER_CARD, !!gErr.numPallets)} />
+                                  {gErr.numPallets && <FormHelperText sx={HELPER_SX}>{gErr.numPallets}</FormHelperText>}
+                                </div>
+
+                                <div className="flex flex-col gap-1 w-full sm:w-[180px]">
+                                  <label className="font-body booking-text text-xs whitespace-nowrap">Pallet Type</label>
+                                  <Select value={g.palletType}
+                                    onChange={(e: SelectChangeEvent) => {
+                                      const type = e.target.value as ItemGroup['palletType']
+                                      handleUpdateGroup(section.dropoffIndex, g.id, { palletType: type, ...PALLET_DIMENSIONS[type] })
+                                    }}
+                                    sx={{ ...selectSx(INPUT_BG_CARD, BORDER_CARD), width: '100%' }} MenuProps={MENU_PROPS}>
+                                    <MenuItem value="Standard">Standard (120×100)</MenuItem>
+                                    <MenuItem value="Euro">Euro (120×80)</MenuItem>
+                                    <MenuItem value="Half">Half (60×80)</MenuItem>
+                                    <MenuItem value="Custom">Custom</MenuItem>
+                                  </Select>
+                                </div>
+
+                                <div className="flex flex-col gap-1 w-full min-w-[220px] flex-1">
+                                  <label className="font-body booking-text text-xs whitespace-nowrap">
+                                    Dimensions <span className="text-white/20">(cm)</span><Req />
+                                  </label>
+                                  <div className="flex gap-1.5 items-start">
+                                    {(['palletLength', 'palletWidth', 'palletHeight'] as const).map((dim) => (
+                                      <div key={dim} className="flex flex-col gap-0.5 flex-1 min-w-0">
+                                        <TextField value={g[dim]}
+                                          onChange={(e) => handleUpdateGroup(section.dropoffIndex, g.id, { [dim]: e.target.value })}
+                                          placeholder={dim === 'palletLength' ? 'L' : dim === 'palletWidth' ? 'W' : 'H'}
+                                          variant="outlined" error={!!gErr[dim as keyof GroupErrors]}
+                                          sx={{ ...fieldSx(INPUT_BG_CARD, BORDER_CARD, !!gErr[dim as keyof GroupErrors]), width: '100%' }} />
+                                        {gErr[dim as keyof GroupErrors] && (
+                                          <FormHelperText sx={HELPER_SX}>{gErr[dim as keyof GroupErrors]}</FormHelperText>
+                                        )}
+                                      </div>
+                                    ))}
+                                    <Select value={g.palletWeightUnit}
+                                      onChange={(e: SelectChangeEvent) =>
+                                        handleUpdateGroup(section.dropoffIndex, g.id, { palletWeightUnit: e.target.value as 'kg' | 'lbs' })}
+                                      sx={{ ...selectSx(INPUT_BG_CARD, BORDER_CARD), width: 64, flexShrink: 0 }} MenuProps={MENU_PROPS}>
+                                      <MenuItem value="kg">kg</MenuItem>
+                                      <MenuItem value="lbs">lbs</MenuItem>
+                                    </Select>
+                                  </div>
+                                </div>
+
+                                <div className="flex flex-col gap-1 w-full sm:w-[180px]">
+                                  <label className="font-body booking-text text-xs whitespace-nowrap">Gross weight / pallet<Req /></label>
+                                  <div className="relative inline-flex">
+                                    <TextField fullWidth value={g.grossWeightPerPallet}
+                                      onChange={(e) => handleUpdateGroup(section.dropoffIndex, g.id, { grossWeightPerPallet: e.target.value })}
+                                      placeholder="0" variant="outlined" error={!!gErr.grossWeightPerPallet}
+                                      sx={{
+                                        ...fieldSx(INPUT_BG_CARD, BORDER_CARD, !!gErr.grossWeightPerPallet),
+                                        '& .MuiInputBase-input': { padding: '0 36px 0 12px', height: 36, boxSizing: 'border-box', '&::placeholder': { color: 'rgba(255,255,255,0.2)', opacity: 1 } },
+                                      }} />
+                                    <div className="absolute right-0 top-0 bottom-0 flex flex-col border-l border-[#333333]">
+                                      <button onClick={() => handleUpdateGroup(section.dropoffIndex, g.id, { grossWeightPerPallet: String((Number(g.grossWeightPerPallet) || 0) + 1) })}
+                                        className="flex-1 px-1.5 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/5 rounded-tr-lg transition-colors cursor-pointer text-[9px] leading-none">▲</button>
+                                      <button onClick={() => handleUpdateGroup(section.dropoffIndex, g.id, { grossWeightPerPallet: String(Math.max(0, (Number(g.grossWeightPerPallet) || 0) - 1)) })}
+                                        className="flex-1 px-1.5 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/5 rounded-br-lg border-t border-[#333333] transition-colors cursor-pointer text-[9px] leading-none">▼</button>
+                                    </div>
+                                  </div>
+                                  {gErr.grossWeightPerPallet && <FormHelperText sx={HELPER_SX}>{gErr.grossWeightPerPallet}</FormHelperText>}
+                                </div>
+
+                                <div className="flex flex-col gap-1 w-full sm:w-[180px]">
+                                  <label className="font-body booking-text text-xs whitespace-nowrap">Net weight / pallet<Req /></label>
+                                  <div className="relative inline-flex">
+                                    <TextField fullWidth value={g.netWeightPerPallet}
+                                      onChange={(e) => handleUpdateGroup(section.dropoffIndex, g.id, { netWeightPerPallet: e.target.value })}
+                                      placeholder="0" variant="outlined" error={!!gErr.netWeightPerPallet}
+                                      sx={{
+                                        ...fieldSx(INPUT_BG_CARD, BORDER_CARD, !!gErr.netWeightPerPallet),
+                                        '& .MuiInputBase-input': { padding: '0 36px 0 12px', height: 36, boxSizing: 'border-box', '&::placeholder': { color: 'rgba(255,255,255,0.2)', opacity: 1 } },
+                                      }} />
+                                    <div className="absolute right-0 top-0 bottom-0 flex flex-col border-l border-[#333333]">
+                                      <button onClick={() => handleUpdateGroup(section.dropoffIndex, g.id, { netWeightPerPallet: String((Number(g.netWeightPerPallet) || 0) + 1) })}
+                                        className="flex-1 px-1.5 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/5 rounded-tr-lg transition-colors cursor-pointer text-[9px] leading-none">▲</button>
+                                      <button onClick={() => handleUpdateGroup(section.dropoffIndex, g.id, { netWeightPerPallet: String(Math.max(0, (Number(g.netWeightPerPallet) || 0) - 1)) })}
+                                        className="flex-1 px-1.5 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/5 rounded-br-lg border-t border-[#333333] transition-colors cursor-pointer text-[9px] leading-none">▼</button>
+                                    </div>
+                                  </div>
+                                  {gErr.netWeightPerPallet && <FormHelperText sx={HELPER_SX}>{gErr.netWeightPerPallet}</FormHelperText>}
+                                </div>
+                              </div>
+                            )}
+
+                            <div className="flex items-center mt-3">
+                              <div className="flex items-center gap-4">
+                                {mode === 'loose' ? (
+                                  <div className="flex items-center gap-4 lg:hidden">
+                                    <CheckRow checked={g.nonTiltable}
+                                      onChange={(v) => handleUpdateGroup(section.dropoffIndex, g.id, { nonTiltable: v })}
+                                      label="Non-tiltable" />
+                                    <CheckRow checked={g.nonStackable}
+                                      onChange={(v) => handleUpdateGroup(section.dropoffIndex, g.id, { nonStackable: v })}
+                                      label="Non-stackable" />
+                                  </div>
+                                ) : (
+                                  <>
+                                    <CheckRow checked={g.stackable}
+                                      onChange={(v) => handleUpdateGroup(section.dropoffIndex, g.id, { stackable: v })}
+                                      label="Stackable" />
+                                    <CheckRow checked={g.oversize}
+                                      onChange={(v) => handleUpdateGroup(section.dropoffIndex, g.id, { oversize: v })}
+                                      label="Oversize" />
+                                    {g.oversize && (
+                                      <span className="font-body booking-text text-xs text-[var(--color-cyan)]">
+                                        Oversize may incur extra charges
+                                      </span>
+                                    )}
+                                  </>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        </motion.div>
-                      ))}
+                          </motion.div>
+                        )
+                      })}
                     </AnimatePresence>
 
                     <motion.button onClick={() => handleAddGroup(section.dropoffIndex)}
@@ -664,37 +803,41 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
       <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.5 }} className="flex justify-between gap-3 pt-2"
       >
-        <WizBtn onClick={onBack} variant="back"> BACK</WizBtn>
-        <WizBtn onClick={() => isValid && onNext()} variant="next" disabled={!isValid}>
-          NEXT
-        </WizBtn>
+        <WizBtn onClick={onBack} variant="back">BACK</WizBtn>
+        <WizBtn onClick={handleNext} variant="next">NEXT</WizBtn>
       </motion.div>
     </div>
   )
 }
 
-function ProductFieldsRow({ group, onUpdate }: { group: ItemGroup; onUpdate: (patch: Partial<ItemGroup>) => void }) {
+function ProductFieldsRow({ group, errors, onUpdate }: {
+  group: ItemGroup; errors: GroupErrors; onUpdate: (patch: Partial<ItemGroup>) => void
+}) {
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 items-end">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 items-start">
       <div className="flex flex-col gap-1">
-        <label className="font-body booking-text text-xs">Commodity</label>
-        <TextField fullWidth placeholder="e.g. Accessories" variant="outlined" value={group.commodity}
-          onChange={(e) => onUpdate({ commodity: e.target.value })} sx={fieldSx(INPUT_BG_CARD, BORDER_CARD)} />
+        <label className="font-body booking-text text-xs">
+          Commodity<span style={{ color: ERROR_COLOR, marginLeft: 2 }}>*</span>
+        </label>
+        <TextField fullWidth placeholder="e.g. Accessories" variant="outlined"
+          value={group.commodity} error={!!errors.commodity}
+          onChange={(e) => onUpdate({ commodity: e.target.value })}
+          sx={fieldSx(INPUT_BG_CARD, BORDER_CARD, !!errors.commodity)} />
+        {errors.commodity && <FormHelperText sx={HELPER_SX}>{errors.commodity}</FormHelperText>}
       </div>
       <div className="flex flex-col gap-1">
         <label className="font-body booking-text text-xs">Product</label>
-        <TextField fullWidth placeholder="e.g. General Cargo" variant="outlined" value={group.product}
-          onChange={(e) => onUpdate({ product: e.target.value })} sx={fieldSx(INPUT_BG_CARD, BORDER_CARD)} />
+        <TextField fullWidth placeholder="e.g. General Cargo" variant="outlined"
+          value={group.product} onChange={(e) => onUpdate({ product: e.target.value })}
+          sx={fieldSx(INPUT_BG_CARD, BORDER_CARD)} />
       </div>
       <div className="flex flex-col gap-1">
         <label className="font-body booking-text text-xs">SHC</label>
         <Select value={group.shc} onChange={(e: SelectChangeEvent) => onUpdate({ shc: e.target.value })}
           displayEmpty sx={{ ...selectSx(INPUT_BG_CARD, BORDER_CARD), width: '100%' }} MenuProps={MENU_PROPS}>
           <MenuItem value=""><em style={{ opacity: 0.4, fontStyle: 'normal' }}>Select SHC</em></MenuItem>
-          <MenuItem value="GEN">GEN</MenuItem>
-          <MenuItem value="PER">PER</MenuItem>
-          <MenuItem value="EAT">EAT</MenuItem>
-          <MenuItem value="HEA">HEA</MenuItem>
+          <MenuItem value="GEN">GEN</MenuItem><MenuItem value="PER">PER</MenuItem>
+          <MenuItem value="EAT">EAT</MenuItem><MenuItem value="HEA">HEA</MenuItem>
         </Select>
       </div>
       <div className="flex flex-col gap-1">

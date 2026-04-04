@@ -10,7 +10,7 @@ export interface ResolvedPlace {
 
 let scriptPromise: Promise<void> | null = null
 
-function loadGoogleMapsScript(): Promise<void> {
+export function loadGoogleMapsScript(): Promise<void> {
   if (scriptPromise) return scriptPromise
   if (typeof window === 'undefined') return Promise.resolve()
   if (window.google?.maps?.places) return Promise.resolve()
@@ -51,11 +51,24 @@ export interface PlaceSuggestion {
 interface UsePlacesAutocompleteOptions {
   componentRestrictions?: { country: string | string[] }
   debounceMs?: number
+  /**
+   * Filter the types of places returned.
+   *
+   * Form inputs (PlacesInput) — narrow, address-only:
+   *   ['geocode', 'street_address', 'premise']  ← default
+   *
+   * Map picker (MapLocationPicker) — broad, addresses + POIs + landmarks:
+   *   []  ← pass empty array to remove filter entirely
+   *
+   * See: https://developers.google.com/maps/documentation/places/web-service/place-types
+   */
+  includedPrimaryTypes?: string[]
 }
 
 export function usePlacesAutocomplete({
   componentRestrictions = { country: 'ph' },
   debounceMs = 300,
+  includedPrimaryTypes = ['geocode', 'street_address', 'premise'],
 }: UsePlacesAutocompleteOptions = {}) {
   const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([])
   const [loading, setLoading] = useState(false)
@@ -64,7 +77,7 @@ export function usePlacesAutocomplete({
 
   const fetchSuggestions = useCallback(
     async (input: string) => {
-      if (!input) {
+      if (!input || input.length < 3) {
         setSuggestions([])
         return
       }
@@ -77,13 +90,20 @@ export function usePlacesAutocomplete({
 
       setLoading(true)
       try {
-        const { suggestions: raw } = await google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions({
+        const requestParams: google.maps.places.AutocompleteRequest = {
           input,
           sessionToken: sessionTokenRef.current,
           includedRegionCodes: Array.isArray(componentRestrictions.country)
             ? componentRestrictions.country
             : [componentRestrictions.country],
-        })
+        }
+
+        if (includedPrimaryTypes.length > 0) {
+          requestParams.includedPrimaryTypes = includedPrimaryTypes
+        }
+
+        const { suggestions: raw } =
+          await google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions(requestParams)
 
         setSuggestions(
           raw.map(s => ({
@@ -98,7 +118,7 @@ export function usePlacesAutocomplete({
         setLoading(false)
       }
     },
-    [componentRestrictions]
+    [componentRestrictions, includedPrimaryTypes]
   )
 
   const onInputChange = useCallback(

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { CheckCircle2, Truck } from 'lucide-react'
+import { Truck } from 'lucide-react'
 import Image from 'next/image'
 import { useAppDispatch, useAppSelector } from '@/app/lib/store/hooks'
 import { resetBooking } from '@/app/lib/store/bookingSlice'
@@ -10,6 +10,7 @@ import type { ServiceType, DropoffSection, CargoMode } from '@/app/lib/store/boo
 import { createBooking } from '@/app/lib/api/client/booking.api'
 import { getMe } from '@/app/lib/api/auth.api'
 import './BookingDetails.css'
+import SuccessView from './SuccessView'
 
 interface Props {
   selectedService: ServiceType
@@ -35,15 +36,20 @@ function calcSummary(sections: DropoffSection[], mode: CargoMode) {
     for (const g of section.groups) {
       if (mode === 'palletized') {
         const pallets = Number(g.numPallets) || 0
+        if (pallets <= 0) continue
         grossWeight += pallets * (Number(g.grossWeightPerPallet) || 0)
         if (g.stackable) stackableRequired = true
       } else {
         const pieces = Number(g.pieces)
-        const l = Number(g.looseLength)
-        const w = Number(g.looseWidth)
-        const h = Number(g.looseHeight)
-        const wt = Number(g.weight)
-        if (!pieces || !l || !w || !h || wt < 0) continue
+        const l      = Number(g.looseLength)
+        const w      = Number(g.looseWidth)
+        const h      = Number(g.looseHeight)
+        const wt     = Number(g.weight)
+        if (!Number.isFinite(pieces) || pieces <= 0) continue
+        if (!Number.isFinite(l) || l <= 0 ||
+            !Number.isFinite(w) || w <= 0 ||
+            !Number.isFinite(h) || h <= 0) continue
+        if (!Number.isFinite(wt) || wt <= 0) continue
         const weightKG = g.weightUnit === 'lbs' ? wt * 0.453592 : wt
         grossWeight += g.perItem === 'Per Item' ? pieces * weightKG : weightKG
         volume += pieces * (l * w * h) / 1_000_000
@@ -481,59 +487,3 @@ function Spinner() {
   )
 }
 
-function SuccessView({
-  bookingId,
-  onNewBooking,
-}: {
-  bookingId: string | null
-  onNewBooking: () => void
-}) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.92 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.5, type: 'spring' }}
-      className="flex flex-col items-center justify-center flex-1 text-center gap-6 py-16 min-h-[400px]"
-    >
-      <motion.div
-        initial={{ scale: 0, rotate: -200 }}
-        animate={{ scale: 1, rotate: 0 }}
-        transition={{ type: 'spring', stiffness: 190, damping: 14, delay: 0.1 }}
-      >
-        <CheckCircle2 size={84} className="text-[var(--color-cyan)]" strokeWidth={1.2} />
-      </motion.div>
-
-      <motion.div
-        initial={{ opacity: 0, y: 18 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.35 }}
-      >
-        <h2 className="font-body booking-text text-white text-3xl lg:text-5xl font-bold mb-3 uppercase tracking-widest">
-          Booking Confirmed!
-        </h2>
-        <p className="font-body booking-text text-[var(--color-muted)] text-base lg:text-xl">
-          Your shipment has been scheduled successfully.
-        </p>
-        {bookingId && (
-          <p className="font-body booking-text text-[var(--color-cyan)] text-sm lg:text-lg mt-2">
-            Booking ID: #{bookingId.slice(0, 8).toUpperCase()}
-          </p>
-        )}
-      </motion.div>
-
-      <motion.button
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.55 }}
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        onClick={onNewBooking}
-        className="mt-2 px-8 py-3 rounded-xl font-body booking-text font-bold uppercase tracking-widest
-                   text-base lg:text-lg text-[var(--color-bg)] bg-[var(--color-cyan)]
-                   cursor-pointer hover:opacity-90 transition-opacity"
-      >
-        New Booking
-      </motion.button>
-    </motion.div>
-  )
-}

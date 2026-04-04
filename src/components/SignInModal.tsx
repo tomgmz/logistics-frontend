@@ -188,17 +188,21 @@ function OtpStep({
   onSuccess: (user: AuthUser) => void
   onBack: () => void
 }) {
+  const resendExpiresAt           = useRef<number>(Date.now() + RESEND_SECS * 1000)
   const [otp,       setOtp]       = useState<string[]>(Array(OTP_LENGTH).fill(''))
   const [loading,   setLoading]   = useState(false)
   const [error,     setError]     = useState('')
   const [resendSec, setResendSec] = useState(RESEND_SECS)
   const [resending, setResending] = useState(false)
   const inputRefs = useRef<(HTMLInputElement | null)[]>([])
-
+  
   useEffect(() => {
     if (resendSec <= 0) return
-    const t = setTimeout(() => setResendSec(s => s - 1), 1000)
-    return () => clearTimeout(t)
+    const interval = setInterval(() => {
+      const remaining = Math.max(0, Math.floor((resendExpiresAt.current - Date.now()) / 1000))
+      setResendSec(remaining)
+    }, 500) // poll every 500ms so it catches up quickly when tab becomes active
+    return () => clearInterval(interval)
   }, [resendSec])
 
   const focusInput = (idx: number) => inputRefs.current[idx]?.focus()
@@ -252,6 +256,7 @@ function OtpStep({
     setResending(true); setError('')
     try {
       await requestOtp(email)
+      resendExpiresAt.current = Date.now() + RESEND_SECS * 1000
       setResendSec(RESEND_SECS)
       setOtp(Array(OTP_LENGTH).fill(''))
       focusInput(0)

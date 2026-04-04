@@ -7,7 +7,7 @@ import { useMemo, useState } from 'react'
 import { useAppDispatch, useAppSelector } from '@/app/lib/store/hooks'
 import { setVehicle } from '@/app/lib/store/bookingSlice'
 import type { CargoMode, DropoffSection } from '@/app/lib/store/bookingSlice'
-import { useTrucks } from '../../hooks/useTrucks'
+import { useTrucks } from '../../../lib/hooks/useTrucks'
 import './BookingDetails.css'
 import WizBtn from '../WizButton'
 
