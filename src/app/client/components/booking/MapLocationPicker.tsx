@@ -27,9 +27,9 @@ const DARK_MAP_STYLES = [
   { featureType: 'road.highway',       elementType: 'labels.text.fill', stylers: [{ color: CYAN }] },
   { featureType: 'water',              elementType: 'geometry',         stylers: [{ color: '#060612' }] },
   { featureType: 'water',              elementType: 'labels.text.fill', stylers: [{ color: '#3a3a5c' }] },
-  { featureType: 'poi',                elementType: 'labels',           stylers: [{ visibility: 'off' }] },
+  { featureType: 'poi',                elementType: 'labels',           stylers: [{ visibility: 'on' }] },
   { featureType: 'poi.park',           elementType: 'geometry',         stylers: [{ color: '#0f1a0f' }] },
-  { featureType: 'transit',            stylers: [{ visibility: 'off' }] },
+  { featureType: 'transit',            stylers: [{ visibility: 'on' }] },
   { featureType: 'administrative',     elementType: 'geometry',         stylers: [{ color: '#2a2a4a' }] },
   { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#9ca3af' }] },
 ]
