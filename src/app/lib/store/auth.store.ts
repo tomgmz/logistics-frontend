@@ -35,7 +35,7 @@ export const useAuthStore = create<AuthStore>()(
                 last_name:  state.user.last_name,
                 role:       state.user.role,
                 status:     state.user.status,
-                clients:    state.user.clients ?? null,  // ← persist clients
+                clients:    state.user.clients ?? null,
               },
             }
           : { user: null },

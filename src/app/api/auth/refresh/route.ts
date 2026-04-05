@@ -13,6 +13,8 @@ export async function POST(req: NextRequest) {
       },
     })
 
+    console.log('[/api/auth/refresh] success')
+
     const res = NextResponse.json(data)
     res.cookies.set('access_token', data.data.accessToken, {
       httpOnly: true,
