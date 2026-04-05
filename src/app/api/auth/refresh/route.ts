@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
   console.log('[refresh] cookie:', req.headers.get('cookie'))
 
   try {
-    const { data } = await axios.post(`${API_URL}/auth/refresh`, null, {
+    const { data } = await axios.post(`${API_URL}/auth/refresh`, {}, {
       headers: {
         'Content-Type': 'application/json',
         cookie:         req.headers.get('cookie') ?? '',
