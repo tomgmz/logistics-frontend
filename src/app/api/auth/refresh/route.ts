@@ -1,45 +1,24 @@
 import axios from 'axios'
 import { NextRequest, NextResponse } from 'next/server'
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL!
-const isProd  = process.env.NODE_ENV === 'production'
+import { API_URL, getForwardHeaders, handleError, cookieOptions } from '../_proxy'
 
 export async function POST(req: NextRequest) {
-  console.log('[refresh] API_URL:', API_URL)
-  console.log('[refresh] cookie:', req.headers.get('cookie'))
-
   try {
     const { data } = await axios.post(`${API_URL}/auth/refresh`, {}, {
-      headers: {
-        'Content-Type': 'application/json',
-        cookie:         req.headers.get('cookie') ?? '',
-      },
+      headers: getForwardHeaders(req),
     })
-
-    console.log('[refresh] success:', data)
 
     const res = NextResponse.json(data)
-    res.cookies.set('access_token', data.data.accessToken, {
-      httpOnly: true,
-      secure:   isProd,
-      sameSite: 'lax',
-      path:     '/',
-      maxAge:   7 * 24 * 60 * 60,
-    })
+    res.cookies.set('access_token', data.data.accessToken, cookieOptions)
     return res
 
-  } catch (error: unknown) {
+  } catch (error) {
     if (axios.isAxiosError(error) && error.response) {
-      console.log('[refresh] axios error:', error.response.status, JSON.stringify(error.response.data))
       const res = NextResponse.json(error.response.data, { status: error.response.status })
       res.cookies.delete('access_token')
       res.cookies.delete('refresh_token')
       return res
     }
-    console.log('[refresh] unknown error:', error)
-    return NextResponse.json(
-      { status: 'error', message: 'Internal server error' },
-      { status: 500 }
-    )
+    return handleError(error)
   }
 }
