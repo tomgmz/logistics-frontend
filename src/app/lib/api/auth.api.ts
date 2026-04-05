@@ -6,10 +6,8 @@ const api: AxiosInstance = axios.create({
   withCredentials: true,
 })
 
-import { getApiUrl } from './api-url'
-
 const authApi: AxiosInstance = axios.create({
-  baseURL: getApiUrl(),
+  baseURL: '/api/proxy',
   headers: { 'Content-Type': 'application/json' },
   withCredentials: true,
 })
