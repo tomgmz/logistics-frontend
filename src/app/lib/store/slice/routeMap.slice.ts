@@ -1,9 +1,8 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit'
 import authApi from '@/app/lib/api/auth.api'
-import { getApiUrl }        from '@/app/lib/api/api-url'
 import type { OptimizedStop, OptimizeRouteResponse } from '@/app/types/maps/routemap.types'
 import type { BookingDetail } from '@/app/types/maps/routemap.types'
-import { useAuthStore } from '../auth.store'
+import type { AuthUser } from '@/app/lib/api/auth.api'
 
 export interface BookingDestination {
   address: string
@@ -22,20 +21,21 @@ export interface BookingWithRelations {
 
 export const fetchBookings = createAsyncThunk(
   'routeMap/fetchBookings',
-  async (_: void, { rejectWithValue }) => {
-    try {
-      const user = useAuthStore.getState().user
-      if (!user) return rejectWithValue('Not authenticated')
+  async (user: AuthUser | null, { rejectWithValue }) => {
+    if (!user) return rejectWithValue('Not authenticated')
 
+    try {
       if (user.role === 'client') {
         const clientId = user.clients?.client_id
-        if (!clientId) return rejectWithValue('Client ID not found. Please log out and log in again.')
+        if (!clientId) {
+          return rejectWithValue('Client ID not found. Please log out and log in again.')
+        }
 
         const res = await authApi.get(`/booking/client/${clientId}`)
         return (res.data?.data ?? []) as BookingWithRelations[]
       }
 
-      const res = await authApi.get('/booking') // ✅
+      const res = await authApi.get('/booking')
       return (res.data?.data ?? []) as BookingWithRelations[]
     } catch (err: unknown) {
       return rejectWithValue(err instanceof Error ? err.message : 'Failed to load bookings')

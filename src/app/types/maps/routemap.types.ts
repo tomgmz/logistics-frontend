@@ -3,10 +3,19 @@ export type BookingStatus =
   | 'PENDING'
   | 'ASSIGNED'
   | 'IN_TRANSIT'
-  | 'IN TRANSIT'
+  | 'ARRIVED'
   | 'COMPLETED'
   | 'CANCELLED'
-  | string
+
+export function asBookingStatus(raw: string): BookingStatus | 'UNKNOWN' {
+  const normalized = raw.replace(/\s+/g, '_').toUpperCase()
+  const known: BookingStatus[] = [
+    'BOOKED', 'PENDING', 'ASSIGNED', 'IN_TRANSIT', 'ARRIVED', 'COMPLETED', 'CANCELLED',
+  ]
+  return (known as string[]).includes(normalized)
+    ? (normalized as BookingStatus)
+    : 'UNKNOWN'
+}
 
 export interface BookingDetail {
   booking_id: string
@@ -72,7 +81,6 @@ export interface OptimizedStop {
   optimized_sequence_order: number
   status: 'pending' | 'delivered' | 'failed'
   notes?: string | null
-  
   estimated_arrival?: string
 }
 

@@ -3,9 +3,7 @@ import { getApiUrl } from './api-url'
 
 const authApi: AxiosInstance = axios.create({
   baseURL: getApiUrl(),
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  headers: { 'Content-Type': 'application/json' },
   withCredentials: true,
 })
 
@@ -19,13 +17,11 @@ let csrfPromise: Promise<void> | null = null
 
 export async function initCsrf(): Promise<void> {
   if (getCsrfToken()) return
-
   if (csrfPromise) return csrfPromise
 
   csrfPromise = authApi
     .get('/auth/csrf')
-    .then(() => {
-    })
+    .then(() => { /* cookie set by Set-Cookie header */ })
     .catch((err) => {
       csrfPromise = null
       throw err
@@ -34,15 +30,12 @@ export async function initCsrf(): Promise<void> {
   return csrfPromise
 }
 
-
 authApi.interceptors.request.use(
   (config) => {
     const method = config.method?.toLowerCase() ?? ''
     if (['post', 'put', 'patch', 'delete'].includes(method)) {
       const token = getCsrfToken()
-      if (token) {
-        config.headers['X-CSRF-Token'] = token
-      }
+      if (token) config.headers['X-CSRF-Token'] = token
     }
     return config
   },
@@ -144,10 +137,6 @@ export async function verifyOtp(
     device_info: device_info ?? getDeviceInfo(),
   })
   return data.data as AuthResponse
-}
-
-export async function refreshAccessToken(): Promise<void> {
-  await authApi.post('/auth/refresh')
 }
 
 export async function logout(): Promise<void> {

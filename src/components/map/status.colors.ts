@@ -1,9 +1,17 @@
-export function statusColor(s: string) {
-  const u = (s ?? '').toUpperCase()
-  if (u.includes('TRANSIT')) return 'var(--color-cyan)'
-  if (u === 'COMPLETED')     return 'var(--color-green)'
-  if (u === 'CANCELLED')     return '#f62626'
-  if (u === 'ASSIGNED')      return '#f69f26'
-  if (u === 'ARRIVED')       return 'var(--color-green)'
-  return '#9f9c9c'
+import { BookingStatus } from '@/app/types/maps/routemap.types'
+
+export function statusColor(s: BookingStatus | 'UNKNOWN' | string): string {
+  const u = (s ?? '').replace(/\s+/g, '_').toUpperCase()
+
+  switch (u as BookingStatus | 'UNKNOWN') {
+    case 'IN_TRANSIT':  return 'var(--color-cyan)'
+    case 'COMPLETED':   return 'var(--color-green)'
+    case 'ARRIVED':     return 'var(--color-green)'
+    case 'ASSIGNED':    return '#f69f26'
+    case 'CANCELLED':   return '#f62626'
+    case 'BOOKED':
+    case 'PENDING':
+    case 'UNKNOWN':
+    default:            return '#9f9c9c'
+  }
 }

@@ -1,10 +1,9 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { useMap, useMapsLibrary } from '@vis.gl/react-google-maps'
+import { useMap } from '@vis.gl/react-google-maps'
 import { OptimizedStop } from '@/app/types/maps/routemap.types'
-
-const GOOGLE_MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!
+import { computeDirections } from '@/app/lib/api/directions.api'
 
 interface DirectionsRendererProps {
   origin: { latitude: number; longitude: number }
@@ -35,68 +34,70 @@ export function decodePolyline(encoded: string): google.maps.LatLngLiteral[] {
 }
 
 export function DirectionsRenderer({ origin, stops }: DirectionsRendererProps) {
-  const map = useMap()
-  const routesLibrary = useMapsLibrary('routes')
+  const map         = useMap()
   const polylineRef = useRef<google.maps.Polyline | null>(null)
+  const fetchingRef = useRef(false)
+
+  const originLat = origin.latitude
+  const originLng = origin.longitude
+  const stopsKey  = stops.map((s) => s.destination_id).join(',')
 
   useEffect(() => {
-    if (!map || !routesLibrary || stops.length === 0) return
+    if (!map || stops.length === 0) return
+    if (fetchingRef.current) return
 
-    const controller = new AbortController()
+    let mounted = true
+    fetchingRef.current = true
 
-    fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
-      method: 'POST',
-      signal: controller.signal,
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Goog-Api-Key': GOOGLE_MAPS_KEY,
-        'X-Goog-FieldMask': 'routes.polyline.encodedPolyline',
+    computeDirections({
+      origin: {
+        location: { latLng: { latitude: originLat, longitude: originLng } },
       },
-      body: JSON.stringify({
-        origin: {
-          location: { latLng: { latitude: origin.latitude, longitude: origin.longitude } },
-        },
-        destination: {
-          location: {
-            latLng: {
-              latitude: stops[stops.length - 1].latitude,
-              longitude: stops[stops.length - 1].longitude,
-            },
+      destination: {
+        location: {
+          latLng: {
+            latitude:  stops[stops.length - 1].latitude,
+            longitude: stops[stops.length - 1].longitude,
           },
         },
-        ...(stops.length > 1 && {
-          intermediates: stops.slice(0, -1).map((stop) => ({
-            location: { latLng: { latitude: stop.latitude, longitude: stop.longitude } },
-          })),
-        }),
-        travelMode: 'DRIVE',
-        routingPreference: 'TRAFFIC_AWARE',
+      },
+      ...(stops.length > 1 && {
+        intermediates: stops.slice(0, -1).map((stop) => ({
+          location: { latLng: { latitude: stop.latitude, longitude: stop.longitude } },
+        })),
       }),
+      travelMode:        'DRIVE',
+      routingPreference: 'TRAFFIC_AWARE',
     })
-      .then((res) => res.json())
       .then((data) => {
+        if (!mounted) return
+
         const encoded = data?.routes?.[0]?.polyline?.encodedPolyline
         if (!encoded) return
 
         polylineRef.current?.setMap(null)
         polylineRef.current = new google.maps.Polyline({
-          path: decodePolyline(encoded),
-          strokeColor: '#06b6d4',
-          strokeWeight: 4,
+          path:          decodePolyline(encoded),
+          strokeColor:   '#06b6d4',
+          strokeWeight:  4,
           strokeOpacity: 0.9,
           map,
         })
       })
       .catch((err) => {
-        if (err.name !== 'AbortError') console.error('Routes API error:', err)
+        console.error('[Directions] error —', err)
+      })
+      .finally(() => {
+        fetchingRef.current = false
       })
 
     return () => {
-      controller.abort()
+      mounted = false
+      fetchingRef.current = false
       polylineRef.current?.setMap(null)
       polylineRef.current = null
     }
-  }, [map, routesLibrary, origin, stops])
+  }, [map, originLat, originLng, stopsKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return null
 }

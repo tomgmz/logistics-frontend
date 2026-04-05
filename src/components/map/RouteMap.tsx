@@ -15,6 +15,7 @@ import { StatusBadge }                       from './RouteMapComponents'
 import { DetailsPanelContent }               from './DetailsPanelContent'
 import { DirectionsRenderer }                from './DirectionsRenderer'
 import { useAppDispatch, useAppSelector }    from '@/app/lib/store/hooks'
+import { useAuthStore }                      from '@/app/lib/store/auth.store'
 import {
   fetchBookings,
   fetchRouteAndDetail,
@@ -29,6 +30,11 @@ const LOGO_SRC           = 'https://www.figma.com/api/mcp/asset/656e388d-93f0-4b
 
 function fmtStatus(s: string) {
   return s.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase())
+}
+
+function addressAbbr(address: string | undefined, fallback: string): string {
+  if (!address) return fallback
+  return address.match(/\b[A-Z]{2,4}\b/)?.[0] ?? address.split(',')[0].slice(0, 3).toUpperCase()
 }
 
 function Logo({ height, width, priority }: { height: number; width: number; priority?: boolean }) {
@@ -58,8 +64,13 @@ function BookingListItem({
   const color  = statusColor(booking.status)
   const label  = fmtStatus(booking.status)
   const origin = booking.origin?.split(',')[0] ?? '—'
-  const dest   = booking.booking_destinations?.[booking.booking_destinations.length - 1]
-                   ?.address?.split(',')[0] ?? '—'
+
+  const lastDestAddress =
+    booking.booking_destinations?.[booking.booking_destinations.length - 1]?.address
+
+  const dest     = lastDestAddress?.split(',')[0] ?? '—'
+
+  const destAbbr = addressAbbr(lastDestAddress, 'DST')
 
   return (
     <motion.button
@@ -86,7 +97,7 @@ function BookingListItem({
 
       <div className="flex items-center gap-1.5 mb-2">
         <span className="text-white text-[10px] font-bold min-w-[24px]">
-          {booking.origin?.match(/\b[A-Z]{2,4}\b/)?.[0] ?? 'ORG'}
+          {addressAbbr(booking.origin, 'ORG')}
         </span>
         <div className="flex-1 relative h-3 flex items-center">
           <div className="absolute inset-0 flex items-center">
@@ -107,7 +118,7 @@ function BookingListItem({
             />
           )}
         </div>
-        <span className="text-white text-[10px] font-bold min-w-[20px] text-right">QC</span>
+        <span className="text-white text-[10px] font-bold min-w-[20px] text-right">{destAbbr}</span>
       </div>
 
       <div className="flex justify-between items-end">
@@ -195,6 +206,8 @@ function EmptyMapState() {
 export default function RouteMap({ initialBookingId }: { initialBookingId?: string }) {
   const dispatch  = useAppDispatch()
 
+  const user = useAuthStore((s) => s.user)
+
   const bookings      = useAppSelector((s) => s.routeMap.bookings)
   const listLoading   = useAppSelector((s) => s.routeMap.listLoading)
   const listError     = useAppSelector((s) => s.routeMap.listError)
@@ -227,8 +240,8 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
   const progressPercentage = totalStops > 0 ? (completedStops / totalStops) * 100 : 0
 
   const loadBookings = useCallback(() => {
-    dispatch(fetchBookings())
-  }, [dispatch])
+    dispatch(fetchBookings(user))
+  }, [dispatch, user])
 
   useEffect(() => {
     loadBookings()
@@ -461,7 +474,6 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
                       <CloseIcon sx={{ fontSize: 14, color: '#9ca3af' }} />
                     </button>
                   </div>
-
                   <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-none">
                     {detailPanel}
                   </div>
