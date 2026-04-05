@@ -5,9 +5,10 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL!
 
 async function handler(
   req: NextRequest,
-  { params }: { params: { path: string[] } }
+  { params }: { params: Promise<{ path: string[] }> }
 ) {
-  const path = params.path.join('/')
+  const { path: pathSegments } = await params
+  const path = pathSegments.join('/')
   const url  = `${API_URL}/${path}`
 
   console.log(`[proxy] ${req.method} ${path}`)
