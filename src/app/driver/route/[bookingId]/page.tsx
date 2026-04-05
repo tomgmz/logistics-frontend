@@ -6,5 +6,5 @@ interface Props {
 
 export default async function DriverRoutePage({ params }: Props) {
   const { bookingId } = await params
-  return <RouteMapWrapper bookingId={bookingId} />
+  return <RouteMapWrapper initialBookingId={bookingId} />
 }
