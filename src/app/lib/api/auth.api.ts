@@ -1,12 +1,25 @@
 import axios, { AxiosInstance, AxiosError } from 'axios'
+import { getApiUrl } from './api-url'
 
-const authApi: AxiosInstance = axios.create({
-  baseURL: '/api',
+const directApi: AxiosInstance = axios.create({
+  baseURL: getApiUrl(),
   headers: { 'Content-Type': 'application/json' },
   withCredentials: true,
 })
 
-//CSRF
+const proxyApi: AxiosInstance = axios.create({
+  baseURL: '/api/proxy',
+  headers: { 'Content-Type': 'application/json' },
+  withCredentials: true,
+})
+
+const nextApi: AxiosInstance = axios.create({
+  baseURL: '',
+  headers: { 'Content-Type': 'application/json' },
+  withCredentials: true,
+})
+
+
 function getCsrfToken(): string | null {
   if (typeof document === 'undefined') return null
   const match = document.cookie.match(/csrf_token=([^;]+)/)
@@ -19,7 +32,7 @@ export async function initCsrf(): Promise<void> {
   if (getCsrfToken()) return
   if (csrfPromise) return csrfPromise
 
-  csrfPromise = authApi
+  csrfPromise = directApi
     .get('/auth/csrf')
     .then(() => {})
     .catch((err) => {
@@ -30,8 +43,7 @@ export async function initCsrf(): Promise<void> {
   return csrfPromise
 }
 
-//CSRF
-authApi.interceptors.request.use(
+proxyApi.interceptors.request.use(
   (config) => {
     const method = config.method?.toLowerCase() ?? ''
     if (['post', 'put', 'patch', 'delete'].includes(method)) {
@@ -43,7 +55,6 @@ authApi.interceptors.request.use(
   (error: AxiosError) => Promise.reject(error)
 )
 
-//REFRESH
 let isRefreshing = false
 
 interface QueueEntry {
@@ -61,26 +72,26 @@ function processQueue(error: unknown): void {
   failedQueue = []
 }
 
-authApi.interceptors.response.use(
+proxyApi.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const originalRequest = error.config as typeof error.config & { _retry?: boolean }
 
     const url = originalRequest?.url ?? ''
     const isExcluded =
-      url.includes('/auth/refresh')    ||
-      url.includes('/auth/verify-otp') ||
-      url.includes('/auth/request-otp')||
-      url.includes('/auth/csrf')       ||
-      url.includes('/auth/logout')     ||
-      url.includes('/auth/me')
+      url.includes('/auth/refresh')     ||
+      url.includes('/auth/verify-otp')  ||
+      url.includes('/auth/request-otp') ||
+      url.includes('/auth/csrf')        ||
+      url.includes('/auth/logout')      ||
+      url.includes('/api/auth/me')
 
     if (error.response?.status === 401 && !originalRequest?._retry && !isExcluded) {
       if (isRefreshing) {
         return new Promise<void>((resolve, reject) => {
           failedQueue.push({ resolve, reject })
         })
-          .then(() => authApi(originalRequest!))
+          .then(() => proxyApi(originalRequest!))
           .catch((err) => Promise.reject(err))
       }
 
@@ -88,10 +99,10 @@ authApi.interceptors.response.use(
       isRefreshing = true
 
       try {
-        await authApi.post('/auth/refresh')
+        await nextApi.post('/api/auth/refresh')
         processQueue(null)
         isRefreshing = false
-        return authApi(originalRequest!)
+        return proxyApi(originalRequest!)
       } catch (refreshError) {
         processQueue(refreshError)
         isRefreshing = false
@@ -126,9 +137,8 @@ export interface AuthResponse {
   expiresAt: string
 }
 
-//AUTH
 export async function requestOtp(email: string): Promise<void> {
-  await authApi.post('/auth/request-otp', { email })
+  await directApi.post('/auth/request-otp', { email })
 }
 
 export async function verifyOtp(
@@ -136,7 +146,7 @@ export async function verifyOtp(
   code:         string,
   device_info?: string
 ): Promise<AuthResponse> {
-  const { data } = await authApi.post('/auth/verify-otp', {
+  const { data } = await nextApi.post('/api/auth/verify-otp', {
     email,
     code,
     device_info: device_info ?? getDeviceInfo(),
@@ -145,16 +155,16 @@ export async function verifyOtp(
 }
 
 export async function getMe(): Promise<AuthUser> {
-  const { data } = await authApi.get('/auth/me')
+  const { data } = await nextApi.get('/api/auth/me')
   return data.data as AuthUser
 }
 
 export async function logout(): Promise<void> {
-  await authApi.post('/auth/logout')
+  await proxyApi.post('/auth/logout')
 }
 
 export async function logoutAll(): Promise<void> {
-  await authApi.post('/auth/logout-all')
+  await proxyApi.post('/auth/logout-all')
 }
 
 function getDeviceInfo(): string {
@@ -162,4 +172,4 @@ function getDeviceInfo(): string {
   return `${navigator.platform} — ${navigator.userAgent.split(' ').slice(-1)[0]}`
 }
 
-export default authApi
+export default proxyApi
