@@ -11,7 +11,7 @@ import { useEffect, useState } from 'react'
 import { logout } from '@/app/lib/api/auth.api'
 import { useAuthStore } from '@/app/lib/store/auth.store'
 import { useAppDispatch, useAppSelector } from '@/app/lib/store/hooks'
-import { setSidebarOpen } from '@/app/lib/store/bookingSlice'
+import { setSidebarOpen } from '@/app/lib/store/slice/booking.slice'
 
 const SIDEBAR_COLLAPSED = 56
 const SIDEBAR_EXPANDED  = 260
@@ -55,7 +55,6 @@ export default function Sidebar() {
     }
   }
 
-  // dispatch is stable so this effect never spuriously re-fires
   useEffect(() => {
     if (isMobile) dispatch(setSidebarOpen(false))
   }, [pathname, isMobile, dispatch])

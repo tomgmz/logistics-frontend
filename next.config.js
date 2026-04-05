@@ -13,6 +13,8 @@ const nextConfig = {
       {
         protocol: 'https',
         hostname: '*.supabase.co',
+        hostname: 'www.figma.com',
+        pathname: '/api/mcp/asset/**',
       },
     ],
   },

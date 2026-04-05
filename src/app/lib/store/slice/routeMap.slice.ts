@@ -1,0 +1,154 @@
+import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit'
+import authApi from '@/app/lib/api/auth.api'
+import { getApiUrl }        from '@/app/lib/api/api-url'
+import type { OptimizedStop, OptimizeRouteResponse } from '@/app/types/maps/routemap.types'
+import type { BookingDetail } from '@/app/types/maps/routemap.types'
+import { useAuthStore } from '../auth.store'
+
+export interface BookingDestination {
+  address: string
+  [key: string]: unknown
+}
+
+export interface BookingWithRelations {
+  booking_id: string
+  origin?: string
+  status: string
+  schedule_date?: string
+  truck_type_needed?: string
+  booking_destinations?: BookingDestination[]
+  [key: string]: unknown
+}
+
+
+export const fetchBookings = createAsyncThunk(
+  'routeMap/fetchBookings',
+  async (_: void, { rejectWithValue }) => {
+    try {
+      const baseUrl = getApiUrl()
+      const user = useAuthStore.getState().user
+
+      if (!user) return rejectWithValue('Not authenticated')
+
+      if (user.role === 'client') {
+        const clientId = user.clients?.client_id
+        if (!clientId) {
+          return rejectWithValue('Client ID not found. Please log out and log in again.')
+        }
+        const res = await authApi.get(`${baseUrl}/booking/client/${clientId}`)
+        return (res.data?.data ?? []) as BookingWithRelations[]
+      }
+
+      const res = await authApi.get(`${baseUrl}/booking`)
+      return (res.data?.data ?? []) as BookingWithRelations[]
+    } catch (err: unknown) {
+      return rejectWithValue(
+        err instanceof Error ? err.message : 'Failed to load bookings'
+      )
+    }
+  }
+)
+
+export const fetchRouteAndDetail = createAsyncThunk(
+  'routeMap/fetchRouteAndDetail',
+  async (bookingId: string, { rejectWithValue }) => {
+    try {
+      const baseUrl = getApiUrl()
+      const [routeRes, detailRes] = await Promise.all([
+        authApi.post(`${baseUrl}/route-optimization/optimize/${bookingId}`),
+        authApi.get(`${baseUrl}/booking/${bookingId}`),
+      ])
+      return {
+        routeData:     routeRes.data?.data as OptimizeRouteResponse,
+        bookingDetail: detailRes.data?.data as BookingDetail,
+      }
+    } catch (err: unknown) {
+      return rejectWithValue(
+        err instanceof Error ? err.message : 'Failed to load route'
+      )
+    }
+  }
+)
+
+interface RouteMapState {
+  bookings:      BookingWithRelations[]
+  listLoading:   boolean
+  listError:     string | null
+
+  selectedId:    string | null
+  routeData:     OptimizeRouteResponse | null
+  bookingDetail: BookingDetail | null
+  stops:         OptimizedStop[]
+  detailLoading: boolean
+  detailError:   string | null
+}
+
+const initialState: RouteMapState = {
+  bookings:      [],
+  listLoading:   false,
+  listError:     null,
+
+  selectedId:    null,
+  routeData:     null,
+  bookingDetail: null,
+  stops:         [],
+  detailLoading: false,
+  detailError:   null,
+}
+
+const routeMapSlice = createSlice({
+  name: 'routeMap',
+  initialState,
+  reducers: {
+    clearSelection(state) {
+      state.selectedId    = null
+      state.routeData     = null
+      state.bookingDetail = null
+      state.stops         = []
+      state.detailError   = null
+    },
+    setSelectedId(state, action: PayloadAction<string>) {
+      state.selectedId    = action.payload
+      state.routeData     = null
+      state.bookingDetail = null
+      state.stops         = []
+      state.detailError   = null
+    },
+  },
+  extraReducers: (builder) => {
+    builder
+      .addCase(fetchBookings.pending, (state) => {
+        state.listLoading = true
+        state.listError   = null
+      })
+      .addCase(fetchBookings.fulfilled, (state, action) => {
+        state.listLoading = false
+        state.bookings    = action.payload
+      })
+      .addCase(fetchBookings.rejected, (state, action) => {
+        state.listLoading = false
+        state.listError   = action.payload as string
+      })
+
+    builder
+      .addCase(fetchRouteAndDetail.pending, (state) => {
+        state.detailLoading = true
+        state.detailError   = null
+      })
+      .addCase(fetchRouteAndDetail.fulfilled, (state, action) => {
+        state.detailLoading = false
+        state.routeData     = action.payload.routeData
+        state.bookingDetail = action.payload.bookingDetail
+        state.stops = [...(action.payload.routeData?.optimized_stops ?? [])].sort(
+          (a, b) => a.optimized_sequence_order - b.optimized_sequence_order
+        )
+      })
+      .addCase(fetchRouteAndDetail.rejected, (state, action) => {
+        state.detailLoading = false
+        state.detailError   = action.payload as string
+      })
+  },
+})
+
+export const { clearSelection, setSelectedId } = routeMapSlice.actions
+export default routeMapSlice.reducer

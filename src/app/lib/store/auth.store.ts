@@ -1,15 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-
-interface AuthUser {
-  user_id: string
-  email: string
-  username: string
-  first_name: string | null
-  last_name: string | null
-  role: string
-  status: string
-}
+import type { AuthUser } from '@/app/lib/api/auth.api'
 
 interface AuthStore {
   user: AuthUser | null

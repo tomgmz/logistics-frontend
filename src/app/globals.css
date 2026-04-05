@@ -7,6 +7,8 @@
     --color-cyan:    #4df9ed;
     --color-green:   #3af626;
     --color-muted:   #818181;
+    --color-border:       #424242;
+    --color-surface-dark: #2a2a2a;
   }
 
   html {
@@ -38,6 +40,13 @@
 }
 
 @layer utilities {
+  .ff-body {
+    font-family: var(--font-alegreya), 'Alegreya Sans', sans-serif;
+  }
+
+  .ff-sc {
+    font-family: var(--font-alegreya-sans-sc), 'Alegreya Sans SC', sans-serif;
+  }
 
   .font-display {
     font-family: var(--font-eurostile), 'Eurostile Extended', 'Franklin Gothic Heavy', sans-serif;
@@ -325,4 +334,12 @@
   background-clip: text;
   -webkit-text-fill-color: transparent;
   animation: shimmer 3s linear infinite;
+}
+
+
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
 }

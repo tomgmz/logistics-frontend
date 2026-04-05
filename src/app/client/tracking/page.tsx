@@ -1,8 +1,10 @@
-export default function TrackingPage() {
-  return (
-    <div className="flex items-center justify-center h-full">
-      <span className="font-body text-[var(--color-muted)] text-3xl">Tracking</span>
-    </div>
-  )
+import RouteMapWrapper from '@/components/map/RouteMapWrapper'
+
+interface Props {
+  params: Promise<{ bookingId: string }>
 }
- 
+
+export default async function DriverRoutePage({ params }: Props) {
+  const { bookingId } = await params
+  return <RouteMapWrapper initialBookingId={bookingId} />
+}

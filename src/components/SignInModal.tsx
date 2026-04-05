@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import { AxiosError } from 'axios'
-import { requestOtp, verifyOtp, AuthUser } from '@/app/lib/api/auth.api'
+import { requestOtp, verifyOtp, getMe, AuthUser } from '@/app/lib/api/auth.api'
 import { useAuthStore } from '@/app/lib/store/auth.store'
 
 const ROLE_ROUTES: Record<string, string> = {
@@ -201,7 +201,7 @@ function OtpStep({
     const interval = setInterval(() => {
       const remaining = Math.max(0, Math.floor((resendExpiresAt.current - Date.now()) / 1000))
       setResendSec(remaining)
-    }, 500) // poll every 500ms so it catches up quickly when tab becomes active
+    }, 500)
     return () => clearInterval(interval)
   }, [resendSec])
 
@@ -455,8 +455,13 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
 
   const handleEmailSuccess = (e: string) => { setEmail(e); setStep('otp') }
 
-  const handleOtpSuccess = (user: AuthUser) => {
-    useAuthStore.getState().setUser(user)
+  const handleOtpSuccess = async (user: AuthUser) => {
+    try {
+      const fullUser = await getMe()
+      useAuthStore.getState().setUser(fullUser)
+    } catch {
+      useAuthStore.getState().setUser(user)
+    }
     setStep('success')
     setTimeout(() => { handleClose(); router.push(getRoleRoute(user.role)) }, 1800)
   }

@@ -1,22 +1,36 @@
 'use client'
 
-import CheckCircleIcon from '@mui/icons-material/CheckCircle'
-import PlaceIcon from '@mui/icons-material/Place'
-import { BookingStatus } from '@/app/types/maps/routemap.types'
+import { motion } from 'framer-motion'
+import CheckCircleIcon  from '@mui/icons-material/CheckCircle'
+import PlaceIcon        from '@mui/icons-material/Place'
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'
 
-export function StatusBadge({ status }: { status: BookingStatus | string }) {
-  const upper = status.toUpperCase() as BookingStatus
-  const config: Record<string, { bg: string; text: string; border: string; dot: string }> = {
-    'BOOKED':     { bg: 'bg-yellow-500/20', text: 'text-yellow-400', border: 'border-yellow-500/40', dot: 'bg-yellow-400' },
-    'IN TRANSIT': { bg: 'bg-cyan-500/20',   text: 'text-cyan-400',   border: 'border-cyan-500/40',   dot: 'bg-cyan-400'  },
-    'ARRIVED':    { bg: 'bg-green-500/20',  text: 'text-green-400',  border: 'border-green-500/40',  dot: 'bg-green-400' },
-    'CANCELED':   { bg: 'bg-red-500/20',    text: 'text-red-400',    border: 'border-red-500/40',    dot: 'bg-red-400'   },
-  }
-  const c = config[upper] ?? config['BOOKED']
+export type BookingStatus =
+  | 'PENDING' | 'ASSIGNED' | 'IN_TRANSIT' | 'IN TRANSIT'
+  | 'COMPLETED' | 'CANCELLED' | 'BOOKED'
+  | string
+
+const STATUS_MAP: Record<string, { label: string; color: string; bg: string; border: string }> = {
+  PENDING:      { label: 'Pending',    color: '#9ca3af',             bg: 'rgba(156,163,175,0.12)', border: 'rgba(156,163,175,0.3)'  },
+  ASSIGNED:     { label: 'Assigned',   color: '#f69f26',             bg: 'rgba(246,159,38,0.12)',  border: 'rgba(246,159,38,0.3)'   },
+  IN_TRANSIT:   { label: 'In Transit', color: 'var(--color-cyan)',   bg: 'rgba(77,249,237,0.12)',  border: 'rgba(77,249,237,0.3)'   },
+  'IN TRANSIT': { label: 'In Transit', color: 'var(--color-cyan)',   bg: 'rgba(77,249,237,0.12)',  border: 'rgba(77,249,237,0.3)'   },
+  BOOKED:       { label: 'Booked',     color: '#f69f26',             bg: 'rgba(246,159,38,0.12)',  border: 'rgba(246,159,38,0.3)'   },
+  COMPLETED:    { label: 'Completed',  color: 'var(--color-green)',  bg: 'rgba(58,246,38,0.12)',   border: 'rgba(58,246,38,0.3)'    },
+  CANCELLED:    { label: 'Cancelled',  color: '#f62626',             bg: 'rgba(246,38,38,0.12)',   border: 'rgba(246,38,38,0.3)'    },
+}
+
+export function StatusBadge({ status }: { status: string }) {
+  const key = status.toUpperCase().replace(/-/g, '_')
+  const cfg = STATUS_MAP[key] ?? STATUS_MAP.PENDING
+
   return (
-    <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold tracking-wider px-2.5 py-1 rounded-full border ${c.bg} ${c.text} ${c.border}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${c.dot} animate-pulse`} />
-      {upper}
+    <span
+      className="inline-flex items-center gap-1.5 text-[10px] font-bold tracking-widest px-2.5 py-1 rounded-full border whitespace-nowrap"
+      style={{ color: cfg.color, background: cfg.bg, borderColor: cfg.border }}
+    >
+      <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: cfg.color }} />
+      {cfg.label.toUpperCase()}
     </span>
   )
 }
@@ -24,57 +38,73 @@ export function StatusBadge({ status }: { status: BookingStatus | string }) {
 export function RouteStop({
   sequenceNumber,
   address,
-  isOrigin,
-  isLast,
+  isOrigin = false,
+  isLast   = false,
   status,
 }: {
   sequenceNumber?: number
-  address: string
+  address:  string
   isOrigin?: boolean
-  isLast?: boolean
-  status?: 'pending' | 'delivered' | 'failed'
+  isLast?:  boolean
+  status?:  'pending' | 'delivered' | 'failed'
 }) {
   const delivered = status === 'delivered'
   const failed    = status === 'failed'
 
+  const dotColor = isOrigin  ? 'var(--color-cyan)'
+    : delivered              ? 'var(--color-green)'
+    : failed                 ? '#f62626'
+    : isLast                 ? '#ef4444'
+    : 'var(--color-cyan)'
+
+  const dotBg = isOrigin  ? 'rgba(77,249,237,0.15)'
+    : delivered            ? 'rgba(58,246,38,0.15)'
+    : failed               ? 'rgba(246,38,38,0.15)'
+    : 'rgba(77,249,237,0.1)'
+
   return (
-    <div className="flex gap-3">
+    <div className="flex gap-3 group">
       <div className="flex flex-col items-center flex-shrink-0">
-        <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${
-          isOrigin    ? 'bg-gray-700 border-gray-600'
-          : delivered ? 'bg-green-500 border-green-400'
-          : failed    ? 'bg-red-500 border-red-400'
-          : isLast    ? 'bg-red-500 border-red-400'
-          : 'bg-cyan-500/20 border-cyan-500/60'
-        }`}>
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="w-8 h-8 rounded-full flex items-center justify-center border-2 flex-shrink-0"
+          style={{ background: dotBg, borderColor: dotColor }}
+        >
           {delivered ? (
-            <CheckCircleIcon sx={{ fontSize: 14, color: '#fff' }} />
+            <CheckCircleIcon  sx={{ fontSize: 14, color: 'var(--color-green)' }} />
           ) : failed ? (
-            <span className="text-white text-[10px] font-bold">✕</span>
+            <ErrorOutlineIcon sx={{ fontSize: 14, color: '#f62626' }} />
           ) : isOrigin ? (
-            <PlaceIcon sx={{ fontSize: 14, color: '#9ca3af' }} />
+            <PlaceIcon        sx={{ fontSize: 14, color: 'var(--color-cyan)'  }} />
           ) : (
             <span className="text-white text-[10px] font-black leading-none">{sequenceNumber}</span>
           )}
-        </div>
+        </motion.div>
         {!isLast && (
-          <div className="w-px flex-1 min-h-[32px] border-l-2 border-dashed border-gray-700 my-1" />
+          <div className="w-px flex-1 min-h-[28px] border-l-2 border-dashed border-gray-800 my-1" />
         )}
       </div>
 
-      <div className="flex-1 pb-2">
+      <div className="flex-1 pb-2 min-w-0">
         <div className="flex items-start justify-between gap-2">
-          <p className="text-white font-semibold text-sm leading-snug">{address}</p>
+          <p className="text-white text-sm font-semibold leading-snug truncate">{address}</p>
           {status && (
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
-              delivered ? 'bg-green-900/40 text-green-400 border border-green-800/50'
-              : failed  ? 'bg-red-900/40 text-red-400 border border-red-800/50'
-              : 'bg-gray-800 text-gray-400 border border-gray-700'
-            }`}>
+            <span
+              className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 border"
+              style={{
+                color:       delivered ? 'var(--color-green)' : failed ? '#f62626' : '#9ca3af',
+                background:  delivered ? 'rgba(58,246,38,0.1)' : failed ? 'rgba(246,38,38,0.1)' : 'rgba(156,163,175,0.1)',
+                borderColor: delivered ? 'rgba(58,246,38,0.3)' : failed ? 'rgba(246,38,38,0.3)' : 'rgba(156,163,175,0.2)',
+              }}
+            >
               {status.charAt(0).toUpperCase() + status.slice(1)}
             </span>
           )}
         </div>
+        {isOrigin && (
+          <p className="text-[10px] text-gray-500 uppercase tracking-widest mt-0.5">Origin / Pickup</p>
+        )}
       </div>
     </div>
   )
@@ -82,7 +112,10 @@ export function RouteStop({
 
 export function DetailRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between bg-[#1a1a1a] rounded-lg px-3 py-2.5 border border-gray-800/60">
+    <div
+      className="flex items-center justify-between rounded-xl px-3 py-2.5 border bg-[#161616]"
+      style={{ borderColor: 'var(--color-border)' }}
+    >
       <span className="text-gray-500 text-xs">{label}</span>
       <span className="text-gray-200 text-xs font-medium">{value}</span>
     </div>

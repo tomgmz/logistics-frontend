@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { useMap, useMapsLibrary } from '@vis.gl/react-google-maps'
-import { OptimizedStop } from '@/app/types/route.types'
+import { OptimizedStop } from '@/app/types/maps/routemap.types'
 
 const GOOGLE_MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!
 

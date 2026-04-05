@@ -8,8 +8,8 @@ import StepBookingDetails from './BookingDetails'
 import StepVehicle from './ChooseVehicle'
 import StepReview from './ReviewBooking'
 import { useAppDispatch, useAppSelector } from '@/app/lib/store/hooks'
-import { setStep, setService } from '@/app/lib/store/bookingSlice'
-import type { ServiceType } from '@/app/lib/store/bookingSlice'
+import { setStep, setService } from '@/app/lib/store/slice/booking.slice'
+import type { ServiceType } from '@/app/lib/store/slice/booking.slice'
 import './BookingDetails.css'
 
 const STEPS = [

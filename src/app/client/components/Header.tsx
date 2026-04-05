@@ -5,7 +5,7 @@ import { Bell, MessageCircle, Menu } from 'lucide-react'
 import Image from 'next/image'
 import { ASSETS } from '@/app/lib/data'
 import { useAppDispatch, useAppSelector } from '@/app/lib/store/hooks'
-import { setSidebarOpen } from '@/app/lib/store/bookingSlice'
+import { setSidebarOpen } from '@/app/lib/store/slice/booking.slice'
 
 export default function Header() {
   const dispatch    = useAppDispatch()

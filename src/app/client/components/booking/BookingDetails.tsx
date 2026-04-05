@@ -18,8 +18,8 @@ import {
   removeGroup as removeGroupAction,
   setAllNonTiltable, setAllNonStackable,
   setAllStackable, setAllOversize,
-} from '@/app/lib/store/bookingSlice'
-import type { CargoMode, ItemGroup, DropoffSection } from '@/app/lib/store/bookingSlice'
+} from '@/app/lib/store/slice/booking.slice'
+import type { CargoMode, ItemGroup, DropoffSection } from '@/app/lib/store/slice/booking.slice'
 import MapLocationPicker from './MapLocationPicker'
 import './BookingDetails.css'
 

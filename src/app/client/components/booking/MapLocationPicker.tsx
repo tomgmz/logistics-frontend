@@ -13,7 +13,7 @@ const RED   = '#f87171'
 const BG    = '#0b0b14'
 const PANEL = 'rgba(13,13,22,0.96)'
 
-const DEFAULT_CENTER = { lat: 14.5995, lng: 120.9842 } // Metro Manila ang fallback kapag hindi makuha ang current location
+const DEFAULT_CENTER = { lat: 14.5995, lng: 120.9842 }
 
 const DARK_MAP_STYLES = [
   { elementType: 'geometry',            stylers: [{ color: '#0d0d1c' }] },
@@ -33,7 +33,6 @@ const DARK_MAP_STYLES = [
   { featureType: 'administrative',     elementType: 'geometry',         stylers: [{ color: '#2a2a4a' }] },
   { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#9ca3af' }] },
 ]
-
 
 export interface MapLocationPickerProps {
   mode: 'pickup' | 'dropoff'
@@ -134,10 +133,8 @@ export default function MapLocationPicker({
         pos => {
           const c = { lat: pos.coords.latitude, lng: pos.coords.longitude }
           map.setCenter(c)
-          // reverseGeocode(c.lat, c.lng)
         },
         () => {
-          // reverseGeocode(DEFAULT_CENTER.lat, DEFAULT_CENTER.lng)
           map.setCenter(DEFAULT_CENTER)
         }
       )
@@ -191,7 +188,6 @@ export default function MapLocationPicker({
     onConfirm({ address, latitude: coords!.lat, longitude: coords!.lng })
   }, [canConfirm, address, coords, onConfirm])
 
-
   return (
     <div
       className="relative w-full h-full overflow-hidden"
@@ -199,10 +195,8 @@ export default function MapLocationPicker({
     >
       <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');`}</style>
 
-      {/* Map */}
       <div ref={mapDivRef} className="absolute inset-0" />
 
-      {/* skeleton */}
       {!mapReady && (
         <div className="absolute inset-0 flex items-center justify-center z-10" style={{ background: BG }}>
           <div className="flex flex-col items-center gap-3">
@@ -215,7 +209,6 @@ export default function MapLocationPicker({
         </div>
       )}
 
-      {/* Fixed center pin */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
         <div
           className="flex flex-col items-center"
@@ -244,21 +237,19 @@ export default function MapLocationPicker({
       </div>
 
       <div className="absolute top-0 left-0 right-0 z-30 p-3 flex flex-col gap-2.5">
-
-        {/* Header */}
         <div className="flex items-center gap-2">
-        {onClose && (
+          {onClose && (
             <button
               onClick={onClose}
               className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0
-                        text-white transition-opacity hover:opacity-70 active:opacity-50"
+                         text-white transition-opacity hover:opacity-70 active:opacity-50"
               style={{ background: PANEL, border: '1px solid rgba(255,255,255,0.08)' }}
             >
               <ArrowLeftIcon />
             </button>
           )}
 
-          {/* Search bar */}
+          {/* Search bar + dropdown */}
           <div ref={searchRef} className="relative flex-1">
             <div
               className="flex items-center gap-2.5 px-3.5 py-3 rounded-2xl transition-all w-full"
@@ -298,39 +289,40 @@ export default function MapLocationPicker({
                 </button>
               )}
             </div>
-          </div>
-        
-          {/* Suggestions dropdown */}
-          {showSugg && suggestions.length > 0 && (
-            <div
-              className="absolute top-full left-0 right-0 mt-1.5 rounded-2xl overflow-hidden shadow-2xl"
-              style={{
-                background: PANEL,
-                border: '1px solid rgba(255,255,255,0.07)',
-                backdropFilter: 'blur(16px)',
-                maxHeight: 240,
-                overflowY: 'auto',
-              }}
-            >
-              {suggestions.map((s, i) => (
-                <button
-                  key={s.placeId}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-left
-                             transition-colors hover:bg-white/5 active:bg-white/10"
-                  style={{ borderBottom: i < suggestions.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}
-                  onClick={() => handleSuggestionSelect(s)}
-                >
-                  <div
-                    className="w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0"
-                    style={{ background: `${pinColor}15` }}
+
+            {/* Suggestions dropdown — inside ref div so outside-click works */}
+            {showSugg && suggestions.length > 0 && (
+              <div
+                className="absolute top-full left-0 right-0 mt-1.5 rounded-2xl overflow-hidden shadow-2xl z-50"
+                style={{
+                  background: PANEL,
+                  border: '1px solid rgba(255,255,255,0.07)',
+                  backdropFilter: 'blur(16px)',
+                  maxHeight: 240,
+                  overflowY: 'auto',
+                }}
+              >
+                {suggestions.map((s, i) => (
+                  <button
+                    key={s.placeId}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left
+                               transition-colors hover:bg-white/5 active:bg-white/10"
+                    style={{ borderBottom: i < suggestions.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}
+                    onMouseDown={e => e.preventDefault()}
+                    onClick={() => handleSuggestionSelect(s)}
                   >
-                    <LocationIcon color={pinColor} />
-                  </div>
-                  <span className="text-sm truncate" style={{ color: 'rgba(255,255,255,0.75)' }}>{s.label}</span>
-                </button>
-              ))}
-            </div>
-          )}
+                    <div
+                      className="w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0"
+                      style={{ background: `${pinColor}15` }}
+                    >
+                      <LocationIcon color={pinColor} />
+                    </div>
+                    <span className="text-sm truncate" style={{ color: 'rgba(255,255,255,0.75)' }}>{s.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -338,7 +330,6 @@ export default function MapLocationPicker({
         className="absolute bottom-0 left-0 right-0 z-30 p-4 flex flex-col gap-3"
         style={{ background: `linear-gradient(to top, ${BG} 70%, transparent)` }}
       >
-        {/* Use my location */}
         <button
           className="self-end flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium
                      transition-opacity hover:opacity-70 active:opacity-50"
@@ -353,7 +344,6 @@ export default function MapLocationPicker({
           Use my location
         </button>
 
-        {/* Address card */}
         <div
           className="flex items-start gap-3 p-4 rounded-2xl"
           style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
@@ -384,7 +374,6 @@ export default function MapLocationPicker({
           </div>
         </div>
 
-        {/* Confirm button */}
         <button
           className="w-full py-4 rounded-2xl text-sm font-bold tracking-wide transition-all active:scale-[0.98]"
           style={{

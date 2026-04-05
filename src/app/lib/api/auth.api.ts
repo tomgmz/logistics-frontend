@@ -9,27 +9,32 @@ const authApi: AxiosInstance = axios.create({
   withCredentials: true,
 })
 
-//csrf
-
 function getCsrfToken(): string | null {
   if (typeof document === 'undefined') return null
   const match = document.cookie.match(/csrf_token=([^;]+)/)
   return match ? decodeURIComponent(match[1]) : null
 }
 
-// Fetch (or refresh) the CSRF cookie from the server
-let csrfInitialized = false
-export async function initCsrf(): Promise<void> {
-  if (csrfInitialized) return
-  try {
-    await authApi.get('/auth/csrf')
-    csrfInitialized = true
-  } catch {
+let csrfPromise: Promise<void> | null = null
 
-  }
+export async function initCsrf(): Promise<void> {
+  if (getCsrfToken()) return
+
+  if (csrfPromise) return csrfPromise
+
+  csrfPromise = authApi
+    .get('/auth/csrf')
+    .then(() => {
+    })
+    .catch((err) => {
+      csrfPromise = null
+      throw err
+    })
+
+  return csrfPromise
 }
 
-// Attach CSRF header to every mutating request
+
 authApi.interceptors.request.use(
   (config) => {
     const method = config.method?.toLowerCase() ?? ''
@@ -44,8 +49,6 @@ authApi.interceptors.request.use(
   (error: AxiosError) => Promise.reject(error)
 )
 
-//token refresh and queue
-
 let isRefreshing = false
 
 interface QueueEntry {
@@ -57,11 +60,8 @@ let failedQueue: QueueEntry[] = []
 
 function processQueue(error: unknown): void {
   failedQueue.forEach((entry) => {
-    if (error) {
-      entry.reject(error)
-    } else {
-      entry.resolve()
-    }
+    if (error) entry.reject(error)
+    else entry.resolve()
   })
   failedQueue = []
 }
@@ -71,7 +71,6 @@ authApi.interceptors.response.use(
   async (error: AxiosError) => {
     const originalRequest = error.config as typeof error.config & { _retry?: boolean }
 
-    // Only attempt refresh on 401, and never on the refresh/login endpoints themselves
     const url = originalRequest?.url ?? ''
     const isAuthEndpoint =
       url.includes('/auth/refresh') ||
@@ -80,7 +79,6 @@ authApi.interceptors.response.use(
       url.includes('/auth/csrf')
 
     if (error.response?.status === 401 && !originalRequest?._retry && !isAuthEndpoint) {
-      // Queue concurrent requests while refresh is in flight
       if (isRefreshing) {
         return new Promise<void>((resolve, reject) => {
           failedQueue.push({ resolve, reject })
@@ -94,20 +92,14 @@ authApi.interceptors.response.use(
 
       try {
         await authApi.post('/auth/refresh')
-
         processQueue(null)
         isRefreshing = false
-
         return authApi(originalRequest!)
       } catch (refreshError) {
         processQueue(refreshError)
         isRefreshing = false
         failedQueue = []
-
-        if (typeof window !== 'undefined') {
-          window.location.href = '/'
-        }
-
+        if (typeof window !== 'undefined') window.location.href = '/'
         return Promise.reject(refreshError)
       }
     }

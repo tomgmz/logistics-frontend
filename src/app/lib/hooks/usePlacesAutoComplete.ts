@@ -134,8 +134,16 @@ export function usePlacesAutocomplete({
     const place = new google.maps.places.Place({ id: placeId })
     await place.fetchFields({ fields: ['displayName', 'formattedAddress', 'location'] })
     sessionTokenRef.current = null
+
+    const displayName     = place.displayName ?? ''
+    const formattedAddress = place.formattedAddress ?? ''
+
+    const address = displayName && !formattedAddress.toLowerCase().includes(displayName.toLowerCase())
+      ? `${displayName}, ${formattedAddress}`
+      : formattedAddress || displayName
+
     return {
-      address:   place.formattedAddress ?? place.displayName ?? '',
+      address,
       latitude:  place.location?.lat() ?? null,
       longitude: place.location?.lng() ?? null,
     }
