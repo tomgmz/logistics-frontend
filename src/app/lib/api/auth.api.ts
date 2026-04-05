@@ -76,7 +76,8 @@ authApi.interceptors.response.use(
       url.includes('/auth/refresh')     ||
       url.includes('/auth/verify-otp')  ||
       url.includes('/auth/request-otp') ||
-      url.includes('/auth/csrf')
+      url.includes('/auth/csrf')        ||
+      url.includes('/api/auth/me')
 
     if (error.response?.status === 401 && !originalRequest?._retry && !isAuthEndpoint) {
       if (isRefreshing) {
