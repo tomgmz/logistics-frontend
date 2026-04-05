@@ -20,31 +20,25 @@ export interface BookingWithRelations {
   [key: string]: unknown
 }
 
-
 export const fetchBookings = createAsyncThunk(
   'routeMap/fetchBookings',
   async (_: void, { rejectWithValue }) => {
     try {
-      const baseUrl = getApiUrl()
       const user = useAuthStore.getState().user
-
       if (!user) return rejectWithValue('Not authenticated')
 
       if (user.role === 'client') {
         const clientId = user.clients?.client_id
-        if (!clientId) {
-          return rejectWithValue('Client ID not found. Please log out and log in again.')
-        }
-        const res = await authApi.get(`${baseUrl}/booking/client/${clientId}`)
+        if (!clientId) return rejectWithValue('Client ID not found. Please log out and log in again.')
+
+        const res = await authApi.get(`/booking/client/${clientId}`)
         return (res.data?.data ?? []) as BookingWithRelations[]
       }
 
-      const res = await authApi.get(`${baseUrl}/booking`)
+      const res = await authApi.get('/booking') // ✅
       return (res.data?.data ?? []) as BookingWithRelations[]
     } catch (err: unknown) {
-      return rejectWithValue(
-        err instanceof Error ? err.message : 'Failed to load bookings'
-      )
+      return rejectWithValue(err instanceof Error ? err.message : 'Failed to load bookings')
     }
   }
 )
@@ -53,19 +47,16 @@ export const fetchRouteAndDetail = createAsyncThunk(
   'routeMap/fetchRouteAndDetail',
   async (bookingId: string, { rejectWithValue }) => {
     try {
-      const baseUrl = getApiUrl()
       const [routeRes, detailRes] = await Promise.all([
-        authApi.post(`${baseUrl}/route-optimization/optimize/${bookingId}`),
-        authApi.get(`${baseUrl}/booking/${bookingId}`),
+        authApi.post(`/route-optimization/optimize/${bookingId}`),
+        authApi.get(`/booking/${bookingId}`),
       ])
       return {
         routeData:     routeRes.data?.data as OptimizeRouteResponse,
         bookingDetail: detailRes.data?.data as BookingDetail,
       }
     } catch (err: unknown) {
-      return rejectWithValue(
-        err instanceof Error ? err.message : 'Failed to load route'
-      )
+      return rejectWithValue(err instanceof Error ? err.message : 'Failed to load route')
     }
   }
 )
