@@ -11,8 +11,6 @@ async function handler(
   const path = pathSegments.join('/')
   const url  = `${API_URL}/${path}`
 
-  console.log(`[proxy] ${req.method} ${path}`)
-
   try {
     const body = req.method !== 'GET' && req.method !== 'HEAD'
       ? await req.text()
