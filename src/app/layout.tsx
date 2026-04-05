@@ -32,8 +32,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     >
       <body suppressHydrationWarning className={`bg-[#0a0a0a] text-white overflow-x-hidden ${alegreyaSansSC.className}`}>
         <CsrfInit />
-        <AuthRehydrator />
         <StoreProvider>
+          <AuthRehydrator />
           <ThemeRegistry>{children}</ThemeRegistry>
         </StoreProvider>
       </body>

@@ -3,21 +3,27 @@ import { persist } from 'zustand/middleware'
 import type { AuthUser } from '@/app/lib/api/auth.api'
 
 interface AuthStore {
-  user: AuthUser | null
-  setUser: (user: AuthUser) => void
-  clearUser: () => void
+  user:           AuthUser | null
+  hasHydrated:    boolean
+  setUser:        (user: AuthUser) => void
+  clearUser:      () => void
+  setHasHydrated: (val: boolean) => void
 }
 
 export const useAuthStore = create<AuthStore>()(
   persist(
     (set) => ({
-      user:      null,
-      setUser:   (user) => set({ user }),
-      clearUser: () => set({ user: null }),
+      user:           null,
+      hasHydrated:    false,
+      setUser:        (user) => set({ user }),
+      clearUser:      () => set({ user: null }),
+      setHasHydrated: (val) => set({ hasHydrated: val }),
     }),
     {
       name: 'auth-user',
-
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true)
+      },
       partialize: (state) =>
         state.user
           ? {
@@ -27,9 +33,9 @@ export const useAuthStore = create<AuthStore>()(
                 username:   state.user.username,
                 first_name: state.user.first_name,
                 last_name:  state.user.last_name,
-                role:    state.user.role,
-                status:  state.user.status,
-                clients: null,
+                role:       state.user.role,
+                status:     state.user.status,
+                clients:    state.user.clients ?? null,  // ← persist clients
               },
             }
           : { user: null },

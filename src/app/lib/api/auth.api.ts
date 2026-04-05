@@ -1,16 +1,15 @@
 import axios, { AxiosInstance, AxiosError } from 'axios'
-import { getApiUrl } from './api-url'
 
-const authApi: AxiosInstance = axios.create({
-  baseURL: getApiUrl(),
+const api: AxiosInstance = axios.create({
+  baseURL: '',
   headers: { 'Content-Type': 'application/json' },
   withCredentials: true,
 })
 
-// Hits Next.js API routes (same origin as frontend)
-// Used for actions that set cookies readable by middleware
-const nextApi: AxiosInstance = axios.create({
-  baseURL: typeof window !== 'undefined' ? window.location.origin : '',
+import { getApiUrl } from './api-url'
+
+const authApi: AxiosInstance = axios.create({
+  baseURL: getApiUrl(),
   headers: { 'Content-Type': 'application/json' },
   withCredentials: true,
 })
@@ -92,9 +91,7 @@ authApi.interceptors.response.use(
       isRefreshing = true
 
       try {
-        // Use Next.js proxy so the refreshed access_token cookie
-        // is set on the frontend domain — readable by middleware
-        await nextApi.post('/api/auth/refresh')
+        await api.post('/api/auth/refresh')
         processQueue(null)
         isRefreshing = false
         return authApi(originalRequest!)
@@ -141,13 +138,17 @@ export async function verifyOtp(
   code:         string,
   device_info?: string
 ): Promise<AuthResponse> {
-  // Next.js proxy route — sets cookie on frontend domain
-  const { data } = await nextApi.post('/api/auth/verify-otp', {
+  const { data } = await api.post('/api/auth/verify-otp', {
     email,
     code,
     device_info: device_info ?? getDeviceInfo(),
   })
   return data.data as AuthResponse
+}
+
+export async function getMe(): Promise<AuthUser> {
+  const { data } = await api.get('/api/auth/me')
+  return data.data as AuthUser
 }
 
 export async function logout(): Promise<void> {
@@ -156,11 +157,6 @@ export async function logout(): Promise<void> {
 
 export async function logoutAll(): Promise<void> {
   await authApi.post('/auth/logout-all')
-}
-
-export async function getMe(): Promise<AuthUser> {
-  const { data } = await authApi.get('/auth/me')
-  return data.data as AuthUser
 }
 
 function getDeviceInfo(): string {

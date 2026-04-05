@@ -244,8 +244,10 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
   }, [dispatch, user])
 
   useEffect(() => {
+    if (!user) return
+    if (user.role === 'client' && !user.clients?.client_id) return
     loadBookings()
-  }, [loadBookings])
+  }, [loadBookings, user])
 
   useEffect(() => {
     if (!initialBookingId) return

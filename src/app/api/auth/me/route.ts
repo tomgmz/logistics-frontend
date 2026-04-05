@@ -2,31 +2,17 @@ import axios from 'axios'
 import { NextRequest, NextResponse } from 'next/server'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL!
-const isProd  = process.env.NODE_ENV === 'production'
 
-const cookieOptions = {
-  httpOnly: true,
-  secure:   isProd,
-  sameSite: 'lax' as const,
-  path:     '/',
-  maxAge:   7 * 24 * 60 * 60,
-}
-
-export async function POST(req: NextRequest) {
+export async function GET(req: NextRequest) {
   try {
-    const body = await req.json()
-
-    const { data } = await axios.post(`${API_URL}/auth/verify-otp`, body, {
+    const { data } = await axios.get(`${API_URL}/auth/me`, {
       headers: {
         'Content-Type': 'application/json',
         cookie:         req.headers.get('cookie') ?? '',
       },
     })
 
-    const res = NextResponse.json(data)
-    res.cookies.set('access_token',  data.data.accessToken,  cookieOptions)
-    res.cookies.set('refresh_token', data.data.refreshToken, cookieOptions)
-    return res
+    return NextResponse.json(data)
 
   } catch (error: unknown) {
     if (axios.isAxiosError(error) && error.response) {
