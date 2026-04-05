@@ -7,6 +7,14 @@ const authApi: AxiosInstance = axios.create({
   withCredentials: true,
 })
 
+// Hits Next.js API routes (same origin as frontend)
+// Used for actions that set cookies readable by middleware
+const nextApi: AxiosInstance = axios.create({
+  baseURL: typeof window !== 'undefined' ? window.location.origin : '',
+  headers: { 'Content-Type': 'application/json' },
+  withCredentials: true,
+})
+
 function getCsrfToken(): string | null {
   if (typeof document === 'undefined') return null
   const match = document.cookie.match(/csrf_token=([^;]+)/)
@@ -21,7 +29,7 @@ export async function initCsrf(): Promise<void> {
 
   csrfPromise = authApi
     .get('/auth/csrf')
-    .then(() => { /* cookie set by Set-Cookie header */ })
+    .then(() => {})
     .catch((err) => {
       csrfPromise = null
       throw err
@@ -46,7 +54,7 @@ let isRefreshing = false
 
 interface QueueEntry {
   resolve: () => void
-  reject: (reason: unknown) => void
+  reject:  (reason: unknown) => void
 }
 
 let failedQueue: QueueEntry[] = []
@@ -66,8 +74,8 @@ authApi.interceptors.response.use(
 
     const url = originalRequest?.url ?? ''
     const isAuthEndpoint =
-      url.includes('/auth/refresh') ||
-      url.includes('/auth/verify-otp') ||
+      url.includes('/auth/refresh')     ||
+      url.includes('/auth/verify-otp')  ||
       url.includes('/auth/request-otp') ||
       url.includes('/auth/csrf')
 
@@ -84,7 +92,9 @@ authApi.interceptors.response.use(
       isRefreshing = true
 
       try {
-        await authApi.post('/auth/refresh')
+        // Use Next.js proxy so the refreshed access_token cookie
+        // is set on the frontend domain — readable by middleware
+        await nextApi.post('/api/auth/refresh')
         processQueue(null)
         isRefreshing = false
         return authApi(originalRequest!)
@@ -102,23 +112,23 @@ authApi.interceptors.response.use(
 )
 
 export interface AuthUser {
-  user_id: string
-  email: string
-  username: string
+  user_id:    string
+  email:      string
+  username:   string
   first_name: string | null
-  last_name: string | null
-  role: string
-  status: string
+  last_name:  string | null
+  role:       string
+  status:     string
   clients?: {
-    client_id: string
-    company_name: string | null
+    client_id:       string
+    company_name:    string | null
     billing_address: string | null
-    payment_terms: number | null
+    payment_terms:   number | null
   } | null
 }
 
 export interface AuthResponse {
-  user: AuthUser
+  user:      AuthUser
   expiresAt: string
 }
 
@@ -127,11 +137,12 @@ export async function requestOtp(email: string): Promise<void> {
 }
 
 export async function verifyOtp(
-  email: string,
-  code: string,
+  email:        string,
+  code:         string,
   device_info?: string
 ): Promise<AuthResponse> {
-  const { data } = await authApi.post('/auth/verify-otp', {
+  // Next.js proxy route — sets cookie on frontend domain
+  const { data } = await nextApi.post('/api/auth/verify-otp', {
     email,
     code,
     device_info: device_info ?? getDeviceInfo(),
