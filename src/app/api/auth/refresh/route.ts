@@ -5,6 +5,9 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL!
 const isProd  = process.env.NODE_ENV === 'production'
 
 export async function POST(req: NextRequest) {
+  console.log('[refresh] API_URL:', API_URL)
+  console.log('[refresh] cookie:', req.headers.get('cookie'))
+
   try {
     const { data } = await axios.post(`${API_URL}/auth/refresh`, null, {
       headers: {
@@ -13,7 +16,7 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    console.log('[/api/auth/refresh] success')
+    console.log('[refresh] success:', data)
 
     const res = NextResponse.json(data)
     res.cookies.set('access_token', data.data.accessToken, {
@@ -27,11 +30,13 @@ export async function POST(req: NextRequest) {
 
   } catch (error: unknown) {
     if (axios.isAxiosError(error) && error.response) {
+      console.log('[refresh] axios error:', error.response.status, JSON.stringify(error.response.data))
       const res = NextResponse.json(error.response.data, { status: error.response.status })
       res.cookies.delete('access_token')
       res.cookies.delete('refresh_token')
       return res
     }
+    console.log('[refresh] unknown error:', error)
     return NextResponse.json(
       { status: 'error', message: 'Internal server error' },
       { status: 500 }
