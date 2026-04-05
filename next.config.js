@@ -3,7 +3,7 @@ const nextConfig = {
   async rewrites() {
     return [
       {
-        source: '/api/:path*',
+        source: '/api/proxy/:path*',
         destination: 'https://logistics-backend.up.railway.app/api/:path*',
       },
     ]
@@ -13,6 +13,9 @@ const nextConfig = {
       {
         protocol: 'https',
         hostname: '*.supabase.co',
+      },
+      {
+        protocol: 'https',
         hostname: 'www.figma.com',
         pathname: '/api/mcp/asset/**',
       },
