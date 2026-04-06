@@ -340,65 +340,6 @@ export function DetailsPanelContent({
             ) : null)}
           </div>
 
-          {parsedCargo && parsedCargo.sections.length > 1 && (
-            <div className="space-y-2 mb-3">
-              {parsedCargo.sections.map((section, si) => (
-                <div key={si}>
-                  <p className="ff-sc text-[11px] mb-1" style={{ color: 'var(--color-muted)' }}>
-                    Drop-off {section.dropoffIndex + 1}
-                  </p>
-                  {section.groups.map((g: CargoGroup, gi: number) => (
-                    <div
-                      key={g.id ?? gi}
-                      className="rounded-[6px] p-2.5 mb-1 border"
-                      style={{ borderColor: 'var(--color-border)' }}
-                    >
-                      <div className="flex justify-between items-start mb-1">
-                        <div>
-                          <p className="ff-sc text-white text-[12px]">{g.commodity || g.product || 'Item'}</p>
-                          {g.product && g.commodity && (
-                            <p className="text-[10px]" style={{ color: 'var(--color-muted)' }}>{g.product}</p>
-                          )}
-                        </div>
-                        {(g.shc || g.additionalShc) && (
-                          <div className="flex gap-1">
-                            {g.shc && (
-                              <span
-                                className="text-[9px] font-bold px-1.5 py-0.5 rounded border"
-                                style={{ color: 'var(--color-cyan)', borderColor: 'rgba(77,249,237,0.3)', background: 'rgba(77,249,237,0.08)' }}
-                              >
-                                {g.shc}
-                              </span>
-                            )}
-                            {g.additionalShc && (
-                              <span
-                                className="text-[9px] font-bold px-1.5 py-0.5 rounded border"
-                                style={{ color: '#f69f26', borderColor: 'rgba(246,159,38,0.3)', background: 'rgba(246,159,38,0.08)' }}
-                              >
-                                {g.additionalShc}
-                              </span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex flex-wrap gap-x-3 gap-y-0.5">
-                        {[
-                          { label: 'Pieces', value: g.pieces },
-                          { label: 'Weight', value: `${g.weight} ${g.weightUnit}` },
-                          { label: 'L×W×H', value: `${g.looseLength}×${g.looseWidth}×${g.looseHeight} cm` },
-                        ].map(({ label, value }) => (
-                          <span key={label} className="text-[10px]" style={{ color: 'var(--color-muted)' }}>
-                            {label}: <span className="text-white">{value}</span>
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          )}
-
           {/* Flags */}
           {(hasNonTiltable || hasNonStackable) && (
             <ul className="list-disc pl-5 space-y-0.5 mt-1">
