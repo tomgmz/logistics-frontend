@@ -12,6 +12,12 @@ export interface DirectionsRequest {
   }[]
   travelMode: 'DRIVE' | 'WALK' | 'BICYCLE' | 'TWO_WHEELER'
   routingPreference?: 'TRAFFIC_AWARE' | 'TRAFFIC_AWARE_OPTIMAL' | 'TRAFFIC_UNAWARE'
+  
+  routeModifiers?: {
+    avoidTolls?:    boolean
+    avoidHighways?: boolean
+    avoidFerries?:  boolean
+  }
 }
 
 export interface DirectionsResponse {

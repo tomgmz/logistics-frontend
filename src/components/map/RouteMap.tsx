@@ -206,6 +206,8 @@ function EmptyMapState() {
 export default function RouteMap({ initialBookingId }: { initialBookingId?: string }) {
   const dispatch  = useAppDispatch()
 
+  const [totalDuration, setTotalDuration] = useState<number>(0)
+
   const user = useAuthStore((s) => s.user)
 
   const bookings      = useAppSelector((s) => s.routeMap.bookings)
@@ -260,6 +262,7 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
       if (selectedId === bookingId) return
       dispatch(setSelectedId(bookingId))
       dispatch(fetchRouteAndDetail(bookingId))
+      setTotalDuration(0)
       setDetailPanelOpen(true)
       if (typeof window !== 'undefined' && window.innerWidth < 1024) {
         setMobileView('map')
@@ -276,7 +279,10 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
 
   const detailPanel = routeData ? (
     <DetailsPanelContent
-      routeData={routeData}
+      routeData={{
+        ...routeData,
+        total_duration: totalDuration > 0 ? Math.floor(totalDuration / 60) : routeData.total_duration,
+      }}
       bookingDetail={bookingDetail}
       completedStops={completedStops}
       totalStops={totalStops}
@@ -320,7 +326,11 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
       ] as never}
     >
       <MapMarkers routeData={routeData} stops={stops} />
-      <DirectionsRenderer origin={routeData.origin} stops={stops} />
+      <DirectionsRenderer
+        origin={routeData.origin}
+        stops={stops}
+        onDurations={(total) => setTotalDuration(total)}
+      />
     </Map>
   ) : (
     <EmptyMapState />

@@ -2,7 +2,7 @@
 
 import Image  from 'next/image'
 import { motion } from 'framer-motion'
-import type { OptimizeRouteResponse, BookingDetail } from '@/app/types/maps/routemap.types'
+import type { OptimizeRouteResponse, BookingDetail, CargoGroup } from '@/app/types/maps/routemap.types'
 import { statusColor } from './status.colors'
 
 const TRUCK_IMG    = 'https://www.figma.com/api/mcp/asset/0318dae9-97ce-4d45-9493-711e78213248'
@@ -44,19 +44,39 @@ export function DetailsPanelContent({
 
   const originCity  = routeData.origin.address.split(',')[0] ?? routeData.origin.address
   const originFull  = routeData.origin.address
-  const destStop    = routeData.optimized_stops?.[routeData.optimized_stops.length - 1]
+  const stops       = routeData.optimized_stops ?? []
+  const destStop    = stops[stops.length - 1]
   const destCity    = destStop?.address?.split(',')[0] ?? '—'
   const destFull    = destStop?.address ?? '—'
 
   const truckType   = bookingDetail?.truck_type_needed ?? 'L300'
   const plateNumber = bookingDetail?.driver?.truck?.plate_number ?? '—'
-  const totalCost   = bookingDetail?.total_cost != null ? `$${bookingDetail.total_cost}` : '—'
+  const totalCost   = bookingDetail?.total_cost != null ? `₱${bookingDetail.total_cost}` : '—'
   const estDelivery = bookingDetail?.estimated_delivery ?? scheduleDate
   const travelTime  = routeData.total_duration
     ? `${Math.floor(routeData.total_duration / 60)}HR ${routeData.total_duration % 60}MINS`
     : '—'
 
   const subCity = (full: string) => full.split(',').slice(1).join(',').trim() || full
+
+  const parsedCargo     = bookingDetail?.parsed_cargo ?? null
+  const allGroups       = parsedCargo?.sections.flatMap(s => s.groups) ?? []
+  const totalPieces     = allGroups.reduce((sum, g) => sum + (parseInt(g.pieces) || 0), 0)
+  const totalWeight     = bookingDetail?.required_weight_kg  ?? null
+  const volume          = bookingDetail?.required_volume_cbm ?? null
+
+  const firstGroup      = allGroups[0] ?? null
+  const product         = firstGroup?.product        ?? null
+  const shc             = firstGroup?.shc            ?? null
+  const additionalShc   = firstGroup?.additionalShc  ?? null
+  const hasNonTiltable  = allGroups.some(g => g.nonTiltable)
+  const hasNonStackable = allGroups.some(g => g.nonStackable)
+
+  const density = totalWeight && volume && volume > 0
+    ? (totalWeight / volume).toFixed(1)
+    : null
+
+  const hasCargo = !!(parsedCargo || totalWeight || volume)
 
   return (
     <div className="flex flex-col min-h-full ff-body">
@@ -95,7 +115,7 @@ export function DetailsPanelContent({
 
       <p className="ff-sc text-center text-[16px] text-white mt-1 mb-2">{plateNumber}</p>
 
-      {/* Origin / Destination */}
+      {/* Origin and Destination */}
       <div className="flex gap-1.5 px-3">
         <div className="flex-1 rounded-[8px] px-3 py-2" style={{ background: 'var(--color-border)' }}>
           <p className="ff-sc text-white text-[13px] mb-0.5">{originCity}</p>
@@ -141,6 +161,17 @@ export function DetailsPanelContent({
           </span>
         </div>
 
+        <div className="flex justify-between px-3 mb-1">
+          <span className="text-[10px]">
+            <span style={{ color: 'var(--color-cyan)' }}>FROM</span>
+            <span style={{ color: 'var(--color-muted)' }}> [1st Drop Off Point]</span>
+          </span>
+          <span className="text-[10px] text-right">
+            <span style={{ color: 'var(--color-cyan)' }}>TO</span>
+            <span style={{ color: 'var(--color-muted)' }}> [2nd Drop Off Point]</span>
+          </span>
+        </div>
+
         <div className="px-3 pb-1.5">
           <div className="relative h-[8px] flex items-center">
             <div className="absolute inset-0 rounded-full" style={{ background: 'var(--color-border)' }} />
@@ -175,6 +206,63 @@ export function DetailsPanelContent({
         </div>
       </div>
 
+      <div className="border-t px-3 py-3" style={{ borderColor: 'var(--color-border)' }}>
+        <div className="flex gap-2">
+
+          {/* Pick Up Point */}
+          <div className="flex-1">
+            <p className="ff-sc text-[11px] text-center mb-2" style={{ color: 'var(--color-muted)' }}>Pick Up Point</p>
+            <div className="flex items-start gap-2">
+              <div className="mt-1 flex-shrink-0">
+                <div className="w-3 h-3 rounded-full border-2" style={{ borderColor: 'var(--color-cyan)', background: 'var(--color-cyan)' }} />
+              </div>
+              <div>
+                <p className="ff-sc text-white text-[12px]">{originCity}</p>
+                <p className="text-[10px]" style={{ color: 'var(--color-muted)' }}>{subCity(originFull)}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="w-px self-stretch" style={{ background: 'var(--color-border)' }} />
+
+          {/* Drop Off Points */}
+          <div className="flex-1">
+            <p className="ff-sc text-[11px] text-center mb-2" style={{ color: 'var(--color-muted)' }}>Drop Off Point</p>
+            <div className="flex flex-col gap-2">
+              {stops.map((stop, i) => {
+                const isDelivered = stop.status === 'delivered'
+                const isFailed    = stop.status === 'failed'
+                const dotColor    = isDelivered ? 'var(--color-cyan)' : isFailed ? '#f62626' : '#555'
+                const isLast      = i === stops.length - 1
+
+                return (
+                  <div key={stop.destination_id} className="flex items-start gap-2">
+                    <div className="flex flex-col items-center flex-shrink-0">
+                      <div
+                        className="w-3 h-3 rounded-full border-2 mt-1"
+                        style={{
+                          borderColor: dotColor,
+                          background:  isDelivered ? 'var(--color-cyan)' : 'transparent',
+                        }}
+                      />
+                      {!isLast && (
+                        <div className="w-px flex-1 min-h-[16px] mt-1" style={{ background: 'var(--color-border)' }} />
+                      )}
+                    </div>
+                    <div>
+                      <p className="ff-sc text-white text-[12px]">{stop.address.split(',')[0]}</p>
+                      <p className="text-[10px]" style={{ color: 'var(--color-muted)' }}>
+                        {stop.address.split(',').slice(1).join(',').trim()}
+                      </p>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Delivery */}
       <div className="flex gap-1.5 px-3 pb-3">
         <div className="flex-1 rounded-[8px] p-3 border" style={{ borderColor: 'var(--color-border)' }}>
@@ -202,7 +290,126 @@ export function DetailsPanelContent({
         </div>
       </div>
 
-      {/* Stops */}
+      {/* Cargo Details */}
+      {hasCargo && (
+        <div className="border-t px-3 pb-4" style={{ borderColor: 'var(--color-border)' }}>
+
+          {/* Header row */}
+          <div className="flex items-center justify-between py-2">
+            <span className="ff-sc text-white text-[16px]">Cargo Details</span>
+            {totalWeight && (
+              <span className="text-[10px]">
+                <span style={{ color: 'var(--color-muted)' }}>TOTAL WEIGHT: </span>
+                <span className="text-white">{totalWeight} KG</span>
+              </span>
+            )}
+          </div>
+
+          <div className="space-y-0">
+            {[
+              { label: 'Product',                          value: product      },
+              { label: 'Special Handling Code',            value: shc          },
+              { label: 'Additional Special Handling Code', value: additionalShc},
+            ].map(({ label, value }) => value ? (
+              <div
+                key={label}
+                className="flex items-center justify-between py-2 border-b"
+                style={{ borderColor: 'var(--color-border)' }}
+              >
+                <span className="ff-sc text-white text-[12px]">{label}</span>
+                <span className="ff-sc text-white text-[12px] text-right">{value}</span>
+              </div>
+            ) : null)}
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 mt-3 mb-3">
+            {[
+              { label: 'Total Piece',  value: totalPieces ? String(totalPieces)        : null },
+              { label: 'Gross Weight', value: totalWeight ? `${totalWeight} KG`        : null },
+              { label: 'Volume',       value: volume      ? `${volume} CBM`            : null },
+              { label: 'Density',      value: density     ? `${density} KG/CBM`        : null },
+            ].map(({ label, value }) => value ? (
+              <div
+                key={label}
+                className="rounded-[5px] p-2 border"
+                style={{ borderColor: 'var(--color-cyan)', background: '#fff' }}
+              >
+                <p className="text-[10px] mb-1" style={{ color: '#818181' }}>{label}</p>
+                <p className="ff-sc text-black text-[14px] font-bold">{value}</p>
+              </div>
+            ) : null)}
+          </div>
+
+          {parsedCargo && parsedCargo.sections.length > 1 && (
+            <div className="space-y-2 mb-3">
+              {parsedCargo.sections.map((section, si) => (
+                <div key={si}>
+                  <p className="ff-sc text-[11px] mb-1" style={{ color: 'var(--color-muted)' }}>
+                    Drop-off {section.dropoffIndex + 1}
+                  </p>
+                  {section.groups.map((g: CargoGroup, gi: number) => (
+                    <div
+                      key={g.id ?? gi}
+                      className="rounded-[6px] p-2.5 mb-1 border"
+                      style={{ borderColor: 'var(--color-border)' }}
+                    >
+                      <div className="flex justify-between items-start mb-1">
+                        <div>
+                          <p className="ff-sc text-white text-[12px]">{g.commodity || g.product || 'Item'}</p>
+                          {g.product && g.commodity && (
+                            <p className="text-[10px]" style={{ color: 'var(--color-muted)' }}>{g.product}</p>
+                          )}
+                        </div>
+                        {(g.shc || g.additionalShc) && (
+                          <div className="flex gap-1">
+                            {g.shc && (
+                              <span
+                                className="text-[9px] font-bold px-1.5 py-0.5 rounded border"
+                                style={{ color: 'var(--color-cyan)', borderColor: 'rgba(77,249,237,0.3)', background: 'rgba(77,249,237,0.08)' }}
+                              >
+                                {g.shc}
+                              </span>
+                            )}
+                            {g.additionalShc && (
+                              <span
+                                className="text-[9px] font-bold px-1.5 py-0.5 rounded border"
+                                style={{ color: '#f69f26', borderColor: 'rgba(246,159,38,0.3)', background: 'rgba(246,159,38,0.08)' }}
+                              >
+                                {g.additionalShc}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+                        {[
+                          { label: 'Pieces', value: g.pieces },
+                          { label: 'Weight', value: `${g.weight} ${g.weightUnit}` },
+                          { label: 'L×W×H', value: `${g.looseLength}×${g.looseWidth}×${g.looseHeight} cm` },
+                        ].map(({ label, value }) => (
+                          <span key={label} className="text-[10px]" style={{ color: 'var(--color-muted)' }}>
+                            {label}: <span className="text-white">{value}</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Flags */}
+          {(hasNonTiltable || hasNonStackable) && (
+            <ul className="list-disc pl-5 space-y-0.5 mt-1">
+              {hasNonTiltable  && <li className="ff-sc text-white text-[12px]">Non-tiltable items present</li>}
+              {hasNonStackable && <li className="ff-sc text-white text-[12px]">Non-stackable items present</li>}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {/* Stops progress */}
       {totalStops > 0 && (
         <div className="px-3 pb-3 border-t pt-2" style={{ borderColor: 'var(--color-border)' }}>
           <div className="flex items-center justify-between mb-1">
@@ -222,6 +429,7 @@ export function DetailsPanelContent({
           </div>
         </div>
       )}
+
     </div>
   )
 }

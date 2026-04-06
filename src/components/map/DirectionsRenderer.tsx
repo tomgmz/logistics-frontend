@@ -8,7 +8,7 @@ import { computeDirections } from '@/app/lib/api/directions.api'
 interface DirectionsRendererProps {
   origin: { latitude: number; longitude: number }
   stops: OptimizedStop[]
-  onDurations?: (total: number, legs: number[]) => void  // seconds
+  onDurations?: (total: number, legs: number[]) => void
 }
 
 export function decodePolyline(encoded: string): google.maps.LatLngLiteral[] {
@@ -67,8 +67,13 @@ export function DirectionsRenderer({ origin, stops, onDurations }: DirectionsRen
           location: { latLng: { latitude: stop.latitude, longitude: stop.longitude } },
         })),
       }),
-      travelMode:        'DRIVE',
-      routingPreference: 'TRAFFIC_AWARE',
+        travelMode:        'DRIVE',
+        routingPreference: 'TRAFFIC_AWARE',
+        routeModifiers: {
+          avoidTolls:    false,
+          avoidHighways: false,
+          avoidFerries:  true,
+        },
     })
       .then((data) => {
         if (!mounted) return
