@@ -19,6 +19,10 @@ export interface DirectionsResponse {
     polyline: {
       encodedPolyline: string
     }
+    duration?: string
+    legs?: {
+      duration?: string
+    }[]
   }[]
 }
 

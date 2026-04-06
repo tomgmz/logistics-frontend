@@ -8,6 +8,7 @@ import { computeDirections } from '@/app/lib/api/directions.api'
 interface DirectionsRendererProps {
   origin: { latitude: number; longitude: number }
   stops: OptimizedStop[]
+  onDurations?: (total: number, legs: number[]) => void  // seconds
 }
 
 export function decodePolyline(encoded: string): google.maps.LatLngLiteral[] {
@@ -33,7 +34,7 @@ export function decodePolyline(encoded: string): google.maps.LatLngLiteral[] {
   return points
 }
 
-export function DirectionsRenderer({ origin, stops }: DirectionsRendererProps) {
+export function DirectionsRenderer({ origin, stops, onDurations }: DirectionsRendererProps) {
   const map         = useMap()
   const polylineRef = useRef<google.maps.Polyline | null>(null)
   const fetchingRef = useRef(false)
@@ -72,7 +73,8 @@ export function DirectionsRenderer({ origin, stops }: DirectionsRendererProps) {
       .then((data) => {
         if (!mounted) return
 
-        const encoded = data?.routes?.[0]?.polyline?.encodedPolyline
+        const route = data?.routes?.[0]
+        const encoded = route?.polyline?.encodedPolyline
         if (!encoded) return
 
         polylineRef.current?.setMap(null)
@@ -83,6 +85,14 @@ export function DirectionsRenderer({ origin, stops }: DirectionsRendererProps) {
           strokeOpacity: 0.9,
           map,
         })
+
+        // parse durations from "2280s" → 2280
+        const parseSecs = (d?: string) => parseInt(d ?? '0')
+
+        const totalSecs = parseSecs(route?.duration)
+        const legSecs   = (route?.legs ?? []).map((l: { duration?: string }) => parseSecs(l.duration))
+
+        onDurations?.(totalSecs, legSecs)
       })
       .catch((err) => {
         console.error('[Directions] error —', err)

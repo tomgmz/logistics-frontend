@@ -12,7 +12,7 @@ async function handler(
   const url  = `${API_URL}/${path}`
 
   try {
-    const body = req.method !== 'GET' && req.method !== 'HEAD'
+    const bodyText = req.method !== 'GET' && req.method !== 'HEAD'
       ? await req.text()
       : undefined
 
@@ -26,7 +26,7 @@ async function handler(
           ? { 'X-CSRF-Token': req.headers.get('x-csrf-token')! }
           : {}),
       },
-      data: body,
+      data: bodyText && bodyText.length > 0 ? bodyText : undefined,
     })
 
     return NextResponse.json(data)
