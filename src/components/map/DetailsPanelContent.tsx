@@ -408,28 +408,6 @@ export function DetailsPanelContent({
           )}
         </div>
       )}
-
-      {/* Stops progress */}
-      {totalStops > 0 && (
-        <div className="px-3 pb-3 border-t pt-2" style={{ borderColor: 'var(--color-border)' }}>
-          <div className="flex items-center justify-between mb-1">
-            <span className="ff-sc text-white text-[11px]">Stops</span>
-            <span className="text-[10px]" style={{ color: 'var(--color-muted)' }}>
-              {completedStops}/{totalStops} delivered
-            </span>
-          </div>
-          <div className="w-full h-[5px] rounded-full" style={{ background: 'var(--color-border)' }}>
-            <motion.div
-              className="h-full rounded-full"
-              style={{ background: 'var(--color-green)' }}
-              initial={{ width: 0 }}
-              animate={{ width: `${progressPercentage}%` }}
-              transition={{ duration: 1, ease: 'easeOut' }}
-            />
-          </div>
-        </div>
-      )}
-
     </div>
   )
 }
