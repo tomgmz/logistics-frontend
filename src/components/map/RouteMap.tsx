@@ -316,20 +316,20 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
       defaultZoom={11}
       gestureHandling="greedy"
       className="w-full h-full"
-      styles={[
-        { elementType: 'geometry',           stylers: [{ color: '#212121' }] },
-        { elementType: 'labels.text.stroke', stylers: [{ color: '#212121' }] },
-        { elementType: 'labels.text.fill',   stylers: [{ color: '#757575' }] },
-        { featureType: 'road',  elementType: 'geometry', stylers: [{ color: '#2c2c2c' }] },
-        { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#000000' }] },
-        { featureType: 'poi',   elementType: 'geometry', stylers: [{ color: '#1a1a1a' }] },
-      ] as never}
+      // styles={[
+      //   { elementType: 'geometry',           stylers: [{ color: '#212121' }] },
+      //   { elementType: 'labels.text.stroke', stylers: [{ color: '#212121' }] },
+      //   { elementType: 'labels.text.fill',   stylers: [{ color: '#757575' }] },
+      //   { featureType: 'road',  elementType: 'geometry', stylers: [{ color: '#2c2c2c' }] },
+      //   { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#000000' }] },
+      //   { featureType: 'poi',   elementType: 'geometry', stylers: [{ color: '#1a1a1a' }] },
+      // ] as never}
     >
       <MapMarkers routeData={routeData} stops={stops} />
       <DirectionsRenderer
         origin={routeData.origin}
         stops={stops}
-        onDurations={(total) => setTotalDuration(total)}
+        onDurations={(total, _legs) => setTotalDuration(total)}
       />
     </Map>
   ) : (
@@ -446,26 +446,6 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
 
           <div className="flex-1 relative overflow-hidden">
             {mapContent}
-
-            {routeData && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.6 }}
-                className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 px-4 py-2.5 rounded-2xl border"
-                style={{ background: '#111', borderColor: '#333' }}
-              >
-                <div className="text-center">
-                  <p className="text-[9px] text-gray-500 uppercase tracking-widest">Completed</p>
-                  <p className="text-white font-bold text-sm leading-none">{completedStops}/{totalStops}</p>
-                </div>
-                <div className="w-px h-8 bg-gray-800" />
-                <div className="text-center">
-                  <p className="text-[9px] text-gray-500 uppercase tracking-widest">Progress</p>
-                  <p className="text-white font-bold text-sm leading-none">{Math.round(progressPercentage)}%</p>
-                </div>
-              </motion.div>
-            )}
 
             <AnimatePresence>
               {(routeData || detailLoading || detailError) && detailPanelOpen && (

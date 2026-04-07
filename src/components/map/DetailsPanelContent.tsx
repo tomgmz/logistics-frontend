@@ -81,16 +81,78 @@ export function DetailsPanelContent({
   return (
     <div className="flex flex-col min-h-full ff-body">
 
-      {/* Header */}
-      <div
-        className="flex items-center justify-center gap-2 px-4 py-1.5 border-b"
-        style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
-      >
-        <span className="ff-sc text-[10px]" style={{ color }}>{scheduleDate}</span>
-        {scheduleDate && <span className="text-[10px]" style={{ color: 'var(--color-border)' }}>•</span>}
-        <span className="ff-sc text-[10px]" style={{ color }}>
-          {statusLbl}{callTime ? `, ${callTime}` : ''}
-        </span>
+      {/*
+        ── Header: Figma concave-tab banner ──
+
+        The Figma shape is a full-width bar that has two concave quarter-circle
+        cutouts at the BOTTOM-LEFT and BOTTOM-RIGHT corners. This makes it look
+        like a "tab" or "badge" that hangs from the top of the panel.
+
+        The shape is achieved with an inline SVG using a path:
+          - Full-width rectangle from top-left to top-right
+          - Straight down to near bottom-right corner
+          - Concave (inward) arc at bottom-right: curves UP-and-IN
+          - Flat bottom across
+          - Concave arc at bottom-left: curves DOWN-and-OUT back to left edge
+          - Back up to start
+
+        viewBox is 100×31 so percentages map cleanly. preserveAspectRatio="none"
+        stretches it to fill the container width exactly.
+
+        Arc params: `a rx,ry x-rot large-arc-flag sweep-flag dx,dy`
+        sweep-flag=0 → counter-clockwise → concave inward curve
+        r=10 matches the panel's own border-radius so the curves align.
+      -->
+      */}
+      <div className="relative w-full flex-shrink-0" style={{ height: 31 }}>
+        <svg
+          className="absolute inset-0 w-full h-full"
+          viewBox="0 0 100 31"
+          preserveAspectRatio="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          {/*
+            Path breakdown (viewBox 100×31, r=10):
+              M 0,0          → top-left
+              L 100,0        → top-right
+              L 100,21       → right side, 10px above bottom
+              a 10,10 0 0 1 -10,10  → concave arc: sweeps inward at bottom-right
+              L 10,31        → flat bottom
+              a 10,10 0 0 1 -10,-10 → concave arc: sweeps inward at bottom-left
+              Z              → back to top-left
+          */}
+          <path
+            d="M 0,0 L 100,0 L 100,21 a 10,10 0 0 1 -10,10 L 10,31 a 10,10 0 0 1 -10,-10 Z"
+            fill="var(--color-surface-dark, #424242)"
+          />
+        </svg>
+
+        {/* Text content — centred, nudged up slightly to sit in the flat part */}
+        <div
+          className="absolute inset-x-0 flex items-center justify-center gap-2"
+          style={{ top: 0, bottom: 10 }}
+        >
+          {scheduleDate && (
+            <span
+              className="ff-sc text-[11px] whitespace-nowrap"
+              style={{ color: 'var(--color-cyan, #4df9ed)' }}
+            >
+              {scheduleDate}
+            </span>
+          )}
+          {scheduleDate && (
+            <span
+              className="rounded-full flex-shrink-0"
+              style={{ width: 4, height: 4, background: 'var(--color-cyan, #4df9ed)' }}
+            />
+          )}
+          <span
+            className="ff-sc text-[11px] whitespace-nowrap"
+            style={{ color: 'var(--color-cyan, #4df9ed)' }}
+          >
+            {statusLbl}{callTime ? `, ${callTime}` : ''}
+          </span>
+        </div>
       </div>
 
       {/* Stage icons */}
@@ -294,7 +356,6 @@ export function DetailsPanelContent({
       {hasCargo && (
         <div className="border-t px-3 pb-4" style={{ borderColor: 'var(--color-border)' }}>
 
-          {/* Header row */}
           <div className="flex items-center justify-between py-2">
             <span className="ff-sc text-white text-[16px]">Cargo Details</span>
             {totalWeight && (
@@ -324,10 +385,10 @@ export function DetailsPanelContent({
 
           <div className="grid grid-cols-2 gap-2 mt-3 mb-3">
             {[
-              { label: 'Total Piece',  value: totalPieces ? String(totalPieces)        : null },
-              { label: 'Gross Weight', value: totalWeight ? `${totalWeight} KG`        : null },
-              { label: 'Volume',       value: volume      ? `${volume} CBM`            : null },
-              { label: 'Density',      value: density     ? `${density} KG/CBM`        : null },
+              { label: 'Total Piece',  value: totalPieces ? String(totalPieces)  : null },
+              { label: 'Gross Weight', value: totalWeight ? `${totalWeight} KG`  : null },
+              { label: 'Volume',       value: volume      ? `${volume} CBM`      : null },
+              { label: 'Density',      value: density     ? `${density} KG/CBM`  : null },
             ].map(({ label, value }) => value ? (
               <div
                 key={label}
@@ -340,7 +401,6 @@ export function DetailsPanelContent({
             ) : null)}
           </div>
 
-          {/* Flags */}
           {(hasNonTiltable || hasNonStackable) && (
             <ul className="list-disc pl-5 space-y-0.5 mt-1">
               {hasNonTiltable  && <li className="ff-sc text-white text-[12px]">Non-tiltable items present</li>}
