@@ -1,22 +1,45 @@
+/* ─── BookingDetails.css ──────────────────────────────────────────────────────
+   Uses clamp() for fluid scaling so the form stays compact on 150%-scaled
+   laptops (which report ~1024–1280px logical width) while still breathing on
+   large unscaled monitors.
+─────────────────────────────────────────────────────────────────────────────── */
+
 .booking-text {
   font-family: var(--font-alegreya), 'Alegreya Sans', sans-serif;
-  font-size: 0.75rem;
+  /* fluid: never smaller than 0.7rem, never larger than 0.875rem */
+  font-size: clamp(0.7rem, 1.1vw, 0.875rem);
 }
 
 @media (min-width: 640px) {
   .booking-text {
-    font-size: 0.8rem;
+    font-size: clamp(0.75rem, 1.1vw, 0.875rem);
   }
 }
 
 @media (min-width: 768px) {
   .booking-text {
-    font-size: 0.9rem;
+    font-size: clamp(0.8rem, 1.1vw, 0.9rem);
   }
 }
 
+/* 1024px — where 150%-scaled laptops land.
+   clamp keeps it compact regardless of the logical viewport width. */
 @media (min-width: 1024px) {
   .booking-text {
-    font-size: 1.1rem;
+    font-size: clamp(0.8rem, 1vw, 0.9rem);
+  }
+}
+
+/* 1280px — genuine large/unscaled screens get a touch more space */
+@media (min-width: 1280px) {
+  .booking-text {
+    font-size: clamp(0.85rem, 1vw, 0.95rem);
+  }
+}
+
+/* 1536px — 2xl, full-size monitors */
+@media (min-width: 1536px) {
+  .booking-text {
+    font-size: clamp(0.875rem, 1vw, 1rem);
   }
 }

@@ -81,29 +81,6 @@ export function DetailsPanelContent({
   return (
     <div className="flex flex-col min-h-full ff-body">
 
-      {/*
-        ── Header: Figma concave-tab banner ──
-
-        The Figma shape is a full-width bar that has two concave quarter-circle
-        cutouts at the BOTTOM-LEFT and BOTTOM-RIGHT corners. This makes it look
-        like a "tab" or "badge" that hangs from the top of the panel.
-
-        The shape is achieved with an inline SVG using a path:
-          - Full-width rectangle from top-left to top-right
-          - Straight down to near bottom-right corner
-          - Concave (inward) arc at bottom-right: curves UP-and-IN
-          - Flat bottom across
-          - Concave arc at bottom-left: curves DOWN-and-OUT back to left edge
-          - Back up to start
-
-        viewBox is 100×31 so percentages map cleanly. preserveAspectRatio="none"
-        stretches it to fill the container width exactly.
-
-        Arc params: `a rx,ry x-rot large-arc-flag sweep-flag dx,dy`
-        sweep-flag=0 → counter-clockwise → concave inward curve
-        r=10 matches the panel's own border-radius so the curves align.
-      -->
-      */}
       <div className="relative w-full flex-shrink-0" style={{ height: 31 }}>
         <svg
           className="absolute inset-0 w-full h-full"
