@@ -52,22 +52,35 @@ function isNonNegNumber(val: string): boolean {
 
 export function validateSchedule(date: string, time: string): ScheduleErrors {
   const errors: ScheduleErrors = {}
+
   if (!date.trim()) {
     errors.date = 'Date is required'
+  } else if (!time.trim()) {
+    errors.date = 'Date cannot be validated without a time'
   } else {
-    const selected = new Date(date)
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
+    const [year, month, day] = date.split('-').map(Number)
+    const [hours, minutes]   = time.split(':').map(Number)
+    const selectedDateTime   = new Date(year, month - 1, day, hours, minutes, 0, 0)
 
-    const maxDate = new Date(today)
+    const now = new Date()
+
+    const ONE_WEEK_MS    = 7 * 24 * 60 * 60 * 1000
+    const oneWeekFromNow = new Date(now.getTime() + ONE_WEEK_MS)
+
+    const maxDate = new Date(now)
     maxDate.setFullYear(maxDate.getFullYear() + 1)
 
-    if (selected < today) {
-      errors.date = 'Date cannot be in the past'
-    } else if (selected > maxDate) {
+    if (selectedDateTime.getTime() < oneWeekFromNow.getTime()) {
+      const pad = (n: number) => String(n).padStart(2, '0')
+      const earliest =
+        `${oneWeekFromNow.getFullYear()}-${pad(oneWeekFromNow.getMonth() + 1)}-${pad(oneWeekFromNow.getDate())} ` +
+        `${pad(oneWeekFromNow.getHours())}:${pad(oneWeekFromNow.getMinutes())}`
+      errors.date = `Booking must be at least 1 week in advance (earliest: ${earliest})`
+    } else if (selectedDateTime > maxDate) {
       errors.date = 'Date cannot be more than 1 year in the future'
     }
   }
+
   if (!time.trim()) errors.time = 'Time is required'
   return errors
 }
