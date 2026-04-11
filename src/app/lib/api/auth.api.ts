@@ -1,5 +1,6 @@
 import axios, { AxiosInstance, AxiosError } from 'axios'
 import { getApiUrl } from './api-url'
+import { AuthStatusResponse } from '@/app/types/auth/auth.types'
 
 const directApi: AxiosInstance = axios.create({
   baseURL: getApiUrl(),
@@ -18,7 +19,6 @@ const nextApi: AxiosInstance = axios.create({
   headers: { 'Content-Type': 'application/json' },
   withCredentials: true,
 })
-
 
 function getCsrfToken(): string | null {
   if (typeof document === 'undefined') return null
@@ -82,6 +82,7 @@ proxyApi.interceptors.response.use(
       url.includes('/auth/refresh')     ||
       url.includes('/auth/verify-otp')  ||
       url.includes('/auth/request-otp') ||
+      url.includes('/auth/status')      ||
       url.includes('/auth/csrf')        ||
       url.includes('/auth/logout')      ||
       url.includes('/api/auth/me')
@@ -135,6 +136,14 @@ export interface AuthUser {
 export interface AuthResponse {
   user:      AuthUser
   expiresAt: string
+}
+
+export async function getAuthStatus(email: string): Promise<AuthStatusResponse> {
+  const { data } = await directApi.post<{ status: string; data: AuthStatusResponse }>(
+    '/auth/status',
+    { email }
+  )
+  return data.data
 }
 
 export async function requestOtp(email: string): Promise<void> {

@@ -12,7 +12,7 @@ import { logout } from '@/app/lib/api/auth.api'
 import { useAuthStore } from '@/app/lib/store/auth.store'
 import { useAppDispatch, useAppSelector } from '@/app/lib/store/hooks'
 import { setSidebarOpen } from '@/app/lib/store/slice/booking.slice'
-
+import ReusableModal from '@/components/ui/ReusableModal'
 const SIDEBAR_COLLAPSED = 56
 const SIDEBAR_EXPANDED  = 260
 
@@ -36,12 +36,13 @@ function useIsMobile() {
 }
 
 export default function Sidebar() {
-  const pathname    = usePathname()
-  const isMobile    = useIsMobile()
-  const dispatch    = useAppDispatch()
-  const sidebarOpen = useAppSelector((s) => s.booking.sidebarOpen)
-  const user        = useAuthStore((state) => state.user)
-  const clearUser   = useAuthStore((state) => state.clearUser)
+  const pathname        = usePathname()
+  const isMobile        = useIsMobile()
+  const dispatch        = useAppDispatch()
+  const sidebarOpen     = useAppSelector((s) => s.booking.sidebarOpen)
+  const user            = useAuthStore((state) => state.user)
+  const clearUser       = useAuthStore((state) => state.clearUser)
+  const [logoutModalOpen, setLogoutModalOpen] = useState(false)
 
   const open = (val: boolean) => dispatch(setSidebarOpen(val))
 
@@ -130,7 +131,7 @@ export default function Sidebar() {
                 onNavigate={() => { if (isMobile) open(false) }}
               />
               <motion.button
-                onClick={handleLogout}
+                onClick={() => setLogoutModalOpen(true)}
                 whileHover={{ x: sidebarOpen ? 2 : 0 }}
                 whileTap={{ scale: 0.97 }}
                 className="w-full flex items-center gap-3 rounded-xl hover:text-red-400 transition-colors group py-3 px-2"
@@ -163,6 +164,17 @@ export default function Sidebar() {
           </motion.button>
         )}
       </div>
+
+      {/* ── Logout confirmation modal ── */}
+      <ReusableModal
+        open={logoutModalOpen}
+        title="Sign Out"
+        description="Are you sure you want to sign out of your account?"
+        confirmLabel="Yes"
+        cancelLabel="No"
+        onConfirm={handleLogout}
+        onCancel={() => setLogoutModalOpen(false)}
+      />
     </>
   )
 }
@@ -193,7 +205,7 @@ function NavItem({ item, isActive, index, expanded, onNavigate }: NavItemProps) 
           <motion.div
             layoutId="activeNav"
             className="absolute inset-0 rounded-xl glass-surface border border-[var(--color-cyan)]/20"
-            transition={{ type: 'spring', stiffness: 320, damping: 32 }}
+            transition={{ type: 'spring' as const, stiffness: 320, damping: 32 }}
           />
         )}
         <span className="relative z-10 shrink-0 flex items-center justify-center" style={{ width: SIDEBAR_COLLAPSED - 32 }}>
