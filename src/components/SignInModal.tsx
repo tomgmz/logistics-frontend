@@ -8,12 +8,12 @@ import { requestOtp, verifyOtp, getMe, getAuthStatus, AuthUser } from '@/app/lib
 import { useAuthStore } from '@/app/lib/store/auth.store'
 
 const ROLE_ROUTES: Record<string, string> = {
-  super_admin:   '/superadmin',
-  admin:         '/admin',
-  driver:        '/driver',
-  helper:        '/helper',
-  client:        '/client',
-  subcontractor: '/subcontractor',
+  super_admin:    '/superadmin',
+  admin:          '/admin',
+  general_manager: '/general_manager',
+  client:         '/client',
+  vendor:         '/vendor',
+  accountant:     '/accountant',
 }
 const getRoleRoute = (role: string) => ROLE_ROUTES[role] || '/'
 

@@ -30,8 +30,8 @@ export interface Truck {
   model_id?: string | null
   truck_model?: TruckModel | null                       // Joined data from truck_models
   status: 'available' | 'in_use' | 'under_maintenance' | 'inactive' | 'archived'
-  owned_by: 'company' | 'subcontractor'
-  subcontractor_id?: string | null
+  owned_by: 'company' | 'vendor'
+  vendor_id?: string | null
   created_at: string
   updated_at: string
 }
@@ -45,8 +45,8 @@ export interface CreateTruckInput {
   truck_type: string
   capacity_tons: number
   model_id?: string | null
-  owned_by: 'company' | 'subcontractor'
-  subcontractor_id?: string | null
+  owned_by: 'company' | 'vendor'
+  vendor_id?: string | null
   created_by?: string | null
 }
 
@@ -60,8 +60,8 @@ export interface UpdateTruckInput {
   capacity_tons?: number
   model_id?: string | null
   status?: 'available' | 'in_use' | 'under_maintenance' | 'inactive'
-  owned_by?: 'company' | 'subcontractor'
-  subcontractor_id?: string | null
+  owned_by?: 'company' | 'vendor'
+  vendor_id?: string | null
 }
 
 /**

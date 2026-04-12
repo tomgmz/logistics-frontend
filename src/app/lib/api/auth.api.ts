@@ -169,11 +169,11 @@ export async function getMe(): Promise<AuthUser> {
 }
 
 export async function logout(): Promise<void> {
-  await proxyApi.post('/auth/logout')
+  await nextApi.post('/api/auth/logout')
 }
 
 export async function logoutAll(): Promise<void> {
-  await proxyApi.post('/auth/logout-all')
+  await nextApi.post('/api/auth/logout-all')
 }
 
 function getDeviceInfo(): string {

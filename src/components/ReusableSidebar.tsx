@@ -4,25 +4,26 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Settings, LogOut, PanelLeftClose, PanelLeft } from 'lucide-react'
-import { ASSETS } from '../../../constants/client/icon'
-import Image from 'next/image'
-import '../components/booking/BookingDetails.css'
 import { useEffect, useState } from 'react'
 import { logout } from '@/app/lib/api/auth.api'
 import { useAuthStore } from '@/app/lib/store/auth.store'
-import { useAppDispatch, useAppSelector } from '@/app/lib/store/hooks'
-import { setSidebarOpen } from '@/app/lib/store/slice/booking.slice'
 import ReusableModal from '@/components/ui/ReusableModal'
-const SIDEBAR_COLLAPSED = 56
-const SIDEBAR_EXPANDED  = 260
 
-const NAV: { href: string; label: string; icon: React.ReactNode }[] = [
-  { href: '/client',          label: 'Overview', icon: <Image src={ASSETS.svcOverview} alt='overview'  width={24} height={24} /> },
-  { href: '/client/booking',  label: 'Booking',  icon: <Image src={ASSETS.svcBooking}  alt='booking'   width={24} height={24} /> },
-  { href: '/client/tracking', label: 'Tracking', icon: <Image src={ASSETS.svcTracking} alt='tracking'  width={24} height={24} /> },
-  { href: '/client/billing',  label: 'Billing',  icon: <Image src={ASSETS.svcBilling}  alt='billing'   width={24} height={24} /> },
-  { href: '/client/history',  label: 'History',  icon: <Image src={ASSETS.svcHistory}  alt='history'   width={24} height={24} /> },
-]
+const SIDEBAR_COLLAPSED = 56
+const SIDEBAR_EXPANDED = 260
+
+interface NavItem {
+  href: string
+  label: string
+  icon: React.ReactNode
+}
+
+interface ReusableSidebarProps {
+  navItems: NavItem[]
+  sidebarOpen: boolean
+  setSidebarOpen: (open: boolean) => void
+  onNavigate?: () => void
+}
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(false)
@@ -35,16 +36,17 @@ function useIsMobile() {
   return isMobile
 }
 
-export default function Sidebar() {
-  const pathname        = usePathname()
-  const isMobile        = useIsMobile()
-  const dispatch        = useAppDispatch()
-  const sidebarOpen     = useAppSelector((s) => s.booking.sidebarOpen)
-  const user            = useAuthStore((state) => state.user)
-  const clearUser       = useAuthStore((state) => state.clearUser)
+export default function ReusableSidebar({
+  navItems,
+  sidebarOpen,
+  setSidebarOpen,
+  onNavigate,
+}: ReusableSidebarProps) {
+  const pathname = usePathname()
+  const isMobile = useIsMobile()
+  const user = useAuthStore((state) => state.user)
+  const clearUser = useAuthStore((state) => state.clearUser)
   const [logoutModalOpen, setLogoutModalOpen] = useState(false)
-
-  const open = (val: boolean) => dispatch(setSidebarOpen(val))
 
   const handleLogout = async () => {
     try {
@@ -60,8 +62,8 @@ export default function Sidebar() {
   }
 
   useEffect(() => {
-    if (isMobile) dispatch(setSidebarOpen(false))
-  }, [pathname, isMobile, dispatch])
+    if (isMobile) setSidebarOpen(false)
+  }, [pathname, isMobile, setSidebarOpen])
 
   return (
     <>
@@ -72,7 +74,7 @@ export default function Sidebar() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={() => open(false)}
+            onClick={() => setSidebarOpen(false)}
             className="lg:hidden fixed inset-0 bg-black/60 z-30"
           />
         )}
@@ -86,7 +88,6 @@ export default function Sidebar() {
           className="h-full border-r border-white/[0.07] bg-[var(--color-bg)] overflow-hidden"
         >
           <div style={{ width: SIDEBAR_EXPANDED }} className="h-full flex flex-col py-5">
-
             {/* User row */}
             <div className="flex items-center gap-3 px-4 mb-7 overflow-hidden">
               <div className="w-8 h-8 rounded-full bg-[var(--color-cyan)] glow-cyan flex items-center justify-center shrink-0">
@@ -105,7 +106,7 @@ export default function Sidebar() {
                     : user?.username ?? 'User'}
                 </p>
                 <p className="font-body sm:!text-[0.8rem] md:!text-[0.9rem] lg:!text-[1.1rem] text-white/40 whitespace-nowrap capitalize">
-                  {user?.role ?? ''}
+                  {user?.role?.replace(/_/g, ' ') ?? ''}
                 </p>
               </motion.div>
             </div>
@@ -113,25 +114,35 @@ export default function Sidebar() {
             <div className="sep-x-cyan mx-4 mb-4" />
 
             <nav className="flex-1 px-2 space-y-0.5">
-              {NAV.map((item, i) => (
+              {navItems.map((item, i) => (
                 <NavItem
                   key={item.href}
                   item={item}
-                  isActive={item.href === '/client' ? pathname === '/client' : pathname.startsWith(item.href)}
+                  isActive={
+                    item.href.endsWith('/') && item.href !== '/'
+                      ? pathname === item.href
+                      : pathname === item.href || pathname.startsWith(item.href + '/')
+                  }
                   index={i}
                   expanded={sidebarOpen}
-                  onNavigate={() => { if (isMobile) open(false) }}
+                  onNavigate={() => {
+                    if (isMobile) setSidebarOpen(false)
+                    onNavigate?.()
+                  }}
                 />
               ))}
             </nav>
 
             <div className="px-2 space-y-0.5 pt-4 border-t border-white/[0.07]">
               <NavItem
-                item={{ href: '/dashboard/settings', label: 'Settings', icon: <Settings size={17} /> }}
-                isActive={pathname === '/dashboard/settings'}
+                item={{ href: '/settings', label: 'Settings', icon: <Settings size={17} /> }}
+                isActive={pathname === '/settings'}
                 index={0}
                 expanded={sidebarOpen}
-                onNavigate={() => { if (isMobile) open(false) }}
+                onNavigate={() => {
+                  if (isMobile) setSidebarOpen(false)
+                  onNavigate?.()
+                }}
               />
               <motion.button
                 onClick={() => setLogoutModalOpen(true)}
@@ -156,7 +167,7 @@ export default function Sidebar() {
 
         {!isMobile && (
           <motion.button
-            onClick={() => open(!sidebarOpen)}
+            onClick={() => setSidebarOpen(!sidebarOpen)}
             whileHover={{ scale: 1.12 }}
             whileTap={{ scale: 0.9 }}
             className="absolute top-17 -right-3.5 items-center justify-center
@@ -168,7 +179,6 @@ export default function Sidebar() {
         )}
       </div>
 
-      {/* ── Logout confirmation modal ── */}
       <ReusableModal
         open={logoutModalOpen}
         title="Sign Out"
@@ -183,7 +193,7 @@ export default function Sidebar() {
 }
 
 interface NavItemProps {
-  item: { href: string; label: string; icon: React.ReactNode }
+  item: NavItem
   isActive: boolean
   index: number
   expanded: boolean
@@ -211,7 +221,7 @@ function NavItem({ item, isActive, index, expanded, onNavigate }: NavItemProps) 
             transition={{ type: 'spring' as const, stiffness: 320, damping: 32 }}
           />
         )}
-        <span className="relative z-10 shrink-0 flex items-center justify-center" style={{ width: SIDEBAR_COLLAPSED - 32 }}>
+        <span className="relative z-10 shrink-0 flex items-center justify-center" style={{ width: 56 - 32 }}>
           {item.icon}
         </span>
         <motion.span
