@@ -73,6 +73,7 @@ export function proxy(req: NextRequest) {
     return NextResponse.redirect(dashboardUrl)
   }
 
+  // ✅ Prevent browser from caching protected pages
   const res = NextResponse.next()
   res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
   res.headers.set('Pragma', 'no-cache')

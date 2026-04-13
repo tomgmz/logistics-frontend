@@ -13,6 +13,7 @@ import { useAuthStore } from '@/app/lib/store/auth.store'
 import { useAppDispatch, useAppSelector } from '@/app/lib/store/hooks'
 import { setSidebarOpen } from '@/app/lib/store/slice/booking.slice'
 import ReusableModal from '@/components/ui/ReusableModal'
+
 const SIDEBAR_COLLAPSED = 56
 const SIDEBAR_EXPANDED  = 260
 
@@ -52,10 +53,8 @@ export default function Sidebar() {
     } catch {
     } finally {
       clearUser()
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('auth-user')
-        window.location.href = '/'
-      }
+      localStorage.removeItem('auth-user')
+      window.location.replace('/')
     }
   }
 
@@ -87,7 +86,6 @@ export default function Sidebar() {
         >
           <div style={{ width: SIDEBAR_EXPANDED }} className="h-full flex flex-col py-5">
 
-            {/* User row */}
             <div className="flex items-center gap-3 px-4 mb-7 overflow-hidden">
               <div className="w-8 h-8 rounded-full bg-[var(--color-cyan)] glow-cyan flex items-center justify-center shrink-0">
                 <span className="font-card sm:!text-[0.8rem] md:!text-[0.9rem] lg:!text-[1.1rem] text-[var(--color-bg)] text-xs font-bold">
@@ -168,7 +166,6 @@ export default function Sidebar() {
         )}
       </div>
 
-      {/* ── Logout confirmation modal ── */}
       <ReusableModal
         open={logoutModalOpen}
         title="Sign Out"

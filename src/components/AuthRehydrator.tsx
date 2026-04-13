@@ -5,7 +5,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { getMe } from '@/app/lib/api/auth.api'
 import { useAuthStore } from '@/app/lib/store/auth.store'
 
-const PUBLIC_PATHS = ['/', '/favicon.ico']
+const PUBLIC_PATHS = ['/']
 
 export default function AuthRehydrator() {
   const setUser   = useAuthStore((s) => s.setUser)
