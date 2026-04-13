@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Check } from 'lucide-react'
 import StepServiceType from './ServiceType'
@@ -8,7 +8,7 @@ import StepBookingDetails from './BookingDetails'
 import StepVehicle from './ChooseVehicle'
 import StepReview from './ReviewBooking'
 import { useAppDispatch, useAppSelector } from '@/app/lib/store/hooks'
-import { setStep, setService } from '@/app/lib/store/slice/booking.slice'
+import { setStep, setService, resetBooking } from '@/app/lib/store/slice/booking.slice'
 import type { ServiceType } from '@/app/lib/store/slice/booking.slice'
 import './BookingDetails.css'
 
@@ -30,7 +30,8 @@ export default function BookingWizard() {
   const step     = useAppSelector((s) => s.booking.step)
   const service  = useAppSelector((s) => s.booking.service)
 
-  const [dir, setDir] = useState(1)
+  const [dir,       setDir]       = useState(1)
+  const [wizardKey, setWizardKey] = useState(0)  // ← NEW
 
   const goNext = () => {
     setDir(1)
@@ -40,6 +41,12 @@ export default function BookingWizard() {
     setDir(-1)
     dispatch(setStep(step - 1))
   }
+
+  // Called from SuccessView via StepReview's onNewBooking prop
+  const handleNewBooking = useCallback(() => {
+    dispatch(resetBooking())
+    setWizardKey(k => k + 1)  // ← forces full remount, clearing all local state
+  }, [dispatch])
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
@@ -88,8 +95,8 @@ export default function BookingWizard() {
         <div className="hidden sm:block" />
       </div>
 
-      {/* Step content */}
-      <div className="flex-1 min-h-0 relative overflow-hidden">
+      {/* Step content — key forces full remount on new booking */}
+      <div key={wizardKey} className="flex-1 min-h-0 relative overflow-hidden">
         <AnimatePresence mode="wait" custom={dir}>
           <motion.div
             key={step}
@@ -110,7 +117,7 @@ export default function BookingWizard() {
             )}
             {step === 2 && <StepBookingDetails onNext={goNext} onBack={goBack} />}
             {step === 3 && <StepVehicle        onNext={goNext} onBack={goBack} />}
-            {step === 4 && <StepReview selectedService={service} onBack={goBack} />}
+            {step === 4 && <StepReview selectedService={service} onBack={goBack} onNewBooking={handleNewBooking} />}
           </motion.div>
         </AnimatePresence>
       </div>

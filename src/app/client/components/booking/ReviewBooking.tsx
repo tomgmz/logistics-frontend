@@ -4,8 +4,7 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Truck } from 'lucide-react'
 import Image from 'next/image'
-import { useAppDispatch, useAppSelector } from '@/app/lib/store/hooks'
-import { resetBooking } from '@/app/lib/store/slice/booking.slice'
+import { useAppSelector } from '@/app/lib/store/hooks'
 import type { ServiceType, DropoffSection, CargoMode } from '@/app/lib/store/slice/booking.slice'
 import { createBooking } from '@/app/lib/api/client/booking.api'
 import { getMe } from '@/app/lib/api/auth.api'
@@ -15,6 +14,7 @@ import SuccessView from './SuccessView'
 interface Props {
   selectedService: ServiceType
   onBack: () => void
+  onNewBooking: () => void
 }
 
 const fadeUp = {
@@ -68,7 +68,7 @@ function buildCargoDetails(
   return JSON.stringify({ service, mode, sections })
 }
 
-export default function StepReview({ selectedService, onBack }: Props) {
+export default function StepReview({ selectedService, onBack, onNewBooking }: Props) {
   const [loading,   setLoading]   = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [bookingId, setBookingId] = useState<string | null>(null)
@@ -78,7 +78,6 @@ export default function StepReview({ selectedService, onBack }: Props) {
   const pickupLng     = useAppSelector((s) => s.booking.pickupLng)
   const dropoffCoords = useAppSelector((s) => s.booking.dropoffCoords)
 
-  const dispatch = useAppDispatch()
   const date     = useAppSelector((s) => s.booking.date)
   const time     = useAppSelector((s) => s.booking.time)
   const pickup   = useAppSelector((s) => s.booking.pickup)
@@ -164,7 +163,7 @@ const confirm = async () => {
           <SuccessView
             key="success"
             bookingId={bookingId}
-            onNewBooking={() => dispatch(resetBooking())}
+            onNewBooking={onNewBooking}
           />
         ) : (
 

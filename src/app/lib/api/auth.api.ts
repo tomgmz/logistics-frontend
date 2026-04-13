@@ -159,6 +159,7 @@ export async function verifyOtp(
     email,
     code,
     device_info: device_info ?? getDeviceInfo(),
+    platform:    'web',
   })
   return data.data as AuthResponse
 }

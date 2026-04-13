@@ -1,5 +1,5 @@
 import { ReactNode } from 'react'
-import ReusableDashboardShell from '@/components/ReusableDashboardShell'
+import ReusableDashboardShell from '@/components/ui/ReusableDashboardShell'
 import { Activity, UsersRound } from 'lucide-react'
 
 const SUPERADMIN_NAV = [

@@ -36,21 +36,12 @@ function getRoleFromToken(token: string): string | null {
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
 
-  // Always allow public paths through
   if (isPublicPath(pathname)) {
     return NextResponse.next()
   }
 
   const token = req.cookies.get('access_token')?.value
- 
-  console.log('MIDDLEWARE DEBUG:', {
-    pathname,
-    hasToken: !!token,
-    tokenPreview: token?.slice(0, 20),
-    allCookies: req.cookies.getAll().map((c) => c.name),
-  })
 
-  // No tokenredirect to landing page
   if (!token) {
     const homeUrl = req.nextUrl.clone()
     homeUrl.pathname = '/'
@@ -60,7 +51,6 @@ export function proxy(req: NextRequest) {
 
   const role = getRoleFromToken(token)
 
-  // Invalid or expired token clear cookies and redirect to landing page
   if (!role) {
     const homeUrl = req.nextUrl.clone()
     homeUrl.pathname = '/'
@@ -73,19 +63,21 @@ export function proxy(req: NextRequest) {
 
   const allowedPrefix = ROLE_ROUTES[role]
 
-  // Role exists but has no mapped route block access
   if (!allowedPrefix) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  // Role is trying to access a route they're not allowed redirect to their dashboard
   if (!pathname.startsWith(allowedPrefix)) {
     const dashboardUrl = req.nextUrl.clone()
     dashboardUrl.pathname = allowedPrefix
     return NextResponse.redirect(dashboardUrl)
   }
 
-  return NextResponse.next()
+  const res = NextResponse.next()
+  res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+  res.headers.set('Pragma', 'no-cache')
+  res.headers.set('Expires', '0')
+  return res
 }
 
 export const config = {

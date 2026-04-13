@@ -2,7 +2,7 @@
 
 import { ReactNode } from 'react'
 import Image from 'next/image'
-import ReusableDashboardShell from '@/components/ReusableDashboardShell'
+import ReusableDashboardShell from '@/components/ui/ReusableDashboardShell'
 import { ASSETS } from '@/constants/client/icon'
 
 const NAV_ITEMS = [

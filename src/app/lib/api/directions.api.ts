@@ -10,7 +10,7 @@ export interface DirectionsRequest {
   intermediates?: {
     location: { latLng: { latitude: number; longitude: number } }
   }[]
-  travelMode: 'DRIVE' | 'WALK' | 'BICYCLE' | 'TWO_WHEELER'
+  travelMode: 'DRIVE'
   routingPreference?: 'TRAFFIC_AWARE' | 'TRAFFIC_AWARE_OPTIMAL' | 'TRAFFIC_UNAWARE'
   
   routeModifiers?: {

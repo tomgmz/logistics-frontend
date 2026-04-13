@@ -6,7 +6,7 @@ import {
   CalendarDays, Clock, MapPin, Package,
   Truck, Plus, X, Check,
 } from 'lucide-react'
-import { useRef } from 'react'
+import { useRef, useEffect } from 'react'
 import { useAppDispatch, useAppSelector } from '@/app/lib/store/hooks'
 import {
   setDate, setTime, setPickup,
@@ -258,9 +258,12 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
     return existing ?? { dropoffIndex: i, groups: [makeDefaultGroup()] }
   })
 
-  if (sections.length !== dropoffs.length) {
-    dispatch(setSections(syncedSections))
-  }
+  useEffect(() => {
+    if (sections.length !== dropoffs.length) {
+      dispatch(setSections(syncedSections))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dropoffs.length])
 
   const rawErrors = validateBooking(date, time, pickup, dropoffs, syncedSections, mode)
   const errors    = touched ? rawErrors : { schedule: {}, route: { dropoffs: {} }, sections: [] }
@@ -600,7 +603,7 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
                                     </div>
                                   </div>
 
-                                  <div className="hidden lg:flex flex-row items-end gap-4 pb-0.5 ml-2 shrink-0">
+                                  <div className="hidden lg:flex flex-row items-end gap-4 pb-0.5 ml-2 shrink-0 self-end">
                                     <CheckRow checked={g.nonTiltable}
                                       onChange={(v) => handleUpdateGroup(section.dropoffIndex, g.id, { nonTiltable: v })}
                                       label="Non-tiltable" />

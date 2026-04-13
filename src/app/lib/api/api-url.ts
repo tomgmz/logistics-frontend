@@ -5,8 +5,7 @@ export function getApiUrl(): string {
   if (!url) {
     if (process.env.NODE_ENV !== 'production') {
       throw new Error(
-        '[getApiUrl] NEXT_PUBLIC_API_URL is not set. ' +
-        'Add it to your .env.local file (e.g. NEXT_PUBLIC_API_URL=http://localhost:4000/api).'
+        '[getApiUrl] NEXT_PUBLIC_API_URL is not set. '
       )
     }
     return '/api'
