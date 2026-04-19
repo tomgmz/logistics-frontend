@@ -1,11 +1,8 @@
 'use client';
 import * as React from 'react';
+import { AppRouterCacheProvider } from '@mui/material-nextjs/v15-appRouter';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
-import { CacheProvider } from '@emotion/react';
-import createCache from '@emotion/cache';
-
-const cache = createCache({ key: 'mui-style' });
 
 const theme = createTheme({
   palette: {
@@ -27,11 +24,11 @@ const theme = createTheme({
 
 export default function ThemeRegistry({ children }: { children: React.ReactNode }) {
   return (
-    <CacheProvider value={cache}>
+    <AppRouterCacheProvider options={{ key: 'mui-style' }}>
       <ThemeProvider theme={theme}>
         <CssBaseline />
         {children}
       </ThemeProvider>
-    </CacheProvider>
+    </AppRouterCacheProvider>
   );
 }

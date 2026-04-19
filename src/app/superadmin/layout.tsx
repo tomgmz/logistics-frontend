@@ -1,12 +1,75 @@
-import { ReactNode } from 'react'
-import ReusableDashboardShell from '@/components/ui/ReusableDashboardShell'
-import { Activity, UsersRound } from 'lucide-react'
+'use client'
 
-const SUPERADMIN_NAV = [
-  { href: '/superadmin/system-logs', label: 'System Logs', icon: <Activity size={20} /> },
-  { href: '/superadmin/admin-management', label: 'Admin Management', icon: <UsersRound size={20} /> },
+import {
+  Users,
+  FileSearch,
+  ScrollText,
+  MessageCircle,
+  Truck,
+  CalendarCheck,
+  MapPin,
+  CreditCard,
+  Bell,
+} from 'lucide-react'
+import ReusableDashboardShell from '../../components/ui/ReusableDashboardShell'
+import { ReactNode } from 'react'
+
+const superAdminNavItems = [
+  {
+    href: '/superadmin/system-logs',
+    label: 'System Logs',
+    icon: <ScrollText size={17} />,
+  },
+  {
+    href: '/superadmin/user-management',
+    label: 'User Management',
+    icon: <Users size={17} />,
+  },
+  {
+    href: '/superadmin/document-review',
+    label: 'Document Review',
+    icon: <FileSearch size={17} />,
+  },
+  {
+    href: '/superadmin/messaging',
+    label: 'Messaging',
+    icon: <MessageCircle size={17} />,
+  },
+  {
+    href: '/superadmin/vehicle-management',
+    label: 'Vehicle Management',
+    icon: <Truck size={17} />,
+  },
+  {
+    href: '/superadmin/booking-management',
+    label: 'Booking Management',
+    icon: <CalendarCheck size={17} />,
+  },
+  {
+    href: '/superadmin/transit-tracking',
+    label: 'Transit Tracking',
+    icon: <MapPin size={17} />,
+  },
+  {
+    href: '/superadmin/billing-payment',
+    label: 'Billing & Payment',
+    icon: <CreditCard size={17} />,
+  },
+  {
+    href: '/superadmin/notifications',
+    label: 'Notifications',
+    icon: <Bell size={17} />,
+  },
 ]
 
-export default function SuperAdminLayout({ children }: { children: ReactNode }) {
-  return <ReusableDashboardShell navItems={SUPERADMIN_NAV}>{children}</ReusableDashboardShell>
+interface SuperAdminShellProps {
+  children: ReactNode
+}
+
+export default function SuperAdminShell({ children }: SuperAdminShellProps) {
+  return (
+    <ReusableDashboardShell navItems={superAdminNavItems}>
+      {children}
+    </ReusableDashboardShell>
+  )
 }
