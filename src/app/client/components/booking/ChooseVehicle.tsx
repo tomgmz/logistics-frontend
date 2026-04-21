@@ -3,52 +3,17 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronLeft, ChevronRight, Truck, Loader2 } from 'lucide-react'
 import Image from 'next/image'
-import { useMemo, useState } from 'react'
-import { useAppDispatch, useAppSelector } from '@/app/lib/store/hooks'
+import { useState } from 'react'
+import { useAppDispatch, useAppSelector } from '@/app/lib/hooks/hooks'
 import { setVehicle } from '@/app/lib/store/slice/booking.slice'
-import type { CargoMode, DropoffSection } from '@/app/lib/store/slice/booking.slice'
 import { useTrucks } from '../../../lib/hooks/useTrucks'
 import './BookingDetails.css'
 import WizBtn from '../WizButton'
+import { selectCargoSummary, selectAllGroups } from '@/app/lib/store/bookingSelectors'
 
 interface Props {
   onNext: () => void
   onBack: () => void
-}
-
-function calcSummary(sections: DropoffSection[], mode: CargoMode) {
-  let totalPieces = 0, grossWeight = 0, netWeight = 0, volume = 0
-  for (const section of sections) {
-    for (const g of section.groups) {
-      if (mode === 'palletized') {
-        const pallets = Number(g.numPallets)           || 0
-        const gross   = Number(g.grossWeightPerPallet) || 0
-        const net     = Number(g.netWeightPerPallet)   || 0
-        if (pallets <= 0) continue
-        totalPieces += pallets
-        grossWeight += pallets * gross
-        netWeight   += pallets * net
-      } else {
-        const pieces = Number(g.pieces)
-        const length = Number(g.looseLength)
-        const width  = Number(g.looseWidth)
-        const height = Number(g.looseHeight)
-        const weight = Number(g.weight)
-        // skip entirely if any required field is missing or zero
-        if (!Number.isFinite(pieces) || pieces <= 0) continue
-        if (!Number.isFinite(length) || length <= 0 ||
-            !Number.isFinite(width)  || width  <= 0 ||
-            !Number.isFinite(height) || height <= 0) continue
-        if (!Number.isFinite(weight) || weight <= 0) continue
-        totalPieces += pieces
-        const weightKG = g.weightUnit === 'lbs' ? weight * 0.453592 : weight
-        grossWeight += g.perItem === 'Per Item' ? pieces * weightKG : weightKG
-        volume += pieces * (length * width * height) / 1_000_000
-      }
-    }
-  }
-  const density = volume > 0 ? grossWeight / volume : 0
-  return { totalPieces, grossWeight, netWeight, volume, density }
 }
 
 function getStatus(
@@ -79,16 +44,14 @@ const slideV = {
 export default function StepVehicle({ onNext, onBack }: Props) {
   const { vehicles, loading, error } = useTrucks()
 
-  const dispatch = useAppDispatch()
-  const sections = useAppSelector((s) => s.booking.sections)
-  const mode     = useAppSelector((s) => s.booking.mode)
+  const dispatch  = useAppDispatch()
+  const mode      = useAppSelector((s) => s.booking.mode)
+  // ── Single source of truth: all cargo math lives in the selector ──────────
+  const summary   = useAppSelector(selectCargoSummary)
+  const allGroups = useAppSelector(selectAllGroups)
 
   const [idx, setIdx] = useState(0)
   const [dir, setDir] = useState(1)
-
-  const allGroups = sections.flatMap((s) => s.groups)
-  
-  const summary   = useMemo(() => calcSummary(sections, mode), [sections, mode])
 
   const navigate = (delta: number) => {
     if (vehicles.length === 0) return
@@ -163,7 +126,6 @@ export default function StepVehicle({ onNext, onBack }: Props) {
     <div className="h-full flex flex-col overflow-y-auto lg:overflow-hidden p-3 sm:p-4 lg:p-5 gap-3 sm:gap-4">
       <div className="flex flex-col lg:flex-row gap-3 sm:gap-4 lg:flex-1 lg:min-h-0">
 
-        {/* LEFT CARD */}
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}
           className="lg:w-[360px] xl:w-[400px] shrink-0 rounded-2xl bg-[#2A2828]
                      border border-white/[0.07] border-t-[3px] border-t-[var(--color-cyan)]
@@ -194,8 +156,11 @@ export default function StepVehicle({ onNext, onBack }: Props) {
             <StatCard label="Volume"
               value={summary.volume > 0 ? `${summary.volume.toFixed(2)} CBM` : '—'} />
             {mode === 'palletized'
-              ? <StatCard label="Net Weight" value={summary.netWeight > 0 ? `${summary.netWeight.toFixed(1)} KG` : '—'} />
-              : <StatCard label="Density"    value={summary.density > 0 ? `${summary.density.toFixed(0)} KG/CBM` : '—'} />}
+              ? <StatCard label="Net Weight"
+                  value={summary.netWeight > 0 ? `${summary.netWeight.toFixed(1)} KG` : '—'} />
+              : <StatCard label="Density"
+                  // toFixed(2) matches BookingDetails — both read from the same selector
+                  value={summary.density > 0 ? `${summary.density.toFixed(2)} KG/CBM` : '—'} />}
           </div>
           <div className="flex flex-col gap-1 mt-1">
             {mode === 'loose' ? (
@@ -220,7 +185,6 @@ export default function StepVehicle({ onNext, onBack }: Props) {
           </div>
         </motion.div>
 
-        {/* RIGHT CARD */}
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, delay: 0.06 }}
           className="flex-1 min-w-0 lg:min-h-0 rounded-2xl bg-[#2A2828]
                      border border-white/[0.07] border-t-[3px] border-t-[var(--color-cyan)] flex flex-col"

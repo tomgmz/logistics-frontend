@@ -10,7 +10,7 @@ import '../components/booking/BookingDetails.css'
 import { useEffect, useState } from 'react'
 import { logout } from '@/app/lib/api/auth.api'
 import { useAuthStore } from '@/app/lib/store/auth.store'
-import { useAppDispatch, useAppSelector } from '@/app/lib/store/hooks'
+import { useAppDispatch, useAppSelector } from '@/app/lib/hooks/hooks'
 import { setSidebarOpen } from '@/app/lib/store/slice/booking.slice'
 import ReusableModal from '@/components/ui/ReusableModal'
 

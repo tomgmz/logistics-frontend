@@ -14,7 +14,7 @@ import type { BookingWithRelations }         from '@/app/lib/store/slice/routeMa
 import { StatusBadge }                       from './RouteMapComponents'
 import { DetailsPanelContent }               from './DetailsPanelContent'
 import { DirectionsRenderer }                from './DirectionsRenderer'
-import { useAppDispatch, useAppSelector }    from '@/app/lib/store/hooks'
+import { useAppDispatch, useAppSelector }    from '@/app/lib/hooks/hooks'
 import { useAuthStore }                      from '@/app/lib/store/auth.store'
 import {
   fetchBookings,
@@ -292,10 +292,8 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
     setDetailPanelOpen(true)
   }, [dispatch])
 
-  // Only use totalDuration from directions fallback (path 2).
-  // When encodedPolyline is present (path 1), routeData.total_duration is used directly.
   const resolvedDuration = encodedPolyline
-    ? (routeData?.total_duration ?? 0) * 60   // convert mins → secs to match format
+    ? (routeData?.total_duration ?? 0) * 60
     : totalDuration
 
   const detailPanel = routeData ? (

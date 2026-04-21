@@ -5,7 +5,6 @@ export type ServiceType = 'fmcg' | null
 
 export interface ItemGroup {
   id: string
-  // loose
   pieces: string
   looseLength: string
   looseWidth: string
@@ -15,7 +14,6 @@ export interface ItemGroup {
   perItem: 'Per Item' | 'Total'
   nonTiltable: boolean
   nonStackable: boolean
-  // palletized
   numPallets: string
   palletType: 'Standard' | 'Euro' | 'Half' | 'Custom'
   palletLength: string
@@ -26,7 +24,6 @@ export interface ItemGroup {
   netWeightPerPallet: string
   stackable: boolean
   oversize: boolean
-  // product meta
   commodity: string
   product: string
   shc: string
@@ -71,6 +68,45 @@ interface BookingState {
   vehicle: VehicleData | null
 }
 
+export function makeDefaultGroup(): ItemGroup {
+  return {
+    id: crypto.randomUUID(),
+    pieces: '',
+    looseLength: '',
+    looseWidth: '',
+    looseHeight: '',
+    weight: '',
+    weightUnit: 'kg',
+    perItem: 'Per Item',
+    nonTiltable: false,
+    nonStackable: false,
+    numPallets: '',
+    palletType: 'Standard',
+    palletLength: '120',
+    palletWidth: '100',
+    palletHeight: '',
+    palletWeightUnit: 'kg',
+    grossWeightPerPallet: '',
+    netWeightPerPallet: '',
+    stackable: false,
+    oversize: false,
+    commodity: '',
+    product: '',
+    shc: '',
+    additionalShc: '',
+  }
+}
+
+function ensureSection(state: BookingState, dropoffIndex: number): DropoffSection {
+  let section = state.sections.find((s) => s.dropoffIndex === dropoffIndex)
+  if (!section) {
+    section = { dropoffIndex, groups: [makeDefaultGroup()] }
+    state.sections.push(section)
+    state.sections.sort((a, b) => a.dropoffIndex - b.dropoffIndex)
+  }
+  return section
+}
+
 const initialState: BookingState = {
   sidebarOpen: true,
   step: 1,
@@ -83,7 +119,7 @@ const initialState: BookingState = {
   dropoffs: [''],
   dropoffCoords: [{ lat: null, lng: null }],
   mode: 'loose',
-  sections: [],
+  sections: [{ dropoffIndex: 0, groups: [makeDefaultGroup()] }],
   allNonTiltable: false,
   allNonStackable: false,
   allStackable: false,
@@ -131,15 +167,18 @@ const bookingSlice = createSlice({
     },
     addDropoff(state) {
       if (state.dropoffs.length < 3) {
+        const newIndex = state.dropoffs.length
         state.dropoffs.push('')
         state.dropoffCoords.push({ lat: null, lng: null })
+        state.sections.push({ dropoffIndex: newIndex, groups: [makeDefaultGroup()] })
       }
     },
     removeDropoff(state, action: PayloadAction<number>) {
-      state.dropoffs      = state.dropoffs.filter((_, i) => i !== action.payload)
-      state.dropoffCoords = state.dropoffCoords.filter((_, i) => i !== action.payload)
+      const removed = action.payload
+      state.dropoffs      = state.dropoffs.filter((_, i) => i !== removed)
+      state.dropoffCoords = state.dropoffCoords.filter((_, i) => i !== removed)
       state.sections = state.sections
-        .filter((s) => s.dropoffIndex !== action.payload)
+        .filter((s) => s.dropoffIndex !== removed)
         .map((s, newIndex) => ({ ...s, dropoffIndex: newIndex }))
     },
     setMode(state, action: PayloadAction<CargoMode>) {
@@ -149,19 +188,19 @@ const bookingSlice = createSlice({
       state.sections = action.payload
     },
     updateGroup(state, action: PayloadAction<{ dropoffIndex: number; groupId: string; patch: Partial<ItemGroup> }>) {
-      const section = state.sections.find((s) => s.dropoffIndex === action.payload.dropoffIndex)
-      if (!section) return
-      const group = section.groups.find((g) => g.id === action.payload.groupId)
+      const section = ensureSection(state, action.payload.dropoffIndex)
+      const group   = section.groups.find((g) => g.id === action.payload.groupId)
       if (!group) return
       Object.assign(group, action.payload.patch)
     },
     addGroup(state, action: PayloadAction<{ dropoffIndex: number; newGroup: ItemGroup }>) {
-      const section = state.sections.find((s) => s.dropoffIndex === action.payload.dropoffIndex)
-      if (section) section.groups.push(action.payload.newGroup)
+      const section = ensureSection(state, action.payload.dropoffIndex)
+      section.groups.push(action.payload.newGroup)
     },
     removeGroup(state, action: PayloadAction<{ dropoffIndex: number; groupId: string }>) {
       const section = state.sections.find((s) => s.dropoffIndex === action.payload.dropoffIndex)
       if (!section) return
+      if (section.groups.length <= 1) return
       section.groups = section.groups.filter((g) => g.id !== action.payload.groupId)
     },
     setAllNonTiltable(state, action: PayloadAction<boolean>) {
@@ -184,7 +223,10 @@ const bookingSlice = createSlice({
       state.vehicle = action.payload
     },
     resetBooking() {
-      return initialState
+      return {
+        ...initialState,
+        sections: [{ dropoffIndex: 0, groups: [makeDefaultGroup()] }],
+      }
     },
   },
 })

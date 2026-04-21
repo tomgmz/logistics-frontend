@@ -1,25 +1,26 @@
 'use client'
 
 import { motion, Variants, AnimatePresence } from 'framer-motion'
-import { useCallback, useState } from 'react'
+import { useCallback, useState, useRef } from 'react'
 import {
   CalendarDays, Clock, MapPin, Package,
   Truck, Plus, X, Check, Info,
 } from 'lucide-react'
-import { useRef, useEffect } from 'react'
-import { useAppDispatch, useAppSelector } from '@/app/lib/store/hooks'
+import { useAppDispatch, useAppSelector } from '@/app/lib/hooks/hooks'
 import {
   setDate, setTime, setPickup,
   setPickupCoords,
   updateDropoff, updateDropoffCoords, addDropoff, removeDropoff,
-  setMode, setSections,
+  setMode,
   updateGroup as updateGroupAction,
   addGroup as addGroupAction,
   removeGroup as removeGroupAction,
   setAllNonTiltable, setAllNonStackable,
   setAllStackable, setAllOversize,
+  makeDefaultGroup,
 } from '@/app/lib/store/slice/booking.slice'
-import type { CargoMode, ItemGroup, DropoffSection } from '@/app/lib/store/slice/booking.slice'
+import type { CargoMode, ItemGroup } from '@/app/lib/store/slice/booking.slice'
+import { selectCargoSummary, selectSections } from '@/app/lib/store/bookingSelectors'
 import MapLocationPicker from './MapLocationPicker'
 import './BookingDetails.css'
 
@@ -143,66 +144,12 @@ const stagger: Variants = {
   show:   { transition: { staggerChildren: 0.07 } },
 }
 
-function calcSummary(sections: DropoffSection[], mode: CargoMode) {
-  let totalPieces = 0, grossWeight = 0, netWeight = 0, volume = 0
-  for (const section of sections) {
-    for (const g of section.groups) {
-      if (mode === 'palletized') {
-        const pallets = Number(g.numPallets) || 0
-        const gross   = Number(g.grossWeightPerPallet) || 0
-        const net     = Number(g.netWeightPerPallet)   || 0
-        if (pallets <= 0) continue
-        totalPieces += pallets
-        grossWeight += pallets * gross
-        netWeight   += pallets * net
-      } else {
-        const pieces = Number(g.pieces)
-        const length = Number(g.looseLength)
-        const width  = Number(g.looseWidth)
-        const height = Number(g.looseHeight)
-        const weight = Number(g.weight)
-        if (!Number.isFinite(pieces) || pieces <= 0) continue
-        if (!Number.isFinite(length) || length <= 0 ||
-            !Number.isFinite(width)  || width  <= 0 ||
-            !Number.isFinite(height) || height <= 0) continue
-        if (!Number.isFinite(weight) || weight <= 0) continue
-        totalPieces += pieces
-        const weightKG = g.weightUnit === 'lbs' ? weight * 0.453592 : weight
-        grossWeight += g.perItem === 'Per Item' ? pieces * weightKG : weightKG
-        volume += pieces * (length * width * height) / 1_000_000
-      }
-    }
-  }
-  const density = volume > 0 ? grossWeight / volume : 0
-  return { totalPieces, grossWeight, netWeight, volume, density }
-}
-
-export function makeDefaultGroup(): ItemGroup {
-  return {
-    id: crypto.randomUUID(),
-    pieces: '', looseLength: '', looseWidth: '', looseHeight: '',
-    weight: '', weightUnit: 'kg', perItem: 'Per Item',
-    nonTiltable: false, nonStackable: false,
-    numPallets: '', palletType: 'Standard',
-    ...PALLET_DIMENSIONS['Standard'],
-    palletWeightUnit: 'kg',
-    grossWeightPerPallet: '', netWeightPerPallet: '',
-    stackable: false, oversize: false,
-    commodity: '', product: '', shc: '', additionalShc: '',
-  }
-}
-
 function Req() {
   return <span style={{ color: ERROR_COLOR, marginLeft: 2 }}>*</span>
 }
 
 function LocationField({
-  value,
-  placeholder,
-  hasError,
-  errorMsg,
-  accentColor,
-  onClick,
+  value, placeholder, hasError, errorMsg, accentColor, onClick,
 }: {
   value: string
   placeholder: string
@@ -227,16 +174,11 @@ function LocationField({
         }}
       >
         <MapPin size={13} style={{ color: accentColor, flexShrink: 0 }} />
-        <span
-          className="flex-1 text-sm truncate"
-          style={{ color: value ? '#fff' : 'rgba(255,255,255,0.3)' }}
-        >
+        <span className="flex-1 text-sm truncate" style={{ color: value ? '#fff' : 'rgba(255,255,255,0.3)' }}>
           {value || placeholder}
         </span>
       </button>
-      {hasError && errorMsg && (
-        <FormHelperText sx={HELPER_SX}>{errorMsg}</FormHelperText>
-      )}
+      {hasError && errorMsg && <FormHelperText sx={HELPER_SX}>{errorMsg}</FormHelperText>}
     </div>
   )
 }
@@ -249,28 +191,19 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
   const pickup          = useAppSelector((s) => s.booking.pickup)
   const dropoffs        = useAppSelector((s) => s.booking.dropoffs)
   const mode            = useAppSelector((s) => s.booking.mode)
-  const sections        = useAppSelector((s) => s.booking.sections)
+  const sections        = useAppSelector(selectSections)
   const allNonTiltable  = useAppSelector((s) => s.booking.allNonTiltable)
   const allNonStackable = useAppSelector((s) => s.booking.allNonStackable)
   const allStackable    = useAppSelector((s) => s.booking.allStackable)
   const allOversize     = useAppSelector((s) => s.booking.allOversize)
+  const summary         = useAppSelector(selectCargoSummary)
 
-  const [touched,     setTouched]     = useState(false)
-  const [mapTarget,   setMapTarget]   = useState<MapPickerTarget>(null)
+  const [touched,   setTouched]   = useState(false)
+  const [mapTarget, setMapTarget] = useState<MapPickerTarget>(null)
 
-  const syncedSections: DropoffSection[] = dropoffs.map((_, i) => {
-    const existing = sections.find((s) => s.dropoffIndex === i)
-    return existing ?? { dropoffIndex: i, groups: [makeDefaultGroup()] }
-  })
+  const allGroups = sections.flatMap((s) => s.groups)
 
-  useEffect(() => {
-    if (sections.length !== dropoffs.length) {
-      dispatch(setSections(syncedSections))
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dropoffs.length])
-
-  const rawErrors = validateBooking(date, time, pickup, dropoffs, syncedSections, mode)
+  const rawErrors = validateBooking(date, time, pickup, dropoffs, sections, mode)
   const errors    = touched ? rawErrors : { schedule: {}, route: { dropoffs: {} }, sections: [] }
 
   const handleNext = () => {
@@ -281,10 +214,6 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
 
   const handleAddDropoff = () => {
     dispatch(addDropoff())
-    dispatch(setSections([
-      ...syncedSections,
-      { dropoffIndex: dropoffs.length, groups: [makeDefaultGroup()] },
-    ]))
   }
 
   const handleUpdateGroup = (dropoffIndex: number, groupId: string, patch: Partial<ItemGroup>) =>
@@ -311,15 +240,11 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
     [dispatch, mapTarget],
   )
 
-  const summary      = calcSummary(syncedSections, mode)
-  const allGroups    = syncedSections.flatMap((s) => s.groups)
   const dateInputRef = useRef<HTMLInputElement>(null)
   const timeInputRef = useRef<HTMLInputElement>(null)
 
   const mapInitialValue = mapTarget
-    ? mapTarget.kind === 'pickup'
-      ? pickup
-      : dropoffs[mapTarget.index] ?? ''
+    ? mapTarget.kind === 'pickup' ? pickup : dropoffs[mapTarget.index] ?? ''
     : ''
 
   const mapPickerMode: 'pickup' | 'dropoff' =
@@ -353,7 +278,6 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
         <motion.div variants={stagger} initial="hidden" animate="show"
           className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-6"
         >
-          {/* TransitSched */}
           <motion.div variants={fadeUp}
             className="bg-[#2A2828] rounded-md border border-white/[0.07] p-4 flex flex-col gap-3"
           >
@@ -410,7 +334,6 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
             </div>
           </motion.div>
 
-          {/* Pickup */}
           <motion.div variants={fadeUp}
             className="bg-[#2A2828] rounded-md border border-white/[0.07] p-4 flex flex-col gap-3"
           >
@@ -418,19 +341,16 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
               <SectionHeader icon={<Truck size={16} />} title="Pick Up Point" />
               <Req />
             </div>
-            <div className="flex flex-col gap-1">
-              <LocationField
-                value={pickup}
-                placeholder="Click to set on map"
-                hasError={!!errors.route.pickup}
-                errorMsg={errors.route.pickup}
-                accentColor={CYAN}
-                onClick={() => setMapTarget({ kind: 'pickup' })}
-              />
-            </div>
+            <LocationField
+              value={pickup}
+              placeholder="Click to set on map"
+              hasError={!!errors.route.pickup}
+              errorMsg={errors.route.pickup}
+              accentColor={CYAN}
+              onClick={() => setMapTarget({ kind: 'pickup' })}
+            />
           </motion.div>
 
-          {/* Dropoff */}
           <motion.div variants={fadeUp}
             className="bg-[#2A2828] rounded-md border border-white/[0.07] p-4 flex flex-col gap-2"
           >
@@ -440,27 +360,25 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
             </div>
             <div className="flex flex-col gap-2 mt-1">
               {dropoffs.map((d, i) => (
-                <div key={i} className="flex flex-col gap-0.5">
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 min-w-0">
-                      <LocationField
-                        value={d}
-                        placeholder="Click to set on map"
-                        hasError={!!errors.route.dropoffs[i]}
-                        errorMsg={errors.route.dropoffs[i]}
-                        accentColor={RED}
-                        onClick={() => setMapTarget({ kind: 'dropoff', index: i })}
-                      />
-                    </div>
-                    {i > 0 && (
-                      <button
-                        onClick={() => dispatch(removeDropoff(i))}
-                        className="hover:text-red-400 transition-colors cursor-pointer shrink-0"
-                      >
-                        <X size={13} />
-                      </button>
-                    )}
+                <div key={i} className="flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <LocationField
+                      value={d}
+                      placeholder="Click to set on map"
+                      hasError={!!errors.route.dropoffs[i]}
+                      errorMsg={errors.route.dropoffs[i]}
+                      accentColor={RED}
+                      onClick={() => setMapTarget({ kind: 'dropoff', index: i })}
+                    />
                   </div>
+                  {i > 0 && (
+                    <button
+                      onClick={() => dispatch(removeDropoff(i))}
+                      className="hover:text-red-400 transition-colors cursor-pointer shrink-0"
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
                 </div>
               ))}
               {dropoffs.length < 3 && (
@@ -474,13 +392,11 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
           </motion.div>
         </motion.div>
 
-        {/* Productand Cargo Capacity */}
         <motion.div variants={fadeUp} initial="hidden" animate="show"
           className="bg-[#2A2828] rounded-md border border-white/[0.07] p-4 flex flex-col gap-4"
         >
           <div className="flex items-start justify-between gap-3">
             <SectionHeader icon={<Package size={16} />} title="Product & Cargo Capacity" />
-
             <div className="relative group shrink-0">
               <button
                 type="button"
@@ -491,7 +407,6 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
               >
                 <Info size={15} />
               </button>
-
               <div
                 role="tooltip"
                 className="pointer-events-none absolute right-0 top-9 z-20 w-[260px]
@@ -529,7 +444,7 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
 
           <div className="flex flex-col gap-6">
             <AnimatePresence>
-              {syncedSections.map((section) => {
+              {sections.map((section) => {
                 const dropoffLabel = dropoffs[section.dropoffIndex]?.trim() || `Drop-off ${section.dropoffIndex + 1}`
                 return (
                   <motion.div key={section.dropoffIndex}
@@ -786,7 +701,6 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
           </div>
         </motion.div>
 
-        {/* Cargo Summary */}
         <motion.div variants={fadeUp} initial="hidden" animate="show"
           className="rounded-md bg-[#2A2828] p-5 flex flex-col gap-3
                      border border-white/[0.07] border-t-[3px] border-t-[var(--color-cyan)]"
@@ -838,7 +752,6 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
           </div>
         </motion.div>
 
-        {/* Nav buttons */}
         <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5 }} className="flex justify-between gap-3 pt-2"
         >
@@ -850,7 +763,7 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
           <WizBtn onClick={handleNext} variant="next">NEXT</WizBtn>
         </motion.div>
 
-      </div>{/* end scrollable content */}
+      </div>
     </div>
   )
 }
