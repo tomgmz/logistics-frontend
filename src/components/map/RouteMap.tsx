@@ -28,6 +28,18 @@ const GOOGLE_MAPS_KEY    = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!
 const GOOGLE_MAPS_MAP_ID = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID!
 const LOGO_SRC           = 'https://www.figma.com/api/mcp/asset/656e388d-93f0-4b64-8a3d-a39b21a2a160'
 
+const FILTERS = ['All', 'Active', 'Pending', 'Completed'] as const
+type FilterKey = typeof FILTERS[number]
+
+function filterBookings(bookings: BookingWithRelations[], filter: FilterKey) {
+  switch (filter) {
+    case 'Active':    return bookings.filter((b) => b.status === 'in_transit' || b.status === 'assigned')
+    case 'Pending':   return bookings.filter((b) => b.status === 'pending')
+    case 'Completed': return bookings.filter((b) => b.status === 'completed'  || b.status === 'cancelled')
+    default:          return bookings
+  }
+}
+
 function fmtStatus(s: string) {
   return s.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase())
 }
@@ -69,7 +81,6 @@ function BookingListItem({
     booking.booking_destinations?.[booking.booking_destinations.length - 1]?.address
 
   const dest     = lastDestAddress?.split(',')[0] ?? '—'
-
   const destAbbr = addressAbbr(lastDestAddress, 'DST')
 
   return (
@@ -145,10 +156,10 @@ function MapMarkers({ routeData, stops }: { routeData: OptimizeRouteResponse; st
           transition={{ delay: 0.3, type: 'spring', stiffness: 300 }}
           className="text-[10px] font-black px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1.5 border"
           style={{
-            background: 'var(--color-bg)',
+            background:  'var(--color-bg)',
             borderColor: 'var(--color-cyan)',
-            color: 'var(--color-cyan)',
-            boxShadow: ' 0 0 12px rgba(77,249,237,0.4)',
+            color:       'var(--color-cyan)',
+            boxShadow:   '0 0 12px rgba(77,249,237,0.4)',
           }}
         >
           <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: 'var(--color-cyan)' }} />
@@ -204,38 +215,42 @@ function EmptyMapState() {
 }
 
 export default function RouteMap({ initialBookingId }: { initialBookingId?: string }) {
-  const dispatch  = useAppDispatch()
+  const dispatch = useAppDispatch()
 
   const [totalDuration, setTotalDuration] = useState<number>(0)
 
   const user = useAuthStore((s) => s.user)
 
-  const bookings      = useAppSelector((s) => s.routeMap.bookings)
-  const listLoading   = useAppSelector((s) => s.routeMap.listLoading)
-  const listError     = useAppSelector((s) => s.routeMap.listError)
-  const selectedId    = useAppSelector((s) => s.routeMap.selectedId)
-  const routeData     = useAppSelector((s) => s.routeMap.routeData)
-  const bookingDetail = useAppSelector((s) => s.routeMap.bookingDetail)
-  const stops         = useAppSelector((s) => s.routeMap.stops)
-  const detailLoading = useAppSelector((s) => s.routeMap.detailLoading)
-  const detailError   = useAppSelector((s) => s.routeMap.detailError)
+  const bookings        = useAppSelector((s) => s.routeMap.bookings)
+  const listLoading     = useAppSelector((s) => s.routeMap.listLoading)
+  const listError       = useAppSelector((s) => s.routeMap.listError)
+  const selectedId      = useAppSelector((s) => s.routeMap.selectedId)
+  const routeData       = useAppSelector((s) => s.routeMap.routeData)
+  const bookingDetail   = useAppSelector((s) => s.routeMap.bookingDetail)
+  const stops           = useAppSelector((s) => s.routeMap.stops)
+  const encodedPolyline = useAppSelector((s) => s.routeMap.encodedPolyline)
+  const detailLoading   = useAppSelector((s) => s.routeMap.detailLoading)
+  const detailError     = useAppSelector((s) => s.routeMap.detailError)
 
   const [search,          setSearch]          = useState('')
+  const [activeFilter,    setActiveFilter]    = useState<FilterKey>('All')
   const [mobileView,      setMobileView]      = useState<'list' | 'map'>('list')
   const [sheetOpen,       setSheetOpen]       = useState(false)
   const [detailPanelOpen, setDetailPanelOpen] = useState(true)
 
-  const filteredList = search.trim()
+  const searchFiltered = search.trim()
     ? bookings.filter((b) => {
         const q = search.toLowerCase()
         return (
-          b.origin?.toLowerCase().includes(q)  ||
-          b.status?.toLowerCase().includes(q)  ||
+          b.origin?.toLowerCase().includes(q) ||
+          b.status?.toLowerCase().includes(q) ||
           b.truck_type_needed?.toLowerCase().includes(q) ||
           b.booking_destinations?.some((d: { address: string }) => d.address.toLowerCase().includes(q))
         )
       })
     : bookings
+
+  const filteredList = filterBookings(searchFiltered, activeFilter)
 
   const completedStops     = stops.filter((s) => s.status === 'delivered').length
   const totalStops         = stops.length
@@ -268,7 +283,7 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
         setMobileView('map')
       }
     },
-    [dispatch, selectedId]
+    [dispatch, selectedId],
   )
 
   const handleClearSelection = useCallback(() => {
@@ -277,11 +292,19 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
     setDetailPanelOpen(true)
   }, [dispatch])
 
+  // Only use totalDuration from directions fallback (path 2).
+  // When encodedPolyline is present (path 1), routeData.total_duration is used directly.
+  const resolvedDuration = encodedPolyline
+    ? (routeData?.total_duration ?? 0) * 60   // convert mins → secs to match format
+    : totalDuration
+
   const detailPanel = routeData ? (
     <DetailsPanelContent
       routeData={{
         ...routeData,
-        total_duration: totalDuration > 0 ? Math.floor(totalDuration / 60) : routeData.total_duration,
+        total_duration: resolvedDuration > 0
+          ? Math.floor(resolvedDuration / 60)
+          : routeData.total_duration,
       }}
       bookingDetail={bookingDetail}
       completedStops={completedStops}
@@ -316,20 +339,15 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
       defaultZoom={11}
       gestureHandling="greedy"
       className="w-full h-full"
-      // styles={[
-      //   { elementType: 'geometry',           stylers: [{ color: '#212121' }] },
-      //   { elementType: 'labels.text.stroke', stylers: [{ color: '#212121' }] },
-      //   { elementType: 'labels.text.fill',   stylers: [{ color: '#757575' }] },
-      //   { featureType: 'road',  elementType: 'geometry', stylers: [{ color: '#2c2c2c' }] },
-      //   { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#000000' }] },
-      //   { featureType: 'poi',   elementType: 'geometry', stylers: [{ color: '#1a1a1a' }] },
-      // ] as never}
     >
       <MapMarkers routeData={routeData} stops={stops} />
       <DirectionsRenderer
+        encodedPolyline={encodedPolyline}
         origin={routeData.origin}
         stops={stops}
-        onDurations={(total, _legs) => setTotalDuration(total)}
+        onDurations={(total, _legs) => {
+          if (!encodedPolyline) setTotalDuration(total)
+        }}
       />
     </Map>
   ) : (
@@ -338,17 +356,85 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
 
   const bookingList = (
     <div className="flex flex-col h-full">
-      <div className="p-3 flex-shrink-0">
+
+      <div className="px-3 pt-3 pb-2 flex-shrink-0">
         <div className="flex items-center gap-2 rounded-[10px] px-3 py-2.5" style={{ background: '#2a2828' }}>
           <SearchIcon sx={{ fontSize: 16, color: '#9f9c9c' }} />
           <input
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value)
+              setActiveFilter('All')
+            }}
             placeholder="Search"
             className="bg-transparent border-none outline-none text-sm flex-1"
             style={{ color: '#9f9c9c' }}
           />
         </div>
+      </div>
+
+      <div className="hidden lg:grid lg:grid-cols-2 gap-1 px-3 pb-2.5 flex-shrink-0">
+        {FILTERS.map((f) => {
+          const isActive = activeFilter === f
+          const count    = filterBookings(searchFiltered, f).length
+          return (
+            <button
+              key={f}
+              onClick={() => setActiveFilter(f)}
+              className="flex items-center justify-center gap-1 py-1.5 rounded-lg text-[11px] font-bold transition-all border"
+              style={{
+                background:  isActive ? 'rgba(77,249,237,0.12)' : 'transparent',
+                borderColor: isActive ? 'rgba(77,249,237,0.35)' : 'var(--color-surface-dark)',
+                color:       isActive ? 'var(--color-cyan)'     : '#555',
+              }}
+            >
+              {f}
+              {count > 0 && (
+                <span
+                  className="rounded-full min-w-[16px] h-4 flex items-center justify-center px-1 text-[10px] font-black leading-none"
+                  style={{
+                    background: isActive ? 'rgba(77,249,237,0.2)' : '#222',
+                    color:      isActive ? 'var(--color-cyan)'     : '#666',
+                  }}
+                >
+                  {count}
+                </span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      <div className="flex lg:hidden gap-1 px-3 pb-2.5 flex-shrink-0">
+        {FILTERS.map((f) => {
+          const isActive = activeFilter === f
+          const count    = filterBookings(searchFiltered, f).length
+          return (
+            <button
+              key={f}
+              onClick={() => setActiveFilter(f)}
+              className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[11px] font-bold transition-all border"
+              style={{
+                background:  isActive ? 'rgba(77,249,237,0.12)' : 'transparent',
+                borderColor: isActive ? 'rgba(77,249,237,0.35)' : 'var(--color-surface-dark)',
+                color:       isActive ? 'var(--color-cyan)'     : '#555',
+              }}
+            >
+              {f}
+              {count > 0 && (
+                <span
+                  className="rounded-full min-w-[16px] h-4 flex items-center justify-center px-1 text-[10px] font-black leading-none"
+                  style={{
+                    background: isActive ? 'rgba(77,249,237,0.2)' : '#222',
+                    color:      isActive ? 'var(--color-cyan)'     : '#666',
+                  }}
+                >
+                  {count}
+                </span>
+              )}
+            </button>
+          )
+        })}
       </div>
 
       <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-800">
@@ -361,15 +447,19 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
         ) : listError ? (
           <div className="p-4 text-center">
             <p className="text-red-400 text-sm mb-3">{listError}</p>
-            <button onClick={loadBookings}
+            <button
+              onClick={loadBookings}
               className="text-[13px] flex items-center gap-1 mx-auto hover:opacity-80"
-              style={{ color: 'var(--color-cyan)' }}>
+              style={{ color: 'var(--color-cyan)' }}
+            >
               <RefreshIcon sx={{ fontSize: 14 }} /> Retry
             </button>
           </div>
         ) : filteredList.length === 0 ? (
           <div className="p-6 text-center">
-            <p className="text-gray-600 text-sm">No bookings found</p>
+            <p className="text-gray-600 text-sm">
+              {activeFilter === 'All' ? 'No bookings found' : `No ${activeFilter.toLowerCase()} bookings`}
+            </p>
           </div>
         ) : (
           <AnimatePresence>
@@ -397,9 +487,9 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
           onClick={() => setDetailPanelOpen(true)}
           className="w-full py-2.5 text-xs font-bold uppercase tracking-widest border-t flex items-center justify-center gap-1.5 hover:opacity-70 transition-opacity flex-shrink-0"
           style={{
-            color: 'var(--color-cyan)',
+            color:       'var(--color-cyan)',
             borderColor: 'var(--color-surface-dark)',
-            background: 'transparent',
+            background:  'transparent',
           }}
         >
           <ArrowForwardIcon sx={{ fontSize: 12 }} />
@@ -517,7 +607,6 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
       >
         <div className="h-12 flex items-center justify-between px-4 flex-shrink-0 border-b"
           style={{ borderColor: 'var(--color-surface-dark)' }}>
-          <Logo height={24} width={96} />
           {routeData && (
             <button
               onClick={handleClearSelection}
@@ -538,8 +627,8 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
               onClick={() => setMobileView(key)}
               className="flex-1 py-2.5 text-xs font-bold uppercase tracking-widest transition-colors border-b-2 ff-sc"
               style={{
-                color:        mobileView === key ? 'var(--color-cyan)' : '#555',
-                borderColor:  mobileView === key ? 'var(--color-cyan)' : 'transparent',
+                color:       mobileView === key ? 'var(--color-cyan)' : '#555',
+                borderColor: mobileView === key ? 'var(--color-cyan)' : 'transparent',
               }}
             >
               {key === 'list' ? 'Bookings' : 'Map'}

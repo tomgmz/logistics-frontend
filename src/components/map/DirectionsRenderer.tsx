@@ -2,10 +2,10 @@
 
 import { useEffect, useRef } from 'react'
 import { useMap } from '@vis.gl/react-google-maps'
-import { OptimizedStop } from '@/app/types/maps/routemap.types'
-import { computeDirections } from '@/app/lib/api/directions.api'
+import type { OptimizedStop } from '@/app/types/maps/routemap.types'
 
 interface DirectionsRendererProps {
+  encodedPolyline?: string | null
   origin: { latitude: number; longitude: number }
   stops: OptimizedStop[]
   onDurations?: (total: number, legs: number[]) => void
@@ -34,51 +34,89 @@ export function decodePolyline(encoded: string): google.maps.LatLngLiteral[] {
   return points
 }
 
-export function DirectionsRenderer({ origin, stops, onDurations }: DirectionsRendererProps) {
+export function DirectionsRenderer({
+  encodedPolyline,
+  origin,
+  stops,
+  onDurations,
+}: DirectionsRendererProps) {
   const map         = useMap()
   const polylineRef = useRef<google.maps.Polyline | null>(null)
-  const fetchingRef = useRef(false)
+  const renderedRef = useRef<string | null>(null)
 
   const originLat = origin.latitude
   const originLng = origin.longitude
   const stopsKey  = stops.map((s) => s.destination_id).join(',')
 
   useEffect(() => {
-    if (!map || stops.length === 0) return
+    if (!map || !encodedPolyline) return
+    if (renderedRef.current === encodedPolyline) return
+
+    polylineRef.current?.setMap(null)
+
+    const path = decodePolyline(encodedPolyline)
+
+    polylineRef.current = new google.maps.Polyline({
+      path,
+      strokeColor:   '#06b6d4',
+      strokeWeight:  4,
+      strokeOpacity: 0.9,
+      map,
+    })
+
+    renderedRef.current = encodedPolyline
+
+    onDurations?.(0, [])
+
+    return () => {
+      polylineRef.current?.setMap(null)
+      polylineRef.current = null
+      renderedRef.current = null
+    }
+  }, [map, encodedPolyline]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const fetchingRef = useRef(false)
+
+  useEffect(() => {
+    if (!map || encodedPolyline || stops.length === 0) return
     if (fetchingRef.current) return
 
     let mounted = true
     fetchingRef.current = true
 
-    computeDirections({
-      origin: {
-        location: { latLng: { latitude: originLat, longitude: originLng } },
-      },
-      destination: {
-        location: {
-          latLng: {
-            latitude:  stops[stops.length - 1].latitude,
-            longitude: stops[stops.length - 1].longitude,
+    import('@/app/lib/api/directions.api')
+      .then(({ computeDirections }) =>
+        computeDirections({
+          origin: {
+            location: { latLng: { latitude: originLat, longitude: originLng } },
           },
-        },
-      },
-      ...(stops.length > 1 && {
-        intermediates: stops.slice(0, -1).map((stop) => ({
-          location: { latLng: { latitude: stop.latitude, longitude: stop.longitude } },
-        })),
-      }),
-        travelMode:        'DRIVE',
-        routingPreference: 'TRAFFIC_AWARE',
-        routeModifiers: {
-          avoidTolls:    false,
-          avoidHighways: false,
-          avoidFerries:  true,
-        },
-    })
+          destination: {
+            location: {
+              latLng: {
+                latitude:  stops[stops.length - 1].latitude,
+                longitude: stops[stops.length - 1].longitude,
+              },
+            },
+          },
+          ...(stops.length > 1 && {
+            intermediates: stops.slice(0, -1).map((stop) => ({
+              location: { latLng: { latitude: stop.latitude, longitude: stop.longitude } },
+              via: true,  // ← forces strict pass-through order, fixes one-way street routing
+            })),
+          }),
+          travelMode:        'DRIVE',
+          routingPreference: 'TRAFFIC_AWARE',
+          routeModifiers: {
+            avoidTolls:    false,
+            avoidHighways: false,
+            avoidFerries:  true,
+          },
+        })
+      )
       .then((data) => {
         if (!mounted) return
 
-        const route = data?.routes?.[0]
+        const route   = data?.routes?.[0]
         const encoded = route?.polyline?.encodedPolyline
         if (!encoded) return
 
@@ -91,16 +129,15 @@ export function DirectionsRenderer({ origin, stops, onDurations }: DirectionsRen
           map,
         })
 
-        // parse durations from "2280s" → 2280
         const parseSecs = (d?: string) => parseInt(d ?? '0')
-
         const totalSecs = parseSecs(route?.duration)
-        const legSecs   = (route?.legs ?? []).map((l: { duration?: string }) => parseSecs(l.duration))
-
+        const legSecs   = (route?.legs ?? []).map(
+          (l: { duration?: string }) => parseSecs(l.duration)
+        )
         onDurations?.(totalSecs, legSecs)
       })
       .catch((err) => {
-        console.error('[Directions] error —', err)
+        console.error('[DirectionsRenderer] fallback directions error —', err)
       })
       .finally(() => {
         fetchingRef.current = false
@@ -112,7 +149,7 @@ export function DirectionsRenderer({ origin, stops, onDurations }: DirectionsRen
       polylineRef.current?.setMap(null)
       polylineRef.current = null
     }
-  }, [map, originLat, originLng, stopsKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [map, encodedPolyline, originLat, originLng, stopsKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return null
 }

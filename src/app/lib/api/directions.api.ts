@@ -9,10 +9,10 @@ export interface DirectionsRequest {
   }
   intermediates?: {
     location: { latLng: { latitude: number; longitude: number } }
+    via?: boolean
   }[]
   travelMode: 'DRIVE'
   routingPreference?: 'TRAFFIC_AWARE' | 'TRAFFIC_AWARE_OPTIMAL' | 'TRAFFIC_UNAWARE'
-  
   routeModifiers?: {
     avoidTolls?:    boolean
     avoidHighways?: boolean

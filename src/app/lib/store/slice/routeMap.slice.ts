@@ -62,29 +62,31 @@ export const fetchRouteAndDetail = createAsyncThunk(
 )
 
 interface RouteMapState {
-  bookings:      BookingWithRelations[]
-  listLoading:   boolean
-  listError:     string | null
+  bookings:         BookingWithRelations[]
+  listLoading:      boolean
+  listError:        string | null
 
-  selectedId:    string | null
-  routeData:     OptimizeRouteResponse | null
-  bookingDetail: BookingDetail | null
-  stops:         OptimizedStop[]
-  detailLoading: boolean
-  detailError:   string | null
+  selectedId:       string | null
+  routeData:        OptimizeRouteResponse | null
+  bookingDetail:    BookingDetail | null
+  stops:            OptimizedStop[]
+  encodedPolyline:  string | null
+  detailLoading:    boolean
+  detailError:      string | null
 }
 
 const initialState: RouteMapState = {
-  bookings:      [],
-  listLoading:   false,
-  listError:     null,
+  bookings:         [],
+  listLoading:      false,
+  listError:        null,
 
-  selectedId:    null,
-  routeData:     null,
-  bookingDetail: null,
-  stops:         [],
-  detailLoading: false,
-  detailError:   null,
+  selectedId:       null,
+  routeData:        null,
+  bookingDetail:    null,
+  stops:            [],
+  encodedPolyline:  null,
+  detailLoading:    false,
+  detailError:      null,
 }
 
 const routeMapSlice = createSlice({
@@ -92,18 +94,20 @@ const routeMapSlice = createSlice({
   initialState,
   reducers: {
     clearSelection(state) {
-      state.selectedId    = null
-      state.routeData     = null
-      state.bookingDetail = null
-      state.stops         = []
-      state.detailError   = null
+      state.selectedId       = null
+      state.routeData        = null
+      state.bookingDetail    = null
+      state.stops            = []
+      state.encodedPolyline  = null
+      state.detailError      = null
     },
     setSelectedId(state, action: PayloadAction<string>) {
-      state.selectedId    = action.payload
-      state.routeData     = null
-      state.bookingDetail = null
-      state.stops         = []
-      state.detailError   = null
+      state.selectedId       = action.payload
+      state.routeData        = null
+      state.bookingDetail    = null
+      state.stops            = []
+      state.encodedPolyline  = null
+      state.detailError      = null
     },
   },
   extraReducers: (builder) => {
@@ -128,11 +132,23 @@ const routeMapSlice = createSlice({
       })
       .addCase(fetchRouteAndDetail.fulfilled, (state, action) => {
         state.detailLoading = false
-        state.routeData     = action.payload.routeData
+        const routeData     = action.payload.routeData
+
+        state.routeData     = routeData
         state.bookingDetail = action.payload.bookingDetail
-        state.stops = [...(action.payload.routeData?.optimized_stops ?? [])].sort(
+        state.stops         = [...(routeData?.optimized_stops ?? [])].sort(
           (a, b) => a.optimized_sequence_order - b.optimized_sequence_order
         )
+
+        interface RouteDataWithPolyline {
+          encoded_polyline?: string
+          encodedPolyline?:  string
+        }
+        const routeDataExt    = routeData as unknown as RouteDataWithPolyline
+        state.encodedPolyline =
+          routeDataExt?.encoded_polyline ??
+          routeDataExt?.encodedPolyline ??
+          null
       })
       .addCase(fetchRouteAndDetail.rejected, (state, action) => {
         state.detailLoading = false
