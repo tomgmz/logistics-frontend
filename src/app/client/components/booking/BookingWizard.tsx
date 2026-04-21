@@ -3,20 +3,17 @@
 import { useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Check } from 'lucide-react'
-import StepServiceType from './ServiceType'
 import StepBookingDetails from './BookingDetails'
 import StepVehicle from './ChooseVehicle'
 import StepReview from './ReviewBooking'
 import { useAppDispatch, useAppSelector } from '@/app/lib/store/hooks'
-import { setStep, setService, resetBooking } from '@/app/lib/store/slice/booking.slice'
-import type { ServiceType } from '@/app/lib/store/slice/booking.slice'
+import { setStep, resetBooking } from '@/app/lib/store/slice/booking.slice'
 import './BookingDetails.css'
 
 const STEPS = [
-  { id: 1, label: 'Service Type'    },
-  { id: 2, label: 'Booking Details' },
-  { id: 3, label: 'Vehicle'         },
-  { id: 4, label: 'Review'          },
+  { id: 1, label: 'Booking Details' },
+  { id: 2, label: 'Vehicle'         },
+  { id: 3, label: 'Review'          },
 ]
 
 const slideVariants = {
@@ -108,16 +105,9 @@ export default function BookingWizard() {
             transition={{ duration: 0.38, ease: [0.4, 0, 0.2, 1] as [number, number, number, number] }}
             className="absolute inset-0 overflow-y-auto"
           >
-            {step === 1 && (
-              <StepServiceType
-                selected={service}
-                setSelected={(val: ServiceType) => dispatch(setService(val))}
-                onNext={goNext}
-              />
-            )}
-            {step === 2 && <StepBookingDetails onNext={goNext} onBack={goBack} />}
-            {step === 3 && <StepVehicle        onNext={goNext} onBack={goBack} />}
-            {step === 4 && <StepReview selectedService={service} onBack={goBack} onNewBooking={handleNewBooking} />}
+            {step === 1 && <StepBookingDetails onNext={goNext} />}
+            {step === 2 && <StepVehicle        onNext={goNext} onBack={goBack} />}
+            {step === 3 && <StepReview selectedService={service} onBack={goBack} onNewBooking={handleNewBooking} />}
           </motion.div>
         </AnimatePresence>
       </div>

@@ -1,7 +1,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
 
 export type CargoMode   = 'loose' | 'palletized'
-export type ServiceType = 'ecommerce' | 'fmcg' | null
+export type ServiceType = 'fmcg' | null
 
 export interface ItemGroup {
   id: string
@@ -74,7 +74,7 @@ interface BookingState {
 const initialState: BookingState = {
   sidebarOpen: true,
   step: 1,
-  service: null,
+  service: 'fmcg',
   date: '',
   time: '',
   pickup: '',
@@ -99,7 +99,7 @@ const bookingSlice = createSlice({
       state.sidebarOpen = action.payload
     },
     setStep(state, action: PayloadAction<number>) {
-      state.step = Math.min(Math.max(action.payload, 1), 4)
+      state.step = Math.min(Math.max(action.payload, 1), 3)
     },
     setService(state, action: PayloadAction<ServiceType>) {
       state.service = action.payload

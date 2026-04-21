@@ -111,6 +111,7 @@ export default function MapLocationPicker({
   useEffect(() => {
     if (!mapDivRef.current) return
     let cancelled = false
+    let clickListener: google.maps.MapsEventListener | null = null
 
     loadGoogleMapsScript().then(() => {
       if (cancelled || !mapDivRef.current) return
@@ -122,7 +123,7 @@ export default function MapLocationPicker({
         zoom:             15,
         disableDefaultUI: true,
         gestureHandling:  'greedy',
-        clickableIcons:   false,
+        clickableIcons:   true,
         styles:           DARK_MAP_STYLES as google.maps.MapTypeStyle[],
       })
 
@@ -145,10 +146,38 @@ export default function MapLocationPicker({
         const c = map.getCenter()
         if (c) reverseGeocode(c.lat(), c.lng())
       })
+
+      // Click establishments/POIs on the map to select them (pickup/drop-off).
+      // Google provides a `placeId` on POI clicks when `clickableIcons` is enabled.
+      clickListener = map.addListener('click', async (e: google.maps.MapMouseEvent) => {
+        const placeId = (e as unknown as { placeId?: string | null }).placeId
+        if (!placeId) return
+
+        // Prevent the default POI info window.
+        ;(e as unknown as { stop?: () => void }).stop?.()
+
+        try {
+          const resolved = await resolvePlace(placeId)
+          if (resolved.latitude !== null && resolved.longitude !== null) {
+            const c = { lat: resolved.latitude, lng: resolved.longitude }
+            map.setCenter(c)
+            map.setZoom(17)
+            setAddress(resolved.address)
+            setCoords(c)
+            setSearchQuery(resolved.address)
+            setShowSugg(false)
+          }
+        } catch (err) {
+          console.error('Failed to resolve POI placeId:', err)
+        }
+      })
     })
 
-    return () => { cancelled = true }
-  }, [reverseGeocode])
+    return () => {
+      cancelled = true
+      if (clickListener) google.maps.event.removeListener(clickListener)
+    }
+  }, [reverseGeocode, resolvePlace])
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {

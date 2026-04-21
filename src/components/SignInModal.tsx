@@ -7,15 +7,23 @@ import { AxiosError } from 'axios'
 import { requestOtp, verifyOtp, getMe, getAuthStatus, AuthUser } from '@/app/lib/api/auth.api'
 import { useAuthStore } from '@/app/lib/store/auth.store'
 
+/**
+ * Fallback map used only when the API doesn't return a portalUrl.
+ * Primary source of truth is `verifyOtp` → `data.portalUrl` from the backend.
+ */
 const ROLE_ROUTES: Record<string, string> = {
-  super_admin:    '/superadmin',
-  admin:          '/admin',
-  general_manager: '/general_manager',
-  client:         '/client',
-  vendor:         '/vendor',
-  accountant:     '/accountant',
+  super_admin:      '/superadmin',
+  general_manager:  '/general_manager',
+  accountant:       '/accountant',
+  human_resources:  '/human_resources',
+  fleet_admin:      '/fleet_admin',
+  operations_admin: '/operations_admin',
+  it_admin:         '/it_admin',
+  client:           '/client',
+  vendor:           '/vendor',
 }
-const getRoleRoute = (role: string) => ROLE_ROUTES[role] || '/'
+
+const getFallbackRoute = (role: string) => ROLE_ROUTES[role] ?? '/'
 
 const OTP_LENGTH  = 6
 const RESEND_SECS = 60
@@ -198,7 +206,7 @@ function OtpStep({
   onBack,
 }: {
   email: string
-  onSuccess: (user: AuthUser) => void
+  onSuccess: (user: AuthUser, portalUrl: string) => void
   onBack: () => void
 }) {
   const resendExpiresAt                   = useRef<number>(Date.now() + RESEND_SECS * 1000)
@@ -314,7 +322,9 @@ function OtpStep({
     setLoading(true); setError('')
     try {
       const res = await verifyOtp(email, code)
-      onSuccess(res.user)
+      // Use portalUrl from the API response; fall back to the local map if absent
+      const destination = res.portalUrl ?? getFallbackRoute(res.user.role)
+      onSuccess(res.user, destination)
     } catch (err) {
       const message = extractErrorMessage(err, 'Invalid or expired code. Please try again.')
       const detected = classifyError(message)
@@ -375,7 +385,7 @@ function OtpStep({
     )
   }
 
-  // Permanent lock screen — shown immediately if DB confirms permanent lock
+  // Permanent lock screen
   if (lockState === 'permanent') {
     return (
       <motion.div
@@ -409,7 +419,6 @@ function OtpStep({
           </span>
           <span>
             Please contact your administrator at{' '}
-            
             <a href="mailto:admin@gmail.com"
               className="underline underline-offset-2 hover:opacity-80 transition-opacity"
               style={{ color: 'rgba(239,68,68,1)' }}
@@ -638,7 +647,7 @@ interface SignInModalProps {
 }
 
 export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
-  const router = useRouter()
+  const router          = useRouter()
   const [step,  setStep]  = useState<Step>('email')
   const [email, setEmail] = useState('')
 
@@ -661,7 +670,7 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
 
   const handleEmailSuccess = (e: string) => { setEmail(e); setStep('otp') }
 
-  const handleOtpSuccess = async (user: AuthUser) => {
+  const handleOtpSuccess = async (user: AuthUser, portalUrl: string) => {
     try {
       const fullUser = await getMe()
       useAuthStore.getState().setUser(fullUser)
@@ -669,7 +678,7 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
       useAuthStore.getState().setUser(user)
     }
     setStep('success')
-    setTimeout(() => { handleClose(); router.push(getRoleRoute(user.role)) }, 1800)
+    setTimeout(() => { handleClose(); router.push(portalUrl) }, 1800)
   }
 
   return (

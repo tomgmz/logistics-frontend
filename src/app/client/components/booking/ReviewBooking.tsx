@@ -151,9 +151,9 @@ const confirm = async () => {
   }
 
   const serviceLabel =
-    selectedService === 'ecommerce' ? 'E-Commerce'
-    : selectedService === 'fmcg'   ? 'Fast Moving Cargo Goods'
-    : 'Not selected'
+    selectedService === 'fmcg'
+      ? 'Fast Moving Cargo Goods'
+      : 'Not selected'
 
   return (
     <div className="flex flex-col h-full overflow-auto p-4 lg:p-6 gap-4 lg:gap-6">

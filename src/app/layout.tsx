@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   title: '8338 Logistics Services — Premium Logistics. Industrial Precision.',
   description:
     'Book, track, and manage deliveries in one place. Real-time updates, seamless booking, and efficient support for all your logistics needs. Serving nationwide Philippines.',
-  keywords: 'logistics, freight, delivery, cargo, Philippines, shipping, e-commerce, FMCG, warehousing',
+  keywords: 'logistics, freight, delivery, cargo, Philippines, shipping, FMCG, warehousing',
   openGraph: {
     title: '8338 Logistics Services',
     description: 'Premium logistics. Industrial precision.',

@@ -4,12 +4,10 @@ import {
   Users,
   FileSearch,
   ScrollText,
-  MessageCircle,
   Truck,
   CalendarCheck,
   MapPin,
   CreditCard,
-  Bell,
 } from 'lucide-react'
 import ReusableDashboardShell from '../../components/ui/ReusableDashboardShell'
 import { ReactNode } from 'react'
@@ -31,11 +29,6 @@ const superAdminNavItems = [
     icon: <FileSearch size={17} />,
   },
   {
-    href: '/superadmin/messaging',
-    label: 'Messaging',
-    icon: <MessageCircle size={17} />,
-  },
-  {
     href: '/superadmin/vehicle-management',
     label: 'Vehicle Management',
     icon: <Truck size={17} />,
@@ -54,11 +47,6 @@ const superAdminNavItems = [
     href: '/superadmin/billing-payment',
     label: 'Billing & Payment',
     icon: <CreditCard size={17} />,
-  },
-  {
-    href: '/superadmin/notifications',
-    label: 'Notifications',
-    icon: <Bell size={17} />,
   },
 ]
 

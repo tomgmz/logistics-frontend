@@ -7,7 +7,7 @@ export default function ContactSection() {
   const ref    = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, margin: '-80px' });
 
-  const [role, setRole] = useState('e-commerce');
+  const [role, setRole] = useState('fmcg');
 
   return (
     <>
@@ -108,7 +108,7 @@ export default function ContactSection() {
                   Your Role or Company
                 </label>
                 <div className="flex flex-wrap gap-x-5 gap-y-2">
-                  {['e-commerce', 'fmcg', 'shipper', 'other'].map((r) => (
+                  {['fmcg', 'shipper', 'other'].map((r) => (
                     <label key={r} className="flex items-center gap-2 cursor-pointer group">
                       <div
                         onClick={() => setRole(r)}

@@ -131,11 +131,21 @@ export interface AuthUser {
     billing_address: string | null
     payment_terms:   number | null
   } | null
+  drivers?: {
+    driver_id:        string
+    license_number:   string
+    license_expiry:   string
+    status:           string
+    is_vendor_driver: boolean
+  } | null
 }
 
 export interface AuthResponse {
-  user:      AuthUser
-  expiresAt: string
+  user:         AuthUser
+  expiresAt:    string
+  accessToken:  string
+  refreshToken: string
+  portalUrl:    string
 }
 
 export async function getAuthStatus(email: string): Promise<AuthStatusResponse> {

@@ -26,6 +26,9 @@ export interface GroupErrors {
   netWeightPerPallet?: string
   // shared
   commodity?: string
+  product?: string
+  shc?: string
+  additionalShc?: string
 }
 
 export interface SectionErrors {
@@ -98,6 +101,9 @@ export function validateGroup(group: ItemGroup, mode: CargoMode): GroupErrors {
   const errors: GroupErrors = {}
 
   if (!group.commodity.trim()) errors.commodity = 'Commodity is required'
+  if (!group.product.trim()) errors.product = 'Product is required'
+  if (!group.shc.trim()) errors.shc = 'SHC is required'
+  if (!group.additionalShc.trim()) errors.additionalShc = 'Additional SHC is required'
 
   if (mode === 'loose') {
     if (!isPositiveNumber(group.pieces))      errors.pieces      = 'Enter a valid piece count'

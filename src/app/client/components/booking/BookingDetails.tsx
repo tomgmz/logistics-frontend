@@ -4,7 +4,7 @@ import { motion, Variants, AnimatePresence } from 'framer-motion'
 import { useCallback, useState } from 'react'
 import {
   CalendarDays, Clock, MapPin, Package,
-  Truck, Plus, X, Check,
+  Truck, Plus, X, Check, Info,
 } from 'lucide-react'
 import { useRef, useEffect } from 'react'
 import { useAppDispatch, useAppSelector } from '@/app/lib/store/hooks'
@@ -42,7 +42,7 @@ import type { ResolvedPlace } from '@/app/lib/hooks/usePlacesAutoComplete'
 
 interface Props {
   onNext: () => void
-  onBack: () => void
+  onBack?: () => void
 }
 
 type MapPickerTarget =
@@ -62,16 +62,17 @@ const PALLET_DIMENSIONS: Record<
 
 const INPUT_BG_CARD  = '#424242'
 const INPUT_BG_PANEL = '#2A2828'
-const BORDER_CARD    = '#333333'
 const BORDER_PANEL   = 'rgba(255,255,255,0.12)'
+const BORDER_CARD    = BORDER_PANEL
 const CYAN           = '#4DF9ED'
 const RED            = '#f87171'
 const ERROR_COLOR    = '#f87171'
+const ERROR_BORDER   = `${ERROR_COLOR}99`
 const RADIUS         = '8px'
 
 function fieldSx(bg: string, borderColor: string, hasError = false): SxProps<Theme> {
   const activeBorder = hasError ? ERROR_COLOR : `${CYAN}66`
-  const idleBorder   = hasError ? `${ERROR_COLOR}99` : borderColor
+  const idleBorder   = hasError ? ERROR_BORDER : borderColor
   return {
     '& .MuiInputBase-root': {
       height: 36, borderRadius: RADIUS, backgroundColor: bg,
@@ -84,6 +85,8 @@ function fieldSx(bg: string, borderColor: string, hasError = false): SxProps<The
     '& .MuiOutlinedInput-notchedOutline': { borderColor: idleBorder, borderRadius: RADIUS },
     '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: activeBorder },
     '& .Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: activeBorder, borderWidth: 1 },
+    '& .MuiOutlinedInput-root.Mui-error .MuiOutlinedInput-notchedOutline': { borderColor: ERROR_BORDER },
+    '& .MuiOutlinedInput-root.Mui-error:hover .MuiOutlinedInput-notchedOutline': { borderColor: ERROR_BORDER },
     '& .MuiInputLabel-root': { display: 'none' },
     '& legend': { display: 'none' },
     '& fieldset': { top: 0 },
@@ -92,7 +95,7 @@ function fieldSx(bg: string, borderColor: string, hasError = false): SxProps<The
 
 function selectSx(bg: string, borderColor: string, hasError = false): SxProps<Theme> {
   const activeBorder = hasError ? ERROR_COLOR : `${CYAN}66`
-  const idleBorder   = hasError ? `${ERROR_COLOR}99` : borderColor
+  const idleBorder   = hasError ? ERROR_BORDER : borderColor
   return {
     height: 36, borderRadius: RADIUS, backgroundColor: bg,
     color: '#fff', fontSize: '0.875rem', fontFamily: 'inherit',
@@ -103,6 +106,8 @@ function selectSx(bg: string, borderColor: string, hasError = false): SxProps<Th
     '& .MuiOutlinedInput-notchedOutline': { borderColor: idleBorder, borderRadius: RADIUS },
     '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: activeBorder },
     '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: activeBorder, borderWidth: 1 },
+    '&.Mui-error .MuiOutlinedInput-notchedOutline': { borderColor: ERROR_BORDER },
+    '&.Mui-error:hover .MuiOutlinedInput-notchedOutline': { borderColor: ERROR_BORDER },
     '& .MuiSvgIcon-root': { color: 'rgba(255,255,255,0.5)' },
     '& legend': { display: 'none' },
     '& fieldset': { top: 0 },
@@ -473,7 +478,31 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
         <motion.div variants={fadeUp} initial="hidden" animate="show"
           className="bg-[#2A2828] rounded-md border border-white/[0.07] p-4 flex flex-col gap-4"
         >
-          <SectionHeader icon={<Package size={16} />} title="Product & Cargo Capacity" />
+          <div className="flex items-start justify-between gap-3">
+            <SectionHeader icon={<Package size={16} />} title="Product & Cargo Capacity" />
+
+            <div className="relative group shrink-0">
+              <button
+                type="button"
+                aria-label="Cargo estimate info"
+                className="mt-0.5 inline-flex items-center justify-center w-7 h-7 rounded-full
+                           border border-white/10 bg-white/[0.03] text-white/60
+                           hover:text-white hover:border-white/20 transition-colors cursor-pointer"
+              >
+                <Info size={15} />
+              </button>
+
+              <div
+                role="tooltip"
+                className="pointer-events-none absolute right-0 top-9 z-20 w-[260px]
+                           rounded-lg border border-white/10 bg-[#111] px-3 py-2
+                           text-xs text-white/80 shadow-xl opacity-0 translate-y-1
+                           group-hover:opacity-100 group-hover:translate-y-0 transition-all"
+              >
+                This is an estimate only. Final capacity and charges may change after review.
+              </div>
+            </div>
+          </div>
 
           <div className="flex items-center gap-6 border-b border-white/[0.07]">
             {(['loose', 'palletized'] as CargoMode[]).map((m) => (
@@ -813,7 +842,11 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
         <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5 }} className="flex justify-between gap-3 pt-2"
         >
-          <WizBtn onClick={onBack} variant="back">BACK</WizBtn>
+          {onBack ? (
+            <WizBtn onClick={onBack} variant="back">BACK</WizBtn>
+          ) : (
+            <span />
+          )}
           <WizBtn onClick={handleNext} variant="next">NEXT</WizBtn>
         </motion.div>
 
@@ -838,29 +871,45 @@ function ProductFieldsRow({ group, errors, onUpdate }: {
         {errors.commodity && <FormHelperText sx={HELPER_SX}>{errors.commodity}</FormHelperText>}
       </div>
       <div className="flex flex-col gap-1">
-        <label className="font-body booking-text text-xs">Product</label>
+        <label className="font-body booking-text text-xs">
+          Product<span style={{ color: ERROR_COLOR, marginLeft: 2 }}>*</span>
+        </label>
         <TextField fullWidth placeholder="e.g. General Cargo" variant="outlined"
-          value={group.product} onChange={(e) => onUpdate({ product: e.target.value })}
-          sx={fieldSx(INPUT_BG_CARD, BORDER_CARD)} />
+          value={group.product} error={!!errors.product}
+          onChange={(e) => onUpdate({ product: e.target.value })}
+          sx={fieldSx(INPUT_BG_CARD, BORDER_CARD, !!errors.product)} />
+        {errors.product && <FormHelperText sx={HELPER_SX}>{errors.product}</FormHelperText>}
       </div>
       <div className="flex flex-col gap-1">
-        <label className="font-body booking-text text-xs">SHC</label>
+        <label className="font-body booking-text text-xs">
+          SHC<span style={{ color: ERROR_COLOR, marginLeft: 2 }}>*</span>
+        </label>
         <Select value={group.shc} onChange={(e: SelectChangeEvent) => onUpdate({ shc: e.target.value })}
-          displayEmpty sx={{ ...selectSx(INPUT_BG_CARD, BORDER_CARD), width: '100%' }} MenuProps={MENU_PROPS}>
+          displayEmpty
+          sx={{ ...selectSx(INPUT_BG_CARD, BORDER_CARD, !!errors.shc), width: '100%' }}
+          MenuProps={MENU_PROPS}
+        >
           <MenuItem value=""><em style={{ opacity: 0.4, fontStyle: 'normal' }}>Select SHC</em></MenuItem>
           <MenuItem value="GEN">GEN</MenuItem><MenuItem value="PER">PER</MenuItem>
           <MenuItem value="EAT">EAT</MenuItem><MenuItem value="HEA">HEA</MenuItem>
         </Select>
+        {errors.shc && <FormHelperText sx={HELPER_SX}>{errors.shc}</FormHelperText>}
       </div>
       <div className="flex flex-col gap-1">
-        <label className="font-body booking-text text-xs">Additional SHC</label>
+        <label className="font-body booking-text text-xs">
+          Additional SHC<span style={{ color: ERROR_COLOR, marginLeft: 2 }}>*</span>
+        </label>
         <Select value={group.additionalShc} onChange={(e: SelectChangeEvent) => onUpdate({ additionalShc: e.target.value })}
-          displayEmpty sx={{ ...selectSx(INPUT_BG_CARD, BORDER_CARD), width: '100%' }} MenuProps={MENU_PROPS}>
+          displayEmpty
+          sx={{ ...selectSx(INPUT_BG_CARD, BORDER_CARD, !!errors.additionalShc), width: '100%' }}
+          MenuProps={MENU_PROPS}
+        >
           <MenuItem value=""><em style={{ opacity: 0.4, fontStyle: 'normal' }}>Select additional SHC</em></MenuItem>
           <MenuItem value="FRAGILE">FRAGILE</MenuItem>
           <MenuItem value="PERISHABLE">PERISHABLE</MenuItem>
           <MenuItem value="HAZMAT">HAZMAT</MenuItem>
         </Select>
+        {errors.additionalShc && <FormHelperText sx={HELPER_SX}>{errors.additionalShc}</FormHelperText>}
       </div>
     </div>
   )
