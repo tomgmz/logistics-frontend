@@ -15,11 +15,17 @@ interface ReusableDashboardShellProps {
   navItems: NavItem[]
 }
 
+// ReusableDashboardShell.tsx
+
 export default function ReusableDashboardShell({ children, navItems }: ReusableDashboardShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
-    <div suppressHydrationWarning className="flex flex-col h-screen bg-[var(--color-bg)] overflow-hidden">
+    <div
+      suppressHydrationWarning
+      className="flex flex-col bg-[var(--color-bg)] overflow-hidden"
+      style={{ height: '100dvh' }}
+    >
       <ReusableHeader sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
 
       <div className="flex flex-1 min-h-0 overflow-hidden">
@@ -29,7 +35,8 @@ export default function ReusableDashboardShell({ children, navItems }: ReusableD
           setSidebarOpen={setSidebarOpen}
         />
 
-        <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[var(--color-surface)]">
+        <main className="min-w-0 flex-1 overflow-y-auto flex flex-col bg-[var(--color-surface)]">
+
           {children}
         </main>
       </div>

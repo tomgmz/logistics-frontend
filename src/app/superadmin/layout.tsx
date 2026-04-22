@@ -10,7 +10,8 @@ import {
   CreditCard,
 } from 'lucide-react'
 import ReusableDashboardShell from '../../components/ui/ReusableDashboardShell'
-import { ReactNode } from 'react'
+import { ReactNode, useEffect } from 'react'
+import { useAuthStore } from '@/app/lib/store/auth.store'
 
 const superAdminNavItems = [
   {
@@ -55,6 +56,20 @@ interface SuperAdminShellProps {
 }
 
 export default function SuperAdminShell({ children }: SuperAdminShellProps) {
+  const user = useAuthStore((s) => s.user)
+  const hasHydrated = useAuthStore((s) => s.hasHydrated)
+
+  useEffect(() => {
+    if (!hasHydrated) return
+    if (!user || user.role !== 'super_admin') {
+      window.location.replace('/')
+    }
+  }, [hasHydrated, user])
+
+  if (!hasHydrated || !user || user.role !== 'super_admin') {
+    return <div className="min-h-screen bg-[#0a0a0a]" />
+  }
+
   return (
     <ReusableDashboardShell navItems={superAdminNavItems}>
       {children}

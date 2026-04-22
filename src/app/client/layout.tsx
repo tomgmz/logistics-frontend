@@ -1,8 +1,7 @@
 'use client'
 
-import { ReactNode, useEffect, useState } from 'react'
+import { ReactNode, useEffect } from 'react'
 import Image from 'next/image'
-import { useRouter } from 'next/navigation'
 import ReusableDashboardShell from '@/components/ui/ReusableDashboardShell'
 import { ASSETS } from '@/constants/client/icon'
 import { useAuthStore } from '@/app/lib/store/auth.store'
@@ -17,24 +16,17 @@ const NAV_ITEMS = [
 
 export default function ClientLayout({ children }: { children: ReactNode }) {
   const user            = useAuthStore((s) => s.user)
-  const router          = useRouter()
-  const [checking, setChecking] = useState(true)
+  const hasHydrated     = useAuthStore((s) => s.hasHydrated)
 
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      setChecking(false)
-      if (!user) {
-        window.location.replace('/')
-      }
-    }, 100)
+    if (!hasHydrated) return
+    if (!user || user.role !== 'client') {
+      window.location.replace('/')
+    }
+  }, [hasHydrated, user])
 
-    return () => clearTimeout(timeout)
-  }, [user, router])
-
-  if (checking || !user) {
-    return (
-      <div className="min-h-screen bg-[#0a0a0a]" />
-    )
+  if (!hasHydrated || !user || user.role !== 'client') {
+    return <div className="min-h-screen bg-[#0a0a0a]" />
   }
 
   return <ReusableDashboardShell navItems={NAV_ITEMS}>{children}</ReusableDashboardShell>
