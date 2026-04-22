@@ -1,7 +1,9 @@
+import BookingManagementView from './BookingManagementView'
+
 export default function BookingManagement() {
   return (
-    <div className="flex items-center justify-center h-full">
-      <span className="font-body text-[var(--color-muted)] text-3xl">Booking Management</span>
+    <div className="flex flex-1 min-h-0 flex-col bg-[var(--color-bg)]">
+      <BookingManagementView />
     </div>
   )
 }
