@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit'
-import authApi from '@/app/lib/api/auth.api'
+import authApi, { initCsrf } from '@/app/lib/api/auth.api'
 import type { OptimizedStop, OptimizeRouteResponse } from '@/app/types/maps/routemap.types'
 import type { BookingDetail } from '@/app/types/maps/routemap.types'
 import type { AuthUser } from '@/app/lib/api/auth.api'
@@ -47,6 +47,7 @@ export const fetchRouteAndDetail = createAsyncThunk(
   'routeMap/fetchRouteAndDetail',
   async (bookingId: string, { rejectWithValue }) => {
     try {
+      await initCsrf()
       const [routeRes, detailRes] = await Promise.all([
         authApi.post(`/route-optimization/optimize/${bookingId}`),
         authApi.get(`/booking/${bookingId}`),

@@ -1,7 +1,17 @@
-import axios from 'axios'
+import axios, { type AxiosResponse } from 'axios'
 import { NextRequest, NextResponse } from 'next/server'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL!
+
+
+function forwardSetCookieHeaders(nextRes: NextResponse, axiosRes: AxiosResponse) {
+  const raw = axiosRes.headers['set-cookie']
+  if (!raw) return
+  const cookies = Array.isArray(raw) ? raw : [raw]
+  for (const cookie of cookies) {
+    if (cookie) nextRes.headers.append('Set-Cookie', cookie)
+  }
+}
 
 async function handler(
   req: NextRequest,
@@ -16,7 +26,7 @@ async function handler(
       ? await req.text()
       : undefined
 
-    const { data } = await axios({
+    const axiosRes = await axios({
       method:  req.method,
       url,
       headers: {
@@ -29,11 +39,15 @@ async function handler(
       data: bodyText && bodyText.length > 0 ? bodyText : undefined,
     })
 
-    return NextResponse.json(data)
+    const nextRes = NextResponse.json(axiosRes.data)
+    forwardSetCookieHeaders(nextRes, axiosRes)
+    return nextRes
 
   } catch (error: unknown) {
     if (axios.isAxiosError(error) && error.response) {
-      return NextResponse.json(error.response.data, { status: error.response.status })
+      const nextRes = NextResponse.json(error.response.data, { status: error.response.status })
+      forwardSetCookieHeaders(nextRes, error.response)
+      return nextRes
     }
     console.error(`[proxy] error:`, error)
     return NextResponse.json(
