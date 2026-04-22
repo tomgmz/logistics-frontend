@@ -192,16 +192,19 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
   const dropoffs        = useAppSelector((s) => s.booking.dropoffs)
   const mode            = useAppSelector((s) => s.booking.mode)
   const sections        = useAppSelector(selectSections)
-  const allNonTiltable  = useAppSelector((s) => s.booking.allNonTiltable)
-  const allNonStackable = useAppSelector((s) => s.booking.allNonStackable)
-  const allStackable    = useAppSelector((s) => s.booking.allStackable)
-  const allOversize     = useAppSelector((s) => s.booking.allOversize)
-  const summary         = useAppSelector(selectCargoSummary)
 
   const [touched,   setTouched]   = useState(false)
   const [mapTarget, setMapTarget] = useState<MapPickerTarget>(null)
 
   const allGroups = sections.flatMap((s) => s.groups)
+
+  // Derived from actual group state so unchecking one item unticks the "All" toggle
+  const computedAllNonTiltable  = allGroups.length > 0 && allGroups.every((g) => g.nonTiltable)
+  const computedAllNonStackable = allGroups.length > 0 && allGroups.every((g) => g.nonStackable)
+  const computedAllStackable    = allGroups.length > 0 && allGroups.every((g) => g.stackable)
+  const computedAllOversize     = allGroups.length > 0 && allGroups.every((g) => g.oversize)
+
+  const summary = useAppSelector(selectCargoSummary)
 
   const rawErrors = validateBooking(date, time, pickup, dropoffs, sections, mode)
   const errors    = touched ? rawErrors : { schedule: {}, route: { dropoffs: {} }, sections: [] }
@@ -222,8 +225,15 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
   const handleRemoveGroup = (dropoffIndex: number, groupId: string) =>
     dispatch(removeGroupAction({ dropoffIndex, groupId }))
 
-  const handleAddGroup = (dropoffIndex: number) =>
-    dispatch(addGroupAction({ dropoffIndex, newGroup: makeDefaultGroup() }))
+  const handleAddGroup = (dropoffIndex: number) => {
+    const newGroup: ItemGroup = {
+      ...makeDefaultGroup(),
+      ...(mode === 'loose'
+        ? { nonTiltable: computedAllNonTiltable, nonStackable: computedAllNonStackable }
+        : { stackable: computedAllStackable, oversize: computedAllOversize }),
+    }
+    dispatch(addGroupAction({ dropoffIndex, newGroup }))
+  }
 
   const handleMapConfirm = useCallback(
     (place: ResolvedPlace) => {
@@ -430,13 +440,13 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
             <div className="ml-auto flex items-center gap-6">
               {mode === 'loose' ? (
                 <>
-                  <CheckRow checked={allNonTiltable}  onChange={(v) => dispatch(setAllNonTiltable(v))}  label="All Non-tiltable"  />
-                  <CheckRow checked={allNonStackable} onChange={(v) => dispatch(setAllNonStackable(v))} label="All Non-stackable" />
+                  <CheckRow checked={computedAllNonTiltable}  onChange={(v) => dispatch(setAllNonTiltable(v))}  label="All Non-tiltable"  />
+                  <CheckRow checked={computedAllNonStackable} onChange={(v) => dispatch(setAllNonStackable(v))} label="All Non-stackable" />
                 </>
               ) : (
                 <>
-                  <CheckRow checked={allStackable} onChange={(v) => dispatch(setAllStackable(v))} label="All Stackable" />
-                  <CheckRow checked={allOversize}  onChange={(v) => dispatch(setAllOversize(v))}  label="All Oversize"  />
+                  <CheckRow checked={computedAllStackable} onChange={(v) => dispatch(setAllStackable(v))} label="All Stackable" />
+                  <CheckRow checked={computedAllOversize}  onChange={(v) => dispatch(setAllOversize(v))}  label="All Oversize"  />
                 </>
               )}
             </div>
