@@ -29,7 +29,7 @@ import {
 interface UserFormModalProps {
   tab: UserTab
   user: AnyUser | null
-  onClose: () => void
+  onClose: () => void 
   onSaved: () => void
 }
 
@@ -100,7 +100,7 @@ function buildInitialState(tab: UserTab, user: AnyUser | null): FormState {
     const v = (user as VendorUser | null)?.vendors
     return {
       ...base,
-      subcontractor_type: v?.subcontractor_type ?? 'individual',
+      vendor_type: v?.vendor_type ?? 'individual',
       company_name:       v?.company_name       ?? '',
       business_permit:    v?.business_permit    ?? '',
     }
@@ -393,12 +393,12 @@ function VendorExtraFields({ form, set, fe }: Omit<BaseFieldsProps, 'isEdit'>) {
     <>
       <TextField
         select
-        label="Subcontractor Type"
-        value={form.subcontractor_type as string}
-        onChange={(e) => set('subcontractor_type', e.target.value)}
+        label="Vendor Type"
+        value={form.vendor_type as string}
+        onChange={(e) => set('vendor_type', e.target.value)}
         required
-        error={!!fe.subcontractor_type}
-        helperText={fe.subcontractor_type}
+        error={!!fe.vendor_type}
+        helperText={fe.vendor_type}
         fullWidth
         size="small"
         sx={muiTextFieldSx}

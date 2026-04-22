@@ -70,7 +70,7 @@ export interface VendorUser extends BaseUser {
   role: 'vendor'
   vendors: {
     vendor_id: string
-    subcontractor_type: 'individual' | 'company'
+    vendor_type: 'individual' | 'company'
     company_name: string | null
     business_permit: string | null
   } | null
@@ -124,7 +124,7 @@ export interface CreateVendorPayload {
   phone?: string
   first_name?: string
   last_name?: string
-  subcontractor_type: 'individual' | 'company'
+  vendor_type: 'individual' | 'company'
   company_name?: string
   business_permit?: string
 }

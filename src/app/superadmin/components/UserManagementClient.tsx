@@ -345,11 +345,11 @@ function renderCells(user: AnyUser, tab: UserTab) {
           <td className="px-4 py-3.5 text-sm text-[#818181]">{u.email}</td>
           <td className="px-4 py-3.5">
             <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${
-              u.vendors?.subcontractor_type === 'company'
+              u.vendors?.vendor_type === 'company'
                 ? 'border-[#4df9ed]/30 bg-[#4df9ed]/10 text-[#4df9ed]'
                 : 'border-[#818181]/30 bg-[#818181]/10 text-[#818181]'
             }`}>
-              {u.vendors?.subcontractor_type ?? '—'}
+              {u.vendors?.vendor_type ?? '—'}
             </span>
           </td>
           <td className="px-4 py-3.5 text-sm text-[#818181]">{u.vendors?.company_name ?? '—'}</td>
@@ -447,7 +447,6 @@ export default function UserManagementClient() {
       <div className="flex flex-col flex-1 min-h-0 bg-[#0a0a0a] text-white">
         <div className="flex flex-col flex-1 min-h-0 mx-auto w-full max-w-[1400px] px-6 py-8 gap-6">
 
-          {/* ── Header ── */}
           <div className="flex items-start justify-between shrink-0">
             <div>
               <p className="text-xs font-semibold tracking-[0.2em] uppercase text-[#4df9ed]">
@@ -469,7 +468,6 @@ export default function UserManagementClient() {
             </button>
           </div>
 
-          {/* ── Stats ── */}
           <div className="grid grid-cols-3 gap-4 shrink-0">
             {[
               { label: 'Total Users', value: stats.total,    color: 'text-white' },
@@ -483,10 +481,8 @@ export default function UserManagementClient() {
             ))}
           </div>
 
-          {/* ── Main card ── */}
           <div className="flex flex-col flex-1 min-h-0 rounded-2xl border border-[#2a2a2a] bg-[#1b1b1b] overflow-hidden">
 
-            {/* ── Tabs: MUI Select dropdown ── */}
             <div className="px-4 pt-3 pb-3 border-b border-[#2a2a2a] shrink-0">
               <FormControl size="small" sx={{ minWidth: 200 }}>
                 <Select
@@ -575,7 +571,6 @@ export default function UserManagementClient() {
               </FormControl>
             </div>
 
-            {/* ── Toolbar ── */}
             <div className="flex items-center gap-3 border-b border-[#2a2a2a] px-4 py-3 shrink-0">
               <div className="relative flex-1 max-w-sm">
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#818181]" />
@@ -599,7 +594,6 @@ export default function UserManagementClient() {
               </span>
             </div>
 
-            {/* ── Error banner ── */}
             {error && (
               <div className="flex items-center gap-3 border-b border-red-500/20 bg-red-500/10 px-5 py-3 text-sm text-red-400 shrink-0">
                 <AlertTriangle size={14} />
@@ -607,7 +601,6 @@ export default function UserManagementClient() {
               </div>
             )}
 
-            {/* ── Table ── */}
             <div className="flex-1 overflow-auto min-h-0">
               <table className="w-full text-sm">
                 <thead className="sticky top-0 z-10 bg-[#1b1b1b]">
@@ -657,7 +650,6 @@ export default function UserManagementClient() {
               </table>
             </div>
 
-            {/* ── Pagination ── */}
             {!loading && filtered.length > PAGE_SIZE && (
               <div className="flex items-center justify-between border-t border-[#2a2a2a] px-5 py-3 shrink-0">
                 <p className="text-xs text-[#818181]">
