@@ -7,10 +7,6 @@ import { AxiosError } from 'axios'
 import { requestOtp, verifyOtp, getMe, getAuthStatus, AuthUser } from '@/app/lib/api/auth.api'
 import { useAuthStore } from '@/app/lib/store/auth.store'
 
-/**
- * Fallback map used only when the API doesn't return a portalUrl.
- * Primary source of truth is `verifyOtp` → `data.portalUrl` from the backend.
- */
 const ROLE_ROUTES: Record<string, string> = {
   super_admin:      '/superadmin',
   general_manager:  '/general_manager',
@@ -221,27 +217,32 @@ function OtpStep({
   const [statusChecked, setStatusChecked] = useState(false)
   const inputRefs = useRef<(HTMLInputElement | null)[]>([])
 
-  // Hydrate lock state from DB on mount
+  const applyStatus = useCallback((status: Awaited<ReturnType<typeof getAuthStatus>>) => {
+    if (status.permanent) {
+      setLockState('permanent')
+    } else if (status.locked_until) {
+      const expiry = new Date(status.locked_until).getTime()
+      lockExpiresAt.current = expiry
+      setLockState('temporary')
+      setLockRemaining(Math.max(0, Math.floor((expiry - Date.now()) / 1000)))
+    } else {
+      setLockState('none')
+      setLockRemaining(0)
+    }
+  }, [])
+
   useEffect(() => {
     async function checkStatus() {
       try {
         const status = await getAuthStatus(email)
-        if (status.permanent) {
-          setLockState('permanent')
-        } else if (status.locked_until) {
-          const expiry = new Date(status.locked_until).getTime()
-          lockExpiresAt.current = expiry
-          setLockState('temporary')
-          setLockRemaining(Math.max(0, Math.floor((expiry - Date.now()) / 1000)))
-        }
+        applyStatus(status)
       } catch {
-        // Silently fail — don't block the user from attempting login
       } finally {
         setStatusChecked(true)
       }
     }
     checkStatus()
-  }, [email])
+  }, [email, applyStatus])
 
   // Resend countdown
   useEffect(() => {
@@ -322,7 +323,6 @@ function OtpStep({
     setLoading(true); setError('')
     try {
       const res = await verifyOtp(email, code)
-      // Use portalUrl from the API response; fall back to the local map if absent
       const destination = res.portalUrl ?? getFallbackRoute(res.user.role)
       onSuccess(res.user, destination)
     } catch (err) {
@@ -333,7 +333,6 @@ function OtpStep({
       setOtp(Array(OTP_LENGTH).fill(''))
 
       if (detected === 'temporary') {
-        // Re-fetch real expiry from DB rather than guessing from the message string
         try {
           const status = await getAuthStatus(email)
           if (status.locked_until) {
@@ -342,7 +341,6 @@ function OtpStep({
             setLockRemaining(Math.max(0, Math.floor((expiry - Date.now()) / 1000)))
           }
         } catch {
-          // Fallback matching ACCOUNT_LOCK_MINS on the backend
           const expiry = Date.now() + 3 * 60 * 1000
           lockExpiresAt.current = expiry
           setLockRemaining(3 * 60)
@@ -364,6 +362,12 @@ function OtpStep({
     setResending(true); setError('')
     try {
       await requestOtp(email)
+      try {
+        const status = await getAuthStatus(email)
+        applyStatus(status)
+      } catch {
+
+      }
       resendExpiresAt.current = Date.now() + RESEND_SECS * 1000
       setResendSec(RESEND_SECS)
       setOtp(Array(OTP_LENGTH).fill(''))
@@ -375,7 +379,6 @@ function OtpStep({
     }
   }
 
-  // Loading gate — wait for DB status check before rendering
   if (!statusChecked) {
     return (
       <div className="flex items-center justify-center py-16">
