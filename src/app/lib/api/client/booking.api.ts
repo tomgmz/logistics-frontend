@@ -1,4 +1,4 @@
-import authApi from '../auth.api'
+import authApi, { initCsrf } from '../auth.api'
 import { getMe } from '../auth.api'
 
 // ROUTE OPTIMIZATION
@@ -33,16 +33,44 @@ export async function createBooking(input: CreateBookingPayload) {
   return data.data
 }
 
+export type DestinationDeliveryStatus = 'pending' | 'delivered' | 'failed'
+
 export async function updateDestinationStatus(
   destinationId: string,
-  status: 'delivered' | 'failed',
+  status: DestinationDeliveryStatus,
   deliveredAt?: string
 ) {
+  await initCsrf()
   const { data } = await authApi.patch(`/booking/destinations/${destinationId}/status`, {
     status,
     ...(deliveredAt && { delivered_at: deliveredAt }),
   })
   return data.data
+}
+
+export type AdminBookingLifecycleStatus =
+  | 'pending'
+  | 'assigned'
+  | 'in_transit'
+  | 'completed'
+  | 'cancelled'
+export async function fetchAllBookingsForAdmin() {
+  const { data } = await authApi.get<{ data: unknown[] }>('/booking')
+  return (data?.data ?? []) as Record<string, unknown>[]
+}
+
+export async function updateBookingStatusAdmin(
+  bookingId: string,
+  status: AdminBookingLifecycleStatus
+) {
+  await initCsrf()
+  const { data } = await authApi.patch<{ data: unknown }>(`/booking/${bookingId}/status`, { status })
+  return data.data
+}
+
+export async function deleteDestinationAdmin(destinationId: string) {
+  await initCsrf()
+  await authApi.delete(`/booking/destinations/${destinationId}`)
 }
 
 export async function getBookingById(bookingId: string) {

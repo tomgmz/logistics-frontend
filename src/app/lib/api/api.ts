@@ -1,4 +1,4 @@
-import authApi from './auth.api'
+import authApi, { initCsrf } from './auth.api'
 
 // ROUTE OPTIMIZATION
 
@@ -10,9 +10,10 @@ export async function optimizeRoute(bookingId: string) {
 // BOOKING
 export async function updateDestinationStatus(
   destinationId: string,
-  status: 'delivered' | 'failed',
+  status: 'pending' | 'delivered' | 'failed',
   deliveredAt?: string
 ) {
+  await initCsrf()
   const { data } = await authApi.patch(`/booking/destinations/${destinationId}/status`, {
     status,
     ...(deliveredAt && { delivered_at: deliveredAt }),
