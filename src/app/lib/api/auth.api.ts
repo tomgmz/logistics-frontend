@@ -32,7 +32,8 @@ export async function initCsrf(): Promise<void> {
   if (getCsrfToken()) return
   if (csrfPromise) return csrfPromise
 
-  csrfPromise = directApi
+ 
+  csrfPromise = proxyApi
     .get('/auth/csrf')
     .then(() => {})
     .catch((err) => {
