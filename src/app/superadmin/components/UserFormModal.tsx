@@ -1,13 +1,14 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import {
+  useState,
+  useEffect,
+  type InputHTMLAttributes,
+  type TextareaHTMLAttributes,
+  type SelectHTMLAttributes,
+} from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Loader2 } from 'lucide-react'
-import TextField from '@mui/material/TextField'
-import MenuItem from '@mui/material/MenuItem'
-import FormControlLabel from '@mui/material/FormControlLabel'
-import Checkbox from '@mui/material/Checkbox'
-import FormHelperText from '@mui/material/FormHelperText'
 import type {
   UserTab,
   ClientUser,
@@ -15,6 +16,7 @@ import type {
   VendorUser,
   AnyUser,
 } from '@/app/types/admin/user-management.types'
+import { USER_SUFFIXES } from '@/app/types/client.types'
 import {
   clientService,
   driverService,
@@ -29,7 +31,7 @@ import {
 interface UserFormModalProps {
   tab: UserTab
   user: AnyUser | null
-  onClose: () => void 
+  onClose: () => void
   onSaved: () => void
 }
 
@@ -46,34 +48,107 @@ const TAB_LABELS: Record<UserTab, string> = {
 
 type FormState = Record<string, string | boolean | number>
 
-interface ValidationError {
-  field: string
-  message: string
+const FIELD_LABELS: Record<string, string> = {
+  first_name:      'First name',
+  last_name:       'Last name',
+  username:        'Username',
+  email:           'Email',
+  phone:           'Phone',
+  password:        'Password',
+  license_number:  'License number',
+  license_expiry:  'License expiry',
+  company_name:    'Company name',
+  billing_address: 'Billing address',
+  payment_terms:   'Payment terms',
+  vendor_type:     'Vendor type',
+  business_permit: 'Business permit',
+  vendor_id:       'Vendor',
 }
 
-type ApiResponseBody = {
-  errors?: ValidationError[]
+function friendlyMessage(field: string, raw: string): string {
+  const label = FIELD_LABELS[field] ?? field.replace(/_/g, ' ')
+  if (
+    raw.toLowerCase().includes('expected string') ||
+    raw.toLowerCase().includes('required') ||
+    raw.toLowerCase().includes('received undefined') ||
+    raw.toLowerCase().includes('invalid input')
+  ) {
+    return `${label} is required`
+  }
+  if (raw.toLowerCase().includes('too_small') || raw.toLowerCase().includes('min')) {
+    return `${label} is too short`
+  }
+  if (raw.toLowerCase().includes('invalid_string') || raw.toLowerCase().includes('regex')) {
+    return `${label} format is invalid`
+  }
+  return raw
+}
+
+interface ApiBody {
+  status?: string
   message?: string
+  errors?: { field: string; message: string }[]
 }
 
-type ApiErrorShape = {
-  response?: { data?: ApiResponseBody }
-  data?: ApiResponseBody
+function extractApiError(err: unknown): {
+  message: string
+  fieldErrors: Record<string, string>
+} {
+  const data: ApiBody | undefined =
+    (err as { response?: { data?: ApiBody } })?.response?.data ??
+    (err as { data?: ApiBody })?.data
+
+  if (data && typeof data === 'object') {
+    const { errors, message } = data
+
+    if (Array.isArray(errors) && errors.length > 0) {
+      const fieldErrors: Record<string, string> = {}
+
+      for (const ve of errors) {
+        const key = ve.field.includes('.')
+          ? ve.field.split('.').pop()!
+          : ve.field
+        const friendly = friendlyMessage(key, ve.message)
+        fieldErrors[key] = fieldErrors[key]
+          ? `${fieldErrors[key]}\n${friendly}`
+          : friendly
+      }
+
+      return {
+        message: '',
+        fieldErrors,
+      }
+    }
+
+    if (typeof message === 'string' && message.trim()) {
+      return { message: message.trim(), fieldErrors: {} }
+    }
+  }
+
+  return {
+    message: err instanceof Error ? err.message : 'Something went wrong.',
+    fieldErrors: {},
+  }
 }
 
-function isApiResponseBody(val: unknown): val is ApiResponseBody {
-  return typeof val === 'object' && val !== null
+function normalizePhone(value: string): string {
+  const digits = value.replace(/[^\d]/g, '')
+  if (digits.startsWith('63')) return `+${digits}`
+  if (digits.startsWith('0'))  return `+63${digits.slice(1)}`
+  if (digits.length > 0)       return `+63${digits}`
+  return value
 }
+
 
 function buildInitialState(tab: UserTab, user: AnyUser | null): FormState {
   const base: FormState = {
-    username:       user?.username       ?? '',
-    email:          user?.email          ?? '',
-    phone:          user?.phone          ?? '',
     first_name:     user?.first_name     ?? '',
     last_name:      user?.last_name      ?? '',
     middle_initial: user?.middle_initial ?? '',
     suffix:         user?.suffix         ?? '',
+    username:       user?.username       ?? '',
+    email:          user?.email          ?? '',
+    phone:          user?.phone          ?? '',
   }
 
   if (tab === 'clients') {
@@ -85,430 +160,133 @@ function buildInitialState(tab: UserTab, user: AnyUser | null): FormState {
       payment_terms:   c?.payment_terms   ?? 30,
     }
   }
+
   if (tab === 'drivers') {
     const d = (user as DriverUser | null)?.drivers
     return {
       ...base,
       password:         '',
-      license_number:   d?.license_number               ?? '',
-      license_expiry:   d?.license_expiry?.split('T')[0] ?? '',
-      is_vendor_driver: d?.is_vendor_driver              ?? false,
-      vendor_id:        d?.vendor_id                    ?? '',
+      license_number:   d?.license_number                   ?? '',
+      license_expiry:   d?.license_expiry?.split('T')[0]    ?? '',
+      is_vendor_driver: d?.is_vendor_driver                 ?? false,
+      vendor_id:        d?.vendor_id                        ?? '',
     }
   }
+
   if (tab === 'vendors') {
     const v = (user as VendorUser | null)?.vendors
     return {
       ...base,
-      vendor_type: v?.vendor_type ?? 'individual',
-      company_name:       v?.company_name       ?? '',
-      business_permit:    v?.business_permit    ?? '',
+      vendor_type:     v?.vendor_type     ?? 'individual',
+      company_name:    v?.company_name    ?? '',
+      business_permit: v?.business_permit ?? '',
     }
   }
+
   return base
 }
 
-async function submitForm(tab: UserTab, form: FormState, editId?: string): Promise<void> {
+async function submitForm(
+  tab: UserTab,
+  form: FormState,
+  editId?: string
+): Promise<void> {
   const clean = Object.fromEntries(
     Object.entries(form).filter(([, v]) => v !== '' && v !== null && v !== undefined)
   )
   switch (tab) {
-    case 'clients':
-      return editId
-        ? clientService.update(editId, clean).then()
-        : clientService.create(clean as unknown as Parameters<typeof clientService.create>[0]).then()
-    case 'drivers':
-      return editId
-        ? driverService.update(editId, clean).then()
-        : driverService.create(clean as unknown as Parameters<typeof driverService.create>[0]).then()
-    case 'vendors':
-      return editId
-        ? vendorService.update(editId, clean).then()
-        : vendorService.create(clean as unknown as Parameters<typeof vendorService.create>[0]).then()
-    case 'accountants':
-      return editId
-        ? accountantService.update(editId, clean).then()
-        : accountantService.create(clean as unknown as Parameters<typeof accountantService.create>[0]).then()
-    case 'general-managers':
-      return editId
-        ? generalManagerService.update(editId, clean).then()
-        : generalManagerService.create(clean as unknown as Parameters<typeof generalManagerService.create>[0]).then()
-    case 'human-resources':
-      return editId
-        ? humanResourcesService.update(editId, clean).then()
-        : humanResourcesService.create(clean as unknown as Parameters<typeof humanResourcesService.create>[0]).then()
-    case 'fleet-admins':
-      return editId
-        ? fleetAdminService.update(editId, clean).then()
-        : fleetAdminService.create(clean as unknown as Parameters<typeof fleetAdminService.create>[0]).then()
-    case 'operations-admins':
-      return editId
-        ? operationsAdminService.update(editId, clean).then()
-        : operationsAdminService.create(clean as unknown as Parameters<typeof operationsAdminService.create>[0]).then()
+    case 'clients':           return editId ? clientService.update(editId, clean as never).then()           : clientService.create(clean as never).then()
+    case 'drivers':           return editId ? driverService.update(editId, clean as never).then()           : driverService.create(clean as never).then()
+    case 'vendors':           return editId ? vendorService.update(editId, clean as never).then()           : vendorService.create(clean as never).then()
+    case 'accountants':       return editId ? accountantService.update(editId, clean as never).then()       : accountantService.create(clean as never).then()
+    case 'general-managers':  return editId ? generalManagerService.update(editId, clean as never).then()  : generalManagerService.create(clean as never).then()
+    case 'human-resources':   return editId ? humanResourcesService.update(editId, clean as never).then()  : humanResourcesService.create(clean as never).then()
+    case 'fleet-admins':      return editId ? fleetAdminService.update(editId, clean as never).then()      : fleetAdminService.create(clean as never).then()
+    case 'operations-admins': return editId ? operationsAdminService.update(editId, clean as never).then() : operationsAdminService.create(clean as never).then()
   }
 }
 
-const muiTextFieldSx = {
-  '& .MuiInputBase-root': {
-    bgcolor: '#2a2a2a99',
-    borderRadius: '10px',
-    color: '#fff',
-  },
-  '& .MuiOutlinedInput-notchedOutline': { borderColor: '#424242' },
-  '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#4df9ed50' },
-  '& .MuiInputLabel-root': {
-    color: '#818181',
-    fontSize: '12px',
-    fontWeight: 700,
-    letterSpacing: '0.12em',
-    textTransform: 'uppercase',
-  },
-  '& .MuiInputLabel-root.Mui-focused': { color: '#4df9ed' },
-  '& .MuiFormHelperText-root': { marginLeft: 0 },
-} as const
-
-interface BaseFieldsProps {
-  form: FormState
-  set: (k: string, v: string | boolean | number) => void
-  fe: Record<string, string>
-  isEdit: boolean
+interface FieldProps {
+  label: string
+  required?: boolean
+  error?: string
+  hint?: string
+  children: React.ReactNode
 }
 
-function BaseFields({ form, set, fe }: BaseFieldsProps) {
+function Field({ label, required, error, hint, children }: FieldProps) {
   return (
-    <>
-      <div className="grid grid-cols-2 gap-4">
-        <TextField
-          label="First Name"
-          value={form.first_name as string}
-          onChange={(e) => set('first_name', e.target.value)}
-          placeholder="Juan"
-          error={!!fe.first_name}
-          helperText={fe.first_name}
-          fullWidth
-          size="small"
-          sx={muiTextFieldSx}
-        />
-        <TextField
-          label="Last Name"
-          value={form.last_name as string}
-          onChange={(e) => set('last_name', e.target.value)}
-          placeholder="Dela Cruz"
-          error={!!fe.last_name}
-          helperText={fe.last_name}
-          fullWidth
-          size="small"
-          sx={muiTextFieldSx}
-        />
-        <TextField
-          label="Middle Initial"
-          value={form.middle_initial as string}
-          onChange={(e) => set('middle_initial', e.target.value)}
-          placeholder="R."
-          inputProps={{ maxLength: 5 }}
-          error={!!fe.middle_initial}
-          helperText={fe.middle_initial}
-          fullWidth
-          size="small"
-          sx={muiTextFieldSx}
-        />
-        <TextField
-          label="Suffix"
-          value={form.suffix as string}
-          onChange={(e) => set('suffix', e.target.value)}
-          placeholder="Jr., III…"
-          error={!!fe.suffix}
-          helperText={fe.suffix}
-          fullWidth
-          size="small"
-          sx={muiTextFieldSx}
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <TextField
-          label="Username"
-          value={form.username as string}
-          onChange={(e) => set('username', e.target.value)}
-          placeholder="jdelacruz"
-          required
-          error={!!fe.username}
-          helperText={fe.username}
-          fullWidth
-          size="small"
-          sx={muiTextFieldSx}
-        />
-        <TextField
-          label="Email"
-          type="email"
-          value={form.email as string}
-          onChange={(e) => set('email', e.target.value)}
-          placeholder="juan@8338logistics.com"
-          required
-          error={!!fe.email}
-          helperText={fe.email}
-          fullWidth
-          size="small"
-          sx={muiTextFieldSx}
-        />
-      </div>
-
-      <TextField
-        label="Phone"
-        type="tel"
-        value={form.phone as string}
-        onChange={(e) => set('phone', e.target.value)}
-        placeholder="+63 912 345 6789"
-        error={!!fe.phone}
-        helperText={fe.phone}
-        fullWidth
-        size="small"
-        sx={muiTextFieldSx}
-      />
-    </>
-  )
-}
-
-function ClientExtraFields({ form, set, fe }: Omit<BaseFieldsProps, 'isEdit'>) {
-  return (
-    <>
-      <div className="grid grid-cols-2 gap-4">
-        <TextField
-          label="Company Name"
-          value={form.company_name as string}
-          onChange={(e) => set('company_name', e.target.value)}
-          placeholder="Acme Corp"
-          error={!!fe.company_name}
-          helperText={fe.company_name}
-          fullWidth
-          size="small"
-          sx={muiTextFieldSx}
-        />
-        <TextField
-          label="Payment Terms (days)"
-          type="number"
-          value={String(form.payment_terms as number)}
-          onChange={(e) => set('payment_terms', Number(e.target.value))}
-          inputProps={{ min: 0 }}
-          placeholder="30"
-          error={!!fe.payment_terms}
-          helperText={fe.payment_terms}
-          fullWidth
-          size="small"
-          sx={muiTextFieldSx}
-        />
-      </div>
-      <TextField
-        label="Billing Address"
-        value={form.billing_address as string}
-        onChange={(e) => set('billing_address', e.target.value)}
-        placeholder="123 Main St, Makati City, Metro Manila"
-        error={!!fe.billing_address}
-        helperText={fe.billing_address}
-        fullWidth
-        size="small"
-        multiline
-        minRows={2}
-        sx={muiTextFieldSx}
-      />
-    </>
-  )
-}
-
-function DriverExtraFields({ form, set, fe, isEdit }: BaseFieldsProps) {
-  return (
-    <>
-      {!isEdit && (
-        <TextField
-          label="Password"
-          type="password"
-          value={(form.password as string) ?? ''}
-          onChange={(e) => set('password', e.target.value)}
-          placeholder="Min. 8 characters"
-          required
-          error={!!fe.password}
-          helperText={fe.password}
-          fullWidth
-          size="small"
-          sx={muiTextFieldSx}
-        />
-      )}
-
-      <div className="grid grid-cols-2 gap-4">
-        <TextField
-          label="License Number"
-          value={form.license_number as string}
-          onChange={(e) => set('license_number', e.target.value)}
-          placeholder="N01-23-456789"
-          required
-          error={!!fe.license_number}
-          helperText={fe.license_number}
-          fullWidth
-          size="small"
-          sx={muiTextFieldSx}
-        />
-        <TextField
-          label="License Expiry"
-          type="date"
-          value={form.license_expiry as string}
-          onChange={(e) => set('license_expiry', e.target.value)}
-          required
-          error={!!fe.license_expiry}
-          helperText={fe.license_expiry}
-          fullWidth
-          size="small"
-          sx={{
-            ...muiTextFieldSx,
-            '& input': { colorScheme: 'dark' },
-          }}
-          InputLabelProps={{ shrink: true }}
-        />
-      </div>
-      <div className="rounded-lg border border-[#2a2a2a] bg-[#2a2a2a]/40 px-4 py-2.5">
-        <FormControlLabel
-          control={
-            <Checkbox
-              checked={form.is_vendor_driver as boolean}
-              onChange={(e) => set('is_vendor_driver', e.target.checked)}
-              sx={{
-                color: '#818181',
-                '&.Mui-checked': { color: '#4df9ed' },
-              }}
-            />
-          }
-          label={<span className="text-sm text-[#818181]">This driver belongs to a vendor / subcontractor</span>}
-        />
-        {fe.vendor_id && (
-          <FormHelperText sx={{ color: 'rgb(248 113 113)', marginLeft: 0, marginTop: '-6px' }}>
-            {fe.vendor_id}
-          </FormHelperText>
-        )}
-      </div>
-    </>
-  )
-}
-
-function VendorExtraFields({ form, set, fe }: Omit<BaseFieldsProps, 'isEdit'>) {
-  return (
-    <>
-      <TextField
-        select
-        label="Vendor Type"
-        value={form.vendor_type as string}
-        onChange={(e) => set('vendor_type', e.target.value)}
-        required
-        error={!!fe.vendor_type}
-        helperText={fe.vendor_type}
-        fullWidth
-        size="small"
-        sx={muiTextFieldSx}
-      >
-        <MenuItem value="individual">Individual</MenuItem>
-        <MenuItem value="company">Company</MenuItem>
-      </TextField>
-      <div className="grid grid-cols-2 gap-4">
-        <TextField
-          label="Company Name"
-          value={form.company_name as string}
-          onChange={(e) => set('company_name', e.target.value)}
-          placeholder="Vendor Co."
-          error={!!fe.company_name}
-          helperText={fe.company_name}
-          fullWidth
-          size="small"
-          sx={muiTextFieldSx}
-        />
-        <TextField
-          label="Business Permit #"
-          value={form.business_permit as string}
-          onChange={(e) => set('business_permit', e.target.value)}
-          placeholder="BP-2024-XXXXX"
-          error={!!fe.business_permit}
-          helperText={fe.business_permit}
-          fullWidth
-          size="small"
-          sx={muiTextFieldSx}
-        />
-      </div>
-    </>
-  )
-}
-
-function RoleInfoBadge({ tab }: { tab: UserTab }) {
-  const roleMap: Partial<Record<UserTab, { label: string; color: string }>> = {
-    'human-resources':   { label: 'human_resources',  color: 'bg-pink-500/15 text-pink-400 border-pink-500/30' },
-    'fleet-admins':      { label: 'fleet_admin',       color: 'bg-orange-500/15 text-orange-400 border-orange-500/30' },
-    'operations-admins': { label: 'operations_admin',  color: 'bg-violet-500/15 text-violet-400 border-violet-500/30' },
-    'accountants':       { label: 'accountant',        color: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' },
-    'general-managers':  { label: 'general_manager',   color: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30' },
-  }
-  const cfg = roleMap[tab]
-  if (!cfg) return null
-  return (
-    <div className="flex items-center gap-2 rounded-lg border border-[#2a2a2a] bg-[#2a2a2a]/40 px-4 py-3">
-      <span className="text-xs text-[#818181]">This account will be assigned the role:</span>
-      <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${cfg.color}`}>
-        {cfg.label.replace(/_/g, ' ')}
-      </span>
+    <div className="flex flex-col gap-1.5">
+      <label className="text-[10px] font-bold tracking-[0.12em] uppercase text-[#818181]">
+        {label}
+        {required && <span className="ml-0.5 text-[#4df9ed]">*</span>}
+      </label>
+      {children}
+      {error ? (
+        <p className="text-[11px] text-red-400 leading-tight whitespace-pre-line">{error}</p>
+      ) : hint ? (
+        <p className="text-[10px] text-[#555]">{hint}</p>
+      ) : null}
     </div>
   )
 }
 
-function extractApiError(err: unknown): {
-  message: string
-  fieldErrors: Record<string, string>
-} {
-  // Axios error shape
-  const body =
-    (err as ApiErrorShape)?.response?.data ??
-    (err as ApiErrorShape)?.data ??
-    err
+const inputBase =
+  'w-full rounded-[10px] border border-[#424242] bg-[#2a2a2a99] px-3 py-2 text-[13px] text-white placeholder-[#555] outline-none transition-colors duration-150 focus:border-[#4df9ed] hover:border-[#4df9ed50]'
 
-  if (isApiResponseBody(body)) {
-    const { errors, message } = body
-
-    if (Array.isArray(errors) && errors.length > 0) {
-      const mapped: Record<string, string> = {}
-      for (const ve of errors) {
-        // Zod uses dot-notation for nested paths e.g. "drivers.license_number"
-        // take the last segment so it matches your form field keys
-        const key = ve.field.includes('.')
-          ? ve.field.split('.').pop()!
-          : ve.field
-        mapped[key] = mapped[key] ? `${mapped[key]}\n${ve.message}` : ve.message
-      }
-
-      const backendMsg =
-        typeof message === 'string' && message.trim().length > 0
-          ? message.trim()
-          : 'Validation failed'
-
-      const combined = errors
-        .map((e) => e?.message)
-        .filter((m): m is string => typeof m === 'string' && m.trim().length > 0)
-
-      const combinedMsg =
-        combined.length > 0
-          ? `${backendMsg}:\n${combined.map((m) => `- ${m}`).join('\n')}`
-          : backendMsg
-
-      return { message: combinedMsg, fieldErrors: mapped }
-    }
-
-    if (typeof message === 'string' && message) {
-      return { message, fieldErrors: {} }
-    }
-  }
-
-  const fallback = err instanceof Error ? err.message : 'Something went wrong.'
-  return { message: fallback, fieldErrors: {} }
+function Input({
+  error,
+  className = '',
+  ...props
+}: Omit<InputHTMLAttributes<HTMLInputElement>, 'required'> & { error?: string }) {
+  return (
+    <input
+      {...props}
+      className={`${inputBase} ${error ? 'border-red-500/60' : ''} ${className}`}
+    />
+  )
 }
 
+function Textarea({
+  error,
+  className = '',
+  ...props
+}: Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'required'> & { error?: string }) {
+  return (
+    <textarea
+      {...props}
+      rows={props.rows ?? 2}
+      className={`${inputBase} resize-none ${error ? 'border-red-500/60' : ''} ${className}`}
+    />
+  )
+}
+
+function Select({
+  error,
+  className = '',
+  children,
+  ...props
+}: Omit<SelectHTMLAttributes<HTMLSelectElement>, 'required'> & { error?: string }) {
+  return (
+    <select
+      {...props}
+      className={`${inputBase} appearance-none bg-[#2a2a2a] ${error ? 'border-red-500/60' : ''} ${className}`}
+      style={{
+        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`,
+        backgroundRepeat: 'no-repeat',
+        backgroundPosition: 'right 12px center',
+      }}
+    >
+      {children}
+    </select>
+  )
+}
 
 export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormModalProps) {
   const isEdit = Boolean(user)
-  const [form, setForm] = useState<FormState>(() => buildInitialState(tab, user))
-  const [loading, setLoading] = useState(false)
+
+  const [form, setForm]               = useState<FormState>(() => buildInitialState(tab, user))
+  const [loading, setLoading]         = useState(false)
   const [globalError, setGlobalError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
@@ -520,13 +298,12 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
 
   function set(key: string, value: string | boolean | number) {
     setForm((prev) => ({ ...prev, [key]: value }))
-    if (fieldErrors[key]) {
-      setFieldErrors((prev) => {
-        const next = { ...prev }
-        delete next[key]
-        return next
-      })
-    }
+    setFieldErrors((prev) => {
+      if (!prev[key]) return prev
+      const next = { ...prev }
+      delete next[key]
+      return next
+    })
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -551,6 +328,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
   return (
     <AnimatePresence>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+
         <motion.div
           key="backdrop"
           initial={{ opacity: 0 }}
@@ -566,11 +344,11 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.96, y: 12 }}
           transition={{ type: 'spring', duration: 0.3, bounce: 0.15 }}
-          className="relative z-10 w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-[#2a2a2a] bg-[#1b1b1b] shadow-2xl"
+          className="relative z-10 w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-[#2a2a2a] bg-[#1b1b1b] shadow-2xl [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
         >
           <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#2a2a2a] bg-[#1b1b1b] px-6 py-4">
             <div>
-              <p className="text-xs font-semibold tracking-widest uppercase text-[#4df9ed]">
+              <p className="text-[10px] font-bold tracking-[0.14em] uppercase text-[#4df9ed]">
                 {isEdit ? 'Edit' : 'Create'} {TAB_LABELS[tab]}
               </p>
               <h2 className="mt-0.5 text-lg font-bold text-white">
@@ -578,6 +356,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
               </h2>
             </div>
             <button
+              type="button"
               onClick={onClose}
               className="rounded-lg p-2 text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white"
             >
@@ -585,39 +364,222 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5 px-6 py-6">
 
-            <BaseFields form={form} set={set} fe={fe} isEdit={isEdit} />
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="First Name" required error={fe.first_name}>
+                <Input
+                  value={form.first_name as string}
+                  onChange={(e) => set('first_name', e.target.value)}
+                  placeholder="Juan"
+                  error={fe.first_name}
+                />
+              </Field>
+              <Field label="Last Name" required error={fe.last_name}>
+                <Input
+                  value={form.last_name as string}
+                  onChange={(e) => set('last_name', e.target.value)}
+                  placeholder="Dela Cruz"
+                  error={fe.last_name}
+                />
+              </Field>
+            </div>
 
-            {tab === 'clients' && (
-              <ClientExtraFields form={form} set={set} fe={fe} />
-            )}
-            {tab === 'drivers' && (
-              <DriverExtraFields form={form} set={set} fe={fe} isEdit={isEdit} />
-            )}
-            {tab === 'vendors' && (
-              <VendorExtraFields form={form} set={set} fe={fe} />
-            )}
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Middle Initial" error={fe.middle_initial}>
+                <Input
+                  value={form.middle_initial as string}
+                  onChange={(e) => set('middle_initial', e.target.value)}
+                  placeholder="R."
+                  maxLength={1}
+                  error={fe.middle_initial}
+                />
+              </Field>
+              <Field label="Suffix" error={fe.suffix}>
+                <Select
+                  value={form.suffix as string}
+                  onChange={(e) => set('suffix', e.target.value)}
+                  error={fe.suffix}
+                >
+                  <option value=""> N/A </option>
+                  {USER_SUFFIXES.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </Select>
+              </Field>
+            </div>
 
-            {(
-              tab === 'accountants' ||
-              tab === 'general-managers' ||
-              tab === 'human-resources' ||
-              tab === 'fleet-admins' ||
-              tab === 'operations-admins'
-            ) && <RoleInfoBadge tab={tab} />}
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Username" required error={fe.username}>
+                <Input
+                  value={form.username as string}
+                  onChange={(e) => set('username', e.target.value)}
+                  placeholder="jdelacruz"
+                  error={fe.username}
+                />
+              </Field>
+              <Field label="Email" required error={fe.email}>
+                <Input
+                  type="email"
+                  value={form.email as string}
+                  onChange={(e) => set('email', e.target.value)}
+                  placeholder="juan@8338logistics.com"
+                  error={fe.email}
+                />
+              </Field>
+            </div>
+
+            {/* Row 4 — Phone */}
+            <Field label="Phone" required error={fe.phone}>
+              <Input
+                type="tel"
+                value={form.phone as string}
+                onChange={(e) => set('phone', e.target.value)}
+                onBlur={(e) => { const n = normalizePhone(e.target.value); if (n !== e.target.value) set('phone', n) }}
+                placeholder="+63 912 345 6789"
+                error={fe.phone}
+              />
+            </Field>
+
+            {tab === 'clients' && (<>
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Company Name" required error={fe.company_name}>
+                  <Input
+                    value={form.company_name as string}
+                    onChange={(e) => set('company_name', e.target.value)}
+                    placeholder="Acme Corp"
+                    error={fe.company_name}
+                  />
+                </Field>
+                <Field label="Payment Terms (Days)" hint="Net days" error={fe.payment_terms}>
+                  <Select
+                    value={String(form.payment_terms)}
+                    onChange={(e) => set('payment_terms', Number(e.target.value))}
+                    error={fe.payment_terms}
+                  >
+                    <option value="30">30 days</option>
+                    <option value="45">45 days</option>
+                    <option value="60">60 days</option>
+                  </Select>
+                </Field>
+              </div>
+              <Field label="Billing Address" required error={fe.billing_address}>
+                <Textarea
+                  value={form.billing_address as string}
+                  onChange={(e) => set('billing_address', e.target.value)}
+                  placeholder="123 Main St, Makati City, Metro Manila"
+                  rows={2}
+                  error={fe.billing_address}
+                />
+              </Field>
+            </>)}
+
+            {tab === 'drivers' && (<>
+              {!isEdit && (
+                <Field label="Password" required error={fe.password}>
+                  <Input
+                    type="password"
+                    value={form.password as string}
+                    onChange={(e) => set('password', e.target.value)}
+                    placeholder="Min. 8 characters"
+                    error={fe.password}
+                  />
+                </Field>
+              )}
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="License Number" required error={fe.license_number}>
+                  <Input
+                    value={form.license_number as string}
+                    onChange={(e) => set('license_number', e.target.value)}
+                    placeholder="N01-23-456789"
+                    error={fe.license_number}
+                  />
+                </Field>
+                <Field label="License Expiry" required error={fe.license_expiry}>
+                  <Input
+                    type="date"
+                    value={form.license_expiry as string}
+                    onChange={(e) => set('license_expiry', e.target.value)}
+                    error={fe.license_expiry}
+                    className="[color-scheme:dark]"
+                  />
+                </Field>
+              </div>
+
+              <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-[#2a2a2a] bg-[#2a2a2a]/40 px-4 py-3">
+                <div className="relative mt-0.5 flex-shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={form.is_vendor_driver as boolean}
+                    onChange={(e) => set('is_vendor_driver', e.target.checked)}
+                    className="peer sr-only"
+                  />
+                  <div className="h-4 w-4 rounded border border-[#424242] bg-[#1b1b1b] transition-colors peer-checked:border-[#4df9ed] peer-checked:bg-[#4df9ed]" />
+                  <svg
+                    className="pointer-events-none absolute inset-0 m-auto hidden h-2.5 w-2.5 text-[#0a0a0a] peer-checked:block"
+                    viewBox="0 0 10 10"
+                    fill="none"
+                  >
+                    <path
+                      d="M1.5 5l2.5 2.5 4.5-4.5"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </div>
+                <span className="text-sm text-[#818181]">
+                  This driver belongs to a vendor / subcontractor
+                </span>
+              </label>
+              {fe.vendor_id && (
+                <p className="text-[11px] text-red-400 -mt-3">{fe.vendor_id}</p>
+              )}
+            </>)}
+
+            {tab === 'vendors' && (<>
+              <Field label="Vendor Type" required error={fe.vendor_type}>
+                <Select
+                  value={form.vendor_type as string}
+                  onChange={(e) => set('vendor_type', e.target.value)}
+                  error={fe.vendor_type}
+                >
+                  <option value="individual">Individual</option>
+                  <option value="company">Company</option>
+                </Select>
+              </Field>
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Company Name" error={fe.company_name}>
+                  <Input
+                    value={form.company_name as string}
+                    onChange={(e) => set('company_name', e.target.value)}
+                    placeholder="Vendor Co."
+                    error={fe.company_name}
+                  />
+                </Field>
+                <Field label="Business Permit #" error={fe.business_permit}>
+                  <Input
+                    value={form.business_permit as string}
+                    onChange={(e) => set('business_permit', e.target.value)}
+                    placeholder="BP-2024-XXXXX"
+                    error={fe.business_permit}
+                  />
+                </Field>
+              </div>
+            </>)}
 
             {globalError && (
-              <motion.p
+              <motion.div
                 initial={{ opacity: 0, y: -4 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm text-red-400 whitespace-pre-line"
+                className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3"
               >
-                {globalError}
-              </motion.p>
+                <p className="text-sm text-red-400 whitespace-pre-line">{globalError}</p>
+              </motion.div>
             )}
 
-            <div className="flex justify-end gap-3 pt-2 border-t border-[#2a2a2a]">
+            <div className="flex justify-end gap-3 border-t border-[#2a2a2a] pt-5 mt-1">
               <button
                 type="button"
                 onClick={onClose}
@@ -634,6 +596,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
                 {loading ? 'Saving…' : isEdit ? 'Save Changes' : `Create ${TAB_LABELS[tab]}`}
               </button>
             </div>
+
           </form>
         </motion.div>
       </div>

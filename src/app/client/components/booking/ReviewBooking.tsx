@@ -4,8 +4,9 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Truck } from 'lucide-react'
 import Image from 'next/image'
-import { useAppSelector } from '@/app/lib/hooks/hooks'
+import { useAppSelector, useAppDispatch } from '@/app/lib/hooks/hooks'
 import type { ServiceType, DropoffSection, CargoMode } from '@/app/lib/store/slice/booking.slice'
+import { resetBooking } from '@/app/lib/store/slice/booking.slice'
 import { createBooking } from '@/app/lib/api/client/booking.api'
 import { getMe } from '@/app/lib/api/auth.api'
 import './BookingDetails.css'
@@ -69,6 +70,8 @@ function buildCargoDetails(
 }
 
 export default function StepReview({ selectedService, onBack, onNewBooking }: Props) {
+  const dispatch = useAppDispatch()
+
   const [loading,   setLoading]   = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [bookingId, setBookingId] = useState<string | null>(null)
@@ -88,7 +91,7 @@ export default function StepReview({ selectedService, onBack, onNewBooking }: Pr
 
   const allGroups = sections.flatMap((s) => s.groups)
 
-const confirm = async () => {
+  const confirm = async () => {
     if (!vehicle) return
     setLoading(true)
     setError(null)
@@ -130,6 +133,7 @@ const confirm = async () => {
 
       const result = await createBooking(payload)
       setBookingId(result?.booking_id ?? null)
+      dispatch(resetBooking())  // ← reset store immediately on success
       setSubmitted(true)
 
     } catch (err: unknown) {
@@ -485,4 +489,3 @@ function Spinner() {
     />
   )
 }
-
