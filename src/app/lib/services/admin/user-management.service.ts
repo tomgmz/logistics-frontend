@@ -20,6 +20,8 @@ import type {
   UpdateFleetAdminPayload,
   CreateOperationsAdminPayload,
   UpdateOperationsAdminPayload,
+  CreateITAdminPayload,
+  UpdateITAdminPayload,
 } from '@/app/types/admin/user-management.types'
 
 interface ApiResponse<T> {
@@ -111,4 +113,12 @@ export const operationsAdminService = {
   create: (p: CreateOperationsAdminPayload) => post<AdminUser>(`${B}/operations-admins`, p),
   update: (id: string, p: UpdateOperationsAdminPayload) => patch<AdminUser>(`${B}/operations-admins/${id}`, p),
   remove: (id: string) => del(`${B}/operations-admins/${id}`),
+}
+
+export const itAdminService = {
+  getAll: () => get<AdminUser[]>(`${B}/it-admins`),
+  getOne: (id: string) => get<AdminUser>(`${B}/it-admins/${id}`),
+  create: (p: CreateITAdminPayload) => post<AdminUser>(`${B}/it-admins`, p),
+  update: (id: string, p: UpdateITAdminPayload) => patch<AdminUser>(`${B}/it-admins/${id}`, p),
+  remove: (id: string) => del(`${B}/it-admins/${id}`),
 }

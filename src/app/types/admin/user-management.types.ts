@@ -20,6 +20,7 @@ export type UserTab =
   | 'human-resources'
   | 'fleet-admins'
   | 'operations-admins'
+  | 'it-admins'
 
 export interface BaseUser {
   user_id: string
@@ -180,12 +181,26 @@ export interface CreateOperationsAdminPayload {
   suffix?: string
 }
 
-export type UpdateAdminPayload            = Partial<Omit<CreateAdminPayload, 'password'>>
-export type UpdateClientPayload           = Partial<Omit<CreateClientPayload, 'password'>>
-export type UpdateDriverPayload           = Partial<Omit<CreateDriverPayload, 'password'>>
-export type UpdateVendorPayload           = Partial<Omit<CreateVendorPayload, 'password'>>
-export type UpdateAccountantPayload       = Partial<Omit<CreateAccountantPayload, 'password'>>
-export type UpdateGeneralManagerPayload   = Partial<Omit<CreateGeneralManagerPayload, 'password'>>
-export type UpdateHumanResourcesPayload   = Partial<Omit<CreateHumanResourcesPayload, 'password'>>
-export type UpdateFleetAdminPayload       = Partial<Omit<CreateFleetAdminPayload, 'password'>>
-export type UpdateOperationsAdminPayload  = Partial<Omit<CreateOperationsAdminPayload, 'password'>>
+export interface CreateITAdminPayload {
+  username:        string
+  email:           string
+  phone?:          string
+  first_name?:     string
+  last_name?:      string
+  middle_initial?: string
+  suffix?:         string
+  created_by?:     string | null
+}
+
+export type UpdateAdminPayload           = Partial<Omit<CreateAdminPayload, 'password'>>
+export type UpdateClientPayload          = Partial<Omit<CreateClientPayload, 'password'>>
+export type UpdateDriverPayload          = Partial<Omit<CreateDriverPayload, 'password'>>
+export type UpdateVendorPayload          = Partial<Omit<CreateVendorPayload, 'password'>>
+export type UpdateAccountantPayload      = Partial<Omit<CreateAccountantPayload, 'password'>>
+export type UpdateGeneralManagerPayload  = Partial<Omit<CreateGeneralManagerPayload, 'password'>>
+export type UpdateHumanResourcesPayload  = Partial<Omit<CreateHumanResourcesPayload, 'password'>>
+export type UpdateFleetAdminPayload      = Partial<Omit<CreateFleetAdminPayload, 'password'>>
+export type UpdateOperationsAdminPayload = Partial<Omit<CreateOperationsAdminPayload, 'password'>>
+export type UpdateITAdminPayload         = Partial<CreateITAdminPayload> & {
+  status?: UserStatus
+}

@@ -39,6 +39,7 @@ import {
   humanResourcesService,
   fleetAdminService,
   operationsAdminService,
+  itAdminService,
 } from '@/app/lib/services/admin/user-management.service'
 import { appToast } from '@/app/lib/toast'
 import UserFormModal from './UserFormModal'
@@ -51,7 +52,6 @@ const muiTheme = createTheme({
   },
 })
 
-// 'all' is a UI-only virtual tab
 type TabValue = UserTab | 'all'
 
 const TABS: { key: TabValue; label: string }[] = [
@@ -62,8 +62,9 @@ const TABS: { key: TabValue; label: string }[] = [
   { key: 'accountants',        label: 'Accountants'   },
   { key: 'general-managers',   label: 'Gen. Managers' },
   { key: 'human-resources',    label: 'HR'            },
-  { key: 'fleet-admins',       label: 'Fleet Admins'  },
-  { key: 'operations-admins',  label: 'Ops. Admins'   },
+  { key: 'fleet-admins',       label: 'Fleet Manager'  },
+  { key: 'operations-admins',  label: 'Ops. Manager'   },
+  { key: 'it-admins',          label: 'IT Admins'     },
 ]
 
 const PAGE_SIZE = 15
@@ -79,6 +80,7 @@ async function fetchUsers(tab: TabValue): Promise<AnyUser[]> {
       humanResourcesService.getAll(),
       fleetAdminService.getAll(),
       operationsAdminService.getAll(),
+      itAdminService.getAll(),
     ])
     return results
       .filter((r) => r.status === 'fulfilled')
@@ -86,32 +88,33 @@ async function fetchUsers(tab: TabValue): Promise<AnyUser[]> {
   }
 
   switch (tab) {
-    case 'clients':           return clientService.getAll() as Promise<AnyUser[]>
-    case 'drivers':           return driverService.getAll() as Promise<AnyUser[]>
-    case 'vendors':           return vendorService.getAll() as Promise<AnyUser[]>
-    case 'accountants':       return accountantService.getAll() as Promise<AnyUser[]>
-    case 'general-managers':  return generalManagerService.getAll() as Promise<AnyUser[]>
-    case 'human-resources':   return humanResourcesService.getAll() as Promise<AnyUser[]>
-    case 'fleet-admins':      return fleetAdminService.getAll() as Promise<AnyUser[]>
-    case 'operations-admins': return operationsAdminService.getAll() as Promise<AnyUser[]>
+    case 'clients':           return clientService.getAll()           as Promise<AnyUser[]>
+    case 'drivers':           return driverService.getAll()           as Promise<AnyUser[]>
+    case 'vendors':           return vendorService.getAll()           as Promise<AnyUser[]>
+    case 'accountants':       return accountantService.getAll()       as Promise<AnyUser[]>
+    case 'general-managers':  return generalManagerService.getAll()   as Promise<AnyUser[]>
+    case 'human-resources':   return humanResourcesService.getAll()   as Promise<AnyUser[]>
+    case 'fleet-admins':      return fleetAdminService.getAll()       as Promise<AnyUser[]>
+    case 'operations-admins': return operationsAdminService.getAll()  as Promise<AnyUser[]>
+    case 'it-admins':         return itAdminService.getAll()          as Promise<AnyUser[]>
   }
 }
 
 async function updateStatus(tab: UserTab, id: string, status: UserStatus): Promise<void> {
-  const payload = { status } as unknown as Parameters<typeof clientService.update>[1]
+  const payload = { status } as never
   switch (tab) {
     case 'clients':           return clientService.update(id, payload).then()
-    case 'drivers':           return driverService.update(id, payload as unknown as Parameters<typeof driverService.update>[1]).then()
-    case 'vendors':           return vendorService.update(id, payload as unknown as Parameters<typeof vendorService.update>[1]).then()
-    case 'accountants':       return accountantService.update(id, payload as unknown as Parameters<typeof accountantService.update>[1]).then()
-    case 'general-managers':  return generalManagerService.update(id, payload as unknown as Parameters<typeof generalManagerService.update>[1]).then()
-    case 'human-resources':   return humanResourcesService.update(id, payload as unknown as Parameters<typeof humanResourcesService.update>[1]).then()
-    case 'fleet-admins':      return fleetAdminService.update(id, payload as unknown as Parameters<typeof fleetAdminService.update>[1]).then()
-    case 'operations-admins': return operationsAdminService.update(id, payload as unknown as Parameters<typeof operationsAdminService.update>[1]).then()
+    case 'drivers':           return driverService.update(id, payload).then()
+    case 'vendors':           return vendorService.update(id, payload).then()
+    case 'accountants':       return accountantService.update(id, payload).then()
+    case 'general-managers':  return generalManagerService.update(id, payload).then()
+    case 'human-resources':   return humanResourcesService.update(id, payload).then()
+    case 'fleet-admins':      return fleetAdminService.update(id, payload).then()
+    case 'operations-admins': return operationsAdminService.update(id, payload).then()
+    case 'it-admins':         return itAdminService.update(id, payload).then()
   }
 }
 
-// Derive a UserTab from a user's role for status update routing
 function tabFromRole(role: string): UserTab {
   switch (role) {
     case 'client':           return 'clients'
@@ -122,6 +125,7 @@ function tabFromRole(role: string): UserTab {
     case 'human_resources':  return 'human-resources'
     case 'fleet_admin':      return 'fleet-admins'
     case 'operations_admin': return 'operations-admins'
+    case 'it_admin':         return 'it-admins'
     default:                 return 'clients'
   }
 }
@@ -161,6 +165,19 @@ const ROLE_COLORS: Record<string, string> = {
   vendor:           'bg-lime-500/15 text-lime-400 border-lime-500/30',
 }
 
+const ROLE_LABELS: Record<string, string> = {
+  super_admin:      'Super Admin',
+  it_admin:         'IT Admin',
+  general_manager:  'General Manager',
+  fleet_admin:      'Fleet Manager',
+  operations_admin: 'Operations Manager',
+  human_resources:  'HR Officer',
+  accountant:       'Accountant',
+  driver:           'Driver',
+  client:           'Client',
+  vendor:           'Vendor',
+}
+
 function StatusBadge({ status }: { status: UserStatus }) {
   const { label, cls } = STATUS_CFG[status] ?? STATUS_CFG.inactive
   return (
@@ -172,9 +189,10 @@ function StatusBadge({ status }: { status: UserStatus }) {
 
 function RoleBadge({ role }: { role: string }) {
   const cls = ROLE_COLORS[role] ?? 'bg-[#818181]/10 text-[#818181] border-[#818181]/30'
+  const label = ROLE_LABELS[role] ?? role.replace(/_/g, ' ')
   return (
     <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold tracking-wide ${cls}`}>
-      {role.replace(/_/g, ' ')}
+      {label}
     </span>
   )
 }
@@ -415,6 +433,7 @@ function renderCells(user: AnyUser, tab: TabValue) {
     case 'human-resources':
     case 'fleet-admins':
     case 'operations-admins':
+    case 'it-admins':
       return <AdminLikeCells user={user as AdminUser} />
   }
 }
@@ -429,6 +448,7 @@ const HEADERS: Record<TabValue, string[]> = {
   'human-resources':   ['Name / Username', 'Email', 'Phone', 'Role', 'Status'],
   'fleet-admins':      ['Name / Username', 'Email', 'Phone', 'Role', 'Status'],
   'operations-admins': ['Name / Username', 'Email', 'Phone', 'Role', 'Status'],
+  'it-admins':         ['Name / Username', 'Email', 'Phone', 'Role', 'Status'],
 }
 
 export default function UserManagementClient() {
@@ -486,14 +506,13 @@ export default function UserManagementClient() {
         {
           loading: `Updating ${user.username}…`,
           success: `${user.username} → ${STATUS_CFG[status].label}`,
-          error:   (e) =>
-            e instanceof Error ? e.message : `Failed to update ${user.username}.`,
+          error:   (e) => e instanceof Error ? e.message : `Failed to update ${user.username}.`,
         },
         { action: 'update-status', entityId: user.user_id },
       )
       await load()
     } catch {
-
+      // handled by toast
     }
   }
 
@@ -517,22 +536,14 @@ export default function UserManagementClient() {
 
           <div className="flex items-start justify-between shrink-0">
             <div>
-              <p className="text-xs font-semibold tracking-[0.2em] uppercase text-[#4df9ed]">
-                Super Admin
-              </p>
-              <h1 className="mt-1 text-2xl font-bold tracking-tight text-white">
-                User Management
-              </h1>
-              <p className="mt-1 text-sm text-[#818181]">
-                Manage all platform accounts, roles, and access levels.
-              </p>
+              <h1 className="mt-1 text-2xl font-bold tracking-tight text-white">User Management</h1>
+              <p className="mt-1 text-sm text-[#818181]">Manage all platform accounts, roles, and access levels.</p>
             </div>
             <button
               onClick={openCreate}
               className="flex items-center gap-2 rounded-xl bg-[#4df9ed] px-5 py-2.5 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5] active:scale-95"
             >
-              <UserPlus size={15} />
-              Add User
+              <UserPlus size={15} /> Add User
             </button>
           </div>
 
@@ -579,25 +590,15 @@ export default function UserManagementClient() {
                     bgcolor: '#2a2a2a',
                     '& .MuiOutlinedInput-notchedOutline': { borderColor: '#424242' },
                     '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#4df9ed50' },
-                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                      borderColor: '#4df9ed',
-                      borderWidth: '1px',
-                    },
+                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#4df9ed', borderWidth: '1px' },
                     '& .MuiSelect-icon': { color: '#818181' },
-                    '& .MuiSelect-select': {
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      paddingTop: '8px',
-                      paddingBottom: '8px',
-                    },
+                    '& .MuiSelect-select': { display: 'flex', alignItems: 'center', gap: '8px', paddingTop: '8px', paddingBottom: '8px' },
                   }}
                   renderValue={(value) => {
                     const tab = TABS.find((t) => t.key === value)!
                     return (
                       <span style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#4df9ed', fontSize: '13px', fontWeight: 500 }}>
-                        <Users size={14} />
-                        {tab.label}
+                        <Users size={14} /> {tab.label}
                       </span>
                     )
                   }}
@@ -657,8 +658,7 @@ export default function UserManagementClient() {
                 disabled={loading}
                 className="flex items-center gap-1.5 rounded-lg border border-[#424242] px-3 py-2 text-sm text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white disabled:opacity-40"
               >
-                <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
-                Refresh
+                <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
               </button>
               <span className="ml-auto text-xs text-[#818181]">
                 {filtered.length} record{filtered.length !== 1 ? 's' : ''}
@@ -667,8 +667,7 @@ export default function UserManagementClient() {
 
             {error && (
               <div className="flex items-center gap-3 border-b border-red-500/20 bg-red-500/10 px-5 py-3 text-sm text-red-400 shrink-0">
-                <AlertTriangle size={14} />
-                {error}
+                <AlertTriangle size={14} /> {error}
               </div>
             )}
 
@@ -722,9 +721,7 @@ export default function UserManagementClient() {
 
             {!loading && filtered.length > PAGE_SIZE && (
               <div className="flex items-center justify-between border-t border-[#2a2a2a] px-5 py-3 shrink-0">
-                <p className="text-xs text-[#818181]">
-                  Page {page} of {totalPages}
-                </p>
+                <p className="text-xs text-[#818181]">Page {page} of {totalPages}</p>
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
@@ -740,9 +737,7 @@ export default function UserManagementClient() {
                         key={n}
                         onClick={() => setPage(n)}
                         className={`h-7 w-7 rounded-lg text-xs font-medium transition ${
-                          n === page
-                            ? 'bg-[#4df9ed] text-[#0a0a0a]'
-                            : 'text-[#818181] hover:bg-[#2a2a2a] hover:text-white'
+                          n === page ? 'bg-[#4df9ed] text-[#0a0a0a]' : 'text-[#818181] hover:bg-[#2a2a2a] hover:text-white'
                         }`}
                       >
                         {n}

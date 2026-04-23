@@ -26,6 +26,7 @@ import {
   humanResourcesService,
   fleetAdminService,
   operationsAdminService,
+  itAdminService,
 } from '@/app/lib/services/admin/user-management.service'
 import { validateForm } from '@/app/lib/validation/user-management.validation'
 import ReusableModal from '@/components/ui/ReusableModal'
@@ -45,8 +46,9 @@ const TAB_LABELS: Record<UserTab, string> = {
   accountants:         'Accountant',
   'general-managers':  'General Manager',
   'human-resources':   'HR Officer',
-  'fleet-admins':      'Fleet Admin',
-  'operations-admins': 'Operations Admin',
+  'fleet-admins':      'Fleet Manager',
+  'operations-admins': 'Operations Manager',
+  'it-admins':         'IT Admin',
 }
 
 type FormState = Record<string, string | boolean | number>
@@ -168,10 +170,11 @@ async function submitForm(tab: UserTab, form: FormState, editId?: string): Promi
     case 'drivers':           return editId ? driverService.update(editId, clean as never).then()           : driverService.create(clean as never).then()
     case 'vendors':           return editId ? vendorService.update(editId, clean as never).then()           : vendorService.create(clean as never).then()
     case 'accountants':       return editId ? accountantService.update(editId, clean as never).then()       : accountantService.create(clean as never).then()
-    case 'general-managers':  return editId ? generalManagerService.update(editId, clean as never).then()  : generalManagerService.create(clean as never).then()
-    case 'human-resources':   return editId ? humanResourcesService.update(editId, clean as never).then()  : humanResourcesService.create(clean as never).then()
-    case 'fleet-admins':      return editId ? fleetAdminService.update(editId, clean as never).then()      : fleetAdminService.create(clean as never).then()
-    case 'operations-admins': return editId ? operationsAdminService.update(editId, clean as never).then() : operationsAdminService.create(clean as never).then()
+    case 'general-managers':  return editId ? generalManagerService.update(editId, clean as never).then()   : generalManagerService.create(clean as never).then()
+    case 'human-resources':   return editId ? humanResourcesService.update(editId, clean as never).then()   : humanResourcesService.create(clean as never).then()
+    case 'fleet-admins':      return editId ? fleetAdminService.update(editId, clean as never).then()       : fleetAdminService.create(clean as never).then()
+    case 'operations-admins': return editId ? operationsAdminService.update(editId, clean as never).then()  : operationsAdminService.create(clean as never).then()
+    case 'it-admins':         return editId ? itAdminService.update(editId, clean as never).then()          : itAdminService.create(clean as never).then()
   }
 }
 
@@ -305,11 +308,8 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
     const errors = validateForm(tab, isEdit, payload)
     setFieldErrors(prev => {
       const next = { ...prev }
-      if (errors[key]) {
-        next[key] = errors[key]
-      } else {
-        delete next[key]
-      }
+      if (errors[key]) next[key] = errors[key]
+      else delete next[key]
       return next
     })
   }
@@ -317,9 +317,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
   function set(key: string, value: string | boolean | number) {
     setForm(prev => {
       const next = { ...prev, [key]: value }
-      if (key === 'is_vendor_driver' && value === false) {
-        next.vendor_id = ''
-      }
+      if (key === 'is_vendor_driver' && value === false) next.vendor_id = ''
       validateField(key, value, next)
       return next
     })
@@ -328,14 +326,12 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setGlobalError(null)
-
     const payload = buildValidationPayload(form)
     const errors = validateForm(tab, isEdit, payload)
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors)
       return
     }
-
     setConfirmSave(true)
   }
 
@@ -492,6 +488,19 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
               </div>
             </Field>
 
+            {/* Drivers only — password on create */}
+            {tab === 'drivers' && !isEdit && (
+              <Field label="Password" required error={fe.password}>
+                <Input
+                  type="password"
+                  value={form.password as string}
+                  onChange={e => set('password', e.target.value)}
+                  placeholder="Min. 8 characters"
+                  error={fe.password}
+                />
+              </Field>
+            )}
+
             {tab === 'clients' && (<>
               <div className="grid grid-cols-2 gap-4">
                 <Field label="Company Name" required error={fe.company_name}>
@@ -526,17 +535,6 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
             </>)}
 
             {tab === 'drivers' && (<>
-              {!isEdit && (
-                <Field label="Password" required error={fe.password}>
-                  <Input
-                    type="password"
-                    value={form.password as string}
-                    onChange={e => set('password', e.target.value)}
-                    placeholder="Min. 8 characters"
-                    error={fe.password}
-                  />
-                </Field>
-              )}
               <div className="grid grid-cols-2 gap-4">
                 <Field label="License Number" required error={fe.license_number}>
                   <Input
@@ -597,9 +595,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
                       {vendorsLoading ? 'Loading vendors…' : 'Select a vendor'}
                     </option>
                     {vendorList.map((v) => (
-                      <option key={v.vendor_id} value={v.vendor_id}>
-                        {v.name}
-                      </option>
+                      <option key={v.vendor_id} value={v.vendor_id}>{v.name}</option>
                     ))}
                   </Select>
                 </Field>
