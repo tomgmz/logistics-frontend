@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import toast, { Toaster } from 'react-hot-toast'
 import {
   Users,
   UserPlus,
@@ -42,7 +43,6 @@ import {
 } from '@/app/lib/services/admin/user-management.service'
 import UserFormModal from './UserFormModal'
 
-// ── MUI theme ─────────────────────────────────────────────────────────────────
 const muiTheme = createTheme({
   palette: {
     mode: 'dark',
@@ -50,8 +50,6 @@ const muiTheme = createTheme({
     background: { paper: '#1b1b1b' },
   },
 })
-
-// ── Constants ─────────────────────────────────────────────────────────────────
 
 const TABS: { key: UserTab; label: string; icon: React.ReactNode }[] = [
   { key: 'clients',            label: 'Clients',         icon: <Users size={14} /> },
@@ -65,8 +63,6 @@ const TABS: { key: UserTab; label: string; icon: React.ReactNode }[] = [
 ]
 
 const PAGE_SIZE = 15
-
-// ── Services ──────────────────────────────────────────────────────────────────
 
 async function fetchUsers(tab: UserTab): Promise<AnyUser[]> {
   switch (tab) {
@@ -95,8 +91,6 @@ async function updateStatus(tab: UserTab, id: string, status: UserStatus): Promi
   }
 }
 
-// ── Formatters ────────────────────────────────────────────────────────────────
-
 function formatDate(iso: string | null): string {
   if (!iso) return '—'
   return new Date(iso).toLocaleDateString('en-PH', {
@@ -111,8 +105,6 @@ function formatDateTime(iso: string | null): string {
     hour: '2-digit', minute: '2-digit',
   })
 }
-
-// ── Badges ────────────────────────────────────────────────────────────────────
 
 const STATUS_CFG: Record<UserStatus, { label: string; cls: string }> = {
   active:             { label: 'Active',   cls: 'bg-[#4df9ed]/10 text-[#4df9ed] border-[#4df9ed]/30' },
@@ -151,8 +143,6 @@ function RoleBadge({ role }: { role: string }) {
     </span>
   )
 }
-
-// ── Row action menu ───────────────────────────────────────────────────────────
 
 interface RowMenuProps {
   user: AnyUser
@@ -234,8 +224,6 @@ function RowMenu({ user, onEdit, onStatusChange }: RowMenuProps) {
   )
 }
 
-// ── Skeleton & Empty ──────────────────────────────────────────────────────────
-
 function TableSkeleton() {
   return (
     <div className="space-y-px">
@@ -273,8 +261,6 @@ function EmptyState({ tab, onAdd }: { tab: UserTab; onAdd: () => void }) {
     </div>
   )
 }
-
-// ── Table cell renderers ──────────────────────────────────────────────────────
 
 function AdminLikeCells({ user }: { user: AdminUser }) {
   const name = [user.first_name, user.middle_initial, user.last_name, user.suffix].filter(Boolean).join(' ') || '—'
@@ -376,8 +362,6 @@ const HEADERS: Record<UserTab, string[]> = {
   'fleet-admins':      ['Name / Username', 'Email', 'Phone', 'Role', 'Status'],
   'operations-admins': ['Name / Username', 'Email', 'Phone', 'Role', 'Status'],
 }
-
-// ── Main component ────────────────────────────────────────────────────────────
 
 export default function UserManagementClient() {
   const [activeTab, setActiveTab] = useState<UserTab>('clients')

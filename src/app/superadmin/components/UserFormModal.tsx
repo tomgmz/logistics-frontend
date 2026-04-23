@@ -27,6 +27,8 @@ import {
   fleetAdminService,
   operationsAdminService,
 } from '@/app/lib/services/admin/user-management.service'
+import { validateForm } from '@/app/lib/validation/user-management.validation'
+import ReusableModal from '@/components/ui/ReusableModal'
 
 interface UserFormModalProps {
   tab: UserTab
@@ -48,42 +50,6 @@ const TAB_LABELS: Record<UserTab, string> = {
 
 type FormState = Record<string, string | boolean | number>
 
-const FIELD_LABELS: Record<string, string> = {
-  first_name:      'First name',
-  last_name:       'Last name',
-  username:        'Username',
-  email:           'Email',
-  phone:           'Phone',
-  password:        'Password',
-  license_number:  'License number',
-  license_expiry:  'License expiry',
-  company_name:    'Company name',
-  billing_address: 'Billing address',
-  payment_terms:   'Payment terms',
-  vendor_type:     'Vendor type',
-  business_permit: 'Business permit',
-  vendor_id:       'Vendor',
-}
-
-function friendlyMessage(field: string, raw: string): string {
-  const label = FIELD_LABELS[field] ?? field.replace(/_/g, ' ')
-  if (
-    raw.toLowerCase().includes('expected string') ||
-    raw.toLowerCase().includes('required') ||
-    raw.toLowerCase().includes('received undefined') ||
-    raw.toLowerCase().includes('invalid input')
-  ) {
-    return `${label} is required`
-  }
-  if (raw.toLowerCase().includes('too_small') || raw.toLowerCase().includes('min')) {
-    return `${label} is too short`
-  }
-  if (raw.toLowerCase().includes('invalid_string') || raw.toLowerCase().includes('regex')) {
-    return `${label} format is invalid`
-  }
-  return raw
-}
-
 interface ApiBody {
   status?: string
   message?: string
@@ -103,21 +69,13 @@ function extractApiError(err: unknown): {
 
     if (Array.isArray(errors) && errors.length > 0) {
       const fieldErrors: Record<string, string> = {}
-
       for (const ve of errors) {
-        const key = ve.field.includes('.')
-          ? ve.field.split('.').pop()!
-          : ve.field
-        const friendly = friendlyMessage(key, ve.message)
+        const key = ve.field.includes('.') ? ve.field.split('.').pop()! : ve.field
         fieldErrors[key] = fieldErrors[key]
-          ? `${fieldErrors[key]}\n${friendly}`
-          : friendly
+          ? `${fieldErrors[key]}\n${ve.message}`
+          : ve.message
       }
-
-      return {
-        message: '',
-        fieldErrors,
-      }
+      return { message: '', fieldErrors }
     }
 
     if (typeof message === 'string' && message.trim()) {
@@ -131,14 +89,25 @@ function extractApiError(err: unknown): {
   }
 }
 
-function normalizePhone(value: string): string {
-  const digits = value.replace(/[^\d]/g, '')
-  if (digits.startsWith('63')) return `+${digits}`
-  if (digits.startsWith('0'))  return `+63${digits.slice(1)}`
-  if (digits.length > 0)       return `+63${digits}`
-  return value
+function toLocalDigits(raw: string): string {
+  const digits = raw.replace(/\D/g, '')
+  if (digits.startsWith('63')) return digits.slice(2)
+  if (digits.startsWith('0'))  return digits.slice(1)
+  return digits
 }
 
+function attachCountryCode(local: string): string {
+  const digits = local.replace(/\D/g, '')
+  return `+63${digits}`
+}
+
+/** Display-only: 9292143537 → 929-2143-537 */
+function formatPhone(digits: string): string {
+  const d = digits.replace(/\D/g, '')
+  if (d.length <= 3) return d
+  if (d.length <= 7) return `${d.slice(0, 3)}-${d.slice(3)}`
+  return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7, 10)}`
+}
 
 function buildInitialState(tab: UserTab, user: AnyUser | null): FormState {
   const base: FormState = {
@@ -148,7 +117,7 @@ function buildInitialState(tab: UserTab, user: AnyUser | null): FormState {
     suffix:         user?.suffix         ?? '',
     username:       user?.username       ?? '',
     email:          user?.email          ?? '',
-    phone:          user?.phone          ?? '',
+    phone:          user?.phone ? toLocalDigits(user.phone) : '',
   }
 
   if (tab === 'clients') {
@@ -166,10 +135,10 @@ function buildInitialState(tab: UserTab, user: AnyUser | null): FormState {
     return {
       ...base,
       password:         '',
-      license_number:   d?.license_number                   ?? '',
-      license_expiry:   d?.license_expiry?.split('T')[0]    ?? '',
-      is_vendor_driver: d?.is_vendor_driver                 ?? false,
-      vendor_id:        d?.vendor_id                        ?? '',
+      license_number:   d?.license_number                ?? '',
+      license_expiry:   d?.license_expiry?.split('T')[0] ?? '',
+      is_vendor_driver: d?.is_vendor_driver              ?? false,
+      vendor_id:        d?.vendor_id                     ?? '',
     }
   }
 
@@ -186,14 +155,14 @@ function buildInitialState(tab: UserTab, user: AnyUser | null): FormState {
   return base
 }
 
-async function submitForm(
-  tab: UserTab,
-  form: FormState,
-  editId?: string
-): Promise<void> {
+async function submitForm(tab: UserTab, form: FormState, editId?: string): Promise<void> {
   const clean = Object.fromEntries(
-    Object.entries(form).filter(([, v]) => v !== '' && v !== null && v !== undefined)
+    Object.entries(form).filter(([, v]) => v !== '' && v !== null && v !== undefined),
   )
+  if (clean.phone) {
+    clean.phone = attachCountryCode(String(clean.phone))
+  }
+
   switch (tab) {
     case 'clients':           return editId ? clientService.update(editId, clean as never).then()           : clientService.create(clean as never).then()
     case 'drivers':           return editId ? driverService.update(editId, clean as never).then()           : driverService.create(clean as never).then()
@@ -285,10 +254,12 @@ function Select({
 export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormModalProps) {
   const isEdit = Boolean(user)
 
-  const [form, setForm]               = useState<FormState>(() => buildInitialState(tab, user))
-  const [loading, setLoading]         = useState(false)
-  const [globalError, setGlobalError] = useState<string | null>(null)
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const [form, setForm]                 = useState<FormState>(() => buildInitialState(tab, user))
+  const [loading, setLoading]           = useState(false)
+  const [globalError, setGlobalError]   = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors]   = useState<Record<string, string>>({})
+  const [confirmClose, setConfirmClose] = useState(false)
+  const [confirmSave, setConfirmSave]   = useState(false)
 
   useEffect(() => {
     setForm(buildInitialState(tab, user))
@@ -296,18 +267,50 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
     setFieldErrors({})
   }, [tab, user])
 
-  function set(key: string, value: string | boolean | number) {
-    setForm((prev) => ({ ...prev, [key]: value }))
-    setFieldErrors((prev) => {
-      if (!prev[key]) return prev
+  function validateField(key: string, value: unknown, currentForm: FormState) {
+    const payload: Record<string, unknown> = { ...currentForm, [key]: value }
+    if (payload.phone) payload.phone = attachCountryCode(String(payload.phone))
+    const errors = validateForm(tab, isEdit, payload)
+    setFieldErrors(prev => {
       const next = { ...prev }
-      delete next[key]
+      if (errors[key]) {
+        next[key] = errors[key]
+      } else {
+        delete next[key]
+      }
       return next
     })
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  function set(key: string, value: string | boolean | number) {
+    setForm(prev => {
+      const next = { ...prev, [key]: value }
+      validateField(key, value, next)
+      return next
+    })
+  }
+
+
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    setGlobalError(null)
+
+    const payload: Record<string, unknown> = { ...form }
+    if (payload.phone) {
+      payload.phone = attachCountryCode(String(payload.phone))
+    }
+
+    const errors = validateForm(tab, isEdit, payload)
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors)
+      return
+    }
+
+    setConfirmSave(true)
+  }
+
+  async function handleConfirmedSubmit() {
+    setConfirmSave(false)
     setLoading(true)
     setGlobalError(null)
     setFieldErrors({})
@@ -327,15 +330,13 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-
+      <div key="modal-container" className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <motion.div
           key="backdrop"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           className="absolute inset-0 bg-black/80 backdrop-blur-sm"
-          onClick={onClose}
         />
 
         <motion.div
@@ -346,6 +347,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
           transition={{ type: 'spring', duration: 0.3, bounce: 0.15 }}
           className="relative z-10 w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-[#2a2a2a] bg-[#1b1b1b] shadow-2xl [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
         >
+          {/* Header */}
           <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#2a2a2a] bg-[#1b1b1b] px-6 py-4">
             <div>
               <p className="text-[10px] font-bold tracking-[0.14em] uppercase text-[#4df9ed]">
@@ -357,7 +359,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
             </div>
             <button
               type="button"
-              onClick={onClose}
+              onClick={() => setConfirmClose(true)}
               className="rounded-lg p-2 text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white"
             >
               <X size={18} />
@@ -370,7 +372,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
               <Field label="First Name" required error={fe.first_name}>
                 <Input
                   value={form.first_name as string}
-                  onChange={(e) => set('first_name', e.target.value)}
+                  onChange={e => set('first_name', e.target.value)}
                   placeholder="Juan"
                   error={fe.first_name}
                 />
@@ -378,7 +380,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
               <Field label="Last Name" required error={fe.last_name}>
                 <Input
                   value={form.last_name as string}
-                  onChange={(e) => set('last_name', e.target.value)}
+                  onChange={e => set('last_name', e.target.value)}
                   placeholder="Dela Cruz"
                   error={fe.last_name}
                 />
@@ -389,7 +391,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
               <Field label="Middle Initial" error={fe.middle_initial}>
                 <Input
                   value={form.middle_initial as string}
-                  onChange={(e) => set('middle_initial', e.target.value)}
+                  onChange={e => set('middle_initial', e.target.value)}
                   placeholder="R."
                   maxLength={1}
                   error={fe.middle_initial}
@@ -398,11 +400,11 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
               <Field label="Suffix" error={fe.suffix}>
                 <Select
                   value={form.suffix as string}
-                  onChange={(e) => set('suffix', e.target.value)}
+                  onChange={e => set('suffix', e.target.value)}
                   error={fe.suffix}
                 >
                   <option value=""> N/A </option>
-                  {USER_SUFFIXES.map((s) => (
+                  {USER_SUFFIXES.map(s => (
                     <option key={s} value={s}>{s}</option>
                   ))}
                 </Select>
@@ -413,7 +415,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
               <Field label="Username" required error={fe.username}>
                 <Input
                   value={form.username as string}
-                  onChange={(e) => set('username', e.target.value)}
+                  onChange={e => set('username', e.target.value)}
                   placeholder="jdelacruz"
                   error={fe.username}
                 />
@@ -422,23 +424,32 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
                 <Input
                   type="email"
                   value={form.email as string}
-                  onChange={(e) => set('email', e.target.value)}
+                  onChange={e => set('email', e.target.value)}
                   placeholder="juan@8338logistics.com"
                   error={fe.email}
                 />
               </Field>
             </div>
 
-            {/* Row 4 — Phone */}
             <Field label="Phone" required error={fe.phone}>
-              <Input
-                type="tel"
-                value={form.phone as string}
-                onChange={(e) => set('phone', e.target.value)}
-                onBlur={(e) => { const n = normalizePhone(e.target.value); if (n !== e.target.value) set('phone', n) }}
-                placeholder="+63 912 345 6789"
-                error={fe.phone}
-              />
+              <div className="flex">
+                <span className="flex items-center rounded-l-[10px] border border-r-0 border-[#424242] bg-[#232323] px-3 text-[13px] font-medium text-[#818181] select-none">
+                  +63
+                </span>
+                <Input
+                  type="tel"
+                  value={formatPhone(form.phone as string)}
+                  onChange={e => {
+                    const digits = e.target.value.replace(/\D/g, '').slice(0, 10)
+                    if (digits.length > 0 && (digits.startsWith('0') || digits.startsWith('1'))) return
+                    set('phone', digits)
+                  }}
+                  placeholder="929-2143-537"
+                  maxLength={12}
+                  error={fe.phone}
+                  className="rounded-l-none"
+                />
+              </div>
             </Field>
 
             {tab === 'clients' && (<>
@@ -446,7 +457,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
                 <Field label="Company Name" required error={fe.company_name}>
                   <Input
                     value={form.company_name as string}
-                    onChange={(e) => set('company_name', e.target.value)}
+                    onChange={e => set('company_name', e.target.value)}
                     placeholder="Acme Corp"
                     error={fe.company_name}
                   />
@@ -454,7 +465,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
                 <Field label="Payment Terms (Days)" hint="Net days" error={fe.payment_terms}>
                   <Select
                     value={String(form.payment_terms)}
-                    onChange={(e) => set('payment_terms', Number(e.target.value))}
+                    onChange={e => set('payment_terms', Number(e.target.value))}
                     error={fe.payment_terms}
                   >
                     <option value="30">30 days</option>
@@ -466,7 +477,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
               <Field label="Billing Address" required error={fe.billing_address}>
                 <Textarea
                   value={form.billing_address as string}
-                  onChange={(e) => set('billing_address', e.target.value)}
+                  onChange={e => set('billing_address', e.target.value)}
                   placeholder="123 Main St, Makati City, Metro Manila"
                   rows={2}
                   error={fe.billing_address}
@@ -480,7 +491,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
                   <Input
                     type="password"
                     value={form.password as string}
-                    onChange={(e) => set('password', e.target.value)}
+                    onChange={e => set('password', e.target.value)}
                     placeholder="Min. 8 characters"
                     error={fe.password}
                   />
@@ -490,7 +501,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
                 <Field label="License Number" required error={fe.license_number}>
                   <Input
                     value={form.license_number as string}
-                    onChange={(e) => set('license_number', e.target.value)}
+                    onChange={e => set('license_number', e.target.value)}
                     placeholder="N01-23-456789"
                     error={fe.license_number}
                   />
@@ -499,7 +510,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
                   <Input
                     type="date"
                     value={form.license_expiry as string}
-                    onChange={(e) => set('license_expiry', e.target.value)}
+                    onChange={e => set('license_expiry', e.target.value)}
                     error={fe.license_expiry}
                     className="[color-scheme:dark]"
                   />
@@ -511,7 +522,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
                   <input
                     type="checkbox"
                     checked={form.is_vendor_driver as boolean}
-                    onChange={(e) => set('is_vendor_driver', e.target.checked)}
+                    onChange={e => set('is_vendor_driver', e.target.checked)}
                     className="peer sr-only"
                   />
                   <div className="h-4 w-4 rounded border border-[#424242] bg-[#1b1b1b] transition-colors peer-checked:border-[#4df9ed] peer-checked:bg-[#4df9ed]" />
@@ -542,7 +553,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
               <Field label="Vendor Type" required error={fe.vendor_type}>
                 <Select
                   value={form.vendor_type as string}
-                  onChange={(e) => set('vendor_type', e.target.value)}
+                  onChange={e => set('vendor_type', e.target.value)}
                   error={fe.vendor_type}
                 >
                   <option value="individual">Individual</option>
@@ -553,7 +564,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
                 <Field label="Company Name" error={fe.company_name}>
                   <Input
                     value={form.company_name as string}
-                    onChange={(e) => set('company_name', e.target.value)}
+                    onChange={e => set('company_name', e.target.value)}
                     placeholder="Vendor Co."
                     error={fe.company_name}
                   />
@@ -561,7 +572,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
                 <Field label="Business Permit #" error={fe.business_permit}>
                   <Input
                     value={form.business_permit as string}
-                    onChange={(e) => set('business_permit', e.target.value)}
+                    onChange={e => set('business_permit', e.target.value)}
                     placeholder="BP-2024-XXXXX"
                     error={fe.business_permit}
                   />
@@ -582,7 +593,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
             <div className="flex justify-end gap-3 border-t border-[#2a2a2a] pt-5 mt-1">
               <button
                 type="button"
-                onClick={onClose}
+                onClick={() => setConfirmClose(true)}
                 className="rounded-lg border border-[#424242] px-5 py-2.5 text-sm font-medium text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white"
               >
                 Cancel
@@ -596,10 +607,35 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
                 {loading ? 'Saving…' : isEdit ? 'Save Changes' : `Create ${TAB_LABELS[tab]}`}
               </button>
             </div>
-
           </form>
         </motion.div>
       </div>
+
+      <ReusableModal
+        key="confirm-close"
+        open={confirmClose}
+        title="Discard changes?"
+        description="Any unsaved changes will be lost. Are you sure you want to close this form?"
+        confirmLabel="Discard"
+        cancelLabel="Keep editing"
+        onConfirm={onClose}
+        onCancel={() => setConfirmClose(false)}
+      />
+
+      <ReusableModal
+        key="confirm-save"
+        open={confirmSave}
+        title={isEdit ? `Save changes to ${user?.username}?` : `Create new ${TAB_LABELS[tab]}?`}
+        description={
+          isEdit
+            ? 'This will update the account with the new information.'
+            : 'A new account will be created with the provided details.'
+        }
+        confirmLabel={isEdit ? 'Save' : 'Create'}
+        cancelLabel="Cancel"
+        onConfirm={handleConfirmedSubmit}
+        onCancel={() => setConfirmSave(false)}
+      />
     </AnimatePresence>
   )
 }
