@@ -16,7 +16,7 @@ import type {
   VendorUser,
   AnyUser,
 } from '@/app/types/admin/user-management.types'
-import { USER_SUFFIXES } from '@/app/types/client.types'
+import { USER_SUFFIXES } from '@/app/lib/validation/user-management.validation'
 import {
   clientService,
   driverService,

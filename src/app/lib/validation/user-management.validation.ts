@@ -1,16 +1,3 @@
-/**
- * Frontend validation schemas for User Management forms.
- *
- * Rules here mirror the backend Zod schemas exactly — same regex, same min/max.
- * What is intentionally EXCLUDED here (backend-only):
- *   - Unique username / email checks  → requires DB lookup
- *   - Unique license_number           → requires DB lookup
- *   - created_by UUID                 → injected server-side from auth session
- *   - vendor_id existence             → requires DB lookup
- *
- * Import and call the right schema in UserFormModal before hitting the API.
- */
-
 import { z } from 'zod'
 
 export const USER_SUFFIXES = ['Jr.', 'Sr.', 'II', 'III', 'IV', 'V'] as const
@@ -199,6 +186,9 @@ export const updateFleetAdminSchema        = z.object(baseUpdateFields)
 export const createOperationsAdminSchema   = z.object(baseCreateFields)
 export const updateOperationsAdminSchema   = z.object(baseUpdateFields)
 
+export const createITAdminSchema           = z.object(baseCreateFields)
+export const updateITAdminSchema           = z.object(baseUpdateFields)
+
 import type { UserTab } from '@/app/types/admin/user-management.types'
 
 type SchemaPair = {
@@ -215,20 +205,9 @@ export const FORM_SCHEMAS: Record<UserTab, SchemaPair> = {
   'human-resources':   { create: createHumanResourcesSchema,  update: updateHumanResourcesSchema  },
   'fleet-admins':      { create: createFleetAdminSchema,      update: updateFleetAdminSchema      },
   'operations-admins': { create: createOperationsAdminSchema, update: updateOperationsAdminSchema },
+  'it-admins':         { create: createITAdminSchema,         update: updateITAdminSchema         },
 }
 
-/**
- * Validates `data` against the appropriate schema.
- * Returns an empty object when valid, or a map of { fieldName: errorMessage }.
- *
- * Usage in UserFormModal:
- *
- *   const errors = validateForm(tab, isEdit, form)
- *   if (Object.keys(errors).length > 0) {
- *     setFieldErrors(errors)
- *     return
- *   }
- */
 export function validateForm(
   tab: UserTab,
   isEdit: boolean,
