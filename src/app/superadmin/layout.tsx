@@ -25,9 +25,14 @@ const superAdminNavItems = [
     icon: <Users size={17} />,
   },
   {
-    href: '/superadmin/document-review',
-    label: 'Document Review',
-    icon: <FileSearch size={17} />,
+    href: '/superadmin/booking-management',
+    label: 'Booking Management',
+    icon: <CalendarCheck size={17} />,
+  },
+  {
+    href: '/superadmin/billing-payment',
+    label: 'Billing & Payment',
+    icon: <CreditCard size={17} />,
   },
   {
     href: '/superadmin/vehicle-management',
@@ -35,19 +40,14 @@ const superAdminNavItems = [
     icon: <Truck size={17} />,
   },
   {
-    href: '/superadmin/booking-management',
-    label: 'Booking Management',
-    icon: <CalendarCheck size={17} />,
-  },
-  {
     href: '/superadmin/transit-tracking',
     label: 'Transit Tracking',
     icon: <MapPin size={17} />,
   },
   {
-    href: '/superadmin/billing-payment',
-    label: 'Billing & Payment',
-    icon: <CreditCard size={17} />,
+    href: '/superadmin/document-review',
+    label: 'Document Review',
+    icon: <FileSearch size={17} />,
   },
 ]
 
