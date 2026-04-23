@@ -29,6 +29,7 @@ import {
 } from '@/app/lib/services/admin/user-management.service'
 import { validateForm } from '@/app/lib/validation/user-management.validation'
 import ReusableModal from '@/components/ui/ReusableModal'
+import { appToast } from '@/app/lib/toast'
 
 interface UserFormModalProps {
   tab: UserTab
@@ -101,7 +102,6 @@ function attachCountryCode(local: string): string {
   return `+63${digits}`
 }
 
-/** Display-only: 9292143537 → 929-2143-537 */
 function formatPhone(digits: string): string {
   const d = digits.replace(/\D/g, '')
   if (d.length <= 3) return d
@@ -261,15 +261,47 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
   const [confirmClose, setConfirmClose] = useState(false)
   const [confirmSave, setConfirmSave]   = useState(false)
 
+  const [vendorList, setVendorList] = useState<{ vendor_id: string; name: string }[]>([])
+  const [vendorsLoading, setVendorsLoading] = useState(false)
+
   useEffect(() => {
     setForm(buildInitialState(tab, user))
     setGlobalError(null)
     setFieldErrors({})
   }, [tab, user])
 
-  function validateField(key: string, value: unknown, currentForm: FormState) {
-    const payload: Record<string, unknown> = { ...currentForm, [key]: value }
+  useEffect(() => {
+    if (tab !== 'drivers') return
+    setVendorsLoading(true)
+    vendorService.getAll()
+      .then((data) => {
+        setVendorList(
+          (data as VendorUser[])
+            .filter((v) => v.vendors?.vendor_id)
+            .map((v) => ({
+              vendor_id: v.vendors!.vendor_id,
+              name:
+                [v.first_name, v.last_name].filter(Boolean).join(' ') +
+                (v.vendors?.company_name ? ` (${v.vendors.company_name})` : ''),
+            }))
+        )
+      })
+      .catch(() => {})
+      .finally(() => setVendorsLoading(false))
+  }, [tab])
+
+  function buildValidationPayload(currentForm: FormState): Record<string, unknown> {
+    const payload: Record<string, unknown> = { ...currentForm }
     if (payload.phone) payload.phone = attachCountryCode(String(payload.phone))
+    if (tab === 'drivers' && !payload.is_vendor_driver) {
+      delete payload.vendor_id
+    }
+    return payload
+  }
+
+  function validateField(key: string, value: unknown, currentForm: FormState) {
+    const merged: FormState = { ...currentForm, [key]: value as string | boolean | number }
+    const payload = buildValidationPayload(merged)
     const errors = validateForm(tab, isEdit, payload)
     setFieldErrors(prev => {
       const next = { ...prev }
@@ -285,21 +317,19 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
   function set(key: string, value: string | boolean | number) {
     setForm(prev => {
       const next = { ...prev, [key]: value }
+      if (key === 'is_vendor_driver' && value === false) {
+        next.vendor_id = ''
+      }
       validateField(key, value, next)
       return next
     })
   }
 
-
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setGlobalError(null)
 
-    const payload: Record<string, unknown> = { ...form }
-    if (payload.phone) {
-      payload.phone = attachCountryCode(String(payload.phone))
-    }
-
+    const payload = buildValidationPayload(form)
     const errors = validateForm(tab, isEdit, payload)
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors)
@@ -316,11 +346,22 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
     setFieldErrors({})
     try {
       await submitForm(tab, form, isEdit ? user!.user_id : undefined)
+      appToast.success(
+        isEdit
+          ? `${user?.username} updated successfully.`
+          : `New ${TAB_LABELS[tab]} account created.`,
+        { action: isEdit ? 'edit-user' : 'create-user', entityId: user?.user_id ?? 'new' },
+      )
       onSaved()
     } catch (err: unknown) {
       const { message, fieldErrors: fe } = extractApiError(err)
       setFieldErrors(fe)
-      setGlobalError(message)
+      if (message) {
+        setGlobalError(message)
+        appToast.error(message, { action: 'user-form-error' })
+      } else if (Object.keys(fe).length > 0) {
+        appToast.error('Please fix the highlighted fields.', { action: 'user-form-error' })
+      }
     } finally {
       setLoading(false)
     }
@@ -347,7 +388,6 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
           transition={{ type: 'spring', duration: 0.3, bounce: 0.15 }}
           className="relative z-10 w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-[#2a2a2a] bg-[#1b1b1b] shadow-2xl [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
         >
-          {/* Header */}
           <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#2a2a2a] bg-[#1b1b1b] px-6 py-4">
             <div>
               <p className="text-[10px] font-bold tracking-[0.14em] uppercase text-[#4df9ed]">
@@ -544,8 +584,25 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
                   This driver belongs to a vendor / subcontractor
                 </span>
               </label>
-              {fe.vendor_id && (
-                <p className="text-[11px] text-red-400 -mt-3">{fe.vendor_id}</p>
+
+              {form.is_vendor_driver && (
+                <Field label="Vendor" required error={fe.vendor_id}>
+                  <Select
+                    value={form.vendor_id as string}
+                    onChange={e => set('vendor_id', e.target.value)}
+                    error={fe.vendor_id}
+                    disabled={vendorsLoading}
+                  >
+                    <option value="">
+                      {vendorsLoading ? 'Loading vendors…' : 'Select a vendor'}
+                    </option>
+                    {vendorList.map((v) => (
+                      <option key={v.vendor_id} value={v.vendor_id}>
+                        {v.name}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
               )}
             </>)}
 

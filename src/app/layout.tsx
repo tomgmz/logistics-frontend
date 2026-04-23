@@ -4,6 +4,7 @@ import CsrfInit from '@/components/CsrfInit';
 import { alegreyaSansSC, aboreto, fredoka, leagueSpartan, eurostile } from '@/app/fonts';
 import StoreProvider from '@/app/lib/store/StoreProvider';
 import AuthRehydrator from '@/components/AuthRehydrator';
+import AppToaster from '@/components/ui/AppToaster';
 import './globals.css';
 
 export const viewport: Viewport = {
@@ -36,6 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <AuthRehydrator />
           <ThemeRegistry>{children}</ThemeRegistry>
         </StoreProvider>
+        <AppToaster />
       </body>
     </html>
   );

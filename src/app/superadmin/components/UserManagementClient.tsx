@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import toast, { Toaster } from 'react-hot-toast'
 import {
   Users,
   UserPlus,
@@ -41,6 +40,7 @@ import {
   fleetAdminService,
   operationsAdminService,
 } from '@/app/lib/services/admin/user-management.service'
+import { appToast } from '@/app/lib/toast'
 import UserFormModal from './UserFormModal'
 
 const muiTheme = createTheme({
@@ -51,20 +51,40 @@ const muiTheme = createTheme({
   },
 })
 
-const TABS: { key: UserTab; label: string; icon: React.ReactNode }[] = [
-  { key: 'clients',            label: 'Clients',         icon: <Users size={14} /> },
-  { key: 'drivers',            label: 'Drivers',         icon: <Users size={14} /> },
-  { key: 'vendors',            label: 'Vendors',         icon: <Users size={14} /> },
-  { key: 'accountants',        label: 'Accountants',     icon: <Users size={14} /> },
-  { key: 'general-managers',   label: 'Gen. Managers',   icon: <Users size={14} /> },
-  { key: 'human-resources',    label: 'HR',              icon: <Users size={14} /> },
-  { key: 'fleet-admins',       label: 'Fleet Admins',    icon: <Users size={14} /> },
-  { key: 'operations-admins',  label: 'Ops. Admins',     icon: <Users size={14} /> },
+// 'all' is a UI-only virtual tab
+type TabValue = UserTab | 'all'
+
+const TABS: { key: TabValue; label: string }[] = [
+  { key: 'all',                label: 'All Users'     },
+  { key: 'clients',            label: 'Clients'       },
+  { key: 'drivers',            label: 'Drivers'       },
+  { key: 'vendors',            label: 'Vendors'       },
+  { key: 'accountants',        label: 'Accountants'   },
+  { key: 'general-managers',   label: 'Gen. Managers' },
+  { key: 'human-resources',    label: 'HR'            },
+  { key: 'fleet-admins',       label: 'Fleet Admins'  },
+  { key: 'operations-admins',  label: 'Ops. Admins'   },
 ]
 
 const PAGE_SIZE = 15
 
-async function fetchUsers(tab: UserTab): Promise<AnyUser[]> {
+async function fetchUsers(tab: TabValue): Promise<AnyUser[]> {
+  if (tab === 'all') {
+    const results = await Promise.allSettled([
+      clientService.getAll(),
+      driverService.getAll(),
+      vendorService.getAll(),
+      accountantService.getAll(),
+      generalManagerService.getAll(),
+      humanResourcesService.getAll(),
+      fleetAdminService.getAll(),
+      operationsAdminService.getAll(),
+    ])
+    return results
+      .filter((r) => r.status === 'fulfilled')
+      .flatMap((r) => (r as PromiseFulfilledResult<unknown>).value as AnyUser[])
+  }
+
   switch (tab) {
     case 'clients':           return clientService.getAll() as Promise<AnyUser[]>
     case 'drivers':           return driverService.getAll() as Promise<AnyUser[]>
@@ -88,6 +108,21 @@ async function updateStatus(tab: UserTab, id: string, status: UserStatus): Promi
     case 'human-resources':   return humanResourcesService.update(id, payload as unknown as Parameters<typeof humanResourcesService.update>[1]).then()
     case 'fleet-admins':      return fleetAdminService.update(id, payload as unknown as Parameters<typeof fleetAdminService.update>[1]).then()
     case 'operations-admins': return operationsAdminService.update(id, payload as unknown as Parameters<typeof operationsAdminService.update>[1]).then()
+  }
+}
+
+// Derive a UserTab from a user's role for status update routing
+function tabFromRole(role: string): UserTab {
+  switch (role) {
+    case 'client':           return 'clients'
+    case 'driver':           return 'drivers'
+    case 'vendor':           return 'vendors'
+    case 'accountant':       return 'accountants'
+    case 'general_manager':  return 'general-managers'
+    case 'human_resources':  return 'human-resources'
+    case 'fleet_admin':      return 'fleet-admins'
+    case 'operations_admin': return 'operations-admins'
+    default:                 return 'clients'
   }
 }
 
@@ -146,11 +181,12 @@ function RoleBadge({ role }: { role: string }) {
 
 interface RowMenuProps {
   user: AnyUser
+  tab: TabValue
   onEdit: () => void
   onStatusChange: (s: UserStatus) => void
 }
 
-function RowMenu({ user, onEdit, onStatusChange }: RowMenuProps) {
+function RowMenu({ user, tab, onEdit, onStatusChange }: RowMenuProps) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -171,6 +207,8 @@ function RowMenu({ user, onEdit, onStatusChange }: RowMenuProps) {
     ] as const satisfies readonly { label: string; status: UserStatus; icon: React.ReactNode }[]
   ).filter((a) => a.status !== user.status)
 
+  const canEdit = tab !== 'all'
+
   return (
     <div ref={ref} className="relative">
       <button
@@ -190,16 +228,18 @@ function RowMenu({ user, onEdit, onStatusChange }: RowMenuProps) {
             className="absolute right-0 top-8 z-50 w-48 rounded-xl border border-[#2a2a2a] bg-[#1b1b1b] py-1 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <button
-              onClick={() => { setOpen(false); onEdit() }}
-              className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white"
-            >
-              <Pencil size={13} /> Edit
-            </button>
+            {canEdit && (
+              <button
+                onClick={() => { setOpen(false); onEdit() }}
+                className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white"
+              >
+                <Pencil size={13} /> Edit
+              </button>
+            )}
 
             {statusActions.length > 0 && (
               <>
-                <div className="my-1 border-t border-[#2a2a2a]" />
+                {canEdit && <div className="my-1 border-t border-[#2a2a2a]" />}
                 {statusActions.map((a) => (
                   <button
                     key={a.status}
@@ -224,25 +264,32 @@ function RowMenu({ user, onEdit, onStatusChange }: RowMenuProps) {
   )
 }
 
-function TableSkeleton() {
+function TableSkeleton({ cols }: { cols: number }) {
   return (
-    <div className="space-y-px">
+    <>
       {Array.from({ length: 8 }).map((_, i) => (
-        <div key={i} className="flex h-14 items-center gap-4 px-5">
-          {Array.from({ length: 5 }).map((_, j) => (
-            <div
-              key={j}
-              className="h-3 animate-pulse rounded bg-[#2a2a2a]"
-              style={{ width: `${[120, 180, 100, 80, 60][j]}px`, animationDelay: `${i * 40}ms` }}
-            />
+        <tr key={i} className="border-b border-[#2a2a2a]/60">
+          {Array.from({ length: cols }).map((_, j) => (
+            <td key={j} className="px-4 py-3.5">
+              <div
+                className="h-3 animate-pulse rounded bg-[#2a2a2a]"
+                style={{ width: j === 0 ? '140px' : j === cols - 1 ? '60px' : '100px', animationDelay: `${i * 40}ms` }}
+              />
+              {j === 0 && (
+                <div
+                  className="mt-1.5 h-2.5 animate-pulse rounded bg-[#2a2a2a]"
+                  style={{ width: '80px', animationDelay: `${i * 40 + 20}ms` }}
+                />
+              )}
+            </td>
           ))}
-        </div>
+        </tr>
       ))}
-    </div>
+    </>
   )
 }
 
-function EmptyState({ tab, onAdd }: { tab: UserTab; onAdd: () => void }) {
+function EmptyState({ tab, onAdd }: { tab: TabValue; onAdd: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-24 text-center">
       <div className="mb-4 rounded-full border border-[#2a2a2a] bg-[#1b1b1b] p-4">
@@ -250,14 +297,16 @@ function EmptyState({ tab, onAdd }: { tab: UserTab; onAdd: () => void }) {
       </div>
       <p className="text-base font-semibold text-white">No records found</p>
       <p className="mt-1 text-sm text-[#818181]">
-        No {tab.replace(/-/g, ' ')} match your current filters.
+        No {tab === 'all' ? 'users' : tab.replace(/-/g, ' ')} match your current filters.
       </p>
-      <button
-        onClick={onAdd}
-        className="mt-6 flex items-center gap-2 rounded-lg bg-[#4df9ed] px-4 py-2 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5]"
-      >
-        <UserPlus size={14} /> Add First User
-      </button>
+      {tab !== 'all' && (
+        <button
+          onClick={onAdd}
+          className="mt-6 flex items-center gap-2 rounded-lg bg-[#4df9ed] px-4 py-2 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5]"
+        >
+          <UserPlus size={14} /> Add First User
+        </button>
+      )}
     </div>
   )
 }
@@ -278,7 +327,25 @@ function AdminLikeCells({ user }: { user: AdminUser }) {
   )
 }
 
-function renderCells(user: AnyUser, tab: UserTab) {
+function AllTabCells({ user }: { user: AnyUser }) {
+  const name = [user.first_name, user.middle_initial, user.last_name, user.suffix].filter(Boolean).join(' ') || '—'
+  return (
+    <>
+      <td className="px-4 py-3.5">
+        <p className="font-medium text-white">{name}</p>
+        <p className="text-xs text-[#818181] font-mono">{user.username}</p>
+      </td>
+      <td className="px-4 py-3.5 text-sm text-[#818181]">{user.email}</td>
+      <td className="px-4 py-3.5 text-sm text-[#818181]">{user.phone ?? '—'}</td>
+      <td className="px-4 py-3.5"><RoleBadge role={user.role} /></td>
+      <td className="px-4 py-3.5"><StatusBadge status={user.status} /></td>
+    </>
+  )
+}
+
+function renderCells(user: AnyUser, tab: TabValue) {
+  if (tab === 'all') return <AllTabCells user={user} />
+
   switch (tab) {
     case 'clients': {
       const u = user as ClientUser
@@ -352,7 +419,8 @@ function renderCells(user: AnyUser, tab: UserTab) {
   }
 }
 
-const HEADERS: Record<UserTab, string[]> = {
+const HEADERS: Record<TabValue, string[]> = {
+  all:                 ['Name / Username', 'Email', 'Phone', 'Role', 'Status'],
   clients:             ['Name / Username', 'Email', 'Company', 'Status', 'Last Login'],
   drivers:             ['Name / Username', 'License #', 'Expiry', 'Driver Status', 'Acct. Status'],
   vendors:             ['Name / Username', 'Email', 'Type', 'Company', 'Status'],
@@ -364,7 +432,7 @@ const HEADERS: Record<UserTab, string[]> = {
 }
 
 export default function UserManagementClient() {
-  const [activeTab, setActiveTab] = useState<UserTab>('clients')
+  const [activeTab, setActiveTab] = useState<TabValue>('clients')
   const [users, setUsers] = useState<AnyUser[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -373,6 +441,7 @@ export default function UserManagementClient() {
 
   const [showForm, setShowForm] = useState(false)
   const [editUser, setEditUser] = useState<AnyUser | null>(null)
+  const [formTab, setFormTab] = useState<UserTab>('clients')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -410,18 +479,33 @@ export default function UserManagementClient() {
   }
 
   async function handleStatusChange(user: AnyUser, status: UserStatus) {
+    const serviceTab = activeTab === 'all' ? tabFromRole(user.role) : activeTab as UserTab
     try {
-      await updateStatus(activeTab, user.user_id, status)
+      await appToast.promise(
+        updateStatus(serviceTab, user.user_id, status),
+        {
+          loading: `Updating ${user.username}…`,
+          success: `${user.username} → ${STATUS_CFG[status].label}`,
+          error:   (e) =>
+            e instanceof Error ? e.message : `Failed to update ${user.username}.`,
+        },
+        { action: 'update-status', entityId: user.user_id },
+      )
       await load()
-    } catch {}
+    } catch {
+
+    }
   }
 
   function openEdit(user: AnyUser) {
+    const tab = activeTab === 'all' ? tabFromRole(user.role) : activeTab as UserTab
+    setFormTab(tab)
     setEditUser(user)
     setShowForm(true)
   }
 
   function openCreate() {
+    setFormTab(activeTab === 'all' ? 'clients' : activeTab as UserTab)
     setEditUser(null)
     setShowForm(true)
   }
@@ -472,7 +556,7 @@ export default function UserManagementClient() {
                 <Select
                   value={activeTab}
                   onChange={(e: SelectChangeEvent) => {
-                    setActiveTab(e.target.value as UserTab)
+                    setActiveTab(e.target.value as TabValue)
                     setSearch('')
                   }}
                   MenuProps={{
@@ -512,7 +596,7 @@ export default function UserManagementClient() {
                     const tab = TABS.find((t) => t.key === value)!
                     return (
                       <span style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#4df9ed', fontSize: '13px', fontWeight: 500 }}>
-                        {tab.icon}
+                        <Users size={14} />
                         {tab.label}
                       </span>
                     )
@@ -526,12 +610,15 @@ export default function UserManagementClient() {
                         borderRadius: '8px',
                         mb: '2px',
                         fontSize: '13px',
-                        fontWeight: 500,
+                        fontWeight: t.key === 'all' ? 600 : 500,
                         color: activeTab === t.key ? '#4df9ed' : '#818181',
                         bgcolor: activeTab === t.key ? '#4df9ed0d' : 'transparent',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '10px',
+                        borderTop: t.key === 'clients' ? '1px solid #2a2a2a' : 'none',
+                        marginTop: t.key === 'clients' ? '4px' : '0',
+                        paddingTop: t.key === 'clients' ? '8px' : undefined,
                         '&:hover': {
                           bgcolor: activeTab === t.key ? '#4df9ed1a' : '#2a2a2a',
                           color: activeTab === t.key ? '#4df9ed' : '#ffffff',
@@ -543,7 +630,7 @@ export default function UserManagementClient() {
                       }}
                     >
                       <span style={{ color: activeTab === t.key ? '#4df9ed' : '#818181', display: 'flex' }}>
-                        {t.icon}
+                        <Users size={14} />
                       </span>
                       {t.label}
                       {activeTab === t.key && (
@@ -601,9 +688,7 @@ export default function UserManagementClient() {
                 </thead>
                 <tbody>
                   {loading ? (
-                    <tr>
-                      <td colSpan={6}><TableSkeleton /></td>
-                    </tr>
+                    <TableSkeleton cols={HEADERS[activeTab].length + 1} />
                   ) : paginated.length === 0 ? (
                     <tr>
                       <td colSpan={6}><EmptyState tab={activeTab} onAdd={openCreate} /></td>
@@ -622,6 +707,7 @@ export default function UserManagementClient() {
                           <td className="px-4 py-3.5 text-right">
                             <RowMenu
                               user={user}
+                              tab={activeTab}
                               onEdit={() => openEdit(user)}
                               onStatusChange={(s) => handleStatusChange(user, s)}
                             />
@@ -678,7 +764,7 @@ export default function UserManagementClient() {
 
         {showForm && (
           <UserFormModal
-            tab={activeTab}
+            tab={formTab}
             user={editUser}
             onClose={() => setShowForm(false)}
             onSaved={async () => {

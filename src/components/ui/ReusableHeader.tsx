@@ -38,15 +38,6 @@ export default function ReusableHeader({ sidebarOpen, onToggleSidebar }: Reusabl
           <Bell size={16} />
           <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-[var(--color-cyan)]" />
         </IconBtn>
-
-        <motion.div
-          whileHover={{ scale: 1.06 }}
-          whileTap={{ scale: 0.94 }}
-          className="w-9 h-9 lg:w-10 lg:h-10 rounded-full bg-[var(--color-cyan)]
-                     flex items-center justify-center cursor-pointer glow-cyan shrink-0"
-        >
-          <span className="font-card text-[var(--color-bg)] text-sm font-bold tracking-widest">C</span>
-        </motion.div>
       </div>
     </motion.header>
   )
