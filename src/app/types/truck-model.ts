@@ -8,6 +8,6 @@ export interface TruckModel {
   max_volume_cbm?:    number | null
   max_weight_kg?:     number | null
   max_length_cm?:     number | null
-  image_url:          string
+  image_url?:         string | null
   created_at?:        string
 }
