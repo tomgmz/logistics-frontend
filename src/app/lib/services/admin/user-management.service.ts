@@ -4,6 +4,7 @@ import type {
   ClientUser,
   DriverUser,
   VendorUser,
+  AnyUser,
   CreateClientPayload,
   UpdateClientPayload,
   CreateDriverPayload,
@@ -22,6 +23,7 @@ import type {
   UpdateOperationsAdminPayload,
   CreateITAdminPayload,
   UpdateITAdminPayload,
+  UserStatus,
 } from '@/app/types/admin/user-management.types'
 
 interface ApiResponse<T> {
@@ -30,8 +32,31 @@ interface ApiResponse<T> {
   message?: string
 }
 
-async function get<T>(url: string): Promise<T> {
-  const { data } = await proxyApi.get<ApiResponse<T>>(url)
+export interface GetUsersParams {
+  role?:   string
+  status?: string
+  search?: string
+  page?:   number
+  limit?:  number
+}
+
+export interface GetUsersResponse {
+  data:       AnyUser[]
+  total:      number
+  page:       number
+  limit:      number
+  totalPages: number
+}
+
+export interface UserStatsResponse {
+  total:    number
+  active:   number
+  inactive: number
+  archived: number
+}
+
+async function get<T>(url: string, params?: Record<string, unknown>): Promise<T> {
+  const { data } = await proxyApi.get<ApiResponse<T>>(url, { params })
   return data.data
 }
 
@@ -50,6 +75,24 @@ async function del(url: string): Promise<void> {
 }
 
 const B = '/admin'
+
+export const userService = {
+  getAll: (params: GetUsersParams) =>
+    proxyApi
+      .get<Omit<GetUsersResponse, 'data'> & { status: string; data: AnyUser[] }>(`${B}/users`, { params })
+      .then((r) => ({
+        data:       r.data.data,
+        total:      r.data.total,
+        page:       r.data.page,
+        limit:      r.data.limit,
+        totalPages: r.data.totalPages,
+      })),
+
+  getStats: () =>
+    proxyApi
+      .get<ApiResponse<UserStatsResponse>>(`${B}/users/stats`)
+      .then((r) => r.data.data),
+}
 
 export const clientService = {
   getAll: () => get<ClientUser[]>(`${B}/clients`),

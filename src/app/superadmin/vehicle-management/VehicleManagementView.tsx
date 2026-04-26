@@ -12,7 +12,6 @@ import {
   ChevronRight,
   X,
   Truck as TruckIcon,
-  AlertTriangle,
 } from 'lucide-react'
 
 import type { Truck, CreateTruckInput, UpdateTruckInput } from '@/app/types/truck.types'
@@ -24,17 +23,18 @@ import {
   adminDeleteTruck,
   adminFetchTruckModels,
   adminFetchVendorsRaw,
-} from '@/app/lib/api/admin/trucks.api'
+} from '@/app/lib/services/admin/trucks.service'
+import ReusableModal from '@/components/ui/ReusableModal'
+import { appToast } from '@/app/lib/toast'
 
 const PAGE_SIZE = 10
 
-/** Absolute URL for model photos (handles relative paths from the API host). */
 function resolveModelImageUrl(url: string | null | undefined): string | null {
   if (!url?.trim()) return null
   const u = url.trim()
   if (u.startsWith('http://') || u.startsWith('https://')) return u
   if (u.startsWith('/')) {
-    const base = process.env.NEXT_PUBLIC_API_URL ?? ''
+    const base   = process.env.NEXT_PUBLIC_API_URL ?? ''
     const origin = base.replace(/\/api\/?$/i, '')
     return origin ? `${origin}${u}` : u
   }
@@ -64,7 +64,7 @@ const ModelThumb = memo(function ModelThumb({
     )
   }
   return (
-    // eslint-disable-next-line @next/next/no-img-element -- arbitrary storage URLs (Supabase, etc.)
+    // eslint-disable-next-line @next/next/no-img-element
     <img
       src={imageUrl}
       alt={label}
@@ -117,7 +117,7 @@ function parseVendorOptions(raw: unknown[]): VendorOption[] {
   const out: VendorOption[] = []
   for (const row of raw) {
     if (!row || typeof row !== 'object') continue
-    const r = row as Record<string, unknown>
+    const r       = row as Record<string, unknown>
     const vendors = r.vendors as Record<string, unknown> | Record<string, unknown>[] | null | undefined
     let vid = ''
     if (Array.isArray(vendors) && vendors[0] && typeof vendors[0] === 'object') {
@@ -126,9 +126,9 @@ function parseVendorOptions(raw: unknown[]): VendorOption[] {
       vid = String((vendors as Record<string, unknown>).vendor_id ?? '')
     }
     if (!vid) continue
-    const fn = typeof r.first_name === 'string' ? r.first_name : ''
-    const ln = typeof r.last_name === 'string' ? r.last_name : ''
-    const email = typeof r.email === 'string' ? r.email : ''
+    const fn    = typeof r.first_name === 'string' ? r.first_name : ''
+    const ln    = typeof r.last_name  === 'string' ? r.last_name  : ''
+    const email = typeof r.email      === 'string' ? r.email      : ''
     const label = `${fn} ${ln}`.trim() || email || vid
     out.push({ vendor_id: vid, label })
   }
@@ -138,9 +138,7 @@ function parseVendorOptions(raw: unknown[]): VendorOption[] {
 function axiosMessage(err: unknown): string {
   const data = (err as { response?: { data?: { message?: string; errors?: { field: string; message: string }[] } } })
     .response?.data
-  if (data?.errors?.length) {
-    return data.errors.map((e) => `${e.field}: ${e.message}`).join(' · ')
-  }
+  if (data?.errors?.length) return data.errors.map((e) => `${e.field}: ${e.message}`).join(' · ')
   if (data?.message && typeof data.message === 'string') return data.message
   if (err instanceof Error) return err.message
   return 'Request failed'
@@ -148,62 +146,64 @@ function axiosMessage(err: unknown): string {
 
 type FormMode = 'create' | 'edit' | null
 
+type ConfirmKind = 'save' | 'delete' | null
+
 interface TruckFormState {
-  plate_number: string
-  truck_type: (typeof TRUCK_TYPES)[number]
+  plate_number:  string
+  truck_type:    (typeof TRUCK_TYPES)[number]
   capacity_tons: string
-  model_id: string
-  owned_by: 'company' | 'vendor'
-  vendor_id: string
-  status: Truck['status']
+  model_id:      string
+  owned_by:      'company' | 'vendor'
+  vendor_id:     string
+  status:        Truck['status']
 }
 
 function emptyForm(): TruckFormState {
   return {
-    plate_number:   '',
-    truck_type:     'truck',
-    capacity_tons:  '',
-    model_id:       '',
-    owned_by:       'company',
-    vendor_id:      '',
-    status:         'available',
+    plate_number:  '',
+    truck_type:    'truck',
+    capacity_tons: '',
+    model_id:      '',
+    owned_by:      'company',
+    vendor_id:     '',
+    status:        'available',
   }
 }
 
 function truckToForm(t: Truck): TruckFormState {
   return {
-    plate_number:   t.plate_number ?? '',
-    truck_type:     (t.truck_type === 'wing_van' ? 'wing_van' : 'truck') as (typeof TRUCK_TYPES)[number],
-    capacity_tons:  String(t.capacity_tons ?? ''),
-    model_id:       t.model_id ?? '',
-    owned_by:       t.owned_by,
-    vendor_id:      t.vendor_id ?? '',
-    status:         t.status,
+    plate_number:  t.plate_number ?? '',
+    truck_type:    (t.truck_type === 'wing_van' ? 'wing_van' : 'truck') as (typeof TRUCK_TYPES)[number],
+    capacity_tons: String(t.capacity_tons ?? ''),
+    model_id:      t.model_id ?? '',
+    owned_by:      t.owned_by,
+    vendor_id:     t.vendor_id ?? '',
+    status:        t.status,
   }
 }
 
 export default function VehicleManagementView() {
-  const [trucks, setTrucks] = useState<Truck[]>([])
-  const [models, setModels] = useState<TruckModel[]>([])
+  const [trucks,  setTrucks]  = useState<Truck[]>([])
+  const [models,  setModels]  = useState<TruckModel[]>([])
   const [vendors, setVendors] = useState<VendorOption[]>([])
 
   const [listLoading, setListLoading] = useState(true)
-  const [listError, setListError] = useState<string | null>(null)
+  const [listError,   setListError]   = useState<string | null>(null)
 
-  const [search, setSearch] = useState('')
+  const [search,       setSearch]       = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [ownerFilter, setOwnerFilter] = useState<string>('all')
-  const [page, setPage] = useState(0)
+  const [ownerFilter,  setOwnerFilter]  = useState<string>('all')
+  const [page,         setPage]         = useState(0)
 
   const [modalMode, setModalMode] = useState<FormMode>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [form, setForm] = useState<TruckFormState>(emptyForm())
-  const [saving, setSaving] = useState(false)
+  const [form,      setForm]      = useState<TruckFormState>(emptyForm())
   const [formError, setFormError] = useState<string | null>(null)
 
+  const [confirmKind, setConfirmKind] = useState<ConfirmKind>(null)
+  const [actionBusy,  setActionBusy]  = useState(false)
+  // deleteId is separate so "Delete vehicle…" link inside edit modal works
   const [deleteId, setDeleteId] = useState<string | null>(null)
-  const [deleteBusy, setDeleteBusy] = useState(false)
-  const [toast, setToast] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
 
   const loadAll = useCallback(async () => {
     try {
@@ -224,30 +224,28 @@ export default function VehicleManagementView() {
     }
   }, [])
 
-  useEffect(() => {
-    void loadAll()
-  }, [loadAll])
+  useEffect(() => { void loadAll() }, [loadAll])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     return trucks.filter((t) => {
       if (statusFilter !== 'all' && t.status !== statusFilter) return false
-      if (ownerFilter !== 'all' && t.owned_by !== ownerFilter) return false
+      if (ownerFilter  !== 'all' && t.owned_by !== ownerFilter) return false
       if (!q) return true
       const modelName = t.truck_model?.name?.toLowerCase() ?? ''
       return (
         t.plate_number.toLowerCase().includes(q) ||
-        t.truck_type.toLowerCase().includes(q) ||
-        t.status.toLowerCase().includes(q) ||
-        modelName.includes(q) ||
+        t.truck_type.toLowerCase().includes(q)   ||
+        t.status.toLowerCase().includes(q)       ||
+        modelName.includes(q)                    ||
         t.truck_id.toLowerCase().includes(q)
       )
     })
   }, [trucks, search, statusFilter, ownerFilter])
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-  const pageSafe = Math.min(page, pageCount - 1)
-  const pageRows = useMemo(() => {
+  const pageSafe  = Math.min(page, pageCount - 1)
+  const pageRows  = useMemo(() => {
     const start = pageSafe * PAGE_SIZE
     return filtered.slice(start, start + PAGE_SIZE)
   }, [filtered, pageSafe])
@@ -256,10 +254,7 @@ export default function VehicleManagementView() {
     setPage((p) => Math.min(p, Math.max(0, pageCount - 1)))
   }, [pageCount])
 
-  const selectedModel = useMemo(
-    () => models.find((m) => m.model_id === form.model_id) ?? null,
-    [models, form.model_id],
-  )
+  const selectedModel         = useMemo(() => models.find((m) => m.model_id === form.model_id) ?? null, [models, form.model_id])
   const selectedModelImageUrl = resolveModelImageUrl(selectedModel?.image_url ?? null)
 
   const openCreate = () => {
@@ -282,91 +277,127 @@ export default function VehicleManagementView() {
     setFormError(null)
   }
 
-  const submitForm = async () => {
+  function validateForm(): boolean {
     setFormError(null)
     const cap = parseFloat(form.capacity_tons)
     if (!form.plate_number.trim()) {
       setFormError('Plate number is required.')
-      return
+      return false
     }
     if (Number.isNaN(cap) || cap <= 0) {
       setFormError('Capacity (tons) must be a positive number.')
-      return
+      return false
     }
     if (form.owned_by === 'vendor' && !form.vendor_id.trim()) {
       setFormError('Select a vendor when ownership is Vendor.')
-      return
+      return false
     }
+    return true
+  }
 
-    const model_id = form.model_id.trim() || null
+  const handleSaveClick = () => {
+    if (!validateForm()) return
+    setConfirmKind('save')
+  }
+
+  const handleDeleteClick = (id: string) => {
+    setDeleteId(id)
+    setConfirmKind('delete')
+  }
+
+  const executeSave = async () => {
+    const cap       = parseFloat(form.capacity_tons)
+    const model_id  = form.model_id.trim() || null
     const vendor_id = form.owned_by === 'vendor' ? form.vendor_id.trim() : null
 
-    setSaving(true)
+    setActionBusy(true)
     try {
       if (modalMode === 'create') {
         const body: CreateTruckInput = {
-          plate_number:   form.plate_number.trim().toUpperCase(),
-          truck_type:     form.truck_type,
-          capacity_tons:  cap,
+          plate_number:  form.plate_number.trim().toUpperCase(),
+          truck_type:    form.truck_type,
+          capacity_tons: cap,
           model_id,
-          owned_by:       form.owned_by,
+          owned_by:      form.owned_by,
           vendor_id,
         }
         await adminCreateTruck(body)
-        setToast({ type: 'ok', text: 'Vehicle created.' })
+        appToast.success('Vehicle created.', { action: 'truck-save' })
       } else if (modalMode === 'edit' && editingId) {
         const body: UpdateTruckInput = {
-          plate_number:   form.plate_number.trim().toUpperCase(),
-          truck_type:     form.truck_type,
-          capacity_tons:  cap,
+          plate_number:  form.plate_number.trim().toUpperCase(),
+          truck_type:    form.truck_type,
+          capacity_tons: cap,
           model_id,
-          status:         form.status,
-          owned_by:       form.owned_by,
-          vendor_id:      form.owned_by === 'vendor' ? vendor_id : null,
+          status:        form.status,
+          owned_by:      form.owned_by,
+          vendor_id:     form.owned_by === 'vendor' ? vendor_id : null,
         }
         await adminUpdateTruck(editingId, body)
-        setToast({ type: 'ok', text: 'Vehicle updated.' })
+        appToast.success('Vehicle updated.', { action: 'truck-save', entityId: editingId })
       }
+      setConfirmKind(null)
       closeModal()
       await loadAll()
     } catch (e) {
+      setConfirmKind(null)
       setFormError(axiosMessage(e))
     } finally {
-      setSaving(false)
+      setActionBusy(false)
     }
   }
 
-  const confirmDelete = async () => {
+  const executeDelete = async () => {
     if (!deleteId) return
-    setDeleteBusy(true)
+    setActionBusy(true)
     try {
       await adminDeleteTruck(deleteId)
-      setDeleteId(null)
-      setToast({ type: 'ok', text: 'Vehicle removed.' })
+      appToast.success('Vehicle removed.', { action: 'truck-delete', entityId: deleteId })
       if (editingId === deleteId) closeModal()
+      setDeleteId(null)
+      setConfirmKind(null)
       await loadAll()
     } catch (e) {
-      setToast({ type: 'err', text: axiosMessage(e) })
+      appToast.error(axiosMessage(e), { action: 'truck-delete', entityId: deleteId })
+      setConfirmKind(null)
     } finally {
-      setDeleteBusy(false)
+      setActionBusy(false)
     }
   }
 
-  useEffect(() => {
-    if (!toast) return
-    const t = setTimeout(() => setToast(null), 5000)
-    return () => clearTimeout(t)
-  }, [toast])
+  const confirmModalProps = useMemo(() => {
+    if (confirmKind === 'save') {
+      const isCreate = modalMode === 'create'
+      return {
+        title:        isCreate ? 'Create vehicle?' : 'Save changes?',
+        description:  isCreate
+          ? `Add ${form.plate_number.trim().toUpperCase() || 'this vehicle'} to the fleet?`
+          : `Save updates to ${form.plate_number.trim().toUpperCase() || 'this vehicle'}?`,
+        confirmLabel: actionBusy ? 'Saving…' : isCreate ? 'Create' : 'Save',
+        onConfirm:    () => { void executeSave() },
+      }
+    }
+    if (confirmKind === 'delete') {
+      return {
+        title:        'Delete vehicle?',
+        description:  'This cannot be undone. Active assignments may block deletion.',
+        confirmLabel: actionBusy ? '…' : 'Delete',
+        onConfirm:    () => { void executeDelete() },
+      }
+    }
+    return null
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [confirmKind, modalMode, form.plate_number, actionBusy])
 
   return (
     <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-hidden ff-body bg-[var(--color-bg)]">
+
       <header className="shrink-0 px-3 py-3 lg:px-4 border-b border-white/[0.07] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-lg font-bold text-white tracking-tight">Vehicle management</h1>
           <p className="text-xs text-white/45 mt-0.5 max-w-xl">
             Create, edit, and archive fleet vehicles. Uses admin APIs (
-            <code className="text-white/55">/api/admin/trucks</code>). Plate format must match PH rules (e.g. ABC
-            1234).
+            <code className="text-white/55">/api/admin/trucks</code>). Plate format must match PH rules (e.g. ABC 1234).
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -390,20 +421,8 @@ export default function VehicleManagementView() {
         </div>
       </header>
 
-      {toast && (
-        <div
-          className="mx-3 mt-2 px-3 py-2 rounded-lg text-xs font-medium border shrink-0"
-          style={{
-            background: toast.type === 'ok' ? 'rgba(58,246,38,0.1)' : 'rgba(246,38,38,0.1)',
-            borderColor: toast.type === 'ok' ? 'rgba(58,246,38,0.25)' : 'rgba(246,38,38,0.25)',
-            color: toast.type === 'ok' ? '#86efac' : '#fca5a5',
-          }}
-        >
-          {toast.text}
-        </div>
-      )}
-
       <div className="flex flex-1 min-h-0 flex-col p-3 lg:p-4 gap-3 overflow-hidden">
+
         <div className="flex flex-col xl:flex-row gap-2 xl:items-center shrink-0">
           <div
             className="flex items-center gap-2 rounded-[10px] px-3 py-2 flex-1 max-w-md"
@@ -412,34 +431,28 @@ export default function VehicleManagementView() {
             <Search size={16} className="text-white/40 shrink-0" />
             <input
               value={search}
-              onChange={(e) => {
-                setSearch(e.target.value)
-                setPage(0)
-              }}
+              onChange={(e) => { setSearch(e.target.value); setPage(0) }}
               placeholder="Search plate, type, model, status…"
               className="bg-transparent border-none outline-none text-sm flex-1 text-white/80 placeholder:text-white/35"
             />
           </div>
+
           <div className="flex flex-wrap gap-1.5">
             <span className="text-[10px] uppercase tracking-wider text-white/35 self-center mr-1">Status</span>
             {(['all', ...STATUSES] as const).map((key) => {
-              const label = key === 'all' ? 'All' : fmtLabel(key)
-              const count =
-                key === 'all' ? trucks.length : trucks.filter((t) => t.status === key).length
+              const label  = key === 'all' ? 'All' : fmtLabel(key)
+              const count  = key === 'all' ? trucks.length : trucks.filter((t) => t.status === key).length
               const active = statusFilter === key
               return (
                 <button
                   key={key}
                   type="button"
-                  onClick={() => {
-                    setStatusFilter(key)
-                    setPage(0)
-                  }}
+                  onClick={() => { setStatusFilter(key); setPage(0) }}
                   className="px-2 py-1 rounded-lg text-[11px] font-bold border transition-colors"
                   style={{
-                    background: active ? 'rgba(77,249,237,0.12)' : 'transparent',
+                    background:  active ? 'rgba(77,249,237,0.12)' : 'transparent',
                     borderColor: active ? 'rgba(77,249,237,0.35)' : 'rgba(255,255,255,0.08)',
-                    color: active ? 'var(--color-cyan)' : '#888',
+                    color:       active ? 'var(--color-cyan)' : '#888',
                   }}
                 >
                   {label} ({count})
@@ -447,26 +460,23 @@ export default function VehicleManagementView() {
               )
             })}
           </div>
+
           <div className="flex flex-wrap gap-1.5 items-center">
             <span className="text-[10px] uppercase tracking-wider text-white/35 self-center mr-1">Owner</span>
             {(['all', 'company', 'vendor'] as const).map((key) => {
-              const label = key === 'all' ? 'All' : fmtLabel(key)
-              const count =
-                key === 'all' ? trucks.length : trucks.filter((t) => t.owned_by === key).length
+              const label  = key === 'all' ? 'All' : fmtLabel(key)
+              const count  = key === 'all' ? trucks.length : trucks.filter((t) => t.owned_by === key).length
               const active = ownerFilter === key
               return (
                 <button
                   key={key}
                   type="button"
-                  onClick={() => {
-                    setOwnerFilter(key)
-                    setPage(0)
-                  }}
+                  onClick={() => { setOwnerFilter(key); setPage(0) }}
                   className="px-2 py-1 rounded-lg text-[11px] font-bold border transition-colors"
                   style={{
-                    background: active ? 'rgba(246,159,38,0.12)' : 'transparent',
+                    background:  active ? 'rgba(246,159,38,0.12)' : 'transparent',
                     borderColor: active ? 'rgba(246,159,38,0.35)' : 'rgba(255,255,255,0.08)',
-                    color: active ? '#fbbf24' : '#888',
+                    color:       active ? '#fbbf24' : '#888',
                   }}
                 >
                   {label} ({count})
@@ -496,11 +506,7 @@ export default function VehicleManagementView() {
             <div className="flex-1 flex flex-col items-center justify-center gap-4 py-12 text-center px-4">
               <TruckIcon size={40} className="text-white/20" />
               <p className="text-sm text-white/45">No vehicles match your filters.</p>
-              <button
-                type="button"
-                onClick={openCreate}
-                className="text-[var(--color-cyan)] text-sm font-bold"
-              >
+              <button type="button" onClick={openCreate} className="text-[var(--color-cyan)] text-sm font-bold">
                 Add your first vehicle
               </button>
             </div>
@@ -522,11 +528,9 @@ export default function VehicleManagementView() {
                   </thead>
                   <tbody>
                     {pageRows.map((t) => {
-                      const st = statusStyle(t.status)
+                      const st         = statusStyle(t.status)
                       const modelLabel = t.truck_model?.name ?? 'Vehicle'
-                      const thumbUrl = resolveModelImageUrl(
-                        (t.truck_model?.image_url as string | null | undefined) ?? null,
-                      )
+                      const thumbUrl   = resolveModelImageUrl((t.truck_model?.image_url as string | null | undefined) ?? null)
                       return (
                         <tr
                           key={t.truck_id}
@@ -563,7 +567,7 @@ export default function VehicleManagementView() {
                             </button>
                             <button
                               type="button"
-                              onClick={() => setDeleteId(t.truck_id)}
+                              onClick={() => handleDeleteClick(t.truck_id)}
                               className="p-1.5 rounded-md border border-red-500/25 text-red-400 hover:bg-red-500/10"
                               title="Delete"
                             >
@@ -576,10 +580,10 @@ export default function VehicleManagementView() {
                   </tbody>
                 </table>
               </div>
+
               <div className="shrink-0 flex items-center justify-between px-3 py-2 border-t border-white/[0.07] text-xs text-white/50">
                 <span>
-                  {pageSafe * PAGE_SIZE + 1}–{Math.min((pageSafe + 1) * PAGE_SIZE, filtered.length)} of{' '}
-                  {filtered.length}
+                  {pageSafe * PAGE_SIZE + 1}–{Math.min((pageSafe + 1) * PAGE_SIZE, filtered.length)} of {filtered.length}
                 </span>
                 <div className="flex items-center gap-1">
                   <button
@@ -590,9 +594,7 @@ export default function VehicleManagementView() {
                   >
                     <ChevronLeft size={16} />
                   </button>
-                  <span className="px-2 tabular-nums">
-                    {pageSafe + 1} / {pageCount}
-                  </span>
+                  <span className="px-2 tabular-nums">{pageSafe + 1} / {pageCount}</span>
                   <button
                     type="button"
                     disabled={pageSafe >= pageCount - 1}
@@ -608,49 +610,20 @@ export default function VehicleManagementView() {
         </div>
       </div>
 
-      <AnimatePresence>
-        {deleteId && (
-          <motion.div
-            className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <motion.div
-              initial={{ scale: 0.96, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.96, opacity: 0 }}
-              className="w-full max-w-sm rounded-2xl border border-white/10 p-5 bg-[#161616] shadow-2xl"
-            >
-              <div className="flex items-start gap-3 mb-4">
-                <AlertTriangle className="text-amber-400 shrink-0" size={22} />
-                <div>
-                  <p className="font-bold text-white">Delete vehicle?</p>
-                  <p className="text-xs text-white/50 mt-1">This cannot be undone. Active assignments may block deletion.</p>
-                </div>
-              </div>
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  disabled={deleteBusy}
-                  onClick={() => setDeleteId(null)}
-                  className="px-3 py-2 rounded-lg border border-white/15 text-sm text-white/80 hover:bg-white/5"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  disabled={deleteBusy}
-                  onClick={() => void confirmDelete()}
-                  className="px-3 py-2 rounded-lg bg-red-600 text-white text-sm font-bold disabled:opacity-50"
-                >
-                  {deleteBusy ? '…' : 'Delete'}
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <ReusableModal
+        open={!!confirmKind && !!confirmModalProps}
+        title={confirmModalProps?.title ?? ''}
+        description={confirmModalProps?.description}
+        confirmLabel={confirmModalProps?.confirmLabel ?? 'Confirm'}
+        cancelLabel="Cancel"
+        disableBackdropClose={actionBusy}
+        onCancel={() => {
+          if (actionBusy) return
+          setConfirmKind(null)
+          if (confirmKind === 'delete' && !editingId) setDeleteId(null)
+        }}
+        onConfirm={confirmModalProps?.onConfirm}
+      />
 
       <AnimatePresence>
         {modalMode && (
@@ -699,15 +672,11 @@ export default function VehicleManagementView() {
                     <span className="text-[11px] font-bold uppercase text-white/40">Type</span>
                     <select
                       value={form.truck_type}
-                      onChange={(e) =>
-                        setForm((f) => ({ ...f, truck_type: e.target.value as (typeof TRUCK_TYPES)[number] }))
-                      }
+                      onChange={(e) => setForm((f) => ({ ...f, truck_type: e.target.value as (typeof TRUCK_TYPES)[number] }))}
                       className="mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-3 py-2.5 text-sm text-white outline-none"
                     >
                       {TRUCK_TYPES.map((t) => (
-                        <option key={t} value={t}>
-                          {fmtLabel(t)}
-                        </option>
+                        <option key={t} value={t}>{fmtLabel(t)}</option>
                       ))}
                     </select>
                   </label>
@@ -726,11 +695,6 @@ export default function VehicleManagementView() {
 
                 <div className="block">
                   <span className="text-[11px] font-bold uppercase text-white/40">Truck model &amp; catalog image</span>
-                  <p className="text-[11px] text-white/40 mt-1 leading-relaxed">
-                    Vehicles do not store a separate photo. The fleet image comes from the linked{' '}
-                    <strong className="text-white/55">truck model</strong> <code className="text-white/50">image_url</code>.
-                    Pick a model in the gallery or list—especially when adding a vehicle.
-                  </p>
 
                   <div className="mt-2 flex gap-2 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-white/15 scrollbar-track-transparent">
                     <button
@@ -745,8 +709,9 @@ export default function VehicleManagementView() {
                       <ModelThumb imageUrl={null} label="No model" size={52} />
                       <span className="text-[10px] font-semibold text-white/60 text-center leading-tight">No model</span>
                     </button>
+
                     {models.map((m) => {
-                      const url = resolveModelImageUrl(m.image_url ?? null)
+                      const url    = resolveModelImageUrl(m.image_url ?? null)
                       const picked = form.model_id === m.model_id
                       return (
                         <button
@@ -779,20 +744,14 @@ export default function VehicleManagementView() {
                     >
                       <option value="">— None —</option>
                       {models.map((m) => (
-                        <option key={m.model_id} value={m.model_id}>
-                          {m.name}
-                        </option>
+                        <option key={m.model_id} value={m.model_id}>{m.name}</option>
                       ))}
                     </select>
                   </label>
                 </div>
 
                 <div className="flex gap-3 rounded-xl border border-white/[0.08] bg-black/25 p-3 items-center">
-                  <ModelThumb
-                    imageUrl={selectedModelImageUrl}
-                    label={selectedModel?.name ?? 'Vehicle'}
-                    size={88}
-                  />
+                  <ModelThumb imageUrl={selectedModelImageUrl} label={selectedModel?.name ?? 'Vehicle'} size={88} />
                   <div className="min-w-0 flex-1">
                     {selectedModel ? (
                       <>
@@ -802,8 +761,7 @@ export default function VehicleManagementView() {
                         )}
                         {!selectedModelImageUrl && (
                           <p className="text-[11px] text-amber-200/90 mt-2 leading-snug">
-                            This model has no <code className="text-white/60">image_url</code> yet. Set it on the truck
-                            model (admin truck-models) so it appears when adding or listing vehicles.
+                            This model has no <code className="text-white/60">image_url</code> yet. Set it on the truck model (admin truck-models) so it appears when adding or listing vehicles.
                           </p>
                         )}
                         {selectedModelImageUrl && (
@@ -831,7 +789,7 @@ export default function VehicleManagementView() {
                       onChange={(e) =>
                         setForm((f) => ({
                           ...f,
-                          owned_by: e.target.value as 'company' | 'vendor',
+                          owned_by:  e.target.value as 'company' | 'vendor',
                           vendor_id: e.target.value === 'company' ? '' : f.vendor_id,
                         }))
                       }
@@ -846,15 +804,11 @@ export default function VehicleManagementView() {
                       <span className="text-[11px] font-bold uppercase text-white/40">Status</span>
                       <select
                         value={form.status}
-                        onChange={(e) =>
-                          setForm((f) => ({ ...f, status: e.target.value as Truck['status'] }))
-                        }
+                        onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as Truck['status'] }))}
                         className="mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-3 py-2.5 text-sm text-white outline-none"
                       >
                         {STATUSES.map((s) => (
-                          <option key={s} value={s}>
-                            {fmtLabel(s)}
-                          </option>
+                          <option key={s} value={s}>{fmtLabel(s)}</option>
                         ))}
                       </select>
                     </label>
@@ -869,15 +823,15 @@ export default function VehicleManagementView() {
                       onChange={(e) => setForm((f) => ({ ...f, vendor_id: e.target.value }))}
                       className="mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-3 py-2.5 text-sm text-white outline-none"
                     >
-                      <option value="">— Select vendor —</option>
+                      <option value="">Select vendor</option>
                       {vendors.map((v) => (
-                        <option key={v.vendor_id} value={v.vendor_id}>
-                          {v.label}
-                        </option>
+                        <option key={v.vendor_id} value={v.vendor_id}>{v.label}</option>
                       ))}
                     </select>
                     {vendors.length === 0 && (
-                      <p className="text-[11px] text-amber-400/90 mt-1">No vendors loaded. Add vendors under user management first.</p>
+                      <p className="text-[11px] text-amber-400/90 mt-1">
+                        No vendors loaded. Add vendors under user management first.
+                      </p>
                     )}
                   </label>
                 )}
@@ -893,9 +847,7 @@ export default function VehicleManagementView() {
                 {modalMode === 'edit' && editingId && (
                   <button
                     type="button"
-                    onClick={() => {
-                      setDeleteId(editingId)
-                    }}
+                    onClick={() => handleDeleteClick(editingId)}
                     className="text-xs font-semibold text-red-400 hover:underline"
                   >
                     Delete vehicle…
@@ -911,12 +863,11 @@ export default function VehicleManagementView() {
                   </button>
                   <button
                     type="button"
-                    disabled={saving}
-                    onClick={() => void submitForm()}
+                    onClick={handleSaveClick}
                     className="px-4 py-2 rounded-lg text-sm font-bold text-black disabled:opacity-50"
                     style={{ background: 'var(--color-cyan)' }}
                   >
-                    {saving ? 'Saving…' : modalMode === 'create' ? 'Create' : 'Save'}
+                    {modalMode === 'create' ? 'Create' : 'Save'}
                   </button>
                 </div>
               </div>

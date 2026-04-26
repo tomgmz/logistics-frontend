@@ -3,43 +3,23 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Users,
-  UserPlus,
-  Search,
-  RefreshCw,
-  MoreVertical,
-  Pencil,
-  ShieldCheck,
-  ShieldOff,
-  Archive,
-  Lock,
-  ChevronLeft,
-  ChevronRight,
-  AlertTriangle,
+  Users, UserPlus, Search, RefreshCw, MoreVertical,
+  Pencil, ShieldCheck, ShieldOff, Archive, Lock,
+  ChevronLeft, ChevronRight, AlertTriangle,
 } from 'lucide-react'
 import Select, { SelectChangeEvent } from '@mui/material/Select'
 import MenuItem from '@mui/material/MenuItem'
 import FormControl from '@mui/material/FormControl'
 import { createTheme, ThemeProvider } from '@mui/material/styles'
 import type {
-  UserTab,
-  AnyUser,
-  UserStatus,
-  AdminUser,
-  ClientUser,
-  DriverUser,
-  VendorUser,
+  UserTab, AnyUser, UserStatus,
+  AdminUser, ClientUser, DriverUser, VendorUser,
 } from '@/app/types/admin/user-management.types'
 import {
-  clientService,
-  driverService,
-  vendorService,
-  accountantService,
-  generalManagerService,
-  humanResourcesService,
-  fleetAdminService,
-  operationsAdminService,
-  itAdminService,
+  userService,
+  clientService, driverService, vendorService,
+  accountantService, generalManagerService, humanResourcesService,
+  fleetAdminService, operationsAdminService, itAdminService,
 } from '@/app/lib/services/admin/user-management.service'
 import { appToast } from '@/app/lib/toast'
 import UserFormModal from './UserFormModal'
@@ -62,41 +42,24 @@ const TABS: { key: TabValue; label: string }[] = [
   { key: 'accountants',        label: 'Accountants'   },
   { key: 'general-managers',   label: 'Gen. Managers' },
   { key: 'human-resources',    label: 'HR'            },
-  { key: 'fleet-admins',       label: 'Fleet Manager'  },
-  { key: 'operations-admins',  label: 'Ops. Manager'   },
+  { key: 'fleet-admins',       label: 'Fleet Manager' },
+  { key: 'operations-admins',  label: 'Ops. Manager'  },
   { key: 'it-admins',          label: 'IT Admins'     },
 ]
 
-const PAGE_SIZE = 15
+const PAGE_SIZE = 10
 
-async function fetchUsers(tab: TabValue): Promise<AnyUser[]> {
-  if (tab === 'all') {
-    const results = await Promise.allSettled([
-      clientService.getAll(),
-      driverService.getAll(),
-      vendorService.getAll(),
-      accountantService.getAll(),
-      generalManagerService.getAll(),
-      humanResourcesService.getAll(),
-      fleetAdminService.getAll(),
-      operationsAdminService.getAll(),
-      itAdminService.getAll(),
-    ])
-    return results
-      .filter((r) => r.status === 'fulfilled')
-      .flatMap((r) => (r as PromiseFulfilledResult<unknown>).value as AnyUser[])
-  }
-
+async function fetchByTab(tab: UserTab): Promise<AnyUser[]> {
   switch (tab) {
-    case 'clients':           return clientService.getAll()           as Promise<AnyUser[]>
-    case 'drivers':           return driverService.getAll()           as Promise<AnyUser[]>
-    case 'vendors':           return vendorService.getAll()           as Promise<AnyUser[]>
-    case 'accountants':       return accountantService.getAll()       as Promise<AnyUser[]>
-    case 'general-managers':  return generalManagerService.getAll()   as Promise<AnyUser[]>
-    case 'human-resources':   return humanResourcesService.getAll()   as Promise<AnyUser[]>
-    case 'fleet-admins':      return fleetAdminService.getAll()       as Promise<AnyUser[]>
-    case 'operations-admins': return operationsAdminService.getAll()  as Promise<AnyUser[]>
-    case 'it-admins':         return itAdminService.getAll()          as Promise<AnyUser[]>
+    case 'clients':           return clientService.getAll()          as Promise<AnyUser[]>
+    case 'drivers':           return driverService.getAll()          as Promise<AnyUser[]>
+    case 'vendors':           return vendorService.getAll()          as Promise<AnyUser[]>
+    case 'accountants':       return accountantService.getAll()      as Promise<AnyUser[]>
+    case 'general-managers':  return generalManagerService.getAll()  as Promise<AnyUser[]>
+    case 'human-resources':   return humanResourcesService.getAll()  as Promise<AnyUser[]>
+    case 'fleet-admins':      return fleetAdminService.getAll()      as Promise<AnyUser[]>
+    case 'operations-admins': return operationsAdminService.getAll() as Promise<AnyUser[]>
+    case 'it-admins':         return itAdminService.getAll()         as Promise<AnyUser[]>
   }
 }
 
@@ -132,9 +95,7 @@ function tabFromRole(role: string): UserTab {
 
 function formatDate(iso: string | null): string {
   if (!iso) return '—'
-  return new Date(iso).toLocaleDateString('en-PH', {
-    month: 'short', day: 'numeric', year: 'numeric',
-  })
+  return new Date(iso).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 function formatDateTime(iso: string | null): string {
@@ -216,14 +177,12 @@ function RowMenu({ user, tab, onEdit, onStatusChange }: RowMenuProps) {
     return () => document.removeEventListener('mousedown', handle)
   }, [])
 
-  const statusActions: { label: string; status: UserStatus; icon: React.ReactNode }[] = (
-    [
-      { label: 'Set Active',   status: 'active',             icon: <ShieldCheck size={13} /> },
-      { label: 'Set Inactive', status: 'inactive',           icon: <ShieldOff size={13} /> },
-      { label: 'Archive',      status: 'archived',           icon: <Archive size={13} /> },
-      { label: 'Perm. Lock',   status: 'permanently_locked', icon: <Lock size={13} /> },
-    ] as const satisfies readonly { label: string; status: UserStatus; icon: React.ReactNode }[]
-  ).filter((a) => a.status !== user.status)
+  const statusActions = ([
+    { label: 'Set Active',   status: 'active'             as UserStatus, icon: <ShieldCheck size={13} /> },
+    { label: 'Set Inactive', status: 'inactive'           as UserStatus, icon: <ShieldOff size={13} /> },
+    { label: 'Archive',      status: 'archived'           as UserStatus, icon: <Archive size={13} /> },
+    { label: 'Perm. Lock',   status: 'permanently_locked' as UserStatus, icon: <Lock size={13} /> },
+  ]).filter((a) => a.status !== user.status)
 
   const canEdit = tab !== 'all'
 
@@ -235,7 +194,6 @@ function RowMenu({ user, tab, onEdit, onStatusChange }: RowMenuProps) {
       >
         <MoreVertical size={15} />
       </button>
-
       <AnimatePresence>
         {open && (
           <motion.div
@@ -254,7 +212,6 @@ function RowMenu({ user, tab, onEdit, onStatusChange }: RowMenuProps) {
                 <Pencil size={13} /> Edit
               </button>
             )}
-
             {statusActions.length > 0 && (
               <>
                 {canEdit && <div className="my-1 border-t border-[#2a2a2a]" />}
@@ -285,7 +242,7 @@ function RowMenu({ user, tab, onEdit, onStatusChange }: RowMenuProps) {
 function TableSkeleton({ cols }: { cols: number }) {
   return (
     <>
-      {Array.from({ length: 8 }).map((_, i) => (
+      {Array.from({ length: PAGE_SIZE }).map((_, i) => (
         <tr key={i} className="border-b border-[#2a2a2a]/60">
           {Array.from({ length: cols }).map((_, j) => (
             <td key={j} className="px-4 py-3.5">
@@ -294,10 +251,7 @@ function TableSkeleton({ cols }: { cols: number }) {
                 style={{ width: j === 0 ? '140px' : j === cols - 1 ? '60px' : '100px', animationDelay: `${i * 40}ms` }}
               />
               {j === 0 && (
-                <div
-                  className="mt-1.5 h-2.5 animate-pulse rounded bg-[#2a2a2a]"
-                  style={{ width: '80px', animationDelay: `${i * 40 + 20}ms` }}
-                />
+                <div className="mt-1.5 h-2.5 animate-pulse rounded bg-[#2a2a2a]" style={{ width: '80px', animationDelay: `${i * 40 + 20}ms` }} />
               )}
             </td>
           ))}
@@ -345,24 +299,22 @@ function AdminLikeCells({ user }: { user: AdminUser }) {
   )
 }
 
-function AllTabCells({ user }: { user: AnyUser }) {
-  const name = [user.first_name, user.middle_initial, user.last_name, user.suffix].filter(Boolean).join(' ') || '—'
-  return (
-    <>
-      <td className="px-4 py-3.5">
-        <p className="font-medium text-white">{name}</p>
-        <p className="text-xs text-[#818181] font-mono">{user.username}</p>
-      </td>
-      <td className="px-4 py-3.5 text-sm text-[#818181]">{user.email}</td>
-      <td className="px-4 py-3.5 text-sm text-[#818181]">{user.phone ?? '—'}</td>
-      <td className="px-4 py-3.5"><RoleBadge role={user.role} /></td>
-      <td className="px-4 py-3.5"><StatusBadge status={user.status} /></td>
-    </>
-  )
-}
-
 function renderCells(user: AnyUser, tab: TabValue) {
-  if (tab === 'all') return <AllTabCells user={user} />
+  if (tab === 'all') {
+    const name = [user.first_name, user.middle_initial, user.last_name, user.suffix].filter(Boolean).join(' ') || '—'
+    return (
+      <>
+        <td className="px-4 py-3.5">
+          <p className="font-medium text-white">{name}</p>
+          <p className="text-xs text-[#818181] font-mono">{user.username}</p>
+        </td>
+        <td className="px-4 py-3.5 text-sm text-[#818181]">{user.email}</td>
+        <td className="px-4 py-3.5 text-sm text-[#818181]">{user.phone ?? '—'}</td>
+        <td className="px-4 py-3.5"><RoleBadge role={user.role} /></td>
+        <td className="px-4 py-3.5"><StatusBadge status={user.status} /></td>
+      </>
+    )
+  }
 
   switch (tab) {
     case 'clients': {
@@ -377,7 +329,7 @@ function renderCells(user: AnyUser, tab: TabValue) {
           <td className="px-4 py-3.5 text-sm text-[#818181]">{u.email}</td>
           <td className="px-4 py-3.5 text-sm text-[#818181]">{u.clients?.company_name ?? '—'}</td>
           <td className="px-4 py-3.5"><StatusBadge status={u.status} /></td>
-          <td className="px-4 py-3.5 text-xs text-[#818181]">{formatDateTime(u.last_login_at)}</td>
+          <td className="px-4 py-3.5 text-xs text-[#818181]">{formatDateTime(u.last_login_at ?? null)}</td>
         </>
       )
     }
@@ -452,51 +404,83 @@ const HEADERS: Record<TabValue, string[]> = {
 }
 
 export default function UserManagementClient() {
-  const [activeTab, setActiveTab] = useState<TabValue>('clients')
-  const [users, setUsers] = useState<AnyUser[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [search, setSearch] = useState('')
-  const [page, setPage] = useState(1)
+  const [activeTab,        setActiveTab]        = useState<TabValue>('clients')
+  const [allRows,          setAllRows]          = useState<AnyUser[]>([])
+  const [loading,          setLoading]          = useState(true)
+  const [error,            setError]            = useState<string | null>(null)
+  const [searchInput,      setSearchInput]      = useState('')
+  const [search,           setSearch]           = useState('')
+  const [page,             setPage]             = useState(1)
+  const [stats,            setStats]            = useState({ total: 0, active: 0, archived: 0 })
+  const [serverTotal,      setServerTotal]      = useState(0)
+  const [serverTotalPages, setServerTotalPages] = useState(1)
+  const [showForm,         setShowForm]         = useState(false)
+  const [editUser,         setEditUser]         = useState<AnyUser | null>(null)
+  const [formTab,          setFormTab]          = useState<UserTab>('clients')
 
-  const [showForm, setShowForm] = useState(false)
-  const [editUser, setEditUser] = useState<AnyUser | null>(null)
-  const [formTab, setFormTab] = useState<UserTab>('clients')
+  useEffect(() => {
+    const t = setTimeout(() => { setSearch(searchInput); setPage(1) }, 400)
+    return () => clearTimeout(t)
+  }, [searchInput])
 
-  const load = useCallback(async () => {
+  const fetchRows = useCallback(async (tab: TabValue, targetPage: number) => {
     setLoading(true)
     setError(null)
+    setAllRows([])
     try {
-      const data = await fetchUsers(activeTab)
-      setUsers(data)
-      setPage(1)
+      const [rows, statsResult] = await Promise.all([
+        tab === 'all'
+          ? userService.getAll({ page: targetPage, limit: PAGE_SIZE }).then((r) => {
+              setServerTotal(r.total)
+              setServerTotalPages(r.totalPages)
+              return r.data
+            })
+          : fetchByTab(tab as UserTab).then((r) => {
+              setServerTotal(r.length)
+              setServerTotalPages(Math.ceil(r.length / PAGE_SIZE))
+              return r
+            }),
+        userService.getStats(),
+      ])
+      setAllRows(rows)
+      setStats({
+        total:    statsResult.total,
+        active:   statsResult.active,
+        archived: statsResult.archived,
+      })
     } catch {
       setError('Failed to load users. Check your connection or permissions.')
     } finally {
       setLoading(false)
     }
-  }, [activeTab])
+  }, [])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    fetchRows(activeTab, 1)
+  }, [activeTab, fetchRows])
 
-  const filtered = users.filter((u) => {
+  useEffect(() => {
+    if (activeTab !== 'all') return
+    fetchRows('all', page)
+  }, [page]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const filtered = allRows.filter((u) => {
+    if (!search) return true
     const q = search.toLowerCase()
     return (
-      u.username.toLowerCase().includes(q) ||
-      u.email.toLowerCase().includes(q) ||
-      (u.first_name ?? '').toLowerCase().includes(q) ||
-      (u.last_name ?? '').toLowerCase().includes(q)
+      u.username?.toLowerCase().includes(q) ||
+      u.email?.toLowerCase().includes(q) ||
+      u.first_name?.toLowerCase().includes(q) ||
+      u.last_name?.toLowerCase().includes(q)
     )
   })
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
-
-  const stats = {
-    total:    users.length,
-    active:   users.filter((u) => u.status === 'active').length,
-    archived: users.filter((u) => u.status === 'archived').length,
-  }
+  const total      = activeTab === 'all' ? serverTotal      : filtered.length
+  const totalPages = activeTab === 'all' ? serverTotalPages : Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const safePage   = Math.min(page, totalPages)
+  const users      = activeTab === 'all'
+    ? allRows
+    : filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
   async function handleStatusChange(user: AnyUser, status: UserStatus) {
     const serviceTab = activeTab === 'all' ? tabFromRole(user.role) : activeTab as UserTab
@@ -510,9 +494,8 @@ export default function UserManagementClient() {
         },
         { action: 'update-status', entityId: user.user_id },
       )
-      await load()
+      await fetchRows(activeTab, safePage)
     } catch {
-      // handled by toast
     }
   }
 
@@ -528,6 +511,8 @@ export default function UserManagementClient() {
     setEditUser(null)
     setShowForm(true)
   }
+
+  const colCount = HEADERS[activeTab].length + 1
 
   return (
     <ThemeProvider theme={muiTheme}>
@@ -568,7 +553,9 @@ export default function UserManagementClient() {
                   value={activeTab}
                   onChange={(e: SelectChangeEvent) => {
                     setActiveTab(e.target.value as TabValue)
+                    setSearchInput('')
                     setSearch('')
+                    setPage(1)
                   }}
                   MenuProps={{
                     PaperProps: {
@@ -647,21 +634,21 @@ export default function UserManagementClient() {
               <div className="relative flex-1 max-w-sm">
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#818181]" />
                 <input
-                  value={search}
-                  onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
                   placeholder="Search name, email, username…"
                   className="w-full rounded-lg border border-[#424242] bg-[#2a2a2a]/60 py-2 pl-9 pr-4 text-sm text-white placeholder-[#818181] outline-none transition focus:border-[#4df9ed] focus:ring-1 focus:ring-[#4df9ed]/20"
                 />
               </div>
               <button
-                onClick={load}
+                onClick={() => fetchRows(activeTab, safePage)}
                 disabled={loading}
                 className="flex items-center gap-1.5 rounded-lg border border-[#424242] px-3 py-2 text-sm text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white disabled:opacity-40"
               >
                 <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
               </button>
               <span className="ml-auto text-xs text-[#818181]">
-                {filtered.length} record{filtered.length !== 1 ? 's' : ''}
+                {total} record{total !== 1 ? 's' : ''}
               </span>
             </div>
 
@@ -687,14 +674,14 @@ export default function UserManagementClient() {
                 </thead>
                 <tbody>
                   {loading ? (
-                    <TableSkeleton cols={HEADERS[activeTab].length + 1} />
-                  ) : paginated.length === 0 ? (
+                    <TableSkeleton cols={colCount} />
+                  ) : users.length === 0 ? (
                     <tr>
-                      <td colSpan={6}><EmptyState tab={activeTab} onAdd={openCreate} /></td>
+                      <td colSpan={colCount}><EmptyState tab={activeTab} onAdd={openCreate} /></td>
                     </tr>
                   ) : (
                     <AnimatePresence mode="wait">
-                      {paginated.map((user, i) => (
+                      {users.map((user, i) => (
                         <motion.tr
                           key={user.user_id}
                           initial={{ opacity: 0, y: 6 }}
@@ -719,56 +706,63 @@ export default function UserManagementClient() {
               </table>
             </div>
 
-            {!loading && filtered.length > PAGE_SIZE && (
-              <div className="flex items-center justify-between border-t border-[#2a2a2a] px-5 py-3 shrink-0">
-                <p className="text-xs text-[#818181]">Page {page} of {totalPages}</p>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                    className="rounded-lg p-1.5 text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white disabled:opacity-30"
-                  >
-                    <ChevronLeft size={15} />
-                  </button>
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    const n = Math.max(1, Math.min(totalPages - 4, page - 2)) + i
-                    return (
-                      <button
-                        key={n}
-                        onClick={() => setPage(n)}
-                        className={`h-7 w-7 rounded-lg text-xs font-medium transition ${
-                          n === page ? 'bg-[#4df9ed] text-[#0a0a0a]' : 'text-[#818181] hover:bg-[#2a2a2a] hover:text-white'
-                        }`}
-                      >
-                        {n}
-                      </button>
-                    )
-                  })}
-                  <button
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={page === totalPages}
-                    className="rounded-lg p-1.5 text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white disabled:opacity-30"
-                  >
-                    <ChevronRight size={15} />
-                  </button>
+            {!loading && totalPages > 1 && (
+              <div className="shrink-0 border-t border-[#2a2a2a] bg-[#1b1b1b] px-5 py-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-[#818181]">
+                    Page {safePage} of {totalPages} &mdash; {total} record{total !== 1 ? 's' : ''}
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={safePage === 1}
+                      className="rounded-lg p-1.5 text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white disabled:opacity-30"
+                    >
+                      <ChevronLeft size={15} />
+                    </button>
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      const n = Math.max(1, Math.min(totalPages - 4, safePage - 2)) + i
+                      return (
+                        <button
+                          key={n}
+                          onClick={() => setPage(n)}
+                          className={`h-7 w-7 rounded-lg text-xs font-medium transition ${
+                            n === safePage
+                              ? 'bg-[#4df9ed] text-[#0a0a0a]'
+                              : 'text-[#818181] hover:bg-[#2a2a2a] hover:text-white'
+                          }`}
+                        >
+                          {n}
+                        </button>
+                      )
+                    })}
+                    <button
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={safePage === totalPages}
+                      className="rounded-lg p-1.5 text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white disabled:opacity-30"
+                    >
+                      <ChevronRight size={15} />
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
+
           </div>
         </div>
-
-        {showForm && (
-          <UserFormModal
-            tab={formTab}
-            user={editUser}
-            onClose={() => setShowForm(false)}
-            onSaved={async () => {
-              setShowForm(false)
-              await load()
-            }}
-          />
-        )}
       </div>
+
+      {showForm && (
+        <UserFormModal
+          tab={formTab}
+          user={editUser}
+          onClose={() => setShowForm(false)}
+          onSaved={async () => {
+            setShowForm(false)
+            await fetchRows(activeTab, safePage)
+          }}
+        />
+      )}
     </ThemeProvider>
   )
 }

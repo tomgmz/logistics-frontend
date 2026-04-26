@@ -52,6 +52,7 @@ export interface ClientUser extends BaseUser {
     company_name: string | null
     billing_address: string | null
     payment_terms: number | null
+    landline:        string | null
   } | null
 }
 
@@ -74,12 +75,12 @@ export interface VendorUser extends BaseUser {
     vendor_type: 'individual' | 'company'
     company_name: string | null
     business_permit: string | null
+    landline:        string | null
   } | null
 }
 
 export type AnyUser = AdminUser | ClientUser | DriverUser | VendorUser
 
-// ── Payloads ──────────────────────────────────────────────────────────────────
 
 export interface CreateAdminPayload {
   username: string

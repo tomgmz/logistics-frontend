@@ -1,7 +1,4 @@
-/**
- * Fleet / super-admin truck APIs (Express: /api/admin/trucks, /api/admin/truck-models, /api/admin/vendors).
- */
-import authApi, { initCsrf } from '../auth.api'
+import authApi, { initCsrf } from '../../api/auth.api'
 import type { Truck, CreateTruckInput, UpdateTruckInput } from '@/app/types/truck.types'
 import type { TruckModel } from '@/app/types/truck-model'
 

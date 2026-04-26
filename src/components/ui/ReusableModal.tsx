@@ -83,7 +83,7 @@ export default function ReusableModal({
           role="dialog"
           aria-labelledby="modal-title"
           aria-describedby={description ? "modal-description" : undefined}
-          className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4"
+          className="fixed inset-0 z-[70] flex items-end justify-center sm:items-center sm:p-4"
           style={{ backgroundColor: "rgba(0,0,0,0.55)", backdropFilter: "" }}
         >
           <motion.div

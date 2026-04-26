@@ -1,44 +1,31 @@
-/**
- * TRUCK MODEL TYPE - Matches Your Actual Supabase Schema
- * 
- * ✅ All fields verified against your database
- */
 
 export interface TruckModel {
   model_id: string
-  name: string                      // ✅ Your DB field (not 'model_name')
-  body_type?: string | null         // ✅ e.g., 'Closed Van', 'Wing Van', 'Refrigerated'
-  dimension_mm?: string | null      // ✅ Your DB field (format: "6000 x 2400 x 2400")
-  suitable_for?: string | null      // ✅ Text description of cargo types
-  stackable_friendly?: boolean      // ✅ Your DB uses underscore, not camelCase
-  max_volume_cbm?: number | null    // ✅ Maximum cargo volume in cubic meters
-  max_weight_kg?: number | null     // ✅ Maximum weight capacity in kg
-  max_length_cm?: number | null     // ✅ Maximum cargo length in cm
-  image_url?: string | null         // Model photo (shown in fleet UI when joined)
+  name: string 
+  body_type?: string | null
+  dimension_mm?: string | null
+  suitable_for?: string | null
+  stackable_friendly?: boolean 
+  max_volume_cbm?: number | null 
+  max_weight_kg?: number | null
+  max_length_cm?: number | null  
+  image_url?: string | null 
   created_at: string
 }
-
-/**
- * TRUCK TYPE - Matches Your Actual Supabase Schema
- */
 
 export interface Truck {
   truck_id: string
   plate_number: string
-  truck_type: string                                    // e.g., 'truck', 'wing_van'
+  truck_type: string 
   capacity_tons: number
   model_id?: string | null
-  truck_model?: TruckModel | null                       // Joined data from truck_models
+  truck_model?: TruckModel | null
   status: 'available' | 'in_use' | 'under_maintenance' | 'inactive' | 'archived'
   owned_by: 'company' | 'vendor'
   vendor_id?: string | null
   created_at: string
   updated_at: string
 }
-
-/**
- * CREATE TRUCK INPUT - For API requests
- */
 
 export interface CreateTruckInput {
   plate_number: string
@@ -50,10 +37,6 @@ export interface CreateTruckInput {
   created_by?: string | null
 }
 
-/**
- * UPDATE TRUCK INPUT - For API requests
- */
-
 export interface UpdateTruckInput {
   plate_number?: string
   truck_type?: string
@@ -64,11 +47,6 @@ export interface UpdateTruckInput {
   vendor_id?: string | null
 }
 
-/**
- * SAMPLE DATA STRUCTURE
- * 
- * This is what your API returns when you call GET /trucks:
- */
 
 /*
 {

@@ -31,6 +31,7 @@ import {
 import { validateForm } from '@/app/lib/validation/user-management.validation'
 import ReusableModal from '@/components/ui/ReusableModal'
 import { appToast } from '@/app/lib/toast'
+import LandlineInputRow, { toLocalLandlineDigits } from './LandLineInputRow'
 
 interface UserFormModalProps {
   tab: UserTab
@@ -69,7 +70,6 @@ function extractApiError(err: unknown): {
 
   if (data && typeof data === 'object') {
     const { errors, message } = data
-
     if (Array.isArray(errors) && errors.length > 0) {
       const fieldErrors: Record<string, string> = {}
       for (const ve of errors) {
@@ -80,7 +80,6 @@ function extractApiError(err: unknown): {
       }
       return { message: '', fieldErrors }
     }
-
     if (typeof message === 'string' && message.trim()) {
       return { message: message.trim(), fieldErrors: {} }
     }
@@ -100,8 +99,7 @@ function toLocalDigits(raw: string): string {
 }
 
 function attachCountryCode(local: string): string {
-  const digits = local.replace(/\D/g, '')
-  return `+63${digits}`
+  return `+63${local.replace(/\D/g, '')}`
 }
 
 function formatPhone(digits: string): string {
@@ -126,6 +124,7 @@ function buildInitialState(tab: UserTab, user: AnyUser | null): FormState {
     const c = (user as ClientUser | null)?.clients
     return {
       ...base,
+      landline:        c?.landline ? toLocalLandlineDigits(c.landline) : '',
       company_name:    c?.company_name    ?? '',
       billing_address: c?.billing_address ?? '',
       payment_terms:   c?.payment_terms   ?? 30,
@@ -148,6 +147,7 @@ function buildInitialState(tab: UserTab, user: AnyUser | null): FormState {
     const v = (user as VendorUser | null)?.vendors
     return {
       ...base,
+      landline:        v?.landline ? toLocalLandlineDigits(v.landline) : '',
       vendor_type:     v?.vendor_type     ?? 'individual',
       company_name:    v?.company_name    ?? '',
       business_permit: v?.business_permit ?? '',
@@ -163,6 +163,9 @@ async function submitForm(tab: UserTab, form: FormState, editId?: string): Promi
   )
   if (clean.phone) {
     clean.phone = attachCountryCode(String(clean.phone))
+  }
+  if (clean.landline) {
+    clean.landline = attachCountryCode(String(clean.landline))
   }
 
   switch (tab) {
@@ -254,18 +257,52 @@ function Select({
   )
 }
 
+function PhoneInputRow({
+  value,
+  onChange,
+  placeholder,
+  maxLength,
+  error,
+}: {
+  value: string
+  onChange: (digits: string) => void
+  placeholder: string
+  maxLength: number
+  error?: string
+}) {
+  return (
+    <div className="flex">
+      <span className="flex items-center rounded-l-[10px] border border-r-0 border-[#424242] bg-[#232323] px-3 text-[13px] font-medium text-[#818181] select-none">
+        +63
+      </span>
+      <Input
+        type="tel"
+        value={value}
+        onChange={e => {
+          const digits = e.target.value.replace(/\D/g, '').slice(0, maxLength)
+          onChange(digits)
+        }}
+        placeholder={placeholder}
+        maxLength={maxLength + Math.floor(maxLength / 3)}
+        error={error}
+        className="rounded-l-none"
+      />
+    </div>
+  )
+}
+
 export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormModalProps) {
   const isEdit = Boolean(user)
 
-  const [form, setForm]                 = useState<FormState>(() => buildInitialState(tab, user))
-  const [loading, setLoading]           = useState(false)
-  const [globalError, setGlobalError]   = useState<string | null>(null)
-  const [fieldErrors, setFieldErrors]   = useState<Record<string, string>>({})
+  const [form, setForm]               = useState<FormState>(() => buildInitialState(tab, user))
+  const [loading, setLoading]         = useState(false)
+  const [globalError, setGlobalError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [confirmClose, setConfirmClose] = useState(false)
-  const [confirmSave, setConfirmSave]   = useState(false)
+  const [confirmSave,  setConfirmSave]  = useState(false)
 
-  const [vendorList, setVendorList] = useState<{ vendor_id: string; name: string }[]>([])
-  const [vendorsLoading, setVendorsLoading] = useState(false)
+  const [vendorList,      setVendorList]      = useState<{ vendor_id: string; name: string }[]>([])
+  const [vendorsLoading,  setVendorsLoading]  = useState(false)
 
   useEffect(() => {
     setForm(buildInitialState(tab, user))
@@ -295,17 +332,16 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
 
   function buildValidationPayload(currentForm: FormState): Record<string, unknown> {
     const payload: Record<string, unknown> = { ...currentForm }
-    if (payload.phone) payload.phone = attachCountryCode(String(payload.phone))
-    if (tab === 'drivers' && !payload.is_vendor_driver) {
-      delete payload.vendor_id
-    }
+    if (payload.phone)    payload.phone    = attachCountryCode(String(payload.phone))
+    if (payload.landline) payload.landline = attachCountryCode(String(payload.landline))
+    if (tab === 'drivers' && !payload.is_vendor_driver) delete payload.vendor_id
     return payload
   }
 
   function validateField(key: string, value: unknown, currentForm: FormState) {
     const merged: FormState = { ...currentForm, [key]: value as string | boolean | number }
     const payload = buildValidationPayload(merged)
-    const errors = validateForm(tab, isEdit, payload)
+    const errors  = validateForm(tab, isEdit, payload)
     setFieldErrors(prev => {
       const next = { ...prev }
       if (errors[key]) next[key] = errors[key]
@@ -327,11 +363,8 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
     e.preventDefault()
     setGlobalError(null)
     const payload = buildValidationPayload(form)
-    const errors = validateForm(tab, isEdit, payload)
-    if (Object.keys(errors).length > 0) {
-      setFieldErrors(errors)
-      return
-    }
+    const errors  = validateForm(tab, isEdit, payload)
+    if (Object.keys(errors).length > 0) { setFieldErrors(errors); return }
     setConfirmSave(true)
   }
 
@@ -434,15 +467,9 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
                 />
               </Field>
               <Field label="Suffix" error={fe.suffix}>
-                <Select
-                  value={form.suffix as string}
-                  onChange={e => set('suffix', e.target.value)}
-                  error={fe.suffix}
-                >
+                <Select value={form.suffix as string} onChange={e => set('suffix', e.target.value)} error={fe.suffix}>
                   <option value=""> N/A </option>
-                  {USER_SUFFIXES.map(s => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
+                  {USER_SUFFIXES.map(s => <option key={s} value={s}>{s}</option>)}
                 </Select>
               </Field>
             </div>
@@ -467,28 +494,19 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
               </Field>
             </div>
 
-            <Field label="Phone" required error={fe.phone}>
-              <div className="flex">
-                <span className="flex items-center rounded-l-[10px] border border-r-0 border-[#424242] bg-[#232323] px-3 text-[13px] font-medium text-[#818181] select-none">
-                  +63
-                </span>
-                <Input
-                  type="tel"
-                  value={formatPhone(form.phone as string)}
-                  onChange={e => {
-                    const digits = e.target.value.replace(/\D/g, '').slice(0, 10)
-                    if (digits.length > 0 && (digits.startsWith('0') || digits.startsWith('1'))) return
-                    set('phone', digits)
-                  }}
-                  placeholder="929-2143-537"
-                  maxLength={12}
-                  error={fe.phone}
-                  className="rounded-l-none"
-                />
-              </div>
+            <Field label="Mobile" required error={fe.phone}>
+              <PhoneInputRow
+                value={formatPhone(form.phone as string)}
+                onChange={digits => {
+                  if (digits.length > 0 && (digits.startsWith('0') || digits.startsWith('1'))) return
+                  set('phone', digits)
+                }}
+                placeholder="929-2143-537"
+                maxLength={10}
+                error={fe.phone}
+              />
             </Field>
 
-            {/* Drivers only — password on create */}
             {tab === 'drivers' && !isEdit && (
               <Field label="Password" required error={fe.password}>
                 <Input
@@ -502,6 +520,14 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
             )}
 
             {tab === 'clients' && (<>
+              <Field label="Landline" hint="Optional" error={fe.landline}>
+                <LandlineInputRow
+                  value={form.landline as string}
+                  onChange={digits => set('landline', digits)}
+                  error={fe.landline}
+                />
+              </Field>
+
               <div className="grid grid-cols-2 gap-4">
                 <Field label="Company Name" required error={fe.company_name}>
                   <Input
@@ -523,6 +549,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
                   </Select>
                 </Field>
               </div>
+
               <Field label="Billing Address" required error={fe.billing_address}>
                 <Textarea
                   value={form.billing_address as string}
@@ -566,16 +593,9 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
                   <div className="h-4 w-4 rounded border border-[#424242] bg-[#1b1b1b] transition-colors peer-checked:border-[#4df9ed] peer-checked:bg-[#4df9ed]" />
                   <svg
                     className="pointer-events-none absolute inset-0 m-auto hidden h-2.5 w-2.5 text-[#0a0a0a] peer-checked:block"
-                    viewBox="0 0 10 10"
-                    fill="none"
+                    viewBox="0 0 10 10" fill="none"
                   >
-                    <path
-                      d="M1.5 5l2.5 2.5 4.5-4.5"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
+                    <path d="M1.5 5l2.5 2.5 4.5-4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </div>
                 <span className="text-sm text-[#818181]">
@@ -591,9 +611,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
                     error={fe.vendor_id}
                     disabled={vendorsLoading}
                   >
-                    <option value="">
-                      {vendorsLoading ? 'Loading vendors…' : 'Select a vendor'}
-                    </option>
+                    <option value="">{vendorsLoading ? 'Loading vendors…' : 'Select a vendor'}</option>
                     {vendorList.map((v) => (
                       <option key={v.vendor_id} value={v.vendor_id}>{v.name}</option>
                     ))}
@@ -603,6 +621,14 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
             </>)}
 
             {tab === 'vendors' && (<>
+              <Field label="Landline" hint="Optional — area code + subscriber, e.g. 32-XXXXXXX" error={fe.landline}>
+                <LandlineInputRow
+                  value={form.landline as string}
+                  onChange={digits => set('landline', digits)}
+                  error={fe.landline}
+                />
+              </Field>
+
               <Field label="Vendor Type" required error={fe.vendor_type}>
                 <Select
                   value={form.vendor_type as string}
@@ -613,6 +639,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
                   <option value="company">Company</option>
                 </Select>
               </Field>
+
               <div className="grid grid-cols-2 gap-4">
                 <Field label="Company Name" error={fe.company_name}>
                   <Input
