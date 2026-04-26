@@ -14,7 +14,7 @@ export interface TruckModel {
   max_volume_cbm?: number | null    // ✅ Maximum cargo volume in cubic meters
   max_weight_kg?: number | null     // ✅ Maximum weight capacity in kg
   max_length_cm?: number | null     // ✅ Maximum cargo length in cm
-  image_url?: string | null         // ✅ BONUS: You have this field!
+  image_url?: string | null         // Model photo (shown in fleet UI when joined)
   created_at: string
 }
 
@@ -59,7 +59,7 @@ export interface UpdateTruckInput {
   truck_type?: string
   capacity_tons?: number
   model_id?: string | null
-  status?: 'available' | 'in_use' | 'under_maintenance' | 'inactive'
+  status?: 'available' | 'in_use' | 'under_maintenance' | 'inactive' | 'archived'
   owned_by?: 'company' | 'vendor'
   vendor_id?: string | null
 }

@@ -54,6 +54,6 @@ function mapTruckModelToVehicle(model: TruckModel): VehicleData {
                         : 'Standard dimensions',
     suitableFor:      model.suitable_for ?? 'General cargo',
     stackableFriendly: model.stackable_friendly,
-    imageUrl:         model.image_url,
+    imageUrl:         model.image_url ?? '',
   }
 }
