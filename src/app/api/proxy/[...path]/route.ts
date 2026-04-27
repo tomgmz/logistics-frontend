@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL!
 
-
 function forwardSetCookieHeaders(nextRes: NextResponse, axiosRes: AxiosResponse) {
   const raw = axiosRes.headers['set-cookie']
   if (!raw) return
@@ -19,7 +18,9 @@ async function handler(
 ) {
   const { path: pathSegments } = await params
   const path = pathSegments.join('/')
-  const url  = `${API_URL}/${path}`
+
+  const search = req.nextUrl.search
+  const url    = `${API_URL}/${path}${search}`
 
   try {
     const bodyText = req.method !== 'GET' && req.method !== 'HEAD'

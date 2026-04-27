@@ -23,7 +23,6 @@ import type {
   UpdateOperationsAdminPayload,
   CreateITAdminPayload,
   UpdateITAdminPayload,
-  UserStatus,
 } from '@/app/types/admin/user-management.types'
 
 interface ApiResponse<T> {

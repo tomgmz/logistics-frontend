@@ -334,6 +334,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
     const payload: Record<string, unknown> = { ...currentForm }
     if (payload.phone)    payload.phone    = attachCountryCode(String(payload.phone))
     if (payload.landline) payload.landline = attachCountryCode(String(payload.landline))
+    else                  delete payload.landline
     if (tab === 'drivers' && !payload.is_vendor_driver) delete payload.vendor_id
     return payload
   }

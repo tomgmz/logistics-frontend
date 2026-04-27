@@ -202,7 +202,6 @@ export default function VehicleManagementView() {
 
   const [confirmKind, setConfirmKind] = useState<ConfirmKind>(null)
   const [actionBusy,  setActionBusy]  = useState(false)
-  // deleteId is separate so "Delete vehicle…" link inside edit modal works
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
   const loadAll = useCallback(async () => {

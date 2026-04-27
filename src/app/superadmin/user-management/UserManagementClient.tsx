@@ -407,6 +407,7 @@ export default function UserManagementClient() {
   const [activeTab,        setActiveTab]        = useState<TabValue>('clients')
   const [allRows,          setAllRows]          = useState<AnyUser[]>([])
   const [loading,          setLoading]          = useState(true)
+  const [fetching,         setFetching]         = useState(false)
   const [error,            setError]            = useState<string | null>(null)
   const [searchInput,      setSearchInput]      = useState('')
   const [search,           setSearch]           = useState('')
@@ -418,36 +419,51 @@ export default function UserManagementClient() {
   const [editUser,         setEditUser]         = useState<AnyUser | null>(null)
   const [formTab,          setFormTab]          = useState<UserTab>('clients')
 
+  const isInitialAllFetch = useRef(true)
+
   useEffect(() => {
-    const t = setTimeout(() => { setSearch(searchInput); setPage(1) }, 400)
+    const t = setTimeout(() => {
+      setSearch(searchInput)
+      setPage(1)
+    }, 400)
     return () => clearTimeout(t)
   }, [searchInput])
 
-  const fetchRows = useCallback(async (tab: TabValue, targetPage: number) => {
+  const fetchAllUsers = useCallback(async (targetPage: number, searchQuery: string, hard = false) => {
+    if (hard) {
+      setLoading(true)
+    } else {
+      setFetching(true)
+    }
+    setError(null)
+    try {
+      const [result, statsResult] = await Promise.all([
+        userService.getAll({ page: targetPage, limit: PAGE_SIZE, search: searchQuery || undefined }),
+        userService.getStats(),
+      ])
+      setAllRows(result.data)
+      setServerTotal(result.total)
+      setServerTotalPages(result.totalPages)
+      setStats({ total: statsResult.total, active: statsResult.active, archived: statsResult.archived })
+    } catch {
+      setError('Failed to load users. Check your connection or permissions.')
+    } finally {
+      setLoading(false)
+      setFetching(false)
+    }
+  }, [])
+
+  const fetchTabUsers = useCallback(async (tab: UserTab) => {
     setLoading(true)
     setError(null)
     setAllRows([])
     try {
       const [rows, statsResult] = await Promise.all([
-        tab === 'all'
-          ? userService.getAll({ page: targetPage, limit: PAGE_SIZE }).then((r) => {
-              setServerTotal(r.total)
-              setServerTotalPages(r.totalPages)
-              return r.data
-            })
-          : fetchByTab(tab as UserTab).then((r) => {
-              setServerTotal(r.length)
-              setServerTotalPages(Math.ceil(r.length / PAGE_SIZE))
-              return r
-            }),
+        fetchByTab(tab),
         userService.getStats(),
       ])
       setAllRows(rows)
-      setStats({
-        total:    statsResult.total,
-        active:   statsResult.active,
-        archived: statsResult.archived,
-      })
+      setStats({ total: statsResult.total, active: statsResult.active, archived: statsResult.archived })
     } catch {
       setError('Failed to load users. Check your connection or permissions.')
     } finally {
@@ -456,24 +472,38 @@ export default function UserManagementClient() {
   }, [])
 
   useEffect(() => {
-    fetchRows(activeTab, 1)
-  }, [activeTab, fetchRows])
+    isInitialAllFetch.current = true
+    setPage(1)
+    setSearch('')
+    setSearchInput('')
+    if (activeTab === 'all') {
+      fetchAllUsers(1, '', true)
+    } else {
+      fetchTabUsers(activeTab as UserTab)
+    }
+  }, [activeTab]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (activeTab !== 'all') return
-    fetchRows('all', page)
-  }, [page]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (isInitialAllFetch.current) {
+      isInitialAllFetch.current = false
+      return
+    }
+    fetchAllUsers(page, search, false)
+  }, [page, search, activeTab, fetchAllUsers])
 
-  const filtered = allRows.filter((u) => {
-    if (!search) return true
-    const q = search.toLowerCase()
-    return (
-      u.username?.toLowerCase().includes(q) ||
-      u.email?.toLowerCase().includes(q) ||
-      u.first_name?.toLowerCase().includes(q) ||
-      u.last_name?.toLowerCase().includes(q)
-    )
-  })
+  const filtered = activeTab === 'all'
+    ? allRows
+    : allRows.filter((u) => {
+        if (!search) return true
+        const q = search.toLowerCase()
+        return (
+          u.username?.toLowerCase().includes(q) ||
+          u.email?.toLowerCase().includes(q) ||
+          u.first_name?.toLowerCase().includes(q) ||
+          u.last_name?.toLowerCase().includes(q)
+        )
+      })
 
   const total      = activeTab === 'all' ? serverTotal      : filtered.length
   const totalPages = activeTab === 'all' ? serverTotalPages : Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
@@ -494,7 +524,11 @@ export default function UserManagementClient() {
         },
         { action: 'update-status', entityId: user.user_id },
       )
-      await fetchRows(activeTab, safePage)
+      if (activeTab === 'all') {
+        await fetchAllUsers(safePage, search, false)
+      } else {
+        await fetchTabUsers(activeTab as UserTab)
+      }
     } catch {
     }
   }
@@ -510,6 +544,14 @@ export default function UserManagementClient() {
     setFormTab(activeTab === 'all' ? 'clients' : activeTab as UserTab)
     setEditUser(null)
     setShowForm(true)
+  }
+
+  function handleRefresh() {
+    if (activeTab === 'all') {
+      fetchAllUsers(safePage, search, false)
+    } else {
+      fetchTabUsers(activeTab as UserTab)
+    }
   }
 
   const colCount = HEADERS[activeTab].length + 1
@@ -553,9 +595,6 @@ export default function UserManagementClient() {
                   value={activeTab}
                   onChange={(e: SelectChangeEvent) => {
                     setActiveTab(e.target.value as TabValue)
-                    setSearchInput('')
-                    setSearch('')
-                    setPage(1)
                   }}
                   MenuProps={{
                     PaperProps: {
@@ -641,11 +680,11 @@ export default function UserManagementClient() {
                 />
               </div>
               <button
-                onClick={() => fetchRows(activeTab, safePage)}
-                disabled={loading}
+                onClick={handleRefresh}
+                disabled={loading || fetching}
                 className="flex items-center gap-1.5 rounded-lg border border-[#424242] px-3 py-2 text-sm text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white disabled:opacity-40"
               >
-                <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
+                <RefreshCw size={13} className={(loading || fetching) ? 'animate-spin' : ''} /> Refresh
               </button>
               <span className="ml-auto text-xs text-[#818181]">
                 {total} record{total !== 1 ? 's' : ''}
@@ -658,7 +697,7 @@ export default function UserManagementClient() {
               </div>
             )}
 
-            <div className="flex-1 overflow-auto min-h-0">
+            <div className={'flex-1 overflow-auto min-h-0'}>
               <table className="w-full text-sm">
                 <thead className="sticky top-0 z-10 bg-[#1b1b1b]">
                   <tr className="border-b border-[#2a2a2a]">
@@ -673,7 +712,7 @@ export default function UserManagementClient() {
                   </tr>
                 </thead>
                 <tbody>
-                  {loading ? (
+                  {(loading || fetching) ? (
                     <TableSkeleton cols={colCount} />
                   ) : users.length === 0 ? (
                     <tr>
@@ -715,7 +754,7 @@ export default function UserManagementClient() {
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => setPage((p) => Math.max(1, p - 1))}
-                      disabled={safePage === 1}
+                      disabled={safePage === 1 || fetching}
                       className="rounded-lg p-1.5 text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white disabled:opacity-30"
                     >
                       <ChevronLeft size={15} />
@@ -726,11 +765,12 @@ export default function UserManagementClient() {
                         <button
                           key={n}
                           onClick={() => setPage(n)}
+                          disabled={fetching}
                           className={`h-7 w-7 rounded-lg text-xs font-medium transition ${
                             n === safePage
                               ? 'bg-[#4df9ed] text-[#0a0a0a]'
                               : 'text-[#818181] hover:bg-[#2a2a2a] hover:text-white'
-                          }`}
+                          } disabled:opacity-50`}
                         >
                           {n}
                         </button>
@@ -738,7 +778,7 @@ export default function UserManagementClient() {
                     })}
                     <button
                       onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                      disabled={safePage === totalPages}
+                      disabled={safePage === totalPages || fetching}
                       className="rounded-lg p-1.5 text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white disabled:opacity-30"
                     >
                       <ChevronRight size={15} />
@@ -759,7 +799,11 @@ export default function UserManagementClient() {
           onClose={() => setShowForm(false)}
           onSaved={async () => {
             setShowForm(false)
-            await fetchRows(activeTab, safePage)
+            if (activeTab === 'all') {
+              await fetchAllUsers(safePage, search, false)
+            } else {
+              await fetchTabUsers(activeTab as UserTab)
+            }
           }}
         />
       )}
