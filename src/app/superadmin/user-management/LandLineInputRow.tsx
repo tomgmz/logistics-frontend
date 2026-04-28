@@ -100,7 +100,7 @@ export default function LandlineInputRow({ value, onChange, error }: LandlineInp
   }
 
   return (
-<div className="flex">
+    <div className="flex">
       <select
         value={areaCode}
         onChange={e => handleAreaChange(e.target.value)}
@@ -128,20 +128,20 @@ export default function LandlineInputRow({ value, onChange, error }: LandlineInp
         ))}
       </select>
 
-<Input
-  type="tel"
-  value={subscriber}
-  onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleSubscriberChange(e.target.value)}
-  placeholder={areaCode ? `${maxSub}-digit number` : 'Select city first'}
-  disabled={!areaCode}
-  error={error}
-  className={[
-    'rounded-l-none disabled:opacity-40 disabled:cursor-not-allowed',
-    error
-      ? 'focus:border-red-500 hover:border-red-500/80'
-      : '',
-  ].join(' ')}
-/>
-    </div>
-  )
+      <Input
+        type="tel"
+        value={subscriber}
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleSubscriberChange(e.target.value)}
+        placeholder={areaCode ? `${maxSub}-digit number` : 'Select city first'}
+        disabled={!areaCode}
+        error={error}
+        className={[
+          'rounded-l-none disabled:opacity-40 disabled:cursor-not-allowed',
+          error
+            ? 'focus:border-red-500 hover:border-red-500/80'
+            : '',
+        ].join(' ')}
+      />
+      </div>
+    )
 }
