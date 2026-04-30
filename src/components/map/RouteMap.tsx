@@ -26,7 +26,7 @@ import { statusColor } from './status.colors'
 
 const GOOGLE_MAPS_KEY    = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!
 const GOOGLE_MAPS_MAP_ID = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID!
-const LOGO_SRC           = 'https://www.figma.com/api/mcp/asset/656e388d-93f0-4b64-8a3d-a39b21a2a160'
+const LOGO_SRC           = '/final-logo.png'
 
 const FILTERS = ['All', 'Active', 'Pending', 'Completed'] as const
 type FilterKey = typeof FILTERS[number]
@@ -505,10 +505,9 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
         style={{ background: 'var(--color-bg)' }}
       >
         <div
-          className="h-16 flex items-center justify-between px-6 flex-shrink-0 border-b"
+          className="h-16 flex items-center justify-end px-6 flex-shrink-0 border-b"
           style={{ borderColor: 'var(--color-surface-dark)', background: 'var(--color-bg)' }}
         >
-          <Logo height={36} width={144} priority />
           <div className="flex items-center gap-2">
             <div className="pill-cyan">
               <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: 'var(--color-cyan)' }} />
@@ -568,9 +567,8 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
         className="hidden md:flex lg:hidden h-screen overflow-hidden flex-col ff-body"
         style={{ background: 'var(--color-bg)' }}
       >
-        <div className="h-14 flex items-center justify-between px-4 flex-shrink-0 border-b"
+        <div className="h-14 flex items-center justify-end px-4 flex-shrink-0 border-b"
           style={{ borderColor: 'var(--color-surface-dark)' }}>
-          <Logo height={28} width={112} />
           {routeData && bookingDetail && <StatusBadge status={bookingDetail.status ?? 'pending'} />}
         </div>
 

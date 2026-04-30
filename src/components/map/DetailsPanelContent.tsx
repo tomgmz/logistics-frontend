@@ -1,23 +1,84 @@
 'use client'
 
-import Image  from 'next/image'
-import { motion } from 'framer-motion'
-import type { OptimizeRouteResponse, BookingDetail, CargoGroup } from '@/app/types/maps/routemap.types'
-import { statusColor } from './status.colors'
-
-const TRUCK_IMG    = 'https://www.figma.com/api/mcp/asset/0318dae9-97ce-4d45-9493-711e78213248'
-const TRUCK_ICON   = 'https://www.figma.com/api/mcp/asset/9da23836-0bfa-4f39-8d62-bfc91725e81f'
-const VEHICLE_ICON = 'https://www.figma.com/api/mcp/asset/726590e5-34b8-4118-b941-a9617ee0ce83'
+import Image                   from 'next/image'
+import { motion }              from 'framer-motion'
+import { useState, useEffect } from 'react'
+import {
+  CalendarClock,
+  PackagePlus,
+  Truck,
+  PackageCheck,
+  ArrowRight,
+} from 'lucide-react'
+import type { OptimizeRouteResponse, BookingDetail } from '@/app/types/maps/routemap.types'
+import { fetchTruckModels } from '@/app/lib/api/client/truck-model'
 
 const STAGE_ICONS = [
-  'https://www.figma.com/api/mcp/asset/bde70cbf-5338-4591-9370-f98c897e0daa',
-  'https://www.figma.com/api/mcp/asset/03e90c74-1172-4615-b67c-5f8dbc8bcea1',
-  'https://www.figma.com/api/mcp/asset/907a700d-f65e-45e2-85af-c815185c594f',
-  'https://www.figma.com/api/mcp/asset/3d5bed75-b6c4-4f5c-83e4-17e1f00e1abb',
+  { Icon: CalendarClock, label: 'Scheduled'  },
+  { Icon: PackagePlus,   label: 'Loading'    },
+  { Icon: Truck,         label: 'In Transit' },
+  { Icon: PackageCheck,  label: 'Delivered'  },
 ]
 
 function fmtStatus(s: string) {
   return (s ?? '').replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase())
+}
+
+function Skeleton({ style }: { style?: React.CSSProperties }) {
+  return (
+    <motion.span
+      style={{
+        display: 'inline-block',
+        background: 'var(--color-surface-dark, #424242)',
+        borderRadius: 4,
+        height: '0.75em',
+        width: '6rem',
+        verticalAlign: 'middle',
+        ...style,
+      }}
+      animate={{ opacity: [0.4, 0.75, 0.4] }}
+      transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
+    />
+  )
+}
+
+function BlockSkeleton({ style }: { style?: React.CSSProperties }) {
+  return (
+    <motion.div
+      style={{
+        background: 'var(--color-surface-dark, #424242)',
+        borderRadius: 10,
+        ...style,
+      }}
+      animate={{ opacity: [0.4, 0.75, 0.4] }}
+      transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
+    />
+  )
+}
+
+function useTruckImage(truckType: string) {
+  const [imageUrl, setImageUrl] = useState<string | null>(null)
+  const [loading,  setLoading]  = useState(true)
+
+  useEffect(() => {
+    if (!truckType) return
+    let active = true
+    fetchTruckModels()
+      .then(models => {
+        if (!active) return
+        const match = models.find(m => m.name.toLowerCase() === truckType.toLowerCase())
+        setImageUrl(match?.image_url ?? null)
+        setLoading(false)
+      })
+      .catch(() => {
+        if (!active) return
+        setImageUrl(null)
+        setLoading(false)
+      })
+    return () => { active = false }
+  }, [truckType])
+
+  return { imageUrl, loading }
 }
 
 interface Props {
@@ -31,25 +92,23 @@ interface Props {
 export function DetailsPanelContent({
   routeData,
   bookingDetail,
-  completedStops,
-  totalStops,
   progressPercentage,
 }: Props) {
-  const status    = bookingDetail?.status ?? 'pending'
-  const color     = statusColor(status)
-  const statusLbl = fmtStatus(status)
+  const isLoading = bookingDetail === null
 
+  const status      = bookingDetail?.status        ?? ''
+  const statusLbl   = fmtStatus(status)
   const scheduleDate = bookingDetail?.schedule_date ?? ''
-  const callTime     = bookingDetail?.call_time ?? ''
+  const callTime     = bookingDetail?.call_time     ?? ''
 
-  const originCity  = routeData.origin.address.split(',')[0] ?? routeData.origin.address
-  const originFull  = routeData.origin.address
-  const stops       = routeData.optimized_stops ?? []
-  const destStop    = stops[stops.length - 1]
-  const destCity    = destStop?.address?.split(',')[0] ?? '—'
-  const destFull    = destStop?.address ?? '—'
+  const originCity = routeData.origin.address.split(',')[0] ?? routeData.origin.address
+  const originFull = routeData.origin.address
+  const stops      = routeData.optimized_stops ?? []
+  const destStop   = stops[stops.length - 1]
+  const destCity   = destStop?.address?.split(',')[0] ?? '—'
+  const destFull   = destStop?.address ?? '—'
 
-  const truckType   = bookingDetail?.truck_type_needed ?? 'L300'
+  const truckType   = bookingDetail?.truck_type_needed          ?? 'L300'
   const plateNumber = bookingDetail?.driver?.truck?.plate_number ?? '—'
   const totalCost   = bookingDetail?.total_cost != null ? `₱${bookingDetail.total_cost}` : '—'
   const estDelivery = bookingDetail?.estimated_delivery ?? scheduleDate
@@ -59,102 +118,89 @@ export function DetailsPanelContent({
 
   const subCity = (full: string) => full.split(',').slice(1).join(',').trim() || full
 
+  const { imageUrl: truckImageUrl, loading: truckImageLoading } = useTruckImage(truckType)
+
   const parsedCargo     = bookingDetail?.parsed_cargo ?? null
   const allGroups       = parsedCargo?.sections.flatMap(s => s.groups) ?? []
   const totalPieces     = allGroups.reduce((sum, g) => sum + (parseInt(g.pieces) || 0), 0)
   const totalWeight     = bookingDetail?.required_weight_kg  ?? null
   const volume          = bookingDetail?.required_volume_cbm ?? null
-
   const firstGroup      = allGroups[0] ?? null
-  const product         = firstGroup?.product        ?? null
-  const shc             = firstGroup?.shc            ?? null
-  const additionalShc   = firstGroup?.additionalShc  ?? null
+  const product         = firstGroup?.product       ?? null
+  const shc             = firstGroup?.shc           ?? null
+  const additionalShc   = firstGroup?.additionalShc ?? null
   const hasNonTiltable  = allGroups.some(g => g.nonTiltable)
   const hasNonStackable = allGroups.some(g => g.nonStackable)
-
-  const density = totalWeight && volume && volume > 0
+  const density         = totalWeight && volume && volume > 0
     ? (totalWeight / volume).toFixed(1)
     : null
-
   const hasCargo = !!(parsedCargo || totalWeight || volume)
 
   return (
     <div className="flex flex-col min-h-full ff-body">
 
       <div className="relative w-full flex-shrink-0" style={{ height: 31 }}>
-        <svg
-          className="absolute inset-0 w-full h-full"
-          viewBox="0 0 100 31"
-          preserveAspectRatio="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          {/*
-            Path breakdown (viewBox 100×31, r=10):
-              M 0,0          → top-left
-              L 100,0        → top-right
-              L 100,21       → right side, 10px above bottom
-              a 10,10 0 0 1 -10,10  → concave arc: sweeps inward at bottom-right
-              L 10,31        → flat bottom
-              a 10,10 0 0 1 -10,-10 → concave arc: sweeps inward at bottom-left
-              Z              → back to top-left
-          */}
-          <path
-            d="M 0,0 L 100,0 L 100,21 a 10,10 0 0 1 -10,10 L 10,31 a 10,10 0 0 1 -10,-10 Z"
-            fill="var(--color-surface-dark, #424242)"
-          />
+        <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 31" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M 0,0 L 100,0 L 100,21 a 10,10 0 0 1 -10,10 L 10,31 a 10,10 0 0 1 -10,-10 Z" fill="var(--color-surface-dark, #424242)" />
         </svg>
-
-        {/* Text content — centred, nudged up slightly to sit in the flat part */}
-        <div
-          className="absolute inset-x-0 flex items-center justify-center gap-2"
-          style={{ top: 0, bottom: 10 }}
-        >
-          {scheduleDate && (
-            <span
-              className="ff-sc text-[11px] whitespace-nowrap"
-              style={{ color: 'var(--color-cyan, #4df9ed)' }}
-            >
-              {scheduleDate}
-            </span>
+        <div className="absolute inset-x-0 flex items-center justify-center gap-2" style={{ top: 0, bottom: 10 }}>
+          {isLoading ? (
+            <Skeleton style={{ width: '60%' }} />
+          ) : (
+            <>
+              {scheduleDate && (
+                <span className="ff-sc text-[11px] whitespace-nowrap" style={{ color: 'var(--color-cyan, #4df9ed)' }}>
+                  {scheduleDate}
+                </span>
+              )}
+              {scheduleDate && (
+                <span className="rounded-full flex-shrink-0" style={{ width: 4, height: 4, background: 'var(--color-cyan, #4df9ed)' }} />
+              )}
+              <span className="ff-sc text-[11px] whitespace-nowrap" style={{ color: 'var(--color-cyan, #4df9ed)' }}>
+                {statusLbl}{callTime ? `, ${callTime}` : ''}
+              </span>
+            </>
           )}
-          {scheduleDate && (
-            <span
-              className="rounded-full flex-shrink-0"
-              style={{ width: 4, height: 4, background: 'var(--color-cyan, #4df9ed)' }}
-            />
-          )}
-          <span
-            className="ff-sc text-[11px] whitespace-nowrap"
-            style={{ color: 'var(--color-cyan, #4df9ed)' }}
-          >
-            {statusLbl}{callTime ? `, ${callTime}` : ''}
-          </span>
         </div>
       </div>
 
-      {/* Stage icons */}
       <div className="flex items-center justify-center gap-2 pt-3 pb-1">
-        {STAGE_ICONS.map((src, i) => (
+        {STAGE_ICONS.map(({ Icon, label }) => (
           <div
-            key={i}
+            key={label}
             className="w-[26px] h-[26px] rounded-full flex items-center justify-center"
             style={{ background: 'var(--color-surface-dark)' }}
+            title={label}
           >
-            <Image src={src} alt="" width={15} height={15} className="object-contain" />
+            <Icon size={14} strokeWidth={1.75} style={{ color: 'var(--color-cyan, #4df9ed)' }} />
           </div>
         ))}
       </div>
 
-      <p className="ff-sc text-center text-[18px] text-white mt-1">{truckType}</p>
+      <p className="ff-sc text-center text-[18px] text-white mt-1">
+        {isLoading ? <Skeleton style={{ width: '4rem' }} /> : truckType}
+      </p>
 
-      {/* Truck hero */}
-      <div className="relative w-full" style={{ height: 160 }}>
-        <Image src={TRUCK_IMG} alt={truckType} fill className="object-contain" priority />
+      <div className="relative w-full px-4" style={{ height: 160 }}>
+        {isLoading || truckImageLoading ? (
+          <div className="w-full h-full flex items-center justify-center">
+            <BlockSkeleton style={{ width: '80%', height: 110 }} />
+          </div>
+        ) : truckImageUrl ? (
+          <motion.div className="relative w-full h-full" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
+            <Image src={truckImageUrl} alt={truckType} fill className="object-contain" priority />
+          </motion.div>
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <Truck size={80} strokeWidth={1} style={{ color: 'var(--color-cyan, #4df9ed)', opacity: 0.4 }} />
+          </div>
+        )}
       </div>
 
-      <p className="ff-sc text-center text-[16px] text-white mt-1 mb-2">{plateNumber}</p>
+      <p className="ff-sc text-center text-[16px] text-white mt-1 mb-2">
+        {isLoading ? <Skeleton style={{ width: '5rem' }} /> : plateNumber}
+      </p>
 
-      {/* Origin and Destination */}
       <div className="flex gap-1.5 px-3">
         <div className="flex-1 rounded-[8px] px-3 py-2" style={{ background: 'var(--color-border)' }}>
           <p className="ff-sc text-white text-[13px] mb-0.5">{originCity}</p>
@@ -163,18 +209,17 @@ export function DetailsPanelContent({
             {(['Scheduled', 'Loading'] as const).map(lbl => (
               <div key={lbl} className="flex justify-between">
                 <span className="text-white text-[10px]">{lbl}</span>
-                <span className="text-white text-[10px]">{callTime || '—'}</span>
+                <span className="text-white text-[10px]">
+                  {isLoading ? <Skeleton style={{ width: '3rem', height: '0.6em' }} /> : callTime || '—'}
+                </span>
               </div>
             ))}
           </div>
         </div>
 
         <div className="flex items-center justify-center w-6 flex-shrink-0">
-          <div
-            className="w-[26px] h-[26px] rounded-full flex items-center justify-center"
-            style={{ background: 'var(--color-surface-dark)' }}
-          >
-            <Image src={VEHICLE_ICON} alt="" width={15} height={15} className="object-contain" />
+          <div className="w-[26px] h-[26px] rounded-full flex items-center justify-center" style={{ background: 'var(--color-surface-dark)' }}>
+            <ArrowRight size={14} strokeWidth={1.75} style={{ color: 'var(--color-cyan, #4df9ed)' }} />
           </div>
         </div>
 
@@ -184,19 +229,22 @@ export function DetailsPanelContent({
           <div className="mt-1.5">
             <div className="flex justify-between">
               <span className="text-white text-[10px]">Estimate Arrival</span>
-              <span className="text-white text-[10px]">{destStop?.estimated_arrival ?? '—'}</span>
+              <span className="text-white text-[10px]">
+                {isLoading ? <Skeleton style={{ width: '3rem', height: '0.6em' }} /> : destStop?.estimated_arrival ?? '—'}
+              </span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Route */}
       <div className="border-t mt-3" style={{ borderColor: 'var(--color-border)' }}>
         <div className="flex items-center justify-between px-3 py-2">
           <span className="ff-sc text-white text-[14px]">Route</span>
           <span className="text-[10px]">
             <span style={{ color: 'var(--color-muted)' }}>ON THE WAY: </span>
-            <span className="text-white">{travelTime}</span>
+            <span className="text-white">
+              {isLoading ? <Skeleton style={{ width: '4rem', height: '0.6em' }} /> : travelTime}
+            </span>
           </span>
         </div>
 
@@ -214,21 +262,26 @@ export function DetailsPanelContent({
         <div className="px-3 pb-1.5">
           <div className="relative h-[8px] flex items-center">
             <div className="absolute inset-0 rounded-full" style={{ background: 'var(--color-border)' }} />
-            <motion.div
-              className="absolute left-0 h-full rounded-full"
-              style={{ background: 'var(--color-cyan)' }}
-              initial={{ width: 0 }}
-              animate={{ width: `${progressPercentage}%` }}
-              transition={{ duration: 1, ease: 'easeOut' }}
-            />
-            <motion.div
-              className="absolute"
-              initial={{ left: '0%' }}
-              animate={{ left: `${Math.max(0, progressPercentage - 3)}%` }}
-              transition={{ duration: 1, ease: 'easeOut' }}
-            >
-              <Image src={TRUCK_ICON} alt="" width={22} height={22} className="-mt-[8px]" />
-            </motion.div>
+            {!isLoading && (
+              <>
+                <motion.div
+                  className="absolute left-0 h-full rounded-full"
+                  style={{ background: 'var(--color-cyan)' }}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${progressPercentage}%` }}
+                  transition={{ duration: 1, ease: 'easeOut' }}
+                />
+                <motion.div
+                  className="absolute flex items-center justify-center"
+                  initial={{ left: '0%' }}
+                  animate={{ left: `${Math.max(0, progressPercentage - 3)}%` }}
+                  transition={{ duration: 1, ease: 'easeOut' }}
+                  style={{ top: '50%', transform: 'translateY(-60%)' }}
+                >
+                  <Truck size={20} strokeWidth={1.75} style={{ color: 'var(--color-cyan, #4df9ed)' }} />
+                </motion.div>
+              </>
+            )}
           </div>
         </div>
 
@@ -247,8 +300,6 @@ export function DetailsPanelContent({
 
       <div className="border-t px-3 py-3" style={{ borderColor: 'var(--color-border)' }}>
         <div className="flex gap-2">
-
-          {/* Pick Up Point */}
           <div className="flex-1">
             <p className="ff-sc text-[11px] text-center mb-2" style={{ color: 'var(--color-muted)' }}>Pick Up Point</p>
             <div className="flex items-start gap-2">
@@ -264,57 +315,62 @@ export function DetailsPanelContent({
 
           <div className="w-px self-stretch" style={{ background: 'var(--color-border)' }} />
 
-          {/* Drop Off Points */}
           <div className="flex-1">
             <p className="ff-sc text-[11px] text-center mb-2" style={{ color: 'var(--color-muted)' }}>Drop Off Point</p>
-            <div className="flex flex-col gap-2">
-              {stops.map((stop, i) => {
-                const isDelivered = stop.status === 'delivered'
-                const isFailed    = stop.status === 'failed'
-                const dotColor    = isDelivered ? 'var(--color-cyan)' : isFailed ? '#f62626' : '#555'
-                const isLast      = i === stops.length - 1
-
-                return (
-                  <div key={stop.destination_id} className="flex items-start gap-2">
-                    <div className="flex flex-col items-center flex-shrink-0">
-                      <div
-                        className="w-3 h-3 rounded-full border-2 mt-1"
-                        style={{
-                          borderColor: dotColor,
-                          background:  isDelivered ? 'var(--color-cyan)' : 'transparent',
-                        }}
-                      />
-                      {!isLast && (
-                        <div className="w-px flex-1 min-h-[16px] mt-1" style={{ background: 'var(--color-border)' }} />
-                      )}
-                    </div>
-                    <div>
-                      <p className="ff-sc text-white text-[12px]">{stop.address.split(',')[0]}</p>
-                      <p className="text-[10px]" style={{ color: 'var(--color-muted)' }}>
-                        {stop.address.split(',').slice(1).join(',').trim()}
-                      </p>
-                    </div>
+            {isLoading ? (
+              <div className="flex flex-col gap-2">
+                {[1, 2, 3].map(n => (
+                  <div key={n} className="flex items-start gap-2">
+                    <div className="w-3 h-3 rounded-full border-2 mt-1 flex-shrink-0" style={{ borderColor: '#555' }} />
+                    <BlockSkeleton style={{ flex: 1, height: 28, borderRadius: 4 }} />
                   </div>
-                )
-              })}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {stops.map((stop, i) => {
+                  const isDelivered = stop.status === 'delivered'
+                  const isFailed    = stop.status === 'failed'
+                  const dotColor    = isDelivered ? 'var(--color-cyan)' : isFailed ? '#f62626' : '#555'
+                  const isLast      = i === stops.length - 1
+                  return (
+                    <div key={stop.destination_id} className="flex items-start gap-2">
+                      <div className="flex flex-col items-center flex-shrink-0">
+                        <div
+                          className="w-3 h-3 rounded-full border-2 mt-1"
+                          style={{ borderColor: dotColor, background: isDelivered ? 'var(--color-cyan)' : 'transparent' }}
+                        />
+                        {!isLast && <div className="w-px flex-1 min-h-[16px] mt-1" style={{ background: 'var(--color-border)' }} />}
+                      </div>
+                      <div>
+                        <p className="ff-sc text-white text-[12px]">{stop.address.split(',')[0]}</p>
+                        <p className="text-[10px]" style={{ color: 'var(--color-muted)' }}>
+                          {stop.address.split(',').slice(1).join(',').trim()}
+                        </p>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Delivery */}
       <div className="flex gap-1.5 px-3 pb-3">
         <div className="flex-1 rounded-[8px] p-3 border" style={{ borderColor: 'var(--color-border)' }}>
           <div className="flex items-center justify-between mb-1.5">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-muted)" strokeWidth="1.5">
               <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
             </svg>
-            {status.toUpperCase() !== 'COMPLETED' && (
+            {!isLoading && status.toUpperCase() !== 'COMPLETED' && (
               <span className="text-[10px] font-bold" style={{ color: '#fd2cbe' }}>Late</span>
             )}
           </div>
           <p className="text-[10px] mb-0.5" style={{ color: 'var(--color-muted)' }}>Estimated Delivery</p>
-          <p className="ff-sc text-white text-[13px]">{estDelivery || '—'}</p>
+          <p className="ff-sc text-white text-[13px]">
+            {isLoading ? <Skeleton style={{ width: '5rem' }} /> : estDelivery || '—'}
+          </p>
         </div>
 
         <div className="flex-1 rounded-[8px] p-3 border" style={{ borderColor: 'var(--color-border)' }}>
@@ -322,67 +378,83 @@ export function DetailsPanelContent({
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-muted)" strokeWidth="1.5">
               <rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>
             </svg>
-            <span className="text-[10px] font-bold" style={{ color: '#c2f626' }}>Paid</span>
+            {!isLoading && <span className="text-[10px] font-bold" style={{ color: '#c2f626' }}>Paid</span>}
           </div>
           <p className="text-[10px] mb-0.5" style={{ color: 'var(--color-muted)' }}>Total Cost</p>
-          <p className="ff-sc text-white text-[13px]">{totalCost}</p>
+          <p className="ff-sc text-white text-[13px]">
+            {isLoading ? <Skeleton style={{ width: '4rem' }} /> : totalCost}
+          </p>
         </div>
       </div>
 
-      {/* Cargo Details */}
-      {hasCargo && (
+      {(hasCargo || isLoading) && (
         <div className="border-t px-3 pb-4" style={{ borderColor: 'var(--color-border)' }}>
-
           <div className="flex items-center justify-between py-2">
             <span className="ff-sc text-white text-[16px]">Cargo Details</span>
-            {totalWeight && (
+            {!isLoading && totalWeight && (
               <span className="text-[10px]">
                 <span style={{ color: 'var(--color-muted)' }}>TOTAL WEIGHT: </span>
                 <span className="text-white">{totalWeight} KG</span>
               </span>
             )}
+            {isLoading && <Skeleton style={{ width: '6rem', height: '0.6em' }} />}
           </div>
 
-          <div className="space-y-0">
-            {[
-              { label: 'Product',                          value: product      },
-              { label: 'Special Handling Code',            value: shc          },
-              { label: 'Additional Special Handling Code', value: additionalShc},
-            ].map(({ label, value }) => value ? (
-              <div
-                key={label}
-                className="flex items-center justify-between py-2 border-b"
-                style={{ borderColor: 'var(--color-border)' }}
-              >
-                <span className="ff-sc text-white text-[12px]">{label}</span>
-                <span className="ff-sc text-white text-[12px] text-right">{value}</span>
+          {isLoading ? (
+            <>
+              <div className="space-y-0">
+                {[1, 2].map(n => (
+                  <div key={n} className="flex items-center justify-between py-2 border-b" style={{ borderColor: 'var(--color-border)' }}>
+                    <BlockSkeleton style={{ width: '40%', height: 10, borderRadius: 4 }} />
+                    <BlockSkeleton style={{ width: '25%', height: 10, borderRadius: 4 }} />
+                  </div>
+                ))}
               </div>
-            ) : null)}
-          </div>
-
-          <div className="grid grid-cols-2 gap-2 mt-3 mb-3">
-            {[
-              { label: 'Total Piece',  value: totalPieces ? String(totalPieces)  : null },
-              { label: 'Gross Weight', value: totalWeight ? `${totalWeight} KG`  : null },
-              { label: 'Volume',       value: volume      ? `${volume} CBM`      : null },
-              { label: 'Density',      value: density     ? `${density} KG/CBM`  : null },
-            ].map(({ label, value }) => value ? (
-              <div
-                key={label}
-                className="rounded-[5px] p-2 border"
-                style={{ borderColor: 'var(--color-cyan)', background: '#fff' }}
-              >
-                <p className="text-[10px] mb-1" style={{ color: '#818181' }}>{label}</p>
-                <p className="ff-sc text-black text-[14px] font-bold">{value}</p>
+              <div className="grid grid-cols-2 gap-2 mt-3 mb-3">
+                {[1, 2, 3, 4].map(n => (
+                  <div key={n} className="rounded-[5px] p-2 border" style={{ borderColor: 'var(--color-cyan)', background: '#fff' }}>
+                    <BlockSkeleton style={{ width: '60%', height: 8, borderRadius: 3, marginBottom: 6, background: '#e0e0e0' }} />
+                    <BlockSkeleton style={{ width: '80%', height: 16, borderRadius: 3, background: '#d0d0d0' }} />
+                  </div>
+                ))}
               </div>
-            ) : null)}
-          </div>
+            </>
+          ) : (
+            <>
+              <div className="space-y-0">
+                {[
+                  { label: 'Product',                          value: product       },
+                  { label: 'Special Handling Code',            value: shc           },
+                  { label: 'Additional Special Handling Code', value: additionalShc },
+                ].map(({ label, value }) => value ? (
+                  <div key={label} className="flex items-center justify-between py-2 border-b" style={{ borderColor: 'var(--color-border)' }}>
+                    <span className="ff-sc text-white text-[12px]">{label}</span>
+                    <span className="ff-sc text-white text-[12px] text-right">{value}</span>
+                  </div>
+                ) : null)}
+              </div>
 
-          {(hasNonTiltable || hasNonStackable) && (
-            <ul className="list-disc pl-5 space-y-0.5 mt-1">
-              {hasNonTiltable  && <li className="ff-sc text-white text-[12px]">Non-tiltable items present</li>}
-              {hasNonStackable && <li className="ff-sc text-white text-[12px]">Non-stackable items present</li>}
-            </ul>
+              <div className="grid grid-cols-2 gap-2 mt-3 mb-3">
+                {[
+                  { label: 'Total Piece',  value: totalPieces ? String(totalPieces) : null },
+                  { label: 'Gross Weight', value: totalWeight ? `${totalWeight} KG` : null },
+                  { label: 'Volume',       value: volume      ? `${volume} CBM`     : null },
+                  { label: 'Density',      value: density     ? `${density} KG/CBM` : null },
+                ].map(({ label, value }) => value ? (
+                  <div key={label} className="rounded-[5px] p-2 border" style={{ borderColor: 'var(--color-cyan)', background: '#fff' }}>
+                    <p className="text-[10px] mb-1" style={{ color: '#818181' }}>{label}</p>
+                    <p className="ff-sc text-black text-[14px] font-bold">{value}</p>
+                  </div>
+                ) : null)}
+              </div>
+
+              {(hasNonTiltable || hasNonStackable) && (
+                <ul className="list-disc pl-5 space-y-0.5 mt-1">
+                  {hasNonTiltable  && <li className="ff-sc text-white text-[12px]">Non-tiltable items present</li>}
+                  {hasNonStackable && <li className="ff-sc text-white text-[12px]">Non-stackable items present</li>}
+                </ul>
+              )}
+            </>
           )}
         </div>
       )}

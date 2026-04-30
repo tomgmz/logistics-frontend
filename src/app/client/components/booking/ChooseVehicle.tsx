@@ -46,7 +46,6 @@ export default function StepVehicle({ onNext, onBack }: Props) {
 
   const dispatch  = useAppDispatch()
   const mode      = useAppSelector((s) => s.booking.mode)
-  // ── Single source of truth: all cargo math lives in the selector ──────────
   const summary   = useAppSelector(selectCargoSummary)
   const allGroups = useAppSelector(selectAllGroups)
 
@@ -159,7 +158,6 @@ export default function StepVehicle({ onNext, onBack }: Props) {
               ? <StatCard label="Net Weight"
                   value={summary.netWeight > 0 ? `${summary.netWeight.toFixed(1)} KG` : '—'} />
               : <StatCard label="Density"
-                  // toFixed(2) matches BookingDetails — both read from the same selector
                   value={summary.density > 0 ? `${summary.density.toFixed(2)} KG/CBM` : '—'} />}
           </div>
           <div className="flex flex-col gap-1 mt-1">
