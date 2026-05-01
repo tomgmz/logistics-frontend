@@ -2,7 +2,7 @@ import proxyApi from '@/app/lib/api/auth.api'
 
 export type LogType =
   | 'user_activity'
-  | 'truck_activity'
+  | 'vehicle_activity'
   | 'booking'
   | 'payment'
   | 'system_error'
@@ -28,7 +28,7 @@ export interface SystemLog {
 export interface LogStats {
   total:          number
   user_activity:  number
-  truck_activity: number
+  vehicle_activity: number
   booking:        number
   payment:        number
   system_error:   number
