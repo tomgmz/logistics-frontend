@@ -28,7 +28,6 @@ function getRoleFromToken(token: string): string | null {
     const payload = JSON.parse(json)
 
     if (payload.type !== 'access') return null
-    if (!payload.exp || Date.now() / 1000 > payload.exp) return null
 
     return payload.role ?? null
   } catch {
@@ -43,29 +42,41 @@ export function proxy(req: NextRequest) {
     return NextResponse.next()
   }
 
-  const token = req.cookies.get('access_token')?.value
+  const accessToken  = req.cookies.get('access_token')?.value
+  const refreshToken = req.cookies.get('refresh_token')?.value
 
-  if (!token) {
+  //No tokens redirect to landing page
+  if (!accessToken && !refreshToken) {
     const homeUrl      = req.nextUrl.clone()
     homeUrl.pathname   = '/'
     homeUrl.search     = ''
     return NextResponse.redirect(homeUrl)
   }
 
-  const role = getRoleFromToken(token)
+  // Let page load for authrehydrator to refresh when access toekn is gone
+  if (!accessToken && refreshToken) {
+    return NextResponse.next()
+  }
 
+  const role = getRoleFromToken(accessToken!)
+
+  // let authrehydrator refresh if refresh tocken exists
+  if (!role && refreshToken) {
+    return NextResponse.next()
+  }
+
+  // Access token invalid and no refresh token then clear and redirect
   if (!role) {
     const homeUrl    = req.nextUrl.clone()
     homeUrl.pathname = '/'
     homeUrl.search   = ''
     const res        = NextResponse.redirect(homeUrl)
     res.cookies.delete('access_token')
-    res.cookies.delete('refresh_token')
     return res
   }
 
+  // Role not mapped 
   const allowedPrefix = ROLE_ROUTES[role]
-
   if (!allowedPrefix) {
     const homeUrl    = req.nextUrl.clone()
     homeUrl.pathname = '/'
@@ -76,9 +87,10 @@ export function proxy(req: NextRequest) {
     return res
   }
 
+  // User is on the wrong portal for their role redirect
   if (!pathname.startsWith(allowedPrefix)) {
-    const dashboardUrl      = req.nextUrl.clone()
-    dashboardUrl.pathname   = allowedPrefix
+    const dashboardUrl    = req.nextUrl.clone()
+    dashboardUrl.pathname = allowedPrefix
     return NextResponse.redirect(dashboardUrl)
   }
 

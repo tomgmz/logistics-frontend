@@ -4,7 +4,15 @@ import { NextRequest, NextResponse } from 'next/server'
 const API_URL = process.env.NEXT_PUBLIC_API_URL!
 const isProd  = process.env.NODE_ENV === 'production'
 
-const cookieOptions = {
+const accessCookieOptions = {
+  httpOnly: true,
+  secure:   isProd,
+  sameSite: 'lax' as const,
+  path:     '/',
+  maxAge:   15 * 60,
+}
+
+const refreshCookieOptions = {
   httpOnly: true,
   secure:   isProd,
   sameSite: 'lax' as const,
@@ -24,8 +32,8 @@ export async function POST(req: NextRequest) {
     })
 
     const res = NextResponse.json(data)
-    res.cookies.set('access_token',  data.data.accessToken,  cookieOptions)
-    res.cookies.set('refresh_token', data.data.refreshToken, cookieOptions)
+    res.cookies.set('access_token',  data.data.accessToken,  accessCookieOptions)
+    res.cookies.set('refresh_token', data.data.refreshToken, refreshCookieOptions)
     return res
 
   } catch (error: unknown) {
