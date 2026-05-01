@@ -2,7 +2,7 @@
 
 import { ReactNode, useEffect } from 'react'
 import Image from 'next/image'
-import ReusableDashboardShell from '@/components/ui/ReusableDashboardShell'
+import ReusableDashboardShell from '@/components/layout/ReusableDashboardShell'
 import { ASSETS } from '@/constants/client/icon'
 import { useAuthStore } from '@/app/lib/store/auth.store'
 
