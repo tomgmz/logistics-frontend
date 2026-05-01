@@ -2,7 +2,7 @@
 
 import { ReactNode, useEffect } from 'react'
 import { Activity, LayoutDashboard } from 'lucide-react'
-import ReusableDashboardShell from '@/components/ui/ReusableDashboardShell'
+import ReusableDashboardShell from '@/components/layout/ReusableDashboardShell'
 import { useAuthStore } from '@/app/lib/store/auth.store'
 
 const NAV_ITEMS = [

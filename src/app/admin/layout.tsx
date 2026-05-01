@@ -1,7 +1,7 @@
 'use client'
 
 import { ReactNode, useEffect } from 'react'
-import ReusableDashboardShell from '@/components/ui/ReusableDashboardShell'
+import ReusableDashboardShell from '@/components/layout/ReusableDashboardShell'
 import { Activity } from 'lucide-react'
 import { useAuthStore } from '@/app/lib/store/auth.store'
 
