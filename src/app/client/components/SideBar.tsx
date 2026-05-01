@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Settings, LogOut, PanelLeftClose, PanelLeft } from 'lucide-react'
+import { LogOut, PanelLeftClose, PanelLeft } from 'lucide-react'
 import { ASSETS } from '../../../constants/client/icon'
 import Image from 'next/image'
 import '../components/booking/BookingDetails.css'
@@ -12,7 +12,7 @@ import { logout } from '@/app/lib/api/auth.api'
 import { useAuthStore } from '@/app/lib/store/auth.store'
 import { useAppDispatch, useAppSelector } from '@/app/lib/hooks/hooks'
 import { setSidebarOpen } from '@/app/lib/store/slice/booking.slice'
-import ReusableModal from '@/components/ui/ReusableModal'
+import ReusableModal from '@/components/layout/ReusableModal'
 
 const SIDEBAR_COLLAPSED = 56
 const SIDEBAR_EXPANDED  = 260

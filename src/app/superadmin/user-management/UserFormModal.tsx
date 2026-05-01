@@ -29,7 +29,7 @@ import {
   itAdminService,
 } from '@/app/lib/services/admin/user-management.service'
 import { validateForm } from '@/app/lib/validation/user-management.validation'
-import ReusableModal from '@/components/ui/ReusableModal'
+import ReusableModal from '@/components/layout/ReusableModal'
 import { appToast } from '@/app/lib/toast'
 import LandlineInputRow, { toLocalLandlineDigits } from './LandLineInputRow'
 

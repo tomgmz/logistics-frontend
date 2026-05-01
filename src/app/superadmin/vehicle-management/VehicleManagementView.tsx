@@ -24,7 +24,7 @@ import {
   adminFetchTruckModels,
   adminFetchVendorsRaw,
 } from '@/app/lib/services/admin/trucks.service'
-import ReusableModal from '@/components/ui/ReusableModal'
+import ReusableModal from '@/components/layout/ReusableModal'
 import { appToast } from '@/app/lib/toast'
 
 const PAGE_SIZE = 10

@@ -3,11 +3,11 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Settings, LogOut, PanelLeftClose, PanelLeft } from 'lucide-react'
+import { LogOut, PanelLeftClose, PanelLeft } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { logout } from '@/app/lib/api/auth.api'
 import { useAuthStore } from '@/app/lib/store/auth.store'
-import ReusableModal from '@/components/ui/ReusableModal'
+import ReusableModal from '@/components/layout/ReusableModal'
 
 const SIDEBAR_COLLAPSED = 56
 const SIDEBAR_EXPANDED = 260
