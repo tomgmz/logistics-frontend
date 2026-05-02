@@ -64,12 +64,24 @@ async function fetchByTab(tab: UserTab): Promise<AnyUser[]> {
 }
 
 async function updateStatus(tab: UserTab, id: string, status: UserStatus): Promise<void> {
+  // Accountants have dedicated activate / deactivate endpoints.
+  // Archived uses the DELETE (soft-delete) route. Other roles use the generic PATCH.
+  if (tab === 'accountants') {
+    switch (status) {
+      case 'active':   return accountantService.activate(id).then()
+      case 'inactive': return accountantService.deactivate(id).then()
+      case 'archived': return accountantService.remove(id)
+      default:
+        // permanently_locked — not yet a dedicated endpoint; fall through to generic update
+        return accountantService.update(id, { status } as never).then()
+    }
+  }
+
   const payload = { status } as never
   switch (tab) {
     case 'clients':           return clientService.update(id, payload).then()
     case 'drivers':           return driverService.update(id, payload).then()
     case 'vendors':           return vendorService.update(id, payload).then()
-    case 'accountants':       return accountantService.update(id, payload).then()
     case 'general-managers':  return generalManagerService.update(id, payload).then()
     case 'human-resources':   return humanResourcesService.update(id, payload).then()
     case 'fleet-admins':      return fleetAdminService.update(id, payload).then()

@@ -80,6 +80,7 @@ const ModelThumb = memo(function ModelThumb({
   )
 })
 
+const TRUCK_TYPES = ['truck', 'wing_van'] as const
 const STATUSES: Truck['status'][] = [
   'available',
   'in_use',
@@ -145,34 +146,48 @@ function axiosMessage(err: unknown): string {
   return 'Request failed'
 }
 
-type FormMode    = 'create' | 'edit' | null
+/** Convert kg to metric tons, returns a clean string like "4" or "4.5" */
+function kgToTons(kg: number | null | undefined): string {
+  if (kg == null) return ''
+  const tons = kg / 1000
+  // strip trailing zeros but keep up to 3 decimals
+  return parseFloat(tons.toFixed(3)).toString()
+}
+
+type FormMode = 'create' | 'edit' | null
 type ConfirmKind = 'save' | 'delete' | null
 
 interface TruckFormState {
-  plate_number: string
-  model_id:     string
-  owned_by:     'company' | 'vendor'
-  vendor_id:    string
-  status:       Truck['status']
+  plate_number:  string
+  truck_type:    (typeof TRUCK_TYPES)[number]
+  capacity_tons: string
+  model_id:      string
+  owned_by:      'company' | 'vendor'
+  vendor_id:     string
+  status:        Truck['status']
 }
 
 function emptyForm(): TruckFormState {
   return {
-    plate_number: '',
-    model_id:     '',
-    owned_by:     'company',
-    vendor_id:    '',
-    status:       'available',
+    plate_number:  '',
+    truck_type:    'truck',
+    capacity_tons: '',
+    model_id:      '',
+    owned_by:      'company',
+    vendor_id:     '',
+    status:        'available',
   }
 }
 
 function truckToForm(t: Truck): TruckFormState {
   return {
-    plate_number: t.plate_number ?? '',
-    model_id:     t.model_id ?? '',
-    owned_by:     t.owned_by,
-    vendor_id:    t.vendor_id ?? '',
-    status:       t.status,
+    plate_number:  t.plate_number ?? '',
+    truck_type:    (t.truck_type === 'wing_van' ? 'wing_van' : 'truck') as (typeof TRUCK_TYPES)[number],
+    capacity_tons: String(t.capacity_tons ?? ''),
+    model_id:      t.model_id ?? '',
+    owned_by:      t.owned_by,
+    vendor_id:     t.vendor_id ?? '',
+    status:        t.status,
   }
 }
 
@@ -196,8 +211,9 @@ export default function VehicleManagementView() {
 
   const [confirmKind, setConfirmKind] = useState<ConfirmKind>(null)
   const [actionBusy,  setActionBusy]  = useState(false)
-  const [deleteId,    setDeleteId]    = useState<string | null>(null)
+  const [deleteId, setDeleteId] = useState<string | null>(null)
 
+  // Truck model catalog modal
   const [modelModalOpen, setModelModalOpen] = useState(false)
 
   const loadAll = useCallback(async () => {
@@ -252,6 +268,24 @@ export default function VehicleManagementView() {
   const selectedModel         = useMemo(() => models.find((m) => m.model_id === form.model_id) ?? null, [models, form.model_id])
   const selectedModelImageUrl = resolveModelImageUrl(selectedModel?.image_url ?? null)
 
+  // ─── helpers to apply a model pick (thumbnail or select) ───────────────────
+  function applyModelPick(modelId: string) {
+    const picked = models.find((m) => m.model_id === modelId) ?? null
+    setForm((f) => ({
+      ...f,
+      model_id: modelId,
+      // auto-fill capacity from model's max_weight_kg (kg → tons), only when field is empty or user hasn't overridden
+      capacity_tons: picked?.max_weight_kg != null
+        ? kgToTons(picked.max_weight_kg)
+        : f.capacity_tons,
+    }))
+  }
+
+  function clearModelPick() {
+    setForm((f) => ({ ...f, model_id: '', capacity_tons: '' }))
+  }
+  // ───────────────────────────────────────────────────────────────────────────
+
   const openCreate = () => {
     setEditingId(null)
     setForm(emptyForm())
@@ -274,12 +308,13 @@ export default function VehicleManagementView() {
 
   function validateForm(): boolean {
     setFormError(null)
+    const cap = parseFloat(form.capacity_tons)
     if (!form.plate_number.trim()) {
       setFormError('Plate number is required.')
       return false
     }
-    if (!form.model_id) {
-      setFormError('Please select a truck model.')
+    if (Number.isNaN(cap) || cap <= 0) {
+      setFormError('Capacity (tons) must be a positive number.')
       return false
     }
     if (form.owned_by === 'vendor' && !form.vendor_id.trim()) {
@@ -300,6 +335,7 @@ export default function VehicleManagementView() {
   }
 
   const executeSave = async () => {
+    const cap       = parseFloat(form.capacity_tons)
     const model_id  = form.model_id.trim() || null
     const vendor_id = form.owned_by === 'vendor' ? form.vendor_id.trim() : null
 
@@ -307,20 +343,24 @@ export default function VehicleManagementView() {
     try {
       if (modalMode === 'create') {
         const body: CreateTruckInput = {
-          plate_number: form.plate_number.trim().toUpperCase(),
+          plate_number:  form.plate_number.trim().toUpperCase(),
+          truck_type:    form.truck_type,
+          capacity_tons: cap,
           model_id,
-          owned_by:    form.owned_by,
+          owned_by:      form.owned_by,
           vendor_id,
         }
         await adminCreateTruck(body)
         appToast.success('Vehicle created.', { action: 'truck-save' })
       } else if (modalMode === 'edit' && editingId) {
         const body: UpdateTruckInput = {
-          plate_number: form.plate_number.trim().toUpperCase(),
+          plate_number:  form.plate_number.trim().toUpperCase(),
+          truck_type:    form.truck_type,
+          capacity_tons: cap,
           model_id,
-          status:      form.status,
-          owned_by:    form.owned_by,
-          vendor_id:   form.owned_by === 'vendor' ? vendor_id : null,
+          status:        form.status,
+          owned_by:      form.owned_by,
+          vendor_id:     form.owned_by === 'vendor' ? vendor_id : null,
         }
         await adminUpdateTruck(editingId, body)
         appToast.success('Vehicle updated.', { action: 'truck-save', entityId: editingId })
@@ -607,12 +647,14 @@ export default function VehicleManagementView() {
         </div>
       </div>
 
+      {/* ── Truck model catalog modal ───────────────────────────────────────── */}
       <TruckModelFormModal
         open={modelModalOpen}
         onClose={() => setModelModalOpen(false)}
         onSaved={() => void loadAll()}
       />
 
+      {/* ── Confirm modal (save / delete) ───────────────────────────────────── */}
       <ReusableModal
         open={!!confirmKind && !!confirmModalProps}
         title={confirmModalProps?.title ?? ''}
@@ -628,6 +670,7 @@ export default function VehicleManagementView() {
         onConfirm={confirmModalProps?.onConfirm}
       />
 
+      {/* ── Vehicle create / edit modal ─────────────────────────────────────── */}
       <AnimatePresence>
         {modalMode && (
           <motion.div
@@ -660,7 +703,6 @@ export default function VehicleManagementView() {
               </div>
 
               <div className="p-4 space-y-3">
-
                 {/* Plate number */}
                 <label className="block">
                   <span className="text-[11px] font-bold uppercase text-white/40">Plate number</span>
@@ -672,13 +714,29 @@ export default function VehicleManagementView() {
                   />
                 </label>
 
+                {/* Type */}
+                <label className="block">
+                  <span className="text-[11px] font-bold uppercase text-white/40">Type</span>
+                  <select
+                    value={form.truck_type}
+                    onChange={(e) => setForm((f) => ({ ...f, truck_type: e.target.value as (typeof TRUCK_TYPES)[number] }))}
+                    className="mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-3 py-2.5 text-sm text-white outline-none"
+                  >
+                    {TRUCK_TYPES.map((t) => (
+                      <option key={t} value={t}>{fmtLabel(t)}</option>
+                    ))}
+                  </select>
+                </label>
+
+                {/* Model picker */}
                 <div className="block">
-                  <span className="text-[11px] font-bold uppercase text-white/40">Truck model</span>
+                  <span className="text-[11px] font-bold uppercase text-white/40">Truck model &amp; catalog image</span>
 
                   <div className="mt-2 flex gap-2 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-white/15 scrollbar-track-transparent">
+                    {/* No model option */}
                     <button
                       type="button"
-                      onClick={() => setForm((f) => ({ ...f, model_id: '' }))}
+                      onClick={clearModelPick}
                       className={`shrink-0 flex flex-col items-center gap-1.5 w-[88px] p-2 rounded-xl border transition-colors ${
                         !form.model_id
                           ? 'border-[var(--color-cyan)] bg-[rgba(77,249,237,0.08)]'
@@ -696,7 +754,7 @@ export default function VehicleManagementView() {
                         <button
                           key={m.model_id}
                           type="button"
-                          onClick={() => setForm((f) => ({ ...f, model_id: m.model_id }))}
+                          onClick={() => applyModelPick(m.model_id)}
                           title={m.name}
                           className={`shrink-0 flex flex-col items-center gap-1.5 w-[88px] p-2 rounded-xl border transition-colors ${
                             picked
@@ -713,11 +771,15 @@ export default function VehicleManagementView() {
                     })}
                   </div>
 
+                  {/* Dropdown mirror */}
                   <label className="block mt-2">
                     <span className="sr-only">Truck model</span>
                     <select
                       value={form.model_id}
-                      onChange={(e) => setForm((f) => ({ ...f, model_id: e.target.value }))}
+                      onChange={(e) => {
+                        if (e.target.value) applyModelPick(e.target.value)
+                        else clearModelPick()
+                      }}
                       className="w-full rounded-lg border border-white/10 bg-[#111] px-3 py-2 text-sm text-white/80 outline-none"
                       aria-label="Select truck model from list"
                     >
@@ -729,6 +791,7 @@ export default function VehicleManagementView() {
                   </label>
                 </div>
 
+                {/* Selected model preview */}
                 <div className="flex gap-3 rounded-xl border border-white/[0.08] bg-black/25 p-3 items-center">
                   <ModelThumb imageUrl={selectedModelImageUrl} label={selectedModel?.name ?? 'Vehicle'} size={88} />
                   <div className="min-w-0 flex-1">
@@ -740,21 +803,14 @@ export default function VehicleManagementView() {
                         )}
                         {selectedModel.max_weight_kg != null && (
                           <p className="text-[11px] text-white/40 mt-1">
-                            Max weight:{' '}
-                            <span className="text-white/65 font-semibold">
-                              {selectedModel.max_weight_kg.toLocaleString()} kg
-                            </span>
-                          </p>
-                        )}
-                        {selectedModel.max_volume_cbm != null && (
-                          <p className="text-[11px] text-white/40 mt-0.5">
-                            Max volume:{' '}
-                            <span className="text-white/65 font-semibold">{selectedModel.max_volume_cbm} cbm</span>
+                            Max weight: <span className="text-white/65 font-semibold">{selectedModel.max_weight_kg.toLocaleString()} kg</span>
+                            <span className="text-white/30 mx-1">·</span>
+                            {kgToTons(selectedModel.max_weight_kg)} tons
                           </p>
                         )}
                         {!selectedModelImageUrl && (
                           <p className="text-[11px] text-amber-200/90 mt-2 leading-snug">
-                            This model has no <code className="text-white/60">image_url</code> yet.
+                            This model has no <code className="text-white/60">image_url</code> yet. Set it on the truck model so it appears in the fleet list.
                           </p>
                         )}
                       </>
@@ -762,13 +818,36 @@ export default function VehicleManagementView() {
                       <>
                         <p className="text-sm font-semibold text-white/80">No model selected</p>
                         <p className="text-[11px] text-white/40 mt-1 leading-relaxed">
-                          Select a model above to link specs and an image to this vehicle.
+                          The table will use the truck icon until you link a model that has an image.
                         </p>
                       </>
                     )}
                   </div>
                 </div>
 
+                {/* Capacity (auto-filled, still editable) */}
+                <label className="block">
+                  <span className="text-[11px] font-bold uppercase text-white/40">
+                    Capacity (tons)
+                    {selectedModel?.max_weight_kg != null && (
+                      <span className="ml-1.5 normal-case text-[10px] text-[var(--color-cyan)]/70 font-normal">
+                        — auto-filled from model
+                      </span>
+                    )}
+                  </span>
+                  <input
+                    type="number"
+                    step="0.001"
+                    min="0"
+                    value={form.capacity_tons}
+                    onChange={(e) => setForm((f) => ({ ...f, capacity_tons: e.target.value }))}
+                    className="mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-3 py-2.5 text-sm text-white outline-none tabular-nums focus:border-[var(--color-cyan)]/40"
+                    placeholder="e.g. 4"
+                  />
+                  <p className="text-[10px] text-white/30 mt-1">You can override the auto-filled value if needed.</p>
+                </label>
+
+                {/* Owned by + Status (edit only) */}
                 <div className="grid grid-cols-2 gap-3">
                   <label className="block">
                     <span className="text-[11px] font-bold uppercase text-white/40">Owned by</span>

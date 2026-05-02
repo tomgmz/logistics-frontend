@@ -64,8 +64,8 @@ async function post<T>(url: string, payload: unknown): Promise<T> {
   return data.data
 }
 
-async function patch<T>(url: string, payload: unknown): Promise<T> {
-  const { data } = await proxyApi.patch<ApiResponse<T>>(url, payload)
+async function patch<T>(url: string, payload?: unknown): Promise<T> {
+  const { data } = await proxyApi.patch<ApiResponse<T>>(url, payload ?? {})
   return data.data
 }
 
@@ -118,11 +118,13 @@ export const vendorService = {
 }
 
 export const accountantService = {
-  getAll: () => get<AdminUser[]>(`${B}/accountants`),
-  getOne: (id: string) => get<AdminUser>(`${B}/accountants/${id}`),
-  create: (p: CreateAccountantPayload) => post<AdminUser>(`${B}/accountants`, p),
-  update: (id: string, p: UpdateAccountantPayload) => patch<AdminUser>(`${B}/accountants/${id}`, p),
-  remove: (id: string) => del(`${B}/accountants/${id}`),
+  getAll:      () => get<AdminUser[]>(`${B}/accountants`),
+  getOne:      (id: string) => get<AdminUser>(`${B}/accountants/${id}`),
+  create:      (p: CreateAccountantPayload) => post<AdminUser>(`${B}/accountants`, p),
+  update:      (id: string, p: UpdateAccountantPayload) => patch<AdminUser>(`${B}/accountants/${id}`, p),
+  remove:      (id: string) => del(`${B}/accountants/${id}`),
+  activate:    (id: string) => patch<AdminUser>(`${B}/accountants/${id}/activate`),
+  deactivate:  (id: string) => patch<AdminUser>(`${B}/accountants/${id}/deactivate`),
 }
 
 export const generalManagerService = {

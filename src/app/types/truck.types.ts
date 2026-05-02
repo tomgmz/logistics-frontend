@@ -29,8 +29,8 @@ export interface Truck {
 
 export interface CreateTruckInput {
   plate_number: string
-  // truck_type: string
-  // capacity_tons: number
+  truck_type: string
+  capacity_tons: number
   model_id?: string | null
   owned_by: 'company' | 'vendor'
   vendor_id?: string | null
