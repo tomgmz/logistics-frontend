@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { fetchTruckModels } from '@/app/lib/api/client/truck-model'
+import { adminFetchTruckModels } from '@/app/lib/services/admin/trucks.service'
 import { TruckModel } from '@/app/types/truck-model'
 
 export interface VehicleData {
@@ -24,7 +24,7 @@ export function useTrucks() {
     async function loadTrucks() {
       try {
         setLoading(true)
-        const models = await fetchTruckModels()
+        const models = await adminFetchTruckModels()
         setVehicles(models.map(mapTruckModelToVehicle))
         setError(null)
       } catch (err: unknown) {
@@ -43,17 +43,17 @@ export function useTrucks() {
 
 function mapTruckModelToVehicle(model: TruckModel): VehicleData {
   return {
-    id:               model.model_id,
-    name:             model.name,
-    maxWeightKG:      model.max_weight_kg ?? 0,
-    maxVolumeCBM:     model.max_volume_cbm ?? 0,
-    maxLengthCM:      model.max_length_cm ?? 0,
-    bodyType:         model.body_type ?? 'Standard',
-    dimension:        model.dimension_mm
-                        ? `${model.dimension_mm}mm (L×W×H)`
-                        : 'Standard dimensions',
-    suitableFor:      model.suitable_for ?? 'General cargo',
+    id:                model.model_id,
+    name:              model.name,
+    maxWeightKG:       model.max_weight_kg ?? 0,
+    maxVolumeCBM:      model.max_volume_cbm ?? 0,
+    maxLengthCM:       model.max_length_cm ?? 0,
+    bodyType:          model.body_type ?? 'Standard',
+    dimension:         model.dimension_mm
+                         ? `${model.dimension_mm}mm (L×W×H)`
+                         : 'Standard dimensions',
+    suitableFor:       model.suitable_for ?? 'General cargo',
     stackableFriendly: model.stackable_friendly,
-    imageUrl:         model.image_url ?? '',
+    imageUrl:          model.image_url ?? '',
   }
 }

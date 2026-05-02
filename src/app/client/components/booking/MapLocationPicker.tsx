@@ -61,6 +61,21 @@ const ArrowLeftIcon = () => (
   </svg>
 )
 
+async function isPhilippines(
+  geocoder: google.maps.Geocoder,
+  lat: number,
+  lng: number
+): Promise<{ isPH: boolean; address: string }> {
+  const result = await geocoder.geocode({ location: { lat, lng } })
+  const first  = result.results[0]
+  if (!first) return { isPH: false, address: '' }
+  const country = first.address_components.find(c => c.types.includes('country'))
+  return {
+    isPH:    country?.short_name === 'PH',
+    address: first.formatted_address,
+  }
+}
+
 export default function MapLocationPicker({
   mode,
   onConfirm,
@@ -71,6 +86,7 @@ export default function MapLocationPicker({
   const mapRef      = useRef<google.maps.Map | null>(null)
   const geocoderRef = useRef<google.maps.Geocoder | null>(null)
   const searchRef   = useRef<HTMLDivElement>(null)
+  const lastValidCenter = useRef<{ lat: number; lng: number }>(DEFAULT_CENTER)
 
   const [address,     setAddress]     = useState(initialValue)
   const [coords,      setCoords]      = useState<{ lat: number; lng: number } | null>(null)
@@ -79,8 +95,12 @@ export default function MapLocationPicker({
   const [mapReady,    setMapReady]    = useState(false)
   const [searchQuery, setSearchQuery] = useState(initialValue)
   const [showSugg,    setShowSugg]    = useState(false)
+  const [outOfBounds, setOutOfBounds] = useState(false)
 
-  const { suggestions, onInputChange, resolvePlace } = usePlacesAutocomplete({ includedPrimaryTypes: [] })
+  const { suggestions, onInputChange, resolvePlace } = usePlacesAutocomplete({
+    includedPrimaryTypes:  [],
+    componentRestrictions: { country: 'ph' },
+  })
 
   const pinColor    = mode === 'pickup' ? CYAN : RED
   const label       = mode === 'pickup' ? 'Pickup' : 'Drop-off'
@@ -93,16 +113,29 @@ export default function MapLocationPicker({
     if (!geocoderRef.current) return
     setIsGeocoding(true)
     try {
-      const result = await geocoderRef.current.geocode({ location: { lat, lng } })
-      const addr = result.results[0]?.formatted_address ?? `${lat.toFixed(6)}, ${lng.toFixed(6)}`
-      setAddress(addr)
+      const { isPH, address: addr } = await isPhilippines(geocoderRef.current, lat, lng)
+
+      if (!isPH) {
+        mapRef.current?.panTo(lastValidCenter.current)
+        setOutOfBounds(true)
+        setAddress('')
+        setCoords(null)
+        setSearchQuery('')
+        return
+      }
+
+      lastValidCenter.current = { lat, lng }
+      setOutOfBounds(false)
+      setAddress(addr || `${lat.toFixed(6)}, ${lng.toFixed(6)}`)
       setCoords({ lat, lng })
-      setSearchQuery(addr)
+      setSearchQuery(addr || `${lat.toFixed(6)}, ${lng.toFixed(6)}`)
     } catch {
-      const addr = `${lat.toFixed(6)}, ${lng.toFixed(6)}`
-      setAddress(addr)
-      setCoords({ lat, lng })
-      setSearchQuery(addr)
+      // geocoder failed — don't accept the location
+      mapRef.current?.panTo(lastValidCenter.current)
+      setOutOfBounds(true)
+      setAddress('')
+      setCoords(null)
+      setSearchQuery('')
     } finally {
       setIsGeocoding(false)
     }
@@ -110,8 +143,10 @@ export default function MapLocationPicker({
 
   useEffect(() => {
     if (!mapDivRef.current) return
-    let cancelled = false
-    let clickListener: google.maps.MapsEventListener | null = null
+    let cancelled      = false
+    let clickListener:     google.maps.MapsEventListener | null = null
+    let dragStartListener: google.maps.MapsEventListener | null = null
+    let dragEndListener:   google.maps.MapsEventListener | null = null
 
     loadGoogleMapsScript().then(() => {
       if (cancelled || !mapDivRef.current) return
@@ -121,6 +156,7 @@ export default function MapLocationPicker({
       const map = new google.maps.Map(mapDivRef.current, {
         center:           DEFAULT_CENTER,
         zoom:             15,
+        minZoom:          6,
         disableDefaultUI: true,
         gestureHandling:  'greedy',
         clickableIcons:   true,
@@ -131,42 +167,59 @@ export default function MapLocationPicker({
       setMapReady(true)
 
       navigator.geolocation?.getCurrentPosition(
-        pos => {
+        async pos => {
           const c = { lat: pos.coords.latitude, lng: pos.coords.longitude }
-          map.setCenter(c)
+          if (!geocoderRef.current) return
+          const { isPH } = await isPhilippines(geocoderRef.current, c.lat, c.lng)
+          if (isPH) {
+            lastValidCenter.current = c
+            map.setCenter(c)
+          }
         },
         () => {
           map.setCenter(DEFAULT_CENTER)
         }
       )
 
-      map.addListener('dragstart', () => setIsDragging(true))
-      map.addListener('dragend', () => {
+      dragStartListener = map.addListener('dragstart', () => setIsDragging(true))
+
+      dragEndListener = map.addListener('dragend', () => {
         setIsDragging(false)
         const c = map.getCenter()
-        if (c) reverseGeocode(c.lat(), c.lng())
+        if (!c) return
+        reverseGeocode(c.lat(), c.lng())
       })
 
-      // Click establishments/POIs on the map to select them (pickup/drop-off).
-      // Google provides a `placeId` on POI clicks when `clickableIcons` is enabled.
       clickListener = map.addListener('click', async (e: google.maps.MapMouseEvent) => {
         const placeId = (e as unknown as { placeId?: string | null }).placeId
         if (!placeId) return
-
-        // Prevent the default POI info window.
         ;(e as unknown as { stop?: () => void }).stop?.()
 
         try {
           const resolved = await resolvePlace(placeId)
-          if (resolved.latitude !== null && resolved.longitude !== null) {
-            const c = { lat: resolved.latitude, lng: resolved.longitude }
-            map.setCenter(c)
-            map.setZoom(17)
-            setAddress(resolved.address)
-            setCoords(c)
-            setSearchQuery(resolved.address)
-            setShowSugg(false)
+          if (resolved.latitude === null || resolved.longitude === null) return
+          if (!geocoderRef.current) return
+
+          const { isPH, address: addr } = await isPhilippines(
+            geocoderRef.current,
+            resolved.latitude,
+            resolved.longitude
+          )
+
+          if (!isPH) {
+            setOutOfBounds(true)
+            return
           }
+
+          const c = { lat: resolved.latitude, lng: resolved.longitude }
+          lastValidCenter.current = c
+          map.setCenter(c)
+          map.setZoom(17)
+          setAddress(addr || resolved.address)
+          setCoords(c)
+          setSearchQuery(addr || resolved.address)
+          setShowSugg(false)
+          setOutOfBounds(false)
         } catch (err) {
           console.error('Failed to resolve POI placeId:', err)
         }
@@ -175,7 +228,9 @@ export default function MapLocationPicker({
 
     return () => {
       cancelled = true
-      if (clickListener) google.maps.event.removeListener(clickListener)
+      if (clickListener)     google.maps.event.removeListener(clickListener)
+      if (dragStartListener) google.maps.event.removeListener(dragStartListener)
+      if (dragEndListener)   google.maps.event.removeListener(dragEndListener)
     }
   }, [reverseGeocode, resolvePlace])
 
@@ -189,28 +244,55 @@ export default function MapLocationPicker({
   }, [])
 
   const handleSuggestionSelect = useCallback(async (s: PlaceSuggestion) => {
-    const resolved = await resolvePlace(s.placeId)
-    if (resolved.latitude !== null && resolved.longitude !== null) {
+    try {
+      const resolved = await resolvePlace(s.placeId)
+      if (resolved.latitude === null || resolved.longitude === null) return
+      if (!geocoderRef.current) return
+
+      const { isPH, address: addr } = await isPhilippines(
+        geocoderRef.current,
+        resolved.latitude,
+        resolved.longitude
+      )
+
+      if (!isPH) {
+        setOutOfBounds(true)
+        setSearchQuery('')
+        setShowSugg(false)
+        return
+      }
+
       const c = { lat: resolved.latitude, lng: resolved.longitude }
+      lastValidCenter.current = c
       mapRef.current?.setCenter(c)
       mapRef.current?.setZoom(17)
-      setAddress(resolved.address)
+      setAddress(addr || resolved.address)
       setCoords(c)
-      setSearchQuery(resolved.address)
+      setSearchQuery(addr || resolved.address)
+      setOutOfBounds(false)
+    } catch (err) {
+      console.error('Failed to resolve suggestion:', err)
     }
     setShowSugg(false)
   }, [resolvePlace])
 
   const handleUseMyLocation = useCallback(() => {
-    navigator.geolocation?.getCurrentPosition(pos => {
+    navigator.geolocation?.getCurrentPosition(async pos => {
       const c = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+      if (!geocoderRef.current) return
+      const { isPH } = await isPhilippines(geocoderRef.current, c.lat, c.lng)
+      if (!isPH) {
+        setOutOfBounds(true)
+        return
+      }
+      lastValidCenter.current = c
       mapRef.current?.setCenter(c)
       mapRef.current?.setZoom(17)
       reverseGeocode(c.lat, c.lng)
     })
   }, [reverseGeocode])
 
-  const canConfirm = !!coords && !!address && !isGeocoding
+  const canConfirm = !!coords && !!address && !isGeocoding && !outOfBounds
 
   const handleConfirm = useCallback(() => {
     if (!canConfirm) return
@@ -278,13 +360,12 @@ export default function MapLocationPicker({
             </button>
           )}
 
-          {/* Search bar + dropdown */}
           <div ref={searchRef} className="relative flex-1">
             <div
               className="flex items-center gap-2.5 px-3.5 py-3 rounded-2xl transition-all w-full"
               style={{
                 background: PANEL,
-                border: `1px solid ${showSugg ? `${pinColor}50` : 'rgba(255,255,255,0.08)'}`,
+                border:     `1px solid ${showSugg ? `${pinColor}50` : 'rgba(255,255,255,0.08)'}`,
               }}
             >
               <span style={{ flexShrink: 0 }}>
@@ -300,6 +381,7 @@ export default function MapLocationPicker({
                   setSearchQuery(e.target.value)
                   onInputChange(e.target.value)
                   setShowSugg(true)
+                  setOutOfBounds(false)
                 }}
                 onFocus={() => suggestions.length > 0 && setShowSugg(true)}
               />
@@ -312,6 +394,7 @@ export default function MapLocationPicker({
                     setSearchQuery('')
                     onInputChange('')
                     setShowSugg(false)
+                    setOutOfBounds(false)
                   }}
                 >
                   ×
@@ -319,16 +402,15 @@ export default function MapLocationPicker({
               )}
             </div>
 
-            {/* Suggestions dropdown — inside ref div so outside-click works */}
             {showSugg && suggestions.length > 0 && (
               <div
                 className="absolute top-full left-0 right-0 mt-1.5 rounded-2xl overflow-hidden shadow-2xl z-50"
                 style={{
-                  background: PANEL,
-                  border: '1px solid rgba(255,255,255,0.07)',
+                  background:     PANEL,
+                  border:         '1px solid rgba(255,255,255,0.07)',
                   backdropFilter: 'blur(16px)',
-                  maxHeight: 240,
-                  overflowY: 'auto',
+                  maxHeight:      240,
+                  overflowY:      'auto',
                 }}
               >
                 {suggestions.map((s, i) => (
@@ -364,8 +446,8 @@ export default function MapLocationPicker({
                      transition-opacity hover:opacity-70 active:opacity-50"
           style={{
             background: 'rgba(255,255,255,0.06)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            color: 'rgba(255,255,255,0.6)',
+            border:     '1px solid rgba(255,255,255,0.1)',
+            color:      'rgba(255,255,255,0.6)',
           }}
           onClick={handleUseMyLocation}
         >
@@ -374,19 +456,31 @@ export default function MapLocationPicker({
         </button>
 
         <div
-          className="flex items-start gap-3 p-4 rounded-2xl"
-          style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
+          className="flex items-start gap-3 p-4 rounded-2xl transition-colors"
+          style={{
+            background: outOfBounds ? 'rgba(248,113,113,0.07)' : 'rgba(255,255,255,0.05)',
+            border:     `1px solid ${outOfBounds ? 'rgba(248,113,113,0.25)' : 'rgba(255,255,255,0.07)'}`,
+          }}
         >
           <div
             className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0"
-            style={{ backgroundColor: pinColor, boxShadow: `0 0 6px ${pinColor}` }}
+            style={{
+              backgroundColor: outOfBounds ? RED : pinColor,
+              boxShadow:       `0 0 6px ${outOfBounds ? RED : pinColor}`,
+            }}
           />
           <div className="flex-1 min-w-0">
-            <p className="text-[10px] mb-1 font-semibold uppercase tracking-widest"
-              style={{ color: 'rgba(255,255,255,0.35)' }}>
+            <p
+              className="text-[10px] mb-1 font-semibold uppercase tracking-widest"
+              style={{ color: 'rgba(255,255,255,0.35)' }}
+            >
               {label}
             </p>
-            {isGeocoding ? (
+            {outOfBounds ? (
+              <p className="text-sm font-medium leading-snug" style={{ color: RED }}>
+                Location must be within the Philippines
+              </p>
+            ) : isGeocoding ? (
               <div className="flex items-center gap-2">
                 <div
                   className="w-3.5 h-3.5 rounded-full border border-t-transparent animate-spin flex-shrink-0"
@@ -395,8 +489,10 @@ export default function MapLocationPicker({
                 <span className="text-sm" style={{ color: 'rgba(255,255,255,0.35)' }}>Finding address…</span>
               </div>
             ) : (
-              <p className="text-sm font-medium leading-snug"
-                style={{ color: address ? '#fff' : 'rgba(255,255,255,0.3)' }}>
+              <p
+                className="text-sm font-medium leading-snug"
+                style={{ color: address ? '#fff' : 'rgba(255,255,255,0.3)' }}
+              >
                 {address || 'Drag the map to pin a location'}
               </p>
             )}
