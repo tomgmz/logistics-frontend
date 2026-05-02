@@ -97,8 +97,8 @@ export default function SystemLogsPage() {
   }
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 bg-[#0a0a0a] text-white">
-      <div className="flex flex-col flex-1 min-h-0 mx-auto w-full max-w-[1400px] px-6 py-8 gap-6">
+    <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-hidden bg-[#0a0a0a] text-white">
+      <div className="flex flex-col flex-1 min-h-0 px-3 py-3 lg:px-4 gap-6 overflow-hidden">
 
         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 shrink-0">
           <div>

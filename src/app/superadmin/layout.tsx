@@ -35,6 +35,16 @@ const superAdminNavItems = [
     icon: <CreditCard size={17} />,
   },
   {
+    href: '/superadmin/expenses',
+    label: 'Expenses',
+    icon: <FileSearch size={17} />,
+  },
+  {
+    href: '/superadmin/transaction-history',
+    label: 'Transaction History',
+    icon: <FileSearch size={17} />,
+  },
+  {
     href: '/superadmin/vehicle-management',
     label: 'Vehicle Management',
     icon: <Truck size={17} />,

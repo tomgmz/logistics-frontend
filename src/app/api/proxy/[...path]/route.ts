@@ -22,22 +22,36 @@ async function handler(
   const search = req.nextUrl.search
   const url    = `${API_URL}/${path}${search}`
 
+  const contentType = req.headers.get('content-type') ?? ''
+  const isMultipart = contentType.includes('multipart/form-data')
+
   try {
-    const bodyText = req.method !== 'GET' && req.method !== 'HEAD'
-      ? await req.text()
-      : undefined
+    let body: string | FormData | undefined
+    let forwardedContentType: string = 'application/json'
+
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      if (isMultipart) {
+        body = await req.formData()
+        // Don't set Content-Type — axios will set multipart + boundary automatically
+        forwardedContentType = ''
+      } else {
+        const text = await req.text()
+        body = text.length > 0 ? text : undefined
+        forwardedContentType = 'application/json'
+      }
+    }
 
     const axiosRes = await axios({
       method:  req.method,
       url,
       headers: {
-        'Content-Type': 'application/json',
-        cookie:         req.headers.get('cookie') ?? '',
+        ...(forwardedContentType ? { 'Content-Type': forwardedContentType } : {}),
+        cookie: req.headers.get('cookie') ?? '',
         ...(req.headers.get('x-csrf-token')
           ? { 'X-CSRF-Token': req.headers.get('x-csrf-token')! }
           : {}),
       },
-      data: bodyText && bodyText.length > 0 ? bodyText : undefined,
+      data: body,
     })
 
     const nextRes = NextResponse.json(axiosRes.data)

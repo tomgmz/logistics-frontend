@@ -1,5 +1,5 @@
 import authApi, { initCsrf } from '../../api/auth.api'
-import type { Truck, CreateTruckInput, UpdateTruckInput } from '@/app/types/truck.types'
+import type { Truck, CreateTruckInput, UpdateTruckInput, CreateTruckModelInput,UpdateTruckModelInput } from '@/app/types/truck.types'
 import type { TruckModel } from '@/app/types/truck-model'
 
 const ADMIN = '/admin'
@@ -36,7 +36,46 @@ export async function adminFetchTruckModels(): Promise<TruckModel[]> {
   return data?.data ?? []
 }
 
-/** Raw rows from GET /admin/vendors (users + nested vendors) */
+export async function adminFetchTruckModelById(modelId: string): Promise<TruckModel> {
+  const { data } = await authApi.get<{ data: TruckModel }>(`${ADMIN}/truck-models/${modelId}`)
+  return data.data
+}
+
+export async function adminUploadTruckModelImage(file: File): Promise<string> {
+  await initCsrf()
+  const formData = new FormData()
+  formData.append('image', file)
+
+  const { data } = await authApi.post<{ data: { url: string } }>(
+    `${ADMIN}/upload/image`,
+    formData,
+    {
+      transformRequest: (data, headers) => {
+        delete headers['Content-Type']   // remove instance-level JSON header
+        return data                       // let axios/browser set multipart + boundary
+      },
+    }
+  )
+  return data.data.url
+}
+
+export async function adminCreateTruckModel(body: CreateTruckModelInput): Promise<TruckModel> {
+  await initCsrf()
+  const { data } = await authApi.post<{ data: TruckModel }>(`${ADMIN}/truck-models`, body)
+  return data.data
+}
+
+export async function adminUpdateTruckModel(modelId: string, body: UpdateTruckModelInput): Promise<TruckModel> {
+  await initCsrf()
+  const { data } = await authApi.patch<{ data: TruckModel }>(`${ADMIN}/truck-models/${modelId}`, body)
+  return data.data
+}
+
+export async function adminDeleteTruckModel(modelId: string): Promise<void> {
+  await initCsrf()
+  await authApi.delete(`${ADMIN}/truck-models/${modelId}`)
+}
+
 export async function adminFetchVendorsRaw(): Promise<unknown[]> {
   const { data } = await authApi.get<{ data: unknown[] }>(`${ADMIN}/vendors`)
   return data?.data ?? []
