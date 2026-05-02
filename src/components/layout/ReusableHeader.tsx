@@ -1,9 +1,10 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { Bell, MessageCircle, Menu } from 'lucide-react'
+import { MessageCircle, Menu } from 'lucide-react'
 import Image from 'next/image'
 import { ASSETS } from '@/app/lib/data'
+import NotificationIcon from '@/components/ui/NotificationIcon' // adjust path if needed
 
 interface ReusableHeaderProps {
   sidebarOpen: boolean
@@ -34,10 +35,8 @@ export default function ReusableHeader({ sidebarOpen, onToggleSidebar }: Reusabl
           <MessageCircle size={16} />
         </IconBtn>
 
-        <IconBtn>
-          <Bell size={16} />
-          <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-[var(--color-cyan)]" />
-        </IconBtn>
+        {/* NotificationIcon ships its own trigger styled to match IconBtn */}
+        <NotificationIcon />
       </div>
     </motion.header>
   )
