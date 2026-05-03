@@ -86,7 +86,7 @@ const licenseExpiry = z
 const baseCreateFields = {
   first_name:     firstName,
   last_name:      lastName,
-  middle_initial: middleName,
+  middle_name: middleName,
   suffix,
   username,
   email,
@@ -96,7 +96,7 @@ const baseCreateFields = {
 const baseUpdateFields = {
   first_name:     firstName.optional(),
   last_name:      lastName.optional(),
-  middle_initial: middleName,
+  middle_name: middleName,
   suffix,
   username:       username.optional(),
   email:          email.optional(),

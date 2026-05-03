@@ -303,7 +303,7 @@ function EmptyState({ tab, onAdd }: { tab: TabValue; onAdd: () => void }) {
 }
 
 function AdminLikeCells({ user }: { user: AdminUser }) {
-  const name = [user.first_name, user.middle_initial, user.last_name, user.suffix].filter(Boolean).join(' ') || '—'
+  const name = [user.first_name, user.middle_name, user.last_name, user.suffix].filter(Boolean).join(' ') || '—'
   return (
     <>
       <td className="px-4 py-3.5">
@@ -320,7 +320,7 @@ function AdminLikeCells({ user }: { user: AdminUser }) {
 
 function renderCells(user: AnyUser, tab: TabValue) {
   if (tab === 'all') {
-    const name = [user.first_name, user.middle_initial, user.last_name, user.suffix].filter(Boolean).join(' ') || '—'
+    const name = [user.first_name, user.middle_name, user.last_name, user.suffix].filter(Boolean).join(' ') || '—'
     return (
       <>
         <td className="px-4 py-3.5">
@@ -338,7 +338,7 @@ function renderCells(user: AnyUser, tab: TabValue) {
   switch (tab) {
     case 'clients': {
       const u = user as ClientUser
-      const name = [u.first_name, u.middle_initial, u.last_name, u.suffix].filter(Boolean).join(' ') || '—'
+      const name = [u.first_name, u.middle_name, u.last_name, u.suffix].filter(Boolean).join(' ') || '—'
       return (
         <>
           <td className="px-4 py-3.5">
@@ -354,7 +354,7 @@ function renderCells(user: AnyUser, tab: TabValue) {
     }
     case 'drivers': {
       const u = user as DriverUser
-      const name = [u.first_name, u.middle_initial, u.last_name, u.suffix].filter(Boolean).join(' ') || '—'
+      const name = [u.first_name, u.middle_name, u.last_name, u.suffix].filter(Boolean).join(' ') || '—'
       const drvStatus = u.drivers?.status
       return (
         <>
@@ -377,7 +377,7 @@ function renderCells(user: AnyUser, tab: TabValue) {
     }
     case 'vendors': {
       const u = user as VendorUser
-      const name = [u.first_name, u.middle_initial, u.last_name, u.suffix].filter(Boolean).join(' ') || '—'
+      const name = [u.first_name, u.middle_name, u.last_name, u.suffix].filter(Boolean).join(' ') || '—'
       return (
         <>
           <td className="px-4 py-3.5">

@@ -31,7 +31,7 @@ export interface BaseUser {
   status: UserStatus
   first_name: string | null
   last_name: string | null
-  middle_initial: string | null
+  middle_name: string | null
   suffix: string | null
   created_at: string
   updated_at: string
@@ -80,7 +80,6 @@ export interface VendorUser extends BaseUser {
 }
 
 export type AnyUser = AdminUser | ClientUser | DriverUser | VendorUser
-
 
 export interface CreateAdminPayload {
   username: string
@@ -156,7 +155,7 @@ export interface CreateHumanResourcesPayload {
   phone?: string
   first_name?: string
   last_name?: string
-  middle_initial?: string
+  middle_name?: string
   suffix?: string
 }
 
@@ -167,7 +166,7 @@ export interface CreateFleetAdminPayload {
   phone?: string
   first_name?: string
   last_name?: string
-  middle_initial?: string
+  middle_name?: string
   suffix?: string
 }
 
@@ -178,7 +177,7 @@ export interface CreateOperationsAdminPayload {
   phone?: string
   first_name?: string
   last_name?: string
-  middle_initial?: string
+  middle_name?: string
   suffix?: string
 }
 
@@ -188,7 +187,7 @@ export interface CreateITAdminPayload {
   phone?:          string
   first_name?:     string
   last_name?:      string
-  middle_initial?: string
+  middle_name?: string
   suffix?:         string
   created_by?:     string | null
 }
