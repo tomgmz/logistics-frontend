@@ -25,15 +25,21 @@ const lastName = z
 
 const middleName = z
   .string()
-  .min(2, 'Middle name must be at least 2 characters')
-  .max(50, 'Middle name is too long')
-  .regex(
-    /^[\p{L}]+(?:[ '-][\p{L}]+)*$/u,
-    'Middle name may only contain letters, spaces, hyphens, or apostrophes',
-  )
   .optional()
   .nullable()
   .transform(v => (v === '' ? null : v))
+  .refine(
+    v => v == null || v.length >= 2,
+    'Middle name must be at least 2 characters',
+  )
+  .refine(
+    v => v == null || v.length <= 50,
+    'Middle name is too long',
+  )
+  .refine(
+    v => v == null || /^[\p{L}]+(?:[ '-][\p{L}]+)*$/u.test(v),
+    'Middle name may only contain letters, spaces, hyphens, or apostrophes',
+  )
 
 const suffix = z.preprocess(
   v => (v === '' ? null : v),
@@ -88,8 +94,8 @@ const licenseExpiry = z
   .refine(val => new Date(val) > new Date(), 'License is already expired')
 
 const baseCreateFields = {
-  first_name:     firstName,
-  last_name:      lastName,
+  first_name:  firstName,
+  last_name:   lastName,
   middle_name: middleName,
   suffix,
   username,
@@ -98,13 +104,13 @@ const baseCreateFields = {
 }
 
 const baseUpdateFields = {
-  first_name:     firstName.optional(),
-  last_name:      lastName.optional(),
+  first_name:  firstName.optional(),
+  last_name:   lastName.optional(),
   middle_name: middleName,
   suffix,
-  username:       username.optional(),
-  email:          email.optional(),
-  phone:          phoneOptional,
+  username:    username.optional(),
+  email:       email.optional(),
+  phone:       phoneOptional,
 }
 
 export const createClientSchema = z.object({
