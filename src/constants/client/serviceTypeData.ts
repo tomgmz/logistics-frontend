@@ -1,4 +1,4 @@
-import { ServiceType } from "@/app/lib/store/slice/booking.slice"
+import { ServiceType } from "@/lib/store/slice/booking.slice"
 
 export const ASSETS = {
   svcFmcg: '/clientside/fmcg.jpg',

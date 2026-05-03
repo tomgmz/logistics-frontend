@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { motion, useInView, AnimatePresence } from 'framer-motion';
-import { FAQS } from '@/app/lib/data';
+import { FAQS } from '@/lib/data';
 
 function FaqItem({ 
   q, 

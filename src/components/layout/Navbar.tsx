@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence, useScroll, useSpring } from 'framer-motion';
-import { ASSETS } from '@/app/lib/data';
+import { ASSETS } from '@/lib/data';
 import Image from 'next/image';
 import SignInModal from '../SignInModal';
 

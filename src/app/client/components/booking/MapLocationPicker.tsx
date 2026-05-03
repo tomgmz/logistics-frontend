@@ -6,7 +6,7 @@ import {
   usePlacesAutocomplete,
   PlaceSuggestion,
   ResolvedPlace,
-} from '../../../lib/hooks/usePlacesAutoComplete'
+} from '@/lib/hooks/usePlacesAutoComplete'
 
 const CYAN  = '#4DF9ED'
 const RED   = '#f87171'

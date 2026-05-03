@@ -1,8 +1,8 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit'
-import authApi, { initCsrf } from '@/app/lib/api/auth.api'
+import authApi, { initCsrf } from '@/lib/api/auth.api'
 import type { OptimizedStop, OptimizeRouteResponse } from '@/app/types/maps/routemap.types'
 import type { BookingDetail } from '@/app/types/maps/routemap.types'
-import type { AuthUser } from '@/app/lib/api/auth.api'
+import type { AuthUser } from '@/lib/api/auth.api'
 
 export interface BookingDestination {
   address: string

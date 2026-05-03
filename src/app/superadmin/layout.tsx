@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 import ReusableDashboardShell from '@/components/layout/ReusableDashboardShell'
 import { ReactNode, useEffect } from 'react'
-import { useAuthStore } from '@/app/lib/store/auth.store'
+import { useAuthStore } from '@/lib/store/auth.store'
 
 const superAdminNavItems = [
   {

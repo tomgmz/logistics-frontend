@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion';
 import Image from 'next/image';
-import { ASSETS } from '@/app/lib/data';
+import { ASSETS } from '@/lib/data';
 
 export default function HeroSection() {
   return (

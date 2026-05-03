@@ -3,7 +3,7 @@
 import { ReactNode, useEffect } from 'react'
 import { CreditCard, LayoutDashboard } from 'lucide-react'
 import ReusableDashboardShell from '@/components/layout/ReusableDashboardShell'
-import { useAuthStore } from '@/app/lib/store/auth.store'
+import { useAuthStore } from '@/lib/store/auth.store'
 
 const NAV_ITEMS = [
   { href: '/accountant/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={17} /> },

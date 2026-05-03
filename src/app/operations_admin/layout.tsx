@@ -3,7 +3,7 @@
 import { ReactNode, useEffect } from 'react'
 import { CalendarCheck, LayoutDashboard } from 'lucide-react'
 import ReusableDashboardShell from '@/components/layout/ReusableDashboardShell'
-import { useAuthStore } from '@/app/lib/store/auth.store'
+import { useAuthStore } from '@/lib/store/auth.store'
 
 const NAV_ITEMS = [
   { href: '/operations_admin/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={17} /> },

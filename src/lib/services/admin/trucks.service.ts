@@ -9,6 +9,40 @@ export async function adminFetchTrucks(): Promise<Truck[]> {
   return data?.data ?? []
 }
 
+export async function adminFetchTrucksPaginated(params: {
+  page: number
+  limit: number
+  status: string
+  owned_by: string
+  search: string
+}): Promise<{
+  rows: Truck[]
+  meta: { total: number; page: number; limit: number; totalPages: number }
+}> {
+  const { data: body } = await authApi.get<{
+    status: string
+    data: Truck[]
+    meta: { total: number; page: number; limit: number; totalPages: number }
+  }>(`${ADMIN}/trucks`, {
+    params: {
+      page:     params.page,
+      limit:    params.limit,
+      status:   params.status,
+      owned_by: params.owned_by,
+      search:   params.search || undefined,
+    },
+  })
+  return {
+    rows: body?.data ?? [],
+    meta: body.meta ?? {
+      total:      0,
+      page:       params.page,
+      limit:      params.limit,
+      totalPages: 1,
+    },
+  }
+}
+
 export async function adminFetchTruck(truckId: string): Promise<Truck> {
   const { data } = await authApi.get<{ data: Truck }>(`${ADMIN}/trucks/${truckId}`)
   return data.data

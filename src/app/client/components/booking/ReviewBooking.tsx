@@ -4,11 +4,12 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Truck } from 'lucide-react'
 import Image from 'next/image'
-import { useAppSelector, useAppDispatch } from '@/app/lib/hooks/hooks'
-import type { ServiceType, DropoffSection, CargoMode } from '@/app/lib/store/slice/booking.slice'
-import { resetBooking } from '@/app/lib/store/slice/booking.slice'
-import { createBooking } from '@/app/lib/api/client/booking.api'
-import { getMe } from '@/app/lib/api/auth.api'
+import { useAppSelector, useAppDispatch } from '@/lib/hooks/hooks'
+import type { ServiceType, DropoffSection, CargoMode } from '@/lib/store/slice/booking.slice'
+import { resetBooking } from '@/lib/store/slice/booking.slice'
+import { bookingService } from '@/lib/services/client/booking.service'
+import { getMe } from '@/lib/api/auth.api'
+import { appToast } from '@/lib/toast'
 import './BookingDetails.css'
 import SuccessView from './SuccessView'
 
@@ -131,10 +132,15 @@ export default function StepReview({ selectedService, onBack, onNewBooking }: Pr
           })),
       }
 
-      const result = await createBooking(payload)
-      setBookingId(result?.booking_id ?? null)
-      dispatch(resetBooking())  // ← reset store immediately on success
+      const result = await bookingService.createBooking(payload)
+      const id = result?.booking_id ?? null
+      setBookingId(id)
+      dispatch(resetBooking())
       setSubmitted(true)
+      appToast.success('Booking submitted successfully.', {
+        action: 'booking-create',
+        ...(id != null ? { entityId: id } : {}),
+      })
 
     } catch (err: unknown) {
       console.error('Booking failed:', err)

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { adminFetchTruckModels } from '@/app/lib/services/admin/trucks.service'
+import { adminFetchTruckModels } from '@/lib/services/admin/trucks.service'
 import { TruckModel } from '@/app/types/truck-model'
 
 export interface VehicleData {

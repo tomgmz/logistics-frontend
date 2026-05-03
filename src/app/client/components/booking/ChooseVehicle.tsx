@@ -4,12 +4,12 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronLeft, ChevronRight, Truck, Loader2 } from 'lucide-react'
 import Image from 'next/image'
 import { useState } from 'react'
-import { useAppDispatch, useAppSelector } from '@/app/lib/hooks/hooks'
-import { setVehicle } from '@/app/lib/store/slice/booking.slice'
-import { useTrucks } from '../../../lib/hooks/useTrucks'
+import { useAppDispatch, useAppSelector } from '@/lib/hooks/hooks'
+import { setVehicle } from '@/lib/store/slice/booking.slice'
+import { useTrucks } from '@/lib/hooks/useTrucks'
 import './BookingDetails.css'
 import WizBtn from '../WizButton'
-import { selectCargoSummary, selectAllGroups } from '@/app/lib/store/bookingSelectors'
+import { selectCargoSummary, selectAllGroups } from '@/lib/store/bookingSelectors'
 
 interface Props {
   onNext: () => void

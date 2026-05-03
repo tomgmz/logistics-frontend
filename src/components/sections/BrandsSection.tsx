@@ -3,7 +3,7 @@
 import { useRef } from 'react';
 import Image from 'next/image';
 import { motion, useInView } from 'framer-motion';
-import { BRANDS } from '@/app/lib/data';
+import { BRANDS } from '@/lib/data';
 
 function LogoCard({ brand }: { brand: typeof BRANDS[number] }) {
   return (

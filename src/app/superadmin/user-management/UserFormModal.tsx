@@ -16,7 +16,7 @@ import type {
   VendorUser,
   AnyUser,
 } from '@/app/types/admin/user-management.types'
-import { USER_SUFFIXES } from '@/app/lib/validation/user-management.validation'
+import { USER_SUFFIXES } from '@/lib/validation/user-management.validation'
 import {
   clientService,
   driverService,
@@ -27,10 +27,10 @@ import {
   fleetAdminService,
   operationsAdminService,
   itAdminService,
-} from '@/app/lib/services/admin/user-management.service'
-import { validateForm } from '@/app/lib/validation/user-management.validation'
+} from '@/lib/services/admin/user-management.service'
+import { validateForm } from '@/lib/validation/user-management.validation'
 import ReusableModal from '@/components/layout/ReusableModal'
-import { appToast } from '@/app/lib/toast'
+import { appToast } from '@/lib/toast'
 import LandlineInputRow, { toLocalLandlineDigits } from './LandLineInputRow'
 
 interface UserFormModalProps {

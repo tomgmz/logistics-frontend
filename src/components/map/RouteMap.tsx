@@ -10,18 +10,18 @@ import SearchIcon         from '@mui/icons-material/Search'
 import ArrowForwardIcon   from '@mui/icons-material/ArrowForward'
 import CloseIcon          from '@mui/icons-material/Close'
 import RefreshIcon        from '@mui/icons-material/Refresh'
-import type { BookingWithRelations }         from '@/app/lib/store/slice/routeMap.slice'
+import type { BookingWithRelations }         from '@/lib/store/slice/routeMap.slice'
 import { StatusBadge }                       from './RouteMapComponents'
 import { DetailsPanelContent }               from './DetailsPanelContent'
 import { DirectionsRenderer }                from './DirectionsRenderer'
-import { useAppDispatch, useAppSelector }    from '@/app/lib/hooks/hooks'
-import { useAuthStore }                      from '@/app/lib/store/auth.store'
+import { useAppDispatch, useAppSelector }    from '@/lib/hooks/hooks'
+import { useAuthStore }                      from '@/lib/store/auth.store'
 import {
   fetchBookings,
   fetchRouteAndDetail,
   clearSelection,
   setSelectedId,
-} from '@/app/lib/store/slice/routeMap.slice'
+} from '@/lib/store/slice/routeMap.slice'
 import { statusColor } from './status.colors'
 
 const GOOGLE_MAPS_KEY    = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!

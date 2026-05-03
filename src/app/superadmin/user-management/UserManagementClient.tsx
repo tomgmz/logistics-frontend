@@ -20,8 +20,8 @@ import {
   clientService, driverService, vendorService,
   accountantService, generalManagerService, humanResourcesService,
   fleetAdminService, operationsAdminService, itAdminService,
-} from '@/app/lib/services/admin/user-management.service'
-import { appToast } from '@/app/lib/toast'
+} from '@/lib/services/admin/user-management.service'
+import { appToast } from '@/lib/toast'
 import UserFormModal from './UserFormModal'
 
 const muiTheme = createTheme({

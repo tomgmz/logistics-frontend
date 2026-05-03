@@ -3,9 +3,9 @@
 import { motion } from 'framer-motion'
 import { Bell, MessageCircle, Menu } from 'lucide-react'
 import Image from 'next/image'
-import { ASSETS } from '@/app/lib/data'
-import { useAppDispatch, useAppSelector } from '@/app/lib/hooks/hooks'
-import { setSidebarOpen } from '@/app/lib/store/slice/booking.slice'
+import { ASSETS } from '@/lib/data'
+import { useAppDispatch, useAppSelector } from '@/lib/hooks/hooks'
+import { setSidebarOpen } from '@/lib/store/slice/booking.slice'
 
 export default function Header() {
   const dispatch    = useAppDispatch()

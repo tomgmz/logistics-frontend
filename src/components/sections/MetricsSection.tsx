@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useState } from 'react';
 import { motion, useInView, animate } from 'framer-motion';
-import { METRICS, ASSETS } from '@/app/lib/data';
+import { METRICS, ASSETS } from '@/lib/data';
 import Image from 'next/image';
 
 function AnimatedValue({ raw }: { raw: string }) {

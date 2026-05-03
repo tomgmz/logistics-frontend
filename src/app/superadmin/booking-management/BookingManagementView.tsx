@@ -21,14 +21,10 @@ import {
 import { statusColor } from '@/components/map/status.colors'
 import type { BookingDetail } from '@/app/types/maps/routemap.types'
 import {
-  fetchAllBookingsForAdmin,
-  getBookingById,
-  updateBookingStatusAdmin,
-  updateDestinationStatus,
-  deleteDestinationAdmin,
+  bookingService,
   type AdminBookingLifecycleStatus,
   type DestinationDeliveryStatus,
-} from '@/app/lib/api/client/booking.api'
+} from '@/lib/services/client/booking.service'
 
 const PAGE_SIZE = 12
 
@@ -90,8 +86,14 @@ export default function BookingManagementView() {
   const [rawBookings, setRawBookings] = useState<Record<string, unknown>[]>([])
   const [listLoading, setListLoading] = useState(true)
   const [listError, setListError] = useState<string | null>(null)
+  const [listMeta, setListMeta] = useState<{
+    total: number
+    totalPages: number
+    statusCounts: Record<string, number>
+  } | null>(null)
 
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [page, setPage] = useState(0)
 
@@ -106,50 +108,46 @@ export default function BookingManagementView() {
   const [deleteAskId, setDeleteAskId] = useState<string | null>(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
 
-  const loadList = useCallback(async () => {
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedSearch(search.trim()), 350)
+    return () => window.clearTimeout(t)
+  }, [search])
+
+  const loadPage = useCallback(async () => {
     try {
       setListLoading(true)
       setListError(null)
-      const data = await fetchAllBookingsForAdmin()
-      setRawBookings(data)
+      const res = await bookingService.fetchBookingsAdminPaginated({
+        page:   page + 1,
+        limit:  PAGE_SIZE,
+        status: statusFilter,
+        search: debouncedSearch,
+      })
+      setRawBookings(res.rows)
+      setListMeta({
+        total:        res.meta.total,
+        totalPages:   res.meta.totalPages,
+        statusCounts: res.meta.statusCounts,
+      })
+      if (res.meta.totalPages >= 1 && page > res.meta.totalPages - 1) {
+        setPage(res.meta.totalPages - 1)
+      }
     } catch (e) {
       setListError(axiosMessage(e))
     } finally {
       setListLoading(false)
     }
-  }, [])
+  }, [page, statusFilter, debouncedSearch])
 
   useEffect(() => {
-    void loadList()
-  }, [loadList])
+    void loadPage()
+  }, [loadPage])
 
-  const rows = useMemo(() => toRows(rawBookings), [rawBookings])
+  const listRows = useMemo(() => toRows(rawBookings), [rawBookings])
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    return rows.filter((r) => {
-      if (statusFilter !== 'all' && r.status !== statusFilter) return false
-      if (!q) return true
-      return (
-        r.booking_id.toLowerCase().includes(q) ||
-        (r.origin ?? '').toLowerCase().includes(q) ||
-        (r.company ?? '').toLowerCase().includes(q) ||
-        (r.truck_type_needed ?? '').toLowerCase().includes(q) ||
-        r.status.toLowerCase().includes(q)
-      )
-    })
-  }, [rows, search, statusFilter])
-
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-  const pageSafe = Math.min(page, pageCount - 1)
-  const pageRows = useMemo(() => {
-    const start = pageSafe * PAGE_SIZE
-    return filtered.slice(start, start + PAGE_SIZE)
-  }, [filtered, pageSafe])
-
-  useEffect(() => {
-    setPage((p) => Math.min(p, Math.max(0, pageCount - 1)))
-  }, [pageCount])
+  const pageCount = Math.max(1, listMeta?.totalPages ?? 1)
+  const pageSafe   = Math.min(page, pageCount - 1)
+  const totalRows  = listMeta?.total ?? 0
 
   const openDetail = useCallback(async (bookingId: string) => {
     setSelectedId(bookingId)
@@ -159,7 +157,7 @@ export default function BookingManagementView() {
     setDeleteAskId(null)
     try {
       setDetailLoading(true)
-      const d = (await getBookingById(bookingId)) as BookingDetail
+      const d = (await bookingService.getBookingById(bookingId)) as BookingDetail
       setDetail(d)
     } catch (e) {
       setDetailError(axiosMessage(e))
@@ -191,7 +189,7 @@ export default function BookingManagementView() {
     setPendingStatus(true)
     setActionMsg(null)
     try {
-      await updateBookingStatusAdmin(selectedId, next)
+      await bookingService.updateBookingStatusAdmin(selectedId, next)
       setDetail({ ...detail, status: next })
       mergeListRow(selectedId, { status: next })
       setActionMsg({ type: 'ok', text: 'Booking status updated.' })
@@ -207,9 +205,9 @@ export default function BookingManagementView() {
     setActionMsg(null)
     try {
       const deliveredAt = status === 'delivered' ? new Date().toISOString() : undefined
-      await updateDestinationStatus(destinationId, status, deliveredAt)
+      await bookingService.updateDestinationStatus(destinationId, status, deliveredAt)
       if (selectedId) await openDetail(selectedId)
-      await loadList()
+      await loadPage()
       setActionMsg({ type: 'ok', text: 'Stop updated.' })
     } catch (e) {
       setActionMsg({ type: 'err', text: axiosMessage(e) })
@@ -222,10 +220,10 @@ export default function BookingManagementView() {
     setDeleteBusy(true)
     setActionMsg(null)
     try {
-      await deleteDestinationAdmin(destinationId)
+      await bookingService.deleteDestinationAdmin(destinationId)
       setDeleteAskId(null)
       if (selectedId) await openDetail(selectedId)
-      await loadList()
+      await loadPage()
       setActionMsg({ type: 'ok', text: 'Stop removed.' })
     } catch (e) {
       setActionMsg({ type: 'err', text: axiosMessage(e) })
@@ -234,13 +232,7 @@ export default function BookingManagementView() {
     }
   }
 
-  const statusCounts = useMemo(() => {
-    const m: Record<string, number> = { all: rows.length }
-    for (const r of rows) {
-      m[r.status] = (m[r.status] ?? 0) + 1
-    }
-    return m
-  }, [rows])
+  const statusCounts = listMeta?.statusCounts ?? { all: 0 }
 
   return (
     <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-hidden ff-body bg-[var(--color-bg)]">
@@ -254,7 +246,7 @@ export default function BookingManagementView() {
         </div>
         <button
           type="button"
-          onClick={() => void loadList()}
+          onClick={() => void loadPage()}
           className="inline-flex items-center gap-2 self-start rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/5 transition-colors"
         >
           <RefreshCw size={14} />
@@ -319,13 +311,13 @@ export default function BookingManagementView() {
                 <p className="text-red-400 text-sm">{listError}</p>
                 <button
                   type="button"
-                  onClick={() => void loadList()}
+                  onClick={() => void loadPage()}
                   className="text-[var(--color-cyan)] text-sm font-semibold"
                 >
                   Try again
                 </button>
               </div>
-            ) : filtered.length === 0 ? (
+            ) : listRows.length === 0 ? (
               <div className="flex-1 flex items-center justify-center text-sm text-white/45 py-12">
                 No bookings match your filters.
               </div>
@@ -344,7 +336,7 @@ export default function BookingManagementView() {
                       </tr>
                     </thead>
                     <tbody>
-                      {pageRows.map((r) => {
+                      {listRows.map((r) => {
                         const active = selectedId === r.booking_id
                         const c = statusColor(r.status)
                         return (
@@ -389,8 +381,11 @@ export default function BookingManagementView() {
                 </div>
                 <div className="shrink-0 flex items-center justify-between px-3 py-2 border-t border-white/[0.07] text-xs text-white/50">
                   <span>
-                    Showing {pageSafe * PAGE_SIZE + 1}–{Math.min((pageSafe + 1) * PAGE_SIZE, filtered.length)} of{' '}
-                    {filtered.length}
+                    Showing{' '}
+                    {totalRows === 0
+                      ? '0'
+                      : `${pageSafe * PAGE_SIZE + 1}–${Math.min((pageSafe + 1) * PAGE_SIZE, totalRows)}`}{' '}
+                    of {totalRows}
                   </span>
                   <div className="flex items-center gap-1">
                     <button

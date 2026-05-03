@@ -7,7 +7,7 @@ import {
   type SystemLog,
   type LogStats,
   type LogType,
-} from '@/app/lib/services/admin/system-logs.service'
+} from '@/lib/services/admin/system-logs.service'
 
 const BADGE_STYLES: Record<LogType, string> = {
   user_activity:  'bg-[rgba(77,249,237,0.12)] text-[#4df9ed] border border-[rgba(77,249,237,0.25)]',

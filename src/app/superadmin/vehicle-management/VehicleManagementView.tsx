@@ -18,16 +18,16 @@ import {
 import type { Truck, CreateTruckInput, UpdateTruckInput } from '@/app/types/truck.types'
 import type { TruckModel } from '@/app/types/truck-model'
 import {
-  adminFetchTrucks,
+  adminFetchTrucksPaginated,
   adminCreateTruck,
   adminUpdateTruck,
   adminDeleteTruck,
   adminFetchTruckModels,
   adminFetchVendorsRaw,
-} from '@/app/lib/services/admin/trucks.service'
+} from '@/lib/services/admin/trucks.service'
 import ReusableModal from '@/components/layout/ReusableModal'
 import TruckModelFormModal from './TruckModelFormModal'
-import { appToast } from '@/app/lib/toast'
+import { appToast } from '@/lib/toast'
 
 const PAGE_SIZE = 10
 
@@ -146,11 +146,9 @@ function axiosMessage(err: unknown): string {
   return 'Request failed'
 }
 
-/** Convert kg to metric tons, returns a clean string like "4" or "4.5" */
 function kgToTons(kg: number | null | undefined): string {
   if (kg == null) return ''
   const tons = kg / 1000
-  // strip trailing zeros but keep up to 3 decimals
   return parseFloat(tons.toFixed(3)).toString()
 }
 
@@ -158,36 +156,33 @@ type FormMode = 'create' | 'edit' | null
 type ConfirmKind = 'save' | 'delete' | null
 
 interface TruckFormState {
-  plate_number:  string
-  truck_type:    (typeof TRUCK_TYPES)[number]
-  capacity_tons: string
-  model_id:      string
-  owned_by:      'company' | 'vendor'
-  vendor_id:     string
-  status:        Truck['status']
+  plate_number: string
+  truck_type:   (typeof TRUCK_TYPES)[number]
+  model_id:     string
+  owned_by:     'company' | 'vendor'
+  vendor_id:    string
+  status:       Truck['status']
 }
 
 function emptyForm(): TruckFormState {
   return {
-    plate_number:  '',
-    truck_type:    'truck',
-    capacity_tons: '',
-    model_id:      '',
-    owned_by:      'company',
-    vendor_id:     '',
-    status:        'available',
+    plate_number: '',
+    truck_type:   'truck',
+    model_id:     '',
+    owned_by:     'company',
+    vendor_id:    '',
+    status:       'available',
   }
 }
 
 function truckToForm(t: Truck): TruckFormState {
   return {
-    plate_number:  t.plate_number ?? '',
-    truck_type:    (t.truck_type === 'wing_van' ? 'wing_van' : 'truck') as (typeof TRUCK_TYPES)[number],
-    capacity_tons: String(t.capacity_tons ?? ''),
-    model_id:      t.model_id ?? '',
-    owned_by:      t.owned_by,
-    vendor_id:     t.vendor_id ?? '',
-    status:        t.status,
+    plate_number: t.plate_number ?? '',
+    truck_type:   (t.truck_type === 'wing_van' ? 'wing_van' : 'truck') as (typeof TRUCK_TYPES)[number],
+    model_id:     t.model_id ?? '',
+    owned_by:     t.owned_by,
+    vendor_id:    t.vendor_id ?? '',
+    status:       t.status,
   }
 }
 
@@ -203,6 +198,11 @@ export default function VehicleManagementView() {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [ownerFilter,  setOwnerFilter]  = useState<string>('all')
   const [page,         setPage]         = useState(0)
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [listMeta, setListMeta] = useState<{
+    total: number
+    totalPages: number
+  } | null>(null)
 
   const [modalMode, setModalMode] = useState<FormMode>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -211,80 +211,78 @@ export default function VehicleManagementView() {
 
   const [confirmKind, setConfirmKind] = useState<ConfirmKind>(null)
   const [actionBusy,  setActionBusy]  = useState(false)
-  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [deleteId,    setDeleteId]    = useState<string | null>(null)
 
-  // Truck model catalog modal
   const [modelModalOpen, setModelModalOpen] = useState(false)
 
-  const loadAll = useCallback(async () => {
+  const loadModelsVendors = useCallback(async () => {
     try {
-      setListLoading(true)
       setListError(null)
-      const [tList, mList, vRaw] = await Promise.all([
-        adminFetchTrucks(),
+      const [mList, vRaw] = await Promise.all([
         adminFetchTruckModels(),
         adminFetchVendorsRaw(),
       ])
-      setTrucks(tList)
       setModels(mList)
       setVendors(parseVendorOptions(vRaw))
+    } catch (e) {
+      setListError(axiosMessage(e))
+    }
+  }, [])
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedSearch(search.trim()), 350)
+    return () => window.clearTimeout(t)
+  }, [search])
+
+  const loadTrucksPage = useCallback(async () => {
+    try {
+      setListLoading(true)
+      setListError(null)
+      const res = await adminFetchTrucksPaginated({
+        page:     page + 1,
+        limit:    PAGE_SIZE,
+        status:   statusFilter,
+        owned_by: ownerFilter,
+        search:   debouncedSearch,
+      })
+      setTrucks(res.rows)
+      setListMeta({ total: res.meta.total, totalPages: res.meta.totalPages })
+      if (res.meta.totalPages >= 1 && page > res.meta.totalPages - 1) {
+        setPage(res.meta.totalPages - 1)
+      }
     } catch (e) {
       setListError(axiosMessage(e))
     } finally {
       setListLoading(false)
     }
-  }, [])
-
-  useEffect(() => { void loadAll() }, [loadAll])
-
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    return trucks.filter((t) => {
-      if (statusFilter !== 'all' && t.status !== statusFilter) return false
-      if (ownerFilter  !== 'all' && t.owned_by !== ownerFilter) return false
-      if (!q) return true
-      const modelName = t.truck_model?.name?.toLowerCase() ?? ''
-      return (
-        t.plate_number.toLowerCase().includes(q) ||
-        t.truck_type.toLowerCase().includes(q)   ||
-        t.status.toLowerCase().includes(q)       ||
-        modelName.includes(q)                    ||
-        t.truck_id.toLowerCase().includes(q)
-      )
-    })
-  }, [trucks, search, statusFilter, ownerFilter])
-
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-  const pageSafe  = Math.min(page, pageCount - 1)
-  const pageRows  = useMemo(() => {
-    const start = pageSafe * PAGE_SIZE
-    return filtered.slice(start, start + PAGE_SIZE)
-  }, [filtered, pageSafe])
+  }, [page, statusFilter, ownerFilter, debouncedSearch])
 
   useEffect(() => {
-    setPage((p) => Math.min(p, Math.max(0, pageCount - 1)))
-  }, [pageCount])
+    void loadModelsVendors()
+  }, [loadModelsVendors])
+
+  useEffect(() => {
+    void loadTrucksPage()
+  }, [loadTrucksPage])
+
+  const refreshAll = useCallback(async () => {
+    await Promise.all([loadModelsVendors(), loadTrucksPage()])
+  }, [loadModelsVendors, loadTrucksPage])
+
+  const pageCount = Math.max(1, listMeta?.totalPages ?? 1)
+  const pageSafe  = Math.min(page, pageCount - 1)
+  const totalRows = listMeta?.total ?? 0
 
   const selectedModel         = useMemo(() => models.find((m) => m.model_id === form.model_id) ?? null, [models, form.model_id])
   const selectedModelImageUrl = resolveModelImageUrl(selectedModel?.image_url ?? null)
 
-  // ─── helpers to apply a model pick (thumbnail or select) ───────────────────
   function applyModelPick(modelId: string) {
-    const picked = models.find((m) => m.model_id === modelId) ?? null
-    setForm((f) => ({
-      ...f,
-      model_id: modelId,
-      // auto-fill capacity from model's max_weight_kg (kg → tons), only when field is empty or user hasn't overridden
-      capacity_tons: picked?.max_weight_kg != null
-        ? kgToTons(picked.max_weight_kg)
-        : f.capacity_tons,
-    }))
+    setForm((f) => ({ ...f, model_id: modelId }))
   }
 
   function clearModelPick() {
-    setForm((f) => ({ ...f, model_id: '', capacity_tons: '' }))
+    setForm((f) => ({ ...f, model_id: '' }))
   }
-  // ───────────────────────────────────────────────────────────────────────────
 
   const openCreate = () => {
     setEditingId(null)
@@ -308,13 +306,8 @@ export default function VehicleManagementView() {
 
   function validateForm(): boolean {
     setFormError(null)
-    const cap = parseFloat(form.capacity_tons)
     if (!form.plate_number.trim()) {
       setFormError('Plate number is required.')
-      return false
-    }
-    if (Number.isNaN(cap) || cap <= 0) {
-      setFormError('Capacity (tons) must be a positive number.')
       return false
     }
     if (form.owned_by === 'vendor' && !form.vendor_id.trim()) {
@@ -335,7 +328,6 @@ export default function VehicleManagementView() {
   }
 
   const executeSave = async () => {
-    const cap       = parseFloat(form.capacity_tons)
     const model_id  = form.model_id.trim() || null
     const vendor_id = form.owned_by === 'vendor' ? form.vendor_id.trim() : null
 
@@ -343,31 +335,29 @@ export default function VehicleManagementView() {
     try {
       if (modalMode === 'create') {
         const body: CreateTruckInput = {
-          plate_number:  form.plate_number.trim().toUpperCase(),
-          truck_type:    form.truck_type,
-          capacity_tons: cap,
+          plate_number: form.plate_number.trim().toUpperCase(),
+          truck_type:   form.truck_type,
           model_id,
-          owned_by:      form.owned_by,
+          owned_by:     form.owned_by,
           vendor_id,
         }
         await adminCreateTruck(body)
         appToast.success('Vehicle created.', { action: 'truck-save' })
       } else if (modalMode === 'edit' && editingId) {
         const body: UpdateTruckInput = {
-          plate_number:  form.plate_number.trim().toUpperCase(),
-          truck_type:    form.truck_type,
-          capacity_tons: cap,
+          plate_number: form.plate_number.trim().toUpperCase(),
+          truck_type:   form.truck_type,
           model_id,
-          status:        form.status,
-          owned_by:      form.owned_by,
-          vendor_id:     form.owned_by === 'vendor' ? vendor_id : null,
+          status:       form.status,
+          owned_by:     form.owned_by,
+          vendor_id:    form.owned_by === 'vendor' ? vendor_id : null,
         }
         await adminUpdateTruck(editingId, body)
         appToast.success('Vehicle updated.', { action: 'truck-save', entityId: editingId })
       }
       setConfirmKind(null)
       closeModal()
-      await loadAll()
+      await refreshAll()
     } catch (e) {
       setConfirmKind(null)
       setFormError(axiosMessage(e))
@@ -385,7 +375,7 @@ export default function VehicleManagementView() {
       if (editingId === deleteId) closeModal()
       setDeleteId(null)
       setConfirmKind(null)
-      await loadAll()
+      await refreshAll()
     } catch (e) {
       appToast.error(axiosMessage(e), { action: 'truck-delete', entityId: deleteId })
       setConfirmKind(null)
@@ -440,7 +430,7 @@ export default function VehicleManagementView() {
           </button>
           <button
             type="button"
-            onClick={() => void loadAll()}
+            onClick={() => void refreshAll()}
             className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/5 transition-colors"
           >
             <RefreshCw size={14} />
@@ -478,7 +468,6 @@ export default function VehicleManagementView() {
             <span className="text-[10px] uppercase tracking-wider text-white/35 self-center mr-1">Status</span>
             {(['all', ...STATUSES] as const).map((key) => {
               const label  = key === 'all' ? 'All' : fmtLabel(key)
-              const count  = key === 'all' ? trucks.length : trucks.filter((t) => t.status === key).length
               const active = statusFilter === key
               return (
                 <button
@@ -492,7 +481,7 @@ export default function VehicleManagementView() {
                     color:       active ? 'var(--color-cyan)' : '#888',
                   }}
                 >
-                  {label} ({count})
+                  {label}
                 </button>
               )
             })}
@@ -502,7 +491,6 @@ export default function VehicleManagementView() {
             <span className="text-[10px] uppercase tracking-wider text-white/35 self-center mr-1">Owner</span>
             {(['all', 'company', 'vendor'] as const).map((key) => {
               const label  = key === 'all' ? 'All' : fmtLabel(key)
-              const count  = key === 'all' ? trucks.length : trucks.filter((t) => t.owned_by === key).length
               const active = ownerFilter === key
               return (
                 <button
@@ -516,7 +504,7 @@ export default function VehicleManagementView() {
                     color:       active ? '#fbbf24' : '#888',
                   }}
                 >
-                  {label} ({count})
+                  {label}
                 </button>
               )
             })}
@@ -535,11 +523,11 @@ export default function VehicleManagementView() {
           ) : listError ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-3 p-6">
               <p className="text-red-400 text-sm text-center">{listError}</p>
-              <button type="button" onClick={() => void loadAll()} className="text-[var(--color-cyan)] text-sm font-semibold">
+              <button type="button" onClick={() => void refreshAll()} className="text-[var(--color-cyan)] text-sm font-semibold">
                 Try again
               </button>
             </div>
-          ) : filtered.length === 0 ? (
+          ) : trucks.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-4 py-12 text-center px-4">
               <TruckIcon size={40} className="text-white/20" />
               <p className="text-sm text-white/45">No vehicles match your filters.</p>
@@ -550,21 +538,21 @@ export default function VehicleManagementView() {
           ) : (
             <>
               <div className="overflow-auto flex-1 min-h-0">
-                <table className="w-full text-left text-sm border-collapse min-w-[780px]">
+                <table className="w-full text-left text-sm border-collapse min-w-[700px]">
                   <thead className="sticky top-0 z-[1] bg-[#141414] border-b border-white/[0.07]">
                     <tr className="text-[11px] uppercase tracking-wider text-white/40">
                       <th className="px-2 py-2.5 font-bold w-14 text-center">Image</th>
                       <th className="px-3 py-2.5 font-bold">Plate</th>
                       <th className="px-3 py-2.5 font-bold">Type</th>
-                      <th className="px-3 py-2.5 font-bold text-right">Tons</th>
                       <th className="px-3 py-2.5 font-bold hidden md:table-cell">Model</th>
+                      <th className="px-3 py-2.5 font-bold hidden md:table-cell">Max weight</th>
                       <th className="px-3 py-2.5 font-bold">Status</th>
                       <th className="px-3 py-2.5 font-bold">Owner</th>
                       <th className="px-3 py-2.5 font-bold text-right w-[100px]">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {pageRows.map((t) => {
+                    {trucks.map((t) => {
                       const st         = statusStyle(t.status)
                       const modelLabel = t.truck_model?.name ?? 'Vehicle'
                       const thumbUrl   = resolveModelImageUrl((t.truck_model?.image_url as string | null | undefined) ?? null)
@@ -580,9 +568,13 @@ export default function VehicleManagementView() {
                           </td>
                           <td className="px-3 py-2.5 font-mono font-semibold text-white">{t.plate_number}</td>
                           <td className="px-3 py-2.5 text-white/70">{fmtLabel(t.truck_type)}</td>
-                          <td className="px-3 py-2.5 text-right text-white/75 tabular-nums">{t.capacity_tons}</td>
                           <td className="px-3 py-2.5 text-white/60 text-xs max-w-[200px] truncate hidden md:table-cell">
                             {t.truck_model?.name ?? '—'}
+                          </td>
+                          <td className="px-3 py-2.5 text-white/60 text-xs hidden md:table-cell tabular-nums">
+                            {t.truck_model?.max_weight_kg != null
+                              ? `${t.truck_model.max_weight_kg.toLocaleString()} kg · ${kgToTons(t.truck_model.max_weight_kg)} t`
+                              : '—'}
                           </td>
                           <td className="px-3 py-2.5">
                             <span
@@ -620,7 +612,10 @@ export default function VehicleManagementView() {
 
               <div className="shrink-0 flex items-center justify-between px-3 py-2 border-t border-white/[0.07] text-xs text-white/50">
                 <span>
-                  {pageSafe * PAGE_SIZE + 1}–{Math.min((pageSafe + 1) * PAGE_SIZE, filtered.length)} of {filtered.length}
+                  {totalRows === 0
+                    ? '0'
+                    : `${pageSafe * PAGE_SIZE + 1}–${Math.min((pageSafe + 1) * PAGE_SIZE, totalRows)}`}{' '}
+                  of {totalRows}
                 </span>
                 <div className="flex items-center gap-1">
                   <button
@@ -647,14 +642,12 @@ export default function VehicleManagementView() {
         </div>
       </div>
 
-      {/* ── Truck model catalog modal ───────────────────────────────────────── */}
       <TruckModelFormModal
         open={modelModalOpen}
         onClose={() => setModelModalOpen(false)}
-        onSaved={() => void loadAll()}
+        onSaved={() => void refreshAll()}
       />
 
-      {/* ── Confirm modal (save / delete) ───────────────────────────────────── */}
       <ReusableModal
         open={!!confirmKind && !!confirmModalProps}
         title={confirmModalProps?.title ?? ''}
@@ -670,7 +663,6 @@ export default function VehicleManagementView() {
         onConfirm={confirmModalProps?.onConfirm}
       />
 
-      {/* ── Vehicle create / edit modal ─────────────────────────────────────── */}
       <AnimatePresence>
         {modalMode && (
           <motion.div
@@ -733,7 +725,6 @@ export default function VehicleManagementView() {
                   <span className="text-[11px] font-bold uppercase text-white/40">Truck model &amp; catalog image</span>
 
                   <div className="mt-2 flex gap-2 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-white/15 scrollbar-track-transparent">
-                    {/* No model option */}
                     <button
                       type="button"
                       onClick={clearModelPick}
@@ -824,28 +815,6 @@ export default function VehicleManagementView() {
                     )}
                   </div>
                 </div>
-
-                {/* Capacity (auto-filled, still editable) */}
-                <label className="block">
-                  <span className="text-[11px] font-bold uppercase text-white/40">
-                    Capacity (tons)
-                    {selectedModel?.max_weight_kg != null && (
-                      <span className="ml-1.5 normal-case text-[10px] text-[var(--color-cyan)]/70 font-normal">
-                        — auto-filled from model
-                      </span>
-                    )}
-                  </span>
-                  <input
-                    type="number"
-                    step="0.001"
-                    min="0"
-                    value={form.capacity_tons}
-                    onChange={(e) => setForm((f) => ({ ...f, capacity_tons: e.target.value }))}
-                    className="mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-3 py-2.5 text-sm text-white outline-none tabular-nums focus:border-[var(--color-cyan)]/40"
-                    placeholder="e.g. 4"
-                  />
-                  <p className="text-[10px] text-white/30 mt-1">You can override the auto-filled value if needed.</p>
-                </label>
 
                 {/* Owned by + Status (edit only) */}
                 <div className="grid grid-cols-2 gap-3">

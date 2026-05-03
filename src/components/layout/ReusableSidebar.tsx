@@ -5,8 +5,8 @@ import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { LogOut, PanelLeftClose, PanelLeft } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { logout } from '@/app/lib/api/auth.api'
-import { useAuthStore } from '@/app/lib/store/auth.store'
+import { logout } from '@/lib/api/auth.api'
+import { useAuthStore } from '@/lib/store/auth.store'
 import ReusableModal from '@/components/layout/ReusableModal'
 
 const SIDEBAR_COLLAPSED = 56

@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react'
 import MuiAutocomplete from '@mui/material/Autocomplete'
 import TextField, { TextFieldProps } from '@mui/material/TextField'
 import CircularProgress from '@mui/material/CircularProgress'
-import { usePlacesAutocomplete, PlaceSuggestion, ResolvedPlace } from '../../../lib/hooks/usePlacesAutoComplete'
+import { usePlacesAutocomplete, PlaceSuggestion, ResolvedPlace } from '@/lib/hooks/usePlacesAutoComplete'
 
 const CYAN  = '#4DF9ED'
 const ERROR = '#f87171'

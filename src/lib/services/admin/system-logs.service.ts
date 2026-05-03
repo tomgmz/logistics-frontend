@@ -1,4 +1,4 @@
-import proxyApi from '@/app/lib/api/auth.api'
+import proxyApi from '@/lib/api/auth.api'
 
 export type LogType =
   | 'user_activity'

@@ -6,8 +6,8 @@ import { Check } from 'lucide-react'
 import StepBookingDetails from './BookingDetails'
 import StepVehicle from './ChooseVehicle'
 import StepReview from './ReviewBooking'
-import { useAppDispatch, useAppSelector } from '@/app/lib/hooks/hooks'
-import { setStep, resetBooking } from '@/app/lib/store/slice/booking.slice'
+import { useAppDispatch, useAppSelector } from '@/lib/hooks/hooks'
+import { setStep, resetBooking } from '@/lib/store/slice/booking.slice'
 import './BookingDetails.css'
 
 const STEPS = [

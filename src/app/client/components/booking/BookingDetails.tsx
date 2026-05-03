@@ -6,7 +6,7 @@ import {
   CalendarDays, Clock, MapPin, Package,
   Truck, Plus, X, Check, Info,
 } from 'lucide-react'
-import { useAppDispatch, useAppSelector } from '@/app/lib/hooks/hooks'
+import { useAppDispatch, useAppSelector } from '@/lib/hooks/hooks'
 import {
   setDate, setTime, setPickup,
   setPickupCoords,
@@ -18,9 +18,9 @@ import {
   setAllNonTiltable, setAllNonStackable,
   setAllStackable, setAllOversize,
   makeDefaultGroup,
-} from '@/app/lib/store/slice/booking.slice'
-import type { CargoMode, ItemGroup } from '@/app/lib/store/slice/booking.slice'
-import { selectCargoSummary, selectSections } from '@/app/lib/store/bookingSelectors'
+} from '@/lib/store/slice/booking.slice'
+import type { CargoMode, ItemGroup } from '@/lib/store/slice/booking.slice'
+import { selectCargoSummary, selectSections } from '@/lib/store/bookingSelectors'
 import MapLocationPicker from './MapLocationPicker'
 import './BookingDetails.css'
 
@@ -37,9 +37,9 @@ import {
   hasAnyErrors,
   getGroupErrors,
   type GroupErrors,
-} from '@/app/lib/validation/bookingValidation'
+} from '@/lib/validation/bookingValidation'
 
-import type { ResolvedPlace } from '@/app/lib/hooks/usePlacesAutoComplete'
+import type { ResolvedPlace } from '@/lib/hooks/usePlacesAutoComplete'
 
 interface Props {
   onNext: () => void

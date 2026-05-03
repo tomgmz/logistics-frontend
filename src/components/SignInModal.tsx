@@ -4,8 +4,8 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import { AxiosError } from 'axios'
-import { requestOtp, verifyOtp, getMe, getAuthStatus, AuthUser } from '@/app/lib/api/auth.api'
-import { useAuthStore } from '@/app/lib/store/auth.store'
+import { requestOtp, verifyOtp, getMe, getAuthStatus, AuthUser } from '@/lib/api/auth.api'
+import { useAuthStore } from '@/lib/store/auth.store'
 import { now } from '@/app/utils/serverTime'
 
 const ROLE_ROUTES: Record<string, string> = {

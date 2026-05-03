@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import ThemeRegistry from '@/components/ui/ThemeRegistry';
 import CsrfInit from '@/components/CsrfInit';
 import { alegreyaSansSC, aboreto, fredoka, leagueSpartan, eurostile } from '@/app/fonts';
-import StoreProvider from '@/app/lib/store/StoreProvider';
+import StoreProvider from '@/lib/store/StoreProvider';
 import AuthRehydrator from '@/components/AuthRehydrator';
 import AppToaster from '@/components/ui/AppToaster';
 import './globals.css';

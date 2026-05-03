@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, useInView } from 'framer-motion';
 import Image from 'next/image';
-import { SERVICES, CYCLING_WORDS } from '@/app/lib/data';
+import { SERVICES, CYCLING_WORDS } from '@/lib/data';
 
 const WORD_COLORS = [
   '#4df9ed',

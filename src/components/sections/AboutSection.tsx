@@ -3,7 +3,7 @@
 import { useRef } from 'react';
 import Image from 'next/image';
 import { motion, useInView } from 'framer-motion';
-import { ASSETS } from '@/app/lib/data';
+import { ASSETS } from '@/lib/data';
 
 export default function AboutSection() {
   const ref = useRef(null);

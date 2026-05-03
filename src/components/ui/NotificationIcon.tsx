@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { Bell, X, Check, Download, CheckCheck, ChevronRight } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import ReusableModal from "../layout/ReusableModal";
 
 /* ─────────────────────────────────────────────
    Types
@@ -85,38 +86,46 @@ interface NotifItemProps {
 
 function PdfNotifItem({ n, onToggleRead }: NotifItemProps) {
   const isUnread = !n.read_at;
-  const linkHref = n.attachment_url || "#";
 
   const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     e.stopPropagation();
-    if (!n.attachment_url) {
-      e.preventDefault();
-      return;
-    }
+    if (!n.attachment_url) { e.preventDefault(); return; }
     if (!n.read_at) onToggleRead(n);
   };
 
   return (
     <a
-      href={linkHref}
+      href={n.attachment_url || "#"}
       target="_blank"
       rel="noopener noreferrer"
-      style={{ textDecoration: "none", display: "block" }}
+      className="block no-underline"
       onClick={handleClick}
     >
-      <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 6, marginBottom: 3 }}>
-        <span style={{ fontFamily: "'Darker Grotesque'", fontWeight: 700, fontSize: 14, color: isUnread ? "#fff" : "rgba(255,255,255,0.5)" }}>
+      <div className="flex items-center flex-wrap gap-1.5 mb-0.5">
+        <span
+          className={`font-bold text-sm tracking-wide ${isUnread ? "text-white" : "text-white/50"}`}
+          style={{ fontFamily: "'Darker Grotesque', sans-serif" }}
+        >
           {n.title}
         </span>
-        <span className="pdf-badge">
+        <span
+          className="inline-flex items-center gap-0.5 bg-red-500 text-white text-[9px] tracking-widest px-1.5 py-0.5 rounded"
+          style={{ fontFamily: "'Aboreto', sans-serif" }}
+        >
           <Download size={8} />
           PDF
         </span>
       </div>
-      <p style={{ fontFamily: "'Darker Grotesque'", fontSize: 13, color: "rgba(255,255,255,0.38)", lineHeight: 1.5, margin: "0 0 5px" }}>
+      <p
+        className="text-[13px] text-white/40 leading-relaxed m-0 mb-1"
+        style={{ fontFamily: "'Darker Grotesque', sans-serif" }}
+      >
         {n.body}
       </p>
-      <span className="notif-aboreto" style={{ fontSize: 10, letterSpacing: "0.06em", color: "rgba(255,255,255,0.2)" }}>
+      <span
+        className="text-[10px] tracking-widest text-white/20"
+        style={{ fontFamily: "'Aboreto', sans-serif" }}
+      >
         {timeAgo(n.created_at)}
       </span>
     </a>
@@ -127,16 +136,25 @@ function RegularNotifItem({ n }: Pick<NotifItemProps, "n">) {
   const isUnread = !n.read_at;
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 3 }}>
-        <span style={{ fontFamily: "'Darker Grotesque'", fontWeight: 700, fontSize: 14, color: isUnread ? "#fff" : "rgba(255,255,255,0.5)" }}>
+      <div className="flex items-center justify-between mb-0.5">
+        <span
+          className={`font-bold text-sm ${isUnread ? "text-white" : "text-white/50"}`}
+          style={{ fontFamily: "'Darker Grotesque', sans-serif" }}
+        >
           {n.title}
         </span>
-        <ChevronRight size={13} style={{ color: "rgba(255,255,255,0.18)", flexShrink: 0, marginLeft: 6 }} />
+        <ChevronRight size={13} className="text-white/20 shrink-0 ml-1.5" />
       </div>
-      <p style={{ fontFamily: "'Darker Grotesque'", fontSize: 13, color: "rgba(255,255,255,0.38)", lineHeight: 1.5, margin: "0 0 5px" }}>
+      <p
+        className="text-[13px] text-white/40 leading-relaxed m-0 mb-1"
+        style={{ fontFamily: "'Darker Grotesque', sans-serif" }}
+      >
         {n.body}
       </p>
-      <span className="notif-aboreto" style={{ fontSize: 10, letterSpacing: "0.06em", color: "rgba(255,255,255,0.2)" }}>
+      <span
+        className="text-[10px] tracking-widest text-white/20"
+        style={{ fontFamily: "'Aboreto', sans-serif" }}
+      >
         {timeAgo(n.created_at)}
       </span>
     </div>
@@ -158,20 +176,12 @@ export default function NotificationIcon() {
   // ── Load ─────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
-
     const load = async () => {
-      // TODO: replace with your API, e.g.:
-      // const res = await fetch("/api/notifications");
-      // const data: Notification[] = await res.json();
-      // if (!cancelled) setNotifications(data);
+      // TODO: replace with your API call
       if (!cancelled) setNotifications(SAMPLE_NOTIFICATIONS);
     };
-
     load();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [refreshKey]);
 
   const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
@@ -203,113 +213,8 @@ export default function NotificationIcon() {
 
   return (
     <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Aboreto&family=Darker+Grotesque:wght@400;500;600;700&display=swap');
-
-        .notif-panel {
-          background: #0d0d0d !important;
-          border: 1px solid rgba(255,255,255,0.08) !important;
-          border-radius: 16px !important;
-          box-shadow: 0 32px 80px rgba(0,0,0,0.9), 0 0 0 1px rgba(255,255,255,0.03) !important;
-          font-family: 'Darker Grotesque', sans-serif;
-          padding: 0 !important;
-          overflow: hidden;
-          width: min(420px, 95vw) !important;
-        }
-        .notif-aboreto { font-family: 'Aboreto', sans-serif; }
-
-        .notif-item {
-          border-bottom: 1px solid rgba(255,255,255,0.05);
-          padding: 12px 18px;
-          transition: background 0.15s;
-          cursor: pointer;
-        }
-        .notif-item:last-child { border-bottom: none; }
-        .notif-item:hover { background: rgba(255,255,255,0.04); }
-        .notif-item.unread { background: rgba(255,255,255,0.025); }
-        .notif-item.unread:hover { background: rgba(255,255,255,0.055); }
-
-        .unread-dot {
-          width: 6px; height: 6px; border-radius: 50%;
-          background: var(--color-cyan, #22d3ee);
-          box-shadow: 0 0 7px var(--color-cyan, #22d3ee);
-          flex-shrink: 0;
-        }
-        .toggle-btn {
-          width: 28px; height: 28px; border-radius: 8px;
-          border: 1px solid rgba(255,255,255,0.1);
-          background: rgba(255,255,255,0.03);
-          color: rgba(255,255,255,0.4);
-          display: flex; align-items: center; justify-content: center;
-          transition: all 0.15s; cursor: pointer; flex-shrink: 0;
-        }
-        .toggle-btn:hover { border-color: rgba(255,255,255,0.25); background: rgba(255,255,255,0.08); color: #fff; }
-        .toggle-btn.is-read { border-color: rgba(255,255,255,0.05); color: rgba(255,255,255,0.18); }
-
-        .pdf-badge {
-          display: inline-flex; align-items: center; gap: 3px;
-          font-family: 'Aboreto', sans-serif; font-size: 9px; letter-spacing: 0.1em;
-          background: #ef4444; color: white; padding: 2px 7px; border-radius: 4px;
-        }
-        .mark-btn {
-          font-family: 'Aboreto', sans-serif; font-size: 10px; letter-spacing: 0.1em;
-          color: rgba(255,255,255,0.38); background: none;
-          border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;
-          padding: 4px 10px; cursor: pointer; transition: all 0.15s;
-          display: flex; align-items: center; gap: 5px;
-        }
-        .mark-btn:hover { color: #fff; border-color: rgba(255,255,255,0.22); background: rgba(255,255,255,0.05); }
-
-        .close-btn {
-          background: none; border: none; cursor: pointer;
-          color: rgba(255,255,255,0.28); display: flex; padding: 2px;
-          transition: color 0.15s;
-        }
-        .close-btn:hover { color: rgba(255,255,255,0.7); }
-
-        .notif-empty {
-          font-family: 'Aboreto', sans-serif; font-size: 11px;
-          letter-spacing: 0.08em; text-transform: uppercase;
-          color: rgba(255,255,255,0.18); text-align: center; padding: 36px 0;
-        }
-        .notif-scroll { max-height: 68vh; overflow-y: auto; padding: 4px 0 8px; }
-        .notif-scroll::-webkit-scrollbar { width: 3px; }
-        .notif-scroll::-webkit-scrollbar-track { background: transparent; }
-        .notif-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
-
-        .confirm-overlay {
-          position: fixed; inset: 0;
-          background: rgba(0,0,0,0.72); backdrop-filter: blur(6px);
-          display: flex; align-items: center; justify-content: center; z-index: 10000;
-        }
-        .confirm-box {
-          background: #111; border: 1px solid rgba(255,255,255,0.1);
-          border-radius: 16px; padding: 32px; width: 360px;
-          box-shadow: 0 40px 100px rgba(0,0,0,0.9);
-        }
-        .confirm-title {
-          font-family: 'Aboreto', sans-serif; font-size: 15px;
-          letter-spacing: 0.12em; text-transform: uppercase; color: #fff; margin-bottom: 10px;
-        }
-        .confirm-body {
-          font-family: 'Darker Grotesque', sans-serif; font-size: 14px;
-          color: rgba(255,255,255,0.42); margin-bottom: 28px; line-height: 1.6;
-        }
-        .confirm-row { display: flex; gap: 10px; justify-content: flex-end; }
-        .btn-cancel {
-          font-family: 'Aboreto', sans-serif; font-size: 11px; letter-spacing: 0.1em;
-          text-transform: uppercase; padding: 10px 20px; border-radius: 10px;
-          border: 1px solid rgba(255,255,255,0.1); background: transparent;
-          color: rgba(255,255,255,0.42); cursor: pointer; transition: all 0.15s;
-        }
-        .btn-cancel:hover { border-color: rgba(255,255,255,0.25); color: #fff; background: rgba(255,255,255,0.05); }
-        .btn-confirm {
-          font-family: 'Aboreto', sans-serif; font-size: 11px; letter-spacing: 0.1em;
-          text-transform: uppercase; padding: 10px 20px; border-radius: 10px;
-          border: none; background: #fff; color: #0a0a0a; cursor: pointer; transition: all 0.15s;
-        }
-        .btn-confirm:hover { background: rgba(255,255,255,0.85); }
-      `}</style>
+      {/* Google Fonts — keep as style import; Tailwind cannot load custom fonts */}
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Aboreto&family=Darker+Grotesque:wght@400;500;600;700&display=swap');`}</style>
 
       {/* ── Popover ── */}
       <Popover open={open} onOpenChange={setOpen}>
@@ -331,81 +236,88 @@ export default function NotificationIcon() {
 
         {/* Panel */}
         <PopoverContent
-          className="notif-panel"
           side="bottom"
           align="end"
           sideOffset={10}
           onOpenAutoFocus={(e) => e.preventDefault()}
+          className="p-0 overflow-hidden w-[min(420px,95vw)] rounded-2xl border border-white/[0.08] bg-[#0d0d0d] shadow-[0_32px_80px_rgba(0,0,0,0.9),0_0_0_1px_rgba(255,255,255,0.03)]"
         >
           {/* Header */}
-          <div style={{ padding: "16px 18px 14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div className="flex items-center justify-between px-[18px] pt-4 pb-3.5">
+            <div className="flex items-center gap-2.5">
               <span
-                className="notif-aboreto"
-                style={{ fontSize: 13, letterSpacing: "0.12em", textTransform: "uppercase", color: "#fff" }}
+                className="text-[13px] tracking-[0.12em] uppercase text-white"
+                style={{ fontFamily: "'Aboreto', sans-serif" }}
               >
                 Notifications
               </span>
               {unreadCount > 0 && (
-                <span style={{
-                  fontFamily: "'Darker Grotesque', sans-serif",
-                  fontSize: 11,
-                  fontWeight: 700,
-                  background: "var(--color-cyan, #22d3ee)",
-                  color: "#0a0a0a",
-                  borderRadius: 20,
-                  padding: "1px 7px",
-                  lineHeight: 1.6,
-                }}>
+                <span
+                  className="text-[11px] font-bold bg-[var(--color-cyan,#22d3ee)] text-[#0a0a0a] rounded-full px-1.5 leading-relaxed"
+                  style={{ fontFamily: "'Darker Grotesque', sans-serif" }}
+                >
                   {unreadCount}
                 </span>
               )}
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div className="flex items-center gap-2">
               {unreadCount > 0 && (
                 <button
-                  className="mark-btn"
-                  onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-                    e.stopPropagation();
-                    setOpenConfirm(true);
-                  }}
+                  className="flex items-center gap-1 text-[10px] tracking-widest text-white/40 bg-transparent border border-white/[0.08] rounded-lg px-2.5 py-1 cursor-pointer transition-all hover:text-white hover:border-white/20 hover:bg-white/5"
+                  style={{ fontFamily: "'Aboreto', sans-serif" }}
+                  onClick={(e) => { e.stopPropagation(); setOpenConfirm(true); }}
                 >
                   <CheckCheck size={12} />
                   Mark all read
                 </button>
               )}
-              <button className="close-btn" onClick={() => setOpen(false)}>
+              <button
+                className="flex p-0.5 bg-transparent border-none cursor-pointer text-white/30 transition-colors hover:text-white/70"
+                onClick={() => setOpen(false)}
+              >
                 <X size={15} />
               </button>
             </div>
           </div>
 
-          <div style={{ height: 1, background: "rgba(255,255,255,0.06)" }} />
+          <div className="h-px bg-white/[0.06]" />
 
           {/* List */}
-          <div className="notif-scroll">
+          <div className="max-h-[68vh] overflow-y-auto py-1 [&::-webkit-scrollbar]:w-[3px] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/[0.08] [&::-webkit-scrollbar-thumb]:rounded-sm">
             {notifications.length === 0 ? (
-              <div className="notif-empty">No notifications yet</div>
+              <div
+                className="text-[11px] tracking-[0.08em] uppercase text-white/20 text-center py-9"
+                style={{ fontFamily: "'Aboreto', sans-serif" }}
+              >
+                No notifications yet
+              </div>
             ) : (
               notifications.map((n) => {
                 const isUnread = !n.read_at;
                 const isPdf = isPrescription(n.title);
 
                 return (
-                  <div key={n.notification_id} className={`notif-item ${isUnread ? "unread" : ""}`}>
-                    <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                  <div
+                    key={n.notification_id}
+                    className={`border-b border-white/[0.05] last:border-b-0 px-[18px] py-3 cursor-pointer transition-colors
+                      ${isUnread
+                        ? "bg-white/[0.025] hover:bg-white/[0.055]"
+                        : "hover:bg-white/[0.04]"
+                      }`}
+                  >
+                    <div className="flex items-start gap-2.5">
 
                       {/* Unread dot */}
-                      <div style={{ paddingTop: 6 }}>
+                      <div className="pt-1.5">
                         {isUnread
-                          ? <div className="unread-dot" />
-                          : <div style={{ width: 6, height: 6 }} />
+                          ? <div className="w-1.5 h-1.5 rounded-full bg-[var(--color-cyan,#22d3ee)] shadow-[0_0_7px_var(--color-cyan,#22d3ee)] shrink-0" />
+                          : <div className="w-1.5 h-1.5" />
                         }
                       </div>
 
                       {/* Body */}
-                      <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="flex-1 min-w-0">
                         {isPdf
                           ? <PdfNotifItem n={n} onToggleRead={toggleRead} />
                           : <RegularNotifItem n={n} />
@@ -414,12 +326,13 @@ export default function NotificationIcon() {
 
                       {/* Toggle read button */}
                       <button
-                        className={`toggle-btn ${!isUnread ? "is-read" : ""}`}
                         title={isUnread ? "Mark as read" : "Mark as unread"}
-                        onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-                          e.stopPropagation();
-                          toggleRead(n);
-                        }}
+                        onClick={(e) => { e.stopPropagation(); toggleRead(n); }}
+                        className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 cursor-pointer transition-all border bg-white/[0.03]
+                          ${isUnread
+                            ? "border-white/10 text-white/40 hover:border-white/25 hover:bg-white/[0.08] hover:text-white"
+                            : "border-white/[0.05] text-white/20"
+                          }`}
                       >
                         {isUnread ? <X size={12} /> : <Check size={12} />}
                       </button>
@@ -431,9 +344,13 @@ export default function NotificationIcon() {
           </div>
 
           {/* Footer */}
-          <div style={{ height: 1, background: "rgba(255,255,255,0.06)" }} />
-          <div style={{ padding: "10px 18px", display: "flex", justifyContent: "flex-end" }}>
-            <button className="mark-btn" onClick={refresh}>
+          <div className="h-px bg-white/[0.06]" />
+          <div className="flex justify-end px-[18px] py-2.5">
+            <button
+              className="flex items-center gap-1 text-[10px] tracking-widest text-white/40 bg-transparent border border-white/[0.08] rounded-lg px-2.5 py-1 cursor-pointer transition-all hover:text-white hover:border-white/20 hover:bg-white/5"
+              style={{ fontFamily: "'Aboreto', sans-serif" }}
+              onClick={refresh}
+            >
               Refresh
             </button>
           </div>
@@ -441,46 +358,18 @@ export default function NotificationIcon() {
       </Popover>
 
       {/* ── Mark All Confirm Modal ── */}
-      <AnimatePresence>
-        {openConfirm && (
-          <motion.div
-            className="confirm-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setOpenConfirm(false)}
-          >
-            <motion.div
-              className="confirm-box"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: 0.18 }}
-              onClick={(e: React.MouseEvent<HTMLDivElement>) => e.stopPropagation()}
-            >
-              <div className="confirm-title">Mark all as read?</div>
-              <div className="confirm-body">
-                This will mark all {unreadCount} unread notification{unreadCount !== 1 ? "s" : ""} as read.
-                You can still unmark them individually afterwards.
-              </div>
-              <div className="confirm-row">
-                <button className="btn-cancel" onClick={() => setOpenConfirm(false)}>
-                  Cancel
-                </button>
-                <button
-                  className="btn-confirm"
-                  onClick={async () => {
-                    await markAllAsRead();
-                    setOpenConfirm(false);
-                  }}
-                >
-                  Confirm
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <ReusableModal
+        open={openConfirm}
+        title="Mark all as read?"
+        description={`This will mark all ${unreadCount} unread notification${unreadCount !== 1 ? "s" : ""} as read. You can still unmark them individually afterwards.`}
+        confirmLabel="Confirm"
+        cancelLabel="Cancel"
+        onConfirm={async () => {
+          await markAllAsRead();
+          setOpenConfirm(false);
+        }}
+        onCancel={() => setOpenConfirm(false)}
+      />
     </>
   );
 }

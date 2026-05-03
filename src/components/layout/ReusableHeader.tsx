@@ -3,7 +3,7 @@
 import { motion } from 'framer-motion'
 import { MessageCircle, Menu } from 'lucide-react'
 import Image from 'next/image'
-import { ASSETS } from '@/app/lib/data'
+import { ASSETS } from '@/lib/data'
 import NotificationIcon from '@/components/ui/NotificationIcon' // adjust path if needed
 
 interface ReusableHeaderProps {

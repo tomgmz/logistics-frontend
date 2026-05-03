@@ -11,7 +11,7 @@ import {
   ArrowRight,
 } from 'lucide-react'
 import type { OptimizeRouteResponse, BookingDetail } from '@/app/types/maps/routemap.types'
-import { fetchTruckModels } from '@/app/lib/api/client/truck-model'
+import { fetchTruckModels } from '@/lib/api/client/truck-model'
 
 const STAGE_ICONS = [
   { Icon: CalendarClock, label: 'Scheduled'  },

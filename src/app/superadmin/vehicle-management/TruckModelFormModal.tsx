@@ -11,9 +11,9 @@ import {
   adminUpdateTruckModel,
   adminDeleteTruckModel,
   adminUploadTruckModelImage,
-} from '@/app/lib/services/admin/trucks.service'
+} from '@/lib/services/admin/trucks.service'
 import ReusableModal from '@/components/layout/ReusableModal'
-import { appToast } from '@/app/lib/toast'
+import { appToast } from '@/lib/toast'
 
 function axiosMessage(err: unknown): string {
   const data = (err as { response?: { data?: { message?: string; errors?: { field: string; message: string }[] } } })

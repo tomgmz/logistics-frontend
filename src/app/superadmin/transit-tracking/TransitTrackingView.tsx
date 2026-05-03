@@ -13,15 +13,15 @@ import { DirectionsRenderer } from '@/components/map/DirectionsRenderer'
 import { DetailsPanelContent } from '@/components/map/DetailsPanelContent'
 import { StatusBadge } from '@/components/map/RouteMapComponents'
 import { statusColor } from '@/components/map/status.colors'
-import { useAppDispatch, useAppSelector } from '@/app/lib/hooks/hooks'
-import { useAuthStore } from '@/app/lib/store/auth.store'
+import { useAppDispatch, useAppSelector } from '@/lib/hooks/hooks'
+import { useAuthStore } from '@/lib/store/auth.store'
 import {
   fetchBookings,
   fetchRouteAndDetail,
   clearSelection,
   setSelectedId,
   type BookingWithRelations,
-} from '@/app/lib/store/slice/routeMap.slice'
+} from '@/lib/store/slice/routeMap.slice'
 import type { BookingDetail, OptimizedStop, OptimizeRouteResponse } from '@/app/types/maps/routemap.types'
 
 const GOOGLE_MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY

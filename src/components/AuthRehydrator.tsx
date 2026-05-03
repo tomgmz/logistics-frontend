@@ -2,8 +2,8 @@
 
 import { useEffect, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { getMe } from '@/app/lib/api/auth.api'
-import { useAuthStore } from '@/app/lib/store/auth.store'
+import { getMe } from '@/lib/api/auth.api'
+import { useAuthStore } from '@/lib/store/auth.store'
 import { syncServerTime } from '@/app/utils/serverTime'
 import axios from 'axios'
 

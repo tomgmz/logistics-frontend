@@ -1,4 +1,4 @@
-import type { CargoMode, ItemGroup, DropoffSection } from '@/app/lib/store/slice/booking.slice'
+import type { CargoMode, ItemGroup, DropoffSection } from '@/lib/store/slice/booking.slice'
 import { nowDate } from '@/app/utils/serverTime'
 
 export interface ScheduleErrors {

@@ -3,7 +3,7 @@
 import { ReactNode, useEffect } from 'react'
 import ReusableDashboardShell from '@/components/layout/ReusableDashboardShell'
 import { Activity } from 'lucide-react'
-import { useAuthStore } from '@/app/lib/store/auth.store'
+import { useAuthStore } from '@/lib/store/auth.store'
 
 const ADMIN_NAV = [
   { href: '/admin/system-logs', label: 'System Logs', icon: <Activity size={20} /> },

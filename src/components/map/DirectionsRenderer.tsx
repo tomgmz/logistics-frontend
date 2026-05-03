@@ -84,7 +84,7 @@ export function DirectionsRenderer({
     let mounted = true
     fetchingRef.current = true
 
-    import('@/app/lib/api/directions.api')
+    import('@/lib/api/directions.api')
       .then(({ computeDirections }) =>
         computeDirections({
           origin: {

@@ -3,7 +3,7 @@
 import Image from 'next/image'
 import { motion, Variants } from 'framer-motion'
 import { ArrowRight } from 'lucide-react'
-import { ServiceType } from '@/app/lib/store/slice/booking.slice'
+import { ServiceType } from '@/lib/store/slice/booking.slice'
 import { SERVICE_TYPES } from '../../../../constants/client/serviceTypeData'
 
 interface Props {
