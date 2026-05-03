@@ -111,13 +111,13 @@ function formatPhone(digits: string): string {
 
 function buildInitialState(tab: UserTab, user: AnyUser | null): FormState {
   const base: FormState = {
-    first_name:     user?.first_name     ?? '',
-    last_name:      user?.last_name      ?? '',
-    middle_initial: user?.middle_initial ?? '',
-    suffix:         user?.suffix         ?? '',
-    username:       user?.username       ?? '',
-    email:          user?.email          ?? '',
-    phone:          user?.phone ? toLocalDigits(user.phone) : '',
+    first_name:  user?.first_name  ?? '',
+    last_name:   user?.last_name   ?? '',
+    middle_name: user?.middle_name ?? '',
+    suffix:      user?.suffix      ?? '',
+    username:    user?.username    ?? '',
+    email:       user?.email       ?? '',
+    phone:       user?.phone ? toLocalDigits(user.phone) : '',
   }
 
   if (tab === 'clients') {
@@ -161,12 +161,8 @@ async function submitForm(tab: UserTab, form: FormState, editId?: string): Promi
   const clean = Object.fromEntries(
     Object.entries(form).filter(([, v]) => v !== '' && v !== null && v !== undefined),
   )
-  if (clean.phone) {
-    clean.phone = attachCountryCode(String(clean.phone))
-  }
-  if (clean.landline) {
-    clean.landline = attachCountryCode(String(clean.landline))
-  }
+  if (clean.phone)    clean.phone    = attachCountryCode(String(clean.phone))
+  if (clean.landline) clean.landline = attachCountryCode(String(clean.landline))
 
   switch (tab) {
     case 'clients':           return editId ? clientService.update(editId, clean as never).then()           : clientService.create(clean as never).then()
@@ -301,8 +297,8 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
   const [confirmClose, setConfirmClose] = useState(false)
   const [confirmSave,  setConfirmSave]  = useState(false)
 
-  const [vendorList,      setVendorList]      = useState<{ vendor_id: string; name: string }[]>([])
-  const [vendorsLoading,  setVendorsLoading]  = useState(false)
+  const [vendorList,     setVendorList]     = useState<{ vendor_id: string; name: string }[]>([])
+  const [vendorsLoading, setVendorsLoading] = useState(false)
 
   useEffect(() => {
     setForm(buildInitialState(tab, user))
@@ -458,13 +454,12 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <Field label="Middle Initial" error={fe.middle_initial}>
+              <Field label="Middle Name" hint="Optional" error={fe.middle_name}>
                 <Input
-                  value={form.middle_initial as string}
-                  onChange={e => set('middle_initial', e.target.value)}
-                  placeholder="R."
-                  maxLength={1}
-                  error={fe.middle_initial}
+                  value={form.middle_name as string}
+                  onChange={e => set('middle_name', e.target.value)}
+                  placeholder="Reyes"
+                  error={fe.middle_name}
                 />
               </Field>
               <Field label="Suffix" error={fe.suffix}>

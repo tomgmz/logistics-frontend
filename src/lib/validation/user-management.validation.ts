@@ -23,10 +23,14 @@ const lastName = z
     'Last name may only contain letters, spaces, hyphens, or apostrophes',
   )
 
-const middleInitial = z
+const middleName = z
   .string()
-  .max(1, 'Middle initial must be a single character')
-  .regex(/^[\p{L}]$/u, 'Middle initial must be a letter')
+  .min(2, 'Middle name must be at least 2 characters')
+  .max(50, 'Middle name is too long')
+  .regex(
+    /^[\p{L}]+(?:[ '-][\p{L}]+)*$/u,
+    'Middle name may only contain letters, spaces, hyphens, or apostrophes',
+  )
   .optional()
   .nullable()
   .transform(v => (v === '' ? null : v))
@@ -82,7 +86,7 @@ const licenseExpiry = z
 const baseCreateFields = {
   first_name:     firstName,
   last_name:      lastName,
-  middle_initial: middleInitial,
+  middle_initial: middleName,
   suffix,
   username,
   email,
@@ -92,7 +96,7 @@ const baseCreateFields = {
 const baseUpdateFields = {
   first_name:     firstName.optional(),
   last_name:      lastName.optional(),
-  middle_initial: middleInitial,
+  middle_initial: middleName,
   suffix,
   username:       username.optional(),
   email:          email.optional(),

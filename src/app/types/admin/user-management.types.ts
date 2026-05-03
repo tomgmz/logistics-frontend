@@ -89,7 +89,7 @@ export interface CreateAdminPayload {
   phone?: string
   first_name?: string
   last_name?: string
-  middle_initial?: string
+  middle_name?: string
   suffix?: string
   role: AdminRole
 }
