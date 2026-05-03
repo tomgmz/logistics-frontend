@@ -8,22 +8,23 @@ import {
   type LogStats,
   type LogType,
 } from '@/lib/services/admin/system-logs.service'
+import { formatDate, formatTime, formatDateTime } from '@/app/utils/timeFormat'
 
 const BADGE_STYLES: Record<LogType, string> = {
-  user_activity:  'bg-[rgba(77,249,237,0.12)] text-[#4df9ed] border border-[rgba(77,249,237,0.25)]',
+  user_activity:    'bg-[rgba(77,249,237,0.12)] text-[#4df9ed] border border-[rgba(77,249,237,0.25)]',
   vehicle_activity: 'bg-[rgba(58,246,38,0.10)] text-[#3af626] border border-[rgba(58,246,38,0.25)]',
-  booking:        'bg-[rgba(255,200,60,0.10)] text-[#ffc83c] border border-[rgba(255,200,60,0.25)]',
-  payment:        'bg-[rgba(160,120,255,0.12)] text-[#b08aff] border border-[rgba(160,120,255,0.25)]',
-  system_error:   'bg-[rgba(255,80,80,0.10)] text-[#ff6060] border border-[rgba(255,80,80,0.25)]',
+  booking:          'bg-[rgba(255,200,60,0.10)] text-[#ffc83c] border border-[rgba(255,200,60,0.25)]',
+  payment:          'bg-[rgba(160,120,255,0.12)] text-[#b08aff] border border-[rgba(160,120,255,0.25)]',
+  system_error:     'bg-[rgba(255,80,80,0.10)] text-[#ff6060] border border-[rgba(255,80,80,0.25)]',
 }
 
 const STAT_COLORS: Record<string, string> = {
-  total:          '#ffffff',
-  user_activity:  '#4df9ed',
+  total:            '#ffffff',
+  user_activity:    '#4df9ed',
   vehicle_activity: '#3af626',
-  booking:        '#ffc83c',
-  payment:        '#b08aff',
-  system_error:   '#ff6060',
+  booking:          '#ffc83c',
+  payment:          '#b08aff',
+  system_error:     '#ff6060',
 }
 
 const PAGE_SIZE = 15
@@ -83,12 +84,6 @@ export default function SystemLogsPage() {
 
   const totalPages = Math.ceil(total / PAGE_SIZE)
 
-  const formatDate = (ts: string) =>
-    new Date(ts).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: '2-digit' })
-
-  const formatTime = (ts: string) =>
-    new Date(ts).toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-
   const displayName = (log: SystemLog) => {
     if (!log.users) return '—'
     const { first_name, last_name, username } = log.users
@@ -109,11 +104,11 @@ export default function SystemLogsPage() {
             <div className="flex flex-wrap gap-3">
               {(
                 [
-                  ['Total',    stats.total,          'total'],
-                  ['Activity', stats.user_activity,  'user_activity'],
-                  ['Vehicles',   stats.vehicle_activity, 'vehicle_activity'],
-                  ['Bookings', stats.booking,        'booking'],
-                  ['Errors',   stats.system_error,   'system_error'],
+                  ['Total',    stats.total,             'total'],
+                  ['Activity', stats.user_activity,     'user_activity'],
+                  ['Vehicles', stats.vehicle_activity,  'vehicle_activity'],
+                  ['Bookings', stats.booking,           'booking'],
+                  ['Errors',   stats.system_error,      'system_error'],
                 ] as [string, number, string][]
               ).map(([label, val, key]) => (
                 <div key={key} className="rounded-xl border border-[#2a2a2a] bg-[#1b1b1b] px-4 py-2 text-center min-w-[72px]">
@@ -178,7 +173,7 @@ export default function SystemLogsPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2">
                 {([
                   ['Log ID',      selected.log_id],
-                  ['Timestamp',   new Date(selected.timestamp).toLocaleString('en-PH')],
+                  ['Timestamp',   formatDateTime(selected.timestamp)],
                   ['Type',        selected.log_type],
                   ['Action',      selected.action],
                   ['Description', selected.description ?? '—'],

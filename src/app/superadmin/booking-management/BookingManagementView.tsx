@@ -25,6 +25,7 @@ import {
   type AdminBookingLifecycleStatus,
   type DestinationDeliveryStatus,
 } from '@/lib/services/client/booking.service'
+import { nowDate } from '@/app/utils/serverTime'
 
 const PAGE_SIZE = 12
 
@@ -204,7 +205,7 @@ export default function BookingManagementView() {
     setDestBusyId(destinationId)
     setActionMsg(null)
     try {
-      const deliveredAt = status === 'delivered' ? new Date().toISOString() : undefined
+      const deliveredAt = status === 'delivered' ? nowDate().toISOString() : undefined
       await bookingService.updateDestinationStatus(destinationId, status, deliveredAt)
       if (selectedId) await openDetail(selectedId)
       await loadPage()

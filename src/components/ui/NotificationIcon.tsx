@@ -5,10 +5,8 @@ import { motion } from "framer-motion";
 import { Bell, X, Check, Download, CheckCheck, ChevronRight } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import ReusableModal from "../layout/ReusableModal";
+import { now, nowDate } from "@/app/utils/serverTime";
 
-/* ─────────────────────────────────────────────
-   Types
-───────────────────────────────────────────── */
 interface Notification {
   notification_id: string;
   title: string;
@@ -18,29 +16,26 @@ interface Notification {
   attachment_url?: string;
 }
 
-/* ─────────────────────────────────────────────
-   Sample data
-───────────────────────────────────────────── */
 const SAMPLE_NOTIFICATIONS: Notification[] = [
   {
     notification_id: "1",
     title: "Booking Confirmed",
     body: "Your booking #BK-00421 from Makati to BGC has been confirmed and assigned to Driver Reyes.",
-    created_at: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
+    created_at: new Date(now() - 1000 * 60 * 5).toISOString(),
     read_at: null,
   },
   {
     notification_id: "2",
     title: "Driver En Route",
     body: "Driver Santos is 10 minutes away from your pickup point at Ayala Ave, Makati.",
-    created_at: new Date(Date.now() - 1000 * 60 * 32).toISOString(),
+    created_at: new Date(now() - 1000 * 60 * 32).toISOString(),
     read_at: null,
   },
   {
     notification_id: "3",
     title: "Prescription Ready",
     body: "Your prescription document for booking #BK-00418 is ready for download.",
-    created_at: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
+    created_at: new Date(now() - 1000 * 60 * 60 * 2).toISOString(),
     read_at: null,
     attachment_url: "/sample-prescription.pdf",
   },
@@ -48,26 +43,23 @@ const SAMPLE_NOTIFICATIONS: Notification[] = [
     notification_id: "4",
     title: "Delivery Completed",
     body: "Booking #BK-00410 has been successfully delivered. Please rate your experience.",
-    created_at: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-    read_at: new Date(Date.now() - 1000 * 60 * 60 * 20).toISOString(),
+    created_at: new Date(now() - 1000 * 60 * 60 * 24).toISOString(),
+    read_at: new Date(now() - 1000 * 60 * 60 * 20).toISOString(),
   },
   {
     notification_id: "5",
     title: "Payment Received",
     body: "Payment of ₱1,250.00 for booking #BK-00410 has been successfully processed.",
-    created_at: new Date(Date.now() - 1000 * 60 * 60 * 25).toISOString(),
-    read_at: new Date(Date.now() - 1000 * 60 * 60 * 22).toISOString(),
+    created_at: new Date(now() - 1000 * 60 * 60 * 25).toISOString(),
+    read_at: new Date(now() - 1000 * 60 * 60 * 22).toISOString(),
   },
 ];
 
-/* ─────────────────────────────────────────────
-   Helpers
-───────────────────────────────────────────── */
 const isPrescription = (title: string) =>
   title.toLowerCase().includes("prescription");
 
 const timeAgo = (iso: string): string => {
-  const diff = Date.now() - new Date(iso).getTime();
+  const diff = now() - new Date(iso).getTime();
   const m = Math.floor(diff / 60000);
   if (m < 1) return "just now";
   if (m < 60) return `${m}m ago`;
@@ -76,9 +68,6 @@ const timeAgo = (iso: string): string => {
   return `${Math.floor(h / 24)}d ago`;
 };
 
-/* ─────────────────────────────────────────────
-   Sub-components
-───────────────────────────────────────────── */
 interface NotifItemProps {
   n: Notification;
   onToggleRead: (n: Notification) => void;
@@ -161,9 +150,6 @@ function RegularNotifItem({ n }: Pick<NotifItemProps, "n">) {
   );
 }
 
-/* ─────────────────────────────────────────────
-   Main Component
-───────────────────────────────────────────── */
 export default function NotificationIcon() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [open, setOpen] = useState(false);
@@ -173,11 +159,9 @@ export default function NotificationIcon() {
 
   const unreadCount = notifications.filter((n) => !n.read_at).length;
 
-  // ── Load ─────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
-      // TODO: replace with your API call
       if (!cancelled) setNotifications(SAMPLE_NOTIFICATIONS);
     };
     load();
@@ -186,16 +170,13 @@ export default function NotificationIcon() {
 
   const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
 
-  // ── Refresh relative timestamps every minute ─
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 60_000);
     return () => clearInterval(id);
   }, []);
 
-  // ── Actions ──────────────────────────────────
   const toggleRead = useCallback((n: Notification) => {
-    // TODO: PATCH /api/notifications/:id
-    const updatedReadAt = n.read_at ? null : new Date().toISOString();
+    const updatedReadAt = n.read_at ? null : nowDate().toISOString();
     setNotifications((prev) =>
       prev.map((item) =>
         item.notification_id === n.notification_id
@@ -206,20 +187,15 @@ export default function NotificationIcon() {
   }, []);
 
   const markAllAsRead = useCallback(async () => {
-    // TODO: PATCH /api/notifications/mark-all-read
-    const now = new Date().toISOString();
-    setNotifications((prev) => prev.map((n) => ({ ...n, read_at: now })));
+    const nowIso = nowDate().toISOString();
+    setNotifications((prev) => prev.map((n) => ({ ...n, read_at: nowIso })));
   }, []);
 
   return (
     <>
-      {/* Google Fonts — keep as style import; Tailwind cannot load custom fonts */}
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Aboreto&family=Darker+Grotesque:wght@400;500;600;700&display=swap');`}</style>
 
-      {/* ── Popover ── */}
       <Popover open={open} onOpenChange={setOpen}>
-
-        {/* Trigger */}
         <PopoverTrigger asChild>
           <motion.button
             whileHover={{ scale: 1.08 }}
@@ -234,7 +210,6 @@ export default function NotificationIcon() {
           </motion.button>
         </PopoverTrigger>
 
-        {/* Panel */}
         <PopoverContent
           side="bottom"
           align="end"
@@ -242,7 +217,6 @@ export default function NotificationIcon() {
           onOpenAutoFocus={(e) => e.preventDefault()}
           className="p-0 overflow-hidden w-[min(420px,95vw)] rounded-2xl border border-white/[0.08] bg-[#0d0d0d] shadow-[0_32px_80px_rgba(0,0,0,0.9),0_0_0_1px_rgba(255,255,255,0.03)]"
         >
-          {/* Header */}
           <div className="flex items-center justify-between px-[18px] pt-4 pb-3.5">
             <div className="flex items-center gap-2.5">
               <span
@@ -283,7 +257,6 @@ export default function NotificationIcon() {
 
           <div className="h-px bg-white/[0.06]" />
 
-          {/* List */}
           <div className="max-h-[68vh] overflow-y-auto py-1 [&::-webkit-scrollbar]:w-[3px] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/[0.08] [&::-webkit-scrollbar-thumb]:rounded-sm">
             {notifications.length === 0 ? (
               <div
@@ -307,8 +280,6 @@ export default function NotificationIcon() {
                       }`}
                   >
                     <div className="flex items-start gap-2.5">
-
-                      {/* Unread dot */}
                       <div className="pt-1.5">
                         {isUnread
                           ? <div className="w-1.5 h-1.5 rounded-full bg-[var(--color-cyan,#22d3ee)] shadow-[0_0_7px_var(--color-cyan,#22d3ee)] shrink-0" />
@@ -316,7 +287,6 @@ export default function NotificationIcon() {
                         }
                       </div>
 
-                      {/* Body */}
                       <div className="flex-1 min-w-0">
                         {isPdf
                           ? <PdfNotifItem n={n} onToggleRead={toggleRead} />
@@ -324,7 +294,6 @@ export default function NotificationIcon() {
                         }
                       </div>
 
-                      {/* Toggle read button */}
                       <button
                         title={isUnread ? "Mark as read" : "Mark as unread"}
                         onClick={(e) => { e.stopPropagation(); toggleRead(n); }}
@@ -343,7 +312,6 @@ export default function NotificationIcon() {
             )}
           </div>
 
-          {/* Footer */}
           <div className="h-px bg-white/[0.06]" />
           <div className="flex justify-end px-[18px] py-2.5">
             <button
@@ -357,7 +325,6 @@ export default function NotificationIcon() {
         </PopoverContent>
       </Popover>
 
-      {/* ── Mark All Confirm Modal ── */}
       <ReusableModal
         open={openConfirm}
         title="Mark all as read?"

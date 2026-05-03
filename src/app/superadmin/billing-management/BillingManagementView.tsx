@@ -23,6 +23,7 @@ import {
   File,
 } from 'lucide-react'
 import ReusableModal from '@/components/layout/ReusableModal'
+import { nowDate } from '@/app/utils/serverTime'
 
 
 type PaymentStatus = 'pending' | 'paid' | 'overdue' | 'cancelled' | 'under_review'
@@ -587,7 +588,7 @@ export default function BillingManagementView() {
       setRecords((prev) =>
         prev.map((r) =>
           r.billing_id === selectedRecord.billing_id
-            ? { ...r, status: 'paid', paid_date: new Date().toISOString().split('T')[0] }
+            ? { ...r, status: 'paid', paid_date: nowDate().toISOString().split('T')[0] }
             : r
         )
       )
