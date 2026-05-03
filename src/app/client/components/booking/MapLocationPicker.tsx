@@ -61,6 +61,18 @@ const ArrowLeftIcon = () => (
   </svg>
 )
 
+async function checkIsPhilippines(
+  geocoder: google.maps.Geocoder,
+  lat: number,
+  lng: number
+): Promise<boolean> {
+  const result = await geocoder.geocode({ location: { lat, lng } })
+  const first  = result.results[0]
+  if (!first) return false
+  const country = first.address_components.find(c => c.types.includes('country'))
+  return country?.short_name === 'PH'
+}
+
 async function isPhilippines(
   geocoder: google.maps.Geocoder,
   lat: number,
@@ -87,6 +99,7 @@ export default function MapLocationPicker({
   const geocoderRef = useRef<google.maps.Geocoder | null>(null)
   const searchRef   = useRef<HTMLDivElement>(null)
   const lastValidCenter = useRef<{ lat: number; lng: number }>(DEFAULT_CENTER)
+  const skipNextDragEndRef = useRef(false)
 
   const [address,     setAddress]     = useState(initialValue)
   const [coords,      setCoords]      = useState<{ lat: number; lng: number } | null>(null)
@@ -114,7 +127,6 @@ export default function MapLocationPicker({
     setIsGeocoding(true)
     try {
       const { isPH, address: addr } = await isPhilippines(geocoderRef.current, lat, lng)
-
       if (!isPH) {
         mapRef.current?.panTo(lastValidCenter.current)
         setOutOfBounds(true)
@@ -123,14 +135,12 @@ export default function MapLocationPicker({
         setSearchQuery('')
         return
       }
-
       lastValidCenter.current = { lat, lng }
       setOutOfBounds(false)
       setAddress(addr || `${lat.toFixed(6)}, ${lng.toFixed(6)}`)
       setCoords({ lat, lng })
       setSearchQuery(addr || `${lat.toFixed(6)}, ${lng.toFixed(6)}`)
     } catch {
-      // geocoder failed — don't accept the location
       mapRef.current?.panTo(lastValidCenter.current)
       setOutOfBounds(true)
       setAddress('')
@@ -170,21 +180,27 @@ export default function MapLocationPicker({
         async pos => {
           const c = { lat: pos.coords.latitude, lng: pos.coords.longitude }
           if (!geocoderRef.current) return
-          const { isPH } = await isPhilippines(geocoderRef.current, c.lat, c.lng)
+          const isPH = await checkIsPhilippines(geocoderRef.current, c.lat, c.lng)
           if (isPH) {
             lastValidCenter.current = c
+            skipNextDragEndRef.current = true
             map.setCenter(c)
           }
         },
-        () => {
-          map.setCenter(DEFAULT_CENTER)
-        }
+        () => { map.setCenter(DEFAULT_CENTER) }
       )
 
-      dragStartListener = map.addListener('dragstart', () => setIsDragging(true))
+      dragStartListener = map.addListener('dragstart', () => {
+        skipNextDragEndRef.current = false
+        setIsDragging(true)
+      })
 
       dragEndListener = map.addListener('dragend', () => {
         setIsDragging(false)
+        if (skipNextDragEndRef.current) {
+          skipNextDragEndRef.current = false
+          return
+        }
         const c = map.getCenter()
         if (!c) return
         reverseGeocode(c.lat(), c.lng())
@@ -200,24 +216,21 @@ export default function MapLocationPicker({
           if (resolved.latitude === null || resolved.longitude === null) return
           if (!geocoderRef.current) return
 
-          const { isPH, address: addr } = await isPhilippines(
+          const isPH = await checkIsPhilippines(
             geocoderRef.current,
             resolved.latitude,
             resolved.longitude
           )
-
-          if (!isPH) {
-            setOutOfBounds(true)
-            return
-          }
+          if (!isPH) { setOutOfBounds(true); return }
 
           const c = { lat: resolved.latitude, lng: resolved.longitude }
           lastValidCenter.current = c
+          skipNextDragEndRef.current = true
           map.setCenter(c)
           map.setZoom(17)
-          setAddress(addr || resolved.address)
+          setAddress(resolved.address)
           setCoords(c)
-          setSearchQuery(addr || resolved.address)
+          setSearchQuery(resolved.address)
           setShowSugg(false)
           setOutOfBounds(false)
         } catch (err) {
@@ -244,48 +257,49 @@ export default function MapLocationPicker({
   }, [])
 
   const handleSuggestionSelect = useCallback(async (s: PlaceSuggestion) => {
+    setShowSugg(false)
     try {
       const resolved = await resolvePlace(s.placeId)
       if (resolved.latitude === null || resolved.longitude === null) return
       if (!geocoderRef.current) return
 
-      const { isPH, address: addr } = await isPhilippines(
+      const isPH = await checkIsPhilippines(
         geocoderRef.current,
         resolved.latitude,
         resolved.longitude
       )
-
       if (!isPH) {
         setOutOfBounds(true)
         setSearchQuery('')
-        setShowSugg(false)
         return
       }
 
       const c = { lat: resolved.latitude, lng: resolved.longitude }
       lastValidCenter.current = c
-      mapRef.current?.setCenter(c)
-      mapRef.current?.setZoom(17)
-      setAddress(addr || resolved.address)
+      skipNextDragEndRef.current = true
+
+      if (mapRef.current) {
+        mapRef.current.setCenter(c)
+        mapRef.current.setZoom(17)
+      }
+
+      setAddress(resolved.address)
       setCoords(c)
-      setSearchQuery(addr || resolved.address)
+      setSearchQuery(resolved.address)
       setOutOfBounds(false)
     } catch (err) {
       console.error('Failed to resolve suggestion:', err)
     }
-    setShowSugg(false)
   }, [resolvePlace])
 
   const handleUseMyLocation = useCallback(() => {
     navigator.geolocation?.getCurrentPosition(async pos => {
       const c = { lat: pos.coords.latitude, lng: pos.coords.longitude }
       if (!geocoderRef.current) return
-      const { isPH } = await isPhilippines(geocoderRef.current, c.lat, c.lng)
-      if (!isPH) {
-        setOutOfBounds(true)
-        return
-      }
+      const isPH = await checkIsPhilippines(geocoderRef.current, c.lat, c.lng)
+      if (!isPH) { setOutOfBounds(true); return }
       lastValidCenter.current = c
+      skipNextDragEndRef.current = true
       mapRef.current?.setCenter(c)
       mapRef.current?.setZoom(17)
       reverseGeocode(c.lat, c.lng)

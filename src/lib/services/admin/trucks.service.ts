@@ -85,8 +85,8 @@ export async function adminUploadTruckModelImage(file: File): Promise<string> {
     formData,
     {
       transformRequest: (data, headers) => {
-        delete headers['Content-Type']   // remove instance-level JSON header
-        return data                       // let axios/browser set multipart + boundary
+        delete headers['Content-Type']
+        return data
       },
     }
   )

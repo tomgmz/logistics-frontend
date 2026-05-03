@@ -64,15 +64,12 @@ async function fetchByTab(tab: UserTab): Promise<AnyUser[]> {
 }
 
 async function updateStatus(tab: UserTab, id: string, status: UserStatus): Promise<void> {
-  // Accountants have dedicated activate / deactivate endpoints.
-  // Archived uses the DELETE (soft-delete) route. Other roles use the generic PATCH.
   if (tab === 'accountants') {
     switch (status) {
-      case 'active':   return accountantService.activate(id).then()
-      case 'inactive': return accountantService.deactivate(id).then()
-      case 'archived': return accountantService.remove(id)
+      case 'active':      return accountantService.activate(id).then()
+      case 'deactivated': return accountantService.deactivate(id).then()
+      case 'archived':    return accountantService.remove(id)
       default:
-        // permanently_locked — not yet a dedicated endpoint; fall through to generic update
         return accountantService.update(id, { status } as never).then()
     }
   }
@@ -119,10 +116,11 @@ function formatDateTime(iso: string | null): string {
 }
 
 const STATUS_CFG: Record<UserStatus, { label: string; cls: string }> = {
-  active:             { label: 'Active',   cls: 'bg-[#4df9ed]/10 text-[#4df9ed] border-[#4df9ed]/30' },
-  inactive:           { label: 'Inactive', cls: 'bg-[#818181]/10 text-[#818181] border-[#818181]/30' },
-  archived:           { label: 'Archived', cls: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30' },
-  permanently_locked: { label: 'Locked',   cls: 'bg-red-500/15 text-red-400 border-red-500/30' },
+  active:             { label: 'Active',      cls: 'bg-[#4df9ed]/10 text-[#4df9ed] border-[#4df9ed]/30'    },
+  inactive:           { label: 'Inactive',    cls: 'bg-[#818181]/10 text-[#818181] border-[#818181]/30'    },
+  deactivated:        { label: 'Deactivated', cls: 'bg-orange-500/15 text-orange-400 border-orange-500/30' },
+  archived:           { label: 'Archived',    cls: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30' },
+  permanently_locked: { label: 'Locked',      cls: 'bg-red-500/15 text-red-400 border-red-500/30'          },
 }
 
 const ROLE_COLORS: Record<string, string> = {
@@ -190,11 +188,18 @@ function RowMenu({ user, tab, onEdit, onStatusChange }: RowMenuProps) {
   }, [])
 
   const statusActions = ([
-    { label: 'Set Active',   status: 'active'             as UserStatus, icon: <ShieldCheck size={13} /> },
-    { label: 'Set Inactive', status: 'inactive'           as UserStatus, icon: <ShieldOff size={13} /> },
-    { label: 'Archive',      status: 'archived'           as UserStatus, icon: <Archive size={13} /> },
-    { label: 'Perm. Lock',   status: 'permanently_locked' as UserStatus, icon: <Lock size={13} /> },
-  ]).filter((a) => a.status !== user.status)
+    { label: 'Set Active',    status: 'active'             as UserStatus, icon: <ShieldCheck size={13} /> },
+    { label: 'Set Inactive',  status: 'inactive'           as UserStatus, icon: <ShieldOff size={13} />   },
+    { label: 'Deactivate',    status: 'deactivated'        as UserStatus, icon: <ShieldOff size={13} />   },
+    { label: 'Archive',       status: 'archived'           as UserStatus, icon: <Archive size={13} />     },
+    { label: 'Perm. Lock',    status: 'permanently_locked' as UserStatus, icon: <Lock size={13} />        },
+  ]).filter((a) => {
+    if (a.status !== user.status) {
+      if (tab === 'accountants' && a.status === 'inactive') return false
+      return true
+    }
+    return false
+  })
 
   const canEdit = tab !== 'all'
 
@@ -236,6 +241,8 @@ function RowMenu({ user, tab, onEdit, onStatusChange }: RowMenuProps) {
                         ? 'text-yellow-400 hover:bg-yellow-500/10'
                         : a.status === 'permanently_locked'
                         ? 'text-red-400 hover:bg-red-500/10'
+                        : a.status === 'deactivated'
+                        ? 'text-orange-400 hover:bg-orange-500/10'
                         : 'text-[#818181] hover:bg-[#2a2a2a] hover:text-white'
                     }`}
                   >

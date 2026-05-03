@@ -8,7 +8,7 @@ export type AdminRole =
   | 'accountant'
 
 export type UserRole = AdminRole | 'driver' | 'client' | 'vendor'
-export type UserStatus = 'active' | 'inactive' | 'archived' | 'permanently_locked'
+export type UserStatus = 'active' | 'inactive' | 'deactivated' | 'archived' | 'permanently_locked'
 export type DriverAvailability = 'available' | 'assigned' | 'on_leave' | 'inactive'
 
 export type UserTab =
@@ -52,7 +52,7 @@ export interface ClientUser extends BaseUser {
     company_name: string | null
     billing_address: string | null
     payment_terms: number | null
-    landline:        string | null
+    landline: string | null
   } | null
 }
 
@@ -75,7 +75,7 @@ export interface VendorUser extends BaseUser {
     vendor_type: 'individual' | 'company'
     company_name: string | null
     business_permit: string | null
-    landline:        string | null
+    landline: string | null
   } | null
 }
 

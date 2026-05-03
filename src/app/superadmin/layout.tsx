@@ -30,8 +30,8 @@ const superAdminNavItems = [
     icon: <CalendarCheck size={17} />,
   },
   {
-    href: '/superadmin/billing-payment',
-    label: 'Billing & Payment',
+    href: '/superadmin/billing-management',
+    label: 'Billing Management',
     icon: <CreditCard size={17} />,
   },
   {

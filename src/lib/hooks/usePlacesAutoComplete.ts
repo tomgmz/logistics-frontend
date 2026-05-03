@@ -135,16 +135,19 @@ export function usePlacesAutocomplete({
     await place.fetchFields({ fields: ['displayName', 'formattedAddress', 'location'] })
     sessionTokenRef.current = null
 
-    const displayName     = place.displayName ?? ''
-    const formattedAddress = place.formattedAddress ?? ''
+    const displayName = place.displayName ?? ''
+    const rawAddress = place.formattedAddress ?? ''
 
-    const address = displayName && !formattedAddress.toLowerCase().includes(displayName.toLowerCase())
-      ? `${displayName}, ${formattedAddress}`
-      : formattedAddress || displayName
+    const formattedAddress = rawAddress.replace(/^[A-Z0-9]{4}\+[A-Z0-9]{2,3},\s*/, '')
+
+    const address =
+      displayName && !formattedAddress.toLowerCase().includes(displayName.toLowerCase())
+        ? `${displayName}, ${formattedAddress}`
+        : formattedAddress || displayName
 
     return {
       address,
-      latitude:  place.location?.lat() ?? null,
+      latitude: place.location?.lat() ?? null,
       longitude: place.location?.lng() ?? null,
     }
   }, [])
