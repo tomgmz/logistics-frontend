@@ -3,6 +3,7 @@
 import {
   useState,
   useEffect,
+  useMemo,
   type InputHTMLAttributes,
   type TextareaHTMLAttributes,
   type SelectHTMLAttributes,
@@ -289,7 +290,9 @@ function PhoneInputRow({
 export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormModalProps) {
   const isEdit = Boolean(user)
 
-  const [form, setForm]               = useState<FormState>(() => buildInitialState(tab, user))
+  const initialState = useMemo(() => buildInitialState(tab, user), [tab, user])
+
+  const [form, setForm]               = useState<FormState>(initialState)
   const [loading, setLoading]         = useState(false)
   const [globalError, setGlobalError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
@@ -299,11 +302,18 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
   const [vendorList,     setVendorList]     = useState<{ vendor_id: string; name: string }[]>([])
   const [vendorsLoading, setVendorsLoading] = useState(false)
 
+  // True when at least one field differs from the initial state
+  const isDirty = useMemo(() => {
+    return Object.keys(initialState).some(
+      (key) => form[key] !== initialState[key]
+    )
+  }, [form, initialState])
+
   useEffect(() => {
-    setForm(buildInitialState(tab, user))
+    setForm(initialState)
     setGlobalError(null)
     setFieldErrors({})
-  }, [tab, user])
+  }, [initialState])
 
   useEffect(() => {
     if (tab !== 'drivers') return
@@ -391,6 +401,10 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
       setLoading(false)
     }
   }
+
+  // For edit mode: disable save when nothing has changed or while loading.
+  // For create mode: always enabled (form starts empty, any input is progress).
+  const isSaveDisabled = loading || (isEdit && !isDirty)
 
   const fe = fieldErrors
 
@@ -675,8 +689,9 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
               </button>
               <button
                 type="submit"
-                disabled={loading}
-                className="flex items-center gap-2 rounded-lg bg-[#4df9ed] px-5 py-2.5 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5] disabled:opacity-60"
+                disabled={isSaveDisabled}
+                title={isEdit && !isDirty ? 'No changes to save' : undefined}
+                className="flex items-center gap-2 rounded-lg bg-[#4df9ed] px-5 py-2.5 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5] disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {loading && <Loader2 size={15} className="animate-spin" />}
                 {loading ? 'Saving…' : isEdit ? 'Save Changes' : `Create ${TAB_LABELS[tab]}`}

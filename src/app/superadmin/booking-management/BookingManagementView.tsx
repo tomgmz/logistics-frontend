@@ -16,6 +16,7 @@ import {
   Trash2,
   User,
   AlertTriangle,
+  UserCheck,
 } from 'lucide-react'
 
 import { statusColor } from '@/components/map/status.colors'
@@ -25,6 +26,11 @@ import {
   type AdminBookingLifecycleStatus,
   type DestinationDeliveryStatus,
 } from '@/lib/services/client/booking.service'
+import { driverService } from '@/lib/services/admin/user-management.service'
+import { adminFetchTrucks } from '@/lib/services/admin/trucks.service'
+import proxyApi from '@/lib/api/auth.api'
+import type { DriverUser } from '@/app/types/admin/user-management.types'
+import type { Truck as TruckType } from '@/app/types/truck.types'
 import { nowDate } from '@/app/utils/serverTime'
 
 const PAGE_SIZE = 12
@@ -72,13 +78,13 @@ function toRows(raw: Record<string, unknown>[]): ListRow[] {
     const clients = b.clients as { company_name?: string | null } | undefined
     const dests = b.booking_destinations as unknown[] | undefined
     return {
-      booking_id:      String(b.booking_id ?? ''),
-      origin:          typeof b.origin === 'string' ? b.origin : undefined,
-      status:          typeof b.status === 'string' ? b.status : 'pending',
-      schedule_date:   typeof b.schedule_date === 'string' ? b.schedule_date : undefined,
+      booking_id:        String(b.booking_id ?? ''),
+      origin:            typeof b.origin === 'string' ? b.origin : undefined,
+      status:            typeof b.status === 'string' ? b.status : 'pending',
+      schedule_date:     typeof b.schedule_date === 'string' ? b.schedule_date : undefined,
       truck_type_needed: typeof b.truck_type_needed === 'string' ? b.truck_type_needed : undefined,
-      company:         clients?.company_name ?? null,
-      stops:           Array.isArray(dests) ? dests.length : 0,
+      company:           clients?.company_name ?? null,
+      stops:             Array.isArray(dests) ? dests.length : 0,
     }
   })
 }
@@ -108,6 +114,19 @@ export default function BookingManagementView() {
   const [destBusyId, setDestBusyId] = useState<string | null>(null)
   const [deleteAskId, setDeleteAskId] = useState<string | null>(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
+
+  const [drivers, setDrivers] = useState<DriverUser[]>([])
+  const [trucks, setTrucks] = useState<TruckType[]>([])
+  const [assignDriverId, setAssignDriverId] = useState<string>('')
+  const [assignTruckId, setAssignTruckId] = useState<string>('')
+  const [assignBusy, setAssignBusy] = useState(false)
+
+  useEffect(() => {
+    void Promise.all([
+      driverService.getAll().then(setDrivers).catch(() => setDrivers([])),
+      adminFetchTrucks().then(setTrucks).catch(() => setTrucks([])),
+    ])
+  }, [])
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedSearch(search.trim()), 350)
@@ -147,8 +166,8 @@ export default function BookingManagementView() {
   const listRows = useMemo(() => toRows(rawBookings), [rawBookings])
 
   const pageCount = Math.max(1, listMeta?.totalPages ?? 1)
-  const pageSafe   = Math.min(page, pageCount - 1)
-  const totalRows  = listMeta?.total ?? 0
+  const pageSafe  = Math.min(page, pageCount - 1)
+  const totalRows = listMeta?.total ?? 0
 
   const openDetail = useCallback(async (bookingId: string) => {
     setSelectedId(bookingId)
@@ -156,6 +175,8 @@ export default function BookingManagementView() {
     setDetailError(null)
     setActionMsg(null)
     setDeleteAskId(null)
+    setAssignDriverId('')
+    setAssignTruckId('')
     try {
       setDetailLoading(true)
       const d = (await bookingService.getBookingById(bookingId)) as BookingDetail
@@ -173,6 +194,8 @@ export default function BookingManagementView() {
     setDetailError(null)
     setActionMsg(null)
     setDeleteAskId(null)
+    setAssignDriverId('')
+    setAssignTruckId('')
   }, [])
 
   const mergeListRow = useCallback((bookingId: string, patch: Partial<ListRow>) => {
@@ -233,7 +256,29 @@ export default function BookingManagementView() {
     }
   }
 
+  const handleAssign = async () => {
+    if (!selectedId || !assignDriverId || !assignTruckId) return
+    setAssignBusy(true)
+    setActionMsg(null)
+    try {
+      await proxyApi.patch(`/admin/bookings/${selectedId}/assign`, {
+        driver_id: assignDriverId,
+        truck_id:  assignTruckId,
+      })
+      await openDetail(selectedId)
+      await loadPage()
+      setActionMsg({ type: 'ok', text: 'Driver and vehicle assigned.' })
+    } catch (e) {
+      setActionMsg({ type: 'err', text: axiosMessage(e) })
+    } finally {
+      setAssignBusy(false)
+    }
+  }
+
   const statusCounts = listMeta?.statusCounts ?? { all: 0 }
+
+  const selectClass =
+    'w-full rounded-lg border border-white/10 bg-[#1a1a1a] text-sm text-white px-3 py-2.5 outline-none focus:border-[var(--color-cyan)]/50 disabled:opacity-50'
 
   return (
     <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-hidden ff-body bg-[var(--color-bg)]">
@@ -241,8 +286,8 @@ export default function BookingManagementView() {
         <div>
           <h1 className="text-lg font-bold text-white tracking-tight">Booking management</h1>
           <p className="text-xs text-white/45 mt-0.5 max-w-xl">
-            View all bookings, change workflow status, and update or remove delivery stops. Client-only edits
-            (full booking body, create/delete booking) stay on the client portal.
+            View all bookings, change workflow status, assign drivers and vehicles, and update or remove delivery
+            stops. Client-only edits (full booking body, create/delete booking) stay on the client portal.
           </p>
         </div>
         <button
@@ -258,7 +303,10 @@ export default function BookingManagementView() {
       <div className="flex flex-1 min-h-0 overflow-hidden">
         <div className="flex-1 flex flex-col min-w-0 min-h-0 p-3 lg:p-4 gap-3">
           <div className="flex flex-col lg:flex-row gap-2 lg:items-center lg:justify-between shrink-0">
-            <div className="flex items-center gap-2 rounded-[10px] px-3 py-2 flex-1 max-w-md" style={{ background: '#2a2828' }}>
+            <div
+              className="flex items-center gap-2 rounded-[10px] px-3 py-2 flex-1 max-w-md"
+              style={{ background: '#2a2828' }}
+            >
               <Search size={16} className="text-white/40 shrink-0" />
               <input
                 value={search}
@@ -272,8 +320,8 @@ export default function BookingManagementView() {
             </div>
             <div className="flex flex-wrap gap-1.5">
               {(['all', 'pending', 'assigned', 'in_transit', 'completed', 'cancelled'] as const).map((key) => {
-                const label = key === 'all' ? 'All' : fmtStatus(key)
-                const count = key === 'all' ? statusCounts.all : statusCounts[key] ?? 0
+                const label  = key === 'all' ? 'All' : fmtStatus(key)
+                const count  = key === 'all' ? statusCounts.all : statusCounts[key] ?? 0
                 const active = statusFilter === key
                 return (
                   <button
@@ -285,9 +333,9 @@ export default function BookingManagementView() {
                     }}
                     className="px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-colors"
                     style={{
-                      background: active ? 'rgba(77,249,237,0.12)' : 'transparent',
+                      background:  active ? 'rgba(77,249,237,0.12)' : 'transparent',
                       borderColor: active ? 'rgba(77,249,237,0.35)' : 'rgba(255,255,255,0.08)',
-                      color: active ? 'var(--color-cyan)' : '#888',
+                      color:       active ? 'var(--color-cyan)' : '#888',
                     }}
                   >
                     {label}
@@ -339,7 +387,7 @@ export default function BookingManagementView() {
                     <tbody>
                       {listRows.map((r) => {
                         const active = selectedId === r.booking_id
-                        const c = statusColor(r.status)
+                        const c      = statusColor(r.status)
                         return (
                           <tr
                             key={r.booking_id}
@@ -353,9 +401,7 @@ export default function BookingManagementView() {
                               }
                             }}
                             className="border-b border-white/[0.05] cursor-pointer transition-colors hover:bg-white/[0.04]"
-                            style={{
-                              background: active ? 'rgba(77,249,237,0.06)' : undefined,
-                            }}
+                            style={{ background: active ? 'rgba(77,249,237,0.06)' : undefined }}
                           >
                             <td className="px-3 py-2.5">
                               <span
@@ -506,7 +552,7 @@ export default function BookingManagementView() {
                           onChange={(e) =>
                             void handleBookingStatusChange(e.target.value as AdminBookingLifecycleStatus)
                           }
-                          className="w-full rounded-lg border border-white/10 bg-[#1a1a1a] text-sm text-white px-3 py-2.5 outline-none focus:border-[var(--color-cyan)]/50 disabled:opacity-50"
+                          className={selectClass}
                         >
                           {BOOKING_STATUSES.map((s) => (
                             <option key={s} value={s}>
@@ -518,6 +564,67 @@ export default function BookingManagementView() {
                           Backend rules: you cannot move backwards in the workflow except to set{' '}
                           <strong className="text-white/55">Cancelled</strong>.
                         </p>
+                      </div>
+
+                      <div className="rounded-xl border border-white/[0.08] p-3 space-y-3 bg-black/20">
+                        <div className="flex items-center gap-2">
+                          <UserCheck size={14} className="text-[var(--color-cyan)]" />
+                          <h3 className="text-[11px] font-bold uppercase tracking-wider text-white/40">
+                            Driver andz vehicle assignment
+                          </h3>
+                        </div>
+
+                        <div className="space-y-2">
+                          <div>
+                            <label className="text-[11px] text-white/40 block mb-1">Driver</label>
+                            <select
+                              value={assignDriverId}
+                              disabled={assignBusy}
+                              onChange={(e) => setAssignDriverId(e.target.value)}
+                              className={selectClass}
+                            >
+                              <option value="">Select driver</option>
+                              {drivers.map((d) => (
+                                <option key={d.user_id} value={d.user_id}>
+                                  {d.first_name} {d.last_name}
+                                  {d.drivers?.license_number ? ` · ${d.drivers.license_number}` : ''}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="text-[11px] text-white/40 block mb-1">Vehicle</label>
+                            <select
+                              value={assignTruckId}
+                              disabled={assignBusy}
+                              onChange={(e) => setAssignTruckId(e.target.value)}
+                              className={selectClass}
+                            >
+                              <option value="">Select vehicle</option>
+                              {trucks.map((t) => (
+                                <option key={t.truck_id} value={t.truck_id}>
+                                  {t.plate_number}
+                                  {t.truck_type ? ` · ${t.truck_type}` : ''}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          disabled={assignBusy || !assignDriverId || !assignTruckId}
+                          onClick={() => void handleAssign()}
+                          className="w-full py-2 rounded-lg text-sm font-bold transition-colors disabled:opacity-40"
+                          style={{
+                            background:  'rgba(77,249,237,0.12)',
+                            border:      '1px solid rgba(77,249,237,0.30)',
+                            color:       'var(--color-cyan)',
+                          }}
+                        >
+                          {assignBusy ? 'Assigning…' : 'Assign'}
+                        </button>
                       </div>
 
                       <div>
@@ -613,10 +720,9 @@ export default function BookingManagementView() {
                   <div
                     className="shrink-0 mx-3 mb-3 px-3 py-2 rounded-lg text-xs font-medium border"
                     style={{
-                      background: actionMsg.type === 'ok' ? 'rgba(58,246,38,0.1)' : 'rgba(246,38,38,0.1)',
-                      borderColor:
-                        actionMsg.type === 'ok' ? 'rgba(58,246,38,0.25)' : 'rgba(246,38,38,0.25)',
-                      color: actionMsg.type === 'ok' ? '#86efac' : '#fca5a5',
+                      background:  actionMsg.type === 'ok' ? 'rgba(58,246,38,0.1)' : 'rgba(246,38,38,0.1)',
+                      borderColor: actionMsg.type === 'ok' ? 'rgba(58,246,38,0.25)' : 'rgba(246,38,38,0.25)',
+                      color:       actionMsg.type === 'ok' ? '#86efac' : '#fca5a5',
                     }}
                   >
                     {actionMsg.text}
