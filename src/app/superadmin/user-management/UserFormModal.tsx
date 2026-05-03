@@ -190,14 +190,13 @@ function Field({ label, required, error, hint, children }: FieldProps) {
     <div className="flex flex-col gap-1.5">
       <label className="text-[10px] font-bold tracking-[0.12em] uppercase text-[#818181]">
         {label}
+        {hint && <span className="ml-1 normal-case font-normal text-[#555]">({hint})</span>}
         {required && <span className="ml-0.5 text-[#4df9ed]">*</span>}
       </label>
       {children}
-      {error ? (
+      {error && (
         <p className="text-[11px] text-red-400 leading-tight whitespace-pre-line">{error}</p>
-      ) : hint ? (
-        <p className="text-[10px] text-[#555]">{hint}</p>
-      ) : null}
+      )}
     </div>
   )
 }
