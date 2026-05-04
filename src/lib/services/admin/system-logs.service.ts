@@ -8,7 +8,6 @@ export type LogType =
   | 'system_error'
 
 export interface LogUser {
-  username:   string | null
   role:       string | null
   first_name: string | null
   last_name:  string | null

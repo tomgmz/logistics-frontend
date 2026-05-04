@@ -86,9 +86,9 @@ export default function SystemLogsPage() {
 
   const displayName = (log: SystemLog) => {
     if (!log.users) return '—'
-    const { first_name, last_name, username } = log.users
+    const { first_name, last_name } = log.users
     if (first_name || last_name) return [first_name, last_name].filter(Boolean).join(' ')
-    return username ?? '—'
+    return '—'
   }
 
   return (
