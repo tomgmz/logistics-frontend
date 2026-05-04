@@ -26,9 +26,9 @@ import {
   type AdminBookingLifecycleStatus,
   type DestinationDeliveryStatus,
 } from '@/lib/services/client/booking.service'
+import { assignmentService } from '@/lib/services/admin/assignment.service'
 import { driverService } from '@/lib/services/admin/user-management.service'
 import { adminFetchTrucks } from '@/lib/services/admin/trucks.service'
-import proxyApi from '@/lib/api/auth.api'
 import type { DriverUser } from '@/app/types/admin/user-management.types'
 import type { Truck as TruckType } from '@/app/types/truck.types'
 import { nowDate } from '@/app/utils/serverTime'
@@ -52,6 +52,20 @@ function fmtStatus(s: string) {
 function normalizeBookingStatus(raw: string): AdminBookingLifecycleStatus {
   const s = (raw ?? '').toLowerCase().replace(/\s+/g, '_') as AdminBookingLifecycleStatus
   return BOOKING_STATUSES.includes(s) ? s : 'pending'
+}
+
+function getAssignedTruckId(detail: BookingDetail, trucks: TruckType[]): string {
+  const assignedPlate = detail.driver?.truck?.plate_number
+  if (!assignedPlate) return ''
+  const truck = trucks.find((t) => t.plate_number === assignedPlate)
+  return truck?.truck_id ?? ''
+}
+
+function getPrefillFromBookingDetail(detail: BookingDetail, trucks: TruckType[]) {
+  return {
+    driverId: detail.driver?.driver_id ?? '',
+    truckId:  getAssignedTruckId(detail, trucks),
+  }
 }
 
 function axiosMessage(err: unknown): string {
@@ -179,14 +193,30 @@ export default function BookingManagementView() {
     setAssignTruckId('')
     try {
       setDetailLoading(true)
-      const d = (await bookingService.getBookingById(bookingId)) as BookingDetail
+      const [bookingResp, assignmentResp] = await Promise.allSettled([
+        bookingService.getBookingById(bookingId),
+        assignmentService.getByBookingId(bookingId),
+      ])
+
+      if (bookingResp.status !== 'fulfilled') throw bookingResp.reason
+
+      const d = bookingResp.value as BookingDetail
       setDetail(d)
+
+      const fallback = getPrefillFromBookingDetail(d, trucks)
+      if (assignmentResp.status === 'fulfilled') {
+        setAssignDriverId(assignmentResp.value.driver_id ?? fallback.driverId)
+        setAssignTruckId(assignmentResp.value.truck_id ?? fallback.truckId)
+      } else {
+        setAssignDriverId(fallback.driverId)
+        setAssignTruckId(fallback.truckId)
+      }
     } catch (e) {
       setDetailError(axiosMessage(e))
     } finally {
       setDetailLoading(false)
     }
-  }, [])
+  }, [trucks])
 
   const closeDetail = useCallback(() => {
     setSelectedId(null)
@@ -261,7 +291,7 @@ export default function BookingManagementView() {
     setAssignBusy(true)
     setActionMsg(null)
     try {
-      await proxyApi.patch(`/admin/bookings/${selectedId}/assign`, {
+      await assignmentService.assignBooking(selectedId, {
         driver_id: assignDriverId,
         truck_id:  assignTruckId,
       })
@@ -585,7 +615,7 @@ export default function BookingManagementView() {
                             >
                               <option value="">Select driver</option>
                               {drivers.map((d) => (
-                                <option key={d.user_id} value={d.user_id}>
+                                <option key={d.user_id} value={d.drivers?.driver_id ?? d.user_id}>
                                   {d.first_name} {d.last_name}
                                   {d.drivers?.license_number ? ` · ${d.drivers.license_number}` : ''}
                                 </option>

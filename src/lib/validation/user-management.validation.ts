@@ -46,15 +46,6 @@ const suffix = z.preprocess(
   z.enum(USER_SUFFIXES, { message: 'Invalid suffix' }).optional().nullable(),
 )
 
-const username = z
-  .string({ error: 'Username is required' })
-  .min(2, 'Username must be at least 2 characters')
-  .max(50, 'Username is too long')
-  .regex(
-    /^[a-zA-Z0-9._-]+$/,
-    'Username may only contain letters, numbers, dots, underscores, or hyphens'
-  )
-
 const email = z
   .string({ error: 'Email is required' })
   .email('Please enter a valid email address')
@@ -98,7 +89,6 @@ const baseCreateFields = {
   last_name:   lastName,
   middle_name: middleName,
   suffix,
-  username,
   email,
   phone,
 }
@@ -108,7 +98,6 @@ const baseUpdateFields = {
   last_name:   lastName.optional(),
   middle_name: middleName,
   suffix,
-  username:    username.optional(),
   email:       email.optional(),
   phone:       phoneOptional,
 }

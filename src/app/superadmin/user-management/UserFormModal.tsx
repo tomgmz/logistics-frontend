@@ -116,7 +116,6 @@ function buildInitialState(tab: UserTab, user: AnyUser | null): FormState {
     last_name:   user?.last_name   ?? '',
     middle_name: user?.middle_name ?? '',
     suffix:      user?.suffix      ?? '',
-    username:    user?.username    ?? '',
     email:       user?.email       ?? '',
     phone:       user?.phone ? toLocalDigits(user.phone) : '',
   }
@@ -383,7 +382,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
       await submitForm(tab, form, isEdit ? user!.user_id : undefined)
       appToast.success(
         isEdit
-          ? `${user?.username} updated successfully.`
+          ? `${TAB_LABELS[tab]} updated successfully.`
           : `New ${TAB_LABELS[tab]} account created.`,
         { action: isEdit ? 'edit-user' : 'create-user', entityId: user?.user_id ?? 'new' },
       )
@@ -433,7 +432,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
                 {isEdit ? 'Edit' : 'Create'} {TAB_LABELS[tab]}
               </p>
               <h2 className="mt-0.5 text-lg font-bold text-white">
-                {isEdit ? `Update ${user?.username}` : `New ${TAB_LABELS[tab]} Account`}
+                {isEdit ? `Update ${TAB_LABELS[tab]}` : `New ${TAB_LABELS[tab]} Account`}
               </h2>
             </div>
             <button
@@ -483,15 +482,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
               </Field>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <Field label="Username" required error={fe.username}>
-                <Input
-                  value={form.username as string}
-                  onChange={e => set('username', e.target.value)}
-                  placeholder="jdelacruz"
-                  error={fe.username}
-                />
-              </Field>
+            <div className="grid grid-cols-1 gap-4">
               <Field label="Email" required error={fe.email}>
                 <Input
                   type="email"
@@ -715,7 +706,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
       <ReusableModal
         key="confirm-save"
         open={confirmSave}
-        title={isEdit ? `Save changes to ${user?.username}?` : `Create new ${TAB_LABELS[tab]}?`}
+        title={isEdit ? `Save changes to this ${TAB_LABELS[tab]}?` : `Create new ${TAB_LABELS[tab]}?`}
         description={
           isEdit
             ? 'This will update the account with the new information.'
