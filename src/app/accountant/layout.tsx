@@ -6,7 +6,7 @@ import ReusableDashboardShell from '@/components/layout/ReusableDashboardShell'
 import { useAuthStore } from '@/lib/store/auth.store'
 
 const NAV_ITEMS = [
-  { href: '/accountant/transaction-hsitory', label: 'Transaction History', icon: <CreditCard size={17} /> },
+  { href: '/accountant/transaction-history', label: 'Transaction History', icon: <CreditCard size={17} /> },
   { href: '/accountant/expenses', label: 'Expenses', icon: <CreditCard size={17} /> },
   { href: '/accountant/document-review', label: 'Document Review', icon: <CreditCard size={17} /> },
   { href: '/accountant/booking-management', label: 'Booking Management', icon: <CreditCard size={17} /> },
