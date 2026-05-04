@@ -70,7 +70,7 @@ const RED            = '#f87171'
 const ERROR_COLOR    = '#f87171'
 const ERROR_BORDER   = `${ERROR_COLOR}99`
 const RADIUS         = '8px'
-
+ 
 function fieldSx(bg: string, borderColor: string, hasError = false): SxProps<Theme> {
   const activeBorder = hasError ? ERROR_COLOR : `${CYAN}66`
   const idleBorder   = hasError ? ERROR_BORDER : borderColor
