@@ -380,7 +380,7 @@ export default function BookingManagementView() {
                         <th className="px-3 py-2.5 font-bold">Schedule</th>
                         <th className="px-3 py-2.5 font-bold hidden md:table-cell">Client</th>
                         <th className="px-3 py-2.5 font-bold">Origin</th>
-                        <th className="px-3 py-2.5 font-bold hidden lg:table-cell">Truck</th>
+                        <th className="px-3 py-2.5 font-bold hidden lg:table-cell">Vehicle</th>
                         <th className="px-3 py-2.5 font-bold text-right">Stops</th>
                       </tr>
                     </thead>
