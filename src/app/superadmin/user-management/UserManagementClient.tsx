@@ -308,7 +308,6 @@ function AdminLikeCells({ user }: { user: AdminUser }) {
     <>
       <td className="px-4 py-3.5">
         <p className="font-medium text-white">{name}</p>
-        <p className="text-xs text-[#818181] font-mono">{user.username}</p>
       </td>
       <td className="px-4 py-3.5 text-sm text-[#818181]">{user.email}</td>
       <td className="px-4 py-3.5 text-sm text-[#818181]">{user.phone ?? '—'}</td>
@@ -325,7 +324,6 @@ function renderCells(user: AnyUser, tab: TabValue) {
       <>
         <td className="px-4 py-3.5">
           <p className="font-medium text-white">{name}</p>
-          <p className="text-xs text-[#818181] font-mono">{user.username}</p>
         </td>
         <td className="px-4 py-3.5 text-sm text-[#818181]">{user.email}</td>
         <td className="px-4 py-3.5 text-sm text-[#818181]">{user.phone ?? '—'}</td>
@@ -343,7 +341,6 @@ function renderCells(user: AnyUser, tab: TabValue) {
         <>
           <td className="px-4 py-3.5">
             <p className="font-medium text-white">{name}</p>
-            <p className="text-xs text-[#818181] font-mono">{u.username}</p>
           </td>
           <td className="px-4 py-3.5 text-sm text-[#818181]">{u.email}</td>
           <td className="px-4 py-3.5 text-sm text-[#818181]">{u.clients?.company_name ?? '—'}</td>
@@ -360,7 +357,6 @@ function renderCells(user: AnyUser, tab: TabValue) {
         <>
           <td className="px-4 py-3.5">
             <p className="font-medium text-white">{name}</p>
-            <p className="text-xs text-[#818181] font-mono">{u.username}</p>
           </td>
           <td className="px-4 py-3.5 text-sm font-mono text-[#818181]">{u.drivers?.license_number ?? '—'}</td>
           <td className="px-4 py-3.5 text-sm text-[#818181]">{formatDate(u.drivers?.license_expiry ?? null)}</td>
@@ -382,7 +378,6 @@ function renderCells(user: AnyUser, tab: TabValue) {
         <>
           <td className="px-4 py-3.5">
             <p className="font-medium text-white">{name}</p>
-            <p className="text-xs text-[#818181] font-mono">{u.username}</p>
           </td>
           <td className="px-4 py-3.5 text-sm text-[#818181]">{u.email}</td>
           <td className="px-4 py-3.5">
@@ -410,16 +405,16 @@ function renderCells(user: AnyUser, tab: TabValue) {
 }
 
 const HEADERS: Record<TabValue, string[]> = {
-  all:                 ['Name / Username', 'Email', 'Phone', 'Role', 'Status'],
-  clients:             ['Name / Username', 'Email', 'Company', 'Status', 'Last Login'],
-  drivers:             ['Name / Username', 'License #', 'Expiry', 'Driver Status', 'Acct. Status'],
-  vendors:             ['Name / Username', 'Email', 'Type', 'Company', 'Status'],
-  accountants:         ['Name / Username', 'Email', 'Phone', 'Role', 'Status'],
-  'general-managers':  ['Name / Username', 'Email', 'Phone', 'Role', 'Status'],
-  'human-resources':   ['Name / Username', 'Email', 'Phone', 'Role', 'Status'],
-  'fleet-admins':      ['Name / Username', 'Email', 'Phone', 'Role', 'Status'],
-  'operations-admins': ['Name / Username', 'Email', 'Phone', 'Role', 'Status'],
-  'it-admins':         ['Name / Username', 'Email', 'Phone', 'Role', 'Status'],
+  all:                 ['Name', 'Email', 'Phone', 'Role', 'Status'],
+  clients:             ['Name', 'Email', 'Company', 'Status', 'Last Login'],
+  drivers:             ['Name', 'License #', 'Expiry', 'Driver Status', 'Acct. Status'],
+  vendors:             ['Name', 'Email', 'Type', 'Company', 'Status'],
+  accountants:         ['Name', 'Email', 'Phone', 'Role', 'Status'],
+  'general-managers':  ['Name', 'Email', 'Phone', 'Role', 'Status'],
+  'human-resources':   ['Name', 'Email', 'Phone', 'Role', 'Status'],
+  'fleet-admins':      ['Name', 'Email', 'Phone', 'Role', 'Status'],
+  'operations-admins': ['Name', 'Email', 'Phone', 'Role', 'Status'],
+  'it-admins':         ['Name', 'Email', 'Phone', 'Role', 'Status'],
 }
 
 export default function UserManagementClient() {
@@ -517,7 +512,6 @@ export default function UserManagementClient() {
         if (!search) return true
         const q = search.toLowerCase()
         return (
-          u.username?.toLowerCase().includes(q) ||
           u.email?.toLowerCase().includes(q) ||
           u.first_name?.toLowerCase().includes(q) ||
           u.last_name?.toLowerCase().includes(q)
@@ -537,9 +531,9 @@ export default function UserManagementClient() {
       await appToast.promise(
         updateStatus(serviceTab, user.user_id, status),
         {
-          loading: `Updating ${user.username}…`,
-          success: `${user.username} → ${STATUS_CFG[status].label}`,
-          error:   (e) => e instanceof Error ? e.message : `Failed to update ${user.username}.`,
+          loading: `Updating account…`,
+          success: `Status updated → ${STATUS_CFG[status].label}`,
+          error:   (e) => e instanceof Error ? e.message : 'Failed to update account.',
         },
         { action: 'update-status', entityId: user.user_id },
       )
@@ -694,7 +688,7 @@ export default function UserManagementClient() {
                 <input
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
-                  placeholder="Search name, email, username…"
+                  placeholder="Search name or email…"
                   className="w-full rounded-lg border border-[#424242] bg-[#2a2a2a]/60 py-2 pl-9 pr-4 text-sm text-white placeholder-[#818181] outline-none transition focus:border-[#4df9ed] focus:ring-1 focus:ring-[#4df9ed]/20"
                 />
               </div>

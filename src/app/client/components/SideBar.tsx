@@ -99,7 +99,7 @@ export default function Sidebar() {
                 <p className="font-body sm:!text-[0.8rem] md:!text-[0.9rem] lg:!text-[1.1rem] text-white whitespace-nowrap">
                   {user?.first_name && user?.last_name
                     ? `${user.first_name} ${user.last_name}`
-                    : user?.username ?? 'User'}
+                    : user?.email ?? 'User'}
                 </p>
                 <p className="font-body sm:!text-[0.8rem] md:!text-[0.9rem] lg:!text-[1.1rem] text-white/40 whitespace-nowrap capitalize">
                   {user?.role ?? ''}

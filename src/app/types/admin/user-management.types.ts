@@ -24,7 +24,6 @@ export type UserTab =
 
 export interface BaseUser {
   user_id: string
-  username: string
   email: string
   phone: string | null
   role: UserRole
@@ -82,7 +81,6 @@ export interface VendorUser extends BaseUser {
 export type AnyUser = AdminUser | ClientUser | DriverUser | VendorUser
 
 export interface CreateAdminPayload {
-  username: string
   email: string
   password: string
   phone?: string
@@ -94,7 +92,6 @@ export interface CreateAdminPayload {
 }
 
 export interface CreateClientPayload {
-  username: string
   email: string
   password: string
   phone?: string
@@ -106,7 +103,6 @@ export interface CreateClientPayload {
 }
 
 export interface CreateDriverPayload {
-  username: string
   email: string
   password: string
   phone?: string
@@ -119,7 +115,6 @@ export interface CreateDriverPayload {
 }
 
 export interface CreateVendorPayload {
-  username: string
   email: string
   password: string
   phone?: string
@@ -131,7 +126,6 @@ export interface CreateVendorPayload {
 }
 
 export interface CreateAccountantPayload {
-  username: string
   email: string
   password: string
   phone?: string
@@ -140,7 +134,6 @@ export interface CreateAccountantPayload {
 }
 
 export interface CreateGeneralManagerPayload {
-  username: string
   email: string
   password: string
   phone?: string
@@ -149,7 +142,6 @@ export interface CreateGeneralManagerPayload {
 }
 
 export interface CreateHumanResourcesPayload {
-  username: string
   email: string
   password: string
   phone?: string
@@ -160,7 +152,6 @@ export interface CreateHumanResourcesPayload {
 }
 
 export interface CreateFleetAdminPayload {
-  username: string
   email: string
   password: string
   phone?: string
@@ -171,7 +162,6 @@ export interface CreateFleetAdminPayload {
 }
 
 export interface CreateOperationsAdminPayload {
-  username: string
   email: string
   password: string
   phone?: string
@@ -182,7 +172,6 @@ export interface CreateOperationsAdminPayload {
 }
 
 export interface CreateITAdminPayload {
-  username:        string
   email:           string
   phone?:          string
   first_name?:     string
