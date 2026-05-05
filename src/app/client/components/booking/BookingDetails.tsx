@@ -717,7 +717,7 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
           </div>
         </motion.div>
 
-        {/* ── Transaction Summary ── */}
+        {/* Transaction Summary */}
         <motion.div variants={fadeUp} initial="hidden" animate="show"
           className="bg-[#2A2828] rounded-md border border-white/[0.07] p-4 flex flex-col gap-4"
         >
@@ -822,11 +822,9 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
             MenuProps={MENU_PROPS}
           >
             <MenuItem value=""><em style={{ opacity: 0.4, fontStyle: 'normal' }}>Select payment terms</em></MenuItem>
-            <MenuItem value="15">15 days</MenuItem>
             <MenuItem value="30">30 days</MenuItem>
             <MenuItem value="45">45 days</MenuItem>
             <MenuItem value="60">60 days</MenuItem>
-            <MenuItem value="90">90 days</MenuItem>
           </Select>
         </motion.div>
 
