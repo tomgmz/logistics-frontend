@@ -1,4 +1,5 @@
 import proxyApi, { initCsrf } from '@/lib/api/auth.api'
+import type { BookingWithRelations } from '@/lib/store/slice/routeMap.slice'
 
 interface ApiResponse<T> {
   status: string
@@ -159,5 +160,13 @@ export const bookingService = {
     await proxyApi.delete(`/booking/destinations/${destinationId}`)
   },
 
-  getBookingById: (bookingId: string) => get<unknown>(`/booking/${bookingId}`),
+  getBookingById: (bookingId: string) =>
+    get<unknown>(`/booking/${bookingId}`),
+
+  fetchBookingsByClient: async (clientId: string): Promise<BookingWithRelations[]> => {
+    const { data } = await proxyApi.get<{ status: string; data: BookingWithRelations[] }>(
+      `/booking/client/${clientId}`
+    )
+    return data?.data ?? []
+  },
 }

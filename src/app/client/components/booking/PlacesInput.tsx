@@ -20,7 +20,6 @@ type PlacesInputProps = Omit<TextFieldProps, 'onChange'> & {
 export default function PlacesInput({ value, onChange, onResolve, error, ...textFieldProps }: PlacesInputProps) {
   const [inputValue, setInputValue] = useState(value)
 
-  // Narrow filter: addresses only (not POIs) — appropriate for form inputs
   const { suggestions, loading, onInputChange, resolvePlace } = usePlacesAutocomplete({
     includedPrimaryTypes: ['geocode', 'street_address', 'premise'],
   })
@@ -44,7 +43,6 @@ export default function PlacesInput({ value, onChange, onResolve, error, ...text
     [resolvePlace, onChange, onResolve]
   )
 
-  // When user finishes typing without selecting, resolve to best suggestion
   const handleBlur = useCallback(async () => {
     if (!inputValue || suggestions.length === 0) return
     const first = suggestions[0]

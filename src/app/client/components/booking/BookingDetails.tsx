@@ -1,10 +1,11 @@
 'use client'
 
 import { motion, Variants, AnimatePresence } from 'framer-motion'
-import { useCallback, useState, useRef } from 'react'
+import { useCallback, useState, useRef, useEffect } from 'react'
 import {
   CalendarDays, Clock, MapPin, Package,
   Truck, Plus, X, Check, Info, Upload, CreditCard, File,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/lib/hooks/hooks'
 import {
@@ -25,10 +26,9 @@ import { selectCargoSummary, selectSections } from '@/lib/store/bookingSelectors
 import MapLocationPicker from './MapLocationPicker'
 import './BookingDetails.css'
 
-import TextField from '@mui/material/TextField'
 import Select, { SelectChangeEvent } from '@mui/material/Select'
 import MenuItem from '@mui/material/MenuItem'
-import InputAdornment from '@mui/material/InputAdornment'
+import TextField from '@mui/material/TextField'
 import FormHelperText from '@mui/material/FormHelperText'
 import { SxProps, Theme } from '@mui/material/styles'
 import WizBtn from '../WizButton'
@@ -77,6 +77,54 @@ const ERROR_COLOR    = '#f87171'
 const ERROR_BORDER   = `${ERROR_COLOR}99`
 const RADIUS         = '8px'
 
+// ─── Time slots: every 30 min, 00:00–23:30 ───────────────────────────────────
+const TIME_SLOTS: string[] = []
+for (let h = 0; h < 24; h++) {
+  TIME_SLOTS.push(`${String(h).padStart(2, '0')}:00`)
+  TIME_SLOTS.push(`${String(h).padStart(2, '0')}:30`)
+}
+
+// ─── Calendar helpers ─────────────────────────────────────────────────────────
+const MONTHS = [
+  'January','February','March','April','May','June',
+  'July','August','September','October','November','December',
+]
+const DOW = ['Su','Mo','Tu','We','Th','Fr','Sa']
+
+function calDays(year: number, month: number) {
+  const first = new Date(year, month, 1).getDay()
+  const total = new Date(year, month + 1, 0).getDate()
+  return { first, total }
+}
+
+function toDateStr(y: number, m: number, d: number) {
+  return `${y}-${String(m + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`
+}
+
+function parseDateStr(s: string): { y: number; m: number; d: number } | null {
+  if (!s) return null
+  const [y, m, d] = s.split('-').map(Number)
+  if (!y || !m || !d) return null
+  return { y, m: m - 1, d }
+}
+
+function formatDisplayDate(s: string) {
+  const p = parseDateStr(s)
+  if (!p) return ''
+  const dt = new Date(p.y, p.m, p.d)
+  return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function formatDisplayTime(s: string) {
+  if (!s) return ''
+  const [hStr, mStr] = s.split(':')
+  const h = parseInt(hStr, 10)
+  const ampm = h >= 12 ? 'PM' : 'AM'
+  const h12  = h % 12 === 0 ? 12 : h % 12
+  return `${h12}:${mStr} ${ampm}`
+}
+
+// ─── Shared SX helpers (unchanged from original) ─────────────────────────────
 function fieldSx(bg: string, borderColor: string, hasError = false): SxProps<Theme> {
   const activeBorder = hasError ? ERROR_COLOR : `${CYAN}66`
   const idleBorder   = hasError ? ERROR_BORDER : borderColor
@@ -160,6 +208,281 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+// ─── DatePickerPopup ──────────────────────────────────────────────────────────
+function DatePickerPopup({
+  value, onChange, hasError, errorMsg,
+}: {
+  value: string
+  onChange: (v: string) => void
+  hasError?: boolean
+  errorMsg?: string
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  const today = new Date()
+  const parsed = parseDateStr(value)
+  const [viewYear,  setViewYear]  = useState(parsed?.y  ?? today.getFullYear())
+  const [viewMonth, setViewMonth] = useState(parsed?.m  ?? today.getMonth())
+
+  // close on outside click
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  const { first, total } = calDays(viewYear, viewMonth)
+  const blanks = first // 0=Sun
+
+  const prevMonth = () => {
+    if (viewMonth === 0) { setViewMonth(11); setViewYear(v => v - 1) }
+    else setViewMonth(v => v - 1)
+  }
+  const nextMonth = () => {
+    if (viewMonth === 11) { setViewMonth(0); setViewYear(v => v + 1) }
+    else setViewMonth(v => v + 1)
+  }
+
+  const selectDay = (d: number) => {
+    onChange(toDateStr(viewYear, viewMonth, d))
+    setOpen(false)
+  }
+
+  const todayY = today.getFullYear()
+  const todayM = today.getMonth()
+  const todayD = today.getDate()
+
+  const isDisabled = (d: number) => {
+    const dt = new Date(viewYear, viewMonth, d)
+    const td = new Date(todayY, todayM, todayD)
+    return dt < td
+  }
+
+  const idleBorder   = hasError ? ERROR_BORDER : BORDER_PANEL
+  const activeBorder = hasError ? ERROR_COLOR   : `${CYAN}66`
+
+  return (
+    <div ref={ref} className="relative flex flex-col gap-1">
+      {/* Trigger button */}
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center gap-2 px-3 text-left transition-all
+                   hover:opacity-90 active:scale-[0.99] cursor-pointer"
+        style={{
+          height: 36,
+          background: INPUT_BG_PANEL,
+          border: `1px solid ${open ? activeBorder : idleBorder}`,
+          borderRadius: RADIUS,
+          outline: 'none',
+        }}
+      >
+        <CalendarDays size={14} style={{ color: CYAN, flexShrink: 0 }} />
+        <span className="flex-1 text-sm" style={{ color: value ? '#fff' : 'rgba(255,255,255,0.3)' }}>
+          {value ? formatDisplayDate(value) : 'Select date'}
+        </span>
+      </button>
+
+      {hasError && errorMsg && <FormHelperText sx={HELPER_SX}>{errorMsg}</FormHelperText>}
+
+      {/* Popup calendar */}
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -6, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0,  scale: 1 }}
+            exit={{   opacity: 0, y: -6,  scale: 0.97 }}
+            transition={{ duration: 0.15 }}
+            className="absolute top-[42px] left-0 z-50 rounded-xl shadow-2xl p-4 w-[260px]"
+            style={{
+              background: '#1E1C1C',
+              border: `1px solid ${BORDER_PANEL}`,
+            }}
+          >
+            {/* Month nav */}
+            <div className="flex items-center justify-between mb-3">
+              <button type="button" onClick={prevMonth}
+                className="p-1 rounded hover:bg-white/10 transition-colors cursor-pointer text-white/60 hover:text-white">
+                <ChevronLeft size={15} />
+              </button>
+              <span className="font-body text-xs font-bold text-white tracking-wider">
+                {MONTHS[viewMonth]} {viewYear}
+              </span>
+              <button type="button" onClick={nextMonth}
+                className="p-1 rounded hover:bg-white/10 transition-colors cursor-pointer text-white/60 hover:text-white">
+                <ChevronRight size={15} />
+              </button>
+            </div>
+
+            {/* Day-of-week headers */}
+            <div className="grid grid-cols-7 mb-1">
+              {DOW.map(d => (
+                <div key={d} className="text-center font-body text-[10px] text-white/30 py-0.5">{d}</div>
+              ))}
+            </div>
+
+            {/* Day cells */}
+            <div className="grid grid-cols-7 gap-y-0.5">
+              {Array.from({ length: blanks }).map((_, i) => <div key={`b${i}`} />)}
+              {Array.from({ length: total }, (_, i) => i + 1).map(d => {
+                const str = toDateStr(viewYear, viewMonth, d)
+                const isSelected = str === value
+                const isToday    = viewYear === todayY && viewMonth === todayM && d === todayD
+                const disabled   = isDisabled(d)
+                return (
+                  <button
+                    key={d}
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => selectDay(d)}
+                    className="h-8 w-full flex items-center justify-center rounded-md text-xs font-body
+                               transition-all cursor-pointer"
+                    style={{
+                      background:  isSelected ? CYAN : isToday ? 'rgba(77,249,237,0.12)' : 'transparent',
+                      color:       disabled ? 'rgba(255,255,255,0.15)'
+                                 : isSelected ? '#000'
+                                 : isToday    ? CYAN
+                                 : '#fff',
+                      cursor: disabled ? 'not-allowed' : 'pointer',
+                      fontWeight:  isSelected || isToday ? 700 : 400,
+                    }}
+                  >
+                    {d}
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Today shortcut */}
+            <div className="mt-3 pt-2 border-t border-white/[0.07] text-center">
+              <button
+                type="button"
+                onClick={() => {
+                  onChange(toDateStr(todayY, todayM, todayD))
+                  setOpen(false)
+                }}
+                className="font-body text-xs cursor-pointer transition-colors"
+                style={{ color: CYAN }}
+              >
+                Today
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+// ─── TimePickerPopup ──────────────────────────────────────────────────────────
+function TimePickerPopup({
+  value, onChange, hasError, errorMsg,
+}: {
+  value: string
+  onChange: (v: string) => void
+  hasError?: boolean
+  errorMsg?: string
+}) {
+  const [open, setOpen] = useState(false)
+  const ref      = useRef<HTMLDivElement>(null)
+  const listRef  = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  // scroll selected slot into view when popup opens
+  useEffect(() => {
+    if (!open || !value) return
+    const idx = TIME_SLOTS.indexOf(value)
+    if (idx === -1 || !listRef.current) return
+    const btn = listRef.current.children[idx] as HTMLElement | undefined
+    btn?.scrollIntoView({ block: 'center' })
+  }, [open, value])
+
+  const idleBorder   = hasError ? ERROR_BORDER : BORDER_PANEL
+  const activeBorder = hasError ? ERROR_COLOR   : `${CYAN}66`
+
+  return (
+    <div ref={ref} className="relative flex flex-col gap-1">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center gap-2 px-3 text-left transition-all
+                   hover:opacity-90 active:scale-[0.99] cursor-pointer"
+        style={{
+          height: 36,
+          background: INPUT_BG_PANEL,
+          border: `1px solid ${open ? activeBorder : idleBorder}`,
+          borderRadius: RADIUS,
+          outline: 'none',
+        }}
+      >
+        <Clock size={14} style={{ color: CYAN, flexShrink: 0 }} />
+        <span className="flex-1 text-sm" style={{ color: value ? '#fff' : 'rgba(255,255,255,0.3)' }}>
+          {value ? formatDisplayTime(value) : 'Select time'}
+        </span>
+      </button>
+
+      {hasError && errorMsg && <FormHelperText sx={HELPER_SX}>{errorMsg}</FormHelperText>}
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -6, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0,  scale: 1 }}
+            exit={{   opacity: 0, y: -6,  scale: 0.97 }}
+            transition={{ duration: 0.15 }}
+            className="absolute top-[42px] left-0 z-50 rounded-xl shadow-2xl w-[160px] overflow-hidden"
+            style={{
+              background: '#1E1C1C',
+              border: `1px solid ${BORDER_PANEL}`,
+            }}
+          >
+            <div className="px-3 py-2 border-b border-white/[0.07]">
+              <span className="font-body text-[10px] text-white/40 uppercase tracking-widest">
+                Select Time
+              </span>
+            </div>
+            <div ref={listRef} className="overflow-y-auto flex flex-col" style={{ maxHeight: 220 }}>
+              {TIME_SLOTS.map(slot => {
+                const selected = slot === value
+                return (
+                  <button
+                    key={slot}
+                    type="button"
+                    onClick={() => { onChange(slot); setOpen(false) }}
+                    className="flex items-center justify-between px-4 py-2 text-sm font-body
+                               transition-colors cursor-pointer text-left"
+                    style={{
+                      background: selected ? `${CYAN}1A` : 'transparent',
+                      color: selected ? CYAN : '#fff',
+                      fontWeight: selected ? 700 : 400,
+                    }}
+                  >
+                    <span>{formatDisplayTime(slot)}</span>
+                    {selected && <Check size={11} style={{ color: CYAN }} />}
+                  </button>
+                )
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+// ─── LocationField (unchanged) ────────────────────────────────────────────────
 function LocationField({
   value, placeholder, hasError, errorMsg, accentColor, onClick,
 }: {
@@ -195,15 +518,16 @@ function LocationField({
   )
 }
 
+// ─── Main Component ───────────────────────────────────────────────────────────
 export default function StepBookingDetails({ onNext, onBack, onFilesChange }: Props) {
   const dispatch = useAppDispatch()
 
-  const date        = useAppSelector((s) => s.booking.date)
-  const time        = useAppSelector((s) => s.booking.time)
-  const pickup      = useAppSelector((s) => s.booking.pickup)
-  const dropoffs    = useAppSelector((s) => s.booking.dropoffs)
-  const mode        = useAppSelector((s) => s.booking.mode)
-  const sections    = useAppSelector(selectSections)
+  const date         = useAppSelector((s) => s.booking.date)
+  const time         = useAppSelector((s) => s.booking.time)
+  const pickup       = useAppSelector((s) => s.booking.pickup)
+  const dropoffs     = useAppSelector((s) => s.booking.dropoffs)
+  const mode         = useAppSelector((s) => s.booking.mode)
+  const sections     = useAppSelector(selectSections)
   const paymentTerms = useAppSelector((s) => s.booking.paymentTerms)
 
   const [touched,    setTouched]    = useState(false)
@@ -265,8 +589,6 @@ export default function StepBookingDetails({ onNext, onBack, onFilesChange }: Pr
     [dispatch, mapTarget],
   )
 
-  const dateInputRef = useRef<HTMLInputElement>(null)
-  const timeInputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const mapInitialValue = mapTarget
@@ -331,62 +653,36 @@ export default function StepBookingDetails({ onNext, onBack, onFilesChange }: Pr
         <motion.div variants={stagger} initial="hidden" animate="show"
           className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-6"
         >
+          {/* ── Transit Schedule ── */}
           <motion.div variants={fadeUp}
             className="bg-[#2A2828] rounded-md border border-white/[0.07] p-4 flex flex-col gap-3"
           >
             <SectionHeader icon={<CalendarDays size={16} />} title="Transit Schedule" />
 
+            {/* DATE — custom popup picker */}
             <div className="flex flex-col gap-1">
               <span className="font-body booking-text text-xs">Date<Req /></span>
-              <TextField
-                fullWidth type="date" value={date}
-                onChange={(e) => dispatch(setDate(e.target.value))}
-                variant="outlined" inputRef={dateInputRef}
-                error={!!errors.schedule.date}
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <CalendarDays size={16}
-                        className="cursor-pointer text-white/40 hover:text-white transition-colors"
-                        onClick={() => dateInputRef.current?.showPicker()} />
-                    </InputAdornment>
-                  ),
-                }}
-                sx={{
-                  ...fieldSx(INPUT_BG_PANEL, BORDER_PANEL, !!errors.schedule.date),
-                  '& input[type="date"]::-webkit-calendar-picker-indicator': { display: 'none' },
-                  '& .MuiInputBase-input': { padding: '0 0 0 12px', height: 36, boxSizing: 'border-box', colorScheme: 'dark' },
-                }}
+              <DatePickerPopup
+                value={date}
+                onChange={(v) => dispatch(setDate(v))}
+                hasError={!!errors.schedule?.date}
+                errorMsg={errors.schedule?.date}
               />
-              {errors.schedule.date && <FormHelperText sx={HELPER_SX}>{errors.schedule.date}</FormHelperText>}
             </div>
 
+            {/* TIME — custom popup picker (30-min slots only) */}
             <div className="flex flex-col gap-1">
               <span className="font-body booking-text text-xs">Time<Req /></span>
-              <TextField
-                fullWidth type="time" value={time}
-                onChange={(e) => dispatch(setTime(e.target.value))}
-                variant="outlined" inputRef={timeInputRef}
-                error={!!errors.schedule.time}
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <Clock size={16}
-                        className="cursor-pointer text-white/40 hover:text-white transition-colors"
-                        onClick={() => timeInputRef.current?.showPicker()} />
-                    </InputAdornment>
-                  ),
-                }}
-                sx={{
-                  ...fieldSx(INPUT_BG_PANEL, BORDER_PANEL, !!errors.schedule.time),
-                  '& input[type="time"]::-webkit-calendar-picker-indicator': { display: 'none' },
-                  '& .MuiInputBase-input': { padding: '0 0 0 12px', height: 36, boxSizing: 'border-box', colorScheme: 'dark' },
-                }}
+              <TimePickerPopup
+                value={time}
+                onChange={(v) => dispatch(setTime(v))}
+                hasError={!!errors.schedule?.time}
+                errorMsg={errors.schedule?.time}
               />
-              {errors.schedule.time && <FormHelperText sx={HELPER_SX}>{errors.schedule.time}</FormHelperText>}
             </div>
           </motion.div>
 
+          {/* ── Pick Up ── */}
           <motion.div variants={fadeUp}
             className="bg-[#2A2828] rounded-md border border-white/[0.07] p-4 flex flex-col gap-3"
           >
@@ -397,13 +693,14 @@ export default function StepBookingDetails({ onNext, onBack, onFilesChange }: Pr
             <LocationField
               value={pickup}
               placeholder="Click to set on map"
-              hasError={!!errors.route.pickup}
-              errorMsg={errors.route.pickup}
+              hasError={!!errors.route?.pickup}
+              errorMsg={errors.route?.pickup}
               accentColor={CYAN}
               onClick={() => setMapTarget({ kind: 'pickup' })}
             />
           </motion.div>
 
+          {/* ── Drop Off ── */}
           <motion.div variants={fadeUp}
             className="bg-[#2A2828] rounded-md border border-white/[0.07] p-4 flex flex-col gap-2"
           >
@@ -418,8 +715,8 @@ export default function StepBookingDetails({ onNext, onBack, onFilesChange }: Pr
                     <LocationField
                       value={d}
                       placeholder="Click to set on map"
-                      hasError={!!errors.route.dropoffs[i]}
-                      errorMsg={errors.route.dropoffs[i]}
+                      hasError={!!errors.route?.dropoffs?.[i]}
+                      errorMsg={errors.route?.dropoffs?.[i]}
                       accentColor={RED}
                       onClick={() => setMapTarget({ kind: 'dropoff', index: i })}
                     />
@@ -765,7 +1062,6 @@ export default function StepBookingDetails({ onNext, onBack, onFilesChange }: Pr
             Upload your transaction summary here — files will be attached when your booking is confirmed.
           </p>
 
-          {/* Drop zone */}
           <div
             onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
             onDragLeave={() => setIsDragging(false)}
@@ -787,18 +1083,15 @@ export default function StepBookingDetails({ onNext, onBack, onFilesChange }: Pr
             }}
           >
             <Upload size={24} style={{ color: isDragging ? CYAN : 'rgba(255,255,255,0.4)' }} />
-
             <div className="flex items-center gap-1 text-sm">
               <span className="font-body booking-text" style={{ color: CYAN, textDecoration: 'underline', textUnderlineOffset: 3 }}>
                 Click to browse
               </span>
               <span className="font-body booking-text text-white/80">or drag and drop</span>
             </div>
-
             <p className="font-body booking-text text-xs text-white/50 text-center">
               .pdf, .docx, or .xlsx · max 10 MB each · up to 3 files
             </p>
-
             <input
               ref={fileInputRef}
               type="file"
@@ -812,14 +1105,10 @@ export default function StepBookingDetails({ onNext, onBack, onFilesChange }: Pr
             />
           </div>
 
-          {docError && (
-            <p className="font-body booking-text text-xs text-red-400">{docError}</p>
-          )}
-
+          {docError && <p className="font-body booking-text text-xs text-red-400">{docError}</p>}
           {touched && rawErrors.documents && !docError && (
             <p className="font-body booking-text text-xs text-red-400">{rawErrors.documents}</p>
           )}
-
           {localFiles.length >= MAX_DOC_COUNT && (
             <p className="font-body booking-text text-xs text-white/40 text-center">
               Maximum of {MAX_DOC_COUNT} files reached
@@ -829,29 +1118,21 @@ export default function StepBookingDetails({ onNext, onBack, onFilesChange }: Pr
           {localFiles.length > 0 && (
             <div className="flex flex-col gap-1.5">
               {localFiles.map((file, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
+                <motion.div key={i} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
                   className="flex items-center justify-between rounded-md px-3 py-2 border border-white/10"
                   style={{ background: INPUT_BG_CARD }}
                 >
                   <div className="flex items-center gap-2 flex-1 min-w-0 mr-2">
                     <File size={13} className="text-white/40 shrink-0" />
                     <div className="flex flex-col flex-1 min-w-0">
-                      <span className="font-body booking-text text-xs text-white/80 truncate">
-                        {file.name}
-                      </span>
+                      <span className="font-body booking-text text-xs text-white/80 truncate">{file.name}</span>
                       <span className="font-body booking-text text-[10px] text-white/40">
                         {formatBytes(file.size)} · queued for upload
                       </span>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => removeFile(i)}
-                    className="hover:text-red-400 transition-colors cursor-pointer shrink-0"
-                  >
+                  <button type="button" onClick={() => removeFile(i)}
+                    className="hover:text-red-400 transition-colors cursor-pointer shrink-0">
                     <X size={13} />
                   </button>
                 </motion.div>
@@ -867,16 +1148,12 @@ export default function StepBookingDetails({ onNext, onBack, onFilesChange }: Pr
           )}
         </motion.div>
 
-        {/* Payment Terms */}
+        {/* ── Payment Terms ── */}
         <motion.div variants={fadeUp} initial="hidden" animate="show"
           className="bg-[#2A2828] rounded-md border border-white/[0.07] p-4 flex flex-col gap-4"
         >
           <SectionHeader icon={<CreditCard size={16} />} title="Payment Terms" />
-
-          <p className="font-body booking-text text-sm text-white/80">
-            Select your payment terms
-          </p>
-
+          <p className="font-body booking-text text-sm text-white/80">Select your payment terms</p>
           <Select
             value={paymentTerms}
             onChange={(e: SelectChangeEvent) => dispatch(setPaymentTerms(e.target.value))}
@@ -890,13 +1167,12 @@ export default function StepBookingDetails({ onNext, onBack, onFilesChange }: Pr
             <MenuItem value="45">45 days</MenuItem>
             <MenuItem value="60">60 days</MenuItem>
           </Select>
-
-           {touched && rawErrors.paymentTerms && (
+          {touched && rawErrors.paymentTerms && (
             <FormHelperText sx={HELPER_SX}>{rawErrors.paymentTerms}</FormHelperText>
           )}
         </motion.div>
 
-        {/* Cargo Summary */}
+        {/* ── Cargo Summary ── */}
         <motion.div variants={fadeUp} initial="hidden" animate="show"
           className="rounded-md bg-[#2A2828] p-5 flex flex-col gap-3
                      border border-white/[0.07] border-t-[3px] border-t-[var(--color-cyan)]"
@@ -956,9 +1232,7 @@ export default function StepBookingDetails({ onNext, onBack, onFilesChange }: Pr
           ) : (
             <span />
           )}
-          <WizBtn onClick={handleNext} variant="next">
-            NEXT
-          </WizBtn>
+          <WizBtn onClick={handleNext} variant="next">NEXT</WizBtn>
         </motion.div>
 
       </div>
@@ -966,6 +1240,7 @@ export default function StepBookingDetails({ onNext, onBack, onFilesChange }: Pr
   )
 }
 
+// ─── Sub-components (unchanged) ───────────────────────────────────────────────
 function ProductFieldsRow({ group, errors, onUpdate }: {
   group: ItemGroup; errors: GroupErrors; onUpdate: (patch: Partial<ItemGroup>) => void
 }) {
