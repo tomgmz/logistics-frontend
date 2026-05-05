@@ -4,7 +4,7 @@ import { motion, Variants, AnimatePresence } from 'framer-motion'
 import { useCallback, useState, useRef } from 'react'
 import {
   CalendarDays, Clock, MapPin, Package,
-  Truck, Plus, X, Check, Info,
+  Truck, Plus, X, Check, Info, Upload, CreditCard,
 } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/lib/hooks/hooks'
 import {
@@ -195,6 +195,9 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
 
   const [touched,   setTouched]   = useState(false)
   const [mapTarget, setMapTarget] = useState<MapPickerTarget>(null)
+  const [transactionFile, setTransactionFile] = useState<File | null>(null)
+  const [isDragging,       setIsDragging]      = useState(false)
+  const [paymentTerms,     setPaymentTerms]    = useState('')
 
   const allGroups = sections.flatMap((s) => s.groups)
 
@@ -709,6 +712,103 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
               })}
             </AnimatePresence>
           </div>
+        </motion.div>
+
+        {/* ── Transaction Summary ── */}
+        <motion.div variants={fadeUp} initial="hidden" animate="show"
+          className="bg-[#2A2828] rounded-md border border-white/[0.07] p-4 flex flex-col gap-4"
+        >
+          <SectionHeader icon={<Upload size={16} />} title="Transaction Summary" />
+
+          <p className="font-body booking-text text-sm text-white/80">
+            Upload your transaction summary here
+          </p>
+
+          <div
+            onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault()
+              setIsDragging(false)
+              const file = e.dataTransfer.files?.[0]
+              if (file) setTransactionFile(file)
+            }}
+            className="flex flex-col items-center gap-2 rounded-md px-4 py-6 border border-dashed transition-colors"
+            style={{
+              background: INPUT_BG_CARD,
+              borderColor: isDragging ? CYAN : '#818181',
+            }}
+          >
+            <Upload size={24} style={{ color: isDragging ? CYAN : 'rgba(255,255,255,0.4)' }} />
+
+            <div className="flex items-center gap-1 text-sm">
+              <label
+                htmlFor="txn-file-upload"
+                className="cursor-pointer font-body booking-text"
+                style={{ color: CYAN, textDecoration: 'underline', textUnderlineOffset: 3 }}
+              >
+                Link
+              </label>
+              <span className="font-body booking-text text-white/80">or drag and drop</span>
+            </div>
+
+            <p className="font-body booking-text text-xs text-white/50 text-center">
+              .pdf, .docx, or .xlsx (max. 3MB)
+            </p>
+
+            <input
+              id="txn-file-upload"
+              type="file"
+              accept=".pdf,.docx,.xlsx"
+              className="sr-only"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file) setTransactionFile(file)
+              }}
+            />
+          </div>
+
+          {transactionFile && (
+            <div className="flex items-center justify-between rounded-md px-3 py-2 border border-white/10"
+              style={{ background: INPUT_BG_CARD }}
+            >
+              <span className="font-body booking-text text-xs text-white/80 truncate flex-1 min-w-0 mr-2">
+                {transactionFile.name}
+              </span>
+              <button
+                type="button"
+                onClick={() => setTransactionFile(null)}
+                className="shrink-0 hover:text-red-400 transition-colors cursor-pointer"
+              >
+                <X size={13} />
+              </button>
+            </div>
+          )}
+        </motion.div>
+
+        <motion.div variants={fadeUp} initial="hidden" animate="show"
+          className="bg-[#2A2828] rounded-md border border-white/[0.07] p-4 flex flex-col gap-4"
+        >
+          <SectionHeader icon={<CreditCard size={16} />} title="Payment Terms" />
+
+          <p className="font-body booking-text text-sm text-white/80">
+            Select your payment terms
+          </p>
+
+          <Select
+            value={paymentTerms}
+            onChange={(e: SelectChangeEvent) => setPaymentTerms(e.target.value)}
+            displayEmpty
+            sx={{ ...selectSx(INPUT_BG_PANEL, BORDER_PANEL), width: '100%' }}
+            MenuProps={MENU_PROPS}
+          >
+            <MenuItem value=""><em style={{ opacity: 0.4, fontStyle: 'normal' }}>Select payment terms</em></MenuItem>
+            <MenuItem value="15">15 days</MenuItem>
+            <MenuItem value="30">30 days</MenuItem>
+            <MenuItem value="45">45 days</MenuItem>
+            <MenuItem value="60">60 days</MenuItem>
+            <MenuItem value="90">90 days</MenuItem>
+          </Select>
         </motion.div>
 
         <motion.div variants={fadeUp} initial="hidden" animate="show"
