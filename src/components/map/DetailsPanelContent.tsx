@@ -139,11 +139,26 @@ export function DetailsPanelContent({
   return (
     <div className="flex flex-col min-h-full ff-body">
 
-      <div className="relative w-full flex-shrink-0" style={{ height: 31 }}>
-        <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 31" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M 0,0 L 100,0 L 100,21 a 10,10 0 0 1 -10,10 L 10,31 a 10,10 0 0 1 -10,-10 Z" fill="var(--color-surface-dark, #424242)" />
+      <div className="relative w-full flex-shrink-0" style={{ height: 31, borderRadius: '10px 10px 0 0', overflow: 'hidden' }}>
+        <svg
+          className="absolute inset-0 w-full h-full"
+          viewBox="0 0 584 31"
+          preserveAspectRatio="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <rect width="584" height="9" fill="#424242" />
+          <g clipPath="url(#banner-clip)">
+            <path d="M116.177 8.00001C98.1978 7.99999 292.198 8.00001 292.198 8.00001V31C292.198 31 174.749 31 152.723 31C130.697 31 134.156 8.00003 116.177 8.00001Z" fill="#424242" />
+            <path d="M468.021 8.00001C486 7.99999 292 8.00001 292 8.00001V31C292 31 409.449 31 431.474 31C453.5 31 450.042 8.00003 468.021 8.00001Z" fill="#424242" />
+          </g>
+          <defs>
+            <clipPath id="banner-clip">
+              <rect width="354" height="31" fill="white" transform="translate(115)" />
+            </clipPath>
+          </defs>
         </svg>
-        <div className="absolute inset-x-0 flex items-center justify-center gap-2" style={{ top: 0, bottom: 10 }}>
+
+        <div className="absolute inset-x-0 flex items-center justify-center gap-2" style={{ top: 9, bottom: 0 }}>
           {isLoading ? (
             <Skeleton style={{ width: '60%' }} />
           ) : (

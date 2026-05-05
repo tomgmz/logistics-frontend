@@ -1,14 +1,12 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import Image from 'next/image'
 import { APIProvider, Map, AdvancedMarker }  from '@vis.gl/react-google-maps'
 import { OptimizedStop, OptimizeRouteResponse } from '@/app/types/maps/routemap.types'
 import { motion, AnimatePresence }           from 'framer-motion'
 import LocalShippingIcon  from '@mui/icons-material/LocalShipping'
 import SearchIcon         from '@mui/icons-material/Search'
 import ArrowForwardIcon   from '@mui/icons-material/ArrowForward'
-import CloseIcon          from '@mui/icons-material/Close'
 import RefreshIcon        from '@mui/icons-material/Refresh'
 import type { BookingWithRelations }         from '@/lib/store/slice/routeMap.slice'
 import { StatusBadge }                       from './RouteMapComponents'
@@ -26,7 +24,6 @@ import { statusColor } from './status.colors'
 
 const GOOGLE_MAPS_KEY    = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!
 const GOOGLE_MAPS_MAP_ID = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID!
-const LOGO_SRC           = '/final-logo.png'
 
 const FILTERS = ['All', 'Active', 'Pending', 'Completed'] as const
 type FilterKey = typeof FILTERS[number]
@@ -47,19 +44,6 @@ function fmtStatus(s: string) {
 function addressAbbr(address: string | undefined, fallback: string): string {
   if (!address) return fallback
   return address.match(/\b[A-Z]{2,4}\b/)?.[0] ?? address.split(',')[0].slice(0, 3).toUpperCase()
-}
-
-function Logo({ height, width, priority }: { height: number; width: number; priority?: boolean }) {
-  return (
-    <Image
-      src={LOGO_SRC}
-      alt="8338 Logistics"
-      height={height}
-      width={width}
-      className="object-contain"
-      priority={priority}
-    />
-  )
 }
 
 function BookingListItem({
@@ -544,15 +528,7 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
                   className="absolute top-4 bottom-4 left-4 w-[500px] z-10 rounded-[24px] overflow-hidden flex flex-col"
                   style={{ background: 'var(--color-surface)' }}
                 >
-                  <div className="flex-shrink-0 flex justify-end px-3 pt-3">
-                    <button
-                      onClick={() => setDetailPanelOpen(false)}
-                      className="w-8 h-8 rounded-full border flex items-center justify-center hover:opacity-70 transition-opacity"
-                      style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)' }}
-                    >
-                      <CloseIcon sx={{ fontSize: 14, color: '#9ca3af' }} />
-                    </button>
-                  </div>
+                  
                   <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-none">
                     {detailPanel}
                   </div>
