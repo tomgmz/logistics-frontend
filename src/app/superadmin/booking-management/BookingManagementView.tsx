@@ -46,6 +46,10 @@ const BOOKING_STATUSES: AdminBookingLifecycleStatus[] = [
 
 const DEST_STATUSES: DestinationDeliveryStatus[] = ['pending', 'delivered', 'failed']
 
+function toDownloadUrl(url: string): string {
+  return url.replace('/upload/', '/upload/fl_attachment/')
+}
+
 function fmtStatus(s: string) {
   return (s ?? '').replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())
 }
@@ -593,9 +597,10 @@ export default function BookingManagementView() {
                                 return (
                                   <li key={url}>
                                     <a
-                                      href={url}
+                                      href={toDownloadUrl(url)}
                                       target="_blank"
                                       rel="noopener noreferrer"
+                                      download={filename}
                                       className="flex items-center gap-2.5 rounded-lg border border-white/[0.08]
                                                 bg-black/20 px-3 py-2 text-sm text-white/80
                                                 hover:border-[var(--color-cyan)]/40 hover:text-white
