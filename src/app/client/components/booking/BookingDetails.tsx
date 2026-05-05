@@ -4,7 +4,7 @@ import { motion, Variants, AnimatePresence } from 'framer-motion'
 import { useCallback, useState, useRef } from 'react'
 import {
   CalendarDays, Clock, MapPin, Package,
-  Truck, Plus, X, Check, Info, Upload, CreditCard,
+  Truck, Plus, X, Check, Info, Upload, CreditCard, File,
 } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/lib/hooks/hooks'
 import {
@@ -70,7 +70,7 @@ const RED            = '#f87171'
 const ERROR_COLOR    = '#f87171'
 const ERROR_BORDER   = `${ERROR_COLOR}99`
 const RADIUS         = '8px'
- 
+
 function fieldSx(bg: string, borderColor: string, hasError = false): SxProps<Theme> {
   const activeBorder = hasError ? ERROR_COLOR : `${CYAN}66`
   const idleBorder   = hasError ? ERROR_BORDER : borderColor
@@ -186,22 +186,21 @@ function LocationField({
 export default function StepBookingDetails({ onNext, onBack }: Props) {
   const dispatch = useAppDispatch()
 
-  const date            = useAppSelector((s) => s.booking.date)
-  const time            = useAppSelector((s) => s.booking.time)
-  const pickup          = useAppSelector((s) => s.booking.pickup)
-  const dropoffs        = useAppSelector((s) => s.booking.dropoffs)
-  const mode            = useAppSelector((s) => s.booking.mode)
-  const sections        = useAppSelector(selectSections)
+  const date     = useAppSelector((s) => s.booking.date)
+  const time     = useAppSelector((s) => s.booking.time)
+  const pickup   = useAppSelector((s) => s.booking.pickup)
+  const dropoffs = useAppSelector((s) => s.booking.dropoffs)
+  const mode     = useAppSelector((s) => s.booking.mode)
+  const sections = useAppSelector(selectSections)
 
-  const [touched,   setTouched]   = useState(false)
-  const [mapTarget, setMapTarget] = useState<MapPickerTarget>(null)
-  const [transactionFile, setTransactionFile] = useState<File | null>(null)
-  const [isDragging,       setIsDragging]      = useState(false)
-  const [paymentTerms,     setPaymentTerms]    = useState('')
+  const [touched,          setTouched]          = useState(false)
+  const [mapTarget,        setMapTarget]        = useState<MapPickerTarget>(null)
+  const [isDragging,       setIsDragging]       = useState(false)
+  const [paymentTerms,     setPaymentTerms]     = useState('')
+  const [transactionFiles, setTransactionFiles] = useState<File[]>([])
 
   const allGroups = sections.flatMap((s) => s.groups)
 
-  // Derived from actual group state so unchecking one item unticks the "All" toggle
   const computedAllNonTiltable  = allGroups.length > 0 && allGroups.every((g) => g.nonTiltable)
   const computedAllNonStackable = allGroups.length > 0 && allGroups.every((g) => g.nonStackable)
   const computedAllStackable    = allGroups.length > 0 && allGroups.every((g) => g.stackable)
@@ -218,9 +217,7 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
     onNext()
   }
 
-  const handleAddDropoff = () => {
-    dispatch(addDropoff())
-  }
+  const handleAddDropoff = () => dispatch(addDropoff())
 
   const handleUpdateGroup = (dropoffIndex: number, groupId: string, patch: Partial<ItemGroup>) =>
     dispatch(updateGroupAction({ dropoffIndex, groupId, patch }))
@@ -255,6 +252,7 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
 
   const dateInputRef = useRef<HTMLInputElement>(null)
   const timeInputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const mapInitialValue = mapTarget
     ? mapTarget.kind === 'pickup' ? pickup : dropoffs[mapTarget.index] ?? ''
@@ -262,6 +260,11 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
 
   const mapPickerMode: 'pickup' | 'dropoff' =
     mapTarget?.kind === 'pickup' ? 'pickup' : 'dropoff'
+
+  const addFiles = (incoming: File[]) => {
+    if (!incoming.length) return
+    setTransactionFiles((prev) => [...prev, ...incoming].slice(0, 3))
+  }
 
   return (
     <div className="relative flex flex-col h-full overflow-hidden">
@@ -718,7 +721,7 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
         <motion.div variants={fadeUp} initial="hidden" animate="show"
           className="bg-[#2A2828] rounded-md border border-white/[0.07] p-4 flex flex-col gap-4"
         >
-          <SectionHeader icon={<Upload size={16} />} title="Transaction Summary" />
+          <SectionHeader icon={<File size={16} />} title="Transaction Summary" />
 
           <p className="font-body booking-text text-sm text-white/80">
             Upload your transaction summary here
@@ -730,25 +733,26 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
             onDrop={(e) => {
               e.preventDefault()
               setIsDragging(false)
-              const file = e.dataTransfer.files?.[0]
-              if (file) setTransactionFile(file)
+              addFiles(Array.from(e.dataTransfer.files))
             }}
-            className="flex flex-col items-center gap-2 rounded-md px-4 py-6 border border-dashed transition-colors"
+            onClick={() => { if (transactionFiles.length < 3) fileInputRef.current?.click() }}
+            className="flex flex-col items-center gap-2 rounded-md px-4 py-6 border border-dashed transition-colors cursor-pointer"
             style={{
               background: INPUT_BG_CARD,
               borderColor: isDragging ? CYAN : '#818181',
+              opacity: transactionFiles.length >= 3 ? 0.5 : 1,
+              pointerEvents: transactionFiles.length >= 3 ? 'none' : 'auto',
             }}
           >
             <Upload size={24} style={{ color: isDragging ? CYAN : 'rgba(255,255,255,0.4)' }} />
 
             <div className="flex items-center gap-1 text-sm">
-              <label
-                htmlFor="txn-file-upload"
-                className="cursor-pointer font-body booking-text"
+              <span
+                className="font-body booking-text"
                 style={{ color: CYAN, textDecoration: 'underline', textUnderlineOffset: 3 }}
               >
                 Link
-              </label>
+              </span>
               <span className="font-body booking-text text-white/80">or drag and drop</span>
             </div>
 
@@ -757,35 +761,50 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
             </p>
 
             <input
-              id="txn-file-upload"
+              ref={fileInputRef}
               type="file"
               accept=".pdf,.docx,.xlsx"
+              multiple
               className="sr-only"
               onChange={(e) => {
-                const file = e.target.files?.[0]
-                if (file) setTransactionFile(file)
+                addFiles(Array.from(e.target.files ?? []))
+                e.target.value = ''
               }}
             />
           </div>
 
-          {transactionFile && (
-            <div className="flex items-center justify-between rounded-md px-3 py-2 border border-white/10"
-              style={{ background: INPUT_BG_CARD }}
-            >
-              <span className="font-body booking-text text-xs text-white/80 truncate flex-1 min-w-0 mr-2">
-                {transactionFile.name}
-              </span>
-              <button
-                type="button"
-                onClick={() => setTransactionFile(null)}
-                className="shrink-0 hover:text-red-400 transition-colors cursor-pointer"
-              >
-                <X size={13} />
-              </button>
+          {transactionFiles.length >= 3 && (
+            <p className="font-body booking-text text-xs text-white/40 text-center">
+              Maximum of 3 files reached
+            </p>
+          )}
+
+          {transactionFiles.length > 0 && (
+            <div className="flex flex-col gap-1.5">
+              {transactionFiles.map((f, i) => (
+                <div key={i} className="flex items-center justify-between rounded-md px-3 py-2 border border-white/10"
+                  style={{ background: INPUT_BG_CARD }}
+                >
+                  <span className="font-body booking-text text-xs text-white/80 truncate flex-1 min-w-0 mr-2">
+                    {f.name}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setTransactionFiles((prev) => prev.filter((_, idx) => idx !== i))
+                    }}
+                    className="shrink-0 hover:text-red-400 transition-colors cursor-pointer"
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
+              ))}
             </div>
           )}
         </motion.div>
 
+        {/* ── Payment Terms ── */}
         <motion.div variants={fadeUp} initial="hidden" animate="show"
           className="bg-[#2A2828] rounded-md border border-white/[0.07] p-4 flex flex-col gap-4"
         >
@@ -811,6 +830,7 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
           </Select>
         </motion.div>
 
+        {/* ── Cargo Summary ── */}
         <motion.div variants={fadeUp} initial="hidden" animate="show"
           className="rounded-md bg-[#2A2828] p-5 flex flex-col gap-3
                      border border-white/[0.07] border-t-[3px] border-t-[var(--color-cyan)]"
