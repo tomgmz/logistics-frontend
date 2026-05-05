@@ -38,10 +38,12 @@ export interface SectionErrors {
 }
 
 export interface BookingErrors {
-  schedule: ScheduleErrors
-  route: RouteErrors
-  sections: SectionErrors[]
-  touched: boolean
+  schedule:      ScheduleErrors
+  route:         RouteErrors
+  sections:      SectionErrors[]
+  paymentTerms?: string
+  documents?:    string
+  touched:       boolean
 }
 
 function isPositiveNumber(val: string): boolean {
@@ -99,9 +101,9 @@ export function validateRoute(pickup: string, dropoffs: string[]): RouteErrors {
 export function validateGroup(group: ItemGroup, mode: CargoMode): GroupErrors {
   const errors: GroupErrors = {}
 
-  if (!group.commodity.trim()) errors.commodity = 'Commodity is required'
-  if (!group.product.trim()) errors.product = 'Product is required'
-  if (!group.shc.trim()) errors.shc = 'SHC is required'
+  if (!group.commodity.trim())    errors.commodity    = 'Commodity is required'
+  if (!group.product.trim())      errors.product      = 'Product is required'
+  if (!group.shc.trim())          errors.shc          = 'SHC is required'
   if (!group.additionalShc.trim()) errors.additionalShc = 'Additional SHC is required'
 
   if (mode === 'loose') {
@@ -111,19 +113,18 @@ export function validateGroup(group: ItemGroup, mode: CargoMode): GroupErrors {
     if (!isPositiveNumber(group.looseHeight)) errors.looseHeight = 'Required'
     if (!isPositiveNumber(group.weight))      errors.weight      = 'Enter a valid weight'
   } else {
-    if (!isPositiveNumber(group.numPallets))           errors.numPallets           = 'Enter number of pallets'
-    if (!isPositiveNumber(group.palletLength))         errors.palletLength         = 'Required'
-    if (!isPositiveNumber(group.palletWidth))          errors.palletWidth          = 'Required'
-    if (!isPositiveNumber(group.palletHeight))         errors.palletHeight         = 'Required'
-    if (!isNonNegNumber(group.grossWeightPerPallet))   errors.grossWeightPerPallet = 'Required'
-    if (!isNonNegNumber(group.netWeightPerPallet))     errors.netWeightPerPallet   = 'Required'
+    if (!isPositiveNumber(group.numPallets))         errors.numPallets         = 'Enter number of pallets'
+    if (!isPositiveNumber(group.palletLength))       errors.palletLength       = 'Required'
+    if (!isPositiveNumber(group.palletWidth))        errors.palletWidth        = 'Required'
+    if (!isPositiveNumber(group.palletHeight))       errors.palletHeight       = 'Required'
+    if (!isNonNegNumber(group.grossWeightPerPallet)) errors.grossWeightPerPallet = 'Required'
+    if (!isNonNegNumber(group.netWeightPerPallet))   errors.netWeightPerPallet   = 'Required'
 
-    // net must not exceed gross
     const gross = Number(group.grossWeightPerPallet)
     const net   = Number(group.netWeightPerPallet)
     if (
       !errors.grossWeightPerPallet &&
-      !errors.netWeightPerPallet &&
+      !errors.netWeightPerPallet   &&
       net > gross
     ) {
       errors.netWeightPerPallet = 'Net weight cannot exceed gross weight'
@@ -135,7 +136,7 @@ export function validateGroup(group: ItemGroup, mode: CargoMode): GroupErrors {
 
 export function validateSections(
   sections: DropoffSection[],
-  mode: CargoMode,
+  mode:     CargoMode,
 ): SectionErrors[] {
   return sections.map((section) => {
     const groupErrors: Record<string, GroupErrors> = {}
@@ -148,18 +149,29 @@ export function validateSections(
 }
 
 export function validateBooking(
-  date: string,
-  time: string,
-  pickup: string,
-  dropoffs: string[],
-  sections: DropoffSection[],
-  mode: CargoMode,
+  date:         string,
+  time:         string,
+  pickup:       string,
+  dropoffs:     string[],
+  sections:     DropoffSection[],
+  mode:         CargoMode,
+  paymentTerms: string,
+  fileCount:    number,
 ): Omit<BookingErrors, 'touched'> {
-  return {
+  const errors: Omit<BookingErrors, 'touched'> = {
     schedule: validateSchedule(date, time),
     route:    validateRoute(pickup, dropoffs),
     sections: validateSections(sections, mode),
   }
+
+  if (!paymentTerms) {
+    errors.paymentTerms = 'Payment terms are required'
+  }
+  if (fileCount === 0) {
+    errors.documents = 'At least one transaction document is required'
+  }
+
+  return errors
 }
 
 export function hasScheduleErrors(e: ScheduleErrors): boolean {
@@ -177,16 +189,17 @@ export function hasSectionErrors(sections: SectionErrors[]): boolean {
 export function hasAnyErrors(errors: Omit<BookingErrors, 'touched'>): boolean {
   return (
     hasScheduleErrors(errors.schedule) ||
-    hasRouteErrors(errors.route) ||
-    hasSectionErrors(errors.sections)
+    hasRouteErrors(errors.route)       ||
+    hasSectionErrors(errors.sections)  ||
+    !!errors.paymentTerms              ||
+    !!errors.documents
   )
 }
 
-/** Pull group-level errors for a specific group id inside a section list */
 export function getGroupErrors(
   sectionErrors: SectionErrors[],
-  dropoffIndex: number,
-  groupId: string,
+  dropoffIndex:  number,
+  groupId:       string,
 ): GroupErrors {
   return sectionErrors.find((s) => s.dropoffIndex === dropoffIndex)?.groups[groupId] ?? {}
 }

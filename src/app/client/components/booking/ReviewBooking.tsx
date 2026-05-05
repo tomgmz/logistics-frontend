@@ -8,6 +8,7 @@ import { useAppSelector, useAppDispatch } from '@/lib/hooks/hooks'
 import type { ServiceType, DropoffSection, CargoMode } from '@/lib/store/slice/booking.slice'
 import { resetBooking } from '@/lib/store/slice/booking.slice'
 import { bookingService } from '@/lib/services/client/booking.service'
+import { uploadService } from '@/lib/services/admin/documentUpload.service'
 import { getMe } from '@/lib/api/auth.api'
 import { appToast } from '@/lib/toast'
 import './BookingDetails.css'
@@ -15,6 +16,7 @@ import SuccessView from './SuccessView'
 
 interface Props {
   selectedService: ServiceType
+  pendingFiles: File[]
   onBack: () => void
   onNewBooking: () => void
 }
@@ -70,27 +72,30 @@ function buildCargoDetails(
   return JSON.stringify({ service, mode, sections })
 }
 
-export default function StepReview({ selectedService, onBack, onNewBooking }: Props) {
+export default function StepReview({ selectedService, pendingFiles, onBack, onNewBooking }: Props) {
   const dispatch = useAppDispatch()
 
-  const [loading,   setLoading]   = useState(false)
-  const [submitted, setSubmitted] = useState(false)
-  const [bookingId, setBookingId] = useState<string | null>(null)
-  const [error,     setError]     = useState<string | null>(null)
+  const [loading,        setLoading]        = useState(false)
+  const [submitted,      setSubmitted]      = useState(false)
+  const [bookingId,      setBookingId]      = useState<string | null>(null)
+  const [error,          setError]          = useState<string | null>(null)
+  const [docUploadState, setDocUploadState] = useState<'idle' | 'uploading' | 'done' | 'failed'>('idle')
 
   const pickupLat     = useAppSelector((s) => s.booking.pickupLat)
   const pickupLng     = useAppSelector((s) => s.booking.pickupLng)
   const dropoffCoords = useAppSelector((s) => s.booking.dropoffCoords)
-
-  const date     = useAppSelector((s) => s.booking.date)
-  const time     = useAppSelector((s) => s.booking.time)
-  const pickup   = useAppSelector((s) => s.booking.pickup)
-  const dropoffs = useAppSelector((s) => s.booking.dropoffs)
-  const mode     = useAppSelector((s) => s.booking.mode)
-  const sections = useAppSelector((s) => s.booking.sections)
-  const vehicle  = useAppSelector((s) => s.booking.vehicle)
+  const date          = useAppSelector((s) => s.booking.date)
+  const time          = useAppSelector((s) => s.booking.time)
+  const pickup        = useAppSelector((s) => s.booking.pickup)
+  const dropoffs      = useAppSelector((s) => s.booking.dropoffs)
+  const mode          = useAppSelector((s) => s.booking.mode)
+  const sections      = useAppSelector((s) => s.booking.sections)
+  const vehicle       = useAppSelector((s) => s.booking.vehicle)
+  const paymentTerms  = useAppSelector((s) => s.booking.paymentTerms)
 
   const allGroups = sections.flatMap((s) => s.groups)
+
+  let docsFailed = false
 
   const confirm = async () => {
     if (!vehicle) return
@@ -100,15 +105,31 @@ export default function StepReview({ selectedService, onBack, onNewBooking }: Pr
     try {
       const me = await getMe()
       const clientId = me.clients?.client_id
-
       if (!clientId) {
         setError('Client profile not found. Please contact support.')
         setLoading(false)
         return
       }
 
+      // ── Step 1: Upload documents first (if any) ───────────────────────
+      let transactionUrls: string[] = []
+      if (pendingFiles.length > 0) {
+        setDocUploadState('uploading')
+        try {
+          const uploadResult = await uploadService.uploadBookingDocuments(pendingFiles)
+          transactionUrls = uploadResult.urls
+          setDocUploadState('done')
+        } catch (uploadErr) {
+          console.error('Document upload failed:', uploadErr)
+          docsFailed = true
+          setDocUploadState('failed')
+          // still proceed — booking will just have no documents
+        }
+      }
+
       const { grossWeight, volume, stackableRequired } = calcSummary(sections, mode)
 
+      // ── Step 2: Create booking with URLs already in payload ───────────
       const payload = {
         client_id:         clientId,
         origin:            pickup,
@@ -118,10 +139,12 @@ export default function StepReview({ selectedService, onBack, onNewBooking }: Pr
         cargo_details:     buildCargoDetails(sections, mode, selectedService),
         schedule_date:     date,
         call_time:         time,
+        ...(paymentTerms && { payment_terms: paymentTerms }),
         ...(grossWeight > 0 && { required_weight_kg:  parseFloat(grossWeight.toFixed(2)) }),
         ...(volume      > 0 && { required_volume_cbm: parseFloat(volume.toFixed(4)) }),
         ...(vehicle.maxLengthCM > 0 && { required_length_cm: vehicle.maxLengthCM }),
         stackable_required: stackableRequired,
+        ...(transactionUrls.length > 0 && { transaction_documents: transactionUrls }),
         destinations: dropoffs
           .filter(Boolean)
           .map((address, i) => ({
@@ -133,27 +156,30 @@ export default function StepReview({ selectedService, onBack, onNewBooking }: Pr
       }
 
       const result = await bookingService.createBooking(payload)
-      const id = result?.booking_id ?? null
-      setBookingId(id)
+
+      setBookingId(result?.booking_id ?? null)
       dispatch(resetBooking())
       setSubmitted(true)
-      appToast.success('Booking submitted successfully.', {
-        action: 'booking-create',
-        ...(id != null ? { entityId: id } : {}),
-      })
+
+      appToast.success(
+        docsFailed
+          ? 'Booking submitted, but document upload failed. Contact support.'
+          : 'Booking submitted successfully.',
+        {
+          action: 'booking-create',
+          ...(result?.booking_id != null ? { entityId: result.booking_id } : {}),
+        },
+      )
 
     } catch (err: unknown) {
       console.error('Booking failed:', err)
-
       let message = 'Failed to submit booking. Please try again.'
       if (err && typeof err === 'object' && 'response' in err) {
         const axiosErr = err as { response?: { data?: { message?: string }; status?: number } }
-        console.error('Backend response:', axiosErr.response?.status, axiosErr.response?.data)
         message = axiosErr.response?.data?.message ?? message
       } else if (err instanceof Error) {
         message = err.message
       }
-
       setError(message)
     } finally {
       setLoading(false)
@@ -164,6 +190,12 @@ export default function StepReview({ selectedService, onBack, onNewBooking }: Pr
     selectedService === 'fmcg'
       ? 'Fast Moving Cargo Goods'
       : 'Not selected'
+
+  const buttonLabel = (() => {
+    if (!loading) return 'Book Transit'
+    if (docUploadState === 'uploading') return 'Uploading documents…'
+    return 'Processing…'
+  })()
 
   return (
     <div className="flex flex-col h-full overflow-auto p-4 lg:p-6 gap-4 lg:gap-6">
@@ -185,7 +217,6 @@ export default function StepReview({ selectedService, onBack, onNewBooking }: Pr
             className="flex flex-col gap-4 lg:gap-6 pb-4"
           >
 
-            {/* heading */}
             <motion.div variants={fadeUp} className="flex items-center gap-2">
               <Truck size={18} className="text-white" />
               <div>
@@ -198,7 +229,6 @@ export default function StepReview({ selectedService, onBack, onNewBooking }: Pr
               </div>
             </motion.div>
 
-            {/* card 1 */}
             <motion.div
               variants={fadeUp}
               className="rounded-2xl bg-[#2A2828] border border-white/[0.07]
@@ -206,7 +236,6 @@ export default function StepReview({ selectedService, onBack, onNewBooking }: Pr
             >
               <div className="flex flex-col lg:flex-row gap-6">
 
-                {/* left */}
                 <div className="flex flex-col gap-4 w-full lg:w-1/2">
                   <div>
                     <SectionLabel>Schedule</SectionLabel>
@@ -234,9 +263,41 @@ export default function StepReview({ selectedService, onBack, onNewBooking }: Pr
                     <SectionLabel>Service Type</SectionLabel>
                     <InfoBox value={serviceLabel} className="mt-2 w-full" />
                   </div>
+
+                  {paymentTerms && (
+                    <div>
+                      <SectionLabel>Payment Terms</SectionLabel>
+                      <InfoBox value={`${paymentTerms} days`} className="mt-2 w-full" />
+                    </div>
+                  )}
+
+                  {/* Display uses pendingFiles directly — no Redux needed */}
+                  {pendingFiles.length > 0 && (
+                    <div>
+                      <SectionLabel>Transaction Documents</SectionLabel>
+                      <div className="flex flex-col gap-1 mt-2">
+                        {pendingFiles.map((f, i) => (
+                          <div
+                            key={i}
+                            className="flex items-center gap-2 rounded-lg border border-white/[0.10]
+                                       bg-white/[0.03] px-3 py-2"
+                          >
+                            <span className="font-body booking-text text-white/60 text-xs truncate flex-1">
+                              {f.name}
+                            </span>
+                            <span className="font-body booking-text text-white/30 text-[10px] shrink-0">
+                              {(f.size / 1024).toFixed(0)} KB
+                            </span>
+                          </div>
+                        ))}
+                        <p className="font-body booking-text text-[10px] text-white/30 mt-1">
+                          Will be uploaded on confirmation
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                {/* right */}
                 <div className="flex flex-col items-center lg:items-end gap-3 w-full lg:w-1/2">
                   <SectionLabel className="self-start lg:self-end">Transit Vehicle</SectionLabel>
                   {vehicle ? (
@@ -261,7 +322,6 @@ export default function StepReview({ selectedService, onBack, onNewBooking }: Pr
               </div>
             </motion.div>
 
-            {/* card 2 */}
             <motion.div
               variants={fadeUp}
               className="rounded-2xl bg-[#2A2828] border border-white/[0.07]
@@ -291,7 +351,6 @@ export default function StepReview({ selectedService, onBack, onNewBooking }: Pr
                   return (
                     <div key={section.dropoffIndex} className="flex flex-col gap-3">
 
-                      {/* dropoff label */}
                       <div className="flex items-center gap-2">
                         <span className="font-body booking-text text-white/50 text-xs uppercase tracking-widest">
                           Drop-off {section.dropoffIndex + 1}:
@@ -301,7 +360,6 @@ export default function StepReview({ selectedService, onBack, onNewBooking }: Pr
                         </span>
                       </div>
 
-                      {/* groups */}
                       {section.groups.map((g, i) => (
                         <motion.div
                           key={g.id}
@@ -386,7 +444,6 @@ export default function StepReview({ selectedService, onBack, onNewBooking }: Pr
               </div>
             </motion.div>
 
-            {/* error banner */}
             {error && (
               <motion.div
                 initial={{ opacity: 0, y: -8 }}
@@ -397,7 +454,6 @@ export default function StepReview({ selectedService, onBack, onNewBooking }: Pr
               </motion.div>
             )}
 
-            {/* action row */}
             <motion.div
               variants={fadeUp}
               className="flex justify-between items-center gap-3 pt-2"
@@ -428,7 +484,7 @@ export default function StepReview({ selectedService, onBack, onNewBooking }: Pr
                            disabled:opacity-50 disabled:cursor-not-allowed
                            transition-colors duration-300 text-sm lg:text-base"
               >
-                {loading ? <><Spinner /> Processing...</> : 'Book Transit'}
+                {loading ? <><Spinner /> {buttonLabel}</> : 'Book Transit'}
               </motion.button>
             </motion.div>
 
@@ -439,7 +495,6 @@ export default function StepReview({ selectedService, onBack, onNewBooking }: Pr
     </div>
   )
 }
-
 
 function SectionLabel({
   children,

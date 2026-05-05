@@ -32,6 +32,7 @@ import { adminFetchTrucks } from '@/lib/services/admin/trucks.service'
 import type { DriverUser } from '@/app/types/admin/user-management.types'
 import type { Truck as TruckType } from '@/app/types/truck.types'
 import { nowDate } from '@/app/utils/serverTime'
+import { appToast } from '@/lib/toast'
 
 const PAGE_SIZE = 12
 
@@ -123,7 +124,6 @@ export default function BookingManagementView() {
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState<string | null>(null)
 
-  const [actionMsg, setActionMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
   const [pendingStatus, setPendingStatus] = useState(false)
   const [destBusyId, setDestBusyId] = useState<string | null>(null)
   const [deleteAskId, setDeleteAskId] = useState<string | null>(null)
@@ -187,7 +187,6 @@ export default function BookingManagementView() {
     setSelectedId(bookingId)
     setDetail(null)
     setDetailError(null)
-    setActionMsg(null)
     setDeleteAskId(null)
     setAssignDriverId('')
     setAssignTruckId('')
@@ -222,7 +221,6 @@ export default function BookingManagementView() {
     setSelectedId(null)
     setDetail(null)
     setDetailError(null)
-    setActionMsg(null)
     setDeleteAskId(null)
     setAssignDriverId('')
     setAssignTruckId('')
@@ -241,14 +239,13 @@ export default function BookingManagementView() {
     if (!selectedId || !detail) return
     if (normalizeBookingStatus(detail.status) === next) return
     setPendingStatus(true)
-    setActionMsg(null)
     try {
       await bookingService.updateBookingStatusAdmin(selectedId, next)
       setDetail({ ...detail, status: next })
       mergeListRow(selectedId, { status: next })
-      setActionMsg({ type: 'ok', text: 'Booking status updated.' })
+      appToast.success('Booking status updated.', { action: 'booking-status', entityId: selectedId })
     } catch (e) {
-      setActionMsg({ type: 'err', text: axiosMessage(e) })
+      appToast.error(axiosMessage(e), { action: 'booking-status', entityId: selectedId })
     } finally {
       setPendingStatus(false)
     }
@@ -256,15 +253,14 @@ export default function BookingManagementView() {
 
   const handleDestStatus = async (destinationId: string, status: DestinationDeliveryStatus) => {
     setDestBusyId(destinationId)
-    setActionMsg(null)
     try {
       const deliveredAt = status === 'delivered' ? nowDate().toISOString() : undefined
       await bookingService.updateDestinationStatus(destinationId, status, deliveredAt)
       if (selectedId) await openDetail(selectedId)
       await loadPage()
-      setActionMsg({ type: 'ok', text: 'Stop updated.' })
+      appToast.success('Stop updated.', { action: 'dest-status', entityId: destinationId })
     } catch (e) {
-      setActionMsg({ type: 'err', text: axiosMessage(e) })
+      appToast.error(axiosMessage(e), { action: 'dest-status', entityId: destinationId })
     } finally {
       setDestBusyId(null)
     }
@@ -272,15 +268,14 @@ export default function BookingManagementView() {
 
   const handleDeleteDest = async (destinationId: string) => {
     setDeleteBusy(true)
-    setActionMsg(null)
     try {
       await bookingService.deleteDestinationAdmin(destinationId)
       setDeleteAskId(null)
       if (selectedId) await openDetail(selectedId)
       await loadPage()
-      setActionMsg({ type: 'ok', text: 'Stop removed.' })
+      appToast.success('Stop removed.', { action: 'dest-delete', entityId: destinationId })
     } catch (e) {
-      setActionMsg({ type: 'err', text: axiosMessage(e) })
+      appToast.error(axiosMessage(e), { action: 'dest-delete', entityId: destinationId })
     } finally {
       setDeleteBusy(false)
     }
@@ -289,7 +284,6 @@ export default function BookingManagementView() {
   const handleAssign = async () => {
     if (!selectedId || !assignDriverId || !assignTruckId) return
     setAssignBusy(true)
-    setActionMsg(null)
     try {
       await assignmentService.assignBooking(selectedId, {
         driver_id: assignDriverId,
@@ -297,9 +291,9 @@ export default function BookingManagementView() {
       })
       await openDetail(selectedId)
       await loadPage()
-      setActionMsg({ type: 'ok', text: 'Driver and vehicle assigned.' })
+      appToast.success('Driver and vehicle assigned.', { action: 'assign', entityId: selectedId })
     } catch (e) {
-      setActionMsg({ type: 'err', text: axiosMessage(e) })
+      appToast.error(axiosMessage(e), { action: 'assign', entityId: selectedId })
     } finally {
       setAssignBusy(false)
     }
@@ -569,8 +563,69 @@ export default function BookingManagementView() {
                                 : ''}
                             </div>
                           )}
+                           {detail.payment_terms && (
+                            <div className="flex items-center gap-2">
+                              <Clock size={14} className="text-white/35" />
+                              Payment terms: {detail.payment_terms} days
+                            </div>
+                          )}
                         </div>
                       </div>
+
+                      {/* Transaction Documents */}
+                      {(() => {
+                        const docs = (detail as BookingDetail & { transaction_documents?: string[] | null }).transaction_documents
+                        if (!docs?.length) return null
+                        return (
+                          <div>
+                            <h3 className="text-[11px] font-bold uppercase tracking-wider text-white/40 mb-2">
+                              Transaction Documents
+                            </h3>
+                            <ul className="space-y-1.5">
+                              {docs.map((url, i) => {
+                                const filename  = url.split('/').pop() ?? `Document ${i + 1}`
+                                const ext       = filename.split('.').pop()?.toLowerCase() ?? ''
+                                const fileLabel = ext === 'pdf'  ? 'PDF'
+                                                : ext === 'xlsx' ? 'XLSX'
+                                                : ext === 'docx' ? 'DOCX'
+                                                : ext === 'doc'  ? 'DOC'
+                                                : ext.toUpperCase() || 'FILE'
+                                return (
+                                  <li key={url}>
+                                    <a
+                                      href={url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="flex items-center gap-2.5 rounded-lg border border-white/[0.08]
+                                                bg-black/20 px-3 py-2 text-sm text-white/80
+                                                hover:border-[var(--color-cyan)]/40 hover:text-white
+                                                transition-colors group"
+                                    >
+                                      <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide
+                                                      px-1.5 py-0.5 rounded border
+                                                      border-[var(--color-cyan)]/30 text-[var(--color-cyan)]">
+                                        {fileLabel} 
+                                      </span>
+                                      <span className="flex-1 truncate font-mono text-xs">{filename}</span>
+                                      <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        width="13" height="13" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" strokeWidth="2"
+                                        strokeLinecap="round" strokeLinejoin="round"
+                                        className="shrink-0 opacity-40 group-hover:opacity-80 transition-opacity"
+                                      >
+                                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                                        <polyline points="15 3 21 3 21 9"/>
+                                        <line x1="10" y1="14" x2="21" y2="3"/>
+                                      </svg>
+                                    </a>
+                                  </li>
+                                )
+                              })}
+                            </ul>
+                          </div>
+                        )
+                      })()}
 
                       <div>
                         <label className="text-[11px] font-bold uppercase tracking-wider text-white/40 block mb-1.5">
@@ -590,17 +645,13 @@ export default function BookingManagementView() {
                             </option>
                           ))}
                         </select>
-                        <p className="text-[11px] text-white/35 mt-1.5">
-                          Backend rules: you cannot move backwards in the workflow except to set{' '}
-                          <strong className="text-white/55">Cancelled</strong>.
-                        </p>
                       </div>
 
                       <div className="rounded-xl border border-white/[0.08] p-3 space-y-3 bg-black/20">
                         <div className="flex items-center gap-2">
                           <UserCheck size={14} className="text-[var(--color-cyan)]" />
                           <h3 className="text-[11px] font-bold uppercase tracking-wider text-white/40">
-                            Driver andz vehicle assignment
+                            Driver and vehicle assignment
                           </h3>
                         </div>
 
@@ -745,19 +796,6 @@ export default function BookingManagementView() {
                     </>
                   )}
                 </div>
-
-                {actionMsg && (
-                  <div
-                    className="shrink-0 mx-3 mb-3 px-3 py-2 rounded-lg text-xs font-medium border"
-                    style={{
-                      background:  actionMsg.type === 'ok' ? 'rgba(58,246,38,0.1)' : 'rgba(246,38,38,0.1)',
-                      borderColor: actionMsg.type === 'ok' ? 'rgba(58,246,38,0.25)' : 'rgba(246,38,38,0.25)',
-                      color:       actionMsg.type === 'ok' ? '#86efac' : '#fca5a5',
-                    }}
-                  >
-                    {actionMsg.text}
-                  </div>
-                )}
               </motion.aside>
             </>
           )}

@@ -351,7 +351,6 @@ export default function TransitTrackingView() {
         </header>
 
         <div className="flex flex-1 min-h-0 flex-col lg:flex-row overflow-hidden">
-          {/* ── Left sidebar: booking list ─────────────────────────────────── */}
           <aside className="w-full lg:w-[300px] shrink-0 flex flex-col border-b lg:border-b-0 lg:border-r border-white/[0.07] bg-[var(--color-bg)] min-h-0 max-h-[42vh] lg:max-h-none">
             <div className="p-2.5 flex-shrink-0">
               <div className="flex items-center gap-2 rounded-[10px] px-3 py-2" style={{ background: '#2a2828' }}>
@@ -445,7 +444,6 @@ export default function TransitTrackingView() {
             )}
           </aside>
 
-          {/* ── Map + detail panel ─────────────────────────────────────────── */}
           <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-hidden relative">
             <div className="flex-1 min-h-[280px] lg:min-h-0 relative bg-black">
               {mapInner}
@@ -453,29 +451,34 @@ export default function TransitTrackingView() {
 
             <AnimatePresence>
               {detailOpen && (selectedId || detailLoading || detailError) && (
-                <motion.aside
-                  initial={{ x: 24, opacity: 0 }}
-                  animate={{ x: 0, opacity: 1 }}
-                  exit={{ x: 24, opacity: 0 }}
-                  transition={{ type: 'spring', damping: 26, stiffness: 220 }}
-                  className="w-full lg:w-[min(440px,100%)] lg:absolute lg:top-3 lg:right-3 lg:bottom-3 z-10 flex flex-col rounded-2xl border border-white/[0.08] shadow-2xl overflow-hidden"
-                  style={{ background: 'var(--color-surface)' }}
-                >
-                  <div className="flex-shrink-0 flex items-center justify-between px-3 py-2.5 border-b border-white/[0.07]">
-                    <span className="text-xs font-bold uppercase tracking-widest text-white/45">Booking details</span>
-                    <button
-                      type="button"
-                      onClick={() => setDetailOpen(false)}
-                      className="w-8 h-8 rounded-full border border-white/10 flex items-center justify-center hover:bg-white/5 text-white/60"
-                      aria-label="Close details"
-                    >
-                      <CloseIcon sx={{ fontSize: 16 }} />
-                    </button>
-                  </div>
-                  <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain scrollbar-thin scrollbar-thumb-white/10">
-                    {detailPanel}
-                  </div>
-                </motion.aside>
+                <>
+                  <motion.button
+                    initial={{ opacity: 0, x: 10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 10 }}
+                    transition={{ type: 'spring', damping: 26, stiffness: 220 }}
+                    type="button"
+                    onClick={() => setDetailOpen(false)}
+                    className="hidden lg:flex absolute top-6 z-20 w-8 h-8 rounded-full border border-white/10 items-center justify-center hover:bg-white/5 text-white/60"
+                    style={{ right: 'calc(min(440px, 100%) + 28px)', background: 'var(--color-bg)' }}
+                    aria-label="Close details"
+                  >
+                    <CloseIcon sx={{ fontSize: 14 }} />
+                  </motion.button>
+
+                  <motion.aside
+                    initial={{ x: 24, opacity: 0 }}
+                    animate={{ x: 0, opacity: 1 }}
+                    exit={{ x: 24, opacity: 0 }}
+                    transition={{ type: 'spring', damping: 26, stiffness: 220 }}
+                    className="w-full lg:w-[min(440px,100%)] lg:absolute lg:top-3 lg:right-3 lg:bottom-3 z-10 flex flex-col rounded-2xl border border-white/[0.08] shadow-2xl overflow-hidden"
+                    style={{ background: 'var(--color-surface)' }}
+                  >
+                    <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain scrollbar-thin scrollbar-thumb-white/10">
+                      {detailPanel}
+                    </div>
+                  </motion.aside>
+                </>
               )}
             </AnimatePresence>
 

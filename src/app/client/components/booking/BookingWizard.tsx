@@ -27,8 +27,9 @@ export default function BookingWizard() {
   const step     = useAppSelector((s) => s.booking.step)
   const service  = useAppSelector((s) => s.booking.service)
 
-  const [dir,       setDir]       = useState(1)
-  const [wizardKey, setWizardKey] = useState(0)  // ← NEW
+  const [dir,          setDir]          = useState(1)
+  const [wizardKey,    setWizardKey]    = useState(0)
+  const [pendingFiles, setPendingFiles] = useState<File[]>([])
 
   const goNext = () => {
     setDir(1)
@@ -39,10 +40,10 @@ export default function BookingWizard() {
     dispatch(setStep(step - 1))
   }
 
-  // Called from SuccessView via StepReview's onNewBooking prop
   const handleNewBooking = useCallback(() => {
+    setPendingFiles([])
     dispatch(resetBooking())
-    setWizardKey(k => k + 1)  // ← forces full remount, clearing all local state
+    setWizardKey(k => k + 1)
   }, [dispatch])
 
   return (
@@ -105,9 +106,21 @@ export default function BookingWizard() {
             transition={{ duration: 0.38, ease: [0.4, 0, 0.2, 1] as [number, number, number, number] }}
             className="absolute inset-0 overflow-y-auto"
           >
-            {step === 1 && <StepBookingDetails onNext={goNext} />}
-            {step === 2 && <StepVehicle        onNext={goNext} onBack={goBack} />}
-            {step === 3 && <StepReview selectedService={service} onBack={goBack} onNewBooking={handleNewBooking} />}
+            {step === 1 && (
+              <StepBookingDetails
+                onNext={goNext}
+                onFilesChange={setPendingFiles}
+              />
+            )}
+            {step === 2 && <StepVehicle onNext={goNext} onBack={goBack} />}
+            {step === 3 && (
+              <StepReview
+                selectedService={service}
+                onBack={goBack}
+                onNewBooking={handleNewBooking}
+                pendingFiles={pendingFiles}
+              />
+            )}
           </motion.div>
         </AnimatePresence>
       </div>

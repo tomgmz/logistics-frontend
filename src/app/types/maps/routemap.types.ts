@@ -74,6 +74,9 @@ export interface BookingDetail {
   total_cost?:         number | null
   estimated_delivery?: string | null
 
+  transaction_documents?:  string[] | null
+  payment_terms?:          string | null
+
   driver?: {
     driver_id?: string
     name?:      string

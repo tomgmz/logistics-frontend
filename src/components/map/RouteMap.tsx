@@ -520,19 +520,35 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
 
             <AnimatePresence>
               {(routeData || detailLoading || detailError) && detailPanelOpen && (
-                <motion.div
-                  initial={{ x: -40, opacity: 0 }}
-                  animate={{ x: 0, opacity: 1 }}
-                  exit={{ x: -40, opacity: 0 }}
-                  transition={{ type: 'spring', damping: 28, stiffness: 200 }}
-                  className="absolute top-4 bottom-4 left-4 w-[500px] z-10 rounded-[24px] overflow-hidden flex flex-col"
-                  style={{ background: 'var(--color-surface)' }}
-                >
-                  
-                  <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-none">
-                    {detailPanel}
-                  </div>
-                </motion.div>
+                <>
+                  <motion.button
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -10 }}
+                    transition={{ type: 'spring', damping: 28, stiffness: 200 }}
+                    onClick={() => setDetailPanelOpen(false)}
+                    className="absolute top-6 left-3 z-20 w-8 h-8 rounded-full border flex items-center justify-center hover:opacity-70 transition-opacity"
+                    style={{
+                      background: 'var(--color-bg)',
+                      borderColor: 'var(--color-border)',
+                    }}
+                  >
+                    <ArrowForwardIcon sx={{ fontSize: 14, color: '#9ca3af', transform: 'rotate(180deg)' }} />
+                  </motion.button>
+
+                  <motion.div
+                    initial={{ x: -40, opacity: 0 }}
+                    animate={{ x: 0, opacity: 1 }}
+                    exit={{ x: -40, opacity: 0 }}
+                    transition={{ type: 'spring', damping: 28, stiffness: 200 }}
+                    className="absolute top-4 bottom-4 left-14 w-[500px] z-10 rounded-[24px] overflow-hidden flex flex-col"
+                    style={{ background: 'var(--color-surface)' }}
+                  >
+                    <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-none">
+                      {detailPanel}
+                    </div>
+                  </motion.div>
+                </>
               )}
             </AnimatePresence>
           </div>

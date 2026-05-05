@@ -34,6 +34,8 @@ export interface CreateBookingPayload {
   required_weight_kg?: number
   required_length_cm?: number
   stackable_required?: boolean
+  payment_terms?: string
+  transaction_documents?: string[]
   destinations: {
     address: string
     sequence_order: number
@@ -45,6 +47,23 @@ export interface CreateBookingPayload {
 
 export interface CreateBookingResult {
   booking_id?: string
+}
+
+export interface UpdateBookingPayload {
+  origin?:                string
+  origin_longitude?:      number | null
+  origin_latitude?:       number | null
+  truck_type_needed?:     string
+  cargo_details?:         string
+  schedule_date?:         string
+  call_time?:             string
+  status?:                string
+  required_volume_cbm?:   number | null
+  required_weight_kg?:    number | null
+  required_length_cm?:    number | null
+  stackable_required?:    boolean | null
+  payment_terms?:         string | null
+  transaction_documents?: string[] | null
 }
 
 export type DestinationDeliveryStatus = 'pending' | 'delivered' | 'failed'
@@ -62,7 +81,11 @@ export const bookingService = {
     return data.data
   },
 
-  createBooking: (input: CreateBookingPayload) => post<CreateBookingResult>('/booking', input),
+  createBooking: (input: CreateBookingPayload) =>
+    post<CreateBookingResult>('/booking', input),
+
+  updateBooking: (bookingId: string, payload: UpdateBookingPayload) =>
+    patch<unknown>(`/booking/${bookingId}`, payload),
 
   updateDestinationStatus: async (
     destinationId: string,
@@ -81,7 +104,6 @@ export const bookingService = {
     return (data?.data ?? []) as Record<string, unknown>[]
   },
 
-  /** Server-side list for super admin (pass `page` + `limit`). */
   fetchBookingsAdminPaginated: async (params: {
     page: number
     limit: number

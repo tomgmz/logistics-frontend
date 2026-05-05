@@ -18,6 +18,7 @@ import {
   setAllNonTiltable, setAllNonStackable,
   setAllStackable, setAllOversize,
   makeDefaultGroup,
+  setPaymentTerms,
 } from '@/lib/store/slice/booking.slice'
 import type { CargoMode, ItemGroup } from '@/lib/store/slice/booking.slice'
 import { selectCargoSummary, selectSections } from '@/lib/store/bookingSelectors'
@@ -44,6 +45,7 @@ import type { ResolvedPlace } from '@/lib/hooks/usePlacesAutoComplete'
 interface Props {
   onNext: () => void
   onBack?: () => void
+  onFilesChange: (files: File[]) => void
 }
 
 type MapPickerTarget =
@@ -60,6 +62,10 @@ const PALLET_DIMENSIONS: Record<
   Half:     { palletLength: '60',  palletWidth: '80',  palletHeight: '' },
   Custom:   { palletLength: '',    palletWidth: '',    palletHeight: '' },
 }
+
+const MAX_DOC_SIZE_BYTES = 10 * 1024 * 1024
+const MAX_DOC_COUNT      = 3
+const ALLOWED_EXTENSIONS = ['.pdf', '.docx', '.xlsx']
 
 const INPUT_BG_CARD  = '#424242'
 const INPUT_BG_PANEL = '#2A2828'
@@ -148,6 +154,12 @@ function Req() {
   return <span style={{ color: ERROR_COLOR, marginLeft: 2 }}>*</span>
 }
 
+function formatBytes(bytes: number): string {
+  if (bytes < 1024)        return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
 function LocationField({
   value, placeholder, hasError, errorMsg, accentColor, onClick,
 }: {
@@ -183,21 +195,23 @@ function LocationField({
   )
 }
 
-export default function StepBookingDetails({ onNext, onBack }: Props) {
+export default function StepBookingDetails({ onNext, onBack, onFilesChange }: Props) {
   const dispatch = useAppDispatch()
 
-  const date     = useAppSelector((s) => s.booking.date)
-  const time     = useAppSelector((s) => s.booking.time)
-  const pickup   = useAppSelector((s) => s.booking.pickup)
-  const dropoffs = useAppSelector((s) => s.booking.dropoffs)
-  const mode     = useAppSelector((s) => s.booking.mode)
-  const sections = useAppSelector(selectSections)
+  const date        = useAppSelector((s) => s.booking.date)
+  const time        = useAppSelector((s) => s.booking.time)
+  const pickup      = useAppSelector((s) => s.booking.pickup)
+  const dropoffs    = useAppSelector((s) => s.booking.dropoffs)
+  const mode        = useAppSelector((s) => s.booking.mode)
+  const sections    = useAppSelector(selectSections)
+  const paymentTerms = useAppSelector((s) => s.booking.paymentTerms)
 
-  const [touched,          setTouched]          = useState(false)
-  const [mapTarget,        setMapTarget]        = useState<MapPickerTarget>(null)
-  const [isDragging,       setIsDragging]       = useState(false)
-  const [paymentTerms,     setPaymentTerms]     = useState('')
-  const [transactionFiles, setTransactionFiles] = useState<File[]>([])
+  const [touched,    setTouched]    = useState(false)
+  const [mapTarget,  setMapTarget]  = useState<MapPickerTarget>(null)
+  const [isDragging, setIsDragging] = useState(false)
+
+  const [localFiles, setLocalFiles] = useState<File[]>([])
+  const [docError,   setDocError]   = useState<string | null>(null)
 
   const allGroups = sections.flatMap((s) => s.groups)
 
@@ -208,12 +222,13 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
 
   const summary = useAppSelector(selectCargoSummary)
 
-  const rawErrors = validateBooking(date, time, pickup, dropoffs, sections, mode)
-  const errors    = touched ? rawErrors : { schedule: {}, route: { dropoffs: {} }, sections: [] }
+  const rawErrors = validateBooking(date, time, pickup, dropoffs, sections, mode, paymentTerms, localFiles.length)
+  const errors    = touched ? rawErrors : { schedule: {}, route: { dropoffs: {} }, sections: [], paymentTerms: undefined, documents: undefined }
 
   const handleNext = () => {
     setTouched(true)
     if (hasAnyErrors(rawErrors)) return
+    onFilesChange(localFiles)
     onNext()
   }
 
@@ -261,9 +276,30 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
   const mapPickerMode: 'pickup' | 'dropoff' =
     mapTarget?.kind === 'pickup' ? 'pickup' : 'dropoff'
 
-  const addFiles = (incoming: File[]) => {
-    if (!incoming.length) return
-    setTransactionFiles((prev) => [...prev, ...incoming].slice(0, 3))
+  const validateAndAddFiles = (incoming: File[]) => {
+    setDocError(null)
+    const slots    = MAX_DOC_COUNT - localFiles.length
+    const accepted = incoming.slice(0, slots)
+    if (accepted.length === 0) return
+
+    for (const f of accepted) {
+      const ext = '.' + f.name.split('.').pop()?.toLowerCase()
+      if (!ALLOWED_EXTENSIONS.includes(ext)) {
+        setDocError(`"${f.name}" is not allowed. Use PDF, DOCX, or XLSX.`)
+        return
+      }
+      if (f.size > MAX_DOC_SIZE_BYTES) {
+        setDocError(`"${f.name}" exceeds the 10 MB limit (${formatBytes(f.size)}).`)
+        return
+      }
+    }
+
+    setLocalFiles((prev) => [...prev, ...accepted])
+  }
+
+  const removeFile = (index: number) => {
+    setLocalFiles((prev) => prev.filter((_, i) => i !== index))
+    setDocError(null)
   }
 
   return (
@@ -291,6 +327,7 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
 
       <div className="flex-1 overflow-auto p-4 lg:p-6 flex flex-col gap-3 sm:gap-6">
 
+        {/* Transit Schedule + Pick Up + Drop Off */}
         <motion.div variants={stagger} initial="hidden" animate="show"
           className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-6"
         >
@@ -408,6 +445,7 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
           </motion.div>
         </motion.div>
 
+        {/* ── Product & Cargo ── */}
         <motion.div variants={fadeUp} initial="hidden" animate="show"
           className="bg-[#2A2828] rounded-md border border-white/[0.07] p-4 flex flex-col gap-4"
         >
@@ -717,47 +755,48 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
           </div>
         </motion.div>
 
-        {/* Transaction Summary */}
+        {/* ── Transaction Summary ── */}
         <motion.div variants={fadeUp} initial="hidden" animate="show"
           className="bg-[#2A2828] rounded-md border border-white/[0.07] p-4 flex flex-col gap-4"
         >
           <SectionHeader icon={<File size={16} />} title="Transaction Summary" />
 
           <p className="font-body booking-text text-sm text-white/80">
-            Upload your transaction summary here
+            Upload your transaction summary here — files will be attached when your booking is confirmed.
           </p>
 
+          {/* Drop zone */}
           <div
             onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
             onDragLeave={() => setIsDragging(false)}
             onDrop={(e) => {
               e.preventDefault()
               setIsDragging(false)
-              addFiles(Array.from(e.dataTransfer.files))
+              if (localFiles.length >= MAX_DOC_COUNT) return
+              validateAndAddFiles(Array.from(e.dataTransfer.files))
             }}
-            onClick={() => { if (transactionFiles.length < 3) fileInputRef.current?.click() }}
+            onClick={() => { if (localFiles.length < MAX_DOC_COUNT) fileInputRef.current?.click() }}
             className="flex flex-col items-center gap-2 rounded-md px-4 py-6 border border-dashed transition-colors cursor-pointer"
             style={{
-              background: INPUT_BG_CARD,
-              borderColor: isDragging ? CYAN : '#818181',
-              opacity: transactionFiles.length >= 3 ? 0.5 : 1,
-              pointerEvents: transactionFiles.length >= 3 ? 'none' : 'auto',
+              background:    INPUT_BG_CARD,
+              borderColor:   isDragging ? CYAN
+                           : (touched && !!rawErrors.documents && !docError) ? ERROR_BORDER
+                           : '#818181',
+              opacity:       localFiles.length >= MAX_DOC_COUNT ? 0.5 : 1,
+              pointerEvents: localFiles.length >= MAX_DOC_COUNT ? 'none' : 'auto',
             }}
           >
             <Upload size={24} style={{ color: isDragging ? CYAN : 'rgba(255,255,255,0.4)' }} />
 
             <div className="flex items-center gap-1 text-sm">
-              <span
-                className="font-body booking-text"
-                style={{ color: CYAN, textDecoration: 'underline', textUnderlineOffset: 3 }}
-              >
-                Link
+              <span className="font-body booking-text" style={{ color: CYAN, textDecoration: 'underline', textUnderlineOffset: 3 }}>
+                Click to browse
               </span>
               <span className="font-body booking-text text-white/80">or drag and drop</span>
             </div>
 
             <p className="font-body booking-text text-xs text-white/50 text-center">
-              .pdf, .docx, or .xlsx (max. 3MB)
+              .pdf, .docx, or .xlsx · max 10 MB each · up to 3 files
             </p>
 
             <input
@@ -767,44 +806,68 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
               multiple
               className="sr-only"
               onChange={(e) => {
-                addFiles(Array.from(e.target.files ?? []))
+                validateAndAddFiles(Array.from(e.target.files ?? []))
                 e.target.value = ''
               }}
             />
           </div>
 
-          {transactionFiles.length >= 3 && (
+          {docError && (
+            <p className="font-body booking-text text-xs text-red-400">{docError}</p>
+          )}
+
+          {touched && rawErrors.documents && !docError && (
+            <p className="font-body booking-text text-xs text-red-400">{rawErrors.documents}</p>
+          )}
+
+          {localFiles.length >= MAX_DOC_COUNT && (
             <p className="font-body booking-text text-xs text-white/40 text-center">
-              Maximum of 3 files reached
+              Maximum of {MAX_DOC_COUNT} files reached
             </p>
           )}
 
-          {transactionFiles.length > 0 && (
+          {localFiles.length > 0 && (
             <div className="flex flex-col gap-1.5">
-              {transactionFiles.map((f, i) => (
-                <div key={i} className="flex items-center justify-between rounded-md px-3 py-2 border border-white/10"
+              {localFiles.map((file, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center justify-between rounded-md px-3 py-2 border border-white/10"
                   style={{ background: INPUT_BG_CARD }}
                 >
-                  <span className="font-body booking-text text-xs text-white/80 truncate flex-1 min-w-0 mr-2">
-                    {f.name}
-                  </span>
+                  <div className="flex items-center gap-2 flex-1 min-w-0 mr-2">
+                    <File size={13} className="text-white/40 shrink-0" />
+                    <div className="flex flex-col flex-1 min-w-0">
+                      <span className="font-body booking-text text-xs text-white/80 truncate">
+                        {file.name}
+                      </span>
+                      <span className="font-body booking-text text-[10px] text-white/40">
+                        {formatBytes(file.size)} · queued for upload
+                      </span>
+                    </div>
+                  </div>
                   <button
                     type="button"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setTransactionFiles((prev) => prev.filter((_, idx) => idx !== i))
-                    }}
-                    className="shrink-0 hover:text-red-400 transition-colors cursor-pointer"
+                    onClick={() => removeFile(i)}
+                    className="hover:text-red-400 transition-colors cursor-pointer shrink-0"
                   >
                     <X size={13} />
                   </button>
-                </div>
+                </motion.div>
               ))}
             </div>
           )}
+
+          {localFiles.length > 0 && (
+            <p className="font-body booking-text text-xs text-white/30 flex items-center gap-1.5">
+              <Check size={11} className="text-[var(--color-cyan)]" />
+              {localFiles.length} file{localFiles.length !== 1 ? 's' : ''} will be uploaded when you confirm your booking
+            </p>
+          )}
         </motion.div>
 
-        {/* ── Payment Terms ── */}
+        {/* Payment Terms */}
         <motion.div variants={fadeUp} initial="hidden" animate="show"
           className="bg-[#2A2828] rounded-md border border-white/[0.07] p-4 flex flex-col gap-4"
         >
@@ -816,9 +879,10 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
 
           <Select
             value={paymentTerms}
-            onChange={(e: SelectChangeEvent) => setPaymentTerms(e.target.value)}
+            onChange={(e: SelectChangeEvent) => dispatch(setPaymentTerms(e.target.value))}
             displayEmpty
-            sx={{ ...selectSx(INPUT_BG_PANEL, BORDER_PANEL), width: '100%' }}
+            error={touched && !!rawErrors.paymentTerms}
+            sx={{ ...selectSx(INPUT_BG_PANEL, BORDER_PANEL, touched && !!rawErrors.paymentTerms), width: '100%' }}
             MenuProps={MENU_PROPS}
           >
             <MenuItem value=""><em style={{ opacity: 0.4, fontStyle: 'normal' }}>Select payment terms</em></MenuItem>
@@ -826,9 +890,13 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
             <MenuItem value="45">45 days</MenuItem>
             <MenuItem value="60">60 days</MenuItem>
           </Select>
+
+           {touched && rawErrors.paymentTerms && (
+            <FormHelperText sx={HELPER_SX}>{rawErrors.paymentTerms}</FormHelperText>
+          )}
         </motion.div>
 
-        {/* ── Cargo Summary ── */}
+        {/* Cargo Summary */}
         <motion.div variants={fadeUp} initial="hidden" animate="show"
           className="rounded-md bg-[#2A2828] p-5 flex flex-col gap-3
                      border border-white/[0.07] border-t-[3px] border-t-[var(--color-cyan)]"
@@ -888,7 +956,9 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
           ) : (
             <span />
           )}
-          <WizBtn onClick={handleNext} variant="next">NEXT</WizBtn>
+          <WizBtn onClick={handleNext} variant="next">
+            NEXT
+          </WizBtn>
         </motion.div>
 
       </div>
@@ -899,11 +969,13 @@ export default function StepBookingDetails({ onNext, onBack }: Props) {
 function ProductFieldsRow({ group, errors, onUpdate }: {
   group: ItemGroup; errors: GroupErrors; onUpdate: (patch: Partial<ItemGroup>) => void
 }) {
+  const INPUT_BG_CARD = '#424242'
+  const BORDER_CARD   = 'rgba(255,255,255,0.12)'
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 items-start">
       <div className="flex flex-col gap-1">
         <label className="font-body booking-text text-xs">
-          Commodity<span style={{ color: ERROR_COLOR, marginLeft: 2 }}>*</span>
+          Commodity<span style={{ color: '#f87171', marginLeft: 2 }}>*</span>
         </label>
         <TextField fullWidth placeholder="e.g. Accessories" variant="outlined"
           value={group.commodity} error={!!errors.commodity}
@@ -913,7 +985,7 @@ function ProductFieldsRow({ group, errors, onUpdate }: {
       </div>
       <div className="flex flex-col gap-1">
         <label className="font-body booking-text text-xs">
-          Product<span style={{ color: ERROR_COLOR, marginLeft: 2 }}>*</span>
+          Product<span style={{ color: '#f87171', marginLeft: 2 }}>*</span>
         </label>
         <TextField fullWidth placeholder="e.g. General Cargo" variant="outlined"
           value={group.product} error={!!errors.product}
@@ -923,7 +995,7 @@ function ProductFieldsRow({ group, errors, onUpdate }: {
       </div>
       <div className="flex flex-col gap-1">
         <label className="font-body booking-text text-xs">
-          SHC<span style={{ color: ERROR_COLOR, marginLeft: 2 }}>*</span>
+          SHC<span style={{ color: '#f87171', marginLeft: 2 }}>*</span>
         </label>
         <Select value={group.shc} onChange={(e: SelectChangeEvent) => onUpdate({ shc: e.target.value })}
           displayEmpty
@@ -938,7 +1010,7 @@ function ProductFieldsRow({ group, errors, onUpdate }: {
       </div>
       <div className="flex flex-col gap-1">
         <label className="font-body booking-text text-xs">
-          Additional SHC<span style={{ color: ERROR_COLOR, marginLeft: 2 }}>*</span>
+          Additional SHC<span style={{ color: '#f87171', marginLeft: 2 }}>*</span>
         </label>
         <Select value={group.additionalShc} onChange={(e: SelectChangeEvent) => onUpdate({ additionalShc: e.target.value })}
           displayEmpty

@@ -66,6 +66,7 @@ interface BookingState {
   allStackable: boolean
   allOversize: boolean
   vehicle: VehicleData | null
+  paymentTerms: string
 }
 
 export function makeDefaultGroup(): ItemGroup {
@@ -125,6 +126,7 @@ const initialState: BookingState = {
   allStackable: false,
   allOversize: false,
   vehicle: null,
+  paymentTerms: '',
 }
 
 const bookingSlice = createSlice({
@@ -222,6 +224,9 @@ const bookingSlice = createSlice({
     setVehicle(state, action: PayloadAction<VehicleData | null>) {
       state.vehicle = action.payload
     },
+    setPaymentTerms(state, action: PayloadAction<string>) {
+      state.paymentTerms = action.payload
+    },
     resetBooking() {
       return {
         ...initialState,
@@ -254,6 +259,7 @@ export const {
   setAllStackable,
   setAllOversize,
   setVehicle,
+  setPaymentTerms,
   resetBooking,
 } = bookingSlice.actions
 

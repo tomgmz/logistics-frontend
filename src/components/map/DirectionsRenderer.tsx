@@ -109,7 +109,7 @@ export function DirectionsRenderer({
           routeModifiers: {
             avoidTolls:    false,
             avoidHighways: false,
-            avoidFerries:  true,
+            avoidFerries:  false,
           },
         })
       )
