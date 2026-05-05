@@ -99,6 +99,10 @@ export default function StepReview({ selectedService, pendingFiles, onBack, onNe
 
   const confirm = async () => {
     if (!vehicle) return
+    if (pendingFiles.length === 0) {
+      setError('At least one transaction document is required.')
+      return
+    }
     setLoading(true)
     setError(null)
 
@@ -111,7 +115,6 @@ export default function StepReview({ selectedService, pendingFiles, onBack, onNe
         return
       }
 
-      // ── Step 1: Upload documents first (if any) ───────────────────────
       let transactionUrls: string[] = []
       if (pendingFiles.length > 0) {
         setDocUploadState('uploading')
@@ -129,7 +132,6 @@ export default function StepReview({ selectedService, pendingFiles, onBack, onNe
 
       const { grossWeight, volume, stackableRequired } = calcSummary(sections, mode)
 
-      // ── Step 2: Create booking with URLs already in payload ───────────
       const payload = {
         client_id:         clientId,
         origin:            pickup,
@@ -271,7 +273,6 @@ export default function StepReview({ selectedService, pendingFiles, onBack, onNe
                     </div>
                   )}
 
-                  {/* Display uses pendingFiles directly — no Redux needed */}
                   {pendingFiles.length > 0 && (
                     <div>
                       <SectionLabel>Transaction Documents</SectionLabel>
