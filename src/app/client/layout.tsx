@@ -8,7 +8,7 @@ import { History, CalendarCheck, MapPin, CreditCard } from 'lucide-react'
 const NAV_ITEMS = [
   { href: '/client/booking',  label: 'Booking',  icon: <CalendarCheck size={20} /> },
   { href: '/client/tracking', label: 'Tracking', icon: <MapPin size={20} /> },
-  { href: '/client/billing',  label: 'Billing',  icon: <CreditCard size={20} /> },
+  { href: '/client/reverse-billing',  label: 'Reverse Billing',  icon: <CreditCard size={20} /> },
   { href: '/client/history',  label: 'History',  icon: <History size={20} /> },
 ]
 
