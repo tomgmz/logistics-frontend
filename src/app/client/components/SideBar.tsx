@@ -4,8 +4,6 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { LogOut, PanelLeftClose, PanelLeft } from 'lucide-react'
-import { ASSETS } from '../../../constants/client/icon'
-import Image from 'next/image'
 import '../components/booking/BookingDetails.css'
 import { useEffect, useState } from 'react'
 import { logout } from '@/lib/api/auth.api'
@@ -13,15 +11,16 @@ import { useAuthStore } from '@/lib/store/auth.store'
 import { useAppDispatch, useAppSelector } from '@/lib/hooks/hooks'
 import { setSidebarOpen } from '@/lib/store/slice/booking.slice'
 import ReusableModal from '@/components/layout/ReusableModal'
+import { History, CalendarCheck, MapPin, CreditCard } from 'lucide-react'
 
 const SIDEBAR_COLLAPSED = 56
 const SIDEBAR_EXPANDED  = 260
 
 const NAV: { href: string; label: string; icon: React.ReactNode }[] = [
-  { href: '/client/booking',  label: 'Booking',  icon: <Image src={ASSETS.svcBooking}  alt='booking'   width={24} height={24} /> },
-  { href: '/client/tracking', label: 'Tracking', icon: <Image src={ASSETS.svcTracking} alt='tracking'  width={24} height={24} /> },
-  { href: '/client/billing',  label: 'Billing',  icon: <Image src={ASSETS.svcBilling}  alt='billing'   width={24} height={24} /> },
-  { href: '/client/history',  label: 'History',  icon: <Image src={ASSETS.svcHistory}  alt='history'   width={24} height={24} /> },
+  { href: '/client/booking',  label: 'Booking',  icon: <CalendarCheck size={20} /> },
+  { href: '/client/tracking', label: 'Tracking', icon: <MapPin size={20} /> },
+  { href: '/client/billing',  label: 'Billing',  icon: <CreditCard size={20} /> },
+  { href: '/client/history',  label: 'History',  icon: <History size={20} /> },
 ]
 
 function useIsMobile() {
