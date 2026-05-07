@@ -54,8 +54,6 @@ export default function SystemLogsPage() {
     setError(null)
     try {
       const res = await systemLogService.getAll({
-        page,
-        limit: PAGE_SIZE,
         sort,
         ...(logType         && { log_type: logType }),
         ...(debouncedSearch && { search: debouncedSearch }),
@@ -68,7 +66,7 @@ export default function SystemLogsPage() {
     } finally {
       setLoading(false)
     }
-  }, [page, sort, logType, debouncedSearch])
+  }, [sort, logType, debouncedSearch])
 
   const fetchStats = useCallback(async () => {
     try {
@@ -83,6 +81,8 @@ export default function SystemLogsPage() {
   useEffect(() => { fetchStats() }, [fetchStats])
 
   const totalPages = Math.ceil(total / PAGE_SIZE)
+  const safePage = Math.min(page, totalPages)
+  const displayedLogs = logs.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
   const displayName = (log: SystemLog) => {
     if (!log.users) return '—'
@@ -255,7 +255,7 @@ export default function SystemLogsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {logs.map(log => (
+                  {displayedLogs.map(log => (
                     <tr
                       key={log.log_id}
                       onClick={() => setSelected(prev => prev?.log_id === log.log_id ? null : log)}
@@ -298,24 +298,24 @@ export default function SystemLogsPage() {
             <div className="shrink-0 border-t border-[#2a2a2a] bg-[#1b1b1b] px-5 py-3">
               <div className="flex items-center justify-between">
                 <p className="text-xs text-[#818181]">
-                  Page {page} of {totalPages} &mdash; {total} records
+                  Page {safePage} of {totalPages} &mdash; {total} records
                 </p>
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => setPage(p => Math.max(1, p - 1))}
-                    disabled={page === 1}
+                    disabled={safePage === 1}
                     className="rounded-lg p-1.5 text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white disabled:opacity-30"
                   >
                     <ChevronLeft size={15} />
                   </button>
                   {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    const n = Math.max(1, Math.min(totalPages - 4, page - 2)) + i
+                    const n = Math.max(1, Math.min(totalPages - 4, safePage - 2)) + i
                     return (
                       <button
                         key={n}
                         onClick={() => setPage(n)}
                         className={`h-7 w-7 rounded-lg text-xs font-medium transition ${
-                          n === page
+                          n === safePage
                             ? 'bg-[#4df9ed] text-[#0a0a0a]'
                             : 'text-[#818181] hover:bg-[#2a2a2a] hover:text-white'
                         }`}
@@ -326,7 +326,7 @@ export default function SystemLogsPage() {
                   })}
                   <button
                     onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                    disabled={page === totalPages}
+                    disabled={safePage === totalPages}
                     className="rounded-lg p-1.5 text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white disabled:opacity-30"
                   >
                     <ChevronRight size={15} />

@@ -14,6 +14,7 @@ import {
 } from '@/lib/services/admin/trucks.service'
 import ReusableModal from '@/components/layout/ReusableModal'
 import { appToast } from '@/lib/toast'
+import { createTruckModelSchema } from '@/lib/validation/truck-model.validation'
 
 export const VEHICLE_TYPES = [
   'Closed Van',
@@ -41,7 +42,9 @@ function axiosMessage(err: unknown): string {
 interface ModelFormState {
   name:               string
   vehicle_type:       string
-  dimension_mm:       string
+  length_mm:          string
+  width_mm:           string
+  height_mm:          string
   suitable_for:       string
   stackable_friendly: boolean
   max_volume_cbm:     string
@@ -54,7 +57,9 @@ function emptyModelForm(): ModelFormState {
   return {
     name:               '',
     vehicle_type:       '',
-    dimension_mm:       '',
+    length_mm:          '',
+    width_mm:           '',
+    height_mm:          '',
     suitable_for:       '',
     stackable_friendly: false,
     max_volume_cbm:     '',
@@ -65,16 +70,19 @@ function emptyModelForm(): ModelFormState {
 }
 
 function modelToForm(m: TruckModel): ModelFormState {
+  const dimParts = m.dimension_mm?.split(/\s*[x×]\s*/i) ?? []
   return {
-    name:               m.name ?? '',
-    vehicle_type:       m.vehicle_type ?? '',
-    dimension_mm:       m.dimension_mm ?? '',
-    suitable_for:       m.suitable_for ?? '',
-    stackable_friendly: m.stackable_friendly ?? false,
+    name:               m.name               ?? '',
+    vehicle_type:       m.vehicle_type        ?? '',
+    length_mm:          dimParts[0]           ?? '',
+    width_mm:           dimParts[1]           ?? '',
+    height_mm:          dimParts[2]           ?? '',
+    suitable_for:       m.suitable_for        ?? '',
+    stackable_friendly: m.stackable_friendly  ?? false,
     max_volume_cbm:     m.max_volume_cbm != null ? String(m.max_volume_cbm) : '',
     max_weight_kg:      m.max_weight_kg  != null ? String(m.max_weight_kg)  : '',
     max_length_cm:      m.max_length_cm  != null ? String(m.max_length_cm)  : '',
-    image_url:          m.image_url ?? '',
+    image_url:          m.image_url           ?? '',
   }
 }
 
@@ -87,16 +95,19 @@ interface Props {
 type FormMode    = 'create' | 'edit' | null
 type ConfirmKind = 'save' | 'delete' | null
 
+type FieldErrors = Partial<Record<keyof ModelFormState | 'image', string>>
+
 export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
   const [models,      setModels]      = useState<TruckModel[]>([])
   const [listLoading, setListLoading] = useState(false)
   const [listError,   setListError]   = useState<string | null>(null)
 
-  const [formMode,    setFormMode]    = useState<FormMode>(null)
-  const [editingId,   setEditingId]   = useState<string | null>(null)
-  const [form,        setForm]        = useState<ModelFormState>(emptyModelForm())
-  const [formError,   setFormError]   = useState<string | null>(null)
-  const [isOtherType, setIsOtherType] = useState(false)
+  const [formMode,     setFormMode]    = useState<FormMode>(null)
+  const [editingId,    setEditingId]   = useState<string | null>(null)
+  const [form,         setForm]        = useState<ModelFormState>(emptyModelForm())
+  const [fieldErrors,  setFieldErrors] = useState<FieldErrors>({})
+  const [touched,      setTouched]     = useState(false)
+  const [isOtherType,  setIsOtherType] = useState(false)
 
   const [imageFile,    setImageFile]    = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
@@ -107,6 +118,8 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
   const [actionBusy,  setActionBusy]  = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // ── helpers ──────────────────────────────────────────────────────────────────
 
   const loadModels = useCallback(async () => {
     try {
@@ -129,7 +142,8 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
     setForm(emptyModelForm())
     setImageFile(null)
     setImagePreview(null)
-    setFormError(null)
+    setFieldErrors({})
+    setTouched(false)
     setIsOtherType(false)
     setFormMode('create')
   }
@@ -139,7 +153,8 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
     setForm(modelToForm(m))
     setImageFile(null)
     setImagePreview(m.image_url ?? null)
-    setFormError(null)
+    setFieldErrors({})
+    setTouched(false)
     setIsOtherType(!!m.vehicle_type && !(KNOWN_TYPES as readonly string[]).includes(m.vehicle_type))
     setFormMode('edit')
   }
@@ -149,7 +164,8 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
     setEditingId(null)
     setImageFile(null)
     setImagePreview(null)
-    setFormError(null)
+    setFieldErrors({})
+    setTouched(false)
     setIsOtherType(false)
   }
 
@@ -159,6 +175,8 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
     setImageFile(file)
     setImagePreview(URL.createObjectURL(file))
     setForm((f) => ({ ...f, image_url: '' }))
+    // clear image error immediately once a file is chosen
+    setFieldErrors((prev) => ({ ...prev, image: undefined }))
   }
 
   const handleVehicleTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -170,26 +188,48 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
       setIsOtherType(false)
       setForm((f) => ({ ...f, vehicle_type: val }))
     }
+    setFieldErrors((prev) => ({ ...prev, vehicle_type: undefined }))
   }
 
+  // ── Zod validation ────────────────────────────────────────────────────────────
+
   function validate(): boolean {
-    setFormError(null)
-    if (!form.name.trim())  { setFormError('Name is required.');         return false }
-    if (!form.vehicle_type) { setFormError('Vehicle type is required.'); return false }
-    if (!imagePreview && !form.image_url) { setFormError('An image is required.'); return false }
-    if (form.max_weight_kg && Number.isNaN(parseFloat(form.max_weight_kg))) {
-      setFormError('Max weight must be a valid number.'); return false
+    const hasImage = !!(imagePreview || form.image_url)
+
+    const result = createTruckModelSchema.safeParse({
+      name:               form.name.trim(),
+      vehicle_type:       form.vehicle_type,
+      length_mm:          form.length_mm,
+      width_mm:           form.width_mm,
+      height_mm:          form.height_mm,
+      suitable_for:       form.suitable_for.trim(),
+      stackable_friendly: form.stackable_friendly,
+      max_volume_cbm:     form.max_volume_cbm,
+      max_weight_kg:      form.max_weight_kg,
+      max_length_cm:      form.max_length_cm,
+      // pass a dummy valid URL so Zod doesn't flag it — image is validated separately
+      image_url:          hasImage ? 'https://placeholder.com' : '',
+    })
+
+    const errs: FieldErrors = {}
+
+    if (!result.success) {
+      for (const issue of result.error.issues) {
+        const key = issue.path[0] as keyof FieldErrors
+        if (!errs[key]) errs[key] = issue.message
+      }
     }
-    if (form.max_volume_cbm && Number.isNaN(parseFloat(form.max_volume_cbm))) {
-      setFormError('Max volume must be a valid number.'); return false
+
+    if (!hasImage) {
+      errs.image = 'An image is required.'
     }
-    if (form.max_length_cm && Number.isNaN(parseFloat(form.max_length_cm))) {
-      setFormError('Max length must be a valid number.'); return false
-    }
-    return true
+
+    setFieldErrors(errs)
+    return Object.keys(errs).length === 0
   }
 
   const handleSaveClick = () => {
+    setTouched(true)
     if (!validate()) return
     setConfirmKind('save')
   }
@@ -198,6 +238,8 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
     setDeleteId(id)
     setConfirmKind('delete')
   }
+
+  // ── save / delete ─────────────────────────────────────────────────────────────
 
   const executeSave = async () => {
     setActionBusy(true)
@@ -210,15 +252,17 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
         setUploadBusy(false)
       }
 
+      const dimension_mm = `${form.length_mm} x ${form.width_mm} x ${form.height_mm}`
+
       const payload = {
         name:               form.name.trim(),
         vehicle_type:       form.vehicle_type,
-        dimension_mm:       form.dimension_mm.trim() || null,
-        suitable_for:       form.suitable_for.trim() || null,
+        dimension_mm,
+        suitable_for:       form.suitable_for.trim(),
         stackable_friendly: form.stackable_friendly,
-        max_volume_cbm:     form.max_volume_cbm ? parseFloat(form.max_volume_cbm) : null,
-        max_weight_kg:      form.max_weight_kg  ? parseFloat(form.max_weight_kg)  : null,
-        max_length_cm:      form.max_length_cm  ? parseFloat(form.max_length_cm)  : null,
+        max_volume_cbm:     parseFloat(form.max_volume_cbm),
+        max_weight_kg:      parseFloat(form.max_weight_kg),
+        max_length_cm:      parseFloat(form.max_length_cm),
         image_url:          finalUrl,
       }
 
@@ -237,7 +281,7 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
     } catch (e) {
       setConfirmKind(null)
       setUploadBusy(false)
-      setFormError(axiosMessage(e))
+      setFieldErrors({ name: axiosMessage(e) })
     } finally {
       setActionBusy(false)
     }
@@ -262,22 +306,37 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
     }
   }
 
-  const confirmTitle       = confirmKind === 'delete' ? 'Delete model?' : formMode === 'create' ? 'Create model?' : 'Save changes?'
+  // ── confirm modal strings ─────────────────────────────────────────────────────
+
+  const confirmTitle = confirmKind === 'delete'
+    ? 'Delete model?'
+    : formMode === 'create' ? 'Create model?' : 'Save changes?'
+
   const confirmDescription = confirmKind === 'delete'
     ? 'This will remove the model. Trucks linked to it will lose their model reference.'
     : formMode === 'create'
       ? `Add "${form.name.trim() || 'this model'}" to the catalog?`
       : `Save updates to "${form.name.trim() || 'this model'}"?`
+
   const confirmLabel = actionBusy
     ? (uploadBusy ? 'Uploading…' : 'Saving…')
     : confirmKind === 'delete'
       ? 'Delete'
-      : formMode === 'create'
-        ? 'Create'
-        : 'Save'
+      : formMode === 'create' ? 'Create' : 'Save'
+
+  // ── shared input class helper ─────────────────────────────────────────────────
+
+  const inputCls = (hasErr: boolean) =>
+    `w-full rounded-lg border bg-[#111] px-3 py-2.5 text-sm text-white outline-none transition-colors
+     ${hasErr
+       ? 'border-red-400/60 focus:border-red-400'
+       : 'border-white/10 focus:border-[var(--color-cyan)]/40'}`
+
+  // ── render ────────────────────────────────────────────────────────────────────
 
   return (
     <>
+      {/* ── Catalog list modal ── */}
       <AnimatePresence>
         {open && (
           <motion.div
@@ -438,6 +497,7 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
         )}
       </AnimatePresence>
 
+      {/* ── Create / Edit form modal ── */}
       <AnimatePresence>
         {formMode && (
           <motion.div
@@ -465,142 +525,190 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
                 </button>
               </div>
 
-              <div className="p-4 space-y-3">
+              <div className="p-4 space-y-4">
 
-                {/* Image upload */}
-                <div
-                  className="relative flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed cursor-pointer transition-colors overflow-hidden"
-                  style={{ borderColor: imagePreview ? 'transparent' : 'rgba(255,255,255,0.12)', minHeight: 140 }}
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  {imagePreview ? (
-                    <>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={imagePreview} alt="Preview" className="w-full h-40 object-cover rounded-xl" />
-                      <div className="absolute inset-0 bg-black/50 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center gap-2 rounded-xl">
-                        <Upload size={18} className="text-white" />
-                        <span className="text-sm font-semibold text-white">Change image</span>
+                {/* ── Image upload ── */}
+                <div className="flex flex-col gap-1">
+                  <div
+                    className="relative flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed cursor-pointer transition-colors overflow-hidden"
+                    style={{
+                      borderColor: fieldErrors.image
+                        ? 'rgba(248,113,113,0.6)'
+                        : imagePreview ? 'transparent' : 'rgba(255,255,255,0.12)',
+                      minHeight: 140,
+                    }}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    {imagePreview ? (
+                      <>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={imagePreview} alt="Preview" className="w-full h-40 object-cover rounded-xl" />
+                        <div className="absolute inset-0 bg-black/50 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center gap-2 rounded-xl">
+                          <Upload size={18} className="text-white" />
+                          <span className="text-sm font-semibold text-white">Change image</span>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex flex-col items-center gap-2 py-6 text-white/30 hover:text-white/50 transition-colors">
+                        <Upload size={28} />
+                        <span className="text-xs font-semibold">Click to upload image</span>
+                        <span className="text-[10px]">PNG, JPG, WEBP · max 5 MB</span>
                       </div>
-                    </>
-                  ) : (
-                    <div className="flex flex-col items-center gap-2 py-6 text-white/30 hover:text-white/50 transition-colors">
-                      <Upload size={28} />
-                      <span className="text-xs font-semibold">Click to upload image</span>
-                      <span className="text-[10px]">PNG, JPG, WEBP · max 5 MB</span>
-                    </div>
+                    )}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleFileChange}
+                    />
+                  </div>
+                  {fieldErrors.image && (
+                    <p className="text-[11px] text-red-400 mt-0.5">{fieldErrors.image}</p>
                   )}
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleFileChange}
-                  />
                 </div>
 
-                {/* Name */}
-                <label className="block">
-                  <span className="text-[11px] font-bold uppercase text-white/40">
+                {/* ── Model name ── */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] font-bold uppercase text-white/40">
                     Model name <span className="text-red-400">*</span>
-                  </span>
+                  </label>
                   <input
                     value={form.name}
-                    onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                    className="mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-3 py-2.5 text-sm text-white outline-none focus:border-[var(--color-cyan)]/40"
+                    onChange={(e) => {
+                      setForm((f) => ({ ...f, name: e.target.value }))
+                      if (touched) setFieldErrors((prev) => ({ ...prev, name: undefined }))
+                    }}
+                    className={inputCls(!!fieldErrors.name)}
                     placeholder="e.g. Isuzu NQR 4HK1"
                   />
-                </label>
-
-                {/* Vehicle type + Dimensions */}
-                <div className="grid grid-cols-2 gap-3">
-                  <label className="block">
-                    <span className="text-[11px] font-bold uppercase text-white/40">
-                      Vehicle type <span className="text-red-400">*</span>
-                    </span>
-                    <select
-                      value={isOtherType ? 'Others' : form.vehicle_type}
-                      onChange={handleVehicleTypeChange}
-                      className="mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-3 py-2.5 text-sm text-white outline-none focus:border-[var(--color-cyan)]/40"
-                    >
-                      <option value="">— Select type —</option>
-                      {VEHICLE_TYPES.map((vt) => (
-                        <option key={vt} value={vt}>{vt}</option>
-                      ))}
-                    </select>
-                    {/* Free-text input shown only when Others is selected */}
-                    {isOtherType && (
-                      <input
-                        value={form.vehicle_type}
-                        onChange={(e) => setForm((f) => ({ ...f, vehicle_type: e.target.value }))}
-                        className="mt-2 w-full rounded-lg border border-white/10 bg-[#111] px-3 py-2.5 text-sm text-white outline-none focus:border-[var(--color-cyan)]/40"
-                        placeholder="Specify vehicle type…"
-                        autoFocus
-                      />
-                    )}
-                  </label>
-                  <label className="block">
-                    <span className="text-[11px] font-bold uppercase text-white/40">Dimensions (mm)</span>
-                    <input
-                      value={form.dimension_mm}
-                      onChange={(e) => setForm((f) => ({ ...f, dimension_mm: e.target.value }))}
-                      className="mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-3 py-2.5 text-sm text-white outline-none focus:border-[var(--color-cyan)]/40"
-                      placeholder="E.G 6000 x 2400 x 2400"
-                    />
-                  </label>
+                  {fieldErrors.name && <p className="text-[11px] text-red-400">{fieldErrors.name}</p>}
                 </div>
 
-                {/* Weight / Volume / Length */}
+                {/* ── Vehicle type ── */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] font-bold uppercase text-white/40">
+                    Vehicle type <span className="text-red-400">*</span>
+                  </label>
+                  <select
+                    value={isOtherType ? 'Others' : form.vehicle_type}
+                    onChange={handleVehicleTypeChange}
+                    className={inputCls(!!fieldErrors.vehicle_type)}
+                  >
+                    <option value="">— Select type —</option>
+                    {VEHICLE_TYPES.map((vt) => (
+                      <option key={vt} value={vt}>{vt}</option>
+                    ))}
+                  </select>
+                  {isOtherType && (
+                    <input
+                      value={form.vehicle_type}
+                      onChange={(e) => {
+                        setForm((f) => ({ ...f, vehicle_type: e.target.value }))
+                        if (touched) setFieldErrors((prev) => ({ ...prev, vehicle_type: undefined }))
+                      }}
+                      className={`mt-1.5 ${inputCls(!!fieldErrors.vehicle_type)}`}
+                      placeholder="Specify vehicle type…"
+                      autoFocus
+                    />
+                  )}
+                  {fieldErrors.vehicle_type && (
+                    <p className="text-[11px] text-red-400">{fieldErrors.vehicle_type}</p>
+                  )}
+                </div>
+
+                {/* ── Dimensions ── */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] font-bold uppercase text-white/40">
+                    Dimensions (mm) <span className="text-red-400">*</span>
+                  </label>
+                  <div className="flex items-start gap-2">
+                    {(
+                      [
+                        { key: 'length_mm', sub: 'L', placeholder: 'Length' },
+                        { key: 'width_mm',  sub: 'W', placeholder: 'Width'  },
+                        { key: 'height_mm', sub: 'H', placeholder: 'Height' },
+                      ] as const
+                    ).map(({ key, sub, placeholder }, i) => (
+                      <div key={key} className="flex items-center gap-2 flex-1 min-w-0">
+                        <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                          <input
+                            type="number"
+                            step="1"
+                            min="0"
+                            value={form[key]}
+                            onChange={(e) => {
+                              setForm((f) => ({ ...f, [key]: e.target.value }))
+                              if (touched) setFieldErrors((prev) => ({ ...prev, [key]: undefined }))
+                            }}
+                            className={inputCls(!!fieldErrors[key])}
+                            placeholder={placeholder}
+                          />
+                          <p className="text-[10px] text-white/25 text-center">{sub}</p>
+                          {fieldErrors[key] && (
+                            <p className="text-[11px] text-red-400">{fieldErrors[key]}</p>
+                          )}
+                        </div>
+                        {i < 2 && (
+                          <span className="text-white/30 font-bold text-base pb-5">×</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* ── Max weight / volume / length ── */}
                 <div className="grid grid-cols-3 gap-3">
-                  <label className="block">
-                    <span className="text-[11px] font-bold uppercase text-white/40">Max weight (kg)</span>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={form.max_weight_kg}
-                      onChange={(e) => setForm((f) => ({ ...f, max_weight_kg: e.target.value }))}
-                      className="mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-3 py-2.5 text-sm text-white outline-none tabular-nums"
-                      placeholder="4000"
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="text-[11px] font-bold uppercase text-white/40">Max volume (cbm)</span>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={form.max_volume_cbm}
-                      onChange={(e) => setForm((f) => ({ ...f, max_volume_cbm: e.target.value }))}
-                      className="mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-3 py-2.5 text-sm text-white outline-none tabular-nums"
-                      placeholder="34.56"
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="text-[11px] font-bold uppercase text-white/40">Max length (cm)</span>
-                    <input
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      value={form.max_length_cm}
-                      onChange={(e) => setForm((f) => ({ ...f, max_length_cm: e.target.value }))}
-                      className="mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-3 py-2.5 text-sm text-white outline-none tabular-nums"
-                      placeholder="600"
-                    />
-                  </label>
+                  {(
+                    [
+                      { key: 'max_weight_kg',  label: 'Max weight (kg)',  placeholder: '4000',  step: '0.01' },
+                      { key: 'max_volume_cbm', label: 'Max volume (cbm)', placeholder: '34.56', step: '0.01' },
+                      { key: 'max_length_cm',  label: 'Max length (cm)',  placeholder: '600',   step: '0.1'  },
+                    ] as const
+                  ).map(({ key, label, placeholder, step }) => (
+                    <div key={key} className="flex flex-col gap-1">
+                      <label className="text-[11px] font-bold uppercase text-white/40">
+                        {label} <span className="text-red-400">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        step={step}
+                        min="0"
+                        value={form[key]}
+                        onChange={(e) => {
+                          setForm((f) => ({ ...f, [key]: e.target.value }))
+                          if (touched) setFieldErrors((prev) => ({ ...prev, [key]: undefined }))
+                        }}
+                        className={inputCls(!!fieldErrors[key])}
+                        placeholder={placeholder}
+                      />
+                      {fieldErrors[key] && (
+                        <p className="text-[11px] text-red-400">{fieldErrors[key]}</p>
+                      )}
+                    </div>
+                  ))}
                 </div>
 
-                {/* Suitable for */}
-                <label className="block">
-                  <span className="text-[11px] font-bold uppercase text-white/40">Suitable for</span>
+                {/* ── Suitable for ── */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] font-bold uppercase text-white/40">
+                    Suitable for <span className="text-red-400">*</span>
+                  </label>
                   <input
                     value={form.suitable_for}
-                    onChange={(e) => setForm((f) => ({ ...f, suitable_for: e.target.value }))}
-                    className="mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-3 py-2.5 text-sm text-white outline-none focus:border-[var(--color-cyan)]/40"
+                    onChange={(e) => {
+                      setForm((f) => ({ ...f, suitable_for: e.target.value }))
+                      if (touched) setFieldErrors((prev) => ({ ...prev, suitable_for: undefined }))
+                    }}
+                    className={inputCls(!!fieldErrors.suitable_for)}
                     placeholder="e.g. Medium cargo, FMCG deliveries"
                   />
-                </label>
+                  {fieldErrors.suitable_for && (
+                    <p className="text-[11px] text-red-400">{fieldErrors.suitable_for}</p>
+                  )}
+                </div>
 
-                {/* Stackable toggle */}
+                {/* ── Stackable toggle ── */}
                 <label className="flex items-center gap-3 cursor-pointer select-none">
                   <div
                     className="w-9 h-5 rounded-full border transition-colors relative shrink-0"
@@ -618,11 +726,13 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
                   <span className="text-sm text-white/70">Stackable friendly</span>
                 </label>
 
-                {formError && (
+                {/* ── API / server error ── */}
+                {touched && fieldErrors.name && actionBusy === false && (
                   <p className="text-xs text-red-400 border border-red-500/25 rounded-lg px-3 py-2 bg-red-500/10">
-                    {formError}
+                    {fieldErrors.name}
                   </p>
                 )}
+
               </div>
 
               {/* Footer */}

@@ -443,7 +443,7 @@ export default function UserManagementClient() {
     return () => clearTimeout(t)
   }, [searchInput])
 
-  const fetchAllUsers = useCallback(async (targetPage: number, searchQuery: string, hard = false) => {
+  const fetchAllUsers = useCallback(async (searchQuery: string, hard = false) => {
     if (hard) {
       setLoading(true)
     } else {
@@ -452,12 +452,12 @@ export default function UserManagementClient() {
     setError(null)
     try {
       const [result, statsResult] = await Promise.all([
-        userService.getAll({ page: targetPage, limit: PAGE_SIZE, search: searchQuery || undefined }),
+        userService.getAll({ search: searchQuery || undefined }),
         userService.getStats(),
       ])
       setAllRows(result.data)
       setServerTotal(result.total)
-      setServerTotalPages(result.totalPages)
+      setServerTotalPages(Math.ceil(result.total / PAGE_SIZE))
       setStats({ total: statsResult.total, active: statsResult.active, archived: statsResult.archived })
     } catch {
       setError('Failed to load users. Check your connection or permissions.')
@@ -491,7 +491,7 @@ export default function UserManagementClient() {
     setSearch('')
     setSearchInput('')
     if (activeTab === 'all') {
-      fetchAllUsers(1, '', true)
+      fetchAllUsers('', true)
     } else {
       fetchTabUsers(activeTab as UserTab)
     }
@@ -503,8 +503,8 @@ export default function UserManagementClient() {
       isInitialAllFetch.current = false
       return
     }
-    fetchAllUsers(page, search, false)
-  }, [page, search, activeTab, fetchAllUsers])
+    fetchAllUsers(search, false)
+  }, [search, activeTab, fetchAllUsers])
 
   const filtered = activeTab === 'all'
     ? allRows
@@ -538,7 +538,7 @@ export default function UserManagementClient() {
         { action: 'update-status', entityId: user.user_id },
       )
       if (activeTab === 'all') {
-        await fetchAllUsers(safePage, search, false)
+        await fetchAllUsers(search, false)
       } else {
         await fetchTabUsers(activeTab as UserTab)
       }
@@ -561,7 +561,7 @@ export default function UserManagementClient() {
 
   function handleRefresh() {
     if (activeTab === 'all') {
-      fetchAllUsers(safePage, search, false)
+      fetchAllUsers(search, false)
     } else {
       fetchTabUsers(activeTab as UserTab)
     }
@@ -813,7 +813,7 @@ export default function UserManagementClient() {
           onSaved={async () => {
             setShowForm(false)
             if (activeTab === 'all') {
-              await fetchAllUsers(safePage, search, false)
+              await fetchAllUsers(search, false)
             } else {
               await fetchTabUsers(activeTab as UserTab)
             }
