@@ -48,7 +48,7 @@ function mapTruckModelToVehicle(model: TruckModel): VehicleData {
     maxWeightKG:       model.max_weight_kg ?? 0,
     maxVolumeCBM:      model.max_volume_cbm ?? 0,
     maxLengthCM:       model.max_length_cm ?? 0,
-    bodyType:          model.body_type ?? 'Standard',
+    bodyType:          model.vehicle_type ?? 'Standard',
     dimension:         model.dimension_mm
                          ? `${model.dimension_mm}mm (L×W×H)`
                          : 'Standard dimensions',
