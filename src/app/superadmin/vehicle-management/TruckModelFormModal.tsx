@@ -661,9 +661,9 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
                 <div className="grid grid-cols-3 gap-3">
                   {(
                     [
-                      { key: 'max_weight_kg',  label: 'Max weight (kg)',  placeholder: '4000',  step: '0.01' },
-                      { key: 'max_volume_cbm', label: 'Max volume (cbm)', placeholder: '34.56', step: '0.01' },
-                      { key: 'max_length_cm',  label: 'Max length (cm)',  placeholder: '600',   step: '0.1'  },
+                      { key: 'max_weight_kg',  label: 'Max weight (kg)',  placeholder: 'E.g. 4000',  step: '0.01' },
+                      { key: 'max_volume_cbm', label: 'Max volume (cbm)', placeholder: 'E.g. 34.56', step: '0.01' },
+                      { key: 'max_length_cm',  label: 'Max length (cm)',  placeholder: 'E.g. 600',   step: '0.1'  },
                     ] as const
                   ).map(({ key, label, placeholder, step }) => (
                     <div key={key} className="flex flex-col gap-1">
