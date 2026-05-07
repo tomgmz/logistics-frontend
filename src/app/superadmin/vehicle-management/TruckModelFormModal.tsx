@@ -15,7 +15,6 @@ import {
 import ReusableModal from '@/components/layout/ReusableModal'
 import { appToast } from '@/lib/toast'
 
-// Controlled vehicle type list — mirrors the DB CHECK constraint
 export const VEHICLE_TYPES = [
   'Closed Van',
   'Wing Van',
@@ -23,9 +22,12 @@ export const VEHICLE_TYPES = [
   'Refrigerated Van',
   'Boom Truck',
   'Flatbed',
+  'Others',
 ] as const
 
 export type VehicleType = (typeof VEHICLE_TYPES)[number]
+
+const KNOWN_TYPES = VEHICLE_TYPES.slice(0, -1)
 
 function axiosMessage(err: unknown): string {
   const data = (err as { response?: { data?: { message?: string; errors?: { field: string; message: string }[] } } })
@@ -38,7 +40,7 @@ function axiosMessage(err: unknown): string {
 
 interface ModelFormState {
   name:               string
-  vehicle_type:       string   // replaces body_type — now a controlled dropdown
+  vehicle_type:       string
   dimension_mm:       string
   suitable_for:       string
   stackable_friendly: boolean
@@ -90,10 +92,11 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
   const [listLoading, setListLoading] = useState(false)
   const [listError,   setListError]   = useState<string | null>(null)
 
-  const [formMode,  setFormMode]  = useState<FormMode>(null)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [form,      setForm]      = useState<ModelFormState>(emptyModelForm())
-  const [formError, setFormError] = useState<string | null>(null)
+  const [formMode,    setFormMode]    = useState<FormMode>(null)
+  const [editingId,   setEditingId]   = useState<string | null>(null)
+  const [form,        setForm]        = useState<ModelFormState>(emptyModelForm())
+  const [formError,   setFormError]   = useState<string | null>(null)
+  const [isOtherType, setIsOtherType] = useState(false)
 
   const [imageFile,    setImageFile]    = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
@@ -127,6 +130,7 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
     setImageFile(null)
     setImagePreview(null)
     setFormError(null)
+    setIsOtherType(false)
     setFormMode('create')
   }
 
@@ -136,6 +140,7 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
     setImageFile(null)
     setImagePreview(m.image_url ?? null)
     setFormError(null)
+    setIsOtherType(!!m.vehicle_type && !(KNOWN_TYPES as readonly string[]).includes(m.vehicle_type))
     setFormMode('edit')
   }
 
@@ -145,6 +150,7 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
     setImageFile(null)
     setImagePreview(null)
     setFormError(null)
+    setIsOtherType(false)
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -155,10 +161,21 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
     setForm((f) => ({ ...f, image_url: '' }))
   }
 
+  const handleVehicleTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value
+    if (val === 'Others') {
+      setIsOtherType(true)
+      setForm((f) => ({ ...f, vehicle_type: '' }))
+    } else {
+      setIsOtherType(false)
+      setForm((f) => ({ ...f, vehicle_type: val }))
+    }
+  }
+
   function validate(): boolean {
     setFormError(null)
-    if (!form.name.trim())         { setFormError('Name is required.');          return false }
-    if (!form.vehicle_type)        { setFormError('Vehicle type is required.');   return false }
+    if (!form.name.trim())  { setFormError('Name is required.');         return false }
+    if (!form.vehicle_type) { setFormError('Vehicle type is required.'); return false }
     if (!imagePreview && !form.image_url) { setFormError('An image is required.'); return false }
     if (form.max_weight_kg && Number.isNaN(parseFloat(form.max_weight_kg))) {
       setFormError('Max weight must be a valid number.'); return false
@@ -195,7 +212,7 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
 
       const payload = {
         name:               form.name.trim(),
-        vehicle_type:       form.vehicle_type,           // ← was body_type
+        vehicle_type:       form.vehicle_type,
         dimension_mm:       form.dimension_mm.trim() || null,
         suitable_for:       form.suitable_for.trim() || null,
         stackable_friendly: form.stackable_friendly,
@@ -261,7 +278,6 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
 
   return (
     <>
-      {/* ── Model catalog list modal ─────────────────────────────────────── */}
       <AnimatePresence>
         {open && (
           <motion.div
@@ -364,8 +380,6 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-semibold text-white truncate">{m.name}</p>
-
-                          {/* vehicle_type badge */}
                           {m.vehicle_type && (
                             <span
                               className="inline-flex mt-1 text-[10px] font-bold px-2 py-0.5 rounded-md border"
@@ -378,7 +392,6 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
                               {m.vehicle_type}
                             </span>
                           )}
-
                           <div className="flex flex-wrap gap-2 mt-1.5">
                             {m.max_weight_kg != null && (
                               <span className="text-[10px] text-white/40 bg-white/[0.05] px-1.5 py-0.5 rounded">
@@ -425,7 +438,6 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
         )}
       </AnimatePresence>
 
-      {/* ── Create / edit form modal ─────────────────────────────────────── */}
       <AnimatePresence>
         {formMode && (
           <motion.div
@@ -506,8 +518,8 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
                       Vehicle type <span className="text-red-400">*</span>
                     </span>
                     <select
-                      value={form.vehicle_type}
-                      onChange={(e) => setForm((f) => ({ ...f, vehicle_type: e.target.value }))}
+                      value={isOtherType ? 'Others' : form.vehicle_type}
+                      onChange={handleVehicleTypeChange}
                       className="mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-3 py-2.5 text-sm text-white outline-none focus:border-[var(--color-cyan)]/40"
                     >
                       <option value="">— Select type —</option>
@@ -515,6 +527,16 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
                         <option key={vt} value={vt}>{vt}</option>
                       ))}
                     </select>
+                    {/* Free-text input shown only when Others is selected */}
+                    {isOtherType && (
+                      <input
+                        value={form.vehicle_type}
+                        onChange={(e) => setForm((f) => ({ ...f, vehicle_type: e.target.value }))}
+                        className="mt-2 w-full rounded-lg border border-white/10 bg-[#111] px-3 py-2.5 text-sm text-white outline-none focus:border-[var(--color-cyan)]/40"
+                        placeholder="Specify vehicle type…"
+                        autoFocus
+                      />
+                    )}
                   </label>
                   <label className="block">
                     <span className="text-[11px] font-bold uppercase text-white/40">Dimensions (mm)</span>
@@ -638,7 +660,6 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
         )}
       </AnimatePresence>
 
-      {/* ── Confirm modal ─────────────────────────────────────────────────── */}
       <ReusableModal
         open={!!confirmKind}
         title={confirmTitle}
