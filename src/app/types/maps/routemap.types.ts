@@ -82,7 +82,7 @@ export interface BookingDetail {
     name?:      string
     truck?: {
       plate_number?: string
-      truck_type?:   string
+      vehicle_type?:   string
     }
   } | null
 
@@ -98,7 +98,7 @@ export interface BookingDetail {
 
   vehicle?: {
     plate_number: string
-    truck_type:   string
+    vehicle_type:   string
   } | null
 
   clients?: {

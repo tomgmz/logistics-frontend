@@ -1,7 +1,7 @@
 export interface TruckModel {
   model_id:           string
   name:               string
-  body_type?:         string | null
+  vehicle_type?:         string | null
   dimension_mm?:      string | null
   suitable_for?:      string | null
   stackable_friendly: boolean

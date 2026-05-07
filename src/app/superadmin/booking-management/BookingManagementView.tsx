@@ -691,7 +691,7 @@ export default function BookingManagementView() {
                               {trucks.map((t) => (
                                 <option key={t.truck_id} value={t.truck_id}>
                                   {t.plate_number}
-                                  {t.truck_type ? ` · ${t.truck_type}` : ''}
+                                  {t.vehicle_type ? ` · ${t.vehicle_type}` : ''}
                                 </option>
                               ))}
                             </select>

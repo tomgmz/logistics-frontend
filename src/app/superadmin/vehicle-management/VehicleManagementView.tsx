@@ -80,7 +80,6 @@ const ModelThumb = memo(function ModelThumb({
   )
 })
 
-const TRUCK_TYPES = ['truck', 'wing_van'] as const
 const STATUSES: Truck['status'][] = [
   'available',
   'in_use',
@@ -152,12 +151,12 @@ function kgToTons(kg: number | null | undefined): string {
   return parseFloat(tons.toFixed(3)).toString()
 }
 
-type FormMode = 'create' | 'edit' | null
+type FormMode    = 'create' | 'edit' | null
 type ConfirmKind = 'save' | 'delete' | null
 
 interface TruckFormState {
   plate_number: string
-  truck_type:   (typeof TRUCK_TYPES)[number]
+  // truck_type removed — vehicle_type is now read from the linked model
   model_id:     string
   owned_by:     'company' | 'vendor'
   vendor_id:    string
@@ -167,7 +166,6 @@ interface TruckFormState {
 function emptyForm(): TruckFormState {
   return {
     plate_number: '',
-    truck_type:   'truck',
     model_id:     '',
     owned_by:     'company',
     vendor_id:    '',
@@ -178,7 +176,6 @@ function emptyForm(): TruckFormState {
 function truckToForm(t: Truck): TruckFormState {
   return {
     plate_number: t.plate_number ?? '',
-    truck_type:   (t.truck_type === 'wing_van' ? 'wing_van' : 'truck') as (typeof TRUCK_TYPES)[number],
     model_id:     t.model_id ?? '',
     owned_by:     t.owned_by,
     vendor_id:    t.vendor_id ?? '',
@@ -194,12 +191,12 @@ export default function VehicleManagementView() {
   const [listLoading, setListLoading] = useState(true)
   const [listError,   setListError]   = useState<string | null>(null)
 
-  const [search,       setSearch]       = useState('')
-  const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [ownerFilter,  setOwnerFilter]  = useState<string>('all')
-  const [page,         setPage]         = useState(0)
+  const [search,          setSearch]          = useState('')
+  const [statusFilter,    setStatusFilter]    = useState<string>('all')
+  const [ownerFilter,     setOwnerFilter]     = useState<string>('all')
+  const [page,            setPage]            = useState(0)
   const [debouncedSearch, setDebouncedSearch] = useState('')
-  const [listMeta, setListMeta] = useState<{
+  const [listMeta,        setListMeta]        = useState<{
     total: number
     totalPages: number
   } | null>(null)
@@ -336,7 +333,6 @@ export default function VehicleManagementView() {
       if (modalMode === 'create') {
         const body: CreateTruckInput = {
           plate_number: form.plate_number.trim().toUpperCase(),
-          truck_type:   form.truck_type,
           model_id,
           owned_by:     form.owned_by,
           vendor_id,
@@ -346,7 +342,6 @@ export default function VehicleManagementView() {
       } else if (modalMode === 'edit' && editingId) {
         const body: UpdateTruckInput = {
           plate_number: form.plate_number.trim().toUpperCase(),
-          truck_type:   form.truck_type,
           model_id,
           status:       form.status,
           owned_by:     form.owned_by,
@@ -450,6 +445,7 @@ export default function VehicleManagementView() {
 
       <div className="flex flex-1 min-h-0 flex-col p-3 lg:p-4 gap-3 overflow-hidden">
 
+        {/* Filters */}
         <div className="flex flex-col xl:flex-row gap-2 xl:items-center shrink-0">
           <div
             className="flex items-center gap-2 rounded-[10px] px-3 py-2 flex-1 max-w-md"
@@ -459,7 +455,7 @@ export default function VehicleManagementView() {
             <input
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(0) }}
-              placeholder="Search plate, type, model, status…"
+              placeholder="Search plate, model, status…"
               className="bg-transparent border-none outline-none text-sm flex-1 text-white/80 placeholder:text-white/35"
             />
           </div>
@@ -511,6 +507,7 @@ export default function VehicleManagementView() {
           </div>
         </div>
 
+        {/* Table */}
         <div className="flex-1 min-h-0 rounded-xl border border-white/[0.08] overflow-hidden flex flex-col bg-[#0f0f0f]">
           {listLoading ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-3 py-16">
@@ -543,7 +540,7 @@ export default function VehicleManagementView() {
                     <tr className="text-[11px] uppercase tracking-wider text-white/40">
                       <th className="px-2 py-2.5 font-bold w-14 text-center">Image</th>
                       <th className="px-3 py-2.5 font-bold">Plate</th>
-                      <th className="px-3 py-2.5 font-bold">Type</th>
+                      <th className="px-3 py-2.5 font-bold">Vehicle type</th>
                       <th className="px-3 py-2.5 font-bold hidden md:table-cell">Model</th>
                       <th className="px-3 py-2.5 font-bold hidden md:table-cell">Max weight</th>
                       <th className="px-3 py-2.5 font-bold">Status</th>
@@ -567,7 +564,10 @@ export default function VehicleManagementView() {
                             </div>
                           </td>
                           <td className="px-3 py-2.5 font-mono font-semibold text-white">{t.plate_number}</td>
-                          <td className="px-3 py-2.5 text-white/70">{fmtLabel(t.truck_type)}</td>
+                          {/* vehicle_type is now read from the linked model */}
+                          <td className="px-3 py-2.5 text-white/70">
+                            {t.truck_model?.vehicle_type ?? '—'}
+                          </td>
                           <td className="px-3 py-2.5 text-white/60 text-xs max-w-[200px] truncate hidden md:table-cell">
                             {t.truck_model?.name ?? '—'}
                           </td>
@@ -610,6 +610,7 @@ export default function VehicleManagementView() {
                 </table>
               </div>
 
+              {/* Pagination */}
               <div className="shrink-0 flex items-center justify-between px-3 py-2 border-t border-white/[0.07] text-xs text-white/50">
                 <span>
                   {totalRows === 0
@@ -642,12 +643,14 @@ export default function VehicleManagementView() {
         </div>
       </div>
 
+      {/* Model catalog modal */}
       <TruckModelFormModal
         open={modelModalOpen}
         onClose={() => setModelModalOpen(false)}
         onSaved={() => void refreshAll()}
       />
 
+      {/* Confirm modal */}
       <ReusableModal
         open={!!confirmKind && !!confirmModalProps}
         title={confirmModalProps?.title ?? ''}
@@ -663,6 +666,7 @@ export default function VehicleManagementView() {
         onConfirm={confirmModalProps?.onConfirm}
       />
 
+      {/* Create / Edit vehicle modal */}
       <AnimatePresence>
         {modalMode && (
           <motion.div
@@ -695,9 +699,12 @@ export default function VehicleManagementView() {
               </div>
 
               <div className="p-4 space-y-3">
+
                 {/* Plate number */}
                 <label className="block">
-                  <span className="text-[11px] font-bold uppercase text-white/40">Plate number</span>
+                  <span className="text-[11px] font-bold uppercase text-white/40">
+                    Plate number <span className="text-red-400">*</span>
+                  </span>
                   <input
                     value={form.plate_number}
                     onChange={(e) => setForm((f) => ({ ...f, plate_number: e.target.value }))}
@@ -706,25 +713,17 @@ export default function VehicleManagementView() {
                   />
                 </label>
 
-                {/* Type */}
-                <label className="block">
-                  <span className="text-[11px] font-bold uppercase text-white/40">Type</span>
-                  <select
-                    value={form.truck_type}
-                    onChange={(e) => setForm((f) => ({ ...f, truck_type: e.target.value as (typeof TRUCK_TYPES)[number] }))}
-                    className="mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-3 py-2.5 text-sm text-white outline-none"
-                  >
-                    {TRUCK_TYPES.map((t) => (
-                      <option key={t} value={t}>{fmtLabel(t)}</option>
-                    ))}
-                  </select>
-                </label>
-
                 {/* Model picker */}
                 <div className="block">
-                  <span className="text-[11px] font-bold uppercase text-white/40">Truck model &amp; catalog image</span>
+                  <span className="text-[11px] font-bold uppercase text-white/40">
+                    Model &amp; vehicle type
+                  </span>
+                  <p className="text-[10px] text-white/30 mt-0.5 mb-2">
+                    Selecting a model sets the vehicle type automatically.
+                  </p>
 
-                  <div className="mt-2 flex gap-2 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-white/15 scrollbar-track-transparent">
+                  <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-white/15 scrollbar-track-transparent">
+                    {/* No model option */}
                     <button
                       type="button"
                       onClick={clearModelPick}
@@ -746,7 +745,7 @@ export default function VehicleManagementView() {
                           key={m.model_id}
                           type="button"
                           onClick={() => applyModelPick(m.model_id)}
-                          title={m.name}
+                          title={`${m.name} · ${m.vehicle_type}`}
                           className={`shrink-0 flex flex-col items-center gap-1.5 w-[88px] p-2 rounded-xl border transition-colors ${
                             picked
                               ? 'border-[var(--color-cyan)] bg-[rgba(77,249,237,0.08)]'
@@ -757,6 +756,9 @@ export default function VehicleManagementView() {
                           <span className="text-[10px] font-semibold text-white/75 text-center leading-tight line-clamp-2">
                             {m.name}
                           </span>
+                          <span className="text-[9px] text-white/35 text-center leading-tight">
+                            {m.vehicle_type}
+                          </span>
                         </button>
                       )
                     })}
@@ -764,7 +766,7 @@ export default function VehicleManagementView() {
 
                   {/* Dropdown mirror */}
                   <label className="block mt-2">
-                    <span className="sr-only">Truck model</span>
+                    <span className="sr-only">Select model from list</span>
                     <select
                       value={form.model_id}
                       onChange={(e) => {
@@ -772,11 +774,13 @@ export default function VehicleManagementView() {
                         else clearModelPick()
                       }}
                       className="w-full rounded-lg border border-white/10 bg-[#111] px-3 py-2 text-sm text-white/80 outline-none"
-                      aria-label="Select truck model from list"
+                      aria-label="Select model from list"
                     >
                       <option value="">— None —</option>
                       {models.map((m) => (
-                        <option key={m.model_id} value={m.model_id}>{m.name}</option>
+                        <option key={m.model_id} value={m.model_id}>
+                          {m.name} ({m.vehicle_type})
+                        </option>
                       ))}
                     </select>
                   </label>
@@ -789,19 +793,32 @@ export default function VehicleManagementView() {
                     {selectedModel ? (
                       <>
                         <p className="text-sm font-semibold text-white truncate">{selectedModel.name}</p>
-                        {selectedModel.body_type && (
-                          <p className="text-xs text-white/45 mt-0.5">{selectedModel.body_type}</p>
-                        )}
+
+                        {/* vehicle_type badge */}
+                        <span
+                          className="inline-flex mt-1 text-[10px] font-bold px-2 py-0.5 rounded-md border"
+                          style={{
+                            background:  'rgba(77,249,237,0.10)',
+                            borderColor: 'rgba(77,249,237,0.30)',
+                            color:       'var(--color-cyan)',
+                          }}
+                        >
+                          {selectedModel.vehicle_type}
+                        </span>
+
                         {selectedModel.max_weight_kg != null && (
-                          <p className="text-[11px] text-white/40 mt-1">
-                            Max weight: <span className="text-white/65 font-semibold">{selectedModel.max_weight_kg.toLocaleString()} kg</span>
+                          <p className="text-[11px] text-white/40 mt-1.5">
+                            Max weight:{' '}
+                            <span className="text-white/65 font-semibold">
+                              {selectedModel.max_weight_kg.toLocaleString()} kg
+                            </span>
                             <span className="text-white/30 mx-1">·</span>
-                            {kgToTons(selectedModel.max_weight_kg)} tons
+                            {kgToTons(selectedModel.max_weight_kg)} t
                           </p>
                         )}
                         {!selectedModelImageUrl && (
                           <p className="text-[11px] text-amber-200/90 mt-2 leading-snug">
-                            This model has no <code className="text-white/60">image_url</code> yet. Set it on the truck model so it appears in the fleet list.
+                            This model has no image yet. Set it in Manage models.
                           </p>
                         )}
                       </>
@@ -809,7 +826,7 @@ export default function VehicleManagementView() {
                       <>
                         <p className="text-sm font-semibold text-white/80">No model selected</p>
                         <p className="text-[11px] text-white/40 mt-1 leading-relaxed">
-                          The table will use the truck icon until you link a model that has an image.
+                          Vehicle type and image come from the linked model.
                         </p>
                       </>
                     )}

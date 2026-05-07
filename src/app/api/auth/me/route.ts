@@ -12,6 +12,8 @@ export async function GET(req: NextRequest) {
       },
     })
 
+    console.log('Backend /auth/me response:', JSON.stringify(data, null, 2))
+
     return NextResponse.json(data)
 
   } catch (error: unknown) {
