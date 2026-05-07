@@ -572,7 +572,7 @@ export default function BookingManagementView() {
                               <Clock size={14} className="text-white/35" />
                               Payment terms: {detail.payment_terms} days
                             </div>
-                          )}
+                          )} 
                         </div>
                       </div>
 
