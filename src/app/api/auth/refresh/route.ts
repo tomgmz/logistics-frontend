@@ -5,7 +5,6 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL!
 const isProd  = process.env.NODE_ENV === 'production'
 
 export async function POST(req: NextRequest) {
-
   try {
     const { data } = await axios.post(`${API_URL}/auth/refresh`, {}, {
       headers: {
@@ -18,7 +17,7 @@ export async function POST(req: NextRequest) {
     res.cookies.set('access_token', data.data.accessToken, {
       httpOnly: true,
       secure:   isProd,
-      sameSite: 'lax',
+      sameSite: 'strict' as const,  // ✅ was 'lax'
       path:     '/',
       maxAge:   15 * 60,
     })

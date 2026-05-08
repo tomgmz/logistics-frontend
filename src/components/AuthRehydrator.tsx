@@ -86,37 +86,42 @@ export default function AuthRehydrator() {
 
     let rehydrated = false
 
-    async function rehydrate() {
-      channel.postMessage({ type: 'REQUEST_SESSION' })
-
-      await new Promise<void>((resolve) => setTimeout(resolve, 300))
-
-      if (rehydrated) return
-
-      try {
-        const user = await getMe()
-        setUser(user)
-        channel.postMessage({ type: 'SESSION_SHARE', user })
-        return
-      } catch (err) {
-        const status = axios.isAxiosError(err) ? err.response?.status : null
-        if (status !== 401) return
-      }
-
-      try {
-        await axios.post('/api/auth/refresh', {}, { withCredentials: true })
-        const user = await getMe()
-        setUser(user)
-        channel.postMessage({ type: 'SESSION_SHARE', user })
-        return
-      } catch {
+  async function rehydrate() {
+    // ✅ Don't auto-login if this profile has no stored user
+    try {
+      const persisted = localStorage.getItem('auth-user')
+      const hasLocalUser = !!JSON.parse(persisted ?? '{}')?.state?.user
+      if (!hasLocalUser) {
         clearUser()
-        const isPublic = PUBLIC_PATHS.some(
-          (p) => pathname === p || pathname.startsWith(p + '/')
-        )
-        if (!isPublic) router.replace('/')
+        return
       }
+    } catch {
+      clearUser()
+      return
     }
+
+    try {
+      const user = await getMe()
+      setUser(user)
+      return
+    } catch (err) {
+      const status = axios.isAxiosError(err) ? err.response?.status : null
+      if (status !== 401) return
+    }
+
+    try {
+      await axios.post('/api/auth/refresh', {}, { withCredentials: true })
+      const user = await getMe()
+      setUser(user)
+      return
+    } catch {
+      clearUser()
+      const isPublic = PUBLIC_PATHS.some(
+        (p) => pathname === p || pathname.startsWith(p + '/')
+      )
+      if (!isPublic) router.replace('/')
+    }
+  }
 
     rehydrate()
 
