@@ -19,19 +19,16 @@ export default function AuthRehydrator() {
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
       if (e.key !== 'auth-user') return
-
       const oldUserId = e.oldValue
         ? (JSON.parse(e.oldValue)?.state?.user?.user_id ?? null)
         : null
       const newUserId = e.newValue
         ? (JSON.parse(e.newValue)?.state?.user?.user_id ?? null)
         : null
-
       if (oldUserId && newUserId && oldUserId !== newUserId) {
         router.replace('/')
         return
       }
-
       if (oldUserId && !newUserId) {
         const isPublic = PUBLIC_PATHS.some(
           (p) => pathname === p || pathname.startsWith(p + '/')
@@ -39,33 +36,9 @@ export default function AuthRehydrator() {
         if (!isPublic) router.replace('/')
       }
     }
-
     window.addEventListener('storage', handleStorage)
     return () => window.removeEventListener('storage', handleStorage)
   }, [router, pathname])
-
-  useEffect(() => {
-    const channel = new BroadcastChannel('auth_sync')
-
-    channel.onmessage = (event) => {
-      if (event.data.type === 'LOGOUT') {
-        clearUser()
-        const isPublic = PUBLIC_PATHS.some(
-          (p) => pathname === p || pathname.startsWith(p + '/')
-        )
-        if (!isPublic) router.replace('/')
-      }
-
-      // ✅ Auto-login other tabs when login happens on any tab
-      if (event.data.type === 'LOGIN') {
-        setUser(event.data.user)
-        const destination = event.data.portalUrl as string | undefined
-        if (destination) router.push(destination)
-      }
-    }
-
-    return () => channel.close()
-  }, [clearUser, setUser, router, pathname])
 
   useEffect(() => {
     if (hasRun.current) return
@@ -73,10 +46,57 @@ export default function AuthRehydrator() {
 
     syncServerTime()
 
+    const channel = new BroadcastChannel('auth_sync')
+
+    channel.onmessage = (event) => {
+      const { type } = event.data
+
+      if (type === 'LOGOUT') {
+        clearUser()
+        const isPublic = PUBLIC_PATHS.some(
+          (p) => pathname === p || pathname.startsWith(p + '/')
+        )
+        if (!isPublic) router.replace('/')
+        return
+      }
+
+      if (type === 'LOGIN') {
+        setUser(event.data.user)
+        const destination = event.data.portalUrl as string | undefined
+        if (destination) router.push(destination)
+        return
+      }
+
+      if (type === 'REQUEST_SESSION') {
+        const user = useAuthStore.getState().user
+        if (user) {
+          channel.postMessage({ type: 'SESSION_SHARE', user })
+        }
+        return
+      }
+
+      if (type === 'SESSION_SHARE') {
+        if (event.data.user && !useAuthStore.getState().user) {
+          setUser(event.data.user)
+          rehydrated = true
+        }
+        return
+      }
+    }
+
+    let rehydrated = false
+
     async function rehydrate() {
+      channel.postMessage({ type: 'REQUEST_SESSION' })
+
+      await new Promise<void>((resolve) => setTimeout(resolve, 300))
+
+      if (rehydrated) return
+
       try {
         const user = await getMe()
         setUser(user)
+        channel.postMessage({ type: 'SESSION_SHARE', user })
         return
       } catch (err) {
         const status = axios.isAxiosError(err) ? err.response?.status : null
@@ -87,6 +107,7 @@ export default function AuthRehydrator() {
         await axios.post('/api/auth/refresh', {}, { withCredentials: true })
         const user = await getMe()
         setUser(user)
+        channel.postMessage({ type: 'SESSION_SHARE', user })
         return
       } catch {
         clearUser()
@@ -98,7 +119,10 @@ export default function AuthRehydrator() {
     }
 
     rehydrate()
-  }, [setUser, clearUser, router, pathname])
+
+    return () => channel.close()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return null
 }

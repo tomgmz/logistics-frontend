@@ -38,6 +38,21 @@ function getRoleFromToken(token: string): string | null {
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
 
+  // Redirect authenticated users away from landing page
+  if (pathname === '/') {
+    const accessToken = req.cookies.get('access_token')?.value
+    if (accessToken) {
+      const role = getRoleFromToken(accessToken)
+      const allowedPrefix = role ? ROLE_ROUTES[role] : null
+      if (allowedPrefix) {
+        const dest = req.nextUrl.clone()
+        dest.pathname = allowedPrefix
+        return NextResponse.redirect(dest)
+      }
+    }
+    return NextResponse.next()
+  }
+
   if (isPublicPath(pathname)) {
     return NextResponse.next()
   }
@@ -53,14 +68,14 @@ export function proxy(req: NextRequest) {
     return NextResponse.redirect(homeUrl)
   }
 
-  // Let page load for authrehydrator to refresh when access toekn is gone
+  // Let page load for authrehydrator to refresh when access token is gone
   if (!accessToken && refreshToken) {
     return NextResponse.next()
   }
 
   const role = getRoleFromToken(accessToken!)
 
-  // let authrehydrator refresh if refresh tocken exists
+  // Let authrehydrator refresh if refresh token exists
   if (!role && refreshToken) {
     return NextResponse.next()
   }
@@ -75,7 +90,7 @@ export function proxy(req: NextRequest) {
     return res
   }
 
-  // Role not mapped 
+  // Role not mapped
   const allowedPrefix = ROLE_ROUTES[role]
   if (!allowedPrefix) {
     const homeUrl    = req.nextUrl.clone()
