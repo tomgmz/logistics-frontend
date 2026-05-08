@@ -51,8 +51,13 @@ export default function Sidebar() {
     } catch {
     } finally {
       clearUser()
-      localStorage.removeItem('auth-user')
-      window.location.replace('/')
+      const ch = new BroadcastChannel('auth_sync')
+      ch.postMessage({ type: 'LOGOUT' })
+      ch.close()
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('auth-user')
+        window.location.href = '/'
+      }
     }
   }
 

@@ -32,7 +32,6 @@ export async function initCsrf(): Promise<void> {
   if (getCsrfToken()) return
   if (csrfPromise) return csrfPromise
 
- 
   csrfPromise = proxyApi
     .get('/auth/csrf')
     .then(() => {})
@@ -73,6 +72,13 @@ function processQueue(error: unknown): void {
   failedQueue = []
 }
 
+function broadcastLogout(): void {
+  if (typeof window === 'undefined') return
+  const ch = new BroadcastChannel('auth_sync')
+  ch.postMessage({ type: 'LOGOUT' })
+  ch.close()
+}
+
 proxyApi.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
@@ -109,6 +115,7 @@ proxyApi.interceptors.response.use(
         processQueue(refreshError)
         isRefreshing = false
         failedQueue = []
+        broadcastLogout()
         if (typeof window !== 'undefined') window.location.href = '/'
         return Promise.reject(refreshError)
       }

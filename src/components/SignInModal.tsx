@@ -245,7 +245,6 @@ function OtpStep({
     checkStatus()
   }, [email, applyStatus])
 
-  // Resend countdown
   useEffect(() => {
     if (resendSec <= 0) return
     const interval = setInterval(() => {
@@ -255,7 +254,6 @@ function OtpStep({
     return () => clearInterval(interval)
   }, [resendSec])
 
-  // Lock countdown
   useEffect(() => {
     if (lockState !== 'temporary') return
     const interval = setInterval(() => {
@@ -366,9 +364,7 @@ function OtpStep({
       try {
         const status = await getAuthStatus(email)
         applyStatus(status)
-      } catch {
-
-      }
+      } catch {}
       resendExpiresAt.current = now() + RESEND_SECS * 1000
       setResendSec(RESEND_SECS)
       setOtp(Array(OTP_LENGTH).fill(''))
@@ -389,7 +385,6 @@ function OtpStep({
     )
   }
 
-  // Permanent lock screen
   if (lockState === 'permanent') {
     return (
       <motion.div
@@ -675,12 +670,19 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
   const handleEmailSuccess = (e: string) => { setEmail(e); setStep('otp') }
 
   const handleOtpSuccess = async (user: AuthUser, portalUrl: string) => {
+    let finalUser = user
     try {
-      const fullUser = await getMe()
-      useAuthStore.getState().setUser(fullUser)
+      finalUser = await getMe()
+      useAuthStore.getState().setUser(finalUser)
     } catch {
       useAuthStore.getState().setUser(user)
     }
+
+    // ✅ Notify other tabs that login occurred
+    const ch = new BroadcastChannel('auth_sync')
+    ch.postMessage({ type: 'LOGIN', user: finalUser, portalUrl })
+    ch.close()
+
     setStep('success')
     setTimeout(() => { handleClose(); router.push(portalUrl) }, 1800)
   }

@@ -54,6 +54,9 @@ export default function ReusableSidebar({
     } catch {
     } finally {
       clearUser()
+      const ch = new BroadcastChannel('auth_sync')
+      ch.postMessage({ type: 'LOGOUT' })
+      ch.close()
       if (typeof window !== 'undefined') {
         localStorage.removeItem('auth-user')
         window.location.href = '/'
