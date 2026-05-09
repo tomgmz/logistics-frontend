@@ -156,7 +156,6 @@ type ConfirmKind = 'save' | 'delete' | null
 
 interface TruckFormState {
   plate_number: string
-  // truck_type removed — vehicle_type is now read from the linked model
   model_id:     string
   owned_by:     'company' | 'vendor'
   vendor_id:    string
@@ -183,6 +182,16 @@ function truckToForm(t: Truck): TruckFormState {
   }
 }
 
+function formsEqual(a: TruckFormState, b: TruckFormState): boolean {
+  return (
+    a.plate_number === b.plate_number &&
+    a.model_id     === b.model_id     &&
+    a.owned_by     === b.owned_by     &&
+    a.vendor_id    === b.vendor_id    &&
+    a.status       === b.status
+  )
+}
+
 export default function VehicleManagementView() {
   const [trucks,  setTrucks]  = useState<Truck[]>([])
   const [models,  setModels]  = useState<TruckModel[]>([])
@@ -201,16 +210,19 @@ export default function VehicleManagementView() {
     totalPages: number
   } | null>(null)
 
-  const [modalMode, setModalMode] = useState<FormMode>(null)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [form,      setForm]      = useState<TruckFormState>(emptyForm())
-  const [formError, setFormError] = useState<string | null>(null)
+  const [modalMode,     setModalMode]     = useState<FormMode>(null)
+  const [editingId,     setEditingId]     = useState<string | null>(null)
+  const [form,          setForm]          = useState<TruckFormState>(emptyForm())
+  const [originalForm,  setOriginalForm]  = useState<TruckFormState>(emptyForm())
+  const [formError,     setFormError]     = useState<string | null>(null)
 
   const [confirmKind, setConfirmKind] = useState<ConfirmKind>(null)
   const [actionBusy,  setActionBusy]  = useState(false)
   const [deleteId,    setDeleteId]    = useState<string | null>(null)
 
   const [modelModalOpen, setModelModalOpen] = useState(false)
+
+  const isUnchanged = modalMode === 'edit' && formsEqual(form, originalForm)
 
   const loadModelsVendors = useCallback(async () => {
     try {
@@ -284,13 +296,16 @@ export default function VehicleManagementView() {
   const openCreate = () => {
     setEditingId(null)
     setForm(emptyForm())
+    setOriginalForm(emptyForm())
     setFormError(null)
     setModalMode('create')
   }
 
   const openEdit = (t: Truck) => {
     setEditingId(t.truck_id)
-    setForm(truckToForm(t))
+    const initial = truckToForm(t)
+    setForm(initial)
+    setOriginalForm(initial)
     setFormError(null)
     setModalMode('edit')
   }
@@ -560,7 +575,6 @@ export default function VehicleManagementView() {
                             </div>
                           </td>
                           <td className="px-3 py-2.5 font-mono font-semibold text-white">{t.plate_number}</td>
-                          {/* vehicle_type is now read from the linked model */}
                           <td className="px-3 py-2.5 text-white/70">
                             {t.truck_model?.vehicle_type ?? '—'}
                           </td>
@@ -714,12 +728,8 @@ export default function VehicleManagementView() {
                   <span className="text-[11px] font-bold uppercase text-white/40">
                     Model &amp; vehicle type
                   </span>
-                  <p className="text-[10px] text-white/30 mt-0.5 mb-2">
-                    Selecting a model sets the vehicle type automatically.
-                  </p>
 
                   <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-white/15 scrollbar-track-transparent">
-                    {/* No model option */}
                     <button
                       type="button"
                       onClick={clearModelPick}
@@ -829,7 +839,6 @@ export default function VehicleManagementView() {
                   </div>
                 </div>
 
-                {/* Owned by + Status (edit only) */}
                 <div className="grid grid-cols-2 gap-3">
                   <label className="block">
                     <span className="text-[11px] font-bold uppercase text-white/40">Owned by</span>
@@ -914,7 +923,9 @@ export default function VehicleManagementView() {
                   <button
                     type="button"
                     onClick={handleSaveClick}
-                    className="px-4 py-2 rounded-lg text-sm font-bold text-black disabled:opacity-50"
+                    disabled={isUnchanged}
+                    title={isUnchanged ? 'No changes to save' : undefined}
+                    className="px-4 py-2 rounded-lg text-sm font-bold text-black disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
                     style={{ background: 'var(--color-cyan)' }}
                   >
                     {modalMode === 'create' ? 'Create' : 'Save'}
