@@ -313,10 +313,6 @@ export default function BookingManagementView() {
       <header className="shrink-0 px-3 py-3 lg:px-4 border-b border-white/[0.07] flex flex-col sm:flex-row sm:items-end justify-between gap-3">
         <div>
           <h1 className="text-lg font-bold text-white tracking-tight">Booking management</h1>
-          <p className="text-xs text-white/45 mt-0.5 max-w-xl">
-            View all bookings, change workflow status, assign drivers and vehicles, and update or remove delivery
-            stops. Client-only edits (full booking body, create/delete booking) stay on the client portal.
-          </p>
         </div>
         <button
           type="button"

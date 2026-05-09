@@ -44,8 +44,6 @@ export default function AuthRehydrator() {
     if (hasRun.current) return
     hasRun.current = true
 
-    syncServerTime()
-
     const channel = new BroadcastChannel('auth_sync')
 
     channel.onmessage = (event) => {
@@ -78,52 +76,53 @@ export default function AuthRehydrator() {
       if (type === 'SESSION_SHARE') {
         if (event.data.user && !useAuthStore.getState().user) {
           setUser(event.data.user)
-          rehydrated = true
         }
         return
       }
     }
 
-    let rehydrated = false
-
-  async function rehydrate() {
-    // ✅ Don't auto-login if this profile has no stored user
-    try {
-      const persisted = localStorage.getItem('auth-user')
-      const hasLocalUser = !!JSON.parse(persisted ?? '{}')?.state?.user
-      if (!hasLocalUser) {
+    async function rehydrate() {
+      try {
+        const persisted = localStorage.getItem('auth-user')
+        const hasLocalUser = !!JSON.parse(persisted ?? '{}')?.state?.user
+        if (!hasLocalUser) {
+          clearUser()
+          return
+        }
+      } catch {
         clearUser()
         return
       }
-    } catch {
-      clearUser()
-      return
+
+      try {
+        const user = await getMe()
+        setUser(user)
+        return
+      } catch (err) {
+        const status = axios.isAxiosError(err) ? err.response?.status : null
+        if (status !== 401) return
+      }
+
+      try {
+        await axios.post('/api/auth/refresh', {}, { withCredentials: true })
+        const user = await getMe()
+        setUser(user)
+        return
+      } catch {
+        clearUser()
+        const isPublic = PUBLIC_PATHS.some(
+          (p) => pathname === p || pathname.startsWith(p + '/')
+        )
+        if (!isPublic) router.replace('/')
+      }
     }
 
-    try {
-      const user = await getMe()
-      setUser(user)
-      return
-    } catch (err) {
-      const status = axios.isAxiosError(err) ? err.response?.status : null
-      if (status !== 401) return
+    async function init() {
+      await syncServerTime()
+      rehydrate()
     }
 
-    try {
-      await axios.post('/api/auth/refresh', {}, { withCredentials: true })
-      const user = await getMe()
-      setUser(user)
-      return
-    } catch {
-      clearUser()
-      const isPublic = PUBLIC_PATHS.some(
-        (p) => pathname === p || pathname.startsWith(p + '/')
-      )
-      if (!isPublic) router.replace('/')
-    }
-  }
-
-    rehydrate()
+    init()
 
     return () => channel.close()
   // eslint-disable-next-line react-hooks/exhaustive-deps

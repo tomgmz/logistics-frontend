@@ -118,8 +118,14 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
   const [actionBusy,  setActionBusy]  = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const initialForm  = useRef<ModelFormState | null>(null)
 
-  // ── helpers ──────────────────────────────────────────────────────────────────
+  const hasChanges = formMode === 'create' || !!imageFile || (
+    initialForm.current !== null &&
+    (Object.keys(form) as (keyof ModelFormState)[]).some(
+      (k) => form[k] !== initialForm.current![k]
+    )
+  )
 
   const loadModels = useCallback(async () => {
     try {
@@ -146,17 +152,20 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
     setTouched(false)
     setIsOtherType(false)
     setFormMode('create')
+    initialForm.current = null
   }
 
   const openEdit = (m: TruckModel) => {
+    const formState = modelToForm(m)
     setEditingId(m.model_id)
-    setForm(modelToForm(m))
+    setForm(formState)
     setImageFile(null)
     setImagePreview(m.image_url ?? null)
     setFieldErrors({})
     setTouched(false)
     setIsOtherType(!!m.vehicle_type && !(KNOWN_TYPES as readonly string[]).includes(m.vehicle_type))
     setFormMode('edit')
+    initialForm.current = formState
   }
 
   const closeForm = () => {
@@ -167,6 +176,7 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
     setFieldErrors({})
     setTouched(false)
     setIsOtherType(false)
+    initialForm.current = null
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -175,7 +185,6 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
     setImageFile(file)
     setImagePreview(URL.createObjectURL(file))
     setForm((f) => ({ ...f, image_url: '' }))
-    // clear image error immediately once a file is chosen
     setFieldErrors((prev) => ({ ...prev, image: undefined }))
   }
 
@@ -191,8 +200,6 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
     setFieldErrors((prev) => ({ ...prev, vehicle_type: undefined }))
   }
 
-  // ── Zod validation ────────────────────────────────────────────────────────────
-
   function validate(): boolean {
     const hasImage = !!(imagePreview || form.image_url)
 
@@ -207,7 +214,6 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
       max_volume_cbm:     form.max_volume_cbm,
       max_weight_kg:      form.max_weight_kg,
       max_length_cm:      form.max_length_cm,
-      // pass a dummy valid URL so Zod doesn't flag it — image is validated separately
       image_url:          hasImage ? 'https://placeholder.com' : '',
     })
 
@@ -238,8 +244,6 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
     setDeleteId(id)
     setConfirmKind('delete')
   }
-
-  // ── save / delete ─────────────────────────────────────────────────────────────
 
   const executeSave = async () => {
     setActionBusy(true)
@@ -306,8 +310,6 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
     }
   }
 
-  // ── confirm modal strings ─────────────────────────────────────────────────────
-
   const confirmTitle = confirmKind === 'delete'
     ? 'Delete model?'
     : formMode === 'create' ? 'Create model?' : 'Save changes?'
@@ -324,19 +326,15 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
       ? 'Delete'
       : formMode === 'create' ? 'Create' : 'Save'
 
-  // ── shared input class helper ─────────────────────────────────────────────────
-
   const inputCls = (hasErr: boolean) =>
     `w-full rounded-lg border bg-[#111] px-3 py-2.5 text-sm text-white outline-none transition-colors
      ${hasErr
        ? 'border-red-400/60 focus:border-red-400'
        : 'border-white/10 focus:border-[var(--color-cyan)]/40'}`
 
-  // ── render ────────────────────────────────────────────────────────────────────
-
   return (
     <>
-      {/* ── Catalog list modal ── */}
+      {/* Catalog list modal */}
       <AnimatePresence>
         {open && (
           <motion.div
@@ -497,7 +495,7 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
         )}
       </AnimatePresence>
 
-      {/* ── Create / Edit form modal ── */}
+      {/* Create / Edit form modal */}
       <AnimatePresence>
         {formMode && (
           <motion.div
@@ -527,7 +525,7 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
 
               <div className="p-4 space-y-4">
 
-                {/* ── Image upload ── */}
+                {/* Image upload */}
                 <div className="flex flex-col gap-1">
                   <div
                     className="relative flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed cursor-pointer transition-colors overflow-hidden"
@@ -568,7 +566,7 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
                   )}
                 </div>
 
-                {/* ── Model name ── */}
+                {/* Model name */}
                 <div className="flex flex-col gap-1">
                   <label className="text-[11px] font-bold uppercase text-white/40">
                     Model name <span className="text-red-400">*</span>
@@ -585,7 +583,7 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
                   {fieldErrors.name && <p className="text-[11px] text-red-400">{fieldErrors.name}</p>}
                 </div>
 
-                {/* ── Vehicle type ── */}
+                {/* Vehicle type */}
                 <div className="flex flex-col gap-1">
                   <label className="text-[11px] font-bold uppercase text-white/40">
                     Vehicle type <span className="text-red-400">*</span>
@@ -595,7 +593,7 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
                     onChange={handleVehicleTypeChange}
                     className={inputCls(!!fieldErrors.vehicle_type)}
                   >
-                    <option value="">— Select type —</option>
+                    <option value="">Select type</option>
                     {VEHICLE_TYPES.map((vt) => (
                       <option key={vt} value={vt}>{vt}</option>
                     ))}
@@ -617,7 +615,7 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
                   )}
                 </div>
 
-                {/* ── Dimensions ── */}
+                {/* Dimensions */}
                 <div className="flex flex-col gap-1">
                   <label className="text-[11px] font-bold uppercase text-white/40">
                     Dimensions (mm) <span className="text-red-400">*</span>
@@ -657,7 +655,7 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
                   </div>
                 </div>
 
-                {/* ── Max weight / volume / length ── */}
+                {/* Max weight / volume / length */}
                 <div className="grid grid-cols-3 gap-3">
                   {(
                     [
@@ -689,7 +687,7 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
                   ))}
                 </div>
 
-                {/* ── Suitable for ── */}
+                {/* Suitable for */}
                 <div className="flex flex-col gap-1">
                   <label className="text-[11px] font-bold uppercase text-white/40">
                     Suitable for <span className="text-red-400">*</span>
@@ -708,7 +706,7 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
                   )}
                 </div>
 
-                {/* ── Stackable toggle ── */}
+                {/* Stackable toggle */}
                 <label className="flex items-center gap-3 cursor-pointer select-none">
                   <div
                     className="w-9 h-5 rounded-full border transition-colors relative shrink-0"
@@ -726,7 +724,7 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
                   <span className="text-sm text-white/70">Stackable friendly</span>
                 </label>
 
-                {/* ── API / server error ── */}
+                {/* API / server error */}
                 {touched && fieldErrors.name && actionBusy === false && (
                   <p className="text-xs text-red-400 border border-red-500/25 rounded-lg px-3 py-2 bg-red-500/10">
                     {fieldErrors.name}
@@ -757,7 +755,7 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
                   <button
                     type="button"
                     onClick={handleSaveClick}
-                    disabled={actionBusy}
+                    disabled={actionBusy || !hasChanges}
                     className="px-4 py-2 rounded-lg text-sm font-bold text-black disabled:opacity-50"
                     style={{ background: 'var(--color-cyan)' }}
                   >

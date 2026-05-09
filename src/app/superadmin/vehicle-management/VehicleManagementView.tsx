@@ -409,10 +409,6 @@ export default function VehicleManagementView() {
       <header className="shrink-0 px-3 py-3 lg:px-4 border-b border-white/[0.07] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-lg font-bold text-white tracking-tight">Vehicle management</h1>
-          <p className="text-xs text-white/45 mt-0.5 max-w-xl">
-            Create, edit, and archive fleet vehicles. Uses admin APIs (
-            <code className="text-white/55">/api/admin/trucks</code>). Plate format must match PH rules (e.g. ABC 1234).
-          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button

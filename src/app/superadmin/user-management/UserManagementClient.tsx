@@ -577,7 +577,6 @@ export default function UserManagementClient() {
           <div className="flex items-start justify-between shrink-0">
             <div>
               <h1 className="mt-1 text-2xl font-bold tracking-tight text-white">User Management</h1>
-              <p className="mt-1 text-sm text-[#818181]">Manage all platform accounts, roles, and access levels.</p>
             </div>
             <button
               onClick={openCreate}
