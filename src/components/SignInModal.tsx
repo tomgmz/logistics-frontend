@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { AxiosError } from 'axios'
 import { requestOtp, verifyOtp, getMe, getAuthStatus, AuthUser } from '@/app/lib/api/auth.api'
 import { useAuthStore } from '@/app/lib/store/auth.store'
+import { now } from '@/app/utils/serverTime'
 
 const ROLE_ROUTES: Record<string, string> = {
   super_admin:      '/superadmin',
@@ -205,7 +206,7 @@ function OtpStep({
   onSuccess: (user: AuthUser, portalUrl: string) => void
   onBack: () => void
 }) {
-  const resendExpiresAt                   = useRef<number>(Date.now() + RESEND_SECS * 1000)
+  const resendExpiresAt                   = useRef<number>(now() + RESEND_SECS * 1000)
   const lockExpiresAt                     = useRef<number>(0)
   const [otp,           setOtp]           = useState<string[]>(Array(OTP_LENGTH).fill(''))
   const [loading,       setLoading]       = useState(false)
@@ -224,7 +225,7 @@ function OtpStep({
       const expiry = new Date(status.locked_until).getTime()
       lockExpiresAt.current = expiry
       setLockState('temporary')
-      setLockRemaining(Math.max(0, Math.floor((expiry - Date.now()) / 1000)))
+      setLockRemaining(Math.max(0, Math.floor((expiry - now()) / 1000)))
     } else {
       setLockState('none')
       setLockRemaining(0)
@@ -248,17 +249,17 @@ function OtpStep({
   useEffect(() => {
     if (resendSec <= 0) return
     const interval = setInterval(() => {
-      const remaining = Math.max(0, Math.floor((resendExpiresAt.current - Date.now()) / 1000))
+      const remaining = Math.max(0, Math.floor((resendExpiresAt.current - now()) / 1000))
       setResendSec(remaining)
     }, 500)
     return () => clearInterval(interval)
   }, [resendSec])
 
-  // Lock countdown — auto-unlocks when it hits 0
+  // Lock countdown
   useEffect(() => {
     if (lockState !== 'temporary') return
     const interval = setInterval(() => {
-      const remaining = Math.max(0, Math.floor((lockExpiresAt.current - Date.now()) / 1000))
+      const remaining = Math.max(0, Math.floor((lockExpiresAt.current - now()) / 1000))
       setLockRemaining(remaining)
       if (remaining <= 0) {
         setLockState('none')
@@ -338,10 +339,10 @@ function OtpStep({
           if (status.locked_until) {
             const expiry = new Date(status.locked_until).getTime()
             lockExpiresAt.current = expiry
-            setLockRemaining(Math.max(0, Math.floor((expiry - Date.now()) / 1000)))
+            setLockRemaining(Math.max(0, Math.floor((expiry - now()) / 1000)))
           }
         } catch {
-          const expiry = Date.now() + 3 * 60 * 1000
+          const expiry = now() + 3 * 60 * 1000
           lockExpiresAt.current = expiry
           setLockRemaining(3 * 60)
         }
@@ -368,7 +369,7 @@ function OtpStep({
       } catch {
 
       }
-      resendExpiresAt.current = Date.now() + RESEND_SECS * 1000
+      resendExpiresAt.current = now() + RESEND_SECS * 1000
       setResendSec(RESEND_SECS)
       setOtp(Array(OTP_LENGTH).fill(''))
       focusInput(0)

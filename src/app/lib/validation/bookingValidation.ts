@@ -1,4 +1,5 @@
 import type { CargoMode, ItemGroup, DropoffSection } from '@/app/lib/store/slice/booking.slice'
+import { nowDate } from '@/app/utils/serverTime'
 
 export interface ScheduleErrors {
   date?: string
@@ -65,12 +66,10 @@ export function validateSchedule(date: string, time: string): ScheduleErrors {
     const [hours, minutes]   = time.split(':').map(Number)
     const selectedDateTime   = new Date(year, month - 1, day, hours, minutes, 0, 0)
 
-    const now = new Date()
-
+    const serverNow      = nowDate()
     const ONE_WEEK_MS    = 7 * 24 * 60 * 60 * 1000
-    const oneWeekFromNow = new Date(now.getTime() + ONE_WEEK_MS)
-
-    const maxDate = new Date(now)
+    const oneWeekFromNow = new Date(serverNow.getTime() + ONE_WEEK_MS)
+    const maxDate        = new Date(serverNow)
     maxDate.setFullYear(maxDate.getFullYear() + 1)
 
     if (selectedDateTime.getTime() < oneWeekFromNow.getTime()) {

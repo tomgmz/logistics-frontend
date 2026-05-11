@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { getMe } from '@/app/lib/api/auth.api'
 import { useAuthStore } from '@/app/lib/store/auth.store'
+import { syncServerTime } from '@/app/utils/serverTime'
 import axios from 'axios'
 
 const PUBLIC_PATHS = ['/']
@@ -19,6 +20,8 @@ export default function AuthRehydrator() {
     if (hasRun.current) return
     hasRun.current = true
 
+    syncServerTime()
+
     async function rehydrate() {
       try {
         const user = await getMe()
@@ -26,10 +29,7 @@ export default function AuthRehydrator() {
         return
       } catch (err) {
         const status = axios.isAxiosError(err) ? err.response?.status : null
-
-        if (status !== 401) {
-          return
-        }
+        if (status !== 401) return
       }
 
       try {
@@ -42,9 +42,7 @@ export default function AuthRehydrator() {
         const isPublic = PUBLIC_PATHS.some(
           (p) => pathname === p || pathname.startsWith(p + '/')
         )
-        if (!isPublic) {
-          router.replace('/')
-        }
+        if (!isPublic) router.replace('/')
       }
     }
 
