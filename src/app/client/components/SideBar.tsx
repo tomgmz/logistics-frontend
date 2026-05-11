@@ -18,7 +18,6 @@ const SIDEBAR_COLLAPSED = 56
 const SIDEBAR_EXPANDED  = 260
 
 const NAV: { href: string; label: string; icon: React.ReactNode }[] = [
-  { href: '/client',          label: 'Overview', icon: <Image src={ASSETS.svcOverview} alt='overview'  width={24} height={24} /> },
   { href: '/client/booking',  label: 'Booking',  icon: <Image src={ASSETS.svcBooking}  alt='booking'   width={24} height={24} /> },
   { href: '/client/tracking', label: 'Tracking', icon: <Image src={ASSETS.svcTracking} alt='tracking'  width={24} height={24} /> },
   { href: '/client/billing',  label: 'Billing',  icon: <Image src={ASSETS.svcBilling}  alt='billing'   width={24} height={24} /> },
