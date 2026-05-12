@@ -109,6 +109,7 @@ export default function BookingWizard() {
             {step === 1 && (
               <StepBookingDetails
                 onNext={goNext}
+                files={pendingFiles}
                 onFilesChange={setPendingFiles}
               />
             )}
@@ -118,6 +119,7 @@ export default function BookingWizard() {
                 selectedService={service}
                 onBack={goBack}
                 onNewBooking={handleNewBooking}
+                onClearFiles={() => setPendingFiles([])}
                 pendingFiles={pendingFiles}
               />
             )}

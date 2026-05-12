@@ -45,6 +45,7 @@ import type { ResolvedPlace } from '@/lib/hooks/usePlacesAutoComplete'
 interface Props {
   onNext: () => void
   onBack?: () => void
+  files: File[]
   onFilesChange: (files: File[]) => void
 }
 
@@ -77,14 +78,12 @@ const ERROR_COLOR    = '#f87171'
 const ERROR_BORDER   = `${ERROR_COLOR}99`
 const RADIUS         = '8px'
 
-// ─── Time slots: every 30 min, 00:00–23:30 ───────────────────────────────────
 const TIME_SLOTS: string[] = []
 for (let h = 0; h < 24; h++) {
   TIME_SLOTS.push(`${String(h).padStart(2, '0')}:00`)
   TIME_SLOTS.push(`${String(h).padStart(2, '0')}:30`)
 }
 
-// ─── Calendar helpers ─────────────────────────────────────────────────────────
 const MONTHS = [
   'January','February','March','April','May','June',
   'July','August','September','October','November','December',
@@ -124,7 +123,6 @@ function formatDisplayTime(s: string) {
   return `${h12}:${mStr} ${ampm}`
 }
 
-// ─── Shared SX helpers (unchanged from original) ─────────────────────────────
 function fieldSx(bg: string, borderColor: string, hasError = false): SxProps<Theme> {
   const activeBorder = hasError ? ERROR_COLOR : `${CYAN}66`
   const idleBorder   = hasError ? ERROR_BORDER : borderColor
@@ -208,7 +206,6 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-// ─── DatePickerPopup ──────────────────────────────────────────────────────────
 function DatePickerPopup({
   value, onChange, hasError, errorMsg,
 }: {
@@ -225,7 +222,6 @@ function DatePickerPopup({
   const [viewYear,  setViewYear]  = useState(parsed?.y  ?? today.getFullYear())
   const [viewMonth, setViewMonth] = useState(parsed?.m  ?? today.getMonth())
 
-  // close on outside click
   useEffect(() => {
     if (!open) return
     const handler = (e: MouseEvent) => {
@@ -236,7 +232,7 @@ function DatePickerPopup({
   }, [open])
 
   const { first, total } = calDays(viewYear, viewMonth)
-  const blanks = first // 0=Sun
+  const blanks = first
 
   const prevMonth = () => {
     if (viewMonth === 0) { setViewMonth(11); setViewYear(v => v - 1) }
@@ -267,7 +263,6 @@ function DatePickerPopup({
 
   return (
     <div ref={ref} className="relative flex flex-col gap-1">
-      {/* Trigger button */}
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
@@ -289,7 +284,6 @@ function DatePickerPopup({
 
       {hasError && errorMsg && <FormHelperText sx={HELPER_SX}>{errorMsg}</FormHelperText>}
 
-      {/* Popup calendar */}
       <AnimatePresence>
         {open && (
           <motion.div
@@ -303,7 +297,6 @@ function DatePickerPopup({
               border: `1px solid ${BORDER_PANEL}`,
             }}
           >
-            {/* Month nav */}
             <div className="flex items-center justify-between mb-3">
               <button type="button" onClick={prevMonth}
                 className="p-1 rounded hover:bg-white/10 transition-colors cursor-pointer text-white/60 hover:text-white">
@@ -318,14 +311,12 @@ function DatePickerPopup({
               </button>
             </div>
 
-            {/* Day-of-week headers */}
             <div className="grid grid-cols-7 mb-1">
               {DOW.map(d => (
                 <div key={d} className="text-center font-body text-[10px] text-white/30 py-0.5">{d}</div>
               ))}
             </div>
 
-            {/* Day cells */}
             <div className="grid grid-cols-7 gap-y-0.5">
               {Array.from({ length: blanks }).map((_, i) => <div key={`b${i}`} />)}
               {Array.from({ length: total }, (_, i) => i + 1).map(d => {
@@ -357,7 +348,6 @@ function DatePickerPopup({
               })}
             </div>
 
-            {/* Today shortcut */}
             <div className="mt-3 pt-2 border-t border-white/[0.07] text-center">
               <button
                 type="button"
@@ -378,7 +368,6 @@ function DatePickerPopup({
   )
 }
 
-// ─── TimePickerPopup ──────────────────────────────────────────────────────────
 function TimePickerPopup({
   value, onChange, hasError, errorMsg,
 }: {
@@ -400,7 +389,6 @@ function TimePickerPopup({
     return () => document.removeEventListener('mousedown', handler)
   }, [open])
 
-  // scroll selected slot into view when popup opens
   useEffect(() => {
     if (!open || !value) return
     const idx = TIME_SLOTS.indexOf(value)
@@ -482,7 +470,6 @@ function TimePickerPopup({
   )
 }
 
-// ─── LocationField (unchanged) ────────────────────────────────────────────────
 function LocationField({
   value, placeholder, hasError, errorMsg, accentColor, onClick,
 }: {
@@ -518,8 +505,7 @@ function LocationField({
   )
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
-export default function StepBookingDetails({ onNext, onBack, onFilesChange }: Props) {
+export default function StepBookingDetails({ onNext, onBack, files, onFilesChange }: Props) {
   const dispatch = useAppDispatch()
 
   const date         = useAppSelector((s) => s.booking.date)
@@ -533,8 +519,6 @@ export default function StepBookingDetails({ onNext, onBack, onFilesChange }: Pr
   const [touched,    setTouched]    = useState(false)
   const [mapTarget,  setMapTarget]  = useState<MapPickerTarget>(null)
   const [isDragging, setIsDragging] = useState(false)
-
-  const [localFiles, setLocalFiles] = useState<File[]>([])
   const [docError,   setDocError]   = useState<string | null>(null)
 
   const allGroups = sections.flatMap((s) => s.groups)
@@ -546,13 +530,12 @@ export default function StepBookingDetails({ onNext, onBack, onFilesChange }: Pr
 
   const summary = useAppSelector(selectCargoSummary)
 
-  const rawErrors = validateBooking(date, time, pickup, dropoffs, sections, mode, paymentTerms, localFiles.length)
+  const rawErrors = validateBooking(date, time, pickup, dropoffs, sections, mode, paymentTerms, files.length)
   const errors    = touched ? rawErrors : { schedule: {}, route: { dropoffs: {} }, sections: [], paymentTerms: undefined, documents: undefined }
 
   const handleNext = () => {
     setTouched(true)
     if (hasAnyErrors(rawErrors)) return
-    onFilesChange(localFiles)
     onNext()
   }
 
@@ -600,7 +583,7 @@ export default function StepBookingDetails({ onNext, onBack, onFilesChange }: Pr
 
   const validateAndAddFiles = (incoming: File[]) => {
     setDocError(null)
-    const slots    = MAX_DOC_COUNT - localFiles.length
+    const slots    = MAX_DOC_COUNT - files.length
     const accepted = incoming.slice(0, slots)
     if (accepted.length === 0) return
 
@@ -616,11 +599,11 @@ export default function StepBookingDetails({ onNext, onBack, onFilesChange }: Pr
       }
     }
 
-    setLocalFiles((prev) => [...prev, ...accepted])
+    onFilesChange([...files, ...accepted])
   }
 
   const removeFile = (index: number) => {
-    setLocalFiles((prev) => prev.filter((_, i) => i !== index))
+    onFilesChange(files.filter((_, i) => i !== index))
     setDocError(null)
   }
 
@@ -659,7 +642,6 @@ export default function StepBookingDetails({ onNext, onBack, onFilesChange }: Pr
           >
             <SectionHeader icon={<CalendarDays size={16} />} title="Transit Schedule" />
 
-            {/* DATE — custom popup picker */}
             <div className="flex flex-col gap-1">
               <span className="font-body booking-text text-xs">Date<Req /></span>
               <DatePickerPopup
@@ -670,7 +652,6 @@ export default function StepBookingDetails({ onNext, onBack, onFilesChange }: Pr
               />
             </div>
 
-            {/* TIME — custom popup picker (30-min slots only) */}
             <div className="flex flex-col gap-1">
               <span className="font-body booking-text text-xs">Time<Req /></span>
               <TimePickerPopup
@@ -1068,18 +1049,18 @@ export default function StepBookingDetails({ onNext, onBack, onFilesChange }: Pr
             onDrop={(e) => {
               e.preventDefault()
               setIsDragging(false)
-              if (localFiles.length >= MAX_DOC_COUNT) return
+              if (files.length >= MAX_DOC_COUNT) return
               validateAndAddFiles(Array.from(e.dataTransfer.files))
             }}
-            onClick={() => { if (localFiles.length < MAX_DOC_COUNT) fileInputRef.current?.click() }}
+            onClick={() => { if (files.length < MAX_DOC_COUNT) fileInputRef.current?.click() }}
             className="flex flex-col items-center gap-2 rounded-md px-4 py-6 border border-dashed transition-colors cursor-pointer"
             style={{
               background:    INPUT_BG_CARD,
               borderColor:   isDragging ? CYAN
                            : (touched && !!rawErrors.documents && !docError) ? ERROR_BORDER
                            : '#818181',
-              opacity:       localFiles.length >= MAX_DOC_COUNT ? 0.5 : 1,
-              pointerEvents: localFiles.length >= MAX_DOC_COUNT ? 'none' : 'auto',
+              opacity:       files.length >= MAX_DOC_COUNT ? 0.5 : 1,
+              pointerEvents: files.length >= MAX_DOC_COUNT ? 'none' : 'auto',
             }}
           >
             <Upload size={24} style={{ color: isDragging ? CYAN : 'rgba(255,255,255,0.4)' }} />
@@ -1109,15 +1090,15 @@ export default function StepBookingDetails({ onNext, onBack, onFilesChange }: Pr
           {touched && rawErrors.documents && !docError && (
             <p className="font-body booking-text text-xs text-red-400">{rawErrors.documents}</p>
           )}
-          {localFiles.length >= MAX_DOC_COUNT && (
+          {files.length >= MAX_DOC_COUNT && (
             <p className="font-body booking-text text-xs text-white/40 text-center">
               Maximum of {MAX_DOC_COUNT} files reached
             </p>
           )}
 
-          {localFiles.length > 0 && (
+          {files.length > 0 && (
             <div className="flex flex-col gap-1.5">
-              {localFiles.map((file, i) => (
+              {files.map((file, i) => (
                 <motion.div key={i} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
                   className="flex items-center justify-between rounded-md px-3 py-2 border border-white/10"
                   style={{ background: INPUT_BG_CARD }}
@@ -1140,10 +1121,10 @@ export default function StepBookingDetails({ onNext, onBack, onFilesChange }: Pr
             </div>
           )}
 
-          {localFiles.length > 0 && (
+          {files.length > 0 && (
             <p className="font-body booking-text text-xs text-white/30 flex items-center gap-1.5">
               <Check size={11} className="text-[var(--color-cyan)]" />
-              {localFiles.length} file{localFiles.length !== 1 ? 's' : ''} will be uploaded when you confirm your booking
+              {files.length} file{files.length !== 1 ? 's' : ''} will be uploaded when you confirm your booking
             </p>
           )}
         </motion.div>
@@ -1240,7 +1221,6 @@ export default function StepBookingDetails({ onNext, onBack, onFilesChange }: Pr
   )
 }
 
-// ─── Sub-components (unchanged) ───────────────────────────────────────────────
 function ProductFieldsRow({ group, errors, onUpdate }: {
   group: ItemGroup; errors: GroupErrors; onUpdate: (patch: Partial<ItemGroup>) => void
 }) {

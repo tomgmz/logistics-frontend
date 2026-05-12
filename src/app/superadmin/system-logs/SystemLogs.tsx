@@ -259,7 +259,11 @@ export default function SystemLogsPage() {
                     <tr
                       key={log.log_id}
                       onClick={() => setSelected(prev => prev?.log_id === log.log_id ? null : log)}
-                      className="border-b border-[#2a2a2a]/60 transition-colors hover:bg-[#2a2a2a]/40 cursor-pointer"
+                      className={`border-b border-[#2a2a2a]/60 transition-colors cursor-pointer ${
+                        selected?.log_id === log.log_id
+                          ? 'bg-[rgba(77,249,237,0.06)] border-l-2 border-l-[#4df9ed]'
+                          : 'hover:bg-[#2a2a2a]/40'
+                      }`}
                     >
                       <td className="px-4 py-3.5 whitespace-nowrap">
                         <div className="text-[#818181] text-[10px]">{formatDate(log.timestamp)}</div>

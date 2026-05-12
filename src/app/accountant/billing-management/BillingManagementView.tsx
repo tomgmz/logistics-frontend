@@ -149,24 +149,6 @@ export const MOCK_BILLING: BillingRecord[] = [
       { name: 'Signed_DR_Apr05.jpg',       size: '980 KB', uploaded: '2026-04-05' },
     ],
   },
-  {
-    billing_id:     'BL-006',
-    booking_id:     'BK-2026-0022',
-    client_name:    'Cabuyao Dist. Hub',
-    client_email:   'billing@cabuyaodist.ph',
-    amount:         5500,
-    status:         'cancelled',
-    billing_type:   'reverse',
-    invoice_number: 'INV-2026-00022',
-    issued_date:    '2026-03-28',
-    due_date:       '2026-04-12',
-    service_type:   'E-Commerce',
-    trips:          1,
-    remarks:        'Client cancelled booking before dispatch.',
-    files: [
-      { name: 'Cancellation_Notice.pdf',   size: '72 KB',  uploaded: '2026-03-29' },
-    ],
-  },
 ]
 
 const PAGE_SIZE = 8

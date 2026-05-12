@@ -41,10 +41,9 @@ const TABS: { key: TabValue; label: string }[] = [
   { key: 'vendors',            label: 'Vendors'       },
   { key: 'accountants',        label: 'Accountants'   },
   { key: 'general-managers',   label: 'Gen. Managers' },
-  { key: 'human-resources',    label: 'HR'            },
   { key: 'fleet-admins',       label: 'Fleet Manager' },
-  { key: 'operations-admins',  label: 'Ops. Manager'  },
-  { key: 'it-admins',          label: 'IT Admins'     },
+  { key: 'operations-admins',  label: 'Operations Manager'  },
+  { key: 'it-admins',          label: 'IT Administrator'     },
 ]
 
 const PAGE_SIZE = 10

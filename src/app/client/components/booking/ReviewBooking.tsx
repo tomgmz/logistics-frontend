@@ -19,6 +19,7 @@ interface Props {
   pendingFiles: File[]
   onBack: () => void
   onNewBooking: () => void
+  onClearFiles: () => void   // ← added
 }
 
 const fadeUp = {
@@ -72,7 +73,7 @@ function buildCargoDetails(
   return JSON.stringify({ service, mode, sections })
 }
 
-export default function StepReview({ selectedService, pendingFiles, onBack, onNewBooking }: Props) {
+export default function StepReview({ selectedService, pendingFiles, onBack, onNewBooking, onClearFiles }: Props) {
   const dispatch = useAppDispatch()
 
   const [loading,        setLoading]        = useState(false)
@@ -160,7 +161,8 @@ export default function StepReview({ selectedService, pendingFiles, onBack, onNe
       const result = await bookingService.createBooking(payload)
 
       setBookingId(result?.booking_id ?? null)
-      dispatch(resetBooking())
+      dispatch(resetBooking())   // ← clears Redux immediately on success
+      onClearFiles()             // ← clears files in sync with Redux reset
       setSubmitted(true)
 
       appToast.success(
@@ -299,8 +301,8 @@ export default function StepReview({ selectedService, pendingFiles, onBack, onNe
                   )}
                 </div>
 
-                <div className="flex flex-col items-center lg:items-end gap-3 w-full lg:w-1/2">
-                  <SectionLabel className="self-start lg:self-end">Transit Vehicle</SectionLabel>
+                <div className="flex flex-col items-center gap-3 w-full lg:w-1/2">
+                  <SectionLabel className="self-center">Transit Vehicle</SectionLabel>
                   {vehicle ? (
                     <>
                       <div className="relative w-full h-[180px] lg:h-[220px]">
