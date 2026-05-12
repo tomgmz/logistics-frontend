@@ -49,7 +49,7 @@ export const fetchRouteAndDetail = createAsyncThunk(
     try {
       await initCsrf()
       const [routeRes, detailRes] = await Promise.all([
-        authApi.post(`/route-optimization/optimize/${bookingId}`),
+        authApi.get(`/route-optimization/${bookingId}`),
         authApi.get(`/booking/${bookingId}`),
       ])
       return {

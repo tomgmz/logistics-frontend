@@ -739,7 +739,6 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
               >
                 <Info size={15} />
               </button>
-              {/* replace the existing tooltip div */}
               <div
                 role="tooltip"
                 className="pointer-events-none absolute right-0 top-9 z-20 w-[300px]

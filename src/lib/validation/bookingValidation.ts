@@ -61,26 +61,29 @@ export function validateSchedule(date: string, time: string): ScheduleErrors {
 
   if (!date.trim()) {
     errors.date = 'Date is required'
-  } else if (!time.trim()) {
-    errors.date = 'Date cannot be validated without a time'
   } else {
     const [year, month, day] = date.split('-').map(Number)
-    const [hours, minutes]   = time.split(':').map(Number)
-    const selectedDateTime   = new Date(year, month - 1, day, hours, minutes, 0, 0)
+    const selectedDate = new Date(year, month - 1, day)
 
-    const serverNow      = nowDate()
-    const ONE_WEEK_MS    = 7 * 24 * 60 * 60 * 1000
-    const oneWeekFromNow = new Date(serverNow.getTime() + ONE_WEEK_MS)
-    const maxDate        = new Date(serverNow)
+    const serverNow = nowDate()
+
+    const oneWeekFromNow = new Date(serverNow)
+    oneWeekFromNow.setDate(oneWeekFromNow.getDate() + 7)
+    const earliestDate = new Date(
+      oneWeekFromNow.getFullYear(),
+      oneWeekFromNow.getMonth(),
+      oneWeekFromNow.getDate(),
+    )
+
+    const maxDate = new Date(serverNow)
     maxDate.setFullYear(maxDate.getFullYear() + 1)
+    const maxDateOnly = new Date(maxDate.getFullYear(), maxDate.getMonth(), maxDate.getDate())
 
-    if (selectedDateTime.getTime() < oneWeekFromNow.getTime()) {
+    if (selectedDate < earliestDate) {
       const pad = (n: number) => String(n).padStart(2, '0')
-      const earliest =
-        `${oneWeekFromNow.getFullYear()}-${pad(oneWeekFromNow.getMonth() + 1)}-${pad(oneWeekFromNow.getDate())} ` +
-        `${pad(oneWeekFromNow.getHours())}:${pad(oneWeekFromNow.getMinutes())}`
+      const earliest = `${earliestDate.getFullYear()}-${pad(earliestDate.getMonth() + 1)}-${pad(earliestDate.getDate())}`
       errors.date = `Booking must be at least 1 week in advance (earliest: ${earliest})`
-    } else if (selectedDateTime > maxDate) {
+    } else if (selectedDate > maxDateOnly) {
       errors.date = 'Date cannot be more than 1 year in the future'
     }
   }
