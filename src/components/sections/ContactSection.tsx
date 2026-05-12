@@ -166,7 +166,7 @@ export default function ContactSection() {
                 <div className="flex items-start gap-3">
                   <span className="text-[#4df9ed] text-base mt-0.5">✉️</span>
                   <span className="font-'Alegreysa Sans SC, sans-serif' text-white/70 text-sm leading-relaxed break-all">
-                    8383LogisticsServices@gmail.com
+                    8338LogisticsServices@gmail.com
                   </span>
                 </div>
                 <div className="flex items-start gap-3">
