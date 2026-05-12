@@ -311,7 +311,7 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
   }
 
   const confirmTitle = confirmKind === 'delete'
-    ? 'Delete model?'
+    ? 'Archive model?'
     : formMode === 'create' ? 'Create model?' : 'Save changes?'
 
   const confirmDescription = confirmKind === 'delete'

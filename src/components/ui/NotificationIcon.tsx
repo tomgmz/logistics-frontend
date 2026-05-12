@@ -33,21 +33,13 @@ const SAMPLE_NOTIFICATIONS: Notification[] = [
   },
   {
     notification_id: "3",
-    title: "Prescription Ready",
-    body: "Your prescription document for booking #BK-00418 is ready for download.",
-    created_at: new Date(now() - 1000 * 60 * 60 * 2).toISOString(),
-    read_at: null,
-    attachment_url: "/sample-prescription.pdf",
-  },
-  {
-    notification_id: "4",
     title: "Delivery Completed",
     body: "Booking #BK-00410 has been successfully delivered. Please rate your experience.",
     created_at: new Date(now() - 1000 * 60 * 60 * 24).toISOString(),
     read_at: new Date(now() - 1000 * 60 * 60 * 20).toISOString(),
   },
   {
-    notification_id: "5",
+    notification_id: "4",
     title: "Payment Received",
     body: "Payment of ₱1,250.00 for booking #BK-00410 has been successfully processed.",
     created_at: new Date(now() - 1000 * 60 * 60 * 25).toISOString(),

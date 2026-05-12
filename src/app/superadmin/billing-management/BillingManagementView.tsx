@@ -494,12 +494,12 @@ function SummaryCards({ records }: { records: BillingRecord[] }) {
   const countPending = records.filter((r) => r.status === 'pending').length
   const countOverdue = records.filter((r) => r.status === 'overdue').length
   const countReview  = records.filter((r) => r.status === 'under_review').length
-
+  
   const cards = [
-    { label: 'Paid Invoices',   value: countPaid,    sub: 'payment confirmed',        color: '#86efac', border: 'rgba(58,246,38,0.2)',   bg: 'rgba(58,246,38,0.05)' },
-    { label: 'Pending Payment', value: countPending, sub: 'awaiting settlement',      color: '#4df9ed', border: 'rgba(77,249,237,0.2)',  bg: 'rgba(77,249,237,0.05)' },
-    { label: 'Overdue',         value: countOverdue, sub: 'past due date',            color: '#f87171', border: 'rgba(239,68,68,0.2)',   bg: 'rgba(239,68,68,0.05)' },
-    { label: 'Under Review',    value: countReview,  sub: 'reverse billing requests', color: '#fbbf24', border: 'rgba(246,159,38,0.2)',  bg: 'rgba(246,159,38,0.05)' },
+    { label: 'Paid Invoices',   value: countPaid,    sub: 'payment confirmed',        color: '#86efac', border: '#2a2a2a',   bg: '#1b1b1b' },
+    { label: 'Pending Payment', value: countPending, sub: 'awaiting settlement',      color: '#4df9ed', border: '#2a2a2a',  bg: '#1b1b1b' },
+    { label: 'Overdue',         value: countOverdue, sub: 'past due date',            color: '#f87171', border: '#2a2a2a',   bg: '#1b1b1b' },
+    { label: 'Under Review',    value: countReview,  sub: 'reverse billing requests', color: '#fbbf24', border: '#2a2a2a',  bg: '#1b1b1b' },
   ]
 
   return (
