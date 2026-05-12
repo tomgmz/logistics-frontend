@@ -8,6 +8,8 @@ import {
   CalendarCheck,
   MapPin,
   CreditCard,
+  BanknoteArrowDown,
+  History,
 } from 'lucide-react'
 import ReusableDashboardShell from '@/components/layout/ReusableDashboardShell'
 import { ReactNode, useEffect } from 'react'
@@ -37,12 +39,12 @@ const superAdminNavItems = [
   {
     href: '/superadmin/expenses',
     label: 'Expenses',
-    icon: <FileSearch size={17} />,
+    icon: <BanknoteArrowDown size={17} />,
   },
   {
     href: '/superadmin/transaction-history',
     label: 'Transaction History',
-    icon: <FileSearch size={17} />,
+    icon: <History size={17} />,
   },
   {
     href: '/superadmin/vehicle-management',
