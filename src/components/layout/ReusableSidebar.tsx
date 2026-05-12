@@ -53,10 +53,13 @@ export default function ReusableSidebar({
       await logout()
     } catch {
     } finally {
+      const userId = useAuthStore.getState().user?.user_id
       clearUser()
-      const ch = new BroadcastChannel('auth_sync')
-      ch.postMessage({ type: 'LOGOUT' })
-      ch.close()
+      if (userId) {
+        const ch = new BroadcastChannel(`auth_sync_${userId}`)
+        ch.postMessage({ type: 'LOGOUT' })
+        ch.close()
+      }
       if (typeof window !== 'undefined') {
         localStorage.removeItem('auth-user')
         window.location.href = '/'
