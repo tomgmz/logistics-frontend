@@ -31,6 +31,14 @@ import { appToast } from '@/lib/toast'
 
 const PAGE_SIZE = 10
 
+function formatPlateNumber(raw: string): string {
+  const cleaned = raw.toUpperCase().replace(/[^A-ZÑ0-9]/g, '')
+  if (cleaned.length > 3 && /^[A-ZÑ]{3}/.test(cleaned)) {
+    return cleaned.slice(0, 3) + ' ' + cleaned.slice(3, 7)
+  }
+  return cleaned.slice(0, 7)
+}
+
 function resolveModelImageUrl(url: string | null | undefined): string | null {
   if (!url?.trim()) return null
   const u = url.trim()
@@ -320,6 +328,11 @@ export default function VehicleManagementView() {
     setFormError(null)
     if (!form.plate_number.trim()) {
       setFormError('Plate number is required.')
+      return false
+    }
+    const plateRegex = /^(?:[A-ZÑ]{3} \d{4}|[A-ZÑ]{2,3} \d{2,3})$/
+    if (!plateRegex.test(form.plate_number)) {
+      setFormError('Invalid plate format (e.g. ABC 1234). Only letters, and numbers allowed.')
       return false
     }
     if (form.owned_by === 'vendor' && !form.vendor_id.trim()) {
@@ -620,7 +633,6 @@ export default function VehicleManagementView() {
                 </table>
               </div>
 
-              {/* Pagination */}
               <div className="shrink-0 flex items-center justify-between px-3 py-2 border-t border-white/[0.07] text-xs text-white/50">
                 <span>
                   {totalRows === 0
@@ -717,10 +729,20 @@ export default function VehicleManagementView() {
                   </span>
                   <input
                     value={form.plate_number}
-                    onChange={(e) => setForm((f) => ({ ...f, plate_number: e.target.value }))}
-                    className="mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-3 py-2.5 text-sm text-white outline-none focus:border-[var(--color-cyan)]/40 font-mono"
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, plate_number: formatPlateNumber(e.target.value) }))
+                    }
+                    maxLength={8}
+                    spellCheck={false}
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="characters"
+                    className="mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-3 py-2.5 text-sm text-white outline-none focus:border-[var(--color-cyan)]/40 font-mono tracking-widest uppercase"
                     placeholder="ABC 1234"
                   />
+                  <p className="text-[10px] text-white/25 mt-1">
+                    Letters and numbers only (e.g. ABC 1234 or ÑBC 5678). Space is inserted automatically.
+                  </p>
                 </label>
 
                 {/* Model picker */}
@@ -799,8 +821,6 @@ export default function VehicleManagementView() {
                     {selectedModel ? (
                       <>
                         <p className="text-sm font-semibold text-white truncate">{selectedModel.name}</p>
-
-                        {/* vehicle_type badge */}
                         <span
                           className="inline-flex mt-1 text-[10px] font-bold px-2 py-0.5 rounded-md border"
                           style={{
@@ -811,7 +831,6 @@ export default function VehicleManagementView() {
                         >
                           {selectedModel.vehicle_type}
                         </span>
-
                         {selectedModel.max_weight_kg != null && (
                           <p className="text-[11px] text-white/40 mt-1.5">
                             Max weight:{' '}
