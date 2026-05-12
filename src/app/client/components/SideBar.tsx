@@ -123,13 +123,6 @@ export default function Sidebar() {
             </nav>
 
             <div className="px-2 space-y-0.5 pt-4 border-t border-white/[0.07]">
-              <NavItem
-                item={{ href: '/dashboard/settings', label: 'Settings', icon: <Settings size={17} /> }}
-                isActive={pathname === '/dashboard/settings'}
-                index={0}
-                expanded={sidebarOpen}
-                onNavigate={() => { if (isMobile) open(false) }}
-              />
               <motion.button
                 onClick={() => setLogoutModalOpen(true)}
                 whileHover={{ x: sidebarOpen ? 2 : 0 }}

@@ -134,16 +134,6 @@ export default function ReusableSidebar({
             </nav>
 
             <div className="px-2 space-y-0.5 pt-4 border-t border-white/[0.07]">
-              <NavItem
-                item={{ href: '/settings', label: 'Settings', icon: <Settings size={17} /> }}
-                isActive={pathname === '/settings'}
-                index={0}
-                expanded={sidebarOpen}
-                onNavigate={() => {
-                  if (isMobile) setSidebarOpen(false)
-                  onNavigate?.()
-                }}
-              />
               <motion.button
                 onClick={() => setLogoutModalOpen(true)}
                 whileHover={{ x: sidebarOpen ? 2 : 0 }}
