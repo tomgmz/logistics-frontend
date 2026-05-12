@@ -1,14 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import axios from 'axios'
-import { API_URL, isProd, getForwardHeaders, handleError } from '../_proxy'
-
-const COOKIE_CLEAR = {
-  httpOnly: true,
-  secure:   isProd,
-  sameSite: 'lax' as const,
-  path:     '/',
-  maxAge:   0,
-}
+import { API_URL, cookieClearOptions, getForwardHeaders, handleError } from '../_proxy'
 
 export async function POST(req: NextRequest) {
   try {
@@ -22,7 +14,7 @@ export async function POST(req: NextRequest) {
   }
 
   const res = NextResponse.json({ status: 'success', message: 'Logged out from all devices' })
-  res.cookies.set('access_token',  '', COOKIE_CLEAR)
-  res.cookies.set('refresh_token', '', COOKIE_CLEAR)
+  res.cookies.set('access_token',  '', cookieClearOptions)
+  res.cookies.set('refresh_token', '', cookieClearOptions)
   return res
 }

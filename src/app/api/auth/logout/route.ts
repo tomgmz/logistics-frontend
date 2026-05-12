@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import axios from 'axios'
-import { API_URL, getForwardHeaders, handleError } from '../_proxy'
+import { API_URL, cookieClearOptions, getForwardHeaders, handleError } from '../_proxy'
 
 export async function POST(req: NextRequest) {
   try {
-    // Revoke the session in the database
     await axios.post(`${API_URL}/auth/logout`, {}, {
       headers: getForwardHeaders(req),
     })
@@ -15,9 +14,7 @@ export async function POST(req: NextRequest) {
   }
 
   const res = NextResponse.json({ status: 'success', message: 'Logged out successfully' })
-
-  res.cookies.delete('access_token')
-  res.cookies.delete('refresh_token')
-
+  res.cookies.set('access_token',  '', cookieClearOptions)
+  res.cookies.set('refresh_token', '', cookieClearOptions)
   return res
 }

@@ -678,8 +678,7 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
       useAuthStore.getState().setUser(user)
     }
 
-    // ✅ Notify other tabs that login occurred
-    const ch = new BroadcastChannel('auth_sync')
+    const ch = new BroadcastChannel(`auth_sync_${finalUser.user_id}`)
     ch.postMessage({ type: 'LOGIN', user: finalUser, portalUrl })
     ch.close()
 

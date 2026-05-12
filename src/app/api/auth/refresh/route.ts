@@ -1,38 +1,24 @@
-import axios from 'axios'
 import { NextRequest, NextResponse } from 'next/server'
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL!
-const isProd  = process.env.NODE_ENV === 'production'
+import axios from 'axios'
+import { API_URL, accessTokenCookieOptions, cookieClearOptions, getForwardHeaders, handleError } from '../_proxy'
 
 export async function POST(req: NextRequest) {
   try {
     const { data } = await axios.post(`${API_URL}/auth/refresh`, {}, {
-      headers: {
-        'Content-Type': 'application/json',
-        cookie:         req.headers.get('cookie') ?? '',
-      },
+      headers: getForwardHeaders(req),
     })
 
     const res = NextResponse.json(data)
-    res.cookies.set('access_token', data.data.accessToken, {
-      httpOnly: true,
-      secure:   isProd,
-      sameSite: 'strict' as const,  // ✅ was 'lax'
-      path:     '/',
-      maxAge:   15 * 60,
-    })
+    res.cookies.set('access_token', data.data.accessToken, accessTokenCookieOptions)
     return res
 
   } catch (error: unknown) {
     if (axios.isAxiosError(error) && error.response) {
       const res = NextResponse.json(error.response.data, { status: error.response.status })
-      res.cookies.delete('access_token')
-      res.cookies.delete('refresh_token')
+      res.cookies.set('access_token',  '', cookieClearOptions)
+      res.cookies.set('refresh_token', '', cookieClearOptions)
       return res
     }
-    return NextResponse.json(
-      { status: 'error', message: 'Internal server error' },
-      { status: 500 }
-    )
+    return handleError(error)
   }
 }

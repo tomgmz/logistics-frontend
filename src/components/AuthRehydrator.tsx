@@ -15,6 +15,7 @@ export default function AuthRehydrator() {
   const router    = useRouter()
   const pathname  = usePathname()
   const hasRun    = useRef(false)
+  const channelRef = useRef<BroadcastChannel | null>(null)
 
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
@@ -44,40 +45,41 @@ export default function AuthRehydrator() {
     if (hasRun.current) return
     hasRun.current = true
 
-    const channel = new BroadcastChannel('auth_sync')
+    function openChannel(userId: string) {
+      // Close any existing channel first
+      channelRef.current?.close()
 
-    channel.onmessage = (event) => {
-      const { type } = event.data
+      const channel = new BroadcastChannel(`auth_sync_${userId}`)
+      channelRef.current = channel
 
-      if (type === 'LOGOUT') {
-        clearUser()
-        const isPublic = PUBLIC_PATHS.some(
-          (p) => pathname === p || pathname.startsWith(p + '/')
-        )
-        if (!isPublic) router.replace('/')
-        return
-      }
+      channel.onmessage = (event) => {
+        const { type } = event.data
 
-      if (type === 'LOGIN') {
-        setUser(event.data.user)
-        const destination = event.data.portalUrl as string | undefined
-        if (destination) router.push(destination)
-        return
-      }
-
-      if (type === 'REQUEST_SESSION') {
-        const user = useAuthStore.getState().user
-        if (user) {
-          channel.postMessage({ type: 'SESSION_SHARE', user })
+        if (type === 'LOGOUT') {
+          clearUser()
+          channel.close()
+          channelRef.current = null
+          const isPublic = PUBLIC_PATHS.some(
+            (p) => pathname === p || pathname.startsWith(p + '/')
+          )
+          if (!isPublic) router.replace('/')
+          return
         }
-        return
-      }
 
-      if (type === 'SESSION_SHARE') {
-        if (event.data.user && !useAuthStore.getState().user) {
-          setUser(event.data.user)
+        if (type === 'REQUEST_SESSION') {
+          const user = useAuthStore.getState().user
+          if (user) {
+            channel.postMessage({ type: 'SESSION_SHARE', user })
+          }
+          return
         }
-        return
+
+        if (type === 'SESSION_SHARE') {
+          if (event.data.user && !useAuthStore.getState().user) {
+            setUser(event.data.user)
+          }
+          return
+        }
       }
     }
 
@@ -97,6 +99,7 @@ export default function AuthRehydrator() {
       try {
         const user = await getMe()
         setUser(user)
+        openChannel(user.user_id)
         return
       } catch (err) {
         const status = axios.isAxiosError(err) ? err.response?.status : null
@@ -107,6 +110,7 @@ export default function AuthRehydrator() {
         await axios.post('/api/auth/refresh', {}, { withCredentials: true })
         const user = await getMe()
         setUser(user)
+        openChannel(user.user_id)
         return
       } catch {
         clearUser()
@@ -124,7 +128,10 @@ export default function AuthRehydrator() {
 
     init()
 
-    return () => channel.close()
+    return () => {
+      channelRef.current?.close()
+      channelRef.current = null
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
