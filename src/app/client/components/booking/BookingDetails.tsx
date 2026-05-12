@@ -739,14 +739,39 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
               >
                 <Info size={15} />
               </button>
+              {/* replace the existing tooltip div */}
               <div
                 role="tooltip"
-                className="pointer-events-none absolute right-0 top-9 z-20 w-[260px]
-                           rounded-lg border border-white/10 bg-[#111] px-3 py-2
-                           text-xs text-white/80 shadow-xl opacity-0 translate-y-1
-                           group-hover:opacity-100 group-hover:translate-y-0 transition-all"
+                className="pointer-events-none absolute right-0 top-9 z-20 w-[300px]
+                          rounded-lg border border-white/10 bg-[#111] px-3 py-3
+                          text-xs text-white/80 shadow-xl opacity-0 translate-y-1
+                          group-hover:opacity-100 group-hover:translate-y-0 transition-all"
               >
-                This is an estimate only. Final capacity and charges may change after review.
+                <p className="text-white/40 text-[10px] uppercase tracking-widest mb-2">
+                  {mode === 'palletized' ? 'Palletized Formulas' : 'Loose Cargo Formulas'}
+                </p>
+                {mode === 'palletized' ? (
+                  <div className="flex flex-col gap-1.5">
+                    <p><span className="text-[var(--color-cyan)]">Gross Weight</span> = Pallets × Gross/Pallet</p>
+                    <p><span className="text-[var(--color-cyan)]">Net Weight</span> = Pallets × Net/Pallet</p>
+                    <p><span className="text-[var(--color-cyan)]">Volume</span> = Pallets × (L × W × H) ÷ 1,000,000</p>
+                    <p className="text-white/30 text-[10px] mt-1 pt-1 border-t border-white/[0.07]">
+                      Dimensions in cm → result in CBM
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-1.5">
+                    <p><span className="text-[var(--color-cyan)]">Gross Weight</span> = Pieces × Weight <span className="text-white/40">(Per Item)</span></p>
+                    <p><span className="text-[var(--color-cyan)]">Volume</span> = Pieces × (L × W × H) ÷ 1,000,000</p>
+                    <p><span className="text-[var(--color-cyan)]">Density</span> = Gross Weight ÷ Volume</p>
+                    <p className="text-white/30 text-[10px] mt-1 pt-1 border-t border-white/[0.07]">
+                      Dimensions in cm → result in CBM · lbs auto-converted to kg
+                    </p>
+                  </div>
+                )}
+                <p className="text-white/25 text-[10px] mt-2 pt-1 border-t border-white/[0.07]">
+                  Estimates only — final charges may vary after review.
+                </p>
               </div>
             </div>
           </div>
