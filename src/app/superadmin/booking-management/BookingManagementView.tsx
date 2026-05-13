@@ -46,8 +46,14 @@ const BOOKING_STATUSES: AdminBookingLifecycleStatus[] = [
 
 const DEST_STATUSES: DestinationDeliveryStatus[] = ['pending', 'delivered', 'failed']
 
-function toDownloadUrl(url: string): string {
-  return url.replace('/upload/', '/upload/fl_attachment/')
+function fileNameFromUrl(url: string): string {
+  try {
+    const pathname = new URL(url).pathname
+    const parts    = pathname.split('/')
+    return decodeURIComponent(parts[parts.length - 1] || url)
+  } catch {
+    return url.split('/').pop() ?? url
+  }
 }
 
 function fmtStatus(s: string) {
@@ -563,18 +569,19 @@ export default function BookingManagementView() {
                                 : ''}
                             </div>
                           )}
-                           {detail.payment_terms && (
+                          {detail.payment_terms && (
                             <div className="flex items-center gap-2">
                               <Clock size={14} className="text-white/35" />
                               Payment terms: {detail.payment_terms} days
                             </div>
-                          )} 
+                          )}
                         </div>
                       </div>
 
                       {/* Transaction Documents */}
                       {(() => {
-                        const docs = (detail as BookingDetail & { transaction_documents?: string[] | null }).transaction_documents
+                        const docs = (detail as BookingDetail & { transaction_documents?: string[] | null })
+                          .transaction_documents
                         if (!docs?.length) return null
                         return (
                           <div>
@@ -583,7 +590,7 @@ export default function BookingManagementView() {
                             </h3>
                             <ul className="space-y-1.5">
                               {docs.map((url, i) => {
-                                const filename  = url.split('/').pop() ?? `Document ${i + 1}`
+                                const filename  = fileNameFromUrl(url) || `Document ${i + 1}`
                                 const ext       = filename.split('.').pop()?.toLowerCase() ?? ''
                                 const fileLabel = ext === 'pdf'  ? 'PDF'
                                                 : ext === 'xlsx' ? 'XLSX'
@@ -593,7 +600,7 @@ export default function BookingManagementView() {
                                 return (
                                   <li key={url}>
                                     <a
-                                      href={toDownloadUrl(url)}
+                                      href={url}
                                       target="_blank"
                                       rel="noopener noreferrer"
                                       download={filename}
@@ -605,7 +612,7 @@ export default function BookingManagementView() {
                                       <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide
                                                       px-1.5 py-0.5 rounded border
                                                       border-[var(--color-cyan)]/30 text-[var(--color-cyan)]">
-                                        {fileLabel} 
+                                        {fileLabel}
                                       </span>
                                       <span className="flex-1 truncate font-mono text-xs">{filename}</span>
                                       <svg

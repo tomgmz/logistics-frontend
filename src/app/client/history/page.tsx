@@ -1,7 +1,9 @@
-export default function HistorygPage() {
+import BookingHistoryModule from "./BookingHistoryModule"
+
+export default function HistoryPage() {
   return (
-    <div className="flex items-center justify-center h-full">
-      <span className="font-body text-[var(--color-muted)] text-3xl">History</span>
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+      <BookingHistoryModule />
     </div>
   )
 }
