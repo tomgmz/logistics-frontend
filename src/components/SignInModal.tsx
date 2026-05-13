@@ -25,7 +25,7 @@ const getFallbackRoute = (role: string) => ROLE_ROUTES[role] ?? '/'
 const OTP_LENGTH  = 6
 const RESEND_SECS = 60
 
-interface ApiErrorResponse { message?: string }
+interface ApiErrorResponse { message?: string; code?: string; retryAfter?: number }
 function extractErrorMessage(err: unknown, fallback: string): string {
   if (err instanceof AxiosError) {
     const data = err.response?.data as ApiErrorResponse | undefined
@@ -114,7 +114,11 @@ function GlassInput({
   )
 }
 
-function EmailStep({ onSuccess }: { onSuccess: (email: string) => void }) {
+function EmailStep({
+  onSuccess,
+}: {
+  onSuccess: (email: string, retryAfter?: number) => void
+}) {
   const [email,   setEmail]   = useState('')
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState('')
@@ -127,6 +131,16 @@ function EmailStep({ onSuccess }: { onSuccess: (email: string) => void }) {
       await requestOtp(email.trim().toLowerCase())
       onSuccess(email.trim().toLowerCase())
     } catch (err) {
+      // OTP already sent and still within cooldown window — the existing code
+      // is still valid, so advance to the OTP step and seed the timer from
+      // the server-supplied retryAfter value instead of showing an error.
+      if (err instanceof AxiosError && err.response?.status === 429) {
+        const data = err.response.data as ApiErrorResponse
+        if (data.code === 'OTP_COOLDOWN') {
+          onSuccess(email.trim().toLowerCase(), data.retryAfter)
+          return
+        }
+      }
       setError(extractErrorMessage(err, 'Something went wrong. Please try again.'))
     } finally {
       setLoading(false)
@@ -199,19 +213,22 @@ function EmailStep({ onSuccess }: { onSuccess: (email: string) => void }) {
 
 function OtpStep({
   email,
+  resendExpiresAt,
   onSuccess,
   onBack,
 }: {
   email: string
+  resendExpiresAt: React.MutableRefObject<number>
   onSuccess: (user: AuthUser, portalUrl: string) => void
   onBack: () => void
 }) {
-  const resendExpiresAt                   = useRef<number>(now() + RESEND_SECS * 1000)
   const lockExpiresAt                     = useRef<number>(0)
   const [otp,           setOtp]           = useState<string[]>(Array(OTP_LENGTH).fill(''))
   const [loading,       setLoading]       = useState(false)
   const [error,         setError]         = useState('')
-  const [resendSec,     setResendSec]     = useState(RESEND_SECS)
+  const [resendSec,     setResendSec]     = useState(() =>
+    Math.max(0, Math.floor((resendExpiresAt.current - now()) / 1000))
+  )
   const [resending,     setResending]     = useState(false)
   const [lockState,     setLockState]     = useState<'none' | 'temporary' | 'permanent'>('none')
   const [lockRemaining, setLockRemaining] = useState(0)
@@ -252,7 +269,7 @@ function OtpStep({
       setResendSec(remaining)
     }, 500)
     return () => clearInterval(interval)
-  }, [resendSec])
+  }, [resendSec, resendExpiresAt])
 
   useEffect(() => {
     if (lockState !== 'temporary') return
@@ -646,13 +663,13 @@ interface SignInModalProps {
 }
 
 export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
-  const router          = useRouter()
-  const [step,  setStep]  = useState<Step>('email')
-  const [email, setEmail] = useState('')
+  const router                = useRouter()
+  const [step,  setStep]      = useState<Step>('email')
+  const [email, setEmail]     = useState('')
+  const resendExpiresAt       = useRef<number>(0)
 
   const handleClose = useCallback(() => {
     onClose()
-    setTimeout(() => { setStep('email'); setEmail('') }, 350)
   }, [onClose])
 
   useEffect(() => {
@@ -667,7 +684,14 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
     return () => window.removeEventListener('keydown', onKey)
   }, [isOpen, handleClose])
 
-  const handleEmailSuccess = (e: string) => { setEmail(e); setStep('otp') }
+  const handleEmailSuccess = (e: string, retryAfter?: number) => {
+    setEmail(e)
+    // If the server returned a cooldown (OTP already sent recently), seed the
+    // timer from retryAfter so the OTP step shows the correct seconds remaining.
+    // Otherwise start a fresh 60s window from now.
+    resendExpiresAt.current = now() + (retryAfter ?? RESEND_SECS) * 1000
+    setStep('otp')
+  }
 
   const handleOtpSuccess = async (user: AuthUser, portalUrl: string) => {
     let finalUser = user
@@ -683,7 +707,14 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
     ch.close()
 
     setStep('success')
-    setTimeout(() => { handleClose(); router.push(portalUrl) }, 1800)
+    setTimeout(() => {
+      handleClose()
+      // Reset only after a completed sign-in so the next open starts fresh
+      setStep('email')
+      setEmail('')
+      resendExpiresAt.current = 0
+      router.push(portalUrl)
+    }, 1800)
   }
 
   return (
@@ -709,7 +740,6 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.3 }}
               className="fixed inset-0 z-[80] bg-black/50"
-              onClick={handleClose}
             />
 
             <motion.aside
@@ -776,8 +806,13 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
                     <OtpStep
                       key="otp"
                       email={email}
+                      resendExpiresAt={resendExpiresAt}
                       onSuccess={handleOtpSuccess}
-                      onBack={() => setStep('email')}
+                      onBack={() => {
+                        setStep('email')
+                        // Reset timer so a new email submission gets a fresh 60s
+                        resendExpiresAt.current = 0
+                      }}
                     />
                   )}
                   {step === 'success' && (
