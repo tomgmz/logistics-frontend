@@ -63,18 +63,52 @@ async function fetchByTab(tab: UserTab): Promise<AnyUser[]> {
 }
 
 async function updateStatus(tab: UserTab, id: string, status: UserStatus): Promise<void> {
-  if (tab === 'accountants') {
-    switch (status) {
-      case 'active':      return accountantService.activate(id).then()
-      case 'deactivated': return accountantService.deactivate(id).then()
-      case 'archived':    return accountantService.remove(id)
-      default:
-        return accountantService.update(id, { status } as never).then()
+  if (status === 'active') {
+    switch (tab) {
+      case 'accountants':       return accountantService.activate(id).then()
+      case 'clients':           return clientService.activate(id).then()
+      case 'drivers':           return driverService.activate(id).then()
+      case 'vendors':           return vendorService.activate(id).then()
+      case 'general-managers':  return generalManagerService.activate(id).then()
+      case 'human-resources':   return humanResourcesService.activate(id).then()
+      case 'fleet-admins':      return fleetAdminService.activate(id).then()
+      case 'operations-admins': return operationsAdminService.activate(id).then()
+      case 'it-admins':         return itAdminService.activate(id).then()
+      default:                  break
+    }
+  }
+  if (status === 'deactivated') {
+    switch (tab) {
+      case 'accountants':       return accountantService.deactivate(id).then()
+      case 'clients':           return clientService.deactivate(id).then()
+      case 'drivers':           return driverService.deactivate(id).then()
+      case 'vendors':           return vendorService.deactivate(id).then()
+      case 'general-managers':  return generalManagerService.deactivate(id).then()
+      case 'human-resources':   return humanResourcesService.deactivate(id).then()
+      case 'fleet-admins':      return fleetAdminService.deactivate(id).then()
+      case 'operations-admins': return operationsAdminService.deactivate(id).then()
+      case 'it-admins':         return itAdminService.deactivate(id).then()
+      default:                  break
+    }
+  }
+  if (status === 'archived') {
+    switch (tab) {
+      case 'accountants':       return accountantService.remove(id)
+      case 'clients':           return clientService.remove(id)
+      case 'drivers':           return driverService.remove(id)
+      case 'vendors':           return vendorService.remove(id)
+      case 'general-managers':  return generalManagerService.remove(id)
+      case 'human-resources':   return humanResourcesService.remove(id)
+      case 'fleet-admins':      return fleetAdminService.remove(id)
+      case 'operations-admins': return operationsAdminService.remove(id)
+      case 'it-admins':         return itAdminService.remove(id)
+      default:                  break
     }
   }
 
   const payload = { status } as never
   switch (tab) {
+    case 'accountants':       return accountantService.update(id, payload).then()
     case 'clients':           return clientService.update(id, payload).then()
     case 'drivers':           return driverService.update(id, payload).then()
     case 'vendors':           return vendorService.update(id, payload).then()
@@ -174,6 +208,15 @@ interface RowMenuProps {
   onStatusChange: (s: UserStatus) => void
 }
 
+const STAFF_TABS_HIDE_INACTIVE_ACTION: TabValue[] = [
+  'accountants',
+  'general-managers',
+  'human-resources',
+  'fleet-admins',
+  'operations-admins',
+  'it-admins',
+]
+
 function RowMenu({ user, tab, onEdit, onStatusChange }: RowMenuProps) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -194,7 +237,7 @@ function RowMenu({ user, tab, onEdit, onStatusChange }: RowMenuProps) {
     { label: 'Perm. Lock',    status: 'permanently_locked' as UserStatus, icon: <Lock size={13} />        },
   ]).filter((a) => {
     if (a.status !== user.status) {
-      if (tab === 'accountants' && a.status === 'inactive') return false
+      if (STAFF_TABS_HIDE_INACTIVE_ACTION.includes(tab) && a.status === 'inactive') return false
       return true
     }
     return false

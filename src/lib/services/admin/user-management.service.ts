@@ -99,6 +99,8 @@ export const clientService = {
   create: (p: CreateClientPayload) => post<ClientUser>(`${B}/clients`, p),
   update: (id: string, p: UpdateClientPayload) => patch<ClientUser>(`${B}/clients/${id}`, p),
   remove: (id: string) => del(`${B}/clients/${id}`),
+  activate:   (id: string) => patch<ClientUser>(`${B}/clients/${id}/activate`),
+  deactivate: (id: string) => patch<ClientUser>(`${B}/clients/${id}/deactivate`),
 }
 
 export const driverService = {
@@ -107,6 +109,8 @@ export const driverService = {
   create: (p: CreateDriverPayload) => post<DriverUser>(`${B}/drivers`, p),
   update: (id: string, p: UpdateDriverPayload) => patch<DriverUser>(`${B}/drivers/${id}`, p),
   remove: (id: string) => del(`${B}/drivers/${id}`),
+  activate:   (id: string) => patch<DriverUser>(`${B}/drivers/${id}/activate`),
+  deactivate: (id: string) => patch<DriverUser>(`${B}/drivers/${id}/deactivate`),
 }
 
 export const vendorService = {
@@ -115,6 +119,8 @@ export const vendorService = {
   create: (p: CreateVendorPayload) => post<VendorUser>(`${B}/vendors`, p),
   update: (id: string, p: UpdateVendorPayload) => patch<VendorUser>(`${B}/vendors/${id}`, p),
   remove: (id: string) => del(`${B}/vendors/${id}`),
+  activate:   (id: string) => patch<VendorUser>(`${B}/vendors/${id}/activate`),
+  deactivate: (id: string) => patch<VendorUser>(`${B}/vendors/${id}/deactivate`),
 }
 
 export const accountantService = {
@@ -133,6 +139,8 @@ export const generalManagerService = {
   create: (p: CreateGeneralManagerPayload) => post<AdminUser>(`${B}/general-managers`, p),
   update: (id: string, p: UpdateGeneralManagerPayload) => patch<AdminUser>(`${B}/general-managers/${id}`, p),
   remove: (id: string) => del(`${B}/general-managers/${id}`),
+  activate:   (id: string) => patch<AdminUser>(`${B}/general-managers/${id}/activate`),
+  deactivate: (id: string) => patch<AdminUser>(`${B}/general-managers/${id}/deactivate`),
 }
 
 export const humanResourcesService = {
@@ -141,6 +149,8 @@ export const humanResourcesService = {
   create: (p: CreateHumanResourcesPayload) => post<AdminUser>(`${B}/human-resources`, p),
   update: (id: string, p: UpdateHumanResourcesPayload) => patch<AdminUser>(`${B}/human-resources/${id}`, p),
   remove: (id: string) => del(`${B}/human-resources/${id}`),
+  activate:   (id: string) => patch<AdminUser>(`${B}/human-resources/${id}/activate`),
+  deactivate: (id: string) => patch<AdminUser>(`${B}/human-resources/${id}/deactivate`),
 }
 
 export const fleetAdminService = {
@@ -149,6 +159,8 @@ export const fleetAdminService = {
   create: (p: CreateFleetAdminPayload) => post<AdminUser>(`${B}/fleet-admins`, p),
   update: (id: string, p: UpdateFleetAdminPayload) => patch<AdminUser>(`${B}/fleet-admins/${id}`, p),
   remove: (id: string) => del(`${B}/fleet-admins/${id}`),
+  activate:   (id: string) => patch<AdminUser>(`${B}/fleet-admins/${id}/activate`),
+  deactivate: (id: string) => patch<AdminUser>(`${B}/fleet-admins/${id}/deactivate`),
 }
 
 export const operationsAdminService = {
@@ -157,6 +169,8 @@ export const operationsAdminService = {
   create: (p: CreateOperationsAdminPayload) => post<AdminUser>(`${B}/operations-admins`, p),
   update: (id: string, p: UpdateOperationsAdminPayload) => patch<AdminUser>(`${B}/operations-admins/${id}`, p),
   remove: (id: string) => del(`${B}/operations-admins/${id}`),
+  activate:   (id: string) => patch<AdminUser>(`${B}/operations-admins/${id}/activate`),
+  deactivate: (id: string) => patch<AdminUser>(`${B}/operations-admins/${id}/deactivate`),
 }
 
 export const itAdminService = {
@@ -165,4 +179,6 @@ export const itAdminService = {
   create: (p: CreateITAdminPayload) => post<AdminUser>(`${B}/it-admins`, p),
   update: (id: string, p: UpdateITAdminPayload) => patch<AdminUser>(`${B}/it-admins/${id}`, p),
   remove: (id: string) => del(`${B}/it-admins/${id}`),
+  activate:   (id: string) => patch<AdminUser>(`${B}/it-admins/${id}/activate`),
+  deactivate: (id: string) => patch<AdminUser>(`${B}/it-admins/${id}/deactivate`),
 }
