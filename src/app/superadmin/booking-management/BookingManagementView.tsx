@@ -38,6 +38,7 @@ const PAGE_SIZE = 12
 
 const BOOKING_STATUSES: AdminBookingLifecycleStatus[] = [
   'pending',
+  'approved',
   'assigned',
   'in_transit',
   'completed',
@@ -48,9 +49,9 @@ const DEST_STATUSES: DestinationDeliveryStatus[] = ['pending', 'delivered', 'fai
 
 function fileNameFromUrl(url: string): string {
   try {
-    const pathname = new URL(url).pathname
-    const parts    = pathname.split('/')
-    return decodeURIComponent(parts[parts.length - 1] || url)
+    const parts = new URL(url).pathname.split('/')
+    const raw = decodeURIComponent(parts[parts.length - 1] || url)
+    return raw.replace(/(\.[a-zA-Z0-9]+)\1+$/i, '$1')
   } catch {
     return url.split('/').pop() ?? url
   }
@@ -245,22 +246,6 @@ export default function BookingManagementView() {
     )
   }, [])
 
-  const handleBookingStatusChange = async (next: AdminBookingLifecycleStatus) => {
-    if (!selectedId || !detail) return
-    if (normalizeBookingStatus(detail.status) === next) return
-    setPendingStatus(true)
-    try {
-      await bookingService.updateBookingStatusAdmin(selectedId, next)
-      setDetail({ ...detail, status: next })
-      mergeListRow(selectedId, { status: next })
-      appToast.success('Booking status updated.', { action: 'booking-status', entityId: selectedId })
-    } catch (e) {
-      appToast.error(axiosMessage(e), { action: 'booking-status', entityId: selectedId })
-    } finally {
-      setPendingStatus(false)
-    }
-  }
-
   const handleDestStatus = async (destinationId: string, status: DestinationDeliveryStatus) => {
     setDestBusyId(destinationId)
     try {
@@ -299,6 +284,12 @@ export default function BookingManagementView() {
         driver_id: assignDriverId,
         truck_id:  assignTruckId,
       })
+
+      if (detail && normalizeBookingStatus(detail.status) === 'approved') {
+        await bookingService.updateBookingStatusAdmin(selectedId, 'assigned')
+        mergeListRow(selectedId, { status: 'assigned' })
+      }
+
       await openDetail(selectedId)
       await loadPage()
       appToast.success('Driver and vehicle assigned.', { action: 'assign', entityId: selectedId })
@@ -308,6 +299,21 @@ export default function BookingManagementView() {
       setAssignBusy(false)
     }
   }
+
+  const handleApprove = async () => {
+  if (!selectedId || !detail) return
+  setPendingStatus(true)
+  try {
+    await bookingService.updateBookingStatusAdmin(selectedId, 'approved')
+    setDetail({ ...detail, status: 'approved' })
+    mergeListRow(selectedId, { status: 'approved' })
+    appToast.success('Booking approved.', { action: 'booking-status', entityId: selectedId })
+  } catch (e) {
+    appToast.error(axiosMessage(e), { action: 'booking-status', entityId: selectedId })
+  } finally {
+    setPendingStatus(false)
+  }
+}
 
   const statusCounts = listMeta?.statusCounts ?? { all: 0 }
 
@@ -349,7 +355,7 @@ export default function BookingManagementView() {
               />
             </div>
             <div className="flex flex-wrap gap-1.5">
-              {(['all', 'pending', 'assigned', 'in_transit', 'completed', 'cancelled'] as const).map((key) => {
+              {(['all', 'pending', 'approved', 'assigned', 'in_transit', 'completed', 'cancelled'] as const).map((key) => {
                 const label  = key === 'all' ? 'All' : fmtStatus(key)
                 const count  = key === 'all' ? statusCounts.all : statusCounts[key] ?? 0
                 const active = statusFilter === key
@@ -603,7 +609,6 @@ export default function BookingManagementView() {
                                       href={url}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      download={filename}
                                       className="flex items-center gap-2.5 rounded-lg border border-white/[0.08]
                                                 bg-black/20 px-3 py-2 text-sm text-white/80
                                                 hover:border-[var(--color-cyan)]/40 hover:text-white
@@ -635,86 +640,104 @@ export default function BookingManagementView() {
                         )
                       })()}
 
-                      <div>
-                        <label className="text-[11px] font-bold uppercase tracking-wider text-white/40 block mb-1.5">
-                          Booking status
-                        </label>
-                        <select
-                          value={normalizeBookingStatus(detail.status)}
-                          disabled={pendingStatus}
-                          onChange={(e) =>
-                            void handleBookingStatusChange(e.target.value as AdminBookingLifecycleStatus)
-                          }
-                          className={selectClass}
-                        >
-                          {BOOKING_STATUSES.map((s) => (
-                            <option key={s} value={s}>
-                              {fmtStatus(s)}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div className="rounded-xl border border-white/[0.08] p-3 space-y-3 bg-black/20">
-                        <div className="flex items-center gap-2">
-                          <UserCheck size={14} className="text-[var(--color-cyan)]" />
-                          <h3 className="text-[11px] font-bold uppercase tracking-wider text-white/40">
-                            Driver and vehicle assignment
-                          </h3>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[11px] font-bold uppercase tracking-wider text-white/40">
+                            Booking status
+                          </label>
+                          <span
+                            className="inline-flex text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border"
+                            style={{
+                              color:       statusColor(detail.status),
+                              borderColor: `${statusColor(detail.status)}55`,
+                              background:  `${statusColor(detail.status)}14`,
+                            }}
+                          >
+                            {fmtStatus(detail.status)}
+                          </span>
                         </div>
 
-                        <div className="space-y-2">
-                          <div>
-                            <label className="text-[11px] text-white/40 block mb-1">Driver</label>
-                            <select
-                              value={assignDriverId}
-                              disabled={assignBusy}
-                              onChange={(e) => setAssignDriverId(e.target.value)}
-                              className={selectClass}
-                            >
-                              <option value="">Select driver</option>
-                              {drivers.map((d) => (
-                                <option key={d.user_id} value={d.drivers?.driver_id ?? d.user_id}>
-                                  {d.first_name} {d.last_name}
-                                  {d.drivers?.license_number ? ` · ${d.drivers.license_number}` : ''}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-
-                          <div>
-                            <label className="text-[11px] text-white/40 block mb-1">Vehicle</label>
-                            <select
-                              value={assignTruckId}
-                              disabled={assignBusy}
-                              onChange={(e) => setAssignTruckId(e.target.value)}
-                              className={selectClass}
-                            >
-                              <option value="">Select vehicle</option>
-                              {trucks.map((t) => (
-                                <option key={t.truck_id} value={t.truck_id}>
-                                  {t.plate_number}
-                                  {t.vehicle_type ? ` · ${t.vehicle_type}` : ''}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          disabled={assignBusy || !assignDriverId || !assignTruckId}
-                          onClick={() => void handleAssign()}
-                          className="w-full py-2 rounded-lg text-sm font-bold transition-colors disabled:opacity-40"
-                          style={{
-                            background:  'rgba(77,249,237,0.12)',
-                            border:      '1px solid rgba(77,249,237,0.30)',
-                            color:       'var(--color-cyan)',
-                          }}
-                        >
-                          {assignBusy ? 'Assigning…' : 'Assign'}
-                        </button>
+                        {/* Approve button — only when pending */}
+                        {normalizeBookingStatus(detail.status) === 'pending' && (
+                          <button
+                            type="button"
+                            disabled={pendingStatus}
+                            onClick={() => void handleApprove()}
+                            className="w-full py-2 rounded-lg text-sm font-bold transition-colors disabled:opacity-40"
+                            style={{
+                              background:  'rgba(77,249,237,0.12)',
+                              border:      '1px solid rgba(77,249,237,0.30)',
+                              color:       'var(--color-cyan)',
+                            }}
+                          >
+                            {pendingStatus ? 'Approving…' : 'Approve Booking'}
+                          </button>
+                        )}
                       </div>
+
+                      {(normalizeBookingStatus(detail.status) === 'approved' ||
+                        normalizeBookingStatus(detail.status) === 'assigned') && (
+                        <div className="rounded-xl border border-white/[0.08] p-3 space-y-3 bg-black/20">
+                          <div className="flex items-center gap-2">
+                            <UserCheck size={14} className="text-[var(--color-cyan)]" />
+                            <h3 className="text-[11px] font-bold uppercase tracking-wider text-white/40">
+                              Driver and vehicle assignment
+                            </h3>
+                          </div>
+
+                          <div className="space-y-2">
+                            <div>
+                              <label className="text-[11px] text-white/40 block mb-1">Driver</label>
+                              <select
+                                value={assignDriverId}
+                                disabled={assignBusy}
+                                onChange={(e) => setAssignDriverId(e.target.value)}
+                                className={selectClass}
+                              >
+                                <option value="">Select driver</option>
+                                {drivers.map((d) => (
+                                  <option key={d.user_id} value={d.drivers?.driver_id ?? d.user_id}>
+                                    {d.first_name} {d.last_name}
+                                    {d.drivers?.license_number ? ` · ${d.drivers.license_number}` : ''}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="text-[11px] text-white/40 block mb-1">Vehicle</label>
+                              <select
+                                value={assignTruckId}
+                                disabled={assignBusy}
+                                onChange={(e) => setAssignTruckId(e.target.value)}
+                                className={selectClass}
+                              >
+                                <option value="">Select vehicle</option>
+                                {trucks.map((t) => (
+                                  <option key={t.truck_id} value={t.truck_id}>
+                                    {t.plate_number}
+                                    {t.vehicle_type ? ` · ${t.vehicle_type}` : ''}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            disabled={assignBusy || !assignDriverId || !assignTruckId}
+                            onClick={() => void handleAssign()}
+                            className="w-full py-2 rounded-lg text-sm font-bold transition-colors disabled:opacity-40"
+                            style={{
+                              background:  'rgba(77,249,237,0.12)',
+                              border:      '1px solid rgba(77,249,237,0.30)',
+                              color:       'var(--color-cyan)',
+                            }}
+                          >
+                            {assignBusy ? 'Assigning…' : 'Assign'}
+                          </button>
+                        </div>
+                      )}
 
                       <div>
                         <h3 className="text-[11px] font-bold uppercase tracking-wider text-white/40 mb-2">

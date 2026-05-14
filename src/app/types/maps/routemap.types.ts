@@ -1,6 +1,7 @@
 export type BookingStatus =
   | 'BOOKED'
   | 'PENDING'
+  | 'APPROVED'
   | 'ASSIGNED'
   | 'IN_TRANSIT'
   | 'ARRIVED'
@@ -10,7 +11,8 @@ export type BookingStatus =
 export function asBookingStatus(raw: string): BookingStatus | 'UNKNOWN' {
   const normalized = raw.replace(/\s+/g, '_').toUpperCase()
   const known: BookingStatus[] = [
-    'BOOKED', 'PENDING', 'ASSIGNED', 'IN_TRANSIT', 'ARRIVED', 'COMPLETED', 'CANCELLED',
+    'BOOKED', 'PENDING', 'APPROVED', 'ASSIGNED',
+    'IN_TRANSIT', 'ARRIVED', 'COMPLETED', 'CANCELLED',
   ]
   return (known as string[]).includes(normalized)
     ? (normalized as BookingStatus)

@@ -93,6 +93,7 @@ const STATUS_META: Record<
   { label: string; color: string; bg: string; icon: React.ReactNode }
 > = {
   BOOKED:     { label: 'Booked',     color: CYAN,  bg: `${CYAN}18`,  icon: <CheckCircle2 size={12} /> },
+  APPROVED: { label: 'Approved', color: CYAN, bg: `${CYAN}18`, icon: <CheckCircle2 size={12} /> },
   PENDING:    { label: 'Pending',    color: AMBER, bg: `${AMBER}18`, icon: <Clock        size={12} /> },
   ASSIGNED:   { label: 'Assigned',   color: CYAN,  bg: `${CYAN}18`,  icon: <CheckCircle2 size={12} /> },
   IN_TRANSIT: { label: 'In Transit', color: GREEN, bg: `${GREEN}18`, icon: <Truck        size={12} /> },
@@ -112,10 +113,11 @@ function getStatusMeta(status: string) {
     : UNKNOWN_META
 }
 
-const STATUS_ORDER: BookingStatus[] = ['PENDING', 'ASSIGNED', 'IN_TRANSIT', 'COMPLETED']
+const STATUS_ORDER: BookingStatus[] = ['PENDING', 'APPROVED', 'ASSIGNED', 'IN_TRANSIT', 'COMPLETED']
 
 const TIMELINE_LABELS: Record<BookingStatus, string> = {
   BOOKED:     'Booking Created',
+  APPROVED: 'Booking Approved',
   PENDING:    'Booking Placed',
   ASSIGNED:   'Driver Assigned',
   IN_TRANSIT: 'In Transit',
@@ -141,6 +143,7 @@ function getStepState(
 const TABS: { key: BookingStatus | 'all'; label: string }[] = [
   { key: 'all',        label: 'All' },
   { key: 'PENDING',    label: 'Pending' },
+  { key: 'APPROVED',   label: 'Approved' },
   { key: 'ASSIGNED',   label: 'Assigned' },
   { key: 'IN_TRANSIT', label: 'In Transit' },
   { key: 'COMPLETED',  label: 'Completed' },
@@ -229,7 +232,8 @@ function formatPeso(n: number | null | undefined): string {
 function fileNameFromUrl(url: string): string {
   try {
     const parts = new URL(url).pathname.split('/')
-    return decodeURIComponent(parts[parts.length - 1] || url)
+    const raw = decodeURIComponent(parts[parts.length - 1] || url)
+    return raw.replace(/(\.[a-zA-Z0-9]+)\1+$/i, '$1')
   } catch { return url }
 }
 

@@ -71,6 +71,7 @@ export type DestinationDeliveryStatus = 'pending' | 'delivered' | 'failed'
 
 export type AdminBookingLifecycleStatus =
   | 'pending'
+  | 'approved'
   | 'assigned'
   | 'in_transit'
   | 'completed'
