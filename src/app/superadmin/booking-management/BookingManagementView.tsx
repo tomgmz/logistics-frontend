@@ -15,7 +15,6 @@ import {
   Building2,
   Trash2,
   User,
-  AlertTriangle,
   UserCheck,
 } from 'lucide-react'
 
@@ -33,6 +32,7 @@ import type { DriverUser } from '@/app/types/admin/user-management.types'
 import type { Truck as TruckType } from '@/app/types/truck.types'
 import { nowDate } from '@/app/utils/serverTime'
 import { appToast } from '@/lib/toast'
+import ReusableModal from '@/components/layout/ReusableModal'
 
 const PAGE_SIZE = 12
 
@@ -137,8 +137,15 @@ export default function BookingManagementView() {
 
   const [pendingStatus, setPendingStatus] = useState(false)
   const [destBusyId, setDestBusyId] = useState<string | null>(null)
+
+  // ── Modal states ─────────────────────────────────────────────────────────────
+  /** destination_id queued for removal — drives the delete confirm modal */
   const [deleteAskId, setDeleteAskId] = useState<string | null>(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
+
+  /** controls the approve-booking confirmation modal */
+  const [approveModalOpen, setApproveModalOpen] = useState(false)
+  // ─────────────────────────────────────────────────────────────────────────────
 
   const [drivers, setDrivers] = useState<DriverUser[]>([])
   const [trucks, setTrucks] = useState<TruckType[]>([])
@@ -199,6 +206,7 @@ export default function BookingManagementView() {
     setDetail(null)
     setDetailError(null)
     setDeleteAskId(null)
+    setApproveModalOpen(false)
     setAssignDriverId('')
     setAssignTruckId('')
     try {
@@ -233,6 +241,7 @@ export default function BookingManagementView() {
     setDetail(null)
     setDetailError(null)
     setDeleteAskId(null)
+    setApproveModalOpen(false)
     setAssignDriverId('')
     setAssignTruckId('')
   }, [])
@@ -261,16 +270,18 @@ export default function BookingManagementView() {
     }
   }
 
-  const handleDeleteDest = async (destinationId: string) => {
+  /** Called when admin confirms removal in the modal */
+  const handleDeleteDest = async () => {
+    if (!deleteAskId) return
     setDeleteBusy(true)
     try {
-      await bookingService.deleteDestinationAdmin(destinationId)
+      await bookingService.deleteDestinationAdmin(deleteAskId)
       setDeleteAskId(null)
       if (selectedId) await openDetail(selectedId)
       await loadPage()
-      appToast.success('Stop removed.', { action: 'dest-delete', entityId: destinationId })
+      appToast.success('Stop removed.', { action: 'dest-delete', entityId: deleteAskId })
     } catch (e) {
-      appToast.error(axiosMessage(e), { action: 'dest-delete', entityId: destinationId })
+      appToast.error(axiosMessage(e), { action: 'dest-delete', entityId: deleteAskId ?? '' })
     } finally {
       setDeleteBusy(false)
     }
@@ -300,28 +311,76 @@ export default function BookingManagementView() {
     }
   }
 
+  /** Runs after admin confirms the approve modal */
   const handleApprove = async () => {
-  if (!selectedId || !detail) return
-  setPendingStatus(true)
-  try {
-    await bookingService.updateBookingStatusAdmin(selectedId, 'approved')
-    setDetail({ ...detail, status: 'approved' })
-    mergeListRow(selectedId, { status: 'approved' })
-    appToast.success('Booking approved.', { action: 'booking-status', entityId: selectedId })
-  } catch (e) {
-    appToast.error(axiosMessage(e), { action: 'booking-status', entityId: selectedId })
-  } finally {
-    setPendingStatus(false)
+    if (!selectedId || !detail) return
+    setApproveModalOpen(false)
+    setPendingStatus(true)
+    try {
+      await bookingService.updateBookingStatusAdmin(selectedId, 'approved')
+      setDetail({ ...detail, status: 'approved' })
+      mergeListRow(selectedId, { status: 'approved' })
+      appToast.success('Booking approved.', { action: 'booking-status', entityId: selectedId })
+    } catch (e) {
+      appToast.error(axiosMessage(e), { action: 'booking-status', entityId: selectedId })
+    } finally {
+      setPendingStatus(false)
+    }
   }
-}
 
   const statusCounts = listMeta?.statusCounts ?? { all: 0 }
 
   const selectClass =
     'w-full rounded-lg border border-white/10 bg-[#1a1a1a] text-sm text-white px-3 py-2.5 outline-none focus:border-[var(--color-cyan)]/50 disabled:opacity-50'
 
+  // ── derive the address of the stop queued for deletion (for modal copy) ──────
+  const deleteAskAddress = useMemo(() => {
+    if (!deleteAskId || !detail) return ''
+    return (
+      detail.booking_destinations?.find((d) => d.destination_id === deleteAskId)?.address ?? ''
+    )
+  }, [deleteAskId, detail])
+
+  // ── count transaction documents for the approve modal copy ───────────────────
+  const docCount =
+    ((detail as BookingDetail & { transaction_documents?: string[] | null } | null)
+      ?.transaction_documents?.length) ?? 0
+
   return (
     <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-hidden ff-body bg-[var(--color-bg)]">
+
+      {/* ── Approve confirmation modal ──────────────────────────────────────── */}
+      <ReusableModal
+        open={approveModalOpen}
+        title="Approve this booking?"
+        description={
+          docCount > 0
+            ? `Please confirm you have reviewed all ${docCount} transaction document${docCount > 1 ? 's' : ''} submitted by the client before proceeding. Approving cannot be undone.`
+            : 'Please confirm you have reviewed all client-submitted documents and details before proceeding. Approving cannot be undone.'
+        }
+        confirmLabel="Approve"
+        cancelLabel="Go back"
+        onConfirm={() => void handleApprove()}
+        onCancel={() => setApproveModalOpen(false)}
+        disableBackdropClose={pendingStatus}
+      />
+
+      {/* ── Delete stop confirmation modal ──────────────────────────────────── */}
+      <ReusableModal
+        open={!!deleteAskId}
+        title="Remove this stop?"
+        description={
+          deleteAskAddress
+            ? `"${deleteAskAddress}" will be permanently removed from the booking. This cannot be undone.`
+            : 'This stop will be permanently removed from the booking. This cannot be undone.'
+        }
+        confirmLabel={deleteBusy ? 'Removing…' : 'Remove'}
+        cancelLabel="Cancel"
+        onConfirm={() => void handleDeleteDest()}
+        onCancel={() => !deleteBusy && setDeleteAskId(null)}
+        disableBackdropClose={deleteBusy}
+      />
+
       <header className="shrink-0 px-3 py-3 lg:px-4 border-b border-white/[0.07] flex flex-col sm:flex-row sm:items-end justify-between gap-3">
         <div>
           <h1 className="text-lg font-bold text-white tracking-tight">Booking management</h1>
@@ -657,12 +716,12 @@ export default function BookingManagementView() {
                           </span>
                         </div>
 
-                        {/* Approve button — only when pending */}
+                        {/* Approve button — opens modal instead of acting directly */}
                         {normalizeBookingStatus(detail.status) === 'pending' && (
                           <button
                             type="button"
                             disabled={pendingStatus}
-                            onClick={() => void handleApprove()}
+                            onClick={() => setApproveModalOpen(true)}
                             className="w-full py-2 rounded-lg text-sm font-bold transition-colors disabled:opacity-40"
                             style={{
                               background:  'rgba(77,249,237,0.12)',
@@ -781,42 +840,18 @@ export default function BookingManagementView() {
                                       {fmtStatus(st)}
                                     </button>
                                   ))}
+                                  {/* Remove button — opens modal, no inline confirmation UI */}
                                   <button
                                     type="button"
                                     disabled={destBusyId !== null || deleteBusy}
                                     onClick={() => setDeleteAskId(d.destination_id)}
-                                    className="text-[11px] font-semibold px-2 py-1 rounded-md border border-red-500/30 text-red-400 hover:bg-red-500/10 ml-auto inline-flex items-center gap-1"
+                                    className="text-[11px] font-semibold px-2 py-1 rounded-md border border-red-500/30 text-red-400 hover:bg-red-500/10 ml-auto inline-flex items-center gap-1 disabled:opacity-40"
                                   >
                                     <Trash2 size={12} />
                                     Remove
                                   </button>
                                 </div>
-                                {deleteAskId === d.destination_id && (
-                                  <div className="flex items-start gap-2 rounded-md bg-red-500/10 border border-red-500/25 p-2 text-xs text-red-200/90">
-                                    <AlertTriangle size={14} className="shrink-0 mt-0.5" />
-                                    <div className="flex-1 space-y-2">
-                                      <p>Remove this stop from the booking? This cannot be undone.</p>
-                                      <div className="flex gap-2">
-                                        <button
-                                          type="button"
-                                          disabled={deleteBusy}
-                                          onClick={() => void handleDeleteDest(d.destination_id)}
-                                          className="px-2 py-1 rounded bg-red-600 text-white text-[11px] font-bold disabled:opacity-50"
-                                        >
-                                          {deleteBusy ? '…' : 'Confirm'}
-                                        </button>
-                                        <button
-                                          type="button"
-                                          disabled={deleteBusy}
-                                          onClick={() => setDeleteAskId(null)}
-                                          className="px-2 py-1 rounded border border-white/20 text-[11px]"
-                                        >
-                                          Cancel
-                                        </button>
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
+                                {/* ↑ Inline deleteAskId confirmation block intentionally removed */}
                               </li>
                             ))}
                         </ul>
