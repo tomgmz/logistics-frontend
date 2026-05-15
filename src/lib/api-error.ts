@@ -22,9 +22,14 @@ const WRAPPER_PREFIXES = [
 
 function unwrapServiceMessage(raw: string): string {
   let msg = raw.trim()
-  for (const prefix of WRAPPER_PREFIXES) {
-    if (prefix.test(msg)) {
-      msg = msg.replace(prefix, '').trim()
+  let changed = true
+  while (changed) {
+    changed = false
+    for (const prefix of WRAPPER_PREFIXES) {
+      if (prefix.test(msg)) {
+        msg = msg.replace(prefix, '').trim()
+        changed = true
+      }
     }
   }
   return msg
@@ -58,7 +63,10 @@ export function toUserFriendlyMessage(raw: string): string {
   }
 
   if (lower.includes('foreign key') || lower.includes('23503') || lower.includes('violates foreign key')) {
-    return 'A related record could not be found. Please refresh the page and try again.'
+    if (lower.includes('still referenced') || lower.includes('update or delete')) {
+      return 'This record cannot be deleted because it is still being used elsewhere.'
+    }
+    return 'A required related record could not be found. Please refresh and try again.'
   }
 
   if (lower.includes('not null') || lower.includes('23502')) {
@@ -77,7 +85,7 @@ export function toUserFriendlyMessage(raw: string): string {
     return 'Please enter a valid email address.'
   }
 
-  if (lower.includes('invalid phone') || lower.includes('phone number')) {
+  if (lower.includes('invalid phone') || lower.includes('phone number is')) {
     return 'Please enter a valid phone number.'
   }
 
@@ -122,7 +130,12 @@ export function toUserFriendlyMessage(raw: string): string {
     return 'Unable to reach the server. Check your connection and try again.'
   }
 
-  if (lower.includes('unauthorized') || lower.includes('forbidden') || lower.includes('403')) {
+  if (
+    lower.includes('unauthorized') ||
+    lower.includes('forbidden') ||
+    lower.includes('403') ||
+    lower.includes('401')
+  ) {
     return 'You do not have permission to perform this action.'
   }
 
@@ -148,7 +161,9 @@ export function getApiErrorMessage(err: unknown, fallback = 'Something went wron
   if (data?.errors?.length) {
     return data.errors
       .map((e) => {
-        const field = e.field.replace(/_/g, ' ')
+        const field = e.field
+          .replace(/_/g, ' ')
+          .replace(/\b\w/g, (c) => c.toUpperCase())
         const msg = toUserFriendlyMessage(e.message)
         return field ? `${field}: ${msg}` : msg
       })
