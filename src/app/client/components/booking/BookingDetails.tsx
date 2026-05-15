@@ -1281,15 +1281,15 @@ function ProductFieldsRow({ group, errors, onUpdate }: {
           sx={{ ...selectSx(INPUT_BG_CARD, BORDER_CARD, !!errors.shc), width: '100%' }}
           MenuProps={MENU_PROPS}
         >
-          <MenuItem value=""><em style={{ opacity: 0.4, fontStyle: 'normal' }}>Select SHC</em></MenuItem>
-          <MenuItem value="GENERAL">GENERAL</MenuItem><MenuItem value="PERISHABLE">PERISHABLE</MenuItem>
-          <MenuItem value="EAT">EAT(Foodstuff)</MenuItem><MenuItem value="HEAVY">HEAVY</MenuItem>
+          <MenuItem value=""><em style={{ opacity: 0.4, fontStyle: 'normal' }}>Select Special Handling Code</em></MenuItem>
+          <MenuItem value="GEN">GEN</MenuItem><MenuItem value="PER">PER</MenuItem>
+          <MenuItem value="EAT">EAT</MenuItem><MenuItem value="HEA">HEA</MenuItem>
         </Select>
         {errors.shc && <FormHelperText sx={HELPER_SX}>{errors.shc}</FormHelperText>}
       </div>
       <div className="flex flex-col gap-1">
         <label className="font-body booking-text text-xs">
-          Additional Special Handling Code<span style={{ color: '#f87171', marginLeft: 2 }}>*</span>
+          Additional SHC<span style={{ color: '#f87171', marginLeft: 2 }}>*</span>
         </label>
         <Select value={group.additionalShc} onChange={(e: SelectChangeEvent) => onUpdate({ additionalShc: e.target.value })}
           displayEmpty
