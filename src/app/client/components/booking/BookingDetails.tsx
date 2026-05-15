@@ -1274,7 +1274,7 @@ function ProductFieldsRow({ group, errors, onUpdate }: {
       </div>
       <div className="flex flex-col gap-1">
         <label className="font-body booking-text text-xs">
-          SHC<span style={{ color: '#f87171', marginLeft: 2 }}>*</span>
+          Special Handling Code<span style={{ color: '#f87171', marginLeft: 2 }}>*</span>
         </label>
         <Select value={group.shc} onChange={(e: SelectChangeEvent) => onUpdate({ shc: e.target.value })}
           displayEmpty
