@@ -9,13 +9,34 @@ import axios from 'axios'
 
 const PUBLIC_PATHS = ['/']
 
+const ROLE_ROUTES: Record<string, string> = {
+  super_admin:      '/superadmin',
+  general_manager:  '/general_manager',
+  accountant:       '/accountant',
+  human_resources:  '/human_resources',
+  fleet_admin:      '/fleet_admin',
+  operations_admin: '/operations_admin',
+  it_admin:         '/it_admin',
+  client:           '/client',
+  vendor:           '/vendor',
+}
+
 export default function AuthRehydrator() {
-  const setUser   = useAuthStore((s) => s.setUser)
-  const clearUser = useAuthStore((s) => s.clearUser)
-  const router    = useRouter()
-  const pathname  = usePathname()
+  const setUser       = useAuthStore((s) => s.setUser)
+  const clearUser     = useAuthStore((s) => s.clearUser)
+  const user          = useAuthStore((s) => s.user)
+  const hasHydrated   = useAuthStore((s) => s.hasHydrated)
+  const router        = useRouter()
+  const pathname      = usePathname()
   const hasRun    = useRef(false)
   const channelRef = useRef<BroadcastChannel | null>(null)
+
+  // Keep logged-in users off the landing page (e.g. browser back after login)
+  useEffect(() => {
+    if (!hasHydrated || !user || pathname !== '/') return
+    const portal = ROLE_ROUTES[user.role]
+    if (portal) router.replace(portal)
+  }, [hasHydrated, user, pathname, router])
 
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
