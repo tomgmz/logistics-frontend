@@ -32,6 +32,7 @@ import type { DriverUser } from '@/app/types/admin/user-management.types'
 import type { Truck as TruckType } from '@/app/types/truck.types'
 import { nowDate } from '@/app/utils/serverTime'
 import { appToast } from '@/lib/toast'
+import { getApiErrorMessage } from '@/lib/api-error'
 import ReusableModal from '@/components/layout/ReusableModal'
 
 const PAGE_SIZE = 12
@@ -78,15 +79,6 @@ function getPrefillFromBookingDetail(detail: BookingDetail, trucks: TruckType[])
     driverId: detail.driver?.driver_id ?? '',
     truckId:  getAssignedTruckId(detail, trucks),
   }
-}
-
-function axiosMessage(err: unknown): string {
-  if (typeof err === 'object' && err !== null && 'response' in err) {
-    const data = (err as { response?: { data?: { message?: string } } }).response?.data
-    if (data?.message && typeof data.message === 'string') return data.message
-  }
-  if (err instanceof Error) return err.message
-  return 'Request failed'
 }
 
 interface ListRow {
@@ -185,7 +177,7 @@ export default function BookingManagementView() {
         setPage(res.meta.totalPages - 1)
       }
     } catch (e) {
-      setListError(axiosMessage(e))
+      setListError(getApiErrorMessage(e, 'Request failed. Please try again.'))
     } finally {
       setListLoading(false)
     }
@@ -230,7 +222,7 @@ export default function BookingManagementView() {
         setAssignTruckId(fallback.truckId)
       }
     } catch (e) {
-      setDetailError(axiosMessage(e))
+      setDetailError(getApiErrorMessage(e, 'Request failed. Please try again.'))
     } finally {
       setDetailLoading(false)
     }
@@ -264,7 +256,7 @@ export default function BookingManagementView() {
       await loadPage()
       appToast.success('Stop updated.', { action: 'dest-status', entityId: destinationId })
     } catch (e) {
-      appToast.error(axiosMessage(e), { action: 'dest-status', entityId: destinationId })
+      appToast.error(getApiErrorMessage(e, 'Request failed. Please try again.'), { action: 'dest-status', entityId: destinationId })
     } finally {
       setDestBusyId(null)
     }
@@ -281,7 +273,7 @@ export default function BookingManagementView() {
       await loadPage()
       appToast.success('Stop removed.', { action: 'dest-delete', entityId: deleteAskId })
     } catch (e) {
-      appToast.error(axiosMessage(e), { action: 'dest-delete', entityId: deleteAskId ?? '' })
+      appToast.error(getApiErrorMessage(e, 'Request failed. Please try again.'), { action: 'dest-delete', entityId: deleteAskId ?? '' })
     } finally {
       setDeleteBusy(false)
     }
@@ -305,7 +297,7 @@ export default function BookingManagementView() {
       await loadPage()
       appToast.success('Driver and vehicle assigned.', { action: 'assign', entityId: selectedId })
     } catch (e) {
-      appToast.error(axiosMessage(e), { action: 'assign', entityId: selectedId })
+      appToast.error(getApiErrorMessage(e, 'Request failed. Please try again.'), { action: 'assign', entityId: selectedId })
     } finally {
       setAssignBusy(false)
     }
@@ -322,7 +314,7 @@ export default function BookingManagementView() {
       mergeListRow(selectedId, { status: 'approved' })
       appToast.success('Booking approved.', { action: 'booking-status', entityId: selectedId })
     } catch (e) {
-      appToast.error(axiosMessage(e), { action: 'booking-status', entityId: selectedId })
+      appToast.error(getApiErrorMessage(e, 'Request failed. Please try again.'), { action: 'booking-status', entityId: selectedId })
     } finally {
       setPendingStatus(false)
     }

@@ -28,6 +28,7 @@ import {
 import ReusableModal from '@/components/layout/ReusableModal'
 import TruckModelFormModal from './TruckModelFormModal'
 import { appToast } from '@/lib/toast'
+import { getApiErrorMessage } from '@/lib/api-error'
 
 const PAGE_SIZE = 10
 
@@ -144,15 +145,6 @@ function parseVendorOptions(raw: unknown[]): VendorOption[] {
   return out.sort((a, b) => a.label.localeCompare(b.label))
 }
 
-function axiosMessage(err: unknown): string {
-  const data = (err as { response?: { data?: { message?: string; errors?: { field: string; message: string }[] } } })
-    .response?.data
-  if (data?.errors?.length) return data.errors.map((e) => `${e.field}: ${e.message}`).join(' · ')
-  if (data?.message && typeof data.message === 'string') return data.message
-  if (err instanceof Error) return err.message
-  return 'Request failed'
-}
-
 function kgToTons(kg: number | null | undefined): string {
   if (kg == null) return ''
   const tons = kg / 1000
@@ -242,7 +234,7 @@ export default function VehicleManagementView() {
       setModels(mList)
       setVendors(parseVendorOptions(vRaw))
     } catch (e) {
-      setListError(axiosMessage(e))
+      setListError(getApiErrorMessage(e, 'Request failed. Please try again.'))
     }
   }, [])
 
@@ -268,7 +260,7 @@ export default function VehicleManagementView() {
         setPage(res.meta.totalPages - 1)
       }
     } catch (e) {
-      setListError(axiosMessage(e))
+      setListError(getApiErrorMessage(e, 'Request failed. Please try again.'))
     } finally {
       setListLoading(false)
     }
@@ -383,7 +375,7 @@ export default function VehicleManagementView() {
       await refreshAll()
     } catch (e) {
       setConfirmKind(null)
-      setFormError(axiosMessage(e))
+      setFormError(getApiErrorMessage(e, 'Request failed. Please try again.'))
     } finally {
       setActionBusy(false)
     }
@@ -400,7 +392,7 @@ export default function VehicleManagementView() {
       setConfirmKind(null)
       await refreshAll()
     } catch (e) {
-      appToast.error(axiosMessage(e), { action: 'truck-delete', entityId: deleteId })
+      appToast.error(getApiErrorMessage(e, 'Request failed. Please try again.'), { action: 'truck-delete', entityId: deleteId })
       setConfirmKind(null)
     } finally {
       setActionBusy(false)

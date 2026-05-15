@@ -22,6 +22,7 @@ import {
   fleetAdminService, operationsAdminService, itAdminService,
 } from '@/lib/services/admin/user-management.service'
 import { appToast } from '@/lib/toast'
+import { getApiErrorMessage } from '@/lib/api-error'
 import UserFormModal from './UserFormModal'
 
 const muiTheme = createTheme({
@@ -575,7 +576,7 @@ export default function UserManagementClient() {
         {
           loading: `Updating account…`,
           success: `Status updated → ${STATUS_CFG[status].label}`,
-          error:   (e) => e instanceof Error ? e.message : 'Failed to update account.',
+          error:   (e) => getApiErrorMessage(e, 'Failed to update account.'),
         },
         { action: 'update-status', entityId: user.user_id },
       )

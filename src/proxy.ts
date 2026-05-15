@@ -27,7 +27,7 @@ function getRoleFromToken(token: string): string | null {
     const json    = Buffer.from(base64, 'base64').toString('utf-8')
     const payload = JSON.parse(json)
 
-    if (payload.type !== 'access') return null
+    if (payload.type !== 'access' && payload.type !== 'refresh') return null
 
     return payload.role ?? null
   } catch {
@@ -40,9 +40,11 @@ export function proxy(req: NextRequest) {
 
   // Redirect authenticated users away from landing page
   if (pathname === '/') {
-    const accessToken = req.cookies.get('access_token')?.value
-    if (accessToken) {
-      const role = getRoleFromToken(accessToken)
+    const accessToken  = req.cookies.get('access_token')?.value
+    const refreshToken = req.cookies.get('refresh_token')?.value
+    const sessionToken = accessToken ?? refreshToken
+    if (sessionToken) {
+      const role = getRoleFromToken(sessionToken)
       const allowedPrefix = role ? ROLE_ROUTES[role] : null
       if (allowedPrefix) {
         const dest = req.nextUrl.clone()
