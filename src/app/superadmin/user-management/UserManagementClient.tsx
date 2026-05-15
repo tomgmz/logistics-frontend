@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Users, UserPlus, Search, RefreshCw, MoreVertical,
-  Pencil, ShieldCheck, ShieldOff, Archive, Lock,
+  Pencil, ShieldCheck, ShieldOff, Archive,
   ChevronLeft, ChevronRight, AlertTriangle,
 } from 'lucide-react'
 import Select, { SelectChangeEvent } from '@mui/material/Select'
@@ -209,15 +209,6 @@ interface RowMenuProps {
   onStatusChange: (s: UserStatus) => void
 }
 
-const STAFF_TABS_HIDE_INACTIVE_ACTION: TabValue[] = [
-  'accountants',
-  'general-managers',
-  'human-resources',
-  'fleet-admins',
-  'operations-admins',
-  'it-admins',
-]
-
 function RowMenu({ user, tab, onEdit, onStatusChange }: RowMenuProps) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -231,18 +222,10 @@ function RowMenu({ user, tab, onEdit, onStatusChange }: RowMenuProps) {
   }, [])
 
   const statusActions = ([
-    { label: 'Set Active',    status: 'active'             as UserStatus, icon: <ShieldCheck size={13} /> },
-    { label: 'Set Inactive',  status: 'inactive'           as UserStatus, icon: <ShieldOff size={13} />   },
-    { label: 'Deactivate',    status: 'deactivated'        as UserStatus, icon: <ShieldOff size={13} />   },
-    { label: 'Archive',       status: 'archived'           as UserStatus, icon: <Archive size={13} />     },
-    { label: 'Perm. Lock',    status: 'permanently_locked' as UserStatus, icon: <Lock size={13} />        },
-  ]).filter((a) => {
-    if (a.status !== user.status) {
-      if (STAFF_TABS_HIDE_INACTIVE_ACTION.includes(tab) && a.status === 'inactive') return false
-      return true
-    }
-    return false
-  })
+    { label: 'Set Active', status: 'active'      as UserStatus, icon: <ShieldCheck size={13} /> },
+    { label: 'Deactivate', status: 'deactivated' as UserStatus, icon: <ShieldOff size={13} />   },
+    { label: 'Archive',    status: 'archived'    as UserStatus, icon: <Archive size={13} />     },
+  ]).filter((a) => a.status !== user.status)
 
   const canEdit = tab !== 'all'
 
