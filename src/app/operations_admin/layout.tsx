@@ -1,13 +1,14 @@
 'use client'
 
 import { ReactNode, useEffect } from 'react'
-import { CalendarCheck, LayoutDashboard } from 'lucide-react'
+import { CalendarCheck } from 'lucide-react'
 import ReusableDashboardShell from '@/components/layout/ReusableDashboardShell'
 import { useAuthStore } from '@/lib/store/auth.store'
 
 const NAV_ITEMS = [
-  { href: '/operations_admin/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={17} /> },
-  { href: '/operations_admin/bookings', label: 'Bookings', icon: <CalendarCheck size={17} /> },
+  { href: '/operations_admin/booking-management', label: 'Booking Management', icon: <CalendarCheck size={17} /> },
+  { href: '/operations_admin/document-management', label: 'Document Management', icon: <CalendarCheck size={17} /> },
+  { href: '/operations_admin/transit-tracking', label: 'Transit Tracking', icon: <CalendarCheck size={17} /> },
 ]
 
 export default function OperationsAdminLayout({ children }: { children: ReactNode }) {

@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 
 export default function OperationsAdminIndex() {
-  redirect('/operations_admin/dashboard')
+  redirect('/operations_admin/booking-management')
 }
 
