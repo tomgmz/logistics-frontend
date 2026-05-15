@@ -1,7 +1,8 @@
-export default function BillingPayment() {
+export default function BillingManagement() {
   return (
-    <div className="flex flex-1 min-h-0 flex-col bg-[var(--color-bg)]">
-      Billing Management
+    <div className="flex items-center justify-center h-full">
+      <span className="font-body text-[var(--color-muted)] text-3xl">Billing Management</span>
     </div>
   )
 }
+ 
