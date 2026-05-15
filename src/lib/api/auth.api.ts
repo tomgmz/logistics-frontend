@@ -28,9 +28,9 @@ function getCsrfToken(): string | null {
 
 let csrfPromise: Promise<void> | null = null
 
-export async function initCsrf(): Promise<void> {
-  if (getCsrfToken()) return
-  if (csrfPromise) return csrfPromise
+export async function initCsrf(force = false): Promise<void> {
+  if (!force && getCsrfToken()) return
+  if (csrfPromise && !force) return csrfPromise
 
   csrfPromise = proxyApi
     .get('/auth/csrf')
@@ -41,6 +41,27 @@ export async function initCsrf(): Promise<void> {
     })
 
   return csrfPromise
+}
+
+function isCsrfError(error: AxiosError): boolean {
+  if (error.response?.status !== 403) return false
+  const msg = (error.response.data as { message?: string })?.message ?? ''
+  return msg.toLowerCase().includes('csrf')
+}
+
+async function refreshAccessToken(): Promise<void> {
+  await nextApi.post('/api/auth/refresh')
+}
+
+/** Re-sync CSRF + access token after the browser regains connectivity. */
+export async function recoverSession(): Promise<boolean> {
+  try {
+    await initCsrf(true)
+    await refreshAccessToken()
+    return true
+  } catch {
+    return false
+  }
 }
 
 proxyApi.interceptors.request.use(
@@ -79,10 +100,15 @@ function broadcastLogout(): void {
   ch.close()
 }
 
+type RetryableRequest = NonNullable<AxiosError['config']> & {
+  _retry?:      boolean
+  _csrfRetry?:  boolean
+}
+
 proxyApi.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
-    const originalRequest = error.config as typeof error.config & { _retry?: boolean }
+    const originalRequest = error.config as RetryableRequest | undefined
 
     const url = originalRequest?.url ?? ''
     const isExcluded =
@@ -93,6 +119,21 @@ proxyApi.interceptors.response.use(
       url.includes('/auth/csrf')        ||
       url.includes('/auth/logout')      ||
       url.includes('/api/auth/me')
+
+    // Stale/missing CSRF after sleep or connectivity loss
+    if (
+      originalRequest &&
+      isCsrfError(error) &&
+      !originalRequest._csrfRetry
+    ) {
+      originalRequest._csrfRetry = true
+      try {
+        await initCsrf(true)
+        return proxyApi(originalRequest)
+      } catch {
+        return Promise.reject(error)
+      }
+    }
 
     if (error.response?.status === 401 && !originalRequest?._retry && !isExcluded) {
       if (isRefreshing) {
@@ -107,7 +148,7 @@ proxyApi.interceptors.response.use(
       isRefreshing = true
 
       try {
-        await nextApi.post('/api/auth/refresh')
+        await refreshAccessToken()
         processQueue(null)
         isRefreshing = false
         return proxyApi(originalRequest!)
@@ -115,8 +156,15 @@ proxyApi.interceptors.response.use(
         processQueue(refreshError)
         isRefreshing = false
         failedQueue = []
-        broadcastLogout()
-        if (typeof window !== 'undefined') window.location.href = '/'
+
+        const refreshFailedAuth =
+          axios.isAxiosError(refreshError) && refreshError.response?.status === 401
+
+        // Only sign out on a real auth failure — not a transient network drop
+        if (refreshFailedAuth) {
+          broadcastLogout()
+          if (typeof window !== 'undefined') window.location.href = '/'
+        }
         return Promise.reject(refreshError)
       }
     }
