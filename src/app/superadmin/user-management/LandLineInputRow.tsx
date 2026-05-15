@@ -69,7 +69,7 @@ function splitDigits(digits: string): { areaCode: string; subscriber: string } {
 }
 
 function subscriberMaxLength(areaCode: string): number {
-  return areaCode === '2' ? 7 : 7 // Metro Manila 7, others 7–8; 7 as safe default
+  return areaCode === '2' ? 8 : 7
 }
 
 export function toLocalLandlineDigits(raw: string): string {
