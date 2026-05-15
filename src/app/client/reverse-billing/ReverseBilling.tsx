@@ -437,121 +437,15 @@ function BillingForm({
         </div>
       </div>
 
-      {/* Billing Details */}
-      <div
-        className="rounded-xl border p-4 flex flex-col gap-4"
-        style={{ background: BG_PANEL, borderColor: BORDER }}
-      >
-        <SectionHeader icon={<FileText size={15} />} title="Billing Details" />
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {/* Billing Date */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-white/70">Billing Date<Req /></label>
-            <TextField
-              fullWidth type="date" value={form.billingDate}
-              onChange={(e) => setForm((f) => ({ ...f, billingDate: e.target.value }))}
-              variant="outlined" inputRef={dateRef}
-              error={!!errors.billingDate}
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <Calendar size={15}
-                      className="cursor-pointer text-white/40 hover:text-white transition-colors"
-                      onClick={() => dateRef.current?.showPicker()} />
-                  </InputAdornment>
-                ),
-              }}
-              sx={{
-                ...fieldSx(BG_CARD, BORDER_C, !!errors.billingDate),
-                '& input[type="date"]::-webkit-calendar-picker-indicator': { display: 'none' },
-                '& .MuiInputBase-input': { padding: '0 0 0 12px', height: 36, boxSizing: 'border-box', colorScheme: 'dark' },
-              }}
-            />
-            {errors.billingDate && <FormHelperText sx={HELPER_SX}>{errors.billingDate}</FormHelperText>}
-          </div>
-
-          {/* Billing Number */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-white/70">Billing Number<Req /></label>
-            <TextField
-              fullWidth placeholder="e.g. INV-2025-0042"
-              value={form.billingNumber}
-              onChange={(e) => setForm((f) => ({ ...f, billingNumber: e.target.value }))}
-              variant="outlined" error={!!errors.billingNumber}
-              sx={fieldSx(BG_CARD, BORDER_C, !!errors.billingNumber)}
-            />
-            {errors.billingNumber && <FormHelperText sx={HELPER_SX}>{errors.billingNumber}</FormHelperText>}
-          </div>
-        </div>
-
-        {/* Line items */}
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-white/70">Billing Items<Req /></span>
-            <button
-              onClick={addLine}
-              className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider transition-opacity hover:opacity-80 cursor-pointer"
-              style={{ color: CYAN }}
-            >
-              <Plus size={12} />Add Item
-            </button>
-          </div>
-
-          {/* Column headers */}
-          <div className="grid grid-cols-[1fr_140px_32px] gap-2 px-1">
-            <span className="text-[10px] uppercase tracking-widest" style={{ color: MUTED }}>Description</span>
-            <span className="text-[10px] uppercase tracking-widest" style={{ color: MUTED }}>Amount (₱)</span>
-            <span />
-          </div>
-
-          <AnimatePresence>
-            {form.lineItems.map((li, idx) => {
-              const le = errors.lineItems?.[li.id] ?? {}
-              return (
-                <motion.div key={li.id}
-                  initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
-                  className="grid grid-cols-[1fr_140px_32px] gap-2 items-start"
-                >
-                  <div className="flex flex-col gap-0.5">
-                    <TextField fullWidth placeholder={`Item ${idx + 1} description`}
-                      value={li.description} error={!!le.description}
-                      onChange={(e) => updateLine(li.id, { description: e.target.value })}
-                      variant="outlined"
-                      sx={fieldSx(BG_CARD, BORDER_C, !!le.description)} />
-                    {le.description && <FormHelperText sx={HELPER_SX}>{le.description}</FormHelperText>}
-                  </div>
-                  <div className="flex flex-col gap-0.5">
-                    <TextField fullWidth placeholder="0.00"
-                      value={li.amount} error={!!le.amount}
-                      onChange={(e) => updateLine(li.id, { amount: e.target.value })}
-                      variant="outlined"
-                      sx={fieldSx(BG_CARD, BORDER_C, !!le.amount)} />
-                    {le.amount && <FormHelperText sx={HELPER_SX}>{le.amount}</FormHelperText>}
-                  </div>
-                  <button
-                    onClick={() => removeLine(li.id)}
-                    disabled={form.lineItems.length === 1}
-                    className="flex items-center justify-center w-9 h-9 rounded-lg border transition-colors cursor-pointer
-                               hover:border-red-400/40 hover:text-red-400 disabled:opacity-20 disabled:cursor-not-allowed"
-                    style={{ borderColor: BORDER_C }}
-                  >
-                    <X size={13} />
-                  </button>
-                </motion.div>
-              )
-            })}
-          </AnimatePresence>
-
-          {/* Total row */}
-          <div className="flex items-center justify-between pt-2 border-t mt-1" style={{ borderColor: BORDER }}>
-            <span className="text-xs uppercase tracking-widest font-bold" style={{ color: MUTED }}>Total Amount</span>
-            <span className="text-lg font-bold" style={{ color: CYAN }}>
-              {formatPeso(totalAmount)}
-            </span>
-          </div>
-        </div>
-      </div>
+      {/* 
+      
+      
+      
+      BILLING DETAILS HEREEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE
+      
+      
+      
+      */}
 
       {/* Supporting Documents */}
       <div
