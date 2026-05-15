@@ -179,9 +179,23 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
     initialForm.current = null
   }
 
+  const ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/webp']
+  const MAX_SIZE_BYTES = 5 * 1024 * 1024 // 5 MB
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      setFieldErrors((prev) => ({ ...prev, image: 'Only PNG, JPG, and WEBP images are allowed.' }))
+      return
+    }
+
+    if (file.size > MAX_SIZE_BYTES) {
+      setFieldErrors((prev) => ({ ...prev, image: 'Image must be 5 MB or smaller.' }))
+      return
+    }
+
     setImageFile(file)
     setImagePreview(URL.createObjectURL(file))
     setForm((f) => ({ ...f, image_url: '' }))
@@ -556,7 +570,7 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
                     <input
                       ref={fileInputRef}
                       type="file"
-                      accept="image/*"
+                      accept="image/png,image/jpeg,image/webp"
                       className="hidden"
                       onChange={handleFileChange}
                     />
