@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { getMe } from '@/lib/api/auth.api'
+import { getMe, recoverSession } from '@/lib/api/auth.api'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { syncServerTime } from '@/app/utils/serverTime'
 import axios from 'axios'
@@ -28,8 +28,9 @@ export default function AuthRehydrator() {
   const hasHydrated   = useAuthStore((s) => s.hasHydrated)
   const router        = useRouter()
   const pathname      = usePathname()
-  const hasRun    = useRef(false)
-  const channelRef = useRef<BroadcastChannel | null>(null)
+  const hasRun           = useRef(false)
+  const channelRef       = useRef<BroadcastChannel | null>(null)
+  const recoverTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Keep logged-in users off the landing page (e.g. browser back after login)
   useEffect(() => {
@@ -37,6 +38,45 @@ export default function AuthRehydrator() {
     const portal = ROLE_ROUTES[user.role]
     if (portal) router.replace(portal)
   }, [hasHydrated, user, pathname, router])
+
+  // After connectivity returns, refresh CSRF + access token before the user retries an action
+  useEffect(() => {
+    if (!user) return
+
+    const scheduleRecover = () => {
+      if (recoverTimerRef.current) clearTimeout(recoverTimerRef.current)
+      recoverTimerRef.current = setTimeout(async () => {
+        const ok = await recoverSession()
+        if (!ok) return
+        try {
+          const me = await getMe()
+          setUser(me)
+        } catch (err) {
+          const status = axios.isAxiosError(err) ? err.response?.status : null
+          if (status === 401) {
+            clearUser()
+            const isPublic = PUBLIC_PATHS.some(
+              (p) => pathname === p || pathname.startsWith(p + '/')
+            )
+            if (!isPublic) router.replace('/')
+          }
+        }
+      }, 400)
+    }
+
+    const onOnline = () => scheduleRecover()
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') scheduleRecover()
+    }
+
+    window.addEventListener('online', onOnline)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      window.removeEventListener('online', onOnline)
+      document.removeEventListener('visibilitychange', onVisible)
+      if (recoverTimerRef.current) clearTimeout(recoverTimerRef.current)
+    }
+  }, [user, pathname, router, setUser, clearUser])
 
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {

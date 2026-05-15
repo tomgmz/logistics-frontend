@@ -130,6 +130,10 @@ export function toUserFriendlyMessage(raw: string): string {
     return 'Unable to reach the server. Check your connection and try again.'
   }
 
+  if (lower.includes('csrf')) {
+    return 'Your session expired. Please refresh the page and try again.'
+  }
+
   if (
     lower.includes('unauthorized') ||
     lower.includes('forbidden') ||
