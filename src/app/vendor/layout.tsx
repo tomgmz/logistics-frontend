@@ -26,9 +26,9 @@ export default function VendorLayout({ children }: VendorShellProps) {
 
   const navItems = [
     {
-      href: '/vendor/transit-tracking',
-      label: 'Transit Tracking',
-      icon: <MapPin size={17} />,
+      href: '/vendor/vehicle-management',
+      label: 'Vehicle Management',
+      icon: <Truck size={17} />,
     },
     {
       href: '/vendor/delivery-assignment',
@@ -36,10 +36,10 @@ export default function VendorLayout({ children }: VendorShellProps) {
       icon: <ClipboardList size={17} />,
     },
     {
-      href: '/vendor/vehicle-management',
-      label: 'Vehicle Management',
-      icon: <Truck size={17} />,
-    }
+      href: '/vendor/transit-tracking',
+      label: 'Transit Tracking',
+      icon: <MapPin size={17} />,
+    },
   ]
 
   return (

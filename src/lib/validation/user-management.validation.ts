@@ -166,7 +166,7 @@ export const createVendorSchema = z
     landline:        landlineOptional,
     vendor_type:     z.enum(['individual', 'company'], { error: 'Vendor type is required' }),
     company_name:    z.string().max(100).optional().nullable().transform(v => (v === '' ? null : v)),
-    business_permit: z.string().max(100).optional().nullable().transform(v => (v === '' ? null : v)),
+    business_permit: z.string().max(100).nullable().transform(v => (v === '' ? null : v)),
   })
   .refine(
     data => data.vendor_type !== 'company' || !!data.company_name,

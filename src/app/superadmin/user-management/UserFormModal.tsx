@@ -605,7 +605,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
               </Field>
 
               <div className="grid grid-cols-2 gap-4">
-                <Field label="Company Name" error={fe.company_name}>
+                <Field label="Company Name" required error={fe.company_name}>
                   <Input
                     value={form.company_name as string}
                     onChange={e => set('company_name', e.target.value)}
@@ -613,7 +613,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
                     error={fe.company_name}
                   />
                 </Field>
-                <Field label="Business Permit #" error={fe.business_permit}>
+                <Field label="Business Permit #" required error={fe.business_permit}>
                   <Input
                     value={form.business_permit as string}
                     onChange={e => set('business_permit', e.target.value)}
