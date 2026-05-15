@@ -713,7 +713,7 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
       setStep('email')
       setEmail('')
       resendExpiresAt.current = 0
-      router.push(portalUrl)
+      router.replace(portalUrl)
     }, 1800)
   }
 
