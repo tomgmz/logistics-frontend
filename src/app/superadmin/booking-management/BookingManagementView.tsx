@@ -825,31 +825,18 @@ export default function BookingManagementView() {
                                 </div>
                                 <div className="flex flex-wrap gap-1.5">
                                   {DEST_STATUSES.map((st) => (
-                                    <button
+                                    <span
                                       key={st}
-                                      type="button"
-                                      disabled={destBusyId === d.destination_id}
-                                      onClick={() => void handleDestStatus(d.destination_id, st)}
-                                      className="text-[11px] font-semibold px-2 py-1 rounded-md border border-white/10 hover:bg-white/5 disabled:opacity-40"
+                                      className="text-[11px] font-semibold px-2 py-1 rounded-md border border-white/10"
                                       style={
                                         d.status === st
                                           ? { borderColor: 'var(--color-cyan)', color: 'var(--color-cyan)' }
-                                          : undefined
+                                          : { color: 'rgba(255,255,255,0.3)' }
                                       }
                                     >
                                       {fmtStatus(st)}
-                                    </button>
+                                    </span>
                                   ))}
-                                  {/* Remove button — opens modal, no inline confirmation UI */}
-                                  <button
-                                    type="button"
-                                    disabled={destBusyId !== null || deleteBusy}
-                                    onClick={() => setDeleteAskId(d.destination_id)}
-                                    className="text-[11px] font-semibold px-2 py-1 rounded-md border border-red-500/30 text-red-400 hover:bg-red-500/10 ml-auto inline-flex items-center gap-1 disabled:opacity-40"
-                                  >
-                                    <Trash2 size={12} />
-                                    Remove
-                                  </button>
                                 </div>
                                 {/* ↑ Inline deleteAskId confirmation block intentionally removed */}
                               </li>
