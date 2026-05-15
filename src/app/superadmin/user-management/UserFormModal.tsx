@@ -32,6 +32,7 @@ import {
 import { validateForm } from '@/lib/validation/user-management.validation'
 import ReusableModal from '@/components/layout/ReusableModal'
 import { appToast } from '@/lib/toast'
+import { extractApiError } from '@/lib/api-error'
 import LandlineInputRow, { toLocalLandlineDigits } from './LandLineInputRow'
 
 interface UserFormModalProps {
@@ -54,43 +55,6 @@ const TAB_LABELS: Record<UserTab, string> = {
 }
 
 type FormState = Record<string, string | boolean | number>
-
-interface ApiBody {
-  status?: string
-  message?: string
-  errors?: { field: string; message: string }[]
-}
-
-function extractApiError(err: unknown): {
-  message: string
-  fieldErrors: Record<string, string>
-} {
-  const data: ApiBody | undefined =
-    (err as { response?: { data?: ApiBody } })?.response?.data ??
-    (err as { data?: ApiBody })?.data
-
-  if (data && typeof data === 'object') {
-    const { errors, message } = data
-    if (Array.isArray(errors) && errors.length > 0) {
-      const fieldErrors: Record<string, string> = {}
-      for (const ve of errors) {
-        const key = ve.field.includes('.') ? ve.field.split('.').pop()! : ve.field
-        fieldErrors[key] = fieldErrors[key]
-          ? `${fieldErrors[key]}\n${ve.message}`
-          : ve.message
-      }
-      return { message: '', fieldErrors }
-    }
-    if (typeof message === 'string' && message.trim()) {
-      return { message: message.trim(), fieldErrors: {} }
-    }
-  }
-
-  return {
-    message: err instanceof Error ? err.message : 'Something went wrong.',
-    fieldErrors: {},
-  }
-}
 
 function toLocalDigits(raw: string): string {
   const digits = raw.replace(/\D/g, '')

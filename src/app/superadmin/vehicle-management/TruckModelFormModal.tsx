@@ -14,6 +14,7 @@ import {
 } from '@/lib/services/admin/trucks.service'
 import ReusableModal from '@/components/layout/ReusableModal'
 import { appToast } from '@/lib/toast'
+import { getApiErrorMessage } from '@/lib/api-error'
 import { createTruckModelSchema } from '@/lib/validation/truck-model.validation'
 
 export const VEHICLE_TYPES = [
@@ -29,15 +30,6 @@ export const VEHICLE_TYPES = [
 export type VehicleType = (typeof VEHICLE_TYPES)[number]
 
 const KNOWN_TYPES = VEHICLE_TYPES.slice(0, -1)
-
-function axiosMessage(err: unknown): string {
-  const data = (err as { response?: { data?: { message?: string; errors?: { field: string; message: string }[] } } })
-    .response?.data
-  if (data?.errors?.length) return data.errors.map((e) => `${e.field}: ${e.message}`).join(' · ')
-  if (data?.message && typeof data.message === 'string') return data.message
-  if (err instanceof Error) return err.message
-  return 'Request failed'
-}
 
 interface ModelFormState {
   name:               string
@@ -133,7 +125,7 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
       setListError(null)
       setModels(await adminFetchTruckModels())
     } catch (e) {
-      setListError(axiosMessage(e))
+      setListError(getApiErrorMessage(e, 'Request failed. Please try again.'))
     } finally {
       setListLoading(false)
     }
@@ -285,7 +277,7 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
     } catch (e) {
       setConfirmKind(null)
       setUploadBusy(false)
-      setFieldErrors({ name: axiosMessage(e) })
+      setFieldErrors({ name: getApiErrorMessage(e, 'Request failed. Please try again.') })
     } finally {
       setActionBusy(false)
     }
@@ -303,7 +295,7 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
       await loadModels()
       onSaved?.()
     } catch (e) {
-      appToast.error(axiosMessage(e), { action: 'truck-model-delete', entityId: deleteId })
+      appToast.error(getApiErrorMessage(e, 'Request failed. Please try again.'), { action: 'truck-model-delete', entityId: deleteId })
       setConfirmKind(null)
     } finally {
       setActionBusy(false)
