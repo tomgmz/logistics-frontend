@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { getMe, recoverSession } from '@/lib/api/auth.api'
+import { getMe, recoverSession, signOutSession } from '@/lib/api/auth.api'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { syncServerTime } from '@/app/utils/serverTime'
 import axios from 'axios'
@@ -13,7 +13,6 @@ const ROLE_ROUTES: Record<string, string> = {
   super_admin:      '/superadmin',
   general_manager:  '/general_manager',
   accountant:       '/accountant',
-  human_resources:  '/human_resources',
   fleet_admin:      '/fleet_admin',
   operations_admin: '/operations_admin',
   it_admin:         '/it_admin',
@@ -54,7 +53,7 @@ export default function AuthRehydrator() {
         } catch (err) {
           const status = axios.isAxiosError(err) ? err.response?.status : null
           if (status === 401) {
-            clearUser()
+            await signOutSession()
             const isPublic = PUBLIC_PATHS.some(
               (p) => pathname === p || pathname.startsWith(p + '/')
             )
@@ -76,7 +75,7 @@ export default function AuthRehydrator() {
       document.removeEventListener('visibilitychange', onVisible)
       if (recoverTimerRef.current) clearTimeout(recoverTimerRef.current)
     }
-  }, [user, pathname, router, setUser, clearUser])
+  }, [user, pathname, router, setUser])
 
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
@@ -174,7 +173,7 @@ export default function AuthRehydrator() {
         openChannel(user.user_id)
         return
       } catch {
-        clearUser()
+        await signOutSession()
         const isPublic = PUBLIC_PATHS.some(
           (p) => pathname === p || pathname.startsWith(p + '/')
         )

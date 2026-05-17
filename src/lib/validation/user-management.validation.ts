@@ -193,8 +193,6 @@ export const createAccountantSchema      = z.object(baseCreateFields)
 export const updateAccountantSchema      = z.object(baseUpdateFields)
 export const createGeneralManagerSchema  = z.object(baseCreateFields)
 export const updateGeneralManagerSchema  = z.object(baseUpdateFields)
-export const createHumanResourcesSchema  = z.object(baseCreateFields)
-export const updateHumanResourcesSchema  = z.object(baseUpdateFields)
 export const createFleetAdminSchema      = z.object(baseCreateFields)
 export const updateFleetAdminSchema      = z.object(baseUpdateFields)
 export const createOperationsAdminSchema = z.object(baseCreateFields)
@@ -212,7 +210,6 @@ export const FORM_SCHEMAS: Record<UserTab, SchemaPair> = {
   vendors:             { create: createVendorSchema,          update: updateVendorSchema          },
   accountants:         { create: createAccountantSchema,      update: updateAccountantSchema      },
   'general-managers':  { create: createGeneralManagerSchema,  update: updateGeneralManagerSchema  },
-  'human-resources':   { create: createHumanResourcesSchema,  update: updateHumanResourcesSchema  },
   'fleet-admins':      { create: createFleetAdminSchema,      update: updateFleetAdminSchema      },
   'operations-admins': { create: createOperationsAdminSchema, update: updateOperationsAdminSchema },
   'it-admins':         { create: createITAdminSchema,         update: updateITAdminSchema         },

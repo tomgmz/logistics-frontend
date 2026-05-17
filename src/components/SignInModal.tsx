@@ -12,7 +12,6 @@ const ROLE_ROUTES: Record<string, string> = {
   super_admin:      '/superadmin',
   general_manager:  '/general_manager',
   accountant:       '/accountant',
-  human_resources:  '/human_resources',
   fleet_admin:      '/fleet_admin',
   operations_admin: '/operations_admin',
   it_admin:         '/it_admin',
