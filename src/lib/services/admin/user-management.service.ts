@@ -182,3 +182,25 @@ export const itAdminService = {
   activate:   (id: string) => patch<AdminUser>(`${B}/it-admins/${id}/activate`),
   deactivate: (id: string) => patch<AdminUser>(`${B}/it-admins/${id}/deactivate`),
 }
+
+export interface LicenseOCRResult {
+  license_number: string  | null
+  license_expiry:  string | null
+  first_name:      string | null
+  last_name:       string | null
+  middle_name:     string | null
+  suffix:          string | null
+}
+
+export const ocrService = {
+  scanLicense: async (file: File): Promise<LicenseOCRResult> => {
+    const form = new FormData()
+    form.append('image', file)
+    const { data } = await proxyApi.post<ApiResponse<LicenseOCRResult>>(
+      `${B}/drivers/scan-license`,
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    )
+    return data.data
+  },
+}

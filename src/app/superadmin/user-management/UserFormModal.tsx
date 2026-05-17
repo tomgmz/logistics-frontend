@@ -34,6 +34,8 @@ import ReusableModal from '@/components/layout/ReusableModal'
 import { appToast } from '@/lib/toast'
 import { extractApiError } from '@/lib/api-error'
 import LandlineInputRow, { toLocalLandlineDigits } from './LandLineInputRow'
+import { ocrService } from '@/lib/services/admin/user-management.service'
+import { ScanLine, CheckCircle } from 'lucide-react'
 
 interface UserFormModalProps {
   tab: UserTab
@@ -264,6 +266,37 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
 
   const [vendorList,     setVendorList]     = useState<{ vendor_id: string; name: string }[]>([])
   const [vendorsLoading, setVendorsLoading] = useState(false)
+
+  const [scanLoading, setScanLoading] = useState(false)
+const [scanDone,    setScanDone]    = useState(false)
+const [scanError,   setScanError]   = useState<string | null>(null)
+
+async function handleLicenseScan(e: React.ChangeEvent<HTMLInputElement>) {
+  const file = e.target.files?.[0]
+  if (!file) return
+  setScanLoading(true)
+  setScanDone(false)
+  setScanError(null)
+  try {
+    const result = await ocrService.scanLicense(file)
+    setForm(prev => ({
+      ...prev,
+      ...(result.first_name      && { first_name:      result.first_name }),
+      ...(result.last_name       && { last_name:        result.last_name }),
+      ...(result.middle_name     && { middle_name:      result.middle_name }),
+      ...(result.suffix          && { suffix:           result.suffix }),
+      ...(result.license_number  && { license_number:   result.license_number }),
+      ...(result.license_expiry  && { license_expiry:   result.license_expiry }),
+    }))
+    setScanDone(true)
+    appToast.success('License scanned — review and confirm the pre-filled fields.', { action: 'ocr-scan' })
+  } catch {
+    setScanError('Scan failed — fill in the fields manually.')
+  } finally {
+    setScanLoading(false)
+    e.target.value = ''
+  }
+}
 
   // True when at least one field differs from the initial state
   const isDirty = useMemo(() => {
@@ -526,63 +559,91 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
             </>)}
 
             {tab === 'drivers' && (<>
-              <div className="grid grid-cols-2 gap-4">
-                <Field label="License Number" required error={fe.license_number}>
-                  <Input
-                    value={form.license_number as string}
-                    onChange={e => set('license_number', e.target.value)}
-                    placeholder="N01-23-456789"
-                    error={fe.license_number}
-                  />
-                </Field>
-                <Field label="License Expiry" required error={fe.license_expiry}>
-                  <Input
-                    type="date"
-                    value={form.license_expiry as string}
-                    onChange={e => set('license_expiry', e.target.value)}
-                    error={fe.license_expiry}
-                    className="[color-scheme:dark]"
-                  />
-                </Field>
-              </div>
+  {!isEdit && (
+    <div className="rounded-xl border border-dashed border-[#424242] bg-[#2a2a2a]/30 px-4 py-4">
+      <p className="mb-2 text-[10px] font-bold tracking-[0.12em] uppercase text-[#818181]">
+        Scan License <span className="normal-case font-normal">(optional — auto-fills fields below)</span>
+      </p>
+      <label className="flex cursor-pointer items-center gap-3">
+        <div className="flex items-center gap-2 rounded-lg border border-[#424242] bg-[#1b1b1b] px-4 py-2 text-sm text-[#818181] transition hover:border-[#4df9ed50] hover:text-white">
+          {scanLoading
+            ? <Loader2 size={14} className="animate-spin" />
+            : scanDone
+            ? <CheckCircle size={14} className="text-[#4df9ed]" />
+            : <ScanLine size={14} />}
+          <span>
+            {scanLoading ? 'Scanning…' : scanDone ? 'License scanned' : 'Upload license image'}
+          </span>
+        </div>
+        <input
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="sr-only"
+          onChange={handleLicenseScan}
+          disabled={scanLoading}
+        />
+        {scanError && <p className="text-[11px] text-red-400">{scanError}</p>}
+      </label>
+    </div>
+  )}
 
-              <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-[#2a2a2a] bg-[#2a2a2a]/40 px-4 py-3">
-                <div className="relative mt-0.5 flex-shrink-0">
-                  <input
-                    type="checkbox"
-                    checked={form.is_vendor_driver as boolean}
-                    onChange={e => set('is_vendor_driver', e.target.checked)}
-                    className="peer sr-only"
-                  />
-                  <div className="h-4 w-4 rounded border border-[#424242] bg-[#1b1b1b] transition-colors peer-checked:border-[#4df9ed] peer-checked:bg-[#4df9ed]" />
-                  <svg
-                    className="pointer-events-none absolute inset-0 m-auto hidden h-2.5 w-2.5 text-[#0a0a0a] peer-checked:block"
-                    viewBox="0 0 10 10" fill="none"
-                  >
-                    <path d="M1.5 5l2.5 2.5 4.5-4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </div>
-                <span className="text-sm text-[#818181]">
-                  This driver belongs to a vendor / subcontractor
-                </span>
-              </label>
+  <div className="grid grid-cols-2 gap-4">
+    <Field label="License Number" required error={fe.license_number}>
+      <Input
+        value={form.license_number as string}
+        onChange={e => set('license_number', e.target.value)}
+        placeholder="N01-23-456789"
+        error={fe.license_number}
+      />
+    </Field>
+    <Field label="License Expiry" required error={fe.license_expiry}>
+      <Input
+        type="date"
+        value={form.license_expiry as string}
+        onChange={e => set('license_expiry', e.target.value)}
+        error={fe.license_expiry}
+        className="[color-scheme:dark]"
+      />
+    </Field>
+  </div>
 
-              {form.is_vendor_driver && (
-                <Field label="Vendor" required error={fe.vendor_id}>
-                  <Select
-                    value={form.vendor_id as string}
-                    onChange={e => set('vendor_id', e.target.value)}
-                    error={fe.vendor_id}
-                    disabled={vendorsLoading}
-                  >
-                    <option value="">{vendorsLoading ? 'Loading vendors…' : 'Select a vendor'}</option>
-                    {vendorList.map((v) => (
-                      <option key={v.vendor_id} value={v.vendor_id}>{v.name}</option>
-                    ))}
-                  </Select>
-                </Field>
-              )}
-            </>)}
+  <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-[#2a2a2a] bg-[#2a2a2a]/40 px-4 py-3">
+    <div className="relative mt-0.5 flex-shrink-0">
+      <input
+        type="checkbox"
+        checked={form.is_vendor_driver as boolean}
+        onChange={e => set('is_vendor_driver', e.target.checked)}
+        className="peer sr-only"
+      />
+      <div className="h-4 w-4 rounded border border-[#424242] bg-[#1b1b1b] transition-colors peer-checked:border-[#4df9ed] peer-checked:bg-[#4df9ed]" />
+      <svg
+        className="pointer-events-none absolute inset-0 m-auto hidden h-2.5 w-2.5 text-[#0a0a0a] peer-checked:block"
+        viewBox="0 0 10 10" fill="none"
+      >
+        <path d="M1.5 5l2.5 2.5 4.5-4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </div>
+    <span className="text-sm text-[#818181]">
+      This driver belongs to a vendor / subcontractor
+    </span>
+  </label>
+
+  {form.is_vendor_driver && (
+    <Field label="Vendor" required error={fe.vendor_id}>
+      <Select
+        value={form.vendor_id as string}
+        onChange={e => set('vendor_id', e.target.value)}
+        error={fe.vendor_id}
+        disabled={vendorsLoading}
+      >
+        <option value="">{vendorsLoading ? 'Loading vendors…' : 'Select a vendor'}</option>
+        {vendorList.map((v) => (
+          <option key={v.vendor_id} value={v.vendor_id}>{v.name}</option>
+        ))}
+      </Select>
+    </Field>
+  )}
+</>)}
 
             {tab === 'vendors' && (<>
               <Field label="Landline" hint="Optional — area code + subscriber, e.g. 32-XXXXXXX" error={fe.landline}>
