@@ -162,7 +162,7 @@ proxyApi.interceptors.response.use(
 
         // Only sign out on a real auth failure — not a transient network drop
         if (refreshFailedAuth) {
-          broadcastLogout()
+          await signOutSession()
           if (typeof window !== 'undefined') window.location.href = '/'
         }
         return Promise.reject(refreshError)
@@ -240,6 +240,20 @@ export async function logout(): Promise<void> {
 
 export async function logoutAll(): Promise<void> {
   await nextApi.post('/api/auth/logout-all')
+}
+
+/** Clear httpOnly auth cookies + local user (fixes redirect loops after failed re-auth). */
+export async function signOutSession(): Promise<void> {
+  if (typeof window !== 'undefined') {
+    const { useAuthStore } = await import('@/lib/store/auth.store')
+    useAuthStore.getState().clearUser()
+  }
+  try {
+    await nextApi.post('/api/auth/logout')
+  } catch {
+    // Route still clears cookies when the backend session is already gone
+  }
+  broadcastLogout()
 }
 
 function getDeviceInfo(): string {

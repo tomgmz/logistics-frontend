@@ -4,7 +4,6 @@ export type AdminRole =
   | 'general_manager'
   | 'fleet_admin'
   | 'operations_admin'
-  | 'human_resources'
   | 'accountant'
 
 export type UserRole = AdminRole | 'driver' | 'client' | 'vendor'
@@ -17,7 +16,6 @@ export type UserTab =
   | 'vendors'
   | 'accountants'
   | 'general-managers'
-  | 'human-resources'
   | 'fleet-admins'
   | 'operations-admins'
   | 'it-admins'
@@ -141,16 +139,6 @@ export interface CreateGeneralManagerPayload {
   last_name?: string
 }
 
-export interface CreateHumanResourcesPayload {
-  email: string
-  password: string
-  phone?: string
-  first_name?: string
-  last_name?: string
-  middle_name?: string
-  suffix?: string
-}
-
 export interface CreateFleetAdminPayload {
   email: string
   password: string
@@ -187,7 +175,6 @@ export type UpdateDriverPayload          = Partial<Omit<CreateDriverPayload, 'pa
 export type UpdateVendorPayload          = Partial<Omit<CreateVendorPayload, 'password'>>
 export type UpdateAccountantPayload      = Partial<Omit<CreateAccountantPayload, 'password'>>
 export type UpdateGeneralManagerPayload  = Partial<Omit<CreateGeneralManagerPayload, 'password'>>
-export type UpdateHumanResourcesPayload  = Partial<Omit<CreateHumanResourcesPayload, 'password'>>
 export type UpdateFleetAdminPayload      = Partial<Omit<CreateFleetAdminPayload, 'password'>>
 export type UpdateOperationsAdminPayload = Partial<Omit<CreateOperationsAdminPayload, 'password'>>
 export type UpdateITAdminPayload         = Partial<CreateITAdminPayload> & {

@@ -18,7 +18,7 @@ import type {
 import {
   userService,
   clientService, driverService, vendorService,
-  accountantService, generalManagerService, humanResourcesService,
+  accountantService, generalManagerService,
   fleetAdminService, operationsAdminService, itAdminService,
 } from '@/lib/services/admin/user-management.service'
 import { appToast } from '@/lib/toast'
@@ -56,7 +56,6 @@ async function fetchByTab(tab: UserTab): Promise<AnyUser[]> {
     case 'vendors':           return vendorService.getAll()          as Promise<AnyUser[]>
     case 'accountants':       return accountantService.getAll()      as Promise<AnyUser[]>
     case 'general-managers':  return generalManagerService.getAll()  as Promise<AnyUser[]>
-    case 'human-resources':   return humanResourcesService.getAll()  as Promise<AnyUser[]>
     case 'fleet-admins':      return fleetAdminService.getAll()      as Promise<AnyUser[]>
     case 'operations-admins': return operationsAdminService.getAll() as Promise<AnyUser[]>
     case 'it-admins':         return itAdminService.getAll()         as Promise<AnyUser[]>
@@ -71,7 +70,6 @@ async function updateStatus(tab: UserTab, id: string, status: UserStatus): Promi
       case 'drivers':           return driverService.activate(id).then()
       case 'vendors':           return vendorService.activate(id).then()
       case 'general-managers':  return generalManagerService.activate(id).then()
-      case 'human-resources':   return humanResourcesService.activate(id).then()
       case 'fleet-admins':      return fleetAdminService.activate(id).then()
       case 'operations-admins': return operationsAdminService.activate(id).then()
       case 'it-admins':         return itAdminService.activate(id).then()
@@ -85,7 +83,6 @@ async function updateStatus(tab: UserTab, id: string, status: UserStatus): Promi
       case 'drivers':           return driverService.deactivate(id).then()
       case 'vendors':           return vendorService.deactivate(id).then()
       case 'general-managers':  return generalManagerService.deactivate(id).then()
-      case 'human-resources':   return humanResourcesService.deactivate(id).then()
       case 'fleet-admins':      return fleetAdminService.deactivate(id).then()
       case 'operations-admins': return operationsAdminService.deactivate(id).then()
       case 'it-admins':         return itAdminService.deactivate(id).then()
@@ -99,7 +96,6 @@ async function updateStatus(tab: UserTab, id: string, status: UserStatus): Promi
       case 'drivers':           return driverService.remove(id)
       case 'vendors':           return vendorService.remove(id)
       case 'general-managers':  return generalManagerService.remove(id)
-      case 'human-resources':   return humanResourcesService.remove(id)
       case 'fleet-admins':      return fleetAdminService.remove(id)
       case 'operations-admins': return operationsAdminService.remove(id)
       case 'it-admins':         return itAdminService.remove(id)
@@ -114,7 +110,6 @@ async function updateStatus(tab: UserTab, id: string, status: UserStatus): Promi
     case 'drivers':           return driverService.update(id, payload).then()
     case 'vendors':           return vendorService.update(id, payload).then()
     case 'general-managers':  return generalManagerService.update(id, payload).then()
-    case 'human-resources':   return humanResourcesService.update(id, payload).then()
     case 'fleet-admins':      return fleetAdminService.update(id, payload).then()
     case 'operations-admins': return operationsAdminService.update(id, payload).then()
     case 'it-admins':         return itAdminService.update(id, payload).then()
@@ -128,7 +123,6 @@ function tabFromRole(role: string): UserTab {
     case 'vendor':           return 'vendors'
     case 'accountant':       return 'accountants'
     case 'general_manager':  return 'general-managers'
-    case 'human_resources':  return 'human-resources'
     case 'fleet_admin':      return 'fleet-admins'
     case 'operations_admin': return 'operations-admins'
     case 'it_admin':         return 'it-admins'
@@ -163,7 +157,6 @@ const ROLE_COLORS: Record<string, string> = {
   general_manager:  'bg-cyan-500/15 text-cyan-400 border-cyan-500/30',
   fleet_admin:      'bg-orange-500/15 text-orange-400 border-orange-500/30',
   operations_admin: 'bg-violet-500/15 text-violet-400 border-violet-500/30',
-  human_resources:  'bg-pink-500/15 text-pink-400 border-pink-500/30',
   accountant:       'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
   driver:           'bg-sky-500/15 text-sky-400 border-sky-500/30',
   client:           'bg-indigo-500/15 text-indigo-400 border-indigo-500/30',
@@ -176,7 +169,6 @@ const ROLE_LABELS: Record<string, string> = {
   general_manager:  'General Manager',
   fleet_admin:      'Fleet Manager',
   operations_admin: 'Operations Manager',
-  human_resources:  'HR Officer',
   accountant:       'Accountant',
   driver:           'Driver',
   client:           'Client',
@@ -422,7 +414,6 @@ function renderCells(user: AnyUser, tab: TabValue) {
     }
     case 'accountants':
     case 'general-managers':
-    case 'human-resources':
     case 'fleet-admins':
     case 'operations-admins':
     case 'it-admins':
@@ -437,7 +428,6 @@ const HEADERS: Record<TabValue, string[]> = {
   vendors:             ['Name', 'Email', 'Type', 'Company', 'Status'],
   accountants:         ['Name', 'Email', 'Phone', 'Role', 'Status'],
   'general-managers':  ['Name', 'Email', 'Phone', 'Role', 'Status'],
-  'human-resources':   ['Name', 'Email', 'Phone', 'Role', 'Status'],
   'fleet-admins':      ['Name', 'Email', 'Phone', 'Role', 'Status'],
   'operations-admins': ['Name', 'Email', 'Phone', 'Role', 'Status'],
   'it-admins':         ['Name', 'Email', 'Phone', 'Role', 'Status'],
@@ -481,7 +471,7 @@ export default function UserManagementClient() {
         userService.getAll({ search: searchQuery || undefined }),
         userService.getStats(),
       ])
-      setAllRows(result.data)
+      setAllRows(result.data.filter((u) => (u.role as string) !== 'human_resources'))
       setServerTotal(result.total)
       setServerTotalPages(Math.ceil(result.total / PAGE_SIZE))
       setStats({ total: statsResult.total, active: statsResult.active, archived: statsResult.archived })
@@ -552,6 +542,10 @@ export default function UserManagementClient() {
     : filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
   async function handleStatusChange(user: AnyUser, status: UserStatus) {
+    if ((user.role as string) === 'human_resources') {
+      appToast.error('This account role is no longer supported.')
+      return
+    }
     const serviceTab = activeTab === 'all' ? tabFromRole(user.role) : activeTab as UserTab
     try {
       await appToast.promise(
@@ -573,6 +567,10 @@ export default function UserManagementClient() {
   }
 
   function openEdit(user: AnyUser) {
+    if ((user.role as string) === 'human_resources') {
+      appToast.error('This account role is no longer supported.')
+      return
+    }
     const tab = activeTab === 'all' ? tabFromRole(user.role) : activeTab as UserTab
     setFormTab(tab)
     setEditUser(user)

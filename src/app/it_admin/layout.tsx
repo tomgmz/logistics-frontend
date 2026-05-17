@@ -1,9 +1,10 @@
 'use client'
 
-import { ReactNode, useEffect } from 'react'
+import { ReactNode } from 'react'
 import { Activity, LayoutDashboard } from 'lucide-react'
 import ReusableDashboardShell from '@/components/layout/ReusableDashboardShell'
-import { useAuthStore } from '@/lib/store/auth.store'
+import PortalAuthLoading from '@/components/layout/PortalAuthLoading'
+import { usePortalAuthGuard } from '@/lib/hooks/usePortalAuthGuard'
 
 const NAV_ITEMS = [
   { href: '/it_admin/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={17} /> },
@@ -11,18 +12,9 @@ const NAV_ITEMS = [
 ]
 
 export default function ItAdminLayout({ children }: { children: ReactNode }) {
-  const user = useAuthStore((s) => s.user)
-  const hasHydrated = useAuthStore((s) => s.hasHydrated)
+  const { isLoading } = usePortalAuthGuard('it_admin')
 
-  useEffect(() => {
-    if (!hasHydrated) return
-    if (!user || user.role !== 'it_admin') window.location.replace('/')
-  }, [hasHydrated, user])
-
-  if (!hasHydrated || !user || user.role !== 'it_admin') {
-    return <div className="min-h-screen bg-[#0a0a0a]" />
-  }
+  if (isLoading) return <PortalAuthLoading />
 
   return <ReusableDashboardShell navItems={NAV_ITEMS}>{children}</ReusableDashboardShell>
 }
-

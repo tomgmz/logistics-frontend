@@ -1,9 +1,10 @@
 'use client'
 
-import { ReactNode, useEffect } from 'react'
+import { ReactNode } from 'react'
 import { CreditCard } from 'lucide-react'
 import ReusableDashboardShell from '@/components/layout/ReusableDashboardShell'
-import { useAuthStore } from '@/lib/store/auth.store'
+import PortalAuthLoading from '@/components/layout/PortalAuthLoading'
+import { usePortalAuthGuard } from '@/lib/hooks/usePortalAuthGuard'
 
 const NAV_ITEMS = [
   { href: '/accountant/transaction-history', label: 'Transaction History', icon: <CreditCard size={17} /> },
@@ -14,18 +15,9 @@ const NAV_ITEMS = [
 ]
 
 export default function AccountantLayout({ children }: { children: ReactNode }) {
-  const user = useAuthStore((s) => s.user)
-  const hasHydrated = useAuthStore((s) => s.hasHydrated)
+  const { isLoading } = usePortalAuthGuard('accountant')
 
-  useEffect(() => {
-    if (!hasHydrated) return
-    if (!user || user.role !== 'accountant') window.location.replace('/')
-  }, [hasHydrated, user])
-
-  if (!hasHydrated || !user || user.role !== 'accountant') {
-    return <div className="min-h-screen bg-[#0a0a0a]" />
-  }
+  if (isLoading) return <PortalAuthLoading />
 
   return <ReusableDashboardShell navItems={NAV_ITEMS}>{children}</ReusableDashboardShell>
 }
-

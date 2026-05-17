@@ -14,7 +14,6 @@ const WRAPPER_PREFIXES = [
   /^Accountant Creation Failed:\s*/i,
   /^Operations Admin Creation Failed:\s*/i,
   /^IT Admin Creation Failed:\s*/i,
-  /^Human Resources Creation Failed:\s*/i,
   /^General Manager Creation Failed:\s*/i,
   /^Fleet Admin Creation Failed:\s*/i,
   /^Admin creation failed:\s*/i,

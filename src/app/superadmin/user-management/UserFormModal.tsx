@@ -24,7 +24,6 @@ import {
   vendorService,
   accountantService,
   generalManagerService,
-  humanResourcesService,
   fleetAdminService,
   operationsAdminService,
   itAdminService,
@@ -48,7 +47,6 @@ const TAB_LABELS: Record<UserTab, string> = {
   vendors:             'Vendor',
   accountants:         'Accountant',
   'general-managers':  'General Manager',
-  'human-resources':   'HR Officer',
   'fleet-admins':      'Fleet Manager',
   'operations-admins': 'Operations Manager',
   'it-admins':         'IT Admin',
@@ -134,7 +132,6 @@ async function submitForm(tab: UserTab, form: FormState, editId?: string): Promi
     case 'vendors':           return editId ? vendorService.update(editId, clean as never).then()           : vendorService.create(clean as never).then()
     case 'accountants':       return editId ? accountantService.update(editId, clean as never).then()       : accountantService.create(clean as never).then()
     case 'general-managers':  return editId ? generalManagerService.update(editId, clean as never).then()   : generalManagerService.create(clean as never).then()
-    case 'human-resources':   return editId ? humanResourcesService.update(editId, clean as never).then()   : humanResourcesService.create(clean as never).then()
     case 'fleet-admins':      return editId ? fleetAdminService.update(editId, clean as never).then()       : fleetAdminService.create(clean as never).then()
     case 'operations-admins': return editId ? operationsAdminService.update(editId, clean as never).then()  : operationsAdminService.create(clean as never).then()
     case 'it-admins':         return editId ? itAdminService.update(editId, clean as never).then()          : itAdminService.create(clean as never).then()

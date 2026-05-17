@@ -4,7 +4,6 @@ const ROLE_ROUTES: Record<string, string> = {
   super_admin:      '/superadmin',
   general_manager:  '/general_manager',
   accountant:       '/accountant',
-  human_resources:  '/human_resources',
   fleet_admin:      '/fleet_admin',
   operations_admin: '/operations_admin',
   it_admin:         '/it_admin',
@@ -29,6 +28,10 @@ function getRoleFromToken(token: string): string | null {
 
     if (payload.type !== 'access' && payload.type !== 'refresh') return null
 
+    if (typeof payload.exp === 'number' && payload.exp * 1000 < Date.now()) {
+      return null
+    }
+
     return payload.role ?? null
   } catch {
     return null
@@ -38,13 +41,11 @@ function getRoleFromToken(token: string): string | null {
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
 
-  // Redirect authenticated users away from landing page
+  // Redirect authenticated users away from landing page (access token only — avoids / ↔ portal loops when refresh is stale)
   if (pathname === '/') {
-    const accessToken  = req.cookies.get('access_token')?.value
-    const refreshToken = req.cookies.get('refresh_token')?.value
-    const sessionToken = accessToken ?? refreshToken
-    if (sessionToken) {
-      const role = getRoleFromToken(sessionToken)
+    const accessToken = req.cookies.get('access_token')?.value
+    if (accessToken) {
+      const role = getRoleFromToken(accessToken)
       const allowedPrefix = role ? ROLE_ROUTES[role] : null
       if (allowedPrefix) {
         const dest = req.nextUrl.clone()
