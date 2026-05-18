@@ -4,7 +4,7 @@ import { motion } from 'framer-motion'
 import { MessageCircle, Menu } from 'lucide-react'
 import Image from 'next/image'
 import { ASSETS } from '@/lib/data'
-import NotificationIcon from '@/components/ui/NotificationIcon' // adjust path if needed
+import NotificationIcon from '@/components/ui/NotificationIcon'
 
 interface ReusableHeaderProps {
   sidebarOpen: boolean

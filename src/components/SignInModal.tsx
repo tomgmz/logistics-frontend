@@ -6,32 +6,24 @@ import { useRouter } from 'next/navigation'
 import { AxiosError } from 'axios'
 import { requestOtp, verifyOtp, loginWithPassword, getMe, getAuthStatus, AuthUser } from '@/lib/api/auth.api'
 import { useAuthStore } from '@/lib/store/auth.store'
+import { ROLE_ROUTES, ADMIN_EMAIL } from '@/constants/roles'
 import { now } from '@/app/utils/serverTime'
-
-const ROLE_ROUTES: Record<string, string> = {
-  super_admin:      '/superadmin',
-  general_manager:  '/general_manager',
-  accountant:       '/accountant',
-  human_resources:  '/human_resources',
-  fleet_admin:      '/fleet_admin',
-  operations_admin: '/operations_admin',
-  it_admin:         '/it_admin',
-  client:           '/client',
-  vendor:           '/vendor',
-}
-
-const getFallbackRoute = (role: string) => ROLE_ROUTES[role] ?? '/'
 
 const OTP_LENGTH  = 6
 const RESEND_SECS = 60
 
 interface ApiErrorResponse { message?: string; code?: string; retryAfter?: number }
+
 function extractErrorMessage(err: unknown, fallback: string): string {
   if (err instanceof AxiosError) {
     const data = err.response?.data as ApiErrorResponse | undefined
     return data?.message ?? fallback
   }
   return fallback
+}
+
+function getFallbackRoute(role: string): string {
+  return ROLE_ROUTES[role] ?? '/'
 }
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
@@ -220,6 +212,57 @@ function ErrorMessage({ message }: { message: string }) {
   )
 }
 
+// ─── Permanent lock screen (shared by OTP and Password steps) ─────────────────
+
+function PermanentLockScreen({ onBack }: { onBack: () => void }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 20 }}
+      transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
+      className="flex flex-col gap-6"
+    >
+      <div className="flex items-center gap-2" style={{ color: 'rgba(239,68,68,0.85)' }}>
+        <IconAlert />
+        <span
+          className="text-[0.72rem] font-semibold tracking-[0.18em] uppercase"
+          style={{ fontFamily: "'League Spartan', sans-serif" }}
+        >
+          Account Locked
+        </span>
+      </div>
+
+      <div
+        className="rounded-xl px-4 py-4 text-[0.78rem] leading-relaxed flex flex-col gap-3"
+        style={{
+          background: 'rgba(239,68,68,0.08)',
+          border: '1px solid rgba(239,68,68,0.25)',
+          color: 'rgba(239,68,68,0.85)',
+          fontFamily: "'League Spartan', sans-serif",
+        }}
+      >
+        <span>
+          Your account has been permanently locked due to too many failed login attempts.
+        </span>
+        <span>
+          Please contact your administrator at{' '}
+          <a
+            href={`mailto:${ADMIN_EMAIL}`}
+            className="underline underline-offset-2 hover:opacity-80 transition-opacity"
+            style={{ color: 'rgba(239,68,68,1)' }}
+          >
+            {ADMIN_EMAIL}
+          </a>{' '}
+          to regain access.
+        </span>
+      </div>
+
+      <BackButton onClick={onBack} label="Change email" />
+    </motion.div>
+  )
+}
+
 // ─── Step 1: Email ────────────────────────────────────────────────────────────
 
 function EmailStep({ onSuccess }: { onSuccess: (email: string) => void }) {
@@ -232,7 +275,6 @@ function EmailStep({ onSuccess }: { onSuccess: (email: string) => void }) {
     if (!email.trim()) return
     setLoading(true); setError('')
     try {
-      // Just validate that the email exists; method choice comes next
       onSuccess(email.trim().toLowerCase())
     } catch (err) {
       setError(extractErrorMessage(err, 'Something went wrong. Please try again.'))
@@ -312,10 +354,6 @@ function MethodStep({
     }
   }
 
-  const handlePassword = () => {
-    onSelectPassword()
-  }
-
   return (
     <motion.div
       key="method-step"
@@ -344,7 +382,6 @@ function MethodStep({
       </div>
 
       <div className="flex flex-col gap-3">
-        {/* OTP option */}
         <motion.button
           whileHover={{ scale: 1.01 }}
           whileTap={{ scale: 0.99 }}
@@ -384,11 +421,10 @@ function MethodStep({
           </div>
         </motion.button>
 
-        {/* Password option */}
         <motion.button
           whileHover={{ scale: 1.01 }}
           whileTap={{ scale: 0.99 }}
-          onClick={handlePassword}
+          onClick={() => onSelectPassword()}
           disabled={!!loading}
           className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-left
             transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
@@ -624,51 +660,7 @@ function OtpStep({
   }
 
   if (lockState === 'permanent') {
-    return (
-      <motion.div
-        initial={{ opacity: 0, x: 20 }}
-        animate={{ opacity: 1, x: 0 }}
-        exit={{ opacity: 0, x: 20 }}
-        transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
-        className="flex flex-col gap-6"
-      >
-        <div className="flex items-center gap-2" style={{ color: 'rgba(239,68,68,0.85)' }}>
-          <IconAlert />
-          <span
-            className="text-[0.72rem] font-semibold tracking-[0.18em] uppercase"
-            style={{ fontFamily: "'League Spartan', sans-serif" }}
-          >
-            Account Locked
-          </span>
-        </div>
-
-        <div
-          className="rounded-xl px-4 py-4 text-[0.78rem] leading-relaxed flex flex-col gap-3"
-          style={{
-            background: 'rgba(239,68,68,0.08)',
-            border: '1px solid rgba(239,68,68,0.25)',
-            color: 'rgba(239,68,68,0.85)',
-            fontFamily: "'League Spartan', sans-serif",
-          }}
-        >
-          <span>
-            Your account has been permanently locked due to too many failed login attempts.
-          </span>
-          <span>
-            Please contact your administrator at{' '}
-            <a href="mailto:admin@gmail.com"
-              className="underline underline-offset-2 hover:opacity-80 transition-opacity"
-              style={{ color: 'rgba(239,68,68,1)' }}
-            >
-              admin@gmail.com
-            </a>{' '}
-            to regain access.
-          </span>
-        </div>
-
-        <BackButton onClick={onBack} label="Change email" />
-      </motion.div>
-    )
+    return <PermanentLockScreen onBack={onBack} />
   }
 
   return (
@@ -814,7 +806,6 @@ function PasswordStep({
   const [lockState,     setLockState]     = useState<'none' | 'temporary' | 'permanent'>('none')
   const [lockRemaining, setLockRemaining] = useState(0)
 
-  // Countdown ticker for temporary lock
   useEffect(() => {
     if (lockState !== 'temporary') return
     const interval = setInterval(() => {
@@ -880,47 +871,7 @@ function PasswordStep({
   }
 
   if (lockState === 'permanent') {
-    return (
-      <motion.div
-        initial={{ opacity: 0, x: 20 }}
-        animate={{ opacity: 1, x: 0 }}
-        exit={{ opacity: 0, x: 20 }}
-        transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
-        className="flex flex-col gap-6"
-      >
-        <div className="flex items-center gap-2" style={{ color: 'rgba(239,68,68,0.85)' }}>
-          <IconAlert />
-          <span
-            className="text-[0.72rem] font-semibold tracking-[0.18em] uppercase"
-            style={{ fontFamily: "'League Spartan', sans-serif" }}
-          >
-            Account Locked
-          </span>
-        </div>
-        <div
-          className="rounded-xl px-4 py-4 text-[0.78rem] leading-relaxed flex flex-col gap-3"
-          style={{
-            background: 'rgba(239,68,68,0.08)',
-            border: '1px solid rgba(239,68,68,0.25)',
-            color: 'rgba(239,68,68,0.85)',
-            fontFamily: "'League Spartan', sans-serif",
-          }}
-        >
-          <span>Your account has been permanently locked due to too many failed login attempts.</span>
-          <span>
-            Please contact your administrator at{' '}
-            <a href="mailto:admin@gmail.com"
-              className="underline underline-offset-2 hover:opacity-80 transition-opacity"
-              style={{ color: 'rgba(239,68,68,1)' }}
-            >
-              admin@gmail.com
-            </a>{' '}
-            to regain access.
-          </span>
-        </div>
-        <BackButton onClick={onBack} label="Change email" />
-      </motion.div>
-    )
+    return <PermanentLockScreen onBack={onBack} />
   }
 
   return (
@@ -1070,8 +1021,7 @@ function SuccessStep() {
 
 type Step = 'email' | 'method' | 'otp' | 'password' | 'success'
 
-// Maps each step to its position index for the progress dots
-const STEP_ORDER: Step[] = ['email', 'method', 'otp', 'success']
+const STEP_ORDER:    Step[] = ['email', 'method', 'otp',      'success']
 const STEP_ORDER_PW: Step[] = ['email', 'method', 'password', 'success']
 
 interface SignInModalProps {
@@ -1080,11 +1030,11 @@ interface SignInModalProps {
 }
 
 export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
-  const router                  = useRouter()
-  const [step,   setStep]       = useState<Step>('email')
-  const [email,  setEmail]      = useState('')
-  const [method, setMethod]     = useState<'otp' | 'password' | null>(null)
-  const resendExpiresAt         = useRef<number>(0)
+  const router              = useRouter()
+  const [step,   setStep]   = useState<Step>('email')
+  const [email,  setEmail]  = useState('')
+  const [method, setMethod] = useState<'otp' | 'password' | null>(null)
+  const resendExpiresAt     = useRef<number>(0)
 
   const handleClose = useCallback(() => {
     onClose()
@@ -1119,17 +1069,19 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
   }
 
   const handleAuthSuccess = async (user: AuthUser, portalUrl: string) => {
+    const mustChange = user.must_change_password
+
     let finalUser = user
     try {
-      finalUser = await getMe()
-      useAuthStore.getState().setUser(finalUser)
+      const freshUser = await getMe()
+      finalUser = { ...freshUser, must_change_password: freshUser.must_change_password ?? mustChange }
     } catch {
-      useAuthStore.getState().setUser(user)
+      // keep original login response user
     }
 
-    const ch = new BroadcastChannel(`auth_sync_${finalUser.user_id}`)
-    ch.postMessage({ type: 'LOGIN', user: finalUser, portalUrl })
-    ch.close()
+    useAuthStore.getState().setUser(finalUser)
+
+    const shouldChangePassword = finalUser.must_change_password
 
     setStep('success')
     setTimeout(() => {
@@ -1138,13 +1090,22 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
       setEmail('')
       setMethod(null)
       resendExpiresAt.current = 0
-      router.replace(portalUrl)
+
+      if (shouldChangePassword) {
+        // must_change_pw cookie is already set by login/verify-otp route,
+        // so middleware enforces this on any new tab automatically
+        router.replace(`/change-password?redirect=${encodeURIComponent(portalUrl)}`)
+      } else {
+        const ch = new BroadcastChannel(`auth_sync_${finalUser.user_id}`)
+        ch.postMessage({ type: 'LOGIN', user: finalUser, portalUrl })
+        ch.close()
+        router.replace(portalUrl)
+      }
     }, 1800)
   }
 
-  // Progress dots — show for all non-success steps
   const progressSteps = method === 'password' ? STEP_ORDER_PW : STEP_ORDER
-  const currentIdx = progressSteps.indexOf(step === 'success' ? 'success' : step)
+  const currentIdx    = progressSteps.indexOf(step === 'success' ? 'success' : step)
 
   return (
     <>
@@ -1201,9 +1162,7 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
                 </button>
 
                 <div className="mb-10">
-                  <h2
-                    className="text-white font-body tracking-[0.15em] uppercase leading-tight"
-                  >
+                  <h2 className="text-white font-body tracking-[0.15em] uppercase leading-tight">
                     Sign In Your Account
                   </h2>
 

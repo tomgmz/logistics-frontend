@@ -16,5 +16,6 @@ export async function POST(req: NextRequest) {
   const res = NextResponse.json({ status: 'success', message: 'Logged out from all devices' })
   res.cookies.set('access_token',  '', cookieClearOptions)
   res.cookies.set('refresh_token', '', cookieClearOptions)
+  res.cookies.set('must_change_pw', '', { ...cookieClearOptions, httpOnly: false })
   return res
 }

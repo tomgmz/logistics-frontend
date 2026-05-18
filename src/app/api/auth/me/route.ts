@@ -7,9 +7,7 @@ export async function GET(req: NextRequest) {
     const { data } = await axios.get(`${API_URL}/auth/me`, {
       headers: getForwardHeaders(req),
     })
-
     return NextResponse.json(data)
-
   } catch (error: unknown) {
     return handleError(error)
   }

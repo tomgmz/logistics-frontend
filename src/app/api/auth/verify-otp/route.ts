@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import axios from 'axios'
-import { API_URL, accessTokenCookieOptions, refreshTokenCookieOptions, getForwardHeaders, handleError } from '../_proxy'
+import {
+  API_URL,
+  accessTokenCookieOptions,
+  refreshTokenCookieOptions,
+  mustChangePwCookieOptions,
+  getForwardHeaders,
+  handleError,
+} from '../_proxy'
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,8 +20,12 @@ export async function POST(req: NextRequest) {
     const res = NextResponse.json(data)
     res.cookies.set('access_token',  data.data.accessToken,  accessTokenCookieOptions)
     res.cookies.set('refresh_token', data.data.refreshToken, refreshTokenCookieOptions)
-    return res
 
+    if (data.data.user?.must_change_password) {
+      res.cookies.set('must_change_pw', '1', mustChangePwCookieOptions)
+    }
+
+    return res
   } catch (error: unknown) {
     return handleError(error)
   }

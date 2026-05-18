@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import axios from 'axios'
-import { API_URL, accessTokenCookieOptions, cookieClearOptions, getForwardHeaders, handleError } from '../_proxy'
+import {
+  API_URL,
+  accessTokenCookieOptions,
+  cookieClearOptions,
+  getForwardHeaders,
+  handleError,
+} from '../_proxy'
 
 export async function POST(req: NextRequest) {
   try {

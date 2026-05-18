@@ -133,6 +133,7 @@ export interface AuthUser {
   last_name:  string | null
   role:       string
   status:     string
+  must_change_password: boolean
   clients?: {
     client_id:       string
     company_name:    string | null
@@ -194,6 +195,10 @@ export async function loginWithPassword(
     platform:    'web',
   })
   return data.data as AuthResponse
+}
+
+export async function changePassword(password: string): Promise<void> {
+  await proxyApi.post('/auth/change-password', { password })
 }
 
 export async function getMe(): Promise<AuthUser> {
