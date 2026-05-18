@@ -6,6 +6,8 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { changePassword } from '@/lib/api/auth.api'
 import { ROLE_ROUTES } from '@/constants/roles'
+import Image from 'next/image'
+import { ASSETS } from '@/lib/data'
 
 interface Requirement {
   label: string
@@ -111,21 +113,17 @@ function IconCheck({ filled }: { filled: boolean }) {
   )
 }
 
-function Logo() {
+function LogoMark() {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: -8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      className="flex flex-col items-start gap-0.5"
-    >
-      <span className="ff-sc text-white text-lg sm:text-[1.35rem] tracking-[0.25em] uppercase leading-none">
-        8338
-      </span>
-      <span className="font-spartan text-[#4df9ed]/60 text-[0.58rem] sm:text-[0.62rem] tracking-[0.35em] uppercase leading-none">
-        Logistics Services
-      </span>
-    </motion.div>
+    <div className="flex items-center gap-2">
+      <Image
+        src={ASSETS.logo}
+        alt="8338 Logistics"
+        width={140}
+        height={40}
+        className="object-contain w-24 sm:w-28 lg:w-[140px]"
+      />
+    </div>
   )
 }
 
@@ -227,7 +225,7 @@ export default function ChangePasswordPage() {
       <div className="sep-x-cyan" />
 
       <header className="px-4 sm:px-10 md:px-16 py-4 sm:py-5 flex items-center justify-between">
-        <Logo />
+        <LogoMark />
         <motion.span
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
