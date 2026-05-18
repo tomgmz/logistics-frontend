@@ -89,6 +89,7 @@ proxyApi.interceptors.response.use(
       url.includes('/auth/refresh')     ||
       url.includes('/auth/verify-otp')  ||
       url.includes('/auth/request-otp') ||
+      url.includes('/auth/login')       ||
       url.includes('/auth/status')      ||
       url.includes('/auth/csrf')        ||
       url.includes('/auth/logout')      ||
@@ -175,6 +176,20 @@ export async function verifyOtp(
   const { data } = await nextApi.post('/api/auth/verify-otp', {
     email,
     code,
+    device_info: device_info ?? getDeviceInfo(),
+    platform:    'web',
+  })
+  return data.data as AuthResponse
+}
+
+export async function loginWithPassword(
+  email:        string,
+  password:     string,
+  device_info?: string
+): Promise<AuthResponse> {
+  const { data } = await nextApi.post('/api/auth/login', {
+    email,
+    password,
     device_info: device_info ?? getDeviceInfo(),
     platform:    'web',
   })

@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import { AxiosError } from 'axios'
-import { requestOtp, verifyOtp, getMe, getAuthStatus, AuthUser } from '@/lib/api/auth.api'
+import { requestOtp, verifyOtp, loginWithPassword, getMe, getAuthStatus, AuthUser } from '@/lib/api/auth.api'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { now } from '@/app/utils/serverTime'
 
@@ -34,6 +34,8 @@ function extractErrorMessage(err: unknown, fallback: string): string {
   return fallback
 }
 
+// ─── Icons ───────────────────────────────────────────────────────────────────
+
 function IconMail() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
@@ -50,6 +52,16 @@ function IconShield() {
       stroke="currentColor" strokeWidth="1.6">
       <path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.25C17.25 22.15 21 17.25 21 12V7l-9-5z"/>
       <path d="m9 12 2 2 4-4"/>
+    </svg>
+  )
+}
+
+function IconLock() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="1.6">
+      <rect x="3" y="11" width="18" height="11" rx="2"/>
+      <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
     </svg>
   )
 }
@@ -81,6 +93,36 @@ function IconAlert() {
     </svg>
   )
 }
+
+function IconEye({ visible }: { visible: boolean }) {
+  return visible ? (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="1.6">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+      <circle cx="12" cy="12" r="3"/>
+    </svg>
+  ) : (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="1.6">
+      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+      <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+      <line x1="1" y1="1" x2="23" y2="23"/>
+    </svg>
+  )
+}
+
+function IconKey() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="1.6">
+      <circle cx="7.5" cy="15.5" r="5.5"/>
+      <path d="m21 2-9.6 9.6"/>
+      <path d="m15.5 7.5 3 3L22 7l-3-3"/>
+    </svg>
+  )
+}
+
+// ─── Shared components ────────────────────────────────────────────────────────
 
 function GlassInput({
   icon,
@@ -114,11 +156,73 @@ function GlassInput({
   )
 }
 
-function EmailStep({
-  onSuccess,
+function PrimaryButton({
+  loading,
+  disabled,
+  onClick,
+  type = 'button',
+  children,
 }: {
-  onSuccess: (email: string, retryAfter?: number) => void
+  loading?: boolean
+  disabled?: boolean
+  onClick?: () => void
+  type?: 'button' | 'submit'
+  children: React.ReactNode
 }) {
+  return (
+    <button
+      type={type}
+      disabled={loading || disabled}
+      onClick={onClick}
+      className="w-full mt-2 py-4 font-body tracking-[0.2em] uppercase !text-[0.82rem]
+        rounded-2xl transition-all duration-200 cursor-pointer
+        hover:bg-[#e0e0e0] active:scale-[0.98]
+        disabled:opacity-40 disabled:cursor-not-allowed"
+      style={{
+        background: '#ffffff',
+        color: '#0a0a0a',
+        fontFamily: "'League Spartan', sans-serif",
+        border: 'none',
+      }}
+    >
+      {loading ? (
+        <span className="inline-block w-4 h-4 border-2 border-black/20
+          border-t-black/70 rounded-full animate-spin" />
+      ) : children}
+    </button>
+  )
+}
+
+function BackButton({ onClick, label = 'Change email' }: { onClick: () => void; label?: string }) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center gap-1.5 text-white/35 text-[0.78rem]
+        hover:text-white/60 transition-colors bg-transparent border-none cursor-pointer"
+      style={{ fontFamily: "'League Spartan', sans-serif" }}
+    >
+      <IconBack /> {label}
+    </button>
+  )
+}
+
+function ErrorMessage({ message }: { message: string }) {
+  return (
+    <motion.p
+      initial={{ opacity: 0, y: -4 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0 }}
+      className="text-red-400/80 text-[0.78rem] flex items-center gap-1.5 -mt-2"
+    >
+      <span className="w-1 h-1 rounded-full bg-red-400 flex-shrink-0" />
+      {message}
+    </motion.p>
+  )
+}
+
+// ─── Step 1: Email ────────────────────────────────────────────────────────────
+
+function EmailStep({ onSuccess }: { onSuccess: (email: string) => void }) {
   const [email,   setEmail]   = useState('')
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState('')
@@ -128,19 +232,9 @@ function EmailStep({
     if (!email.trim()) return
     setLoading(true); setError('')
     try {
-      await requestOtp(email.trim().toLowerCase())
+      // Just validate that the email exists; method choice comes next
       onSuccess(email.trim().toLowerCase())
     } catch (err) {
-      // OTP already sent and still within cooldown window — the existing code
-      // is still valid, so advance to the OTP step and seed the timer from
-      // the server-supplied retryAfter value instead of showing an error.
-      if (err instanceof AxiosError && err.response?.status === 429) {
-        const data = err.response.data as ApiErrorResponse
-        if (data.code === 'OTP_COOLDOWN') {
-          onSuccess(email.trim().toLowerCase(), data.retryAfter)
-          return
-        }
-      }
       setError(extractErrorMessage(err, 'Something went wrong. Please try again.'))
     } finally {
       setLoading(false)
@@ -152,7 +246,7 @@ function EmailStep({
       key="email-step"
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 20 }}
+      exit={{ opacity: 0, x: -20 }}
       transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
       className="flex flex-col gap-7"
     >
@@ -172,44 +266,171 @@ function EmailStep({
         </GlassInput>
 
         <AnimatePresence>
-          {error && (
-            <motion.p
-              initial={{ opacity: 0, y: -4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              className="text-red-400/80 text-[0.78rem] flex items-center gap-1.5 -mt-2"
-            >
-              <span className="w-1 h-1 rounded-full bg-red-400 flex-shrink-0" />
-              {error}
-            </motion.p>
-          )}
+          {error && <ErrorMessage message={error} />}
         </AnimatePresence>
 
-        <button
-          type="submit"
-          disabled={loading || !email.trim()}
-          className="w-full mt-2 py-4 font-body tracking-[0.2em] uppercase !text-[0.82rem]
-            rounded-2xl transition-all duration-200 cursor-pointer
-            hover:bg-[#e0e0e0] active:scale-[0.98]
-            disabled:opacity-40 disabled:cursor-not-allowed"
-          style={{
-            background: '#ffffff',
-            color: '#0a0a0a',
-            fontFamily: "'League Spartan', sans-serif",
-            border: 'none',
-          }}
-        >
-          {loading ? (
-            <span className="inline-block w-4 h-4 border-2 border-black/20
-              border-t-black/70 rounded-full animate-spin" />
-          ) : (
-            'Send Sign In Code'
-          )}
-        </button>
+        <PrimaryButton type="submit" loading={loading} disabled={!email.trim()}>
+          Continue
+        </PrimaryButton>
       </form>
     </motion.div>
   )
 }
+
+// ─── Step 2: Method selection ─────────────────────────────────────────────────
+
+function MethodStep({
+  email,
+  onSelectOtp,
+  onSelectPassword,
+  onBack,
+}: {
+  email: string
+  onSelectOtp: (retryAfter?: number) => void
+  onSelectPassword: () => void
+  onBack: () => void
+}) {
+  const [loading, setLoading] = useState<'otp' | 'password' | null>(null)
+  const [error,   setError]   = useState('')
+
+  const handleOtp = async () => {
+    setLoading('otp'); setError('')
+    try {
+      await requestOtp(email)
+      onSelectOtp()
+    } catch (err) {
+      if (err instanceof AxiosError && err.response?.status === 429) {
+        const data = err.response.data as ApiErrorResponse
+        if (data.code === 'OTP_COOLDOWN') {
+          onSelectOtp(data.retryAfter)
+          return
+        }
+      }
+      setError(extractErrorMessage(err, 'Failed to send code. Please try again.'))
+    } finally {
+      setLoading(null)
+    }
+  }
+
+  const handlePassword = () => {
+    onSelectPassword()
+  }
+
+  return (
+    <motion.div
+      key="method-step"
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -20 }}
+      transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
+      className="flex flex-col gap-6"
+    >
+      <div className="flex flex-col gap-1">
+        <p
+          className="text-white/40 text-[0.8rem] leading-relaxed"
+          style={{ fontFamily: "'League Spartan', sans-serif" }}
+        >
+          Signing in as{' '}
+          <span className="text-[#4df9ed]/70 break-all" style={{ fontFamily: 'monospace' }}>
+            {email}
+          </span>
+        </p>
+        <p
+          className="text-white/30 text-[0.75rem] mt-1"
+          style={{ fontFamily: "'League Spartan', sans-serif" }}
+        >
+          How would you like to continue?
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        {/* OTP option */}
+        <motion.button
+          whileHover={{ scale: 1.01 }}
+          whileTap={{ scale: 0.99 }}
+          onClick={handleOtp}
+          disabled={!!loading}
+          className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-left
+            transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+          style={{
+            background: 'rgba(77,249,237,0.06)',
+            border: '1px solid rgba(77,249,237,0.2)',
+            backdropFilter: 'blur(12px)',
+          }}
+        >
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+            style={{ background: 'rgba(77,249,237,0.1)' }}
+          >
+            {loading === 'otp' ? (
+              <span className="w-4 h-4 border-2 border-[#4df9ed]/20 border-t-[#4df9ed] rounded-full animate-spin" />
+            ) : (
+              <span className="text-[#4df9ed]"><IconShield /></span>
+            )}
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <span
+              className="text-white text-[0.85rem] font-semibold tracking-wide"
+              style={{ fontFamily: "'League Spartan', sans-serif" }}
+            >
+              Email Sign-In Code
+            </span>
+            <span
+              className="text-white/35 text-[0.72rem]"
+              style={{ fontFamily: "'League Spartan', sans-serif" }}
+            >
+              We&apos;ll send a 6-digit code to your inbox
+            </span>
+          </div>
+        </motion.button>
+
+        {/* Password option */}
+        <motion.button
+          whileHover={{ scale: 1.01 }}
+          whileTap={{ scale: 0.99 }}
+          onClick={handlePassword}
+          disabled={!!loading}
+          className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-left
+            transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+          style={{
+            background: 'rgba(255,255,255,0.05)',
+            border: '1px solid rgba(255,255,255,0.1)',
+            backdropFilter: 'blur(12px)',
+          }}
+        >
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+            style={{ background: 'rgba(255,255,255,0.07)' }}
+          >
+            <span className="text-white/50"><IconKey /></span>
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <span
+              className="text-white text-[0.85rem] font-semibold tracking-wide"
+              style={{ fontFamily: "'League Spartan', sans-serif" }}
+            >
+              Password
+            </span>
+            <span
+              className="text-white/35 text-[0.72rem]"
+              style={{ fontFamily: "'League Spartan', sans-serif" }}
+            >
+              Sign in with your account password
+            </span>
+          </div>
+        </motion.button>
+      </div>
+
+      <AnimatePresence>
+        {error && <ErrorMessage message={error} />}
+      </AnimatePresence>
+
+      <BackButton onClick={onBack} label="Change email" />
+    </motion.div>
+  )
+}
+
+// ─── Step 3a: OTP ─────────────────────────────────────────────────────────────
 
 function OtpStep({
   email,
@@ -445,14 +666,7 @@ function OtpStep({
           </span>
         </div>
 
-        <button
-          onClick={onBack}
-          className="flex items-center gap-1.5 text-white/35 text-[0.78rem]
-            hover:text-white/60 transition-colors bg-transparent border-none cursor-pointer"
-          style={{ fontFamily: "'League Spartan', sans-serif" }}
-        >
-          <IconBack /> Change email
-        </button>
+        <BackButton onClick={onBack} label="Change email" />
       </motion.div>
     )
   }
@@ -462,7 +676,7 @@ function OtpStep({
       key="otp-step"
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 20 }}
+      exit={{ opacity: 0, x: -20 }}
       transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
       className="flex flex-col gap-6"
     >
@@ -549,51 +763,20 @@ function OtpStep({
         )}
 
         {lockState === 'none' && error && (
-          <motion.p
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="text-red-400/80 text-[0.78rem] flex items-center gap-1.5 -mt-2"
-          >
-            <span className="w-1 h-1 rounded-full bg-red-400 flex-shrink-0" />
-            {error}
-          </motion.p>
+          <ErrorMessage message={error} />
         )}
       </AnimatePresence>
 
-      <button
+      <PrimaryButton
+        loading={loading}
+        disabled={code.length !== OTP_LENGTH || lockState !== 'none'}
         onClick={handleSubmit}
-        disabled={loading || code.length !== OTP_LENGTH || lockState !== 'none'}
-        className="w-full py-4 font-body tracking-[0.2em] uppercase !text-[0.82rem]
-          rounded-2xl transition-all duration-200 cursor-pointer
-          hover:bg-[#e0e0e0] active:scale-[0.98]
-          disabled:opacity-40 disabled:cursor-not-allowed"
-        style={{
-          background: '#ffffff',
-          color: '#0a0a0a',
-          fontFamily: "'League Spartan', sans-serif",
-          border: 'none',
-        }}
       >
-        {loading ? (
-          <span className="inline-block w-4 h-4 border-2 border-black/20
-            border-t-black/70 rounded-full animate-spin" />
-        ) : lockState === 'temporary' ? (
-          'Locked'
-        ) : (
-          'Verify & Sign In'
-        )}
-      </button>
+        {lockState === 'temporary' ? 'Locked' : 'Verify & Sign In'}
+      </PrimaryButton>
 
       <div className="flex items-center justify-between">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-1.5 text-white/35 text-[0.78rem]
-            hover:text-white/60 transition-colors bg-transparent border-none cursor-pointer"
-          style={{ fontFamily: "'League Spartan', sans-serif" }}
-        >
-          <IconBack /> Change email
-        </button>
+        <BackButton onClick={onBack} label="Back" />
 
         {lockState === 'none' && (
           <button
@@ -611,6 +794,234 @@ function OtpStep({
     </motion.div>
   )
 }
+
+// ─── Step 3b: Password ────────────────────────────────────────────────────────
+
+function PasswordStep({
+  email,
+  onSuccess,
+  onBack,
+}: {
+  email: string
+  onSuccess: (user: AuthUser, portalUrl: string) => void
+  onBack: () => void
+}) {
+  const lockExpiresAt = useRef<number>(0)
+  const [password,      setPassword]      = useState('')
+  const [showPassword,  setShowPassword]  = useState(false)
+  const [loading,       setLoading]       = useState(false)
+  const [error,         setError]         = useState('')
+  const [lockState,     setLockState]     = useState<'none' | 'temporary' | 'permanent'>('none')
+  const [lockRemaining, setLockRemaining] = useState(0)
+
+  // Countdown ticker for temporary lock
+  useEffect(() => {
+    if (lockState !== 'temporary') return
+    const interval = setInterval(() => {
+      const remaining = Math.max(0, Math.floor((lockExpiresAt.current - now()) / 1000))
+      setLockRemaining(remaining)
+      if (remaining <= 0) {
+        setLockState('none')
+        setError('')
+      }
+    }, 500)
+    return () => clearInterval(interval)
+  }, [lockState])
+
+  function classifyError(message: string): 'temporary' | 'permanent' | 'none' {
+    if (message.toLowerCase().includes('permanently locked')) return 'permanent'
+    if (message.toLowerCase().includes('please contact'))    return 'permanent'
+    if (
+      message.toLowerCase().includes('temporarily locked') ||
+      message.toLowerCase().includes('account locked')     ||
+      message.toLowerCase().includes('too many failed')
+    ) return 'temporary'
+    return 'none'
+  }
+
+  function formatCountdown(seconds: number): string {
+    const m = Math.floor(seconds / 60)
+    const s = seconds % 60
+    return `${m}:${s.toString().padStart(2, '0')}`
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!password || lockState !== 'none') return
+    setLoading(true); setError('')
+    try {
+      const res = await loginWithPassword(email, password)
+      const destination = res.portalUrl ?? getFallbackRoute(res.user.role)
+      onSuccess(res.user, destination)
+    } catch (err) {
+      const message = extractErrorMessage(err, 'Incorrect password. Please try again.')
+      const detected = classifyError(message)
+      setError(message)
+      setLockState(detected)
+      setPassword('')
+
+      if (detected === 'temporary') {
+        try {
+          const status = await getAuthStatus(email)
+          if (status.locked_until) {
+            const expiry = new Date(status.locked_until).getTime()
+            lockExpiresAt.current = expiry
+            setLockRemaining(Math.max(0, Math.floor((expiry - now()) / 1000)))
+          }
+        } catch {
+          const expiry = now() + 3 * 60 * 1000
+          lockExpiresAt.current = expiry
+          setLockRemaining(3 * 60)
+        }
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (lockState === 'permanent') {
+    return (
+      <motion.div
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: 20 }}
+        transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
+        className="flex flex-col gap-6"
+      >
+        <div className="flex items-center gap-2" style={{ color: 'rgba(239,68,68,0.85)' }}>
+          <IconAlert />
+          <span
+            className="text-[0.72rem] font-semibold tracking-[0.18em] uppercase"
+            style={{ fontFamily: "'League Spartan', sans-serif" }}
+          >
+            Account Locked
+          </span>
+        </div>
+        <div
+          className="rounded-xl px-4 py-4 text-[0.78rem] leading-relaxed flex flex-col gap-3"
+          style={{
+            background: 'rgba(239,68,68,0.08)',
+            border: '1px solid rgba(239,68,68,0.25)',
+            color: 'rgba(239,68,68,0.85)',
+            fontFamily: "'League Spartan', sans-serif",
+          }}
+        >
+          <span>Your account has been permanently locked due to too many failed login attempts.</span>
+          <span>
+            Please contact your administrator at{' '}
+            <a href="mailto:admin@gmail.com"
+              className="underline underline-offset-2 hover:opacity-80 transition-opacity"
+              style={{ color: 'rgba(239,68,68,1)' }}
+            >
+              admin@gmail.com
+            </a>{' '}
+            to regain access.
+          </span>
+        </div>
+        <BackButton onClick={onBack} label="Change email" />
+      </motion.div>
+    )
+  }
+
+  return (
+    <motion.div
+      key="password-step"
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -20 }}
+      transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
+      className="flex flex-col gap-6"
+    >
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-2 text-white/60">
+          <IconLock />
+          <span
+            className="text-[0.72rem] font-semibold tracking-[0.18em] uppercase"
+            style={{ fontFamily: "'League Spartan', sans-serif" }}
+          >
+            Enter your password
+          </span>
+        </div>
+        <p
+          className="text-white/40 text-[0.8rem] leading-relaxed"
+          style={{ fontFamily: "'League Spartan', sans-serif" }}
+        >
+          Signing in as{' '}
+          <span className="text-[#4df9ed]/70 break-all" style={{ fontFamily: 'monospace' }}>
+            {email}
+          </span>
+        </p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+        <GlassInput icon={<IconLock />} label="Password">
+          <input
+            type={showPassword ? 'text' : 'password'}
+            value={password}
+            onChange={e => { setPassword(e.target.value); setError('') }}
+            placeholder="••••••••"
+            required
+            autoFocus
+            disabled={lockState !== 'none'}
+            className="w-full bg-transparent text-white text-[0.95rem] outline-none
+              placeholder-white/20 disabled:opacity-40"
+            style={{ fontFamily: "'League Spartan', sans-serif" }}
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword(v => !v)}
+            className="text-white/30 hover:text-white/60 transition-colors
+              bg-transparent border-none cursor-pointer shrink-0 p-0"
+            tabIndex={-1}
+            aria-label={showPassword ? 'Hide password' : 'Show password'}
+          >
+            <IconEye visible={showPassword} />
+          </button>
+        </GlassInput>
+
+        <AnimatePresence mode="wait">
+          {lockState === 'temporary' && (
+            <motion.div
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="rounded-xl px-4 py-3 text-[0.78rem] leading-relaxed flex items-center justify-between gap-4"
+              style={{
+                background: 'rgba(251,146,60,0.08)',
+                border: '1px solid rgba(251,146,60,0.25)',
+                color: 'rgba(251,146,60,0.85)',
+                fontFamily: "'League Spartan', sans-serif",
+              }}
+            >
+              <span>Account temporarily locked. Try again in</span>
+              <span
+                className="font-bold shrink-0"
+                style={{ fontFamily: 'monospace', fontSize: '0.95rem', color: 'rgba(251,146,60,1)' }}
+              >
+                {formatCountdown(lockRemaining)}
+              </span>
+            </motion.div>
+          )}
+          {lockState === 'none' && error && (
+            <ErrorMessage message={error} />
+          )}
+        </AnimatePresence>
+
+        <PrimaryButton
+          type="submit"
+          loading={loading}
+          disabled={!password || lockState !== 'none'}
+        >
+          {lockState === 'temporary' ? 'Locked' : 'Sign In'}
+        </PrimaryButton>
+      </form>
+
+      <BackButton onClick={onBack} label="Back" />
+    </motion.div>
+  )
+}
+
+// ─── Success ──────────────────────────────────────────────────────────────────
 
 function SuccessStep() {
   return (
@@ -655,7 +1066,13 @@ function SuccessStep() {
   )
 }
 
-type Step = 'email' | 'otp' | 'success'
+// ─── Modal shell ──────────────────────────────────────────────────────────────
+
+type Step = 'email' | 'method' | 'otp' | 'password' | 'success'
+
+// Maps each step to its position index for the progress dots
+const STEP_ORDER: Step[] = ['email', 'method', 'otp', 'success']
+const STEP_ORDER_PW: Step[] = ['email', 'method', 'password', 'success']
 
 interface SignInModalProps {
   isOpen: boolean
@@ -663,10 +1080,11 @@ interface SignInModalProps {
 }
 
 export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
-  const router                = useRouter()
-  const [step,  setStep]      = useState<Step>('email')
-  const [email, setEmail]     = useState('')
-  const resendExpiresAt       = useRef<number>(0)
+  const router                  = useRouter()
+  const [step,   setStep]       = useState<Step>('email')
+  const [email,  setEmail]      = useState('')
+  const [method, setMethod]     = useState<'otp' | 'password' | null>(null)
+  const resendExpiresAt         = useRef<number>(0)
 
   const handleClose = useCallback(() => {
     onClose()
@@ -684,16 +1102,23 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
     return () => window.removeEventListener('keydown', onKey)
   }, [isOpen, handleClose])
 
-  const handleEmailSuccess = (e: string, retryAfter?: number) => {
+  const handleEmailSuccess = (e: string) => {
     setEmail(e)
-    // If the server returned a cooldown (OTP already sent recently), seed the
-    // timer from retryAfter so the OTP step shows the correct seconds remaining.
-    // Otherwise start a fresh 60s window from now.
+    setStep('method')
+  }
+
+  const handleSelectOtp = (retryAfter?: number) => {
+    setMethod('otp')
     resendExpiresAt.current = now() + (retryAfter ?? RESEND_SECS) * 1000
     setStep('otp')
   }
 
-  const handleOtpSuccess = async (user: AuthUser, portalUrl: string) => {
+  const handleSelectPassword = () => {
+    setMethod('password')
+    setStep('password')
+  }
+
+  const handleAuthSuccess = async (user: AuthUser, portalUrl: string) => {
     let finalUser = user
     try {
       finalUser = await getMe()
@@ -709,13 +1134,17 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
     setStep('success')
     setTimeout(() => {
       handleClose()
-      // Reset only after a completed sign-in so the next open starts fresh
       setStep('email')
       setEmail('')
+      setMethod(null)
       resendExpiresAt.current = 0
       router.replace(portalUrl)
     }, 1800)
   }
+
+  // Progress dots — show for all non-success steps
+  const progressSteps = method === 'password' ? STEP_ORDER_PW : STEP_ORDER
+  const currentIdx = progressSteps.indexOf(step === 'success' ? 'success' : step)
 
   return (
     <>
@@ -780,15 +1209,15 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
 
                   {step !== 'success' && (
                     <div className="flex gap-1.5 mt-4">
-                      {(['email', 'otp'] as const).map((s, i) => (
+                      {progressSteps.filter(s => s !== 'success').map((s, i) => (
                         <motion.div
                           key={s}
                           className="h-[3px] rounded-full"
                           animate={{
-                            width: step === s ? 28 : 10,
-                            backgroundColor: step === s
+                            width: i === currentIdx ? 28 : 10,
+                            backgroundColor: i === currentIdx
                               ? 'rgba(77,249,237,0.85)'
-                              : i < (['email', 'otp'] as const).indexOf(step)
+                              : i < currentIdx
                                 ? 'rgba(77,249,237,0.35)'
                                 : 'rgba(255,255,255,0.12)',
                           }}
@@ -802,17 +1231,30 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
                   {step === 'email' && (
                     <EmailStep key="email" onSuccess={handleEmailSuccess} />
                   )}
+                  {step === 'method' && (
+                    <MethodStep
+                      key="method"
+                      email={email}
+                      onSelectOtp={handleSelectOtp}
+                      onSelectPassword={handleSelectPassword}
+                      onBack={() => setStep('email')}
+                    />
+                  )}
                   {step === 'otp' && (
                     <OtpStep
                       key="otp"
                       email={email}
                       resendExpiresAt={resendExpiresAt}
-                      onSuccess={handleOtpSuccess}
-                      onBack={() => {
-                        setStep('email')
-                        // Reset timer so a new email submission gets a fresh 60s
-                        resendExpiresAt.current = 0
-                      }}
+                      onSuccess={handleAuthSuccess}
+                      onBack={() => setStep('method')}
+                    />
+                  )}
+                  {step === 'password' && (
+                    <PasswordStep
+                      key="password"
+                      email={email}
+                      onSuccess={handleAuthSuccess}
+                      onBack={() => setStep('method')}
                     />
                   )}
                   {step === 'success' && (
