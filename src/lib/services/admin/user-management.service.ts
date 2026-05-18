@@ -183,13 +183,23 @@ export const itAdminService = {
   deactivate: (id: string) => patch<AdminUser>(`${B}/it-admins/${id}/deactivate`),
 }
 
+export interface VehicleEligibility {
+  can_drive_light_commercial: boolean
+  can_drive_heavy_truck:      boolean
+  can_drive_articulated:      boolean
+  can_drive_bus:              boolean
+}
+
 export interface LicenseOCRResult {
-  license_number: string  | null
-  license_expiry:  string | null
-  first_name:      string | null
-  last_name:       string | null
-  middle_name:     string | null
-  suffix:          string | null
+  license_number:      string | null
+  license_expiry:      string | null
+  first_name:          string | null
+  last_name:           string | null
+  middle_name:         string | null
+  suffix:              string | null
+  dl_codes:            string[]
+  restriction_codes:   string[]
+  vehicle_eligibility: VehicleEligibility | null
 }
 
 export const ocrService = {
