@@ -1,11 +1,12 @@
 'use client'
 
 import { ReactNode, useEffect } from 'react'
-import { CreditCard } from 'lucide-react'
+import { CreditCard, LayoutDashboard } from 'lucide-react'
 import ReusableDashboardShell from '@/components/layout/ReusableDashboardShell'
 import { useAuthStore } from '@/lib/store/auth.store'
 
 const NAV_ITEMS = [
+  { href: '/accountant/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={17} /> },
   { href: '/accountant/transaction-history', label: 'Transaction History', icon: <CreditCard size={17} /> },
   { href: '/accountant/expenses', label: 'Expenses', icon: <CreditCard size={17} /> },
   { href: '/accountant/document-management', label: 'Document Management', icon: <CreditCard size={17} /> },

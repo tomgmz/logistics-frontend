@@ -1,30 +1,102 @@
 'use client'
 
-import { ReactNode, useEffect } from 'react'
+import {
+  Users,
+  FileSearch,
+  ScrollText,
+  Truck,
+  CalendarCheck,
+  MapPin,
+  CreditCard,
+  BanknoteArrowDown,
+  History,
+  Layers,
+  LayoutDashboard
+} from 'lucide-react'
 import ReusableDashboardShell from '@/components/layout/ReusableDashboardShell'
-import { Activity } from 'lucide-react'
+import { ReactNode, useEffect } from 'react'
 import { useAuthStore } from '@/lib/store/auth.store'
 
-const ADMIN_NAV = [
-  { href: '/admin/audit-logs', label: 'Audit Logs', icon: <Activity size={20} /> },
+const adminNavItems = [
+  {
+    href: '/admin/dashboard',
+    label: 'Dashboard',
+    icon: <LayoutDashboard size={17} />,
+  },
+  {
+    href: '/admin/user-management',
+    label: 'User Management',
+    icon: <Users size={17} />,
+  },
+  {
+    href: '/admin/booking-management',
+    label: 'Booking Management',
+    icon: <CalendarCheck size={17} />,
+  },
+  {
+    href: '/admin/transit-tracking',
+    label: 'Transit Tracking',
+    icon: <MapPin size={17} />,
+  },
+  {
+    href: '/admin/vehicle-management',
+    label: 'Vehicle Management',
+    icon: <Truck size={17} />,
+  },
+  {
+    href: '/admin/billing-management',
+    label: 'Billing Management',
+    icon: <CreditCard size={17} />,
+  },
+  {
+    href: '/admin/transaction-history',
+    label: 'Transaction History',
+    icon: <History size={17} />,
+  },
+  {
+    href: '/admin/document-management',
+    label: 'Document Management',
+    icon: <FileSearch size={17} />,
+  },
+  {
+    href: '/admin/cargo-catalog',
+    label: 'Cargo Catalog',
+    icon: <Layers size={17} />,
+  },
+  {
+    href: '/admin/audit-logs',
+    label: 'Audit Logs',
+    icon: <ScrollText size={17} />,
+  },
+  {
+    href: '/admin/expenses',
+    label: 'Expenses',
+    icon: <BanknoteArrowDown size={17} />,
+  },
 ]
 
-export default function AdminLayout({ children }: { children: ReactNode }) {
+interface AdminShellProps {
+  children: ReactNode
+}
+
+export default function AdminShell({ children }: AdminShellProps) {
   const user = useAuthStore((s) => s.user)
   const hasHydrated = useAuthStore((s) => s.hasHydrated)
 
   useEffect(() => {
     if (!hasHydrated) return
-    const allowed = user?.role === 'it_admin' || user?.role === 'super_admin'
-    if (!user || !allowed) {
+    if (!user || user.role !== 'admin') {
       window.location.replace('/')
     }
   }, [hasHydrated, user])
 
-  const allowed = user?.role === 'it_admin' || user?.role === 'super_admin'
-  if (!hasHydrated || !user || !allowed) {
+  if (!hasHydrated || !user || user.role !== 'admin') {
     return <div className="min-h-screen bg-[#0a0a0a]" />
   }
 
-  return <ReusableDashboardShell navItems={ADMIN_NAV}>{children}</ReusableDashboardShell>
+  return (
+    <ReusableDashboardShell navItems={adminNavItems}>
+      {children}
+    </ReusableDashboardShell>
+  )
 }

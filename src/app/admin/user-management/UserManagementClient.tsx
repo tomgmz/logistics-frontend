@@ -158,7 +158,7 @@ const STATUS_CFG: Record<UserStatus, { label: string; cls: string }> = {
 }
 
 const ROLE_COLORS: Record<string, string> = {
-  super_admin:      'bg-[#4df9ed]/10 text-[#4df9ed] border-[#4df9ed]/30',
+  admin:      'bg-[#4df9ed]/10 text-[#4df9ed] border-[#4df9ed]/30',
   it_admin:         'bg-blue-500/15 text-blue-400 border-blue-500/30',
   general_manager:  'bg-cyan-500/15 text-cyan-400 border-cyan-500/30',
   fleet_admin:      'bg-orange-500/15 text-orange-400 border-orange-500/30',
@@ -171,7 +171,7 @@ const ROLE_COLORS: Record<string, string> = {
 }
 
 const ROLE_LABELS: Record<string, string> = {
-  super_admin:      'Super Admin',
+  admin:      'Admin',
   it_admin:         'IT Admin',
   general_manager:  'General Manager',
   fleet_admin:      'Fleet Manager',

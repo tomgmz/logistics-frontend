@@ -1,5 +1,5 @@
 export const ROLE_ROUTES: Record<string, string> = {
-  super_admin:      '/superadmin',
+  admin:      '/admin',
   general_manager:  '/general_manager',
   accountant:       '/accountant',
   human_resources:  '/human_resources',

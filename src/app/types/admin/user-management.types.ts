@@ -1,5 +1,5 @@
 export type AdminRole =
-  | 'super_admin'
+  | 'admin'
   | 'it_admin'
   | 'general_manager'
   | 'fleet_admin'

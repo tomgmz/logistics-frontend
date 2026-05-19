@@ -375,7 +375,7 @@ export default function CargoCatalogView() {
       {/* ── header ─────────────────────────────────────────────────────────── */}
       <header className="shrink-0 border-b border-white/[0.07] px-4 py-3 flex items-center justify-between gap-4">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/35">Super Admin</p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/35">Admin</p>
           <h1 className="mt-0.5 text-lg font-bold tracking-tight text-white">Cargo Catalog</h1>
         </div>
         <button
