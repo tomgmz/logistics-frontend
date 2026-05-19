@@ -25,6 +25,9 @@ import type { CargoMode, ItemGroup } from '@/lib/store/slice/booking.slice'
 import { selectCargoSummary, selectSections } from '@/lib/store/bookingSelectors'
 import MapLocationPicker from './MapLocationPicker'
 import './BookingDetails.css'
+import { cargoCatalogService } from '@/lib/services/admin/cargo-catalog.service'
+import { appToast } from '@/lib/toast'
+import type { Commodity, Product, HandlingCode } from '@/app/types/admin/cargo-catalog.types'
 
 import Select, { SelectChangeEvent } from '@mui/material/Select'
 import MenuItem from '@mui/material/MenuItem'
@@ -523,6 +526,34 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
 
   const allGroups = sections.flatMap((s) => s.groups)
 
+  const [commodities,     setCommodities]     = useState<Commodity[]>([])
+  const [productsCatalog, setProductsCatalog] = useState<Product[]>([])
+  const [shcStandardList, setShcStandardList] = useState<HandlingCode[]>([])
+  const [shcAdditionalList, setShcAdditionalList] = useState<HandlingCode[]>([])
+
+  useEffect(() => {
+    let mounted = true
+    async function loadCatalog() {
+      try {
+        const [comms, prods, std, add] = await Promise.all([
+          cargoCatalogService.getCommodities(),
+          cargoCatalogService.getProducts(),
+          cargoCatalogService.getHandlingCodes('standard'),
+          cargoCatalogService.getHandlingCodes('additional'),
+        ])
+        if (!mounted) return
+        setCommodities(comms)
+        setProductsCatalog(prods)
+        setShcStandardList(std)
+        setShcAdditionalList(add)
+      } catch (err: unknown) {
+        appToast.error('Unable to load cargo catalog')
+      }
+    }
+    loadCatalog()
+    return () => { mounted = false }
+  }, [])
+
   const computedAllNonTiltable  = allGroups.length > 0 && allGroups.every((g) => g.nonTiltable)
   const computedAllNonStackable = allGroups.length > 0 && allGroups.every((g) => g.nonStackable)
   const computedAllStackable    = allGroups.length > 0 && allGroups.every((g) => g.stackable)
@@ -843,6 +874,10 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                               <ProductFieldsRow
                                 group={g} errors={gErr}
                                 onUpdate={(patch) => handleUpdateGroup(section.dropoffIndex, g.id, patch)}
+                                commodities={commodities}
+                                productsCatalog={productsCatalog}
+                                shcStandardList={shcStandardList}
+                                shcAdditionalList={shcAdditionalList}
                               />
 
                               <div className="border-t border-white/[0.07] my-3" />
@@ -1245,64 +1280,267 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
   )
 }
 
-function ProductFieldsRow({ group, errors, onUpdate }: {
-  group: ItemGroup; errors: GroupErrors; onUpdate: (patch: Partial<ItemGroup>) => void
+function ComboboxField({
+  label,
+  required,
+  options,
+  value,
+  inputValue,
+  onSelect,
+  onType,
+  onClear,
+  disabled,
+  placeholder,
+  hasError,
+  errorMsg,
+}: {
+  label: string
+  required?: boolean
+  options: { id: string; label: string }[]
+  value: string
+  inputValue: string
+  onSelect: (id: string, label: string) => void
+  onType: (text: string) => void
+  onClear: () => void
+  disabled?: boolean
+  placeholder?: string
+  hasError?: boolean
+  errorMsg?: string
 }) {
-  const INPUT_BG_CARD = '#424242'
-  const BORDER_CARD   = 'rgba(255,255,255,0.12)'
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  const filtered = options.filter((o) =>
+    o.label.toLowerCase().includes(inputValue.toLowerCase())
+  )
+
+  const isCustom = inputValue.trim() !== '' && value === ''
+
+  const idleBorder   = hasError ? `${ERROR_COLOR}99` : BORDER_CARD
+  const activeBorder = hasError ? ERROR_COLOR : `${CYAN}66`
+
+  return (
+    <div ref={ref} className="flex flex-col gap-1 relative">
+      <label className="font-body booking-text text-xs">
+        {label}{required && <span style={{ color: ERROR_COLOR, marginLeft: 2 }}>*</span>}
+      </label>
+      <div
+        className="flex items-center rounded-lg border transition-colors"
+        style={{
+          background:    INPUT_BG_CARD,
+          borderColor:   open ? activeBorder : idleBorder,
+          height:        36,
+          opacity:       disabled ? 0.45 : 1,
+          pointerEvents: disabled ? 'none' : 'auto',
+        }}
+      >
+        <input
+          value={inputValue}
+          onChange={(e) => {
+            onType(e.target.value)
+            setOpen(true)
+          }}
+          onFocus={() => setOpen(true)}
+          placeholder={placeholder ?? 'Search or type…'}
+          className="flex-1 bg-transparent outline-none px-3 text-sm text-white placeholder:text-white/25"
+          style={{ height: 36 }}
+        />
+        {inputValue && (
+          <button
+            type="button"
+            onClick={() => { onClear(); setOpen(false) }}
+            className="px-2 text-white/30 hover:text-white/70 transition-colors"
+          >
+            <X size={12} />
+          </button>
+        )}
+        {value && (
+          <span className="px-2 shrink-0">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#4DF9ED] inline-block" title="From catalog" />
+          </span>
+        )}
+        {isCustom && (
+          <span className="px-2 text-[10px] text-white/30 shrink-0 font-mono">custom</span>
+        )}
+      </div>
+
+      {hasError && errorMsg && (
+        <FormHelperText sx={HELPER_SX}>{errorMsg}</FormHelperText>
+      )}
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -4, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0,  scale: 1 }}
+            exit={{   opacity: 0, y: -4,  scale: 0.98 }}
+            transition={{ duration: 0.12 }}
+            className="absolute top-[62px] left-0 right-0 z-50 rounded-lg shadow-2xl overflow-hidden"
+            style={{ background: '#1E1C1C', border: `1px solid ${BORDER_PANEL}` }}
+          >
+            <div className="max-h-[200px] overflow-y-auto">
+              {filtered.length > 0 ? (
+                filtered.map((o) => (
+                  <button
+                    key={o.id}
+                    type="button"
+                    onClick={() => { onSelect(o.id, o.label); setOpen(false) }}
+                    className="w-full text-left px-3 py-2 text-sm transition-colors flex items-center justify-between gap-2"
+                    style={{
+                      background: o.id === value ? 'rgba(77,249,237,0.10)' : 'transparent',
+                      color:      o.id === value ? CYAN : '#fff',
+                    }}
+                    onMouseEnter={(e) => { if (o.id !== value) (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.05)' }}
+                    onMouseLeave={(e) => { if (o.id !== value) (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
+                  >
+                    <span className="truncate">{o.label}</span>
+                    {o.id === value && <Check size={11} style={{ color: CYAN, flexShrink: 0 }} />}
+                  </button>
+                ))
+              ) : (
+                <div className="px-3 py-2 text-sm text-white/30">No matches in catalog</div>
+              )}
+
+              {inputValue.trim() !== '' && !filtered.some((o) => o.label.toLowerCase() === inputValue.trim().toLowerCase()) && (
+                <>
+                  <div className="border-t border-white/[0.07] mx-3" />
+                  <button
+                    type="button"
+                    onClick={() => { onSelect('', inputValue.trim()); setOpen(false) }}
+                    className="w-full text-left px-3 py-2 text-sm text-white/50 hover:text-white transition-colors flex items-center gap-2"
+                    style={{ background: 'transparent' }}
+                  >
+                    <Plus size={12} />
+                    Use <span className="text-white font-medium mx-1">&ldquo;{inputValue.trim()}&rdquo;</span> as custom
+                  </button>
+                </>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+function ProductFieldsRow({
+  group, errors, onUpdate, commodities, productsCatalog, shcStandardList, shcAdditionalList,
+}: {
+  group: ItemGroup
+  errors: GroupErrors
+  onUpdate: (patch: Partial<ItemGroup>) => void
+  commodities: Commodity[]
+  productsCatalog: Product[]
+  shcStandardList: HandlingCode[]
+  shcAdditionalList: HandlingCode[]
+}) {
+  // Build options lists
+  const commodityOptions = commodities.map((c) => ({
+    id:    c.commodity_id,
+    label: c.name + (c.category ? ` — ${c.category}` : ''),
+  }))
+
+  const productsForCommodity = group.commodityId
+    ? productsCatalog.filter((p) => p.commodity_id === group.commodityId)
+    : productsCatalog
+
+  const productOptions = productsForCommodity.map((p) => ({
+    id:    p.product_id,
+    label: p.name + (p.unit ? ` — ${p.unit}` : ''),
+  }))
+
+  const shcStandardOptions   = shcStandardList.map((h)   => ({ id: h.handling_code_id, label: h.code }))
+  const shcAdditionalOptions = shcAdditionalList.map((h) => ({ id: h.handling_code_id, label: h.code }))
+
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 items-start">
-      <div className="flex flex-col gap-1">
-        <label className="font-body booking-text text-xs">
-          Commodity<span style={{ color: '#f87171', marginLeft: 2 }}>*</span>
-        </label>
-        <TextField fullWidth placeholder="e.g. Accessories" variant="outlined"
-          value={group.commodity} error={!!errors.commodity}
-          onChange={(e) => onUpdate({ commodity: e.target.value })}
-          sx={fieldSx(INPUT_BG_CARD, BORDER_CARD, !!errors.commodity)} />
-        {errors.commodity && <FormHelperText sx={HELPER_SX}>{errors.commodity}</FormHelperText>}
-      </div>
-      <div className="flex flex-col gap-1">
-        <label className="font-body booking-text text-xs">
-          Product<span style={{ color: '#f87171', marginLeft: 2 }}>*</span>
-        </label>
-        <TextField fullWidth placeholder="e.g. General Cargo" variant="outlined"
-          value={group.product} error={!!errors.product}
-          onChange={(e) => onUpdate({ product: e.target.value })}
-          sx={fieldSx(INPUT_BG_CARD, BORDER_CARD, !!errors.product)} />
-        {errors.product && <FormHelperText sx={HELPER_SX}>{errors.product}</FormHelperText>}
-      </div>
-      <div className="flex flex-col gap-1">
-        <label className="font-body booking-text text-xs">
-          Special Handling Code<span style={{ color: '#f87171', marginLeft: 2 }}>*</span>
-        </label>
-        <Select value={group.shc} onChange={(e: SelectChangeEvent) => onUpdate({ shc: e.target.value })}
-          displayEmpty
-          sx={{ ...selectSx(INPUT_BG_CARD, BORDER_CARD, !!errors.shc), width: '100%' }}
-          MenuProps={MENU_PROPS}
-        >
-          <MenuItem value=""><em style={{ opacity: 0.4, fontStyle: 'normal' }}>Select Special Handling Code</em></MenuItem>
-          <MenuItem value="GEN">GEN</MenuItem><MenuItem value="PER">PER</MenuItem>
-          <MenuItem value="EAT">EAT</MenuItem><MenuItem value="HEA">HEA</MenuItem>
-        </Select>
-        {errors.shc && <FormHelperText sx={HELPER_SX}>{errors.shc}</FormHelperText>}
-      </div>
-      <div className="flex flex-col gap-1">
-        <label className="font-body booking-text text-xs">
-          Additional SHC<span style={{ color: '#f87171', marginLeft: 2 }}>*</span>
-        </label>
-        <Select value={group.additionalShc} onChange={(e: SelectChangeEvent) => onUpdate({ additionalShc: e.target.value })}
-          displayEmpty
-          sx={{ ...selectSx(INPUT_BG_CARD, BORDER_CARD, !!errors.additionalShc), width: '100%' }}
-          MenuProps={MENU_PROPS}
-        >
-          <MenuItem value=""><em style={{ opacity: 0.4, fontStyle: 'normal' }}>Select additional SHC</em></MenuItem>
-          <MenuItem value="FRAGILE">FRAGILE</MenuItem>
-          <MenuItem value="PERISHABLE">PERISHABLE</MenuItem>
-          <MenuItem value="HAZMAT">HAZMAT</MenuItem>
-        </Select>
-        {errors.additionalShc && <FormHelperText sx={HELPER_SX}>{errors.additionalShc}</FormHelperText>}
-      </div>
+
+      {/* Commodity */}
+      <ComboboxField
+        label="Commodity"
+        required
+        options={commodityOptions}
+        value={group.commodityId}
+        inputValue={group.commodity}
+        onSelect={(id, label) => {
+          const name = id
+            ? (commodities.find((c) => c.commodity_id === id)?.name ?? label)
+            : label
+          // Reset product when commodity changes
+          onUpdate({ commodity: name, commodityId: id, product: '', productId: '' })
+        }}
+        onType={(text) => onUpdate({ commodity: text, commodityId: '', product: '', productId: '' })}
+        onClear={() => onUpdate({ commodity: '', commodityId: '', product: '', productId: '' })}
+        placeholder="Search commodity…"
+        hasError={!!errors.commodity}
+        errorMsg={errors.commodity}
+      />
+
+      {/* Product */}
+      <ComboboxField
+        label="Product"
+        required
+        options={productOptions}
+        value={group.productId}
+        inputValue={group.product}
+        onSelect={(id, label) => {
+          const name = id
+            ? (productsCatalog.find((p) => p.product_id === id)?.name ?? label)
+            : label
+          onUpdate({ product: name, productId: id })
+        }}
+        onType={(text) => onUpdate({ product: text, productId: '' })}
+        onClear={() => onUpdate({ product: '', productId: '' })}
+        disabled={!group.commodity}
+        placeholder={group.commodity ? 'Search product…' : 'Select commodity first'}
+        hasError={!!errors.product}
+        errorMsg={errors.product}
+      />
+
+      {/* SHC */}
+      <ComboboxField
+        label="Special Handling Code"
+        required
+        options={shcStandardOptions}
+        value={group.shcId}
+        inputValue={group.shc}
+        onSelect={(id, label) => {
+          // label is the code string; id is the UUID
+          onUpdate({ shc: label, shcId: id })
+        }}
+        onType={(text) => onUpdate({ shc: text, shcId: '' })}
+        onClear={() => onUpdate({ shc: '', shcId: '' })}
+        placeholder="Search SHC…"
+        hasError={!!errors.shc}
+        errorMsg={errors.shc}
+      />
+
+      {/* Additional SHC */}
+      <ComboboxField
+        label="Additional SHC"
+        required
+        options={shcAdditionalOptions}
+        value={group.ashcId}
+        inputValue={group.additionalShc}
+        onSelect={(id, label) => {
+          onUpdate({ additionalShc: label, ashcId: id })
+        }}
+        onType={(text) => onUpdate({ additionalShc: text, ashcId: '' })}
+        onClear={() => onUpdate({ additionalShc: '', ashcId: '' })}
+        placeholder="Search additional SHC…"
+        hasError={!!errors.additionalShc}
+        errorMsg={errors.additionalShc}
+      />
+
     </div>
   )
 }

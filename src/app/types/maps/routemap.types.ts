@@ -50,8 +50,9 @@ export interface ParsedCargoDetails {
 }
 
 export interface BookingDetail {
-  booking_id:  string
-  client_id:   string
+  booking_id:       string
+  reference_number?: string | null
+  client_id:        string
 
   origin:             string
   origin_latitude?:   number | null
@@ -107,6 +108,29 @@ export interface BookingDetail {
     client_id:      string
     company_name?:  string | null
   } | null
+
+    booking_cargo_items?: {
+    item_id:         string
+    commodity_id?:   string | null
+    commodity_text?: string | null
+    product_id?:     string | null
+    product_text?:   string | null
+    shc_id?:         string | null
+    shc_text?:       string | null
+    ashc_id?:        string | null
+    ashc_text?:      string | null
+    quantity?:       number | null
+    weight_kg?:      number | null
+    volume_cbm?:     number | null
+    length_cm?:      number | null
+    width_cm?:       number | null
+    height_cm?:      number | null
+    notes?:          string | null
+    commodities?:    { name: string; category?: string | null } | null
+    products?:       { name: string; unit?: string | null } | null
+    shc?:            { code: string; name: string; type: string } | null
+    ashc?:           { code: string; name: string; type: string } | null
+  }[]
 }
 
 export interface OptimizedStop {

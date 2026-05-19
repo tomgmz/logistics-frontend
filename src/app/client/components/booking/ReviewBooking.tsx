@@ -8,6 +8,7 @@ import { useAppSelector, useAppDispatch } from '@/lib/hooks/hooks'
 import type { ServiceType, DropoffSection, CargoMode } from '@/lib/store/slice/booking.slice'
 import { resetBooking } from '@/lib/store/slice/booking.slice'
 import { bookingService } from '@/lib/services/client/booking.service'
+import type { CargoItemPayload } from '@/lib/services/client/booking.service'
 import { uploadService } from '@/lib/services/admin/documentUpload.service'
 import { getMe } from '@/lib/api/auth.api'
 import { appToast } from '@/lib/toast'
@@ -19,7 +20,7 @@ interface Props {
   pendingFiles: File[]
   onBack: () => void
   onNewBooking: () => void
-  onClearFiles: () => void   // ← added
+  onClearFiles: () => void
 }
 
 const fadeUp = {
@@ -33,8 +34,8 @@ const stagger = {
 }
 
 function calcSummary(sections: DropoffSection[], mode: CargoMode) {
-  let grossWeight = 0
-  let volume = 0
+  let grossWeight       = 0
+  let volume            = 0
   let stackableRequired = false
 
   for (const section of sections) {
@@ -57,7 +58,7 @@ function calcSummary(sections: DropoffSection[], mode: CargoMode) {
         if (!Number.isFinite(wt) || wt <= 0) continue
         const weightKG = g.weightUnit === 'lbs' ? wt * 0.453592 : wt
         grossWeight += g.perItem === 'Per Item' ? pieces * weightKG : weightKG
-        volume += pieces * (l * w * h) / 1_000_000
+        volume      += pieces * (l * w * h) / 1_000_000
       }
     }
   }
@@ -65,12 +66,85 @@ function calcSummary(sections: DropoffSection[], mode: CargoMode) {
   return { grossWeight, volume, stackableRequired }
 }
 
-function buildCargoDetails(
-  sections: DropoffSection[],
-  mode: CargoMode,
-  service: ServiceType,
-): string {
-  return JSON.stringify({ service, mode, sections })
+function buildCargoItems(sections: DropoffSection[], mode: CargoMode): CargoItemPayload[] {
+  const items: CargoItemPayload[] = []
+
+  for (const section of sections) {
+    for (const g of section.groups) {
+      const catalogFields: Partial<CargoItemPayload> = {
+        ...(g.commodityId   ? { commodity_id:   g.commodityId   } : g.commodity     ? { commodity_text: g.commodity     } : {}),
+        ...(g.productId     ? { product_id:     g.productId     } : g.product       ? { product_text:   g.product       } : {}),
+        ...(g.shcId         ? { shc_id:         g.shcId         } : g.shc           ? { shc_text:        g.shc           } : {}),
+        ...(g.ashcId        ? { ashc_id:        g.ashcId        } : g.additionalShc ? { ashc_text:       g.additionalShc } : {}),
+      }
+
+      let quantity:   number | undefined
+      let weight_kg:  number | undefined
+      let volume_cbm: number | undefined
+      let length_cm:  number | undefined
+      let width_cm:   number | undefined
+      let height_cm:  number | undefined
+
+      if (mode === 'palletized') {
+        const pallets = Number(g.numPallets) || 0
+        const gross   = Number(g.grossWeightPerPallet) || 0
+        const l       = Number(g.palletLength) || 0
+        const w       = Number(g.palletWidth)  || 0
+        const h       = Number(g.palletHeight) || 0
+
+        if (pallets > 0) {
+          quantity  = pallets
+          const grossKG = g.palletWeightUnit === 'lbs' ? gross * 0.453592 : gross
+          if (grossKG > 0) weight_kg = parseFloat((pallets * grossKG).toFixed(2))
+          if (l > 0 && w > 0 && h > 0) {
+            volume_cbm = parseFloat((pallets * (l * w * h) / 1_000_000).toFixed(4))
+          }
+          if (l > 0) length_cm = l
+          if (w > 0) width_cm  = w
+          if (h > 0) height_cm = h
+        }
+      } else {
+        const pieces = Number(g.pieces)
+        const l      = Number(g.looseLength)
+        const w      = Number(g.looseWidth)
+        const h      = Number(g.looseHeight)
+        const wt     = Number(g.weight)
+
+        if (Number.isFinite(pieces) && pieces > 0) quantity = pieces
+
+        if (Number.isFinite(wt) && wt > 0 && Number.isFinite(pieces) && pieces > 0) {
+          const weightKG = g.weightUnit === 'lbs' ? wt * 0.453592 : wt
+          weight_kg = parseFloat(
+            (g.perItem === 'Per Item' ? pieces * weightKG : weightKG).toFixed(2),
+          )
+        }
+
+        if (
+          Number.isFinite(l) && l > 0 &&
+          Number.isFinite(w) && w > 0 &&
+          Number.isFinite(h) && h > 0 &&
+          Number.isFinite(pieces) && pieces > 0
+        ) {
+          volume_cbm = parseFloat((pieces * (l * w * h) / 1_000_000).toFixed(4))
+          length_cm  = l
+          width_cm   = w
+          height_cm  = h
+        }
+      }
+
+      items.push({
+        ...catalogFields,
+        ...(quantity   !== undefined && { quantity }),
+        ...(weight_kg  !== undefined && { weight_kg }),
+        ...(volume_cbm !== undefined && { volume_cbm }),
+        ...(length_cm  !== undefined && { length_cm }),
+        ...(width_cm   !== undefined && { width_cm }),
+        ...(height_cm  !== undefined && { height_cm }),
+      })
+    }
+  }
+
+  return items
 }
 
 export default function StepReview({ selectedService, pendingFiles, onBack, onNewBooking, onClearFiles }: Props) {
@@ -127,11 +201,19 @@ export default function StepReview({ selectedService, pendingFiles, onBack, onNe
           console.error('Document upload failed:', uploadErr)
           docsFailed = true
           setDocUploadState('failed')
-          // still proceed — booking will just have no documents
         }
       }
 
       const { grossWeight, volume, stackableRequired } = calcSummary(sections, mode)
+      const cargoItems = buildCargoItems(sections, mode)
+
+      const maxLength = Math.max(
+        ...sections.flatMap((s) =>
+          s.groups.map((g) =>
+            mode === 'palletized' ? Number(g.palletLength) || 0 : Number(g.looseLength) || 0,
+          ),
+        ),
+      )
 
       const payload = {
         client_id:         clientId,
@@ -139,15 +221,15 @@ export default function StepReview({ selectedService, pendingFiles, onBack, onNe
         ...(pickupLat != null && { origin_latitude:  pickupLat }),
         ...(pickupLng != null && { origin_longitude: pickupLng }),
         truck_type_needed: vehicle.name,
-        cargo_details:     buildCargoDetails(sections, mode, selectedService),
         schedule_date:     date,
         call_time:         time,
-        ...(paymentTerms && { payment_terms: paymentTerms }),
-        ...(grossWeight > 0 && { required_weight_kg:  parseFloat(grossWeight.toFixed(2)) }),
-        ...(volume      > 0 && { required_volume_cbm: parseFloat(volume.toFixed(4)) }),
-        ...(vehicle.maxLengthCM > 0 && { required_length_cm: vehicle.maxLengthCM }),
+        ...(paymentTerms            && { payment_terms:       paymentTerms }),
+        ...(grossWeight > 0         && { required_weight_kg:  parseFloat(grossWeight.toFixed(2)) }),
+        ...(volume      > 0         && { required_volume_cbm: parseFloat(volume.toFixed(4)) }),
+        ...(maxLength   > 0         && { required_length_cm:  maxLength }),
         stackable_required: stackableRequired,
         ...(transactionUrls.length > 0 && { transaction_documents: transactionUrls }),
+        ...(cargoItems.length > 0      && { cargo_items:           cargoItems }),
         destinations: dropoffs
           .filter(Boolean)
           .map((address, i) => ({
@@ -159,10 +241,11 @@ export default function StepReview({ selectedService, pendingFiles, onBack, onNe
       }
 
       const result = await bookingService.createBooking(payload)
+      const bookingReference = result?.reference_number ?? result?.booking_id ?? null
 
-      setBookingId(result?.booking_id ?? null)
-      dispatch(resetBooking())   // ← clears Redux immediately on success
-      onClearFiles()             // ← clears files in sync with Redux reset
+      setBookingId(bookingReference)
+      dispatch(resetBooking())
+      onClearFiles()
       setSubmitted(true)
 
       appToast.success(
@@ -208,7 +291,7 @@ export default function StepReview({ selectedService, pendingFiles, onBack, onNe
         {submitted ? (
           <SuccessView
             key="success"
-            bookingId={bookingId}
+            bookingReference={bookingId}
             onNewBooking={onNewBooking}
           />
         ) : (

@@ -6,7 +6,7 @@ import { Activity } from 'lucide-react'
 import { useAuthStore } from '@/lib/store/auth.store'
 
 const ADMIN_NAV = [
-  { href: '/admin/system-logs', label: 'System Logs', icon: <Activity size={20} /> },
+  { href: '/admin/audit-logs', label: 'Audit Logs', icon: <Activity size={20} /> },
 ]
 
 export default function AdminLayout({ children }: { children: ReactNode }) {

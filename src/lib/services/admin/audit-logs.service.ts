@@ -13,7 +13,7 @@ export interface LogUser {
   last_name:  string | null
 }
 
-export interface SystemLog {
+export interface AuditLog {
   log_id:      string
   user_id:     string | null
   log_type:    LogType
@@ -42,7 +42,7 @@ export interface GetLogsParams {
 }
 
 export interface GetLogsResponse {
-  data:  SystemLog[]
+  data:  AuditLog[]
   total: number
   page:  number
   limit: number
@@ -61,10 +61,10 @@ async function get<T>(url: string, params?: Record<string, unknown>): Promise<T>
 
 const B = '/admin/audit-logs'
 
-export const systemLogService = {
+export const auditLogService = {
   getAll: (params: GetLogsParams): Promise<GetLogsResponse> =>
     proxyApi
-      .get<ApiResponse<SystemLog[]> & { total: number; page: number; limit: number }>(B, { params })
+      .get<ApiResponse<AuditLog[]> & { total: number; page: number; limit: number }>(B, { params })
       .then((r) => ({
         data:  r.data.data,
         total: r.data.total,
@@ -75,6 +75,6 @@ export const systemLogService = {
   getStats: (): Promise<LogStats> =>
     get<LogStats>(`${B}/stats`),
 
-  getById: (id: string): Promise<SystemLog> =>
-    get<SystemLog>(`${B}/${id}`),
+  getById: (id: string): Promise<AuditLog> =>
+    get<AuditLog>(`${B}/${id}`),
 }

@@ -328,7 +328,7 @@ function BookingCard({ booking, onSelect }: {
           <div className="flex items-center gap-2">
             <Hash size={12} style={{ color: CYAN }} />
             <span className="font-bold text-white text-sm tracking-wide font-mono">
-              {booking.booking_id.slice(0, 8).toUpperCase()}
+              {booking.reference_number ?? booking.booking_id.slice(0, 8).toUpperCase()}
             </span>
           </div>
           <div className="flex items-center gap-1.5 text-xs" style={{ color: MUTED }}>
@@ -484,7 +484,7 @@ function BookingDetail({ booking }: {
             <div className="flex items-center gap-2">
               <Hash size={13} style={{ color: CYAN }} />
               <span className="font-bold text-white tracking-wide font-mono">
-                {booking.booking_id.slice(0, 8).toUpperCase()}
+                {booking.reference_number ?? booking.booking_id.slice(0, 8).toUpperCase()}
               </span>
             </div>
             <div className="flex items-center gap-1.5 text-xs" style={{ color: MUTED }}>
@@ -682,6 +682,7 @@ export default function BookingHistoryModule() {
       const bDests      = (b.booking_destinations as BookingDestination[] | undefined) ?? []
       const matchSearch =
         !q ||
+        b.reference_number?.toLowerCase().includes(q) ||
         b.booking_id.toLowerCase().includes(q) ||
         bOrigin.toLowerCase().includes(q) ||
         bDests.some((d) => d.address.toLowerCase().includes(q))
@@ -734,7 +735,7 @@ export default function BookingHistoryModule() {
         <div className="flex items-center gap-2">
           <History size={18} style={{ color: CYAN }} />
           <h1 className="font-bold text-white text-base tracking-wide">
-            {view === 'list' ? 'Transaction History' : selected?.booking_id.slice(0, 8).toUpperCase()}
+            {view === 'list' ? 'Transaction History' : (selected?.reference_number ?? selected?.booking_id.slice(0, 8).toUpperCase())}
           </h1>
         </div>
         {view === 'list' && !loading && (
@@ -765,7 +766,7 @@ export default function BookingHistoryModule() {
             Transaction History
           </button>
           <ChevronRight size={11} />
-          <span style={{ color: CYAN }}>{selected.booking_id.slice(0, 8).toUpperCase()}</span>
+          <span style={{ color: CYAN }}>{selected.reference_number ?? selected.booking_id.slice(0, 8).toUpperCase()}</span>
         </div>
       )}
 
@@ -782,7 +783,7 @@ export default function BookingHistoryModule() {
                 <div className="flex-1">
                   <TextField
                     fullWidth
-                    placeholder="Search by booking ID, pickup, or drop-off…"
+                    placeholder="Search by reference number, pickup, or drop-off…"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     variant="outlined"

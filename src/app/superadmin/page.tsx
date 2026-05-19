@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
 
 export default function ClientPage() {
-  redirect('/superadmin/system-logs')
+  redirect('/superadmin/audit-logs')
 }

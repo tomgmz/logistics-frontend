@@ -10,6 +10,7 @@ import {
   CreditCard,
   BanknoteArrowDown,
   History,
+  Layers,
 } from 'lucide-react'
 import ReusableDashboardShell from '@/components/layout/ReusableDashboardShell'
 import { ReactNode, useEffect } from 'react'
@@ -17,10 +18,11 @@ import { useAuthStore } from '@/lib/store/auth.store'
 
 const superAdminNavItems = [
   {
-    href: '/superadmin/system-logs',
-    label: 'System Logs',
+    href: '/superadmin/audit-logs',
+    label: 'Audit Logs',
     icon: <ScrollText size={17} />,
   },
+
   {
     href: '/superadmin/user-management',
     label: 'User Management',
@@ -30,6 +32,11 @@ const superAdminNavItems = [
     href: '/superadmin/booking-management',
     label: 'Booking Management',
     icon: <CalendarCheck size={17} />,
+  },
+  {
+    href: '/superadmin/cargo-catalog',
+    label: 'Cargo Catalog',
+    icon: <Layers size={17} />,
   },
   {
     href: '/superadmin/billing-management',

@@ -22,32 +22,59 @@ async function patch<T>(url: string, payload?: unknown): Promise<T> {
   return data.data
 }
 
+// ---------------------------------------------------------------------------
+// Cargo item payload — mirrors CreateCargoItemInput on the backend
+// ---------------------------------------------------------------------------
+
+export interface CargoItemPayload {
+  commodity_id?:   string
+  commodity_text?: string
+  product_id?:     string
+  product_text?:   string
+  shc_id?:         string
+  shc_text?:       string
+  ashc_id?:        string
+  ashc_text?:      string
+  quantity?:       number
+  weight_kg?:      number
+  volume_cbm?:     number
+  length_cm?:      number
+  width_cm?:       number
+  height_cm?:      number
+  notes?:          string
+}
+
+// ---------------------------------------------------------------------------
+// Booking payloads
+// ---------------------------------------------------------------------------
+
 export interface CreateBookingPayload {
-  client_id: string
-  origin: string
-  origin_latitude?: number
-  origin_longitude?: number
-  truck_type_needed: string
-  cargo_details?: string
-  schedule_date: string
-  call_time: string
-  required_volume_cbm?: number
-  required_weight_kg?: number
-  required_length_cm?: number
-  stackable_required?: boolean
-  payment_terms?: string
+  client_id:              string
+  origin:                 string
+  origin_latitude?:       number
+  origin_longitude?:      number
+  truck_type_needed:      string
+  schedule_date:          string
+  call_time:              string
+  required_volume_cbm?:   number
+  required_weight_kg?:    number
+  required_length_cm?:    number
+  stackable_required?:    boolean
+  payment_terms?:         string
   transaction_documents?: string[]
+  cargo_items?:           CargoItemPayload[]
   destinations: {
-    address: string
+    address:        string
     sequence_order: number
-    notes?: string
-    latitude?: number
-    longitude?: number
+    notes?:         string
+    latitude?:      number
+    longitude?:     number
   }[]
 }
 
 export interface CreateBookingResult {
-  booking_id?: string
+  booking_id?:       string
+  reference_number?: string
 }
 
 export interface UpdateBookingPayload {
@@ -55,7 +82,6 @@ export interface UpdateBookingPayload {
   origin_longitude?:      number | null
   origin_latitude?:       number | null
   truck_type_needed?:     string
-  cargo_details?:         string
   schedule_date?:         string
   call_time?:             string
   status?:                string
@@ -77,6 +103,10 @@ export type AdminBookingLifecycleStatus =
   | 'completed'
   | 'cancelled'
 
+// ---------------------------------------------------------------------------
+// Service
+// ---------------------------------------------------------------------------
+
 export const bookingService = {
   optimizeRoute: async (bookingId: string) => {
     const { data } = await proxyApi.post(`/route-optimization/optimize/${bookingId}`)
@@ -92,7 +122,7 @@ export const bookingService = {
   updateDestinationStatus: async (
     destinationId: string,
     status: DestinationDeliveryStatus,
-    deliveredAt?: string
+    deliveredAt?: string,
   ) => {
     await initCsrf()
     return patch<unknown>(`/booking/destinations/${destinationId}/status`, {
@@ -107,28 +137,28 @@ export const bookingService = {
   },
 
   fetchBookingsAdminPaginated: async (params: {
-    page: number
-    limit: number
+    page:   number
+    limit:  number
     status: string
     search: string
   }): Promise<{
     rows: Record<string, unknown>[]
     meta: {
-      total: number
-      page: number
-      limit: number
-      totalPages: number
+      total:        number
+      page:         number
+      limit:        number
+      totalPages:   number
       statusCounts: Record<string, number>
     }
   }> => {
     const { data: body } = await proxyApi.get<{
       status: string
-      data: Record<string, unknown>[]
+      data:   Record<string, unknown>[]
       meta: {
-        total: number
-        page: number
-        limit: number
-        totalPages: number
+        total:        number
+        page:         number
+        limit:        number
+        totalPages:   number
         statusCounts: Record<string, number>
       }
     }>('/booking', {
@@ -166,7 +196,7 @@ export const bookingService = {
 
   fetchBookingsByClient: async (clientId: string): Promise<BookingWithRelations[]> => {
     const { data } = await proxyApi.get<{ status: string; data: BookingWithRelations[] }>(
-      `/booking/client/${clientId}`
+      `/booking/client/${clientId}`,
     )
     return data?.data ?? []
   },

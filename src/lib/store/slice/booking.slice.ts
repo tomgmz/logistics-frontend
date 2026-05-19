@@ -24,10 +24,16 @@ export interface ItemGroup {
   netWeightPerPallet: string
   stackable: boolean
   oversize: boolean
+  // display strings
   commodity: string
   product: string
   shc: string
   additionalShc: string
+  // resolved catalog UUIDs (empty string = freeform / not from catalog)
+  commodityId: string
+  productId: string
+  shcId: string
+  ashcId: string
 }
 
 export interface DropoffSection {
@@ -95,6 +101,10 @@ export function makeDefaultGroup(): ItemGroup {
     product: '',
     shc: '',
     additionalShc: '',
+    commodityId: '',
+    productId: '',
+    shcId: '',
+    ashcId: '',
   }
 }
 

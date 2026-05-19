@@ -2,10 +2,10 @@ import  { motion } from 'framer-motion'
 import { CheckCircle2 } from 'lucide-react'
 
 export default function SuccessView({
-  bookingId,
+  bookingReference,
   onNewBooking,
 }: {
-  bookingId: string | null
+  bookingReference: string | null
   onNewBooking: () => void
 }) {
   return (
@@ -34,9 +34,9 @@ export default function SuccessView({
         <p className="font-body booking-text text-[var(--color-muted)] text-base lg:text-xl">
           Your shipment has been scheduled successfully.
         </p>
-        {bookingId && (
+        {bookingReference && (
           <p className="font-body booking-text text-[var(--color-cyan)] text-sm lg:text-lg mt-2">
-            Booking ID: #{bookingId.slice(0, 8).toUpperCase()}
+            Reference Number: {bookingReference}
           </p>
         )}
       </motion.div>

@@ -3,11 +3,11 @@
 import { useEffect, useState, useCallback } from 'react'
 import { RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react'
 import {
-  systemLogService,
-  type SystemLog,
+  auditLogService as systemLogService,
+  type AuditLog as SystemLog,
   type LogStats,
   type LogType,
-} from '@/lib/services/admin/system-logs.service'
+} from '@/lib/services/admin/audit-logs.service'
 import { formatDate, formatTime, formatDateTime } from '@/app/utils/timeFormat'
 
 const BADGE_STYLES: Record<LogType, string> = {
@@ -97,7 +97,7 @@ export default function SystemLogsPage() {
 
         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 shrink-0">
           <div>
-            <h1 className="mt-1 text-2xl font-bold tracking-tight text-white">System Logs</h1>
+            <h1 className="mt-1 text-2xl font-bold tracking-tight text-white">Audit Logs</h1>
           </div>
 
           {stats && (
