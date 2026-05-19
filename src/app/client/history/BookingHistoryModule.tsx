@@ -209,6 +209,15 @@ function getTruckModel(booking: BookingWithRelations): string | null {
   return m ? `${m.name ?? ''} (${m.vehicle_type ?? ''})` : null
 }
 
+function getBookingDisplayId(booking: BookingWithRelations | null | undefined): string {
+  if (!booking) return ''
+  const ref = booking.reference_number
+  if (typeof ref === 'string' && ref.trim() !== '') return ref
+  return typeof booking.booking_id === 'string'
+    ? booking.booking_id.slice(0, 8).toUpperCase()
+    : ''
+}
+
 function formatDate(iso: string | Date | null | undefined): string {
   if (!iso) return '—'
   return new Date(iso).toLocaleDateString('en-PH', {
@@ -328,7 +337,7 @@ function BookingCard({ booking, onSelect }: {
           <div className="flex items-center gap-2">
             <Hash size={12} style={{ color: CYAN }} />
             <span className="font-bold text-white text-sm tracking-wide font-mono">
-              {booking.reference_number ?? booking.booking_id.slice(0, 8).toUpperCase()}
+              {(booking.reference_number as string | null | undefined) ?? booking.booking_id.slice(0, 8).toUpperCase()}
             </span>
           </div>
           <div className="flex items-center gap-1.5 text-xs" style={{ color: MUTED }}>
@@ -484,7 +493,7 @@ function BookingDetail({ booking }: {
             <div className="flex items-center gap-2">
               <Hash size={13} style={{ color: CYAN }} />
               <span className="font-bold text-white tracking-wide font-mono">
-                {booking.reference_number ?? booking.booking_id.slice(0, 8).toUpperCase()}
+                {(booking.reference_number as string | null | undefined) ?? (booking.booking_id as string | null | undefined)?.slice(0, 8).toUpperCase()}
               </span>
             </div>
             <div className="flex items-center gap-1.5 text-xs" style={{ color: MUTED }}>
@@ -678,14 +687,16 @@ export default function BookingHistoryModule() {
       const bStatus     = asBookingStatus(b.status)
       const matchTab    = activeTab === 'all' || bStatus === activeTab
       const q           = search.toLowerCase()
-      const bOrigin     = (b.origin as string | undefined) ?? ''
+      const bRef        = typeof b.reference_number === 'string' ? b.reference_number : ''
+      const bId         = typeof b.booking_id === 'string' ? b.booking_id : ''
+      const bOrigin     = typeof b.origin === 'string' ? b.origin : ''
       const bDests      = (b.booking_destinations as BookingDestination[] | undefined) ?? []
       const matchSearch =
         !q ||
-        b.reference_number?.toLowerCase().includes(q) ||
-        b.booking_id.toLowerCase().includes(q) ||
+        bRef.toLowerCase().includes(q) ||
+        bId.toLowerCase().includes(q) ||
         bOrigin.toLowerCase().includes(q) ||
-        bDests.some((d) => d.address.toLowerCase().includes(q))
+        bDests.some((d) => (d.address as string | undefined)?.toLowerCase().includes(q))
       const schedDate   = (b.schedule_date as string | undefined) ?? ''
       const matchFrom   = !dateFrom || schedDate >= dateFrom
       const matchTo     = !dateTo   || schedDate <= dateTo
@@ -735,7 +746,7 @@ export default function BookingHistoryModule() {
         <div className="flex items-center gap-2">
           <History size={18} style={{ color: CYAN }} />
           <h1 className="font-bold text-white text-base tracking-wide">
-            {view === 'list' ? 'Transaction History' : (selected?.reference_number ?? selected?.booking_id.slice(0, 8).toUpperCase())}
+            {view === 'list' ? 'Transaction History' : getBookingDisplayId(selected)}
           </h1>
         </div>
         {view === 'list' && !loading && (
@@ -766,7 +777,7 @@ export default function BookingHistoryModule() {
             Transaction History
           </button>
           <ChevronRight size={11} />
-          <span style={{ color: CYAN }}>{selected.reference_number ?? selected.booking_id.slice(0, 8).toUpperCase()}</span>
+          <span style={{ color: CYAN }}>{getBookingDisplayId(selected)}</span>
         </div>
       )}
 

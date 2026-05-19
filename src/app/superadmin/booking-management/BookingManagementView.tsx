@@ -96,6 +96,7 @@ function getPrefillFromBookingDetail(detail: BookingDetail, trucks: TruckType[])
 
 interface ListRow {
   booking_id: string
+  display_id: string
   origin?: string
   status: string
   schedule_date?: string
@@ -108,8 +109,13 @@ function toRows(raw: Record<string, unknown>[]): ListRow[] {
   return raw.map((b) => {
     const clients = b.clients as { company_name?: string | null } | undefined
     const dests   = b.booking_destinations as unknown[] | undefined
+    const referenceNumber = typeof b.reference_number === 'string' && b.reference_number.trim()
+      ? b.reference_number
+      : undefined
+
     return {
       booking_id:        String(b.booking_id ?? ''),
+      display_id:        referenceNumber ?? String(b.booking_id ?? '').slice(0, 8).toUpperCase(),
       origin:            typeof b.origin === 'string' ? b.origin : undefined,
       status:            typeof b.status === 'string' ? b.status : 'pending',
       schedule_date:     typeof b.schedule_date === 'string' ? b.schedule_date : undefined,
@@ -430,6 +436,17 @@ export default function BookingManagementView() {
   const pageSafe  = Math.min(page, pageCount - 1)
   const totalRows = listMeta?.total ?? 0
 
+  const restoreAssignment = useCallback((detail: BookingDetail, assignment?: { driver_id?: string | null; truck_id?: string | null }) => {
+    const fallback = getPrefillFromBookingDetail(detail, trucks)
+    const ids = {
+      driverId: assignment?.driver_id ?? fallback.driverId,
+      truckId:  assignment?.truck_id  ?? fallback.truckId,
+    }
+    setAssignDriverId(ids.driverId)
+    setAssignTruckId(ids.truckId)
+    setCommittedAssignment(ids)
+  }, [trucks])
+
   const openDetail = useCallback(async (bookingId: string) => {
     setSelectedId(bookingId)
     setDetail(null)
@@ -440,7 +457,6 @@ export default function BookingManagementView() {
     setAssignDriverId('')
     setAssignTruckId('')
     setAssignEditMode(false)
-    setCommittedAssignment({ driverId: '', truckId: '' })
     try {
       setDetailLoading(true)
       const [bookingResp, assignmentResp] = await Promise.allSettled([
@@ -453,27 +469,17 @@ export default function BookingManagementView() {
       const d = bookingResp.value as BookingDetail
       setDetail(d)
 
-      const fallback = getPrefillFromBookingDetail(d, trucks)
-
       if (assignmentResp.status === 'fulfilled') {
-        const ids = {
-          driverId: assignmentResp.value.driver_id ?? fallback.driverId,
-          truckId:  assignmentResp.value.truck_id  ?? fallback.truckId,
-        }
-        setAssignDriverId(ids.driverId)
-        setAssignTruckId(ids.truckId)
-        setCommittedAssignment(ids)
+        restoreAssignment(d, assignmentResp.value)
       } else {
-        setAssignDriverId(fallback.driverId)
-        setAssignTruckId(fallback.truckId)
-        setCommittedAssignment(fallback)
+        restoreAssignment(d)
       }
     } catch (e) {
       setDetailError(getApiErrorMessage(e, 'Request failed. Please try again.'))
     } finally {
       setDetailLoading(false)
     }
-  }, [trucks])
+  }, [restoreAssignment])
 
   const closeDetail = useCallback(() => {
     setSelectedId(null)
@@ -717,6 +723,7 @@ export default function BookingManagementView() {
                   <table className="w-full text-left text-sm border-collapse">
                     <thead className="sticky top-0 z-[1] bg-[#141414] border-b border-white/[0.07]">
                       <tr className="text-[11px] uppercase tracking-wider text-white/40">
+                        <th className="px-3 py-2.5 font-bold">Booking</th>
                         <th className="px-3 py-2.5 font-bold">Status</th>
                         <th className="px-3 py-2.5 font-bold">Schedule</th>
                         <th className="px-3 py-2.5 font-bold hidden md:table-cell">Client</th>
@@ -741,7 +748,8 @@ export default function BookingManagementView() {
                             className="border-b border-white/[0.05] cursor-pointer transition-colors hover:bg-white/[0.04]"
                             style={{ background: active ? 'rgba(77,249,237,0.06)' : undefined }}
                           >
-                            <td className="px-3 py-2.5">
+                            <td className="px-3 py-2.5 text-white/85 max-w-[160px] truncate">{r.display_id}</td>
+                          <td className="px-3 py-2.5">
                               <span
                                 className="inline-flex text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border"
                                 style={{ color: c, borderColor: `${c}55`, background: `${c}14` }}
@@ -1011,10 +1019,11 @@ export default function BookingManagementView() {
                           onEditClick={() => setAssignEditMode(true)}
                           onCancelEdit={() => {
                             setAssignEditMode(false)
-                            // Restore from committedAssignment — the actual saved assignment IDs
-                            // fetched from assignmentService, not the denormalized detail.driver field.
-                            setAssignDriverId(committedAssignment.driverId)
-                            setAssignTruckId(committedAssignment.truckId)
+                            const restore = committedAssignment.driverId || committedAssignment.truckId
+                              ? committedAssignment
+                              : getPrefillFromBookingDetail(detail, trucks)
+                            setAssignDriverId(restore.driverId)
+                            setAssignTruckId(restore.truckId)
                           }}
                         />
                       )}
