@@ -273,7 +273,7 @@ export default function ChangePasswordPage() {
 
                   <div className="flex flex-col gap-0.5">
                     <h1 className="ff-sc text-white text-[1.05rem] sm:text-[1.25rem] tracking-[0.12em] uppercase leading-tight">
-                      Set Your Password
+                      One Time Change Password
                     </h1>
                     <p className="font-spartan text-white/35 text-[0.73rem] sm:text-[0.78rem] leading-relaxed">
                       Welcome,{' '}
