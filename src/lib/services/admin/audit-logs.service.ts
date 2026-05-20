@@ -2,6 +2,7 @@ import proxyApi from '@/lib/api/auth.api'
 
 export type LogType =
   | 'user_activity'
+  | 'admin_activity'
   | 'vehicle_activity'
   | 'booking'
   | 'payment'
@@ -26,6 +27,7 @@ export interface AuditLog {
 export interface LogStats {
   total:          number
   user_activity:  number
+  admin_activity: number
   vehicle_activity: number
   booking:        number
   payment:        number

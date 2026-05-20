@@ -12,6 +12,7 @@ import { formatDate, formatTime, formatDateTime } from '@/app/utils/timeFormat'
 
 const BADGE_STYLES: Record<LogType, string> = {
   user_activity:    'bg-[rgba(77,249,237,0.12)] text-[#4df9ed] border border-[rgba(77,249,237,0.25)]',
+  admin_activity:   'bg-[rgba(255,140,0,0.10)] text-[#ff9a3c] border border-[rgba(255,140,0,0.25)]',
   vehicle_activity: 'bg-[rgba(58,246,38,0.10)] text-[#3af626] border border-[rgba(58,246,38,0.25)]',
   booking:          'bg-[rgba(255,200,60,0.10)] text-[#ffc83c] border border-[rgba(255,200,60,0.25)]',
   payment:          'bg-[rgba(160,120,255,0.12)] text-[#b08aff] border border-[rgba(160,120,255,0.25)]',
@@ -21,6 +22,7 @@ const BADGE_STYLES: Record<LogType, string> = {
 const STAT_COLORS: Record<string, string> = {
   total:            '#ffffff',
   user_activity:    '#4df9ed',
+  admin_activity:   '#ff9a3c',
   vehicle_activity: '#3af626',
   booking:          '#ffc83c',
   payment:          '#b08aff',
@@ -106,6 +108,7 @@ export default function SystemLogsPage() {
                 [
                   ['Total',    stats.total,             'total'],
                   ['Activity', stats.user_activity,     'user_activity'],
+                  ['Admin',    stats.admin_activity,    'admin_activity'],
                   ['Vehicles', stats.vehicle_activity,  'vehicle_activity'],
                   ['Bookings', stats.booking,           'booking'],
                   ['Errors',   stats.system_error,      'system_error'],
@@ -137,6 +140,7 @@ export default function SystemLogsPage() {
             >
               <option value="">All Types</option>
               <option value="user_activity">User Activity</option>
+              <option value="admin_activity">Admin Activity</option>
               <option value="vehicle_activity">Vehicle Activity</option>
               <option value="booking">Booking</option>
               <option value="payment">Payment</option>
