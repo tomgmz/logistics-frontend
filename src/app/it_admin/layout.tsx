@@ -1,12 +1,13 @@
 'use client'
 
 import { ReactNode, useEffect } from 'react'
-import { Activity, LayoutDashboard } from 'lucide-react'
+import { Activity, LayoutDashboard, Users } from 'lucide-react'
 import ReusableDashboardShell from '@/components/layout/ReusableDashboardShell'
 import { useAuthStore } from '@/lib/store/auth.store'
 
 const NAV_ITEMS = [
   { href: '/it_admin/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={17} /> },
+  { href: '/it_admin/administrator-management', label: 'Admin Management', icon: <Users size={17} /> },
   { href: '/it_admin/audit-logs', label: 'Audit Logs', icon: <Activity size={17} /> },
 ]
 

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Users, UserPlus, Search, RefreshCw, MoreVertical,
+  ShieldCheck as ShieldCheckIcon, UserPlus, Search, RefreshCw, MoreVertical,
   Pencil, ShieldCheck, ShieldOff, Archive,
   ChevronLeft, ChevronRight, AlertTriangle,
 } from 'lucide-react'
@@ -12,26 +12,31 @@ import MenuItem from '@mui/material/MenuItem'
 import FormControl from '@mui/material/FormControl'
 import { createTheme, ThemeProvider } from '@mui/material/styles'
 import type {
-  UserTab, AnyUser, UserStatus,
-  ClientUser, DriverUser, VendorUser,
+  UserTab, AnyUser, UserStatus, AdminUser,
 } from '@/app/types/admin/user-management.types'
 import {
   userService,
-  clientService, driverService, vendorService,
+  accountantService, generalManagerService,
+  fleetAdminService, operationsAdminService, itAdminService,
 } from '@/lib/services/admin/user-management.service'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
-import UserFormModal from './UserFormModal'
+import UserFormModal from '@/app/admin/user-management/UserFormModal'
 
-// ─── Only the three tabs this admin view manages ─────────────────────────────
-type UserMgmtTab = Extract<UserTab, 'clients' | 'drivers' | 'vendors'>
-type TabValue = UserMgmtTab | 'all'
+// ─── Admin-type tabs (no human-resources) ────────────────────────────────────
+type AdminMgmtTab = Extract<
+  UserTab,
+  'accountants' | 'general-managers' | 'fleet-admins' | 'operations-admins' | 'it-admins'
+>
+type TabValue = AdminMgmtTab | 'all'
 
 const TABS: { key: TabValue; label: string }[] = [
-  { key: 'all',     label: 'All Users' },
-  { key: 'clients', label: 'Clients'   },
-  { key: 'drivers', label: 'Drivers'   },
-  { key: 'vendors', label: 'Vendors'   },
+  { key: 'all',                label: 'All Administrators'           },
+  { key: 'accountants',        label: 'Accountants'         },
+  { key: 'general-managers',   label: 'General Managers'    },
+  { key: 'fleet-admins',       label: 'Fleet Managers'      },
+  { key: 'operations-admins',  label: 'Operations Managers' },
+  { key: 'it-admins',          label: 'IT Administrators'   },
 ]
 
 const muiTheme = createTheme({
@@ -44,16 +49,26 @@ const muiTheme = createTheme({
 
 const PAGE_SIZE = 10
 
-async function fetchByTab(tab: UserMgmtTab): Promise<AnyUser[]> {
+async function fetchByTab(tab: AdminMgmtTab): Promise<AnyUser[]> {
   switch (tab) {
-    case 'clients': return clientService.getAll() as Promise<AnyUser[]>
-    case 'drivers': return driverService.getAll() as Promise<AnyUser[]>
-    case 'vendors': return vendorService.getAll() as Promise<AnyUser[]>
+    case 'accountants':       return accountantService.getAll()      as Promise<AnyUser[]>
+    case 'general-managers':  return generalManagerService.getAll()  as Promise<AnyUser[]>
+    case 'fleet-admins':      return fleetAdminService.getAll()      as Promise<AnyUser[]>
+    case 'operations-admins': return operationsAdminService.getAll() as Promise<AnyUser[]>
+    case 'it-admins':         return itAdminService.getAll()         as Promise<AnyUser[]>
   }
 }
 
-async function updateStatus(tab: UserMgmtTab, id: string, status: UserStatus): Promise<void> {
-  const svc = tab === 'clients' ? clientService : tab === 'drivers' ? driverService : vendorService
+async function updateStatus(tab: AdminMgmtTab, id: string, status: UserStatus): Promise<void> {
+  const svcMap = {
+    accountants:         accountantService,
+    'general-managers':  generalManagerService,
+    'fleet-admins':      fleetAdminService,
+    'operations-admins': operationsAdminService,
+    'it-admins':         itAdminService,
+  } as const
+
+  const svc = svcMap[tab]
 
   if (status === 'active')      return svc.activate(id).then()
   if (status === 'deactivated') return svc.deactivate(id).then()
@@ -62,25 +77,18 @@ async function updateStatus(tab: UserMgmtTab, id: string, status: UserStatus): P
   return svc.update(id, { status } as never).then()
 }
 
-function tabFromRole(role: string): UserMgmtTab {
-  if (role === 'driver') return 'drivers'
-  if (role === 'vendor') return 'vendors'
-  return 'clients'
+function tabFromRole(role: string): AdminMgmtTab {
+  switch (role) {
+    case 'accountant':       return 'accountants'
+    case 'general_manager':  return 'general-managers'
+    case 'fleet_admin':      return 'fleet-admins'
+    case 'operations_admin': return 'operations-admins'
+    case 'it_admin':         return 'it-admins'
+    default:                 return 'accountants'
+  }
 }
 
-function formatDate(iso: string | null): string {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-function formatDateTime(iso: string | null): string {
-  if (!iso) return 'Never'
-  return new Date(iso).toLocaleDateString('en-PH', {
-    month: 'short', day: 'numeric', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  })
-}
-
+// ─── Shared helpers ───────────────────────────────────────────────────────────
 const STATUS_CFG: Record<UserStatus, { label: string; cls: string }> = {
   active:             { label: 'Active',      cls: 'bg-[#4df9ed]/10 text-[#4df9ed] border-[#4df9ed]/30'    },
   inactive:           { label: 'Inactive',    cls: 'bg-[#818181]/10 text-[#818181] border-[#818181]/30'    },
@@ -89,8 +97,34 @@ const STATUS_CFG: Record<UserStatus, { label: string; cls: string }> = {
   permanently_locked: { label: 'Locked',      cls: 'bg-red-500/15 text-red-400 border-red-500/30'          },
 }
 
+const ROLE_COLORS: Record<string, string> = {
+  it_admin:         'bg-blue-500/15 text-blue-400 border-blue-500/30',
+  general_manager:  'bg-cyan-500/15 text-cyan-400 border-cyan-500/30',
+  fleet_admin:      'bg-orange-500/15 text-orange-400 border-orange-500/30',
+  operations_admin: 'bg-violet-500/15 text-violet-400 border-violet-500/30',
+  accountant:       'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+}
+
+const ROLE_LABELS: Record<string, string> = {
+  it_admin:         'IT Admin',
+  general_manager:  'General Manager',
+  fleet_admin:      'Fleet Manager',
+  operations_admin: 'Operations Manager',
+  accountant:       'Accountant',
+}
+
 function StatusBadge({ status }: { status: UserStatus }) {
   const { label, cls } = STATUS_CFG[status] ?? STATUS_CFG.inactive
+  return (
+    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold tracking-wide ${cls}`}>
+      {label}
+    </span>
+  )
+}
+
+function RoleBadge({ role }: { role: string }) {
+  const cls   = ROLE_COLORS[role]  ?? 'bg-[#818181]/10 text-[#818181] border-[#818181]/30'
+  const label = ROLE_LABELS[role]  ?? role.replace(/_/g, ' ')
   return (
     <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold tracking-wide ${cls}`}>
       {label}
@@ -203,132 +237,55 @@ function TableSkeleton({ cols }: { cols: number }) {
 }
 
 function EmptyState({ tab, onAdd }: { tab: TabValue; onAdd: () => void }) {
+  const label = tab === 'all' ? 'staff accounts' : TABS.find(t => t.key === tab)?.label.toLowerCase() ?? tab
   return (
     <div className="flex flex-col items-center justify-center py-24 text-center">
       <div className="mb-4 rounded-full border border-[#2a2a2a] bg-[#1b1b1b] p-4">
-        <Users size={28} className="text-[#818181]" />
+        <ShieldCheckIcon size={28} className="text-[#818181]" />
       </div>
       <p className="text-base font-semibold text-white">No records found</p>
-      <p className="mt-1 text-sm text-[#818181]">
-        No {tab === 'all' ? 'users' : tab} match your current filters.
-      </p>
+      <p className="mt-1 text-sm text-[#818181]">No {label} match your current filters.</p>
       {tab !== 'all' && (
         <button
           onClick={onAdd}
           className="mt-6 flex items-center gap-2 rounded-lg bg-[#4df9ed] px-4 py-2 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5]"
         >
-          <UserPlus size={14} /> Add First User
+          <UserPlus size={14} /> Add First Account
         </button>
       )}
     </div>
   )
 }
 
-// ─── Role badge (limited to these 3 roles) ───────────────────────────────────
-const ROLE_COLORS: Record<string, string> = {
-  driver: 'bg-sky-500/15 text-sky-400 border-sky-500/30',
-  client: 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30',
-  vendor: 'bg-lime-500/15 text-lime-400 border-lime-500/30',
-}
-const ROLE_LABELS: Record<string, string> = {
-  driver: 'Driver',
-  client: 'Client',
-  vendor: 'Vendor',
+// ─── All admin tabs share the same columns ────────────────────────────────────
+const SHARED_HEADERS = ['Name', 'Email', 'Phone', 'Role', 'Status']
+
+const HEADERS: Record<TabValue, string[]> = {
+  all:                 SHARED_HEADERS,
+  accountants:         SHARED_HEADERS,
+  'general-managers':  SHARED_HEADERS,
+  'fleet-admins':      SHARED_HEADERS,
+  'operations-admins': SHARED_HEADERS,
+  'it-admins':         SHARED_HEADERS,
 }
 
-function RoleBadge({ role }: { role: string }) {
-  const cls = ROLE_COLORS[role] ?? 'bg-[#818181]/10 text-[#818181] border-[#818181]/30'
-  const label = ROLE_LABELS[role] ?? role
+function renderCells(user: AnyUser) {
+  const u = user as AdminUser
+  const name = [u.first_name, u.middle_name, u.last_name, u.suffix].filter(Boolean).join(' ') || '—'
   return (
-    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold tracking-wide ${cls}`}>
-      {label}
-    </span>
+    <>
+      <td className="px-4 py-3.5"><p className="font-medium text-white">{name}</p></td>
+      <td className="px-4 py-3.5 text-sm text-[#818181]">{u.email}</td>
+      <td className="px-4 py-3.5 text-sm text-[#818181]">{u.phone ?? '—'}</td>
+      <td className="px-4 py-3.5"><RoleBadge role={u.role} /></td>
+      <td className="px-4 py-3.5"><StatusBadge status={u.status} /></td>
+    </>
   )
 }
 
-// ─── Cell renderers ───────────────────────────────────────────────────────────
-function renderCells(user: AnyUser, tab: TabValue) {
-  if (tab === 'all') {
-    const name = [user.first_name, user.middle_name, user.last_name, user.suffix].filter(Boolean).join(' ') || '—'
-    return (
-      <>
-        <td className="px-4 py-3.5"><p className="font-medium text-white">{name}</p></td>
-        <td className="px-4 py-3.5 text-sm text-[#818181]">{user.email}</td>
-        <td className="px-4 py-3.5 text-sm text-[#818181]">{user.phone ?? '—'}</td>
-        <td className="px-4 py-3.5"><RoleBadge role={user.role} /></td>
-        <td className="px-4 py-3.5"><StatusBadge status={user.status} /></td>
-      </>
-    )
-  }
-
-  switch (tab) {
-    case 'clients': {
-      const u = user as ClientUser
-      const name = [u.first_name, u.middle_name, u.last_name, u.suffix].filter(Boolean).join(' ') || '—'
-      return (
-        <>
-          <td className="px-4 py-3.5"><p className="font-medium text-white">{name}</p></td>
-          <td className="px-4 py-3.5 text-sm text-[#818181]">{u.email}</td>
-          <td className="px-4 py-3.5 text-sm text-[#818181]">{u.clients?.company_name ?? '—'}</td>
-          <td className="px-4 py-3.5"><StatusBadge status={u.status} /></td>
-          <td className="px-4 py-3.5 text-xs text-[#818181]">{formatDateTime(u.last_login_at ?? null)}</td>
-        </>
-      )
-    }
-    case 'drivers': {
-      const u = user as DriverUser
-      const name = [u.first_name, u.middle_name, u.last_name, u.suffix].filter(Boolean).join(' ') || '—'
-      const drvStatus = u.drivers?.status
-      return (
-        <>
-          <td className="px-4 py-3.5"><p className="font-medium text-white">{name}</p></td>
-          <td className="px-4 py-3.5 text-sm font-mono text-[#818181]">{u.drivers?.license_number ?? '—'}</td>
-          <td className="px-4 py-3.5 text-sm text-[#818181]">{formatDate(u.drivers?.license_expiry ?? null)}</td>
-          <td className="px-4 py-3.5">
-            {drvStatus && (
-              <span className="inline-flex items-center rounded-full border border-[#4df9ed]/30 bg-[#4df9ed]/10 px-2 py-0.5 text-[11px] font-semibold text-[#4df9ed]">
-                {drvStatus.replace(/_/g, ' ')}
-              </span>
-            )}
-          </td>
-          <td className="px-4 py-3.5"><StatusBadge status={u.status} /></td>
-        </>
-      )
-    }
-    case 'vendors': {
-      const u = user as VendorUser
-      const name = [u.first_name, u.middle_name, u.last_name, u.suffix].filter(Boolean).join(' ') || '—'
-      return (
-        <>
-          <td className="px-4 py-3.5"><p className="font-medium text-white">{name}</p></td>
-          <td className="px-4 py-3.5 text-sm text-[#818181]">{u.email}</td>
-          <td className="px-4 py-3.5">
-            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${
-              u.vendors?.vendor_type === 'company'
-                ? 'border-[#4df9ed]/30 bg-[#4df9ed]/10 text-[#4df9ed]'
-                : 'border-[#818181]/30 bg-[#818181]/10 text-[#818181]'
-            }`}>
-              {u.vendors?.vendor_type ?? '—'}
-            </span>
-          </td>
-          <td className="px-4 py-3.5 text-sm text-[#818181]">{u.vendors?.company_name ?? '—'}</td>
-          <td className="px-4 py-3.5"><StatusBadge status={u.status} /></td>
-        </>
-      )
-    }
-  }
-}
-
-const HEADERS: Record<TabValue, string[]> = {
-  all:     ['Name', 'Email', 'Phone', 'Role', 'Status'],
-  clients: ['Name', 'Email', 'Company', 'Status', 'Last Login'],
-  drivers: ['Name', 'License #', 'Expiry', 'Driver Status', 'Acct. Status'],
-  vendors: ['Name', 'Email', 'Type', 'Company', 'Status'],
-}
-
 // ─── Main component ───────────────────────────────────────────────────────────
-export default function UserManagementClient() {
-  const [activeTab,        setActiveTab]        = useState<TabValue>('clients')
+export default function AdminManagementClient() {
+  const [activeTab,        setActiveTab]        = useState<TabValue>('accountants')
   const [allRows,          setAllRows]          = useState<AnyUser[]>([])
   const [loading,          setLoading]          = useState(true)
   const [fetching,         setFetching]         = useState(false)
@@ -341,11 +298,10 @@ export default function UserManagementClient() {
   const [serverTotalPages, setServerTotalPages] = useState(1)
   const [showForm,         setShowForm]         = useState(false)
   const [editUser,         setEditUser]         = useState<AnyUser | null>(null)
-  const [formTab,          setFormTab]          = useState<UserMgmtTab>('clients')
+  const [formTab,          setFormTab]          = useState<AdminMgmtTab>('accountants')
 
   const isInitialAllFetch = useRef(true)
 
-  // Debounce search
   useEffect(() => {
     const t = setTimeout(() => { setSearch(searchInput); setPage(1) }, 400)
     return () => clearTimeout(t)
@@ -356,34 +312,34 @@ export default function UserManagementClient() {
     setError(null)
     try {
       const [result, statsResult] = await Promise.all([
-        userService.getAll({ search: searchQuery || undefined, role: 'client,driver,vendor' }),
-        userService.getStats('client,driver,vendor'),
+        userService.getAll({ search: searchQuery || undefined, role: 'accountant,general_manager,fleet_admin,operations_admin,it_admin' }),
+        userService.getStats('accountant,general_manager,fleet_admin,operations_admin,it_admin')
       ])
       setAllRows(result.data)
       setServerTotal(result.total)
       setServerTotalPages(Math.ceil(result.total / PAGE_SIZE))
       setStats({ total: statsResult.total, active: statsResult.active, archived: statsResult.archived })
     } catch {
-      setError('Failed to load users. Check your connection or permissions.')
+      setError('Failed to load accounts. Check your connection or permissions.')
     } finally {
       setLoading(false)
       setFetching(false)
     }
   }, [])
 
-  const fetchTabUsers = useCallback(async (tab: UserMgmtTab) => {
+  const fetchTabUsers = useCallback(async (tab: AdminMgmtTab) => {
     setLoading(true)
     setError(null)
     setAllRows([])
     try {
       const [rows, statsResult] = await Promise.all([
         fetchByTab(tab),
-        userService.getStats('client,driver,vendor')
+        userService.getStats('accountant,general_manager,fleet_admin,operations_admin,it_admin')
       ])
       setAllRows(rows)
       setStats({ total: statsResult.total, active: statsResult.active, archived: statsResult.archived })
     } catch {
-      setError('Failed to load users. Check your connection or permissions.')
+      setError('Failed to load accounts. Check your connection or permissions.')
     } finally {
       setLoading(false)
     }
@@ -424,7 +380,7 @@ export default function UserManagementClient() {
     : filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
   async function handleStatusChange(user: AnyUser, status: UserStatus) {
-    const serviceTab = activeTab === 'all' ? tabFromRole(user.role) : activeTab as UserMgmtTab
+    const serviceTab = activeTab === 'all' ? tabFromRole(user.role) : activeTab as AdminMgmtTab
     try {
       await appToast.promise(
         updateStatus(serviceTab, user.user_id, status),
@@ -441,14 +397,14 @@ export default function UserManagementClient() {
   }
 
   function openEdit(user: AnyUser) {
-    const tab = activeTab === 'all' ? tabFromRole(user.role) : activeTab as UserMgmtTab
+    const tab = activeTab === 'all' ? tabFromRole(user.role) : activeTab as AdminMgmtTab
     setFormTab(tab)
     setEditUser(user)
     setShowForm(true)
   }
 
   function openCreate() {
-    setFormTab(activeTab === 'all' ? 'clients' : activeTab as UserMgmtTab)
+    setFormTab(activeTab === 'all' ? 'accountants' : activeTab as AdminMgmtTab)
     setEditUser(null)
     setShowForm(true)
   }
@@ -467,21 +423,23 @@ export default function UserManagementClient() {
 
           {/* Header */}
           <div className="flex items-start justify-between shrink-0">
-            <h1 className="mt-1 text-2xl font-bold tracking-tight text-white">User Management</h1>
+            <div>
+              <h1 className="mt-1 text-2xl font-bold tracking-tight text-white">Administrator Management</h1>
+            </div>
             <button
               onClick={openCreate}
               className="flex items-center gap-2 rounded-xl bg-[#4df9ed] px-5 py-2.5 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5] active:scale-95"
             >
-              <UserPlus size={15} /> Add User
+              <UserPlus size={15} /> Add Account
             </button>
           </div>
 
           {/* Stats */}
           <div className="grid grid-cols-3 gap-4 shrink-0">
             {[
-              { label: 'Total Users', value: stats.total,    color: 'text-white'        },
-              { label: 'Active',      value: stats.active,   color: 'text-[#4df9ed]'    },
-              { label: 'Archived',    value: stats.archived, color: 'text-yellow-400'   },
+              { label: 'Total Staff',  value: stats.total,    color: 'text-white'      },
+              { label: 'Active',       value: stats.active,   color: 'text-[#4df9ed]'  },
+              { label: 'Archived',     value: stats.archived, color: 'text-yellow-400' },
             ].map((s) => (
               <div key={s.label} className="rounded-xl border border-[#2a2a2a] bg-[#1b1b1b] px-5 py-4">
                 <p className="text-xs font-semibold uppercase tracking-widest text-[#818181]">{s.label}</p>
@@ -495,7 +453,7 @@ export default function UserManagementClient() {
 
             {/* Tab selector */}
             <div className="px-4 pt-3 pb-3 border-b border-[#2a2a2a] shrink-0">
-              <FormControl size="small" sx={{ minWidth: 200 }}>
+              <FormControl size="small" sx={{ minWidth: 220 }}>
                 <Select
                   value={activeTab}
                   onChange={(e: SelectChangeEvent) => setActiveTab(e.target.value as TabValue)}
@@ -521,7 +479,7 @@ export default function UserManagementClient() {
                     const tab = TABS.find((t) => t.key === value)!
                     return (
                       <span style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#4df9ed', fontSize: '13px', fontWeight: 500 }}>
-                        <Users size={14} /> {tab.label}
+                        <ShieldCheckIcon size={14} /> {tab.label}
                       </span>
                     )
                   }}
@@ -535,9 +493,9 @@ export default function UserManagementClient() {
                         color: activeTab === t.key ? '#4df9ed' : '#818181',
                         bgcolor: activeTab === t.key ? '#4df9ed0d' : 'transparent',
                         display: 'flex', alignItems: 'center', gap: '10px',
-                        borderTop: t.key === 'clients' ? '1px solid #2a2a2a' : 'none',
-                        marginTop: t.key === 'clients' ? '4px' : '0',
-                        paddingTop: t.key === 'clients' ? '8px' : undefined,
+                        borderTop: t.key === 'accountants' ? '1px solid #2a2a2a' : 'none',
+                        marginTop: t.key === 'accountants' ? '4px' : '0',
+                        paddingTop: t.key === 'accountants' ? '8px' : undefined,
                         '&:hover': {
                           bgcolor: activeTab === t.key ? '#4df9ed1a' : '#2a2a2a',
                           color: activeTab === t.key ? '#4df9ed' : '#ffffff',
@@ -546,7 +504,7 @@ export default function UserManagementClient() {
                       }}
                     >
                       <span style={{ color: activeTab === t.key ? '#4df9ed' : '#818181', display: 'flex' }}>
-                        <Users size={14} />
+                        <ShieldCheckIcon size={14} />
                       </span>
                       {t.label}
                       {activeTab === t.key && (
@@ -621,7 +579,7 @@ export default function UserManagementClient() {
                           transition={{ delay: i * 0.02 }}
                           className="border-b border-[#2a2a2a]/60 transition-colors hover:bg-[#2a2a2a]/40"
                         >
-                          {renderCells(user, activeTab)}
+                          {renderCells(user)}
                           <td className="px-4 py-3.5 text-right">
                             <RowMenu
                               user={user}

@@ -87,10 +87,10 @@ export const userService = {
         totalPages: r.data.totalPages,
       })),
 
-  getStats: () =>
-    proxyApi
-      .get<ApiResponse<UserStatsResponse>>(`${B}/users/stats`)
-      .then((r) => r.data.data),
+    getStats: (roles?: string) =>
+        proxyApi
+          .get<ApiResponse<UserStatsResponse>>(`${B}/users/stats`, { params: roles ? { roles } : undefined })
+          .then((r) => r.data.data),
 }
 
 export const clientService = {
