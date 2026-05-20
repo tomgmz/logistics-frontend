@@ -140,7 +140,7 @@ export default function SystemLogsPage() {
               <option value="vehicle_activity">Vehicle Activity</option>
               <option value="booking">Booking</option>
               <option value="payment">Payment</option>
-              <option value="system_error">System Error</option>
+              {/* <option value="system_error">System Error</option> */}
             </select>
             <select
               value={sort}
