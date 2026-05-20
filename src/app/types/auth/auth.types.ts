@@ -13,7 +13,6 @@ export interface OtpCode {
   expires_at: Date
   used: boolean
   attempts: number
-  ip_address?: string
   blocked_until?: Date
   created_at: Date
 }
@@ -24,7 +23,6 @@ export interface UserSession {
   token: string
   refresh_token?: string
   device_info?: string | null
-  ip_address?: string | null
   created_at: Date
   last_active_at: Date
   expires_at: Date
@@ -43,7 +41,6 @@ export interface AuthUser {
   lockup_count?: number
   locked_until?: Date | null
   last_login_at?: Date | null
-  last_login_ip?: string | null
   clients?: {
     client_id: string
     company_name: string | null
@@ -56,7 +53,6 @@ export interface LoginHistory {
   id: string
   user_id?: string
   email: string
-  ip_address?: string
   device_info?: string
   user_agent?: string
   location_city?: string

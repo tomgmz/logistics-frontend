@@ -19,7 +19,6 @@ export interface SystemLog {
   log_type:    LogType
   action:      string
   description: string | null
-  ip_address:  string | null
   timestamp:   string
   users:       LogUser | null
 }

@@ -179,7 +179,7 @@ export default function SystemLogsPage() {
                   ['Description', selected.description ?? '—'],
                   ['User',        displayName(selected)],
                   ['Role',        selected.users?.role ?? '—'],
-                  ['IP Address',  selected.ip_address ?? '—'],
+
                 ] as [string, string][]).map(([k, v]) => (
                   <div key={k} className="flex gap-3">
                     <span className="text-[#818181] text-[10px] uppercase tracking-[0.1em] w-24 flex-shrink-0 pt-0.5">{k}</span>
@@ -201,7 +201,7 @@ export default function SystemLogsPage() {
               <table className="w-full text-sm">
                 <thead className="sticky top-0 z-10 bg-[#1b1b1b]">
                   <tr className="border-b border-[#2a2a2a]">
-                    {['Timestamp', 'Type', 'Action', 'Description', 'User', 'IP'].map(h => (
+                    {['Timestamp', 'Type', 'Action', 'Description', 'User'].map(h => (
                       <th key={h} className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#818181]">
                         {h}
                       </th>
@@ -247,7 +247,7 @@ export default function SystemLogsPage() {
               <table className="w-full text-sm">
                 <thead className="sticky top-0 z-10 bg-[#1b1b1b]">
                   <tr className="border-b border-[#2a2a2a]">
-                    {['Timestamp', 'Type', 'Action', 'Description', 'User', 'IP'].map(h => (
+                    {['Timestamp', 'Type', 'Action', 'Description', 'User'].map(h => (
                       <th key={h} className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#818181]">
                         {h}
                       </th>
@@ -287,9 +287,6 @@ export default function SystemLogsPage() {
                         {log.users?.role && (
                           <p className="text-[#818181] text-[9px] uppercase tracking-wide">{log.users.role}</p>
                         )}
-                      </td>
-                      <td className="px-4 py-3.5 font-mono text-[10px] text-[#818181]">
-                        {log.ip_address ?? '—'}
                       </td>
                     </tr>
                   ))}
