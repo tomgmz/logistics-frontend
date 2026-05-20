@@ -10,7 +10,7 @@ const firstName = z
   .min(2, 'First name must be at least 2 characters')
   .max(50, 'First name is too long')
   .regex(
-    /^[\p{L}]+(?:[ '-][\p{L}]+)*$/u,
+    /^[\p{L}]+\.?(?:[ '-][\p{L}]+\.?)*$/u,
     'First name may only contain letters, spaces, hyphens, or apostrophes',
   )
 
