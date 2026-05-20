@@ -5,6 +5,9 @@ export const USER_SUFFIXES = ['Jr.', 'Sr.', 'II', 'III', 'IV', 'V'] as const
 const PH_MOBILE_REGEX   = /^\+639[0-9]{9}$/
 const PH_LANDLINE_REGEX = /^\+63[0-9]{9}$/
 
+const emailRegex =
+  /^[a-zA-Z0-9](?:[a-zA-Z0-9]|[._%+-](?=[a-zA-Z0-9]))*@(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,63}$/
+
 const firstName = z
   .string({ error: 'First name is required' })
   .min(2, 'First name must be at least 2 characters')
@@ -48,7 +51,23 @@ const suffix = z.preprocess(
 
 const email = z
   .string({ error: 'Email is required' })
-  .email('Please enter a valid email address')
+  .min(5, 'Email is too short')
+  .max(254, 'Email is too long')
+  .regex(emailRegex, 'Please enter a valid email address')
+  .refine(
+    v => v.split('@')[0].length <= 64,
+    'Email local part is too long',
+  )
+  .refine(v => {
+    const domain = v.split('@')[1]
+    if (!domain) return true
+    const parts  = domain.split('.')
+    for (let i = 0; i < parts.length - 1; i++) {
+      if (parts[i] === parts[i + 1]) return false
+    }
+    return true
+  }, 'Please enter a valid email address')
+  .transform(v => v.trim().toLowerCase())
 
 const phone = z
   .string({ error: 'Phone is required' })
@@ -82,7 +101,7 @@ const licenseExpiry = z
   .string({ error: 'License expiry is required' })
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format')
   .refine(val => !isNaN(new Date(val).getTime()), 'Invalid date')
-  .refine(val => new Date(val) > new Date(), 'License is already expired')
+  .refine(val => isNaN(new Date(val).getTime()) || new Date(val) > new Date(), 'License is already expired')
 
 const baseCreateFields = {
   first_name:  firstName,
