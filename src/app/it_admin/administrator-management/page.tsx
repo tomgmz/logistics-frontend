@@ -23,7 +23,6 @@ import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import UserFormModal from '@/app/admin/user-management/UserFormModal'
 
-// ─── Admin-type tabs (no human-resources) ────────────────────────────────────
 type AdminMgmtTab = Extract<
   UserTab,
   'accountants' | 'general-managers' | 'fleet-admins' | 'operations-admins' | 'it-admins'
