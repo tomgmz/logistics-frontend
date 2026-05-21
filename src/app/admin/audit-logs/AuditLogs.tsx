@@ -107,7 +107,7 @@ export default function AuditLogsPage() {
               {(
                 [
                   ['Total',    stats.total,             'total'],
-                  ['Activity', stats.user_activity,     'user_activity'],
+                  ['User',     stats.user_activity,     'user_activity'],
                   ['Admin',    stats.admin_activity,    'admin_activity'],
                   ['Vehicles', stats.vehicle_activity,  'vehicle_activity'],
                   ['Bookings', stats.booking,           'booking'],
