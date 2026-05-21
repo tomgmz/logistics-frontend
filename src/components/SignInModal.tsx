@@ -212,7 +212,7 @@ function ErrorMessage({ message }: { message: string }) {
   )
 }
 
-// ─── Permanent lock screen (shared by OTP and Password steps) ─────────────────
+// ─── Permanent lock screen ────────────────────────────────────────────────────
 
 function PermanentLockScreen({ onBack }: { onBack: () => void }) {
   return (
@@ -298,7 +298,7 @@ function EmailStep({ onSuccess }: { onSuccess: (email: string) => void }) {
             type="email"
             value={email}
             onChange={e => { setEmail(e.target.value); setError('') }}
-            placeholder="you@example.com"
+            placeholder="email@example.com"
             required
             autoFocus
             className="w-full bg-transparent text-white text-[0.95rem] outline-none
@@ -967,7 +967,40 @@ function PasswordStep({
         </PrimaryButton>
       </form>
 
-      <BackButton onClick={onBack} label="Back" />
+      {/* ── Forgot password ── */}
+      <div className="flex items-center justify-between">
+        <BackButton onClick={onBack} label="Back" />
+        <a
+          href={`mailto:${ADMIN_EMAIL}?subject=Password%20Reset%20Request`}
+          className="text-[0.75rem] transition-colors no-underline"
+          style={{
+            color: 'rgba(255,255,255,0.28)',
+            fontFamily: "'League Spartan', sans-serif",
+          }}
+          onMouseEnter={e => ((e.currentTarget as HTMLAnchorElement).style.color = 'rgba(77,249,237,0.65)')}
+          onMouseLeave={e => ((e.currentTarget as HTMLAnchorElement).style.color = 'rgba(255,255,255,0.28)')}
+        >
+          Forgot password?
+        </a>
+      </div>
+
+      {/* ── Forgot password hint ── */}
+      <p
+        className="text-[0.71rem] leading-relaxed -mt-3 text-center"
+        style={{
+          color: 'rgba(255,255,255,0.18)',
+          fontFamily: "'League Spartan', sans-serif",
+        }}
+      >
+        Password resets are managed by your administrator.{' '}
+        <a
+          href={`mailto:${ADMIN_EMAIL}?subject=Password%20Reset%20Request`}
+          className="underline underline-offset-2 transition-opacity hover:opacity-80 no-underline"
+          style={{ color: 'rgba(77,249,237,0.45)', textDecoration: 'underline' }}
+        >
+          {ADMIN_EMAIL}
+        </a>
+      </p>
     </motion.div>
   )
 }
@@ -1092,8 +1125,6 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
       resendExpiresAt.current = 0
 
       if (shouldChangePassword) {
-        // must_change_pw cookie is already set by login/verify-otp route,
-        // so middleware enforces this on any new tab automatically
         router.replace(`/change-password?redirect=${encodeURIComponent(portalUrl)}`)
       } else {
         const ch = new BroadcastChannel(`auth_sync_${finalUser.user_id}`)
@@ -1220,6 +1251,51 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
                     <SuccessStep key="success" />
                   )}
                 </AnimatePresence>
+
+                {/* ── Be Our Partner footer — visible on all steps except success ── */}
+                {step !== 'success' && (
+                  <div className="mt-auto pt-10">
+                    <div
+                      className="h-[1px] mb-6"
+                      style={{ background: 'rgba(255,255,255,0.06)' }}
+                    />
+                    <div className="flex items-center justify-between gap-4">
+                      <p
+                        className="text-[0.73rem] leading-snug"
+                        style={{
+                          color: 'rgba(255,255,255,0.25)',
+                          fontFamily: "'League Spartan', sans-serif",
+                        }}
+                      >
+                        Interested in working with us?
+                      </p>
+                      <a
+                        href="#contact"
+                        onClick={handleClose}
+                        className="shrink-0 text-[0.75rem] tracking-[0.15em] uppercase
+                          px-4 py-2 rounded-xl transition-all duration-200 no-underline"
+                        style={{
+                          fontFamily: "'League Spartan', sans-serif",
+                          background: 'rgba(77,249,237,0.06)',
+                          border: '1px solid rgba(77,249,237,0.2)',
+                          color: 'rgba(77,249,237,0.75)',
+                        }}
+                        onMouseEnter={e => {
+                          const el = e.currentTarget as HTMLAnchorElement
+                          el.style.background = 'rgba(77,249,237,0.12)'
+                          el.style.color = 'rgba(77,249,237,1)'
+                        }}
+                        onMouseLeave={e => {
+                          const el = e.currentTarget as HTMLAnchorElement
+                          el.style.background = 'rgba(77,249,237,0.06)'
+                          el.style.color = 'rgba(77,249,237,0.75)'
+                        }}
+                      >
+                        Be Our Partner
+                      </a>
+                    </div>
+                  </div>
+                )}
               </div>
             </motion.aside>
           </>

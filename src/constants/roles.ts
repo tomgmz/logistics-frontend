@@ -10,4 +10,4 @@ export const ROLE_ROUTES: Record<string, string> = {
   vendor:           '/vendor',
 }
 
-export const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL ?? 'admin@example.com'
+export const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL ?? '8338logisticsservice@example.com'
