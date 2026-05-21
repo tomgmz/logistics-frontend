@@ -28,7 +28,10 @@ import {
   type AdminBookingLifecycleStatus,
   type DestinationDeliveryStatus,
 } from '@/lib/services/client/booking.service'
-import { assignmentService } from '@/lib/services/admin/assignment.service'
+import {
+  assignmentService,
+  type AssignmentRecord,
+} from '@/lib/services/admin/assignment.service'
 import { driverService } from '@/lib/services/admin/user-management.service'
 import { adminFetchTrucks } from '@/lib/services/admin/trucks.service'
 import type { DriverUser } from '@/app/types/admin/user-management.types'
@@ -378,14 +381,12 @@ export default function BookingManagementView() {
 
   const [drivers, setDrivers]             = useState<DriverUser[]>([])
   const [trucks, setTrucks]               = useState<TruckType[]>([])
+  const [allAssignments, setAllAssignments] = useState<AssignmentRecord[]>([])
   const [assignDriverId, setAssignDriverId] = useState<string>('')
   const [assignTruckId, setAssignTruckId]   = useState<string>('')
   const [assignBusy, setAssignBusy]         = useState(false)
   const [assignEditMode, setAssignEditMode] = useState(false)
 
-  // Tracks the last successfully saved assignment so Cancel can restore it correctly.
-  // This is kept separately from detail.driver because the assignment record
-  // (driver_id / truck_id) comes from assignmentService, not from the booking detail itself.
   const [committedAssignment, setCommittedAssignment] = useState<{
     driverId: string
     truckId: string
@@ -395,6 +396,7 @@ export default function BookingManagementView() {
     void Promise.all([
       driverService.getAll().then(setDrivers).catch(() => setDrivers([])),
       adminFetchTrucks().then(setTrucks).catch(() => setTrucks([])),
+      assignmentService.getAll().then(setAllAssignments).catch(() => setAllAssignments([])),
     ])
   }, [])
 
@@ -435,6 +437,45 @@ export default function BookingManagementView() {
   const pageCount = Math.max(1, listMeta?.totalPages ?? 1)
   const pageSafe  = Math.min(page, pageCount - 1)
   const totalRows = listMeta?.total ?? 0
+
+  // Assignments active on a different booking
+  const busyElsewhere = useMemo(
+    () =>
+      allAssignments.filter(
+        (a) =>
+          a.booking_id !== selectedId &&
+          (a.status === 'pending' || a.status === 'in_transit'),
+      ),
+    [allAssignments, selectedId],
+  )
+
+  const busyDriverIds = useMemo(
+    () => new Set(busyElsewhere.map((a) => a.driver_id).filter(Boolean) as string[]),
+    [busyElsewhere],
+  )
+
+  const busyTruckIds = useMemo(
+    () => new Set(busyElsewhere.map((a) => a.truck_id).filter(Boolean) as string[]),
+    [busyElsewhere],
+  )
+
+  // Keep the currently-selected option visible even if it belongs to this booking
+  const availableDrivers = useMemo(
+    () =>
+      drivers.filter((dr) => {
+        const id = dr.drivers?.driver_id ?? dr.user_id
+        return !busyDriverIds.has(id) || id === assignDriverId
+      }),
+    [drivers, busyDriverIds, assignDriverId],
+  )
+
+  const availableTrucks = useMemo(
+    () =>
+      trucks.filter(
+        (t) => !busyTruckIds.has(t.truck_id) || t.truck_id === assignTruckId,
+      ),
+    [trucks, busyTruckIds, assignTruckId],
+  )
 
   const restoreAssignment = useCallback((detail: BookingDetail, assignment?: { driver_id?: string | null; truck_id?: string | null }) => {
     const fallback = getPrefillFromBookingDetail(detail, trucks)
@@ -539,12 +580,12 @@ export default function BookingManagementView() {
         driver_id: assignDriverId,
         truck_id:  assignTruckId,
       })
-      // Persist the newly saved IDs so Cancel can restore them correctly
-      // if the user opens edit mode again before the detail re-fetches.
       setCommittedAssignment({ driverId: assignDriverId, truckId: assignTruckId })
       setAssignEditMode(false)
       await openDetail(selectedId)
       await loadPage()
+      // Refresh the global busy-set so subsequent opens reflect the new assignment
+      assignmentService.getAll().then(setAllAssignments).catch(() => null)
       appToast.success('Driver and vehicle assigned.', { action: 'assign', entityId: selectedId })
     } catch (e) {
       appToast.error(getApiErrorMessage(e, 'Request failed. Please try again.'), { action: 'assign', entityId: selectedId })
@@ -749,7 +790,7 @@ export default function BookingManagementView() {
                             style={{ background: active ? 'rgba(77,249,237,0.06)' : undefined }}
                           >
                             <td className="px-3 py-2.5 text-white/85 max-w-[160px] truncate">{r.display_id}</td>
-                          <td className="px-3 py-2.5">
+                            <td className="px-3 py-2.5">
                               <span
                                 className="inline-flex text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border"
                                 style={{ color: c, borderColor: `${c}55`, background: `${c}14` }}
@@ -1006,8 +1047,8 @@ export default function BookingManagementView() {
                         normalizeBookingStatus(detail.status) === 'assigned') && (
                         <AssignmentPanel
                           detail={detail}
-                          drivers={drivers}
-                          trucks={trucks}
+                          drivers={availableDrivers}
+                          trucks={availableTrucks}
                           assignDriverId={assignDriverId}
                           assignTruckId={assignTruckId}
                           assignBusy={assignBusy}
