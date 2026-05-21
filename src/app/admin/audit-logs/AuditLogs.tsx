@@ -31,7 +31,7 @@ const STAT_COLORS: Record<string, string> = {
 
 const PAGE_SIZE = 15
 
-export default function SystemLogsPage() {
+export default function AuditLogsPage() {
   const [logs, setLogs]                       = useState<SystemLog[]>([])
   const [stats, setStats]                     = useState<LogStats | null>(null)
   const [total, setTotal]                     = useState(0)

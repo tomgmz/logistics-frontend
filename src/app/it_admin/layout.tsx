@@ -8,7 +8,7 @@ import { useAuthStore } from '@/lib/store/auth.store'
 const NAV_ITEMS = [
   { href: '/it_admin/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={17} /> },
   { href: '/it_admin/administrator-management', label: 'Admin Management', icon: <Users size={17} /> },
-  { href: '/it_admin/audit-logs', label: 'Audit Logs', icon: <Activity size={17} /> },
+  { href: '/it_admin/logs', label: 'Audit Logs', icon: <Activity size={17} /> },
 ]
 
 export default function ItAdminLayout({ children }: { children: ReactNode }) {

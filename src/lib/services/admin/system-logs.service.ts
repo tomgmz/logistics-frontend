@@ -5,7 +5,6 @@ export type LogType =
   | 'vehicle_activity'
   | 'booking'
   | 'payment'
-  | 'system_error'
 
 export interface LogUser {
   role:       string | null
