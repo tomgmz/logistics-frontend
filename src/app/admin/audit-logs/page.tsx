@@ -1,4 +1,4 @@
-import SystemLogsPage from './SystemLogs'
+import SystemLogsPage from './AuditLogs'
 
 export default function AuditLogs() {
   return <SystemLogsPage />
