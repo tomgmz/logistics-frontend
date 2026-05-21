@@ -68,11 +68,7 @@ type ActiveTab = 'audit' | 'system'
 
 // ─── Audit Logs Tab ──────────────────────────────────────────────────────────
 
-interface AuditLogsTabProps {
-  stats: LogStats | null
-}
-
-function AuditLogsTab({ stats }: AuditLogsTabProps) {
+function AuditLogsTab() {
   const [logs, setLogs]                       = useState<AuditLog[]>([])
   const [total, setTotal]                     = useState(0)
   const [page, setPage]                       = useState(1)
@@ -83,6 +79,7 @@ function AuditLogsTab({ stats }: AuditLogsTabProps) {
   const [logType, setLogType]                 = useState<LogType | ''>('')
   const [sort, setSort]                       = useState<'desc' | 'asc'>('desc')
   const [selected, setSelected]               = useState<AuditLog | null>(null)
+  const [refreshKey, setRefreshKey]           = useState(0)
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 400)
@@ -110,7 +107,7 @@ function AuditLogsTab({ stats }: AuditLogsTabProps) {
     }
   }, [sort, logType, debouncedSearch])
 
-  useEffect(() => { fetchLogs() }, [fetchLogs])
+  useEffect(() => { fetchLogs() }, [fetchLogs, refreshKey])
 
   const totalPages    = Math.ceil(total / PAGE_SIZE)
   const safePage      = Math.min(page, Math.max(1, totalPages))
@@ -125,30 +122,6 @@ function AuditLogsTab({ stats }: AuditLogsTabProps) {
 
   return (
     <div className="flex flex-col flex-1 min-h-0 gap-3 overflow-hidden">
-
-      {/* Stats — outside the table */}
-      {stats && (
-        <div className="flex flex-wrap gap-3 shrink-0">
-          {(
-            [
-              ['Total',    stats.total,            '#ffffff'],
-              ['Activity', stats.user_activity,    '#4df9ed'],
-              ['Admin',    stats.admin_activity,   '#ff9a3c'],
-              ['Vehicles', stats.vehicle_activity, '#3af626'],
-              ['Bookings', stats.booking,          '#ffc83c'],
-              ['Payment',  stats.payment,          '#b08aff'],
-              ['Errors',   stats.system_error,     '#ff6060'],
-            ] as [string, number, string][]
-          ).map(([label, val, color]) => (
-            <div key={label} className="rounded-xl border border-[#2a2a2a] bg-[#1b1b1b] px-4 py-2 text-center min-w-[72px]">
-              <p className="text-2xl font-bold font-mono" style={{ color }}>{val}</p>
-              <p className="text-[9px] uppercase tracking-widest text-[#818181] mt-0.5">{label}</p>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Table container */}
       <div className="flex flex-col flex-1 min-h-0 rounded-2xl border border-[#2a2a2a] bg-[#1b1b1b] overflow-hidden">
 
         {/* Toolbar */}
@@ -181,7 +154,7 @@ function AuditLogsTab({ stats }: AuditLogsTabProps) {
             <option value="asc">Oldest First</option>
           </select>
           <button
-            onClick={fetchLogs}
+            onClick={() => setRefreshKey(k => k + 1)}
             disabled={loading}
             className="flex items-center gap-1.5 rounded-lg border border-[#424242] px-3 py-2 text-sm text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white disabled:opacity-40"
           >
@@ -350,11 +323,7 @@ function AuditLogsTab({ stats }: AuditLogsTabProps) {
 
 // ─── System Logs Tab ─────────────────────────────────────────────────────────
 
-interface SystemLogsTabProps {
-  stats: SystemLogStats | null
-}
-
-function SystemLogsTab({ stats }: SystemLogsTabProps) {
+function SystemLogsTab() {
   const [logs, setLogs]                       = useState<AppSystemLog[]>([])
   const [total, setTotal]                     = useState(0)
   const [page, setPage]                       = useState(1)
@@ -366,6 +335,7 @@ function SystemLogsTab({ stats }: SystemLogsTabProps) {
   const [level, setLevel]                     = useState<SystemLogLevel | ''>('')
   const [sort, setSort]                       = useState<'desc' | 'asc'>('desc')
   const [selected, setSelected]               = useState<AppSystemLog | null>(null)
+  const [refreshKey, setRefreshKey]           = useState(0)
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 400)
@@ -374,26 +344,30 @@ function SystemLogsTab({ stats }: SystemLogsTabProps) {
 
   useEffect(() => { setPage(1) }, [debouncedSearch, eventType, level, sort])
 
-  // TODO: replace with real systemLogsService.getAll() call
-  const fetchLogs = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      // const res = await systemLogsService.getAll({ sort, event_type: eventType, level, search: debouncedSearch })
-      // setLogs(res.data)
-      // setTotal(res.total)
-      await new Promise(r => setTimeout(r, 600))
-      setLogs([])
-      setTotal(0)
-    } catch (e: unknown) {
-      const err = e as { response?: { data?: { message?: string } }; message?: string }
-      setError(err.response?.data?.message ?? err.message ?? 'Failed to fetch system logs')
-    } finally {
-      setLoading(false)
+  useEffect(() => {
+    let cancelled = false
+    const run = async () => {
+      setLoading(true)
+      setError(null)
+      try {
+        // const res = await systemLogsService.getAll({ sort, event_type: eventType, log_level: level, search: debouncedSearch })
+        // setLogs(res.data)
+        // setTotal(res.total)
+        await new Promise(r => setTimeout(r, 600))
+        if (!cancelled) {
+          setLogs([])
+          setTotal(0)
+        }
+      } catch (e: unknown) {
+        const err = e as { response?: { data?: { message?: string } }; message?: string }
+        if (!cancelled) setError(err.response?.data?.message ?? err.message ?? 'Failed to fetch system logs')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
     }
-  }, [sort, eventType, level, debouncedSearch])
-
-  useEffect(() => { fetchLogs() }, [fetchLogs])
+    run()
+    return () => { cancelled = true }
+  }, [sort, eventType, level, debouncedSearch, refreshKey])
 
   const totalPages    = Math.ceil(total / PAGE_SIZE)
   const safePage      = Math.min(page, Math.max(1, totalPages))
@@ -401,29 +375,6 @@ function SystemLogsTab({ stats }: SystemLogsTabProps) {
 
   return (
     <div className="flex flex-col flex-1 min-h-0 gap-3 overflow-hidden">
-
-      {/* Stats — outside the table */}
-      {stats && (
-        <div className="flex flex-wrap gap-3 shrink-0">
-          {(
-            [
-              ['Total',      stats.total,      '#ffffff'],
-              ['Info',       stats.info,       '#4df9ed'],
-              ['Warn',       stats.warn,       '#ffc83c'],
-              ['Error',      stats.error,      '#ff6060'],
-              ['Critical',   stats.critical,   '#ff3030'],
-              ['Unresolved', stats.unresolved, '#ff9a3c'],
-            ] as [string, number, string][]
-          ).map(([label, val, color]) => (
-            <div key={label} className="rounded-xl border border-[#2a2a2a] bg-[#1b1b1b] px-4 py-2 text-center min-w-[72px]">
-              <p className="text-2xl font-bold font-mono" style={{ color }}>{val}</p>
-              <p className="text-[9px] uppercase tracking-widest text-[#818181] mt-0.5">{label}</p>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Table container */}
       <div className="flex flex-col flex-1 min-h-0 rounded-2xl border border-[#2a2a2a] bg-[#1b1b1b] overflow-hidden">
 
         {/* Toolbar */}
@@ -468,7 +419,7 @@ function SystemLogsTab({ stats }: SystemLogsTabProps) {
             <option value="asc">Oldest First</option>
           </select>
           <button
-            onClick={fetchLogs}
+            onClick={() => setRefreshKey(k => k + 1)}
             disabled={loading}
             className="flex items-center gap-1.5 rounded-lg border border-[#424242] px-3 py-2 text-sm text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white disabled:opacity-40"
           >
@@ -650,9 +601,9 @@ function SystemLogsTab({ stats }: SystemLogsTabProps) {
 // ─── Logs Page ────────────────────────────────────────────────────────────────
 
 export default function LogsPage() {
-  const [activeTab, setActiveTab]       = useState<ActiveTab>('audit')
-  const [auditStats, setAuditStats]     = useState<LogStats | null>(null)
-  const [systemStats, setSystemStats]   = useState<SystemLogStats | null>(null)
+  const [activeTab, setActiveTab]   = useState<ActiveTab>('audit')
+  const [auditStats, setAuditStats] = useState<LogStats | null>(null)
+  const [systemStats]               = useState<SystemLogStats | null>(null)
 
   useEffect(() => {
     auditLogService.getStats()
@@ -672,10 +623,55 @@ export default function LogsPage() {
       <div className="flex flex-col flex-1 min-h-0 px-3 py-3 lg:px-4 gap-4 overflow-hidden">
 
         {/* Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 shrink-0">
-          <h1 className="mt-1 text-2xl font-bold tracking-tight text-white">Logs</h1>
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 shrink-0">
 
-          {/* Tab switcher */}
+          {/* Left: title + stats inline */}
+          <div className="flex flex-wrap items-center gap-2 mt-1">
+            <h1 className="text-2xl font-bold tracking-tight text-white mr-1">Logs</h1>
+
+            {activeTab === 'audit' && auditStats && (
+              <>
+                {(
+                  [
+                    ['Total',    auditStats.total,            '#ffffff'],
+                    ['User',     auditStats.user_activity,    '#4df9ed'],
+                    ['Admin',    auditStats.admin_activity,   '#ff9a3c'],
+                    ['Vehicles', auditStats.vehicle_activity, '#3af626'],
+                    ['Bookings', auditStats.booking,          '#ffc83c'],
+                    ['Payment',  auditStats.payment,          '#b08aff'],
+                    ['Errors',   auditStats.system_error,     '#ff6060'],
+                  ] as [string, number, string][]
+                ).map(([label, val, color]) => (
+                  <div key={label} className="rounded-lg border border-[#2a2a2a] bg-[#1b1b1b] px-3 py-1 text-center min-w-[52px]">
+                    <p className="text-base font-bold font-mono leading-tight" style={{ color }}>{val}</p>
+                    <p className="text-[8px] uppercase tracking-widest text-[#818181]">{label}</p>
+                  </div>
+                ))}
+              </>
+            )}
+
+            {activeTab === 'system' && systemStats && (
+              <>
+                {(
+                  [
+                    ['Total',      systemStats.total,      '#ffffff'],
+                    ['Info',       systemStats.info,       '#4df9ed'],
+                    ['Warn',       systemStats.warn,       '#ffc83c'],
+                    ['Error',      systemStats.error,      '#ff6060'],
+                    ['Critical',   systemStats.critical,   '#ff3030'],
+                    ['Unresolved', systemStats.unresolved, '#ff9a3c'],
+                  ] as [string, number, string][]
+                ).map(([label, val, color]) => (
+                  <div key={label} className="rounded-lg border border-[#2a2a2a] bg-[#1b1b1b] px-3 py-1 text-center min-w-[52px]">
+                    <p className="text-base font-bold font-mono leading-tight" style={{ color }}>{val}</p>
+                    <p className="text-[8px] uppercase tracking-widest text-[#818181]">{label}</p>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+
+          {/* Right: tab switcher */}
           <div className="flex items-center gap-1 rounded-xl border border-[#2a2a2a] bg-[#1b1b1b] p-1 self-start lg:self-auto">
             <button
               onClick={() => setActiveTab('audit')}
@@ -703,8 +699,8 @@ export default function LogsPage() {
         </div>
 
         {/* Tab content */}
-        {activeTab === 'audit'  && <AuditLogsTab  stats={auditStats}  />}
-        {activeTab === 'system' && <SystemLogsTab stats={systemStats} />}
+        {activeTab === 'audit'  && <AuditLogsTab  />}
+        {activeTab === 'system' && <SystemLogsTab />}
 
       </div>
     </div>
