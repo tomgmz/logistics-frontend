@@ -64,6 +64,8 @@ export interface DriverUser extends BaseUser {
     status: DriverAvailability
     is_vendor_driver: boolean
     vendor_id: string | null
+    license_image_url: string | null
+    profile_image_url: string | null
   } | null
 }
 
@@ -172,13 +174,13 @@ export interface CreateOperationsAdminPayload {
 }
 
 export interface CreateITAdminPayload {
-  email:           string
-  phone?:          string
-  first_name?:     string
-  last_name?:      string
+  email:        string
+  phone?:       string
+  first_name?:  string
+  last_name?:   string
   middle_name?: string
-  suffix?:         string
-  created_by?:     string | null
+  suffix?:      string
+  created_by?:  string | null
 }
 
 export type UpdateAdminPayload           = Partial<Omit<CreateAdminPayload, 'password'>>

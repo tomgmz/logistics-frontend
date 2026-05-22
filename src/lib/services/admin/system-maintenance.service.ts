@@ -15,7 +15,6 @@ export interface HandlingCode {
   code:             string
   name:             string
   description?:     string | null
-  type:             HandlingCodeType
   is_active:        boolean
   created_at?:      string
 }
@@ -55,7 +54,6 @@ export interface CreateHandlingCodePayload {
   code:         string
   name:         string
   description?: string
-  type:         HandlingCodeType
   is_active?:   boolean
 }
 
@@ -63,7 +61,6 @@ export interface UpdateHandlingCodePayload {
   code?:        string
   name?:        string
   description?: string | null
-  type?:        HandlingCodeType
   is_active?:   boolean
 }
 
@@ -101,14 +98,12 @@ export interface CreateLandlinePrefixPayload {
   prefix:     string
   city:       string
   region?:    string | null
-  is_active?: boolean
 }
 
 export interface UpdateLandlinePrefixPayload {
   prefix?:    string
   city?:      string
   region?:    string | null
-  is_active?: boolean
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

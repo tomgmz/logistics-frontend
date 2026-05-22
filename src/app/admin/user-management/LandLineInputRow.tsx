@@ -19,16 +19,22 @@ function Input({
   )
 }
 
+function getRawPrefix(prefix: string): string {
+  return prefix.replace(/^0+/, '')
+}
+
 function splitDigits(digits: string, areaCodes: LandlinePrefix[]): { areaCode: string; subscriber: string } {
   if (!digits) return { areaCode: '', subscriber: '' }
-  if (digits.startsWith('2')) return { areaCode: '2', subscriber: digits.slice(1) }
-  const twoDigit = areaCodes.find(a => a.prefix.length === 2 && digits.startsWith(a.prefix))
-  if (twoDigit) return { areaCode: twoDigit.prefix, subscriber: digits.slice(2) }
-  return { areaCode: '', subscriber: digits }
+  const match = areaCodes
+    .map(a => ({ ...a, raw: getRawPrefix(a.prefix) }))
+    .sort((a, b) => b.raw.length - a.raw.length)
+    .find(a => digits.startsWith(a.raw))
+  if (!match) return { areaCode: '', subscriber: digits }
+  return { areaCode: match.prefix, subscriber: digits.slice(match.raw.length) }
 }
 
 function subscriberMaxLength(areaCode: string): number {
-  return areaCode === '2' ? 8 : 7
+  return getRawPrefix(areaCode) === '2' ? 8 : 7
 }
 
 export function toLocalLandlineDigits(raw: string): string {
@@ -58,12 +64,13 @@ export default function LandlineInputRow({ value, onChange, error }: LandlineInp
   const maxSub = subscriberMaxLength(areaCode)
 
   function handleAreaChange(code: string) {
-    onChange(code + subscriber.slice(0, subscriberMaxLength(code)))
+    const rawCode = getRawPrefix(code)
+    onChange(rawCode + subscriber.slice(0, subscriberMaxLength(code)))
   }
 
   function handleSubscriberChange(raw: string) {
     const digits = raw.replace(/\D/g, '').slice(0, maxSub)
-    onChange(areaCode + digits)
+    onChange(getRawPrefix(areaCode) + digits)
   }
 
   return (
@@ -90,7 +97,7 @@ export default function LandlineInputRow({ value, onChange, error }: LandlineInp
         <option value="">Select city</option>
         {areaCodes.map(a => (
           <option key={a.prefix_id} value={a.prefix}>
-            ({a.prefix.length === 1 ? `0${a.prefix}` : a.prefix}) {a.city}
+            ({a.prefix}) {a.city}
           </option>
         ))}
       </select>

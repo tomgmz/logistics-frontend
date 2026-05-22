@@ -4,6 +4,7 @@ import {
   useState,
   useEffect,
   useMemo,
+  useRef,
   type InputHTMLAttributes,
   type TextareaHTMLAttributes,
   type SelectHTMLAttributes,
@@ -36,7 +37,8 @@ import ReusableModal from '@/components/layout/ReusableModal'
 import { appToast } from '@/lib/toast'
 import { extractApiError } from '@/lib/api-error'
 import LandlineInputRow, { toLocalLandlineDigits } from './LandLineInputRow'
-import { ScanLine, CheckCircle } from 'lucide-react'
+import { ScanLine, CheckCircle, ImagePlus } from 'lucide-react'
+import proxyApi from '@/lib/api/auth.api'
 
 interface UserFormModalProps {
   tab: UserTab
@@ -108,7 +110,6 @@ function buildInitialState(tab: UserTab, user: AnyUser | null): FormState {
     const d = (user as DriverUser | null)?.drivers
     return {
       ...base,
-      password:         '',
       license_number:   d?.license_number                ?? '',
       license_expiry:   d?.license_expiry?.split('T')[0] ?? '',
       is_vendor_driver: d?.is_vendor_driver              ?? false,
@@ -130,12 +131,30 @@ function buildInitialState(tab: UserTab, user: AnyUser | null): FormState {
   return base
 }
 
-async function submitForm(tab: UserTab, form: FormState, editId?: string): Promise<void> {
+async function submitForm(
+  tab: UserTab,
+  form: FormState,
+  licenseFile: File | null,
+  editId?: string,
+): Promise<void> {
   const clean = Object.fromEntries(
     Object.entries(form).filter(([, v]) => v !== '' && v !== null && v !== undefined),
   )
   if (clean.phone)    clean.phone    = attachCountryCode(String(clean.phone))
   if (clean.landline) clean.landline = attachCountryCode(String(clean.landline))
+
+  // Driver create always multipart; driver edit is multipart only when a new image was picked
+  if (tab === 'drivers' && (!editId || licenseFile)) {
+    const fd = new FormData()
+    Object.entries(clean).forEach(([k, v]) => fd.append(k, String(v)))
+    if (licenseFile) fd.append('image', licenseFile)
+    const url    = editId ? `/admin/drivers/${editId}` : '/admin/drivers'
+    const method = editId ? 'patch' : 'post'   // change 'patch' → 'put' if your API uses PUT
+    await proxyApi[method](url, fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return
+  }
 
   switch (tab) {
     case 'clients':           return editId ? clientService.update(editId, clean as never).then()           : clientService.create(clean as never).then()
@@ -149,6 +168,8 @@ async function submitForm(tab: UserTab, form: FormState, editId?: string): Promi
     case 'it-admins':         return editId ? itAdminService.update(editId, clean as never).then()          : itAdminService.create(clean as never).then()
   }
 }
+
+// ─── Shared field UI primitives ───────────────────────────────────────────────
 
 interface FieldProps {
   label: string
@@ -259,6 +280,8 @@ function PhoneInputRow({
   )
 }
 
+// ─── Main component ───────────────────────────────────────────────────────────
+
 export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormModalProps) {
   const isEdit = Boolean(user)
 
@@ -271,29 +294,51 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
   const [confirmClose, setConfirmClose] = useState(false)
   const [confirmSave,  setConfirmSave]  = useState(false)
 
+  // License image — used for both create (required) and edit (optional replace)
+  const [licenseFile,    setLicenseFile]    = useState<File | null>(null)
+  const [licensePreview, setLicensePreview] = useState<string | null>(null)
+  const licenseInputRef = useRef<HTMLInputElement>(null)
+
   const [vendorList,     setVendorList]     = useState<{ vendor_id: string; name: string }[]>([])
   const [vendorsLoading, setVendorsLoading] = useState(false)
 
-  const [scanLoading,  setScanLoading]  = useState(false)
-  const [scanDone,     setScanDone]     = useState(false)
-  const [scanError,    setScanError]    = useState<string | null>(null)
-  const [eligibility,  setEligibility]  = useState<ScanEligibilityState | null>(null)
+  const [scanLoading, setScanLoading] = useState(false)
+  const [scanDone,    setScanDone]    = useState(false)
+  const [scanError,   setScanError]   = useState<string | null>(null)
+  const [eligibility, setEligibility] = useState<ScanEligibilityState | null>(null)
 
+  // The existing stored URL — only meaningful for edit mode
+  const storedLicenseUrl =
+    tab === 'drivers' ? (user as DriverUser | null)?.drivers?.license_image_url ?? null : null
+
+  // Revoke object URL on unmount to avoid memory leaks
+  useEffect(() => {
+    return () => { if (licensePreview) URL.revokeObjectURL(licensePreview) }
+  }, [licensePreview])
+
+  // ── OCR scan ──────────────────────────────────────────────────────────────
   async function handleLicenseScan(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
+
+    setLicenseFile(file)
+    if (licensePreview) URL.revokeObjectURL(licensePreview)
+    setLicensePreview(URL.createObjectURL(file))
+    setFieldErrors(prev => { const n = { ...prev }; delete n.license_image; return n })
+
     setScanLoading(true)
     setScanDone(false)
     setScanError(null)
     setEligibility(null)
+
     try {
       const result = await ocrService.scanLicense(file)
       setForm(prev => ({
         ...prev,
-        ...(result.first_name     && { first_name:    result.first_name }),
-        ...(result.last_name      && { last_name:     result.last_name }),
-        ...(result.middle_name    && { middle_name:   result.middle_name }),
-        ...(result.suffix         && { suffix:        result.suffix }),
+        ...(result.first_name     && { first_name:     result.first_name }),
+        ...(result.last_name      && { last_name:      result.last_name }),
+        ...(result.middle_name    && { middle_name:    result.middle_name }),
+        ...(result.suffix         && { suffix:         result.suffix }),
         ...(result.license_number && { license_number: result.license_number }),
         ...(result.license_expiry && { license_expiry: result.license_expiry }),
       }))
@@ -307,35 +352,54 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
       setScanDone(true)
       appToast.success('License scanned — review and confirm the pre-filled fields.', { action: 'ocr-scan' })
     } catch {
-      setScanError('Scan failed — fill in the fields manually.')
+      setScanError('Scan failed — fields were not auto-filled, but the image is still attached.')
     } finally {
       setScanLoading(false)
       e.target.value = ''
     }
   }
 
-  // True when at least one field differs from the initial state
-  const isDirty = useMemo(() => {
-    return Object.keys(initialState).some(
-      (key) => form[key] !== initialState[key]
-    )
-  }, [form, initialState])
+  // ── Manual image pick (no OCR) ────────────────────────────────────────────
+  function handleImagePick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setLicenseFile(file)
+    if (licensePreview) URL.revokeObjectURL(licensePreview)
+    setLicensePreview(URL.createObjectURL(file))
+    setFieldErrors(prev => { const n = { ...prev }; delete n.license_image; return n })
+    e.target.value = ''
+  }
 
+  // ── Dirty check ───────────────────────────────────────────────────────────
+  const isDirty = useMemo(() => {
+    const formDirty = Object.keys(initialState).some(key => form[key] !== initialState[key])
+    // Any newly picked file (create or edit) counts as a change
+    if (tab === 'drivers') return formDirty || licenseFile !== null
+    return formDirty
+  }, [form, initialState, licenseFile, tab])
+
+  // ── Reset when the target user changes ───────────────────────────────────
   useEffect(() => {
     setForm(initialState)
     setGlobalError(null)
     setFieldErrors({})
+    setLicenseFile(null)
+    setLicensePreview(null)
+    setScanDone(false)
+    setScanError(null)
+    setEligibility(null)
   }, [initialState])
 
+  // ── Load vendor list for driver forms ─────────────────────────────────────
   useEffect(() => {
     if (tab !== 'drivers') return
     setVendorsLoading(true)
     vendorService.getAll()
-      .then((data) => {
+      .then(data => {
         setVendorList(
           (data as VendorUser[])
-            .filter((v) => v.vendors?.vendor_id)
-            .map((v) => ({
+            .filter(v => v.vendors?.vendor_id)
+            .map(v => ({
               vendor_id: v.vendors!.vendor_id,
               name:
                 [v.first_name, v.last_name].filter(Boolean).join(' ') +
@@ -347,6 +411,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
       .finally(() => setVendorsLoading(false))
   }, [tab])
 
+  // ── Validation helpers ────────────────────────────────────────────────────
   function buildValidationPayload(currentForm: FormState): Record<string, unknown> {
     const payload: Record<string, unknown> = { ...currentForm }
     if (payload.phone)    payload.phone    = attachCountryCode(String(payload.phone))
@@ -363,7 +428,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
     setFieldErrors(prev => {
       const next = { ...prev }
       if (errors[key]) next[key] = errors[key]
-      else delete next[key]
+      else             delete next[key]
       return next
     })
   }
@@ -377,9 +442,17 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
     })
   }
 
+  // ── Submit ────────────────────────────────────────────────────────────────
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setGlobalError(null)
+
+    // License image is required only on create
+    if (tab === 'drivers' && !isEdit && !licenseFile) {
+      setFieldErrors(prev => ({ ...prev, license_image: 'License image is required' }))
+      return
+    }
+
     const payload = buildValidationPayload(form)
     const errors  = validateForm(tab, isEdit, payload)
     if (Object.keys(errors).length > 0) { setFieldErrors(errors); return }
@@ -392,7 +465,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
     setGlobalError(null)
     setFieldErrors({})
     try {
-      await submitForm(tab, form, isEdit ? user!.user_id : undefined)
+      await submitForm(tab, form, licenseFile, isEdit ? user!.user_id : undefined)
       appToast.success(
         isEdit
           ? `${TAB_LABELS[tab]} updated successfully.`
@@ -414,12 +487,10 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
     }
   }
 
-  // For edit mode: disable save when nothing has changed or while loading.
-  // For create mode: always enabled (form starts empty, any input is progress).
   const isSaveDisabled = loading || (isEdit && !isDirty)
-
   const fe = fieldErrors
 
+  // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <AnimatePresence>
       <div key="modal-container" className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -439,6 +510,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
           transition={{ type: 'spring', duration: 0.3, bounce: 0.15 }}
           className="relative z-10 w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-[#2a2a2a] bg-[#1b1b1b] shadow-2xl [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
         >
+          {/* ── Header ── */}
           <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#2a2a2a] bg-[#1b1b1b] px-6 py-4">
             <div>
               <p className="text-[10px] font-bold tracking-[0.14em] uppercase text-[#4df9ed]">
@@ -459,6 +531,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
 
           <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5 px-6 py-6">
 
+            {/* ── Name row ── */}
             <div className="grid grid-cols-2 gap-4">
               <Field label="First Name" required error={fe.first_name}>
                 <Input
@@ -495,6 +568,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
               </Field>
             </div>
 
+            {/* ── Contact ── */}
             <div className="grid grid-cols-1 gap-4">
               <Field label="Email" required error={fe.email}>
                 <Input
@@ -520,18 +594,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
               />
             </Field>
 
-            {tab === 'drivers' && !isEdit && (
-              <Field label="Password" required error={fe.password}>
-                <Input
-                  type="password"
-                  value={form.password as string}
-                  onChange={e => set('password', e.target.value)}
-                  placeholder="Min. 8 characters"
-                  error={fe.password}
-                />
-              </Field>
-            )}
-
+            {/* ════════════════════════════════ CLIENT FIELDS ═══════════════════════════ */}
             {tab === 'clients' && (<>
               <Field label="Landline" hint="Optional" error={fe.landline}>
                 <LandlineInputRow
@@ -574,94 +637,152 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
               </Field>
             </>)}
 
+            {/* ════════════════════════════════ DRIVER FIELDS ═══════════════════════════ */}
             {tab === 'drivers' && (<>
-              {!isEdit && (
-                <div className="rounded-xl border border-dashed border-[#424242] bg-[#2a2a2a]/30 px-4 py-4">
-                  <p className="mb-2 text-[10px] font-bold tracking-[0.12em] uppercase text-[#818181]">
-                    Scan License <span className="normal-case font-normal">(optional — auto-fills fields below)</span>
+
+              {/* ── License image card (create = required + scan; edit = optional replace) ── */}
+              <div className="rounded-xl border border-dashed border-[#424242] bg-[#2a2a2a]/30 px-4 py-4">
+
+                {/* Header */}
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="text-[10px] font-bold tracking-[0.12em] uppercase text-[#818181]">
+                    License Image
+                    {!isEdit && <span className="ml-0.5 text-[#4df9ed]">*</span>}
+                    {isEdit && (
+                      <span className="ml-1 normal-case font-normal text-[#555]">
+                        (optional — upload to replace)
+                      </span>
+                    )}
                   </p>
-                  <label className="flex cursor-pointer items-center gap-3">
-                    <div className="flex items-center gap-2 rounded-lg border border-[#424242] bg-[#1b1b1b] px-4 py-2 text-sm text-[#818181] transition hover:border-[#4df9ed50] hover:text-white">
+                  {licenseFile && (
+                    <span className="text-[10px] text-[#4df9ed] font-medium truncate max-w-[180px]">
+                      {licenseFile.name}
+                    </span>
+                  )}
+                </div>
+
+                {/* Preview — new local file takes priority; falls back to stored Cloudinary URL */}
+                {(licensePreview ?? storedLicenseUrl) && (
+                  <div className="mb-3 overflow-hidden rounded-lg border border-[#424242]">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={licensePreview ?? storedLicenseUrl!}
+                      alt="License preview"
+                      className="h-32 w-full object-cover"
+                    />
+                  </div>
+                )}
+
+                {/* Action buttons */}
+                <div className="flex flex-wrap items-center gap-2">
+
+                  {/* Scan + auto-fill (create only — OCR on edit would clobber existing data) */}
+                  {!isEdit && (
+                    <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-[#424242] bg-[#1b1b1b] px-4 py-2 text-sm text-[#818181] transition hover:border-[#4df9ed50] hover:text-white">
                       {scanLoading
                         ? <Loader2 size={14} className="animate-spin" />
                         : scanDone
                         ? <CheckCircle size={14} className="text-[#4df9ed]" />
                         : <ScanLine size={14} />}
                       <span>
-                        {scanLoading ? 'Scanning…' : scanDone ? 'License scanned' : 'Upload license image'}
+                        {scanLoading ? 'Scanning…' : scanDone ? 'Re-scan' : 'Scan & auto-fill'}
                       </span>
-                    </div>
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        className="sr-only"
+                        onChange={handleLicenseScan}
+                        disabled={scanLoading}
+                      />
+                    </label>
+                  )}
+
+                  {/* Manual pick / replace */}
+                  {/* <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-[#424242] bg-[#1b1b1b] px-4 py-2 text-sm text-[#818181] transition hover:border-[#4df9ed50] hover:text-white">
+                    <ImagePlus size={14} />
+                    <span>
+                      {isEdit
+                        ? licenseFile ? 'Change image' : 'Replace image'
+                        : licenseFile && !scanDone ? 'Change image' : 'Upload image only'}
+                    </span>
                     <input
+                      ref={licenseInputRef}
                       type="file"
                       accept="image/jpeg,image/png,image/webp"
                       className="sr-only"
-                      onChange={handleLicenseScan}
-                      disabled={scanLoading}
+                      onChange={handleImagePick}
                     />
-                    {scanError && <p className="text-[11px] text-red-400">{scanError}</p>}
-                  </label>
+                  </label> */}
 
-                  {/* Eligibility badges — shown after a successful scan */}
-                  {scanDone && eligibility && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 6 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.2 }}
-                      className="mt-3 flex flex-col gap-2"
-                    >
-                      {/* Raw DL / restriction code pills */}
-                      {(eligibility.dl_codes.length > 0 || eligibility.restriction_codes.length > 0) && (
-                        <div className="flex flex-wrap gap-1.5">
-                          {eligibility.dl_codes.map(code => (
-                            <span
-                              key={code}
-                              className="rounded-md border border-[#4df9ed30] bg-[#4df9ed10] px-2 py-0.5 text-[10px] font-bold tracking-wider text-[#4df9ed]"
-                            >
-                              DL {code}
-                            </span>
-                          ))}
-                          {eligibility.restriction_codes.map(code => (
-                            <span
-                              key={code}
-                              className="rounded-md border border-[#ffffff15] bg-[#ffffff08] px-2 py-0.5 text-[10px] font-bold tracking-wider text-[#818181]"
-                            >
-                              RC {code}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Eligibility flags grid */}
-                      <div className="grid grid-cols-2 gap-1.5">
-                        {(
-                          [
-                            ['can_drive_light_commercial', 'Light Commercial (L300 / FB / Pick-up)'],
-                            ['can_drive_heavy_truck',      'Heavy Truck (6-wheeler / 10-wheeler)'],
-                            ['can_drive_articulated',      'Articulated (Wing Van + Trailer)'],
-                            ['can_drive_bus',              'Passenger Bus'],
-                          ] as const
-                        ).map(([key, label]) => {
-                          const allowed = eligibility.vehicle_eligibility[key]
-                          return (
-                            <div
-                              key={key}
-                              className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-[11px] ${
-                                allowed
-                                  ? 'border-[#4df9ed25] bg-[#4df9ed08] text-[#4df9ed]'
-                                  : 'border-[#ffffff10] bg-transparent text-[#444]'
-                              }`}
-                            >
-                              <span className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${allowed ? 'bg-[#4df9ed]' : 'bg-[#333]'}`} />
-                              {label}
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </motion.div>
+                  {scanError && (
+                    <p className="w-full text-[11px] text-red-400">{scanError}</p>
                   )}
                 </div>
-              )}
 
+                {/* Required-image validation error */}
+                {fe.license_image && (
+                  <p className="mt-2 text-[11px] text-red-400">{fe.license_image}</p>
+                )}
+
+                {/* Eligibility badges — only shown after a successful scan on create */}
+                {!isEdit && scanDone && eligibility && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="mt-3 flex flex-col gap-2"
+                  >
+                    {(eligibility.dl_codes.length > 0 || eligibility.restriction_codes.length > 0) && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {eligibility.dl_codes.map(code => (
+                          <span
+                            key={code}
+                            className="rounded-md border border-[#4df9ed30] bg-[#4df9ed10] px-2 py-0.5 text-[10px] font-bold tracking-wider text-[#4df9ed]"
+                          >
+                            DL {code}
+                          </span>
+                        ))}
+                        {eligibility.restriction_codes.map(code => (
+                          <span
+                            key={code}
+                            className="rounded-md border border-[#ffffff15] bg-[#ffffff08] px-2 py-0.5 text-[10px] font-bold tracking-wider text-[#818181]"
+                          >
+                            RC {code}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {(
+                        [
+                          ['can_drive_light_commercial', 'Light Commercial (L300 / FB / Pick-up)'],
+                          ['can_drive_heavy_truck',      'Heavy Truck (6-wheeler / 10-wheeler)'],
+                          ['can_drive_articulated',      'Articulated (Wing Van + Trailer)'],
+                          ['can_drive_bus',              'Passenger Bus'],
+                        ] as const
+                      ).map(([key, label]) => {
+                        const allowed = eligibility.vehicle_eligibility[key]
+                        return (
+                          <div
+                            key={key}
+                            className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-[11px] ${
+                              allowed
+                                ? 'border-[#4df9ed25] bg-[#4df9ed08] text-[#4df9ed]'
+                                : 'border-[#ffffff10] bg-transparent text-[#444]'
+                            }`}
+                          >
+                            <span className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${allowed ? 'bg-[#4df9ed]' : 'bg-[#333]'}`} />
+                            {label}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </motion.div>
+                )}
+              </div>
+
+              {/* ── License number + expiry ── */}
               <div className="grid grid-cols-2 gap-4">
                 <Field label="License Number" required error={fe.license_number}>
                   <Input
@@ -682,6 +803,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
                 </Field>
               </div>
 
+              {/* ── Vendor driver toggle ── */}
               <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-[#2a2a2a] bg-[#2a2a2a]/40 px-4 py-3">
                 <div className="relative mt-0.5 flex-shrink-0">
                   <input
@@ -712,7 +834,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
                     disabled={vendorsLoading}
                   >
                     <option value="">{vendorsLoading ? 'Loading vendors…' : 'Select a vendor'}</option>
-                    {vendorList.map((v) => (
+                    {vendorList.map(v => (
                       <option key={v.vendor_id} value={v.vendor_id}>{v.name}</option>
                     ))}
                   </Select>
@@ -720,6 +842,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
               )}
             </>)}
 
+            {/* ════════════════════════════════ VENDOR FIELDS ═══════════════════════════ */}
             {tab === 'vendors' && (<>
               <Field label="Landline" hint="Optional — area code + subscriber, e.g. 32-XXXXXXX" error={fe.landline}>
                 <LandlineInputRow
@@ -760,6 +883,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
               </div>
             </>)}
 
+            {/* ── Global error ── */}
             {globalError && (
               <motion.div
                 initial={{ opacity: 0, y: -4 }}
@@ -770,6 +894,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
               </motion.div>
             )}
 
+            {/* ── Footer actions ── */}
             <div className="flex justify-end gap-3 border-t border-[#2a2a2a] pt-5 mt-1">
               <button
                 type="button"

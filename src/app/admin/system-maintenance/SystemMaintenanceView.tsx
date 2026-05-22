@@ -12,7 +12,6 @@ import type {
   CreateLandlinePrefixPayload,
   CreateProductPayload,
   HandlingCode,
-  HandlingCodeType,
   LandlinePrefix,
   Product,
   UpdateLandlinePrefixPayload,
@@ -21,24 +20,24 @@ import type {
 // ── Tabs ────────────────────────────────────────────────────────────────────
 
 const TABS = [
-  { key: 'handling',   label: 'Handling Codes',    singular: 'Handling Code',   icon: Tag },
-  { key: 'commodities',label: 'Commodities',        singular: 'Commodity',       icon: Layers },
-  { key: 'products',   label: 'Products',           singular: 'Product',         icon: Package },
-  { key: 'landline',   label: 'Landline Prefixes',  singular: 'Landline Prefix', icon: Phone },
+  { key: 'handling',    label: 'Handling Codes',   singular: 'Handling Code',   icon: Tag },
+  { key: 'commodities', label: 'Commodities',       singular: 'Commodity',       icon: Layers },
+  { key: 'products',    label: 'Products',          singular: 'Product',         icon: Package },
+  { key: 'landline',    label: 'Landline Prefixes', singular: 'Landline Prefix', icon: Phone },
 ] as const
 type TabKey = (typeof TABS)[number]['key']
 
 // ── Form state ───────────────────────────────────────────────────────────────
 
-type HandlingForm  = { code: string; name: string; description: string; type: HandlingCodeType }
+type HandlingForm  = { code: string; name: string; description: string }
 type CommodityForm = { name: string; description: string; category: string }
 type ProductForm   = { commodity_id: string; name: string; description: string; unit: string }
-type LandlineForm  = { prefix: string; city: string; region: string; is_active: boolean }
+type LandlineForm  = { prefix: string; city: string; region: string }
 
-const initHandling:  HandlingForm  = { code: '', name: '', description: '', type: 'standard' }
+const initHandling:  HandlingForm  = { code: '', name: '', description: '' }
 const initCommodity: CommodityForm = { name: '', description: '', category: '' }
 const initProduct:   ProductForm   = { commodity_id: '', name: '', description: '', unit: '' }
-const initLandline:  LandlineForm  = { prefix: '', city: '', region: '', is_active: true }
+const initLandline:  LandlineForm  = { prefix: '', city: '', region: '' }
 
 // ── Shared styles ────────────────────────────────────────────────────────────
 
@@ -60,13 +59,13 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 export default function SystemMaintenanceView() {
   const [tab, setTab] = useState<TabKey>('handling')
 
-  const [handlingCodes, setHandling]     = useState<HandlingCode[]>([])
-  const [commodities,   setCommodities]  = useState<Commodity[]>([])
-  const [products,      setProducts]     = useState<Product[]>([])
-  const [prefixes,      setPrefixes]     = useState<LandlinePrefix[]>([])
+  const [handlingCodes, setHandling]    = useState<HandlingCode[]>([])
+  const [commodities,   setCommodities] = useState<Commodity[]>([])
+  const [products,      setProducts]    = useState<Product[]>([])
+  const [prefixes,      setPrefixes]    = useState<LandlinePrefix[]>([])
 
-  const [loading, setLoading] = useState(false)
-  const [saving,  setSaving]  = useState(false)
+  const [loading,  setLoading]  = useState(false)
+  const [saving,   setSaving]   = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
 
   const [hForm, setHForm] = useState<HandlingForm>(initHandling)
@@ -118,7 +117,6 @@ export default function SystemMaintenanceView() {
       code:        hForm.code.trim().toUpperCase(),
       name:        hForm.name.trim(),
       description: hForm.description.trim() || undefined,
-      type:        hForm.type,
     }
     try {
       setSaving(true)
@@ -209,26 +207,24 @@ export default function SystemMaintenanceView() {
 
       if (editingPrefix) {
         const payload: UpdateLandlinePrefixPayload = {
-          prefix:    lForm.prefix.trim(),
-          city:      lForm.city.trim(),
-          region:    lForm.region.trim() || null,
-          is_active: lForm.is_active,
+          prefix: lForm.prefix.trim(),
+          city:   lForm.city.trim(),
+          region: lForm.region.trim() || null,
         }
         const updated = await systemMaintenanceService.updateLandlinePrefix(editingPrefix.prefix_id, payload)
         setPrefixes(prev => prev.map(p => p.prefix_id === updated.prefix_id ? updated : p))
-        appToast.success(`Prefix (0${updated.prefix}) updated.`)
+        appToast.success(`Prefix (${updated.prefix}) updated.`)
         cancelEditLandline()
       } else {
         const payload: CreateLandlinePrefixPayload = {
-          prefix:    lForm.prefix.trim(),
-          city:      lForm.city.trim(),
-          region:    lForm.region.trim() || null,
-          is_active: lForm.is_active,
+          prefix: lForm.prefix.trim(),
+          city:   lForm.city.trim(),
+          region: lForm.region.trim() || null,
         }
         const created = await systemMaintenanceService.createLandlinePrefix(payload)
         setPrefixes(prev => [...prev, created].sort((a, b) => Number(a.prefix) - Number(b.prefix)))
         setLForm(initLandline)
-        appToast.success(`Prefix (0${created.prefix}) added.`)
+        appToast.success(`Prefix (${created.prefix}) added.`)
       }
     } catch (e: unknown) {
       const msg = getApiErrorMessage(e)
@@ -246,7 +242,7 @@ export default function SystemMaintenanceView() {
       await systemMaintenanceService.deleteLandlinePrefix(pfx.prefix_id)
       setPrefixes(prev => prev.filter(p => p.prefix_id !== pfx.prefix_id))
       if (editingPrefix?.prefix_id === pfx.prefix_id) cancelEditLandline()
-      appToast.success(`Prefix (0${pfx.prefix}) deleted.`)
+      appToast.success(`Prefix (${pfx.prefix}) deleted.`)
     } catch (e: unknown) {
       appToast.error(getApiErrorMessage(e) || 'Failed to delete prefix')
     } finally {
@@ -257,10 +253,9 @@ export default function SystemMaintenanceView() {
   function startEditLandline(pfx: LandlinePrefix) {
     setEditingPrefix(pfx)
     setLForm({
-      prefix:    pfx.prefix,
-      city:      pfx.city,
-      region:    pfx.region ?? '',
-      is_active: pfx.is_active,
+      prefix: pfx.prefix,
+      city:   pfx.city,
+      region: pfx.region ?? '',
     })
   }
 
@@ -274,34 +269,14 @@ export default function SystemMaintenanceView() {
   function renderForm() {
     if (tab === 'handling') return (
       <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Code">
-            <input
-              value={hForm.code}
-              onChange={e => setHForm(p => ({ ...p, code: e.target.value.toUpperCase() }))}
-              className={inputCls}
-              placeholder="e.g. GEN"
-            />
-          </Field>
-          <Field label="Type">
-            <div className="flex gap-2 pt-0.5">
-              {(['standard', 'additional'] as const).map(t => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => setHForm(p => ({ ...p, type: t }))}
-                  className="flex-1 rounded-lg border py-2.5 text-xs font-bold uppercase tracking-widest transition"
-                  style={hForm.type === t
-                    ? { borderColor: '#4DF9ED55', background: 'rgba(77,249,237,0.10)', color: '#4DF9ED' }
-                    : { borderColor: 'rgba(255,255,255,0.08)', background: 'transparent', color: 'rgba(255,255,255,0.35)' }
-                  }
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
-          </Field>
-        </div>
+        <Field label="Code">
+          <input
+            value={hForm.code}
+            onChange={e => setHForm(p => ({ ...p, code: e.target.value.toUpperCase() }))}
+            className={inputCls}
+            placeholder="e.g. GEN"
+          />
+        </Field>
         <Field label="Name">
           <input
             value={hForm.name}
@@ -403,7 +378,7 @@ export default function SystemMaintenanceView() {
         {editingPrefix && (
           <div className="flex items-center justify-between rounded-lg border border-[#4DF9ED]/20 bg-[#4DF9ED]/5 px-3 py-2">
             <p className="text-xs font-bold text-[#4DF9ED]">
-              Editing (0{editingPrefix.prefix}) {editingPrefix.city}
+              Editing ({editingPrefix.prefix}) {editingPrefix.city}
             </p>
             <button
               type="button"
@@ -416,35 +391,15 @@ export default function SystemMaintenanceView() {
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Prefix *">
-            <input
-              value={lForm.prefix}
-              onChange={e => setLForm(p => ({ ...p, prefix: e.target.value.replace(/\D/g, '').slice(0, 4) }))}
-              className={inputCls}
-              placeholder="e.g. 2, 32, 62"
-              inputMode="numeric"
-            />
-          </Field>
-          <Field label="Status">
-            <div className="flex gap-2 pt-0.5">
-              {([true, false] as const).map(val => (
-                <button
-                  key={String(val)}
-                  type="button"
-                  onClick={() => setLForm(p => ({ ...p, is_active: val }))}
-                  className="flex-1 rounded-lg border py-2.5 text-xs font-bold uppercase tracking-widest transition"
-                  style={lForm.is_active === val
-                    ? { borderColor: '#4DF9ED55', background: 'rgba(77,249,237,0.10)', color: '#4DF9ED' }
-                    : { borderColor: 'rgba(255,255,255,0.08)', background: 'transparent', color: 'rgba(255,255,255,0.35)' }
-                  }
-                >
-                  {val ? 'Active' : 'Inactive'}
-                </button>
-              ))}
-            </div>
-          </Field>
-        </div>
+        <Field label="Prefix *">
+          <input
+            value={lForm.prefix}
+            onChange={e => setLForm(p => ({ ...p, prefix: e.target.value.replace(/\D/g, '').slice(0, 4) }))}
+            className={inputCls}
+            placeholder="e.g. 2, 32, 62"
+            inputMode="numeric"
+          />
+        </Field>
 
         <Field label="City *">
           <input
@@ -488,14 +443,9 @@ export default function SystemMaintenanceView() {
         <div className="space-y-2">
           {handlingCodes.map(hc => (
             <div key={hc.handling_code_id} className="rounded-lg border border-white/[0.07] bg-black/30 p-3">
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <span className="font-mono text-sm font-bold text-[#4DF9ED]">{hc.code}</span>
-                  <span className="ml-2 text-sm text-white/70">{hc.name}</span>
-                </div>
-                <span className="shrink-0 rounded border border-white/10 px-2 py-0.5 text-[10px] uppercase tracking-widest text-white/40">
-                  {hc.type}
-                </span>
+              <div className="flex items-center gap-3">
+                <span className="font-mono text-sm font-bold text-[#4DF9ED]">{hc.code}</span>
+                <span className="text-sm text-white/70">{hc.name}</span>
               </div>
               {hc.description && <p className="mt-1.5 text-xs text-white/35">{hc.description}</p>}
             </div>
@@ -554,7 +504,7 @@ export default function SystemMaintenanceView() {
     return (
       <div className="space-y-2">
         {prefixes.map(pfx => {
-          const isBeingEdited = editingPrefix?.prefix_id === pfx.prefix_id
+          const isBeingEdited  = editingPrefix?.prefix_id === pfx.prefix_id
           const isBeingDeleted = deleting === pfx.prefix_id
           return (
             <div
@@ -570,7 +520,7 @@ export default function SystemMaintenanceView() {
                     className="shrink-0 rounded border border-white/10 px-2 py-0.5 font-mono text-sm font-bold"
                     style={{ color: '#4DF9ED' }}
                   >
-                    0{pfx.prefix}
+                    {pfx.prefix}
                   </span>
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-white truncate">{pfx.city}</p>
@@ -581,7 +531,6 @@ export default function SystemMaintenanceView() {
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
-                  <ActiveBadge active={pfx.is_active} />
                   <button
                     type="button"
                     onClick={() => startEditLandline(pfx)}
