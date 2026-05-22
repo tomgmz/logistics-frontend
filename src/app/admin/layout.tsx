@@ -59,8 +59,8 @@ const adminNavItems = [
     icon: <FileSearch size={17} />,
   },
   {
-    href: '/admin/cargo-catalog',
-    label: 'Cargo Catalog',
+    href: '/admin/system-maintenance',
+    label: 'System Maintenance',
     icon: <Layers size={17} />,
   },
   {
