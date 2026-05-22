@@ -378,7 +378,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
     setScanError(null)
     setEligibility(null)
     setShowCustomSuffix(
-      initialState.suffix !== '' && !USER_SUFFIXES.includes(initialState.suffix as never),
+      !!initialState.suffix && !USER_SUFFIXES.includes(initialState.suffix as never),
     )
   }, [initialState])
 
