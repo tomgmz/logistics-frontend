@@ -58,7 +58,7 @@ const TAB_LABELS: Record<UserTab, string> = {
   'it-admins':         'IT Admin',
 }
 
-type FormState = Record<string, string | boolean | number>
+type FormState = Record<string, string | boolean | number | null>
 
 interface ScanEligibilityState {
   dl_codes:            string[]
@@ -89,7 +89,7 @@ function buildInitialState(tab: UserTab, user: AnyUser | null): FormState {
     first_name:  user?.first_name  ?? '',
     last_name:   user?.last_name   ?? '',
     middle_name: user?.middle_name ?? '',
-    suffix:      user?.suffix      ?? '',
+    suffix:      user?.suffix      ?? null,
     email:       user?.email       ?? '',
     phone:       user?.phone ? toLocalDigits(user.phone) : '',
   }
@@ -137,11 +137,12 @@ async function submitForm(
   editId?: string,
 ): Promise<void> {
   const clean = Object.fromEntries(
-    Object.entries(form).filter(([, v]) => v !== '' && v !== null && v !== undefined),
+    Object.entries(form).filter(([key, value]) =>
+      value !== undefined && (value !== null ? (value !== '' ? true : key === 'suffix') : key === 'suffix'),
+    ),
   )
   if (clean.phone)    clean.phone    = attachCountryCode(String(clean.phone))
   if (clean.landline) clean.landline = attachCountryCode(String(clean.landline))
-  if (clean.suffix === 'others') clean.suffix = ''
 
   // Driver create always multipart; driver edit is multipart only when a new image was picked
   if (tab === 'drivers' && (!editId || licenseFile)) {
@@ -293,6 +294,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [confirmClose, setConfirmClose] = useState(false)
   const [confirmSave,  setConfirmSave]  = useState(false)
+  const [showCustomSuffix, setShowCustomSuffix] = useState(false)
 
   // License image — used for both create (required) and edit (optional replace)
   const [licenseFile,    setLicenseFile]    = useState<File | null>(null)
@@ -375,6 +377,9 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
     setScanDone(false)
     setScanError(null)
     setEligibility(null)
+    setShowCustomSuffix(
+      initialState.suffix !== '' && !USER_SUFFIXES.includes(initialState.suffix as never),
+    )
   }, [initialState])
 
   // ── Load vendor list for driver forms ─────────────────────────────────────
@@ -420,7 +425,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
     })
   }
 
-  function set(key: string, value: string | boolean | number) {
+  function set(key: string, value: string | boolean | number | null) {
     setForm(prev => {
       const next = { ...prev, [key]: value }
       if (key === 'is_vendor_driver' && value === false) next.vendor_id = ''
@@ -479,7 +484,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
 
   // Helper: is the current suffix value a known predefined one?
   const isKnownSuffix = USER_SUFFIXES.includes(form.suffix as never)
-  const suffixSelectValue = isKnownSuffix || form.suffix === '' ? form.suffix as string : 'others'
+  const suffixSelectValue = showCustomSuffix ? 'others' : ((form.suffix ?? '') as string)
 
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
@@ -556,8 +561,14 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
                   <Select
                     value={suffixSelectValue}
                     onChange={e => {
-                      if (e.target.value === 'others') set('suffix', 'others')
-                      else set('suffix', e.target.value)
+                      const value = e.target.value
+                      if (value === 'others') {
+                        setShowCustomSuffix(true)
+                        set('suffix', '')
+                      } else {
+                        setShowCustomSuffix(false)
+                        set('suffix', value === '' ? null : value)
+                      }
                     }}
                     error={fe.suffix}
                   >
@@ -567,7 +578,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
                   </Select>
                   {suffixSelectValue === 'others' ? (
                     <Input
-                      value={form.suffix === 'others' ? '' : (form.suffix as string)}
+                      value={form.suffix as string}
                       onChange={e => set('suffix', e.target.value)}
                       placeholder="Type suffix…"
                       maxLength={20}
