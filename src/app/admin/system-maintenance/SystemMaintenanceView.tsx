@@ -12,6 +12,7 @@ import type {
   CreateLandlinePrefixPayload,
   CreateProductPayload,
   HandlingCode,
+  HandlingCodeType,
   LandlinePrefix,
   Product,
   UpdateLandlinePrefixPayload,
@@ -29,12 +30,12 @@ type TabKey = (typeof TABS)[number]['key']
 
 // ── Form state ───────────────────────────────────────────────────────────────
 
-type HandlingForm  = { code: string; name: string; description: string }
+type HandlingForm  = { code: string; name: string; description: string; type: HandlingCodeType }
 type CommodityForm = { name: string; description: string; category: string }
 type ProductForm   = { commodity_id: string; name: string; description: string; unit: string }
 type LandlineForm  = { prefix: string; city: string; region: string }
 
-const initHandling:  HandlingForm  = { code: '', name: '', description: '' }
+const initHandling:  HandlingForm  = { code: '', name: '', description: '', type: 'standard' }
 const initCommodity: CommodityForm = { name: '', description: '', category: '' }
 const initProduct:   ProductForm   = { commodity_id: '', name: '', description: '', unit: '' }
 const initLandline:  LandlineForm  = { prefix: '', city: '', region: '' }
@@ -117,6 +118,7 @@ export default function SystemMaintenanceView() {
       code:        hForm.code.trim().toUpperCase(),
       name:        hForm.name.trim(),
       description: hForm.description.trim() || undefined,
+      type:        hForm.type,
     }
     try {
       setSaving(true)
@@ -285,6 +287,23 @@ export default function SystemMaintenanceView() {
             placeholder="e.g. General Cargo"
           />
         </Field>
+        <Field label="Type">
+          <div className="grid grid-cols-2 gap-2">
+            {(['standard', 'additional'] as const).map((option) => (
+              <button
+                key={option}
+                type="button"
+                onClick={() => setHForm(p => ({ ...p, type: option }))}
+                className={`rounded-lg border px-3 py-2 text-sm font-semibold transition
+                  ${hForm.type === option
+                    ? 'border-[#4DF9ED] bg-[#4DF9ED]/15 text-white'
+                    : 'border-white/10 bg-[#0a0a0a] text-white/70 hover:border-white/30'}`}
+              >
+                {option === 'standard' ? 'Standard' : 'Additional'}
+              </button>
+            ))}
+          </div>
+        </Field>
         <Field label="Description (optional)">
           <textarea
             value={hForm.description}
@@ -443,9 +462,12 @@ export default function SystemMaintenanceView() {
         <div className="space-y-2">
           {handlingCodes.map(hc => (
             <div key={hc.handling_code_id} className="rounded-lg border border-white/[0.07] bg-black/30 p-3">
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <span className="font-mono text-sm font-bold text-[#4DF9ED]">{hc.code}</span>
                 <span className="text-sm text-white/70">{hc.name}</span>
+                <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] uppercase tracking-[0.2em] text-white/70">
+                  {hc.type === 'additional' ? 'Additional' : 'Standard'}
+                </span>
               </div>
               {hc.description && <p className="mt-1.5 text-xs text-white/35">{hc.description}</p>}
             </div>

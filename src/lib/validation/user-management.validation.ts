@@ -46,7 +46,11 @@ const middleName = z
 
 const suffix = z.preprocess(
   v => (v === '' ? null : v),
-  z.enum(USER_SUFFIXES, { message: 'Invalid suffix' }).optional().nullable(),
+  z.string()
+    .max(20, 'Suffix is too long')
+    .regex(/^[\p{L}0-9 .,'-]*$/u, 'Suffix may only contain letters, numbers, spaces, periods, commas, apostrophes, or hyphens')
+    .optional()
+    .nullable(),
 )
 
 const email = z

@@ -17,7 +17,7 @@ import type {
 import {
   userService,
   accountantService, generalManagerService,
-  fleetAdminService, operationsAdminService, itAdminService,
+  fleetAdminService, operationsAdminService,
 } from '@/lib/services/admin/user-management.service'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
@@ -25,7 +25,7 @@ import UserFormModal from '@/app/admin/user-management/UserFormModal'
 
 type AdminMgmtTab = Extract<
   UserTab,
-  'accountants' | 'general-managers' | 'fleet-admins' | 'operations-admins' | 'it-admins'
+  'accountants' | 'general-managers' | 'fleet-admins' | 'operations-admins'
 >
 type TabValue = AdminMgmtTab | 'all'
 
@@ -35,7 +35,6 @@ const TABS: { key: TabValue; label: string }[] = [
   { key: 'general-managers',   label: 'General Managers'    },
   { key: 'fleet-admins',       label: 'Fleet Managers'      },
   { key: 'operations-admins',  label: 'Operations Managers' },
-  { key: 'it-admins',          label: 'IT Administrators'   },
 ]
 
 const muiTheme = createTheme({
@@ -54,7 +53,6 @@ async function fetchByTab(tab: AdminMgmtTab): Promise<AnyUser[]> {
     case 'general-managers':  return generalManagerService.getAll()  as Promise<AnyUser[]>
     case 'fleet-admins':      return fleetAdminService.getAll()      as Promise<AnyUser[]>
     case 'operations-admins': return operationsAdminService.getAll() as Promise<AnyUser[]>
-    case 'it-admins':         return itAdminService.getAll()         as Promise<AnyUser[]>
   }
 }
 
@@ -64,7 +62,6 @@ async function updateStatus(tab: AdminMgmtTab, id: string, status: UserStatus): 
     'general-managers':  generalManagerService,
     'fleet-admins':      fleetAdminService,
     'operations-admins': operationsAdminService,
-    'it-admins':         itAdminService,
   } as const
 
   const svc = svcMap[tab]
@@ -82,7 +79,6 @@ function tabFromRole(role: string): AdminMgmtTab {
     case 'general_manager':  return 'general-managers'
     case 'fleet_admin':      return 'fleet-admins'
     case 'operations_admin': return 'operations-admins'
-    case 'it_admin':         return 'it-admins'
     default:                 return 'accountants'
   }
 }
@@ -265,7 +261,6 @@ const HEADERS: Record<TabValue, string[]> = {
   'general-managers':  SHARED_HEADERS,
   'fleet-admins':      SHARED_HEADERS,
   'operations-admins': SHARED_HEADERS,
-  'it-admins':         SHARED_HEADERS,
 }
 
 function renderCells(user: AnyUser) {
@@ -311,8 +306,8 @@ export default function AdminManagementClient() {
     setError(null)
     try {
       const [result, statsResult] = await Promise.all([
-        userService.getAll({ search: searchQuery || undefined, role: 'accountant,general_manager,fleet_admin,operations_admin,it_admin' }),
-        userService.getStats('accountant,general_manager,fleet_admin,operations_admin,it_admin')
+        userService.getAll({ search: searchQuery || undefined, role: 'accountant,general_manager,fleet_admin,operations_admin' }),
+        userService.getStats('accountant,general_manager,fleet_admin,operations_admin')
       ])
       setAllRows(result.data)
       setServerTotal(result.total)
@@ -333,7 +328,7 @@ export default function AdminManagementClient() {
     try {
       const [rows, statsResult] = await Promise.all([
         fetchByTab(tab),
-        userService.getStats('accountant,general_manager,fleet_admin,operations_admin,it_admin')
+        userService.getStats('accountant,general_manager,fleet_admin,operations_admin')
       ])
       setAllRows(rows)
       setStats({ total: statsResult.total, active: statsResult.active, archived: statsResult.archived })

@@ -54,6 +54,7 @@ export interface CreateHandlingCodePayload {
   code:         string
   name:         string
   description?: string
+  type?:        HandlingCodeType
   is_active?:   boolean
 }
 
@@ -61,6 +62,7 @@ export interface UpdateHandlingCodePayload {
   code?:        string
   name?:        string
   description?: string | null
+  type?:        HandlingCodeType
   is_active?:   boolean
 }
 

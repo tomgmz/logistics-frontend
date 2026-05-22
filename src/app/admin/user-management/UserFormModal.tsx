@@ -403,6 +403,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
     if (payload.phone)    payload.phone    = attachCountryCode(String(payload.phone))
     if (payload.landline) payload.landline = attachCountryCode(String(payload.landline))
     else                  delete payload.landline
+    if (payload.suffix === 'others') payload.suffix = ''
     if (tab === 'drivers' && !payload.is_vendor_driver) delete payload.vendor_id
     return payload
   }
@@ -477,7 +478,8 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
   const fe = fieldErrors
 
   // Helper: is the current suffix value a known predefined one?
-  const isKnownSuffix = (form.suffix as string) === '' || USER_SUFFIXES.includes(form.suffix as never)
+  const isKnownSuffix = USER_SUFFIXES.includes(form.suffix as never)
+  const suffixSelectValue = isKnownSuffix || form.suffix === '' ? form.suffix as string : 'others'
 
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
@@ -550,29 +552,34 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
                 />
               </Field>
               <Field label="Suffix" error={fe.suffix}>
-                <Select
-                  value={isKnownSuffix ? form.suffix as string : 'others'}
-                  onChange={e => {
-                    if (e.target.value === 'others') set('suffix', '')
-                    else set('suffix', e.target.value)
-                  }}
-                  error={fe.suffix}
-                >
-                  <option value=""> N/A </option>
-                  {USER_SUFFIXES.map(s => <option key={s} value={s}>{s}</option>)}
-                  <option value="others">Others…</option>
-                </Select>
-                {/* Show free-text input when "Others…" is selected */}
-                {!isKnownSuffix && (
-                  <Input
-                    value={form.suffix as string}
-                    onChange={e => set('suffix', e.target.value)}
-                    placeholder="Type suffix…"
-                    maxLength={20}
+                <div className="grid gap-2 items-end ${suffixSelectValue === 'others' ? 'grid-cols-[1fr_1.4fr]' : 'grid-cols-1'}">
+                  <Select
+                    value={suffixSelectValue}
+                    onChange={e => {
+                      if (e.target.value === 'others') set('suffix', 'others')
+                      else set('suffix', e.target.value)
+                    }}
                     error={fe.suffix}
-                    autoFocus
-                  />
-                )}
+                  >
+                    <option value=""> N/A </option>
+                    {USER_SUFFIXES.map(s => <option key={s} value={s}>{s}</option>)}
+                    <option value="others">Others…</option>
+                  </Select>
+                  {suffixSelectValue === 'others' ? (
+                    <Input
+                      value={form.suffix === 'others' ? '' : (form.suffix as string)}
+                      onChange={e => set('suffix', e.target.value)}
+                      placeholder="Type suffix…"
+                      maxLength={20}
+                      error={fe.suffix}
+                      className="border-0 border-b border-[#555] bg-transparent px-0 py-2 text-sm text-white placeholder:text-[#777]"
+                      style={{ borderRadius: 0, borderTop: 'none', borderLeft: 'none', borderRight: 'none' }}
+                      autoFocus
+                    />
+                  ) : (
+                    <div />
+                  )}
+                </div>
               </Field>
             </div>
 
