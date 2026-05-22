@@ -53,6 +53,13 @@ const suffix = z.preprocess(
     .nullable(),
 )
 
+// Disallow the sentinel value 'others' used by the UI; the form must provide
+// a real suffix string when the user selects "Others…".
+const suffixWithOthersCheck = suffix.refine(
+  v => v == null || v !== 'others',
+  'Please type a suffix when Others is selected',
+)
+
 const email = z
   .string({ error: 'Email is required' })
   .min(5, 'Email is too short')
@@ -104,7 +111,7 @@ const baseCreateFields = {
   first_name:  firstName,
   last_name:   lastName,
   middle_name: middleName,
-  suffix,
+  suffix:      suffixWithOthersCheck,
   email,
   phone,
 }
@@ -113,7 +120,7 @@ const baseUpdateFields = {
   first_name:  firstName.optional(),
   last_name:   lastName.optional(),
   middle_name: middleName,
-  suffix,
+  suffix:      suffixWithOthersCheck,
   email:       email.optional(),
   phone:       phoneOptional,
 }

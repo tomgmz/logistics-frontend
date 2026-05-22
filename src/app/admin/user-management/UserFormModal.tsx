@@ -141,6 +141,7 @@ async function submitForm(
   )
   if (clean.phone)    clean.phone    = attachCountryCode(String(clean.phone))
   if (clean.landline) clean.landline = attachCountryCode(String(clean.landline))
+  if (clean.suffix === 'others') clean.suffix = ''
 
   // Driver create always multipart; driver edit is multipart only when a new image was picked
   if (tab === 'drivers' && (!editId || licenseFile)) {
@@ -403,7 +404,6 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
     if (payload.phone)    payload.phone    = attachCountryCode(String(payload.phone))
     if (payload.landline) payload.landline = attachCountryCode(String(payload.landline))
     else                  delete payload.landline
-    if (payload.suffix === 'others') payload.suffix = ''
     if (tab === 'drivers' && !payload.is_vendor_driver) delete payload.vendor_id
     return payload
   }
@@ -662,12 +662,6 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
                 <div className="mb-3 flex items-center justify-between">
                   <p className="text-[10px] font-bold tracking-[0.12em] uppercase text-[#818181]">
                     License Image
-                    {!isEdit && <span className="ml-0.5 text-[#4df9ed]">*</span>}
-                    {isEdit && (
-                      <span className="ml-1 normal-case font-normal text-[#555]">
-                        (optional — upload to replace)
-                      </span>
-                    )}
                   </p>
                   {licenseFile && (
                     <span className="text-[10px] text-[#4df9ed] font-medium truncate max-w-[180px]">
