@@ -340,7 +340,7 @@ export function RemarksModal({
                 <p
                   className="m-0 text-white/75 break-words"
                   style={{
-                    fontFamily: "'Alegreya Sans', sans-serif",
+                    fontFamily: "'Alegreya Sans SC', sans-serif",
                     fontWeight: 400,
                     fontSize: "clamp(12px, 2.8vw, 15px)",
                     lineHeight: "1.55",
