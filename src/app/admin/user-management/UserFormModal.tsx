@@ -4,7 +4,6 @@ import {
   useState,
   useEffect,
   useMemo,
-  useRef,
   type InputHTMLAttributes,
   type TextareaHTMLAttributes,
   type SelectHTMLAttributes,
@@ -37,7 +36,7 @@ import ReusableModal from '@/components/layout/ReusableModal'
 import { appToast } from '@/lib/toast'
 import { extractApiError } from '@/lib/api-error'
 import LandlineInputRow, { toLocalLandlineDigits } from './LandLineInputRow'
-import { ScanLine, CheckCircle, ImagePlus } from 'lucide-react'
+import { ScanLine, CheckCircle } from 'lucide-react'
 import proxyApi from '@/lib/api/auth.api'
 
 interface UserFormModalProps {
@@ -149,7 +148,7 @@ async function submitForm(
     Object.entries(clean).forEach(([k, v]) => fd.append(k, String(v)))
     if (licenseFile) fd.append('image', licenseFile)
     const url    = editId ? `/admin/drivers/${editId}` : '/admin/drivers'
-    const method = editId ? 'patch' : 'post'   // change 'patch' → 'put' if your API uses PUT
+    const method = editId ? 'patch' : 'post'
     await proxyApi[method](url, fd, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
@@ -297,7 +296,6 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
   // License image — used for both create (required) and edit (optional replace)
   const [licenseFile,    setLicenseFile]    = useState<File | null>(null)
   const [licensePreview, setLicensePreview] = useState<string | null>(null)
-  const licenseInputRef = useRef<HTMLInputElement>(null)
 
   const [vendorList,     setVendorList]     = useState<{ vendor_id: string; name: string }[]>([])
   const [vendorsLoading, setVendorsLoading] = useState(false)
@@ -359,21 +357,9 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
     }
   }
 
-  // ── Manual image pick (no OCR) ────────────────────────────────────────────
-  function handleImagePick(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setLicenseFile(file)
-    if (licensePreview) URL.revokeObjectURL(licensePreview)
-    setLicensePreview(URL.createObjectURL(file))
-    setFieldErrors(prev => { const n = { ...prev }; delete n.license_image; return n })
-    e.target.value = ''
-  }
-
   // ── Dirty check ───────────────────────────────────────────────────────────
   const isDirty = useMemo(() => {
     const formDirty = Object.keys(initialState).some(key => form[key] !== initialState[key])
-    // Any newly picked file (create or edit) counts as a change
     if (tab === 'drivers') return formDirty || licenseFile !== null
     return formDirty
   }, [form, initialState, licenseFile, tab])
@@ -490,6 +476,9 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
   const isSaveDisabled = loading || (isEdit && !isDirty)
   const fe = fieldErrors
 
+  // Helper: is the current suffix value a known predefined one?
+  const isKnownSuffix = (form.suffix as string) === '' || USER_SUFFIXES.includes(form.suffix as never)
+
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <AnimatePresence>
@@ -561,10 +550,29 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
                 />
               </Field>
               <Field label="Suffix" error={fe.suffix}>
-                <Select value={form.suffix as string} onChange={e => set('suffix', e.target.value)} error={fe.suffix}>
+                <Select
+                  value={isKnownSuffix ? form.suffix as string : 'others'}
+                  onChange={e => {
+                    if (e.target.value === 'others') set('suffix', '')
+                    else set('suffix', e.target.value)
+                  }}
+                  error={fe.suffix}
+                >
                   <option value=""> N/A </option>
                   {USER_SUFFIXES.map(s => <option key={s} value={s}>{s}</option>)}
+                  <option value="others">Others…</option>
                 </Select>
+                {/* Show free-text input when "Others…" is selected */}
+                {!isKnownSuffix && (
+                  <Input
+                    value={form.suffix as string}
+                    onChange={e => set('suffix', e.target.value)}
+                    placeholder="Type suffix…"
+                    maxLength={20}
+                    error={fe.suffix}
+                    autoFocus
+                  />
+                )}
               </Field>
             </div>
 
@@ -696,23 +704,6 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
                       />
                     </label>
                   )}
-
-                  {/* Manual pick / replace */}
-                  {/* <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-[#424242] bg-[#1b1b1b] px-4 py-2 text-sm text-[#818181] transition hover:border-[#4df9ed50] hover:text-white">
-                    <ImagePlus size={14} />
-                    <span>
-                      {isEdit
-                        ? licenseFile ? 'Change image' : 'Replace image'
-                        : licenseFile && !scanDone ? 'Change image' : 'Upload image only'}
-                    </span>
-                    <input
-                      ref={licenseInputRef}
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp"
-                      className="sr-only"
-                      onChange={handleImagePick}
-                    />
-                  </label> */}
 
                   {scanError && (
                     <p className="w-full text-[11px] text-red-400">{scanError}</p>
