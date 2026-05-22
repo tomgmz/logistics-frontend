@@ -15,6 +15,7 @@ export interface HandlingCode {
   code:             string
   name:             string
   description?:     string | null
+  type:             HandlingCodeType
   is_active:        boolean
   created_at?:      string
 }
