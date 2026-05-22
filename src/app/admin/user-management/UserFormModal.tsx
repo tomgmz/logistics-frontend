@@ -722,62 +722,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
                   <p className="mt-2 text-[11px] text-red-400">{fe.license_image}</p>
                 )}
 
-                {/* Eligibility badges — only shown after a successful scan on create */}
-                {!isEdit && scanDone && eligibility && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="mt-3 flex flex-col gap-2"
-                  >
-                    {(eligibility.dl_codes.length > 0 || eligibility.restriction_codes.length > 0) && (
-                      <div className="flex flex-wrap gap-1.5">
-                        {eligibility.dl_codes.map(code => (
-                          <span
-                            key={code}
-                            className="rounded-md border border-[#4df9ed30] bg-[#4df9ed10] px-2 py-0.5 text-[10px] font-bold tracking-wider text-[#4df9ed]"
-                          >
-                            DL {code}
-                          </span>
-                        ))}
-                        {eligibility.restriction_codes.map(code => (
-                          <span
-                            key={code}
-                            className="rounded-md border border-[#ffffff15] bg-[#ffffff08] px-2 py-0.5 text-[10px] font-bold tracking-wider text-[#818181]"
-                          >
-                            RC {code}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-
-                    <div className="grid grid-cols-2 gap-1.5">
-                      {(
-                        [
-                          ['can_drive_light_commercial', 'Light Commercial (L300 / FB / Pick-up)'],
-                          ['can_drive_heavy_truck',      'Heavy Truck (6-wheeler / 10-wheeler)'],
-                          ['can_drive_articulated',      'Articulated (Wing Van + Trailer)'],
-                          ['can_drive_bus',              'Passenger Bus'],
-                        ] as const
-                      ).map(([key, label]) => {
-                        const allowed = eligibility.vehicle_eligibility[key]
-                        return (
-                          <div
-                            key={key}
-                            className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-[11px] ${
-                              allowed
-                                ? 'border-[#4df9ed25] bg-[#4df9ed08] text-[#4df9ed]'
-                                : 'border-[#ffffff10] bg-transparent text-[#444]'
-                            }`}
-                          >
-                            <span className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${allowed ? 'bg-[#4df9ed]' : 'bg-[#333]'}`} />
-                            {label}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </motion.div>
-                )}
+                {/* Eligibility UI removed per request (no DL/RC or vehicle badges) */}
               </div>
 
               {/* ── License number + expiry ── */}
