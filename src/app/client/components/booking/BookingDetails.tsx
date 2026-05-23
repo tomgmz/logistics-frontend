@@ -667,7 +667,6 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
         <motion.div variants={stagger} initial="hidden" animate="show"
           className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-6"
         >
-          {/* ── Transit Schedule ── */}
           <motion.div variants={fadeUp}
             className="bg-[#2A2828] rounded-md border border-white/[0.07] p-4 flex flex-col gap-3"
           >
@@ -694,7 +693,6 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
             </div>
           </motion.div>
 
-          {/* ── Pick Up ── */}
           <motion.div variants={fadeUp}
             className="bg-[#2A2828] rounded-md border border-white/[0.07] p-4 flex flex-col gap-3"
           >
@@ -712,7 +710,6 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
             />
           </motion.div>
 
-          {/* ── Drop Off ── */}
           <motion.div variants={fadeUp}
             className="bg-[#2A2828] rounded-md border border-white/[0.07] p-4 flex flex-col gap-2"
           >
@@ -754,7 +751,6 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
           </motion.div>
         </motion.div>
 
-        {/* ── Product & Cargo ── */}
         <motion.div variants={fadeUp} initial="hidden" animate="show"
           className="bg-[#2A2828] rounded-md border border-white/[0.07] p-4 flex flex-col gap-4"
         >
@@ -1092,7 +1088,6 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
           </div>
         </motion.div>
 
-        {/* ── Transaction Summary ── */}
         <motion.div variants={fadeUp} initial="hidden" animate="show"
           className="bg-[#2A2828] rounded-md border border-white/[0.07] p-4 flex flex-col gap-4"
         >
@@ -1188,7 +1183,6 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
           )}
         </motion.div>
 
-        {/* ── Payment Terms ── */}
         <motion.div variants={fadeUp} initial="hidden" animate="show"
           className="bg-[#2A2828] rounded-md border border-white/[0.07] p-4 flex flex-col gap-4"
         >
@@ -1212,7 +1206,6 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
           )}
         </motion.div>
 
-        {/* ── Cargo Summary ── */}
         <motion.div variants={fadeUp} initial="hidden" animate="show"
           className="rounded-md bg-[#2A2828] p-5 flex flex-col gap-3
                      border border-white/[0.07] border-t-[3px] border-t-[var(--color-cyan)]"
@@ -1443,7 +1436,6 @@ function ProductFieldsRow({
   shcStandardList: HandlingCode[]
   shcAdditionalList: HandlingCode[]
 }) {
-  // Build options lists
   const commodityOptions = commodities.map((c) => ({
     id:    c.commodity_id,
     label: c.name + (c.category ? ` — ${c.category}` : ''),
@@ -1475,7 +1467,6 @@ function ProductFieldsRow({
           const name = id
             ? (commodities.find((c) => c.commodity_id === id)?.name ?? label)
             : label
-          // Reset product when commodity changes
           onUpdate({ commodity: name, commodityId: id, product: '', productId: '' })
         }}
         onType={(text) => onUpdate({ commodity: text, commodityId: '', product: '', productId: '' })}
@@ -1514,7 +1505,6 @@ function ProductFieldsRow({
         value={group.shcId}
         inputValue={group.shc}
         onSelect={(id, label) => {
-          // label is the code string; id is the UUID
           onUpdate({ shc: label, shcId: id })
         }}
         onType={(text) => onUpdate({ shc: text, shcId: '' })}

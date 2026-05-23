@@ -29,7 +29,6 @@ function LogoCard({ brand }: { brand: typeof BRANDS[number] }) {
 }
 
 function MarqueeRow({ reverse = false }: { reverse?: boolean }) {
-  // 4× duplication ensures seamless infinite loop at any screen width
   const items = [...BRANDS, ...BRANDS, ...BRANDS, ...BRANDS];
   return (
     <div className="overflow-hidden w-full py-1.5">

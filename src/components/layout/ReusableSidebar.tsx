@@ -91,13 +91,10 @@ export default function ReusableSidebar({
           initial={false}
           animate={{ width: sidebarOpen ? SIDEBAR_EXPANDED : isMobile ? 0 : SIDEBAR_COLLAPSED }}
           transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] as [number, number, number, number] }}
-          // ↓ overflow-x-hidden keeps the slide animation clean; overflow-y visible lets scroll work
           className="h-full border-r border-white/[0.07] bg-[var(--color-bg)] overflow-x-hidden overflow-y-hidden"
         >
-          {/* Fixed-width inner column — min-h-0 is critical so flex children can shrink */}
           <div style={{ width: SIDEBAR_EXPANDED }} className="h-full flex flex-col py-5 min-h-0">
 
-            {/* User row — never shrinks */}
             <div className="flex items-center gap-3 px-4 mb-7 overflow-hidden shrink-0">
               <div className="w-8 h-8 rounded-full bg-[var(--color-cyan)] glow-cyan flex items-center justify-center shrink-0">
                 <span className="font-card sm:!text-[0.8rem] md:!text-[0.9rem] lg:!text-[1.1rem] text-[var(--color-bg)] text-xs font-bold">
@@ -120,14 +117,8 @@ export default function ReusableSidebar({
               </motion.div>
             </div>
 
-            {/* Divider — never shrinks */}
             <div className="sep-x-cyan mx-4 mb-4 shrink-0" />
 
-            {/*
-              Nav — flex-1 + min-h-0 lets it fill available space;
-              overflow-y-auto makes it scroll when items overflow.
-              Custom scrollbar keeps it subtle.
-            */}
             <nav
               className={`
                 flex-1 min-h-0 px-2 space-y-0.5
@@ -158,7 +149,6 @@ export default function ReusableSidebar({
               ))}
             </nav>
 
-            {/* Sign-out footer — never shrinks */}
             <div className="px-2 space-y-0.5 pt-4 border-t border-white/[0.07] shrink-0">
               <motion.button
                 onClick={() => setLogoutModalOpen(true)}

@@ -211,8 +211,6 @@ export default function ReusableModal({
   );
 }
 
-// ── RemarksModal ──────────────────────────────────────────────────────────────
-
 export interface RemarksModalProps {
   open: boolean;
   title: string;

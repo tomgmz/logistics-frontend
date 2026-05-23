@@ -16,8 +16,6 @@ function getRoleFromToken(token: string): string | null {
     const json    = Buffer.from(base64, 'base64').toString('utf-8')
     const payload = JSON.parse(json)
 
-    // NOTE: This decodes without signature verification — used for routing only.
-    // Every sensitive API route must independently verify the token server-side.
     if (payload.type !== 'access' && payload.type !== 'refresh') return null
 
     return payload.role ?? null
@@ -29,9 +27,6 @@ function getRoleFromToken(token: string): string | null {
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
 
-  // IMPORTANT: must_change_pw check must come before all other checks.
-  // If reordered, a user with must_change_pw=1 could be redirected to their
-  // portal first, requiring a second redirect to catch them.
   const mustChangePw = req.cookies.get('must_change_pw')?.value === '1'
   if (mustChangePw && !isPublicPath(pathname)) {
     const accessToken = req.cookies.get('access_token')?.value
@@ -75,8 +70,6 @@ export function proxy(req: NextRequest) {
     return NextResponse.redirect(homeUrl)
   }
 
-  // Let page load for AuthRehydrator to refresh when access token is gone.
-  // AuthRehydrator will call /api/auth/refresh and retry getMe().
   if (!accessToken && refreshToken) {
     return NextResponse.next()
   }

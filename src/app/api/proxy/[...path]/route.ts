@@ -32,7 +32,6 @@ async function handler(
     if (req.method !== 'GET' && req.method !== 'HEAD') {
       if (isMultipart) {
         body = await req.formData()
-        // Don't set Content-Type — axios will set multipart + boundary automatically
         forwardedContentType = ''
       } else {
         const text = await req.text()

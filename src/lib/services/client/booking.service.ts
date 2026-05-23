@@ -22,10 +22,6 @@ async function patch<T>(url: string, payload?: unknown): Promise<T> {
   return data.data
 }
 
-// ---------------------------------------------------------------------------
-// Cargo item payload — mirrors CreateCargoItemInput on the backend
-// ---------------------------------------------------------------------------
-
 export interface CargoItemPayload {
   commodity_id?:   string
   commodity_text?: string
@@ -43,10 +39,6 @@ export interface CargoItemPayload {
   height_cm?:      number
   notes?:          string
 }
-
-// ---------------------------------------------------------------------------
-// Booking payloads
-// ---------------------------------------------------------------------------
 
 export interface CreateBookingPayload {
   client_id:              string
@@ -102,10 +94,6 @@ export type AdminBookingLifecycleStatus =
   | 'in_transit'
   | 'completed'
   | 'cancelled'
-
-// ---------------------------------------------------------------------------
-// Service
-// ---------------------------------------------------------------------------
 
 export const bookingService = {
   optimizeRoute: async (bookingId: string) => {

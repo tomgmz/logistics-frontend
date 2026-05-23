@@ -83,7 +83,6 @@ function tabFromRole(role: string): AdminMgmtTab {
   }
 }
 
-// ─── Shared helpers ───────────────────────────────────────────────────────────
 const STATUS_CFG: Record<UserStatus, { label: string; cls: string }> = {
   active:             { label: 'Active',      cls: 'bg-[#4df9ed]/10 text-[#4df9ed] border-[#4df9ed]/30'    },
   inactive:           { label: 'Inactive',    cls: 'bg-[#818181]/10 text-[#818181] border-[#818181]/30'    },
@@ -127,7 +126,6 @@ function RoleBadge({ role }: { role: string }) {
   )
 }
 
-// ─── Row action menu ──────────────────────────────────────────────────────────
 interface RowMenuProps {
   user: AnyUser
   tab: TabValue
@@ -208,7 +206,6 @@ function RowMenu({ user, tab, onEdit, onStatusChange }: RowMenuProps) {
   )
 }
 
-// ─── Table helpers ────────────────────────────────────────────────────────────
 function TableSkeleton({ cols }: { cols: number }) {
   return (
     <>
@@ -252,7 +249,6 @@ function EmptyState({ tab, onAdd }: { tab: TabValue; onAdd: () => void }) {
   )
 }
 
-// ─── All admin tabs share the same columns ────────────────────────────────────
 const SHARED_HEADERS = ['Name', 'Email', 'Phone', 'Role', 'Status']
 
 const HEADERS: Record<TabValue, string[]> = {
@@ -277,7 +273,6 @@ function renderCells(user: AnyUser) {
   )
 }
 
-// ─── Main component ───────────────────────────────────────────────────────────
 export default function AdminManagementClient() {
   const [activeTab,        setActiveTab]        = useState<TabValue>('accountants')
   const [allRows,          setAllRows]          = useState<AnyUser[]>([])

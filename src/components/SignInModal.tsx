@@ -2203,7 +2203,6 @@ function PasswordStep({
         </PrimaryButton>
       </form>
 
-      {/* ── Forgot password ── */}
       <div className="flex items-center justify-between">
         <BackButton onClick={onBack} label="Back" />
         <a
@@ -2220,7 +2219,6 @@ function PasswordStep({
         </a>
       </div>
 
-      {/* ── Forgot password hint ── */}
       <p
         className="text-[0.71rem] leading-relaxed -mt-3 text-center"
         style={{
@@ -2240,8 +2238,6 @@ function PasswordStep({
     </motion.div>
   )
 }
-
-// ─── Success ──────────────────────────────────────────────────────────────────
 
 function SuccessStep() {
   return (
@@ -2285,8 +2281,6 @@ function SuccessStep() {
     </motion.div>
   )
 }
-
-// ─── Modal shell ──────────────────────────────────────────────────────────────
 
 type Step = 'email' | 'method' | 'otp' | 'password' | 'success'
 
@@ -2488,7 +2482,6 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
                   )}
                 </AnimatePresence>
 
-                {/* ── Be Our Partner footer — visible on all steps except success ── */}
                 {step !== 'success' && (
                   <div className="mt-auto pt-10">
                     <div

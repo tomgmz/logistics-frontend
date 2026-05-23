@@ -157,8 +157,6 @@ export default function ChangePasswordPage() {
   useEffect(() => {
     if (!hasHydrated) return
     if (!user) { router.replace('/'); return }
-    // Treat undefined/null the same as false — if must_change_password is not
-    // explicitly true, the user has already changed it or doesn't need to
     if (!user.must_change_password) router.replace(destination())
   }, [hasHydrated, user, router, destination])
 
@@ -170,13 +168,10 @@ export default function ChangePasswordPage() {
     try {
       await changePassword(password)
 
-      // Clear the middleware gate cookie so other tabs are unblocked
       await fetch('/api/auth/clear-must-change', { method: 'POST' })
 
-      // Update the store so the redirect effect doesn't re-trigger
       setUser({ ...user!, must_change_password: false })
 
-      // Notify all other tabs so they update their store and navigate to portal
       if (user?.user_id) {
         const ch = new BroadcastChannel(`auth_sync_${user.user_id}`)
         ch.postMessage({ type: 'PASSWORD_CHANGED', portalUrl: destination() })

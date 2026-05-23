@@ -10,8 +10,6 @@ import {
 } from '@/lib/services/admin/audit-logs.service'
 import { formatDate, formatTime, formatDateTime } from '@/app/utils/timeFormat'
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
 export type SystemLogLevel     = 'info' | 'warn' | 'error' | 'critical'
 export type SystemLogEventType = 'server_error' | 'auth_event' | 'email_event' | 'external_api' | 'cron_job' | 'db_event'
 
@@ -34,8 +32,6 @@ export interface SystemLogStats {
   critical:   number
   unresolved: number
 }
-
-// ─── Constants ────────────────────────────────────────────────────────────────
 
 const AUDIT_BADGE: Record<LogType, string> = {
   user_activity:    'bg-[rgba(77,249,237,0.12)] text-[#4df9ed] border border-[rgba(77,249,237,0.25)]',
@@ -65,8 +61,6 @@ const EVENT_BADGE: Record<SystemLogEventType, string> = {
 const PAGE_SIZE = 15
 
 type ActiveTab = 'audit' | 'system'
-
-// ─── Audit Logs Tab ──────────────────────────────────────────────────────────
 
 function AuditLogsTab() {
   const [logs, setLogs]                       = useState<AuditLog[]>([])
@@ -320,8 +314,6 @@ function AuditLogsTab() {
     </div>
   )
 }
-
-// ─── System Logs Tab ─────────────────────────────────────────────────────────
 
 function SystemLogsTab() {
   const [logs, setLogs]                       = useState<AppSystemLog[]>([])
@@ -597,8 +589,6 @@ function SystemLogsTab() {
     </div>
   )
 }
-
-// ─── Logs Page ────────────────────────────────────────────────────────────────
 
 export default function LogsPage() {
   const [activeTab, setActiveTab]   = useState<ActiveTab>('audit')

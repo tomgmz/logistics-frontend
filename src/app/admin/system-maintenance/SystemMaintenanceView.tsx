@@ -18,8 +18,6 @@ import type {
   UpdateLandlinePrefixPayload,
 } from '@/lib/services/admin/system-maintenance.service'
 
-// ── Tabs ────────────────────────────────────────────────────────────────────
-
 const TABS = [
   { key: 'handling',    label: 'Handling Codes',   singular: 'Handling Code',   icon: Tag },
   { key: 'commodities', label: 'Commodities',       singular: 'Commodity',       icon: Layers },
@@ -27,8 +25,6 @@ const TABS = [
   { key: 'landline',    label: 'Landline Prefixes', singular: 'Landline Prefix', icon: Phone },
 ] as const
 type TabKey = (typeof TABS)[number]['key']
-
-// ── Form state ───────────────────────────────────────────────────────────────
 
 type HandlingForm  = { code: string; name: string; description: string; type: HandlingCodeType }
 type CommodityForm = { name: string; description: string; category: string }
@@ -39,8 +35,6 @@ const initHandling:  HandlingForm  = { code: '', name: '', description: '', type
 const initCommodity: CommodityForm = { name: '', description: '', category: '' }
 const initProduct:   ProductForm   = { commodity_id: '', name: '', description: '', unit: '' }
 const initLandline:  LandlineForm  = { prefix: '', city: '', region: '' }
-
-// ── Shared styles ────────────────────────────────────────────────────────────
 
 const inputCls =
   'w-full rounded-lg border border-white/10 bg-[#0a0a0a] px-3 py-2.5 text-sm text-white outline-none transition placeholder:text-white/25 focus:border-[#4DF9ED]/40 focus:ring-0'
@@ -54,8 +48,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     </div>
   )
 }
-
-// ── Component ────────────────────────────────────────────────────────────────
 
 export default function SystemMaintenanceView() {
   const [tab, setTab] = useState<TabKey>('handling')
@@ -75,8 +67,6 @@ export default function SystemMaintenanceView() {
   const [lForm, setLForm] = useState<LandlineForm>(initLandline)
 
   const [editingPrefix, setEditingPrefix] = useState<LandlinePrefix | null>(null)
-
-  // ── Load ───────────────────────────────────────────────────────────────────
 
   async function load() {
     try {
@@ -100,14 +90,10 @@ export default function SystemMaintenanceView() {
 
   useEffect(() => { void load() }, [])
 
-  // ── Derived ────────────────────────────────────────────────────────────────
-
   const filteredProducts = useMemo(() => {
     if (!pForm.commodity_id) return products
     return products.filter(p => p.commodity_id === pForm.commodity_id)
   }, [products, pForm.commodity_id])
-
-  // ── Submit: handling ───────────────────────────────────────────────────────
 
   async function submitHandling() {
     if (!hForm.code.trim() || !hForm.name.trim()) {
@@ -133,8 +119,6 @@ export default function SystemMaintenanceView() {
     }
   }
 
-  // ── Submit: commodity ──────────────────────────────────────────────────────
-
   async function submitCommodity() {
     if (!cForm.name.trim()) {
       appToast.error('Commodity name is required.')
@@ -157,8 +141,6 @@ export default function SystemMaintenanceView() {
       setSaving(false)
     }
   }
-
-  // ── Submit: product ────────────────────────────────────────────────────────
 
   async function submitProduct() {
     if (!pForm.commodity_id) {
@@ -187,8 +169,6 @@ export default function SystemMaintenanceView() {
       setSaving(false)
     }
   }
-
-  // ── Submit: landline prefix (create + update) ──────────────────────────────
 
   async function submitLandline() {
     if (!lForm.prefix.trim()) {
@@ -265,8 +245,6 @@ export default function SystemMaintenanceView() {
     setEditingPrefix(null)
     setLForm(initLandline)
   }
-
-  // ── Form renderers ─────────────────────────────────────────────────────────
 
   function renderForm() {
     if (tab === 'handling') return (
@@ -447,8 +425,6 @@ export default function SystemMaintenanceView() {
     )
   }
 
-  // ── List renderer ──────────────────────────────────────────────────────────
-
   function renderList() {
     if (loading) return (
       <div className="flex items-center justify-center py-12">
@@ -583,8 +559,6 @@ export default function SystemMaintenanceView() {
     )
   }
 
-  // ── Render ─────────────────────────────────────────────────────────────────
-
   const activeTab = TABS.find(t => t.key === tab)!
 
   return (
@@ -681,8 +655,6 @@ export default function SystemMaintenanceView() {
     </div>
   )
 }
-
-// ── Shared sub-components ────────────────────────────────────────────────────
 
 function SubmitBtn({ label, busy, onClick }: { label: string; busy: boolean; onClick: () => void }) {
   return (

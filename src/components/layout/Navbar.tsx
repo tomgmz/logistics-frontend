@@ -71,7 +71,6 @@ export default function Navbar() {
         <div className="max-w-[1600px] mx-auto px-6 md:px-12 lg:px-16
           h-[76px] flex items-center relative">
 
-          {/* Logo — left-anchored */}
           <a href="#hero" className="flex items-center no-underline shrink-0">
             <Image
               src={ASSETS.logo}
@@ -82,7 +81,6 @@ export default function Navbar() {
             />
           </a>
 
-          {/* Nav links — absolutely centered */}
           <ul className="hidden md:flex items-center gap-1 list-none m-0 p-0
             absolute left-1/2 -translate-x-1/2">
             {NAV_LINKS.map((item, i) => (
@@ -114,9 +112,7 @@ export default function Navbar() {
             ))}
           </ul>
 
-          {/* Right side — Sign In button + mobile hamburger */}
           <div className="ml-auto flex items-center gap-3">
-            {/* Sign In button — desktop */}
             <motion.button
               initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}

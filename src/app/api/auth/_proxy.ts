@@ -15,9 +15,6 @@ export const accessTokenCookieOptions = {
 export const refreshTokenCookieOptions = {
   httpOnly: true,
   secure:   isProd,
-  // strict: prevents the refresh token being sent on cross-site navigations.
-  // Previously lax — changed to strict to match access token and reduce
-  // the cross-site request surface on /api/auth/refresh.
   sameSite: 'strict' as const,
   path:     '/',
   maxAge:   7 * 24 * 60 * 60,
@@ -32,16 +29,12 @@ export const cookieClearOptions = {
 }
 
 export const mustChangePwCookieOptions = {
-  httpOnly: false, // intentionally readable by middleware for routing
+  httpOnly: false,
   secure:   isProd,
   sameSite: 'strict' as const,
   path:     '/',
   maxAge:   60 * 60,
 }
-
-// NOTE: mustChangePwCookieOptions is non-httpOnly so middleware can read it
-// for routing. It is UX enforcement only — your backend must independently
-// reject requests from users with must_change_password: true.
 
 export function getForwardHeaders(req: NextRequest) {
   return {

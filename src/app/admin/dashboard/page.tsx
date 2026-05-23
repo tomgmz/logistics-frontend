@@ -14,7 +14,6 @@ import {
   TrendingUp, TrendingDown,
 } from "lucide-react";
 
-// ── Theme tokens ─────────────────────────────────────────────────────
 const T = {
   bg:      "#0a0a0a",
   surface: "#1b1b1b",
@@ -33,7 +32,6 @@ const T = {
   purple:  "#818cf8",
 } as const;
 
-// ── Types ────────────────────────────────────────────────────────────
 type StatusKey = "In Transit" | "Pending" | "Completed" | "Cancelled";
 
 interface Booking {
@@ -53,7 +51,6 @@ interface KpiTileProps {
   accent: string; delay: number;
 }
 
-// ── Static data (module-level — never recreated) ─────────────────────
 const revenueData = [
   { month: "Jan", revenue: 142000, bookings: 312 },
   { month: "Feb", revenue: 168000, bookings: 378 },
@@ -105,7 +102,6 @@ const billingRows = [
   { label: "Overdue (30+ days)",  value: "₱8,100",   accent: T.red,      pct: 3  },
 ];
 
-// ── Motion variants ──────────────────────────────────────────────────
 const fadeUp: Variants = {
   hidden:  { opacity: 0, y: 20 },
   visible: (i: number = 0) => ({
@@ -130,15 +126,12 @@ const scaleIn: Variants = {
   }),
 };
 
-// ── Chart isolation wrapper — prevents Recharts ResizeObserver thrash ─
-// contain:strict boxes the subtree so reflows don't escape upward
 const chartShell: React.CSSProperties = {
   willChange: "transform",
   contain: "layout style",
   transform: "translateZ(0)",
 };
 
-// ── Animated counter ─────────────────────────────────────────────────
 const Counter = memo(function Counter({ target, prefix = "", suffix = "", duration = 1600 }: CounterProps) {
   const [val, setVal] = useState(0);
   useEffect(() => {
@@ -156,7 +149,6 @@ const Counter = memo(function Counter({ target, prefix = "", suffix = "", durati
   return <>{prefix}{val.toLocaleString()}{suffix}</>;
 });
 
-// ── KPI Tile ─────────────────────────────────────────────────────────
 const KpiTile = memo(function KpiTile({ label, value, prefix = "", suffix = "", delta, icon, accent, delay }: KpiTileProps) {
   const isPos = delta >= 0;
   return (
@@ -217,7 +209,6 @@ const KpiTile = memo(function KpiTile({ label, value, prefix = "", suffix = "", 
   );
 });
 
-// ── Tooltip ──────────────────────────────────────────────────────────
 const CustomTooltip = memo(function CustomTooltip({ active, payload, label }: {
   active?: boolean; label?: string;
   payload?: Array<{ name?: string; value?: ValueType; color?: string }>;
@@ -241,7 +232,6 @@ const CustomTooltip = memo(function CustomTooltip({ active, payload, label }: {
   );
 });
 
-// ── Card wrapper ─────────────────────────────────────────────────────
 const Card = memo(function Card({ children, style }: { children: ReactNode; style?: React.CSSProperties }) {
   return (
     <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 16, ...style }}>
@@ -249,8 +239,6 @@ const Card = memo(function Card({ children, style }: { children: ReactNode; styl
     </div>
   );
 });
-
-// ── Isolated chart sections (memoised so sidebar toggle can't re-render them) ─
 
 const RevenueChart = memo(function RevenueChart() {
   return (
@@ -469,7 +457,6 @@ const BookingsTable = memo(function BookingsTable() {
   );
 });
 
-// ── Main — memoised so parent re-renders (sidebar state) don't propagate ──
 const AdminDashboard = memo(function AdminDashboard() {
   return (
     <div style={{

@@ -15,8 +15,6 @@ interface ReusableDashboardShellProps {
   navItems: NavItem[]
 }
 
-// ReusableDashboardShell.tsx
-
 export default function ReusableDashboardShell({ children, navItems }: ReusableDashboardShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 

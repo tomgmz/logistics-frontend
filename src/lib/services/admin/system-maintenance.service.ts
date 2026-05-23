@@ -6,7 +6,6 @@ interface ApiResponse<T> {
   message?: string
 }
 
-// ── Types ───────────────────────────────────────────────────────────────────
 
 export type HandlingCodeType = 'standard' | 'additional'
 
@@ -48,8 +47,6 @@ export interface LandlinePrefix {
   is_active:  boolean
   created_at: string
 }
-
-// ── Payloads ─────────────────────────────────────────────────────────────────
 
 export interface CreateHandlingCodePayload {
   code:         string
@@ -109,8 +106,6 @@ export interface UpdateLandlinePrefixPayload {
   region?:    string | null
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
 async function get<T>(url: string): Promise<T> {
   const { data } = await proxyApi.get<ApiResponse<T>>(url)
   return data.data
@@ -134,18 +129,13 @@ async function del<T>(url: string): Promise<T> {
   return data.data
 }
 
-// ── Base paths ───────────────────────────────────────────────────────────────
-
 const HC = '/admin/handling-codes'
 const CM = '/admin/commodities'
 const PR = '/admin/products'
 const LP = '/admin/landline-prefixes'
 
-// ── Service ───────────────────────────────────────────────────────────────────
-
 export const systemMaintenanceService = {
 
-  // ── Handling Codes ──────────────────────────────────────────────────────────
   getHandlingCodes: (type?: HandlingCodeType) =>
     get<HandlingCode[]>(type ? `${HC}?type=${type}` : HC),
 
@@ -161,7 +151,6 @@ export const systemMaintenanceService = {
   deleteHandlingCode: (id: string) =>
     del<null>(`${HC}/${id}`),
 
-  // ── Commodities ─────────────────────────────────────────────────────────────
   getCommodities: () =>
     get<Commodity[]>(CM),
 
@@ -177,7 +166,6 @@ export const systemMaintenanceService = {
   deleteCommodity: (id: string) =>
     del<null>(`${CM}/${id}`),
 
-  // ── Products ────────────────────────────────────────────────────────────────
   getProducts: (commodityId?: string) =>
     get<Product[]>(commodityId ? `${PR}?commodity_id=${commodityId}` : PR),
 
@@ -193,7 +181,6 @@ export const systemMaintenanceService = {
   deleteProduct: (id: string) =>
     del<null>(`${PR}/${id}`),
 
-  // ── Landline Prefixes ───────────────────────────────────────────────────────
   getLandlinePrefixes: () =>
     get<LandlinePrefix[]>(LP),
 

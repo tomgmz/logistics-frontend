@@ -35,7 +35,6 @@ export default function ReusableHeader({ sidebarOpen, onToggleSidebar }: Reusabl
           <MessageCircle size={16} />
         </IconBtn>
 
-        {/* NotificationIcon ships its own trigger styled to match IconBtn */}
         <NotificationIcon />
       </div>
     </motion.header>

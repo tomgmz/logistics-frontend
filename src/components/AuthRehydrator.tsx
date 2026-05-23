@@ -20,14 +20,11 @@ export default function AuthRehydrator() {
   const hasRun      = useRef(false)
   const channelRef  = useRef<BroadcastChannel | null>(null)
 
-  // Keep a live ref to pathname so BroadcastChannel handlers
-  // always read the current value, not the stale closure value
   const pathnameRef = useRef(pathname)
   useEffect(() => {
     pathnameRef.current = pathname
   }, [pathname])
 
-  // Dedicated effect: redirect to /change-password from any page when flag is set
   useEffect(() => {
     if (!hasHydrated || !user) return
     if (!user.must_change_password) return
@@ -36,7 +33,6 @@ export default function AuthRehydrator() {
     router.replace(`/change-password?redirect=${encodeURIComponent(portalUrl)}`)
   }, [hasHydrated, user, pathname, router])
 
-  // Keep logged-in users off the landing page (e.g. browser back after login)
   useEffect(() => {
     if (!hasHydrated || !user || pathname !== '/') return
     if (user.must_change_password) return
@@ -44,13 +40,6 @@ export default function AuthRehydrator() {
     if (portal) router.replace(portal)
   }, [hasHydrated, user, pathname, router])
 
-  // Cross-tab logout and user-switch detection via localStorage events.
-  // Note: localStorage.removeItem('auth-user') is called only in the
-  // originating tab (ReusableSidebar). Other tabs rely on this StorageEvent
-  // to detect the removal and redirect to '/'. The BroadcastChannel LOGOUT
-  // message handles the same for tabs on the same origin that share a channel.
-  // Both mechanisms are needed because StorageEvent doesn't fire in the
-  // originating tab, and BroadcastChannel doesn't persist across restarts.
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
       if (e.key !== 'auth-user') return
@@ -93,8 +82,6 @@ export default function AuthRehydrator() {
           clearUser()
           channel.close()
           channelRef.current = null
-          // Use pathnameRef so we always check the current route,
-          // not the stale value captured when the channel was opened
           const isPublic = PUBLIC_PATHS.some(
             (p) =>
               pathnameRef.current === p ||

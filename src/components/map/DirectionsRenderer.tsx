@@ -101,7 +101,7 @@ export function DirectionsRenderer({
           ...(stops.length > 1 && {
             intermediates: stops.slice(0, -1).map((stop) => ({
               location: { latLng: { latitude: stop.latitude, longitude: stop.longitude } },
-              via: true,  // ← forces strict pass-through order, fixes one-way street routing
+              via: true,
             })),
           }),
           travelMode:        'DRIVE',

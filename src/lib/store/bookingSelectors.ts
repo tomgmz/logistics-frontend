@@ -25,7 +25,6 @@ function calcSummary(sections: DropoffSection[], mode: CargoMode) {
         totalPieces += pallets
         grossWeight += pallets * gross
         netWeight   += pallets * net
-        // Only accumulate volume when all three dimensions are present
         if (length > 0 && width > 0 && height > 0) {
           volume += pallets * (length * width * height) / 1_000_000
         }

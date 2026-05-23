@@ -75,7 +75,7 @@ export default function AuditLogsPage() {
       const data = await systemLogService.getStats()
       setStats(data)
     } catch {
-      // non-critical — fail silently
+      // non-critical fail silently
     }
   }, [])
 

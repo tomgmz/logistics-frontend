@@ -145,8 +145,6 @@ function fmtNum(n: number | null | undefined, unit: string, decimals = 2): strin
   return `${n.toFixed(decimals)} ${unit}`
 }
 
-// ── AssignmentPanel ───────────────────────────────────────────────────────────
-
 function AssignmentPanel({
   detail,
   drivers,
@@ -294,8 +292,6 @@ function AssignmentPanel({
   )
 }
 
-// ── TransactionDocs ───────────────────────────────────────────────────────────
-
 function TransactionDocs({ docs }: { docs: string[] }) {
   return (
     <div>
@@ -347,8 +343,6 @@ function TransactionDocs({ docs }: { docs: string[] }) {
     </div>
   )
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
 
 export default function BookingManagementView() {
   const [rawBookings, setRawBookings] = useState<Record<string, unknown>[]>([])
@@ -459,7 +453,6 @@ export default function BookingManagementView() {
     [busyElsewhere],
   )
 
-  // Keep the currently-selected option visible even if it belongs to this booking
   const availableDrivers = useMemo(
     () =>
       drivers.filter((dr) => {
@@ -584,7 +577,6 @@ export default function BookingManagementView() {
       setAssignEditMode(false)
       await openDetail(selectedId)
       await loadPage()
-      // Refresh the global busy-set so subsequent opens reflect the new assignment
       assignmentService.getAll().then(setAllAssignments).catch(() => null)
       appToast.success('Driver and vehicle assigned.', { action: 'assign', entityId: selectedId })
     } catch (e) {
@@ -703,7 +695,7 @@ export default function BookingManagementView() {
       <div className="flex flex-1 min-h-0 overflow-hidden">
         <div className="flex-1 flex flex-col min-w-0 min-h-0 p-3 lg:p-4 gap-3">
 
-          {/* ── Filters ── */}
+          {/* Filters */}
           <div className="flex flex-col lg:flex-row gap-2 lg:items-center lg:justify-between shrink-0">
             <div
               className="flex items-center gap-2 rounded-[10px] px-3 py-2 flex-1 max-w-md"
@@ -742,7 +734,7 @@ export default function BookingManagementView() {
             </div>
           </div>
 
-          {/* ── Table ── */}
+          {/* Table */}
           <div className="flex-1 min-h-0 rounded-xl border border-white/[0.08] overflow-hidden flex flex-col bg-[#0f0f0f]">
             {listLoading ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-3 py-16">
@@ -830,7 +822,7 @@ export default function BookingManagementView() {
           </div>
         </div>
 
-        {/* ── Detail panel ── */}
+        {/* Detail panel */}
         <AnimatePresence>
           {selectedId && (
             <>
@@ -869,7 +861,7 @@ export default function BookingManagementView() {
                   )}
                   {detail && !detailLoading && (
                     <>
-                      {/* ── Booking info ── */}
+                      {/* Booking info */}
                       <div className="rounded-xl border border-white/[0.08] p-3 space-y-2 bg-black/20">
                         <p className="text-[10px] font-mono text-white/35 break-all">
                           {detail.reference_number ?? detail.booking_id}
@@ -911,12 +903,12 @@ export default function BookingManagementView() {
                         </div>
                       </div>
 
-                      {/* ── Transaction documents ── */}
+                      {/* Transaction documents */}
                       {(d?.transaction_documents?.length ?? 0) > 0 && (
                         <TransactionDocs docs={d!.transaction_documents!} />
                       )}
 
-                      {/* ── Cargo summary ── */}
+                      {/* Cargo summary */}
                       {(d?.required_weight_kg || d?.required_volume_cbm || d?.required_length_cm) && (
                         <div>
                           <h3 className="text-[11px] font-bold uppercase tracking-wider text-white/40 mb-2 flex items-center gap-1.5">
@@ -954,7 +946,7 @@ export default function BookingManagementView() {
                         </div>
                       )}
 
-                      {/* ── Cargo items ── */}
+                      {/* Cargo items */}
                       {cargoItems.length > 0 && (
                         <div>
                           <h3 className="text-[11px] font-bold uppercase tracking-wider text-white/40 mb-2 flex items-center gap-1.5">
@@ -1000,7 +992,7 @@ export default function BookingManagementView() {
                         </div>
                       )}
 
-                      {/* ── Booking status ── */}
+                      {/* Booking status */}
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">
                           <label className="text-[11px] font-bold uppercase tracking-wider text-white/40">
@@ -1042,7 +1034,7 @@ export default function BookingManagementView() {
                         )}
                       </div>
 
-                      {/* ── Driver / vehicle assignment ── */}
+                      {/* Driver / vehicle assignment */}
                       {(normalizeBookingStatus(detail.status) === 'approved' ||
                         normalizeBookingStatus(detail.status) === 'assigned') && (
                         <AssignmentPanel
@@ -1069,7 +1061,7 @@ export default function BookingManagementView() {
                         />
                       )}
 
-                      {/* ── Delivery stops ── */}
+                      {/* Delivery stops */}
                       <div>
                         <h3 className="text-[11px] font-bold uppercase tracking-wider text-white/40 mb-2">
                           Delivery stops

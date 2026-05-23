@@ -23,7 +23,6 @@ import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import UserFormModal from './UserFormModal'
 
-// ─── Only the three tabs this admin view manages ─────────────────────────────
 type UserMgmtTab = Extract<UserTab, 'clients' | 'drivers' | 'vendors'>
 type TabValue = UserMgmtTab | 'all'
 
@@ -98,7 +97,6 @@ function StatusBadge({ status }: { status: UserStatus }) {
   )
 }
 
-// ─── Row action menu ──────────────────────────────────────────────────────────
 interface RowMenuProps {
   user: AnyUser
   tab: TabValue
@@ -179,7 +177,6 @@ function RowMenu({ user, tab, onEdit, onStatusChange }: RowMenuProps) {
   )
 }
 
-// ─── Table helpers ────────────────────────────────────────────────────────────
 function TableSkeleton({ cols }: { cols: number }) {
   return (
     <>
@@ -224,7 +221,6 @@ function EmptyState({ tab, onAdd }: { tab: TabValue; onAdd: () => void }) {
   )
 }
 
-// ─── Role badge (limited to these 3 roles) ───────────────────────────────────
 const ROLE_COLORS: Record<string, string> = {
   driver: 'bg-sky-500/15 text-sky-400 border-sky-500/30',
   client: 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30',
@@ -246,7 +242,6 @@ function RoleBadge({ role }: { role: string }) {
   )
 }
 
-// ─── Cell renderers ───────────────────────────────────────────────────────────
 function renderCells(user: AnyUser, tab: TabValue) {
   if (tab === 'all') {
     const name = [user.first_name, user.middle_name, user.last_name, user.suffix].filter(Boolean).join(' ') || '—'
@@ -326,7 +321,6 @@ const HEADERS: Record<TabValue, string[]> = {
   vendors: ['Name', 'Email', 'Type', 'Company', 'Status'],
 }
 
-// ─── Main component ───────────────────────────────────────────────────────────
 export default function UserManagementClient() {
   const [activeTab,        setActiveTab]        = useState<TabValue>('clients')
   const [allRows,          setAllRows]          = useState<AnyUser[]>([])
