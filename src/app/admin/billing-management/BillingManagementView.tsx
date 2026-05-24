@@ -1,814 +1,693 @@
-'use client'
+"use client";
 
-import { useCallback, useMemo, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useState, useMemo } from "react";
 import {
-  Search,
-  RefreshCw,
-  X,
-  ChevronLeft,
-  ChevronRight,
-  CreditCard,
-  Download,
-  CheckCircle2,
-  XCircle,
-  Clock,
-  Eye,
-  AlertTriangle,
-  Receipt,
-  Paperclip,
-  FileText,
-  FileImage,
-  FileSpreadsheet,
-  File,
-} from 'lucide-react'
-import ReusableModal from '@/components/layout/ReusableModal'
-import { nowDate } from '@/app/utils/serverTime'
+  CheckCircle, Clock, AlertTriangle, Wallet,
+  FileText, ArrowDownToLine, RefreshCw, Plus, Search,
+  Download, FileDown, Receipt, CreditCard,
+} from "lucide-react";
 
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-type PaymentStatus = 'pending' | 'paid' | 'overdue' | 'cancelled' | 'under_review'
-type BillingType   = 'reverse'
+type InvoiceStatus = "Paid" | "Pending" | "Overdue" | "Under Review";
+type ExpenseStatus = "Paid" | "Pending" | "Review";
+type Tab = "billing" | "expenses";
 
-interface SubmittedFile {
-  name:     string
-  size:     string
-  uploaded: string
+interface Invoice {
+  id: string;
+  bookingRef: string;
+  client: string;
+  totalAmount: number;
+  trips: number;
+  costPerTrip: number;
+  issueDate: string;
+  dueDate: string;
+  paidDate: string | null;
+  status: InvoiceStatus;
+  fileName: string;
 }
 
-interface BillingRecord {
-  billing_id:     string
-  booking_id:     string
-  client_name:    string
-  client_email:   string
-  amount:         number
-  status:         PaymentStatus
-  billing_type:   BillingType
-  invoice_number: string
-  issued_date:    string
-  due_date:       string
-  paid_date?:     string
-  remarks?:       string
-  service_type:   string
-  trips:          number
-  files:          SubmittedFile[]
+interface Expense {
+  id: string;
+  category: string;
+  date: string;
+  payee: string;
+  amount: number;
+  paymentMethod: string;
+  status: ExpenseStatus;
 }
 
-type ConfirmKind = 'approve' | 'reject' | 'generate' | null
+// ─── Mock Data ────────────────────────────────────────────────────────────────
 
-export const MOCK_BILLING: BillingRecord[] = [
-  {
-    billing_id:     'BL-001',
-    booking_id:     'BK-2026-0041',
-    client_name:    'Airspeed Corp.',
-    client_email:   'billing@airspeed.ph',
-    amount:         18500,
-    status:         'under_review',
-    billing_type:   'reverse',
-    invoice_number: 'INV-2026-00041',
-    issued_date:    '2026-04-28',
-    due_date:       '2026-05-12',
-    service_type:   'FMCG',
-    trips:          2,
-    remarks:        'Client submitted billing summary for 2 completed FMCG trips.',
-    files: [
-      { name: 'Billing_Summary_Apr28.pdf', size: '284 KB', uploaded: '2026-04-28' },
-      { name: 'DR_Trip01_Signed.jpg',      size: '1.2 MB', uploaded: '2026-04-28' },
-      { name: 'DR_Trip02_Signed.jpg',      size: '1.1 MB', uploaded: '2026-04-28' },
-      { name: 'Trip_Computation.xlsx',     size: '96 KB',  uploaded: '2026-04-29' },
-    ],
-  },
-  {
-    billing_id:     'BL-002',
-    booking_id:     'BK-2026-0038',
-    client_name:    'STA Warehouses Inc.',
-    client_email:   'accounts@stawh.com',
-    amount:         9200,
-    status:         'paid',
-    billing_type:   'reverse',
-    invoice_number: 'INV-2026-00038',
-    issued_date:    '2026-04-20',
-    due_date:       '2026-05-05',
-    paid_date:      '2026-05-02',
-    service_type:   'E-Commerce',
-    trips:          1,
-    files: [
-      { name: 'OR_INV-2026-00038.pdf',     size: '156 KB', uploaded: '2026-05-02' },
-      { name: 'Payment_Confirmation.pdf',  size: '88 KB',  uploaded: '2026-05-02' },
-    ],
-  },
-  {
-    billing_id:     'BL-003',
-    booking_id:     'BK-2026-0035',
-    client_name:    'MTR Port Logistics',
-    client_email:   'finance@mtrport.com',
-    amount:         32400,
-    status:         'overdue',
-    billing_type:   'reverse',
-    invoice_number: 'INV-2026-00035',
-    issued_date:    '2026-04-10',
-    due_date:       '2026-04-25',
-    service_type:   'FMCG',
-    trips:          4,
-    files: [
-      { name: 'INV-2026-00035.pdf',        size: '204 KB', uploaded: '2026-04-10' },
-      { name: 'POD_Batch_FMCG_Apr.xlsx',   size: '140 KB', uploaded: '2026-04-10' },
-    ],
-  },
-  {
-    billing_id:     'BL-004',
-    booking_id:     'BK-2026-0030',
-    client_name:    'Greenfield Supply Co.',
-    client_email:   'ops@greenfieldsupply.ph',
-    amount:         7800,
-    status:         'pending',
-    billing_type:   'reverse',
-    invoice_number: 'INV-2026-00030',
-    issued_date:    '2026-05-01',
-    due_date:       '2026-05-15',
-    service_type:   'E-Commerce',
-    trips:          1,
-    files: [],
-  },
-  {
-    billing_id:     'BL-005',
-    booking_id:     'BK-2026-0027',
-    client_name:    'Airspeed Corp.',
-    client_email:   'billing@airspeed.ph',
-    amount:         14600,
-    status:         'paid',
-    billing_type:   'reverse',
-    invoice_number: 'INV-2026-00027',
-    issued_date:    '2026-04-05',
-    due_date:       '2026-04-20',
-    paid_date:      '2026-04-18',
-    service_type:   'FMCG',
-    trips:          2,
-    files: [
-      { name: 'Billing_Summary_Mar31.pdf', size: '261 KB', uploaded: '2026-04-05' },
-      { name: 'OR_INV-2026-00027.pdf',     size: '148 KB', uploaded: '2026-04-18' },
-      { name: 'Signed_DR_Apr05.jpg',       size: '980 KB', uploaded: '2026-04-05' },
-    ],
-  },
-]
+const invoices: Invoice[] = [
+  { id: "RB-10081", bookingRef: "BK-20481", client: "Airspeed Corp.",     totalAmount: 18400, trips: 2, costPerTrip: 9200,  issueDate: "Aug 04, 2026", dueDate: "Aug 18, 2026", paidDate: "Aug 08, 2026", status: "Paid",         fileName: "reverse-billing-rb-10081.pdf" },
+  { id: "RB-10082", bookingRef: "BK-20482", client: "Universal Robina",   totalAmount: 34200, trips: 4, costPerTrip: 8550,  issueDate: "Aug 05, 2026", dueDate: "Aug 19, 2026", paidDate: null,           status: "Pending",      fileName: "reverse-billing-rb-10082.pdf" },
+  { id: "RB-10083", bookingRef: "BK-20483", client: "FreshMart PH",       totalAmount: 12600, trips: 3, costPerTrip: 4200,  issueDate: "Aug 06, 2026", dueDate: "Aug 10, 2026", paidDate: null,           status: "Overdue",      fileName: "reverse-billing-rb-10083.pdf" },
+  { id: "RB-10084", bookingRef: "BK-20484", client: "NovaBev Trading",    totalAmount: 27000, trips: 3, costPerTrip: 9000,  issueDate: "Aug 07, 2026", dueDate: "Aug 21, 2026", paidDate: null,           status: "Under Review", fileName: "reverse-billing-rb-10084.pdf" },
+  { id: "RB-10085", bookingRef: "BK-20485", client: "Monde Nissin PH",    totalAmount: 9800,  trips: 2, costPerTrip: 4900,  issueDate: "Aug 08, 2026", dueDate: "Aug 22, 2026", paidDate: "Aug 12, 2026", status: "Paid",         fileName: "reverse-billing-rb-10085.pdf" },
+  { id: "RB-10086", bookingRef: "BK-20486", client: "STA Warehouses",     totalAmount: 15500, trips: 5, costPerTrip: 3100,  issueDate: "Aug 09, 2026", dueDate: "Aug 23, 2026", paidDate: null,           status: "Pending",      fileName: "reverse-billing-rb-10086.pdf" },
+  { id: "RB-10087", bookingRef: "BK-20487", client: "Airspeed Corp.",     totalAmount: 8200,  trips: 1, costPerTrip: 8200,  issueDate: "Aug 10, 2026", dueDate: "Aug 14, 2026", paidDate: null,           status: "Overdue",      fileName: "reverse-billing-rb-10087.pdf" },
+  { id: "RB-10088", bookingRef: "BK-20488", client: "FreshMart PH",       totalAmount: 22100, trips: 3, costPerTrip: 7367,  issueDate: "Aug 11, 2026", dueDate: "Aug 25, 2026", paidDate: null,           status: "Under Review", fileName: "reverse-billing-rb-10088.pdf" },
+];
 
-const PAGE_SIZE = 8
+const expenses: Expense[] = [
+  { id: "EX-3401", category: "Fuel",            date: "Aug 03, 2026", payee: "Caltex Fleet Services", amount: 24300, paymentMethod: "Corporate Card", status: "Paid"    },
+  { id: "EX-3402", category: "Vehicle Repair",  date: "Aug 05, 2026", payee: "Makati AutoCare",       amount: 18700, paymentMethod: "Bank Transfer",  status: "Pending" },
+  { id: "EX-3403", category: "Toll & Parking",  date: "Aug 06, 2026", payee: "Expressway Pass",       amount: 8950,  paymentMethod: "Cash Advance",   status: "Paid"    },
+  { id: "EX-3404", category: "Office Supplies", date: "Aug 07, 2026", payee: "Central Depot",         amount: 4150,  paymentMethod: "Corporate Card", status: "Review"  },
+  { id: "EX-3405", category: "Fuel",            date: "Aug 08, 2026", payee: "Shell Cabuyao",         amount: 19600, paymentMethod: "Corporate Card", status: "Paid"    },
+  { id: "EX-3406", category: "Maintenance",     date: "Aug 09, 2026", payee: "Fleet Workshop PH",     amount: 31200, paymentMethod: "Bank Transfer",  status: "Pending" },
+  { id: "EX-3407", category: "Insurance",       date: "Aug 10, 2026", payee: "Pioneer Insurance",     amount: 18000, paymentMethod: "Bank Transfer",  status: "Paid"    },
+  { id: "EX-3408", category: "Driver Allowance",date: "Aug 11, 2026", payee: "Payroll Office",        amount: 12400, paymentMethod: "Cash Advance",   status: "Review"  },
+];
 
-function fmtCurrency(n: number) {
-  return `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`
-}
+// ─── Constants ────────────────────────────────────────────────────────────────
 
-function fmtDate(d: string) {
-  return new Date(d).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })
-}
+const fmt = (n: number) => `₱${n.toLocaleString()}`;
 
-function fmtLabel(s: string) {
-  return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
-}
+const INVOICE_FILTER_TABS = ["Paid Invoices", "Pending Payments", "Overdue Invoices", "Under Review"] as const;
+type InvoiceFilterTab = typeof INVOICE_FILTER_TABS[number];
 
-function fileExt(name: string) {
-  return name.split('.').pop()?.toLowerCase() ?? ''
-}
+const FILTER_TO_STATUS: Record<InvoiceFilterTab, InvoiceStatus> = {
+  "Paid Invoices":      "Paid",
+  "Pending Payments":   "Pending",
+  "Overdue Invoices":   "Overdue",
+  "Under Review":       "Under Review",
+};
 
-function fileIconConfig(name: string): { icon: React.ReactNode; bg: string; color: string } {
-  const ext = fileExt(name)
-  switch (ext) {
-    case 'pdf':
-      return { icon: <FileText size={13} />, bg: 'rgba(239,68,68,.18)', color: '#f87171' }
-    case 'jpg':
-    case 'jpeg':
-    case 'png':
-      return { icon: <FileImage size={13} />, bg: 'rgba(147,51,234,.18)', color: '#c084fc' }
-    case 'xlsx':
-    case 'xls':
-      return { icon: <FileSpreadsheet size={13} />, bg: 'rgba(58,246,38,.15)', color: '#86efac' }
-    case 'docx':
-    case 'doc':
-      return { icon: <FileText size={13} />, bg: 'rgba(77,249,237,.15)', color: '#4df9ed' }
-    default:
-      return { icon: <File size={13} />, bg: 'rgba(255,255,255,.08)', color: '#9ca3af' }
-  }
-}
+const EXPENSE_FILTERS = ["All Expenses", "Paid", "Pending", "Review"] as const;
+type ExpenseFilter = typeof EXPENSE_FILTERS[number];
 
-function statusStyle(status: PaymentStatus): { bg: string; color: string; border: string; icon: React.ReactNode } {
-  switch (status) {
-    case 'paid':
-      return { bg: 'rgba(58,246,38,0.1)',    color: '#86efac', border: 'rgba(58,246,38,0.3)',    icon: <CheckCircle2 size={12} /> }
-    case 'pending':
-      return { bg: 'rgba(77,249,237,0.1)',   color: '#4df9ed', border: 'rgba(77,249,237,0.3)',   icon: <Clock size={12} /> }
-    case 'under_review':
-      return { bg: 'rgba(246,159,38,0.1)',   color: '#fbbf24', border: 'rgba(246,159,38,0.3)',   icon: <Eye size={12} /> }
-    case 'overdue':
-      return { bg: 'rgba(239,68,68,0.1)',    color: '#f87171', border: 'rgba(239,68,68,0.3)',    icon: <AlertTriangle size={12} /> }
-    case 'cancelled':
-      return { bg: 'rgba(107,114,128,0.12)', color: '#9ca3af', border: 'rgba(107,114,128,0.3)', icon: <XCircle size={12} /> }
-    default:
-      return { bg: 'rgba(255,255,255,0.05)', color: '#9ca3af', border: 'rgba(255,255,255,0.1)', icon: null }
-  }
-}
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
-const STATUSES: PaymentStatus[] = ['pending', 'paid', 'overdue', 'under_review', 'cancelled']
-
-function FileChip({ file }: { file: SubmittedFile }) {
-  const fi = fileIconConfig(file.name)
-  return (
-    <div
-      className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-white/[0.07] bg-black/20 hover:border-[rgba(77,249,237,0.3)] hover:bg-[rgba(77,249,237,0.05)] transition-all cursor-pointer group"
-      title={`Uploaded ${fmtDate(file.uploaded)}`}
-    >
-      <div
-        className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-        style={{ background: fi.bg, color: fi.color }}
-      >
-        {fi.icon}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-xs font-semibold text-white/85 truncate leading-tight">{file.name}</p>
-        <p className="text-[10px] text-white/35 font-mono mt-0.5">{file.size} · {fmtDate(file.uploaded)}</p>
-      </div>
-      <Download size={12} className="text-white/30 group-hover:text-[#4df9ed] transition-colors shrink-0" />
-    </div>
-  )
-}
-
-function FileStackBadge({ files }: { files: SubmittedFile[] }) {
-  if (files.length === 0) {
-    return <span className="text-[10px] text-white/25 italic">None</span>
-  }
-  return (
-    <div className="flex items-center gap-1.5">
-      <div className="flex">
-        {files.slice(0, 3).map((f, i) => {
-          const fi = fileIconConfig(f.name)
-          return (
-            <div
-              key={i}
-              className="w-5 h-5 rounded-md flex items-center justify-center border border-black/50"
-              style={{ background: fi.bg, color: fi.color, marginLeft: i > 0 ? '-5px' : 0, zIndex: 3 - i }}
-            >
-              <span style={{ fontSize: 8, fontWeight: 700, fontFamily: 'monospace' }}>
-                {fileExt(f.name).toUpperCase().slice(0, 3)}
-              </span>
-            </div>
-          )
-        })}
-      </div>
-      <span className="text-[11px] text-white/50 font-semibold">
-        {files.length} file{files.length > 1 ? 's' : ''}
-      </span>
-    </div>
-  )
-}
-
-function BillingDetailPanel({
-  record,
-  onClose,
-  onApprove,
-  onReject,
-  onGenerate,
+function StatCard({
+  label, value, icon, accent,
 }: {
-  record: BillingRecord
-  onClose: () => void
-  onApprove: () => void
-  onReject: () => void
-  onGenerate: () => void
+  label: string;
+  value: string | number;
+  icon: React.ReactNode;
+  accent: string;
 }) {
-  const st = statusStyle(record.status)
+  return (
+    <div style={{
+      background: "#1c1c1c",
+      border: "1px solid #2a2a2a",
+      borderRadius: 12,
+      padding: "20px 22px",
+      display: "flex",
+      flexDirection: "column",
+      gap: 12,
+      flex: 1,
+      minWidth: 0,
+    }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <span style={{ fontSize: 11, color: "#666", letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 500 }}>
+          {label}
+        </span>
+        <div style={{
+          width: 34, height: 34, borderRadius: 8,
+          background: `${accent}18`,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          color: accent, flexShrink: 0,
+        }}>
+          {icon}
+        </div>
+      </div>
+      <div style={{ fontSize: 32, fontWeight: 700, color: "#fff", letterSpacing: -1 }}>{value}</div>
+      <div style={{ height: 3, background: "#2a2a2a", borderRadius: 99, overflow: "hidden" }}>
+        <div style={{ height: "100%", width: "65%", background: accent, borderRadius: 99 }} />
+      </div>
+    </div>
+  );
+}
+
+function StatusBadge({ status }: { status: InvoiceStatus | ExpenseStatus }) {
+  const map: Record<string, { bg: string; color: string }> = {
+    Paid:           { bg: "rgba(74,222,128,0.12)", color: "#4ade80" },
+    Pending:        { bg: "rgba(251,191,36,0.12)",  color: "#fbbf24" },
+    Overdue:        { bg: "rgba(239,68,68,0.12)",   color: "#ef4444" },
+    "Under Review": { bg: "rgba(139,92,246,0.12)",  color: "#a78bfa" },
+    Review:         { bg: "rgba(139,92,246,0.12)",  color: "#a78bfa" },
+  };
+  const s = map[status] ?? map.Pending;
+  return (
+    <span style={{
+      background: s.bg, color: s.color,
+      border: `1px solid ${s.color}30`,
+      fontSize: 11, fontWeight: 600,
+      padding: "3px 10px", borderRadius: 99,
+      whiteSpace: "nowrap",
+    }}>
+      {status}
+    </span>
+  );
+}
+
+// ─── Billing Module ───────────────────────────────────────────────────────────
+
+function BillingModule() {
+  const [activeFilter, setActiveFilter] = useState<InvoiceFilterTab>("Paid Invoices");
+
+  const filtered = useMemo(
+    () => invoices.filter(inv => inv.status === FILTER_TO_STATUS[activeFilter]),
+    [activeFilter],
+  );
+
+  const displayed = filtered[0] ?? null;
+
+  const paidCount      = invoices.filter(i => i.status === "Paid").length;
+  const pendingCount   = invoices.filter(i => i.status === "Pending").length;
+  const overdueCount   = invoices.filter(i => i.status === "Overdue").length;
+  const expensesMTD    = expenses.reduce((s, e) => s + e.amount, 0);
 
   return (
-    <motion.div
-      className="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-black/65"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      onClick={onClose}
-    >
-      <motion.div
-        initial={{ y: 14, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        exit={{ y: 14, opacity: 0 }}
-        transition={{ type: 'spring', damping: 26, stiffness: 280 }}
-        className="w-full max-w-2xl max-h-[90vh] overflow-y-auto scrollbar-none rounded-2xl border border-white/10 shadow-2xl"
-        style={{ background: 'var(--color-surface)' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-start justify-between px-5 py-4 border-b border-white/[0.07]">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40">
-                Reverse Billing
-              </span>
-              <span
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[10px] font-bold uppercase tracking-wide"
-                style={{ color: st.color, borderColor: st.border, background: st.bg }}
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      {/* KPI row */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
+        <StatCard label="Paid Invoices"       value={paidCount}    icon={<CheckCircle size={17} />}    accent="#4ade80" />
+        <StatCard label="Pending Review"      value={pendingCount} icon={<Clock size={17} />}          accent="#fbbf24" />
+        <StatCard label="Overdue Items"       value={overdueCount} icon={<AlertTriangle size={17} />}  accent="#ef4444" />
+        <StatCard label="Expenses This Month" value={fmt(expensesMTD)} icon={<Wallet size={17} />}    accent="#22d3ee" />
+      </div>
+
+      {/* Main content */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 360px", gap: 16 }}>
+        {/* Left: Invoice card + filter tabs */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+          {/* Section header */}
+          <div style={{ marginBottom: 16 }}>
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#fff" }}>Reverse Billing Module</h2>
+          </div>
+
+          {/* Filter tabs */}
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 16 }}>
+            {INVOICE_FILTER_TABS.map(tab => (
+              <button
+                key={tab}
+                onClick={() => setActiveFilter(tab)}
+                style={{
+                  background: activeFilter === tab ? "#22d3ee" : "#1c1c1c",
+                  border: `1px solid ${activeFilter === tab ? "#22d3ee" : "#2a2a2a"}`,
+                  color: activeFilter === tab ? "#000" : "#888",
+                  borderRadius: 99, padding: "7px 16px",
+                  fontSize: 12, fontWeight: 600, cursor: "pointer",
+                  transition: "all 0.15s",
+                }}
               >
-                {st.icon}
-                {fmtLabel(record.status)}
-              </span>
-            </div>
-            <h2 className="text-lg font-bold text-white mt-1">{record.invoice_number}</h2>
-            <p className="text-xs text-white/45 mt-0.5">{record.booking_id} · {record.service_type}</p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 rounded-lg hover:bg-white/5 text-white/50 transition-colors"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        <div className="p-5 space-y-5">
-          <div className="rounded-xl border border-white/[0.07] bg-black/20 p-4">
-            <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/35 mb-2">Client</p>
-            <p className="text-sm font-semibold text-white">{record.client_name}</p>
-            <p className="text-xs text-white/45 mt-0.5">{record.client_email}</p>
-          </div>
-
-          <div className="grid grid-cols-3 gap-3">
-            <div className="rounded-xl border border-white/[0.07] bg-black/20 p-4">
-              <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/35 mb-1">Total Amount</p>
-              <p className="text-xl font-bold text-white tabular-nums">{fmtCurrency(record.amount)}</p>
-            </div>
-            <div className="rounded-xl border border-white/[0.07] bg-black/20 p-4">
-              <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/35 mb-1">Trips</p>
-              <p className="text-xl font-bold text-white tabular-nums">{record.trips}</p>
-            </div>
-            <div className="rounded-xl border border-white/[0.07] bg-black/20 p-4">
-              <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/35 mb-1">Per Trip</p>
-              <p className="text-xl font-bold text-white tabular-nums">{fmtCurrency(Math.round(record.amount / record.trips))}</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-3">
-            {[
-              { label: 'Issued',    value: fmtDate(record.issued_date) },
-              { label: 'Due Date',  value: fmtDate(record.due_date) },
-              { label: 'Paid Date', value: record.paid_date ? fmtDate(record.paid_date) : '—' },
-            ].map(({ label, value }) => (
-              <div key={label} className="rounded-xl border border-white/[0.07] bg-black/20 p-4">
-                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/35 mb-1">{label}</p>
-                <p className="text-sm font-semibold text-white/85">{value}</p>
-              </div>
+                {tab}
+              </button>
             ))}
+            <button style={{
+              marginLeft: "auto", display: "flex", alignItems: "center", gap: 6,
+              background: "transparent", border: "1px solid #2a2a2a", borderRadius: 8,
+              color: "#888", padding: "7px 14px", fontSize: 12, cursor: "pointer",
+            }}>
+              <Search size={13} /> Search
+            </button>
+            <button style={{
+              display: "flex", alignItems: "center", gap: 6,
+              background: "#22d3ee18", border: "1px solid #22d3ee40", borderRadius: 8,
+              color: "#22d3ee", padding: "7px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer",
+            }}>
+              <ArrowDownToLine size={13} /> Export Invoices
+            </button>
           </div>
 
-          {/* Remarks */}
-          {record.remarks && (
-            <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
-              <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-amber-400/70 mb-1.5">Remarks</p>
-              <p className="text-sm text-white/70 leading-relaxed">{record.remarks}</p>
-            </div>
-          )}
-
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/35">Submitted Files</p>
-                {record.files.length > 0 && (
-                  <span
-                    className="text-[9px] font-bold px-2 py-0.5 rounded-full border"
-                    style={{
-                      color: '#4df9ed',
-                      borderColor: 'rgba(77,249,237,.25)',
-                      background: 'rgba(77,249,237,.1)',
-                    }}
-                  >
-                    {record.files.length}
-                  </span>
-                )}
+          {/* Invoice card */}
+          {displayed ? (
+            <div style={{
+              background: "#1c1c1c", border: "1px solid #2a2a2a",
+              borderRadius: 14, padding: 20, display: "flex", flexDirection: "column", gap: 16,
+            }}>
+              {/* Card header */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                    <FileText size={15} color="#22d3ee" />
+                    <span style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>
+                      {displayed.id} · {displayed.bookingRef}
+                    </span>
+                  </div>
+                  <span style={{ fontSize: 12, color: "#666" }}>{displayed.client}</span>
+                </div>
+                <StatusBadge status={displayed.status} />
               </div>
-              {record.files.length > 0 && (
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-white/50 hover:text-white/80 transition-colors"
-                >
-                  <Download size={11} />
-                  Download All
-                </button>
-              )}
-            </div>
 
-            {record.files.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-white/10 p-6 flex flex-col items-center gap-2 text-center">
-                <Paperclip size={22} className="text-white/20" />
-                <p className="text-xs text-white/30">No files submitted by client</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {record.files.map((f, i) => (
-                  <FileChip key={i} file={f} />
+              {/* Detail grid */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+                {[
+                  { label: "Total Amount",  value: fmt(displayed.totalAmount) },
+                  { label: "Trips",         value: String(displayed.trips) },
+                  { label: "Cost / Trip",   value: fmt(displayed.costPerTrip) },
+                  { label: "Issue Date",    value: displayed.issueDate },
+                  { label: "Due Date",      value: displayed.dueDate },
+                  { label: "Paid Date",     value: displayed.paidDate ?? "—" },
+                ].map(({ label, value }) => (
+                  <div key={label} style={{
+                    background: "#232323", border: "1px solid #2e2e2e",
+                    borderRadius: 10, padding: "12px 14px",
+                  }}>
+                    <div style={{ fontSize: 10, color: "#555", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>{label}</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>{value}</div>
+                  </div>
                 ))}
               </div>
-            )}
-          </div>
 
-          {record.status === 'under_review' && (
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/35 mb-1.5">
-                Rejection Remarks (optional)
-              </p>
-              <textarea
-                rows={3}
-                className="w-full rounded-lg border border-white/10 bg-[#111] px-3 py-2 text-sm text-white/80 placeholder:text-white/30 outline-none focus:border-[rgba(77,249,237,0.4)] resize-none"
-                placeholder="Enter reason for rejection…"
-              />
-            </div>
-          )}
-        </div>
-
-        <div className="flex items-center justify-between gap-2 px-5 py-4 border-t border-white/[0.07]">
-          <button
-            type="button"
-            onClick={onGenerate}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-white/10 text-xs font-semibold text-white/70 hover:bg-white/5 transition-colors"
-          >
-            <Download size={14} />
-            Export Invoice
-          </button>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 rounded-lg border border-white/15 text-sm text-white/80 hover:bg-white/5 transition-colors"
-            >
-              Close
-            </button>
-            {record.status === 'under_review' && (
-              <>
-                <button
-                  type="button"
-                  onClick={onReject}
-                  className="px-4 py-2 rounded-lg border border-red-500/25 text-sm font-bold text-red-400 hover:bg-red-500/10 transition-colors"
-                >
-                  Reject
-                </button>
-                <button
-                  type="button"
-                  onClick={onApprove}
-                  className="px-4 py-2 rounded-lg text-sm font-bold text-black transition-opacity hover:opacity-90"
-                  style={{ background: 'var(--color-cyan)' }}
-                >
-                  Approve & Generate OR
-                </button>
-              </>
-            )}
-            {record.status === 'pending' && (
-              <button
-                type="button"
-                onClick={onGenerate}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold text-black transition-opacity hover:opacity-90"
-                style={{ background: 'var(--color-cyan)' }}
-              >
-                <Receipt size={15} />
-                Generate Official Receipt
-              </button>
-            )}
-          </div>
-        </div>
-      </motion.div>
-    </motion.div>
-  )
-}
-
-function SummaryCards({ records }: { records: BillingRecord[] }) {
-  const countPaid    = records.filter((r) => r.status === 'paid').length
-  const countPending = records.filter((r) => r.status === 'pending').length
-  const countOverdue = records.filter((r) => r.status === 'overdue').length
-  const countReview  = records.filter((r) => r.status === 'under_review').length
-
-  const cards = [
-    { label: 'Paid Invoices',   value: countPaid,    sub: 'payment confirmed',        color: '#86efac', border: '#2a2a2a',   bg: '#1b1b1b' },
-    { label: 'Pending Payment', value: countPending, sub: 'awaiting settlement',      color: '#4df9ed', border: '#2a2a2a',  bg: '#1b1b1b' },
-    { label: 'Overdue',         value: countOverdue, sub: 'past due date',            color: '#f87171', border: '#2a2a2a',   bg: '#1b1b1b' },
-    { label: 'Under Review',    value: countReview,  sub: 'reverse billing requests', color: '#fbbf24', border: '#2a2a2a',  bg: '#1b1b1b' },
-  ]
-
-  return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 shrink-0">
-      {cards.map((c) => (
-        <div
-          key={c.label}
-          className="rounded-xl border p-3 flex flex-col gap-1"
-          style={{ border: `1px solid ${c.border}`, background: c.bg }}
-        >
-          <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/40">{c.label}</p>
-          <p className="text-2xl font-bold tabular-nums leading-none" style={{ color: c.color }}>
-            {c.value}
-          </p>
-          <p className="text-[10px] text-white/35">{c.sub}</p>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function buildConfirmConfig(
-  kind: ConfirmKind,
-  record: BillingRecord | null,
-  busy: boolean,
-): { title: string; description: string; confirmLabel: string; cancelLabel: string } | null {
-  if (!kind || !record) return null
-
-  if (kind === 'approve') return {
-    title:        'Approve & Generate Official Receipt?',
-    description:  `Generate an official receipt for ${record.invoice_number} — ${record.client_name} (${fmtCurrency(record.amount)}). This will mark the billing as Paid.`,
-    confirmLabel: busy ? 'Processing…' : 'Approve',
-    cancelLabel:  'Cancel',
-  }
-  if (kind === 'reject') return {
-    title:        'Reject this billing request?',
-    description:  `Rejection remarks will be sent to ${record.client_name}. The billing will be marked as Cancelled.`,
-    confirmLabel: busy ? 'Rejecting…' : 'Reject',
-    cancelLabel:  'Cancel',
-  }
-  if (kind === 'generate') return {
-    title:        'Export Invoice?',
-    description:  `Download the invoice PDF for ${record.invoice_number}.`,
-    confirmLabel: busy ? 'Exporting…' : 'Export',
-    cancelLabel:  'Cancel',
-  }
-  return null
-}
-
-export default function BillingManagementView() {
-  const [records, setRecords]           = useState<BillingRecord[]>(MOCK_BILLING)
-  const [search,  setSearch]            = useState('')
-  const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [page, setPage]                 = useState(0)
-  const [loading, setLoading]           = useState(false)
-
-  const [selectedRecord, setSelectedRecord] = useState<BillingRecord | null>(null)
-  const [confirmKind,    setConfirmKind]    = useState<ConfirmKind>(null)
-  const [actionBusy,     setActionBusy]     = useState(false)
-
-  const handleRefresh = useCallback(async () => {
-    setLoading(true)
-    await new Promise((r) => setTimeout(r, 700))
-    setLoading(false)
-  }, [])
-
-  const filtered = useMemo(() => {
-    return records.filter((r) => {
-      const q = search.trim().toLowerCase()
-      if (q && ![r.client_name, r.invoice_number, r.booking_id, r.service_type].some((s) => s.toLowerCase().includes(q))) return false
-      if (statusFilter !== 'all' && r.status !== statusFilter) return false
-      return true
-    })
-  }, [records, search, statusFilter])
-
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-  const pageSafe  = Math.min(page, pageCount - 1)
-  const pageRows  = filtered.slice(pageSafe * PAGE_SIZE, (pageSafe + 1) * PAGE_SIZE)
-
-  const handleAction = async () => {
-    if (!selectedRecord || !confirmKind) return
-    setActionBusy(true)
-    await new Promise((r) => setTimeout(r, 800))
-
-    if (confirmKind === 'approve') {
-      setRecords((prev) =>
-        prev.map((r) =>
-          r.billing_id === selectedRecord.billing_id
-            ? { ...r, status: 'paid', paid_date: nowDate().toISOString().split('T')[0] }
-            : r
-        )
-      )
-    } else if (confirmKind === 'reject') {
-      setRecords((prev) =>
-        prev.map((r) =>
-          r.billing_id === selectedRecord.billing_id ? { ...r, status: 'cancelled' } : r
-        )
-      )
-    }
-
-    setActionBusy(false)
-    setConfirmKind(null)
-    setSelectedRecord(null)
-  }
-
-  const confirmConfig = buildConfirmConfig(confirmKind, selectedRecord, actionBusy)
-
-  return (
-    <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-hidden ff-body bg-[var(--color-bg)]">
-
-      <header className="shrink-0 px-3 py-3 lg:px-4 border-b border-white/[0.07] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-bold text-white tracking-tight">Billing & Payment Management</h1>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={handleRefresh}
-            className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/5 transition-colors"
-          >
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-            Refresh
-          </button>
-          <button
-            type="button"
-            className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-white/70 hover:bg-white/5 transition-colors"
-          >
-            <Download size={14} />
-            Export All
-          </button>
-        </div>
-      </header>
-
-      <div className="flex flex-1 min-h-0 flex-col p-3 lg:p-4 gap-3 overflow-hidden">
-
-        <SummaryCards records={records} />
-
-        <div className="flex flex-col xl:flex-row gap-2 xl:items-center shrink-0">
-          <div
-            className="flex items-center gap-2 rounded-[10px] px-3 py-2 flex-1 max-w-sm"
-            style={{ background: '#2a2828' }}
-          >
-            <Search size={15} className="text-white/40 shrink-0" />
-            <input
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(0) }}
-              placeholder="Search client, invoice, booking…"
-              className="bg-transparent border-none outline-none text-sm flex-1 text-white/80 placeholder:text-white/35"
-            />
-            {search && (
-              <button type="button" onClick={() => setSearch('')} className="text-white/40 hover:text-white/70">
-                <X size={13} />
-              </button>
-            )}
-          </div>
-
-          <div className="flex flex-wrap gap-1.5 items-center">
-            <span className="text-[10px] uppercase tracking-wider text-white/35 self-center mr-1">Status</span>
-            {(['all', ...STATUSES] as const).map((key) => {
-              const active = statusFilter === key
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => { setStatusFilter(key); setPage(0) }}
-                  className="px-2 py-1 rounded-lg text-[11px] font-bold border transition-colors"
-                  style={{
-                    background:  active ? 'rgba(77,249,237,0.12)' : 'transparent',
-                    borderColor: active ? 'rgba(77,249,237,0.35)' : 'rgba(255,255,255,0.08)',
-                    color:       active ? '#4df9ed' : '#888',
-                  }}
-                >
-                  {key === 'all' ? 'All' : fmtLabel(key)}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        <div className="flex-1 min-h-0 rounded-xl border border-white/[0.08] overflow-hidden flex flex-col bg-[#0f0f0f]">
-          {loading ? (
-            <div className="flex-1 flex flex-col items-center justify-center gap-3 py-16">
-              <div
-                className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin"
-                style={{ borderColor: 'var(--color-cyan)' }}
-              />
-              <p className="text-sm text-white/45">Loading billing records…</p>
-            </div>
-          ) : pageRows.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center gap-4 py-12 text-center px-4">
-              <CreditCard size={40} className="text-white/15" />
-              <p className="text-sm text-white/45">No billing records match your filters.</p>
-            </div>
-          ) : (
-            <>
-              <div className="overflow-auto flex-1 min-h-0">
-                <table className="w-full text-left text-sm border-collapse min-w-[900px]">
-                  <thead className="sticky top-0 z-[1] bg-[#141414] border-b border-white/[0.07]">
-                    <tr className="text-[10px] uppercase tracking-wider text-white/40">
-                      <th className="px-3 py-2.5 font-bold">Invoice</th>
-                      <th className="px-3 py-2.5 font-bold">Client</th>
-                      <th className="px-3 py-2.5 font-bold hidden lg:table-cell">Due Date</th>
-                      <th className="px-3 py-2.5 font-bold">Amount</th>
-                      <th className="px-3 py-2.5 font-bold hidden sm:table-cell">Files</th>
-                      <th className="px-3 py-2.5 font-bold">Status</th>
-                      <th className="px-3 py-2.5 font-bold text-right w-[110px]">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pageRows.map((r) => {
-                      const st = statusStyle(r.status)
-                      const isOverdue = r.status === 'overdue'
-                      return (
-                        <tr
-                          key={r.billing_id}
-                          className="border-b border-white/[0.04] hover:bg-white/[0.025] transition-colors"
-                        >
-                          <td className="px-3 py-3 align-middle">
-                            <p className="font-mono text-xs font-semibold text-white/90">{r.invoice_number}</p>
-                            <p className="text-[10px] text-white/40 mt-0.5">{r.booking_id} · {r.service_type}</p>
-                          </td>
-                          <td className="px-3 py-3 align-middle">
-                            <p className="text-sm font-semibold text-white truncate max-w-[160px]">{r.client_name}</p>
-                            <p className="text-[10px] text-white/40 truncate max-w-[160px]">{r.client_email}</p>
-                          </td>
-                          <td className="px-3 py-3 align-middle hidden lg:table-cell">
-                            <span className={`text-xs tabular-nums ${isOverdue ? 'text-red-400 font-semibold' : 'text-white/60'}`}>
-                              {fmtDate(r.due_date)}
-                            </span>
-                            {isOverdue && <p className="text-[10px] text-red-400/70 mt-0.5">Past due</p>}
-                          </td>
-                          <td className="px-3 py-3 align-middle">
-                            <span className="font-mono text-sm font-bold text-white tabular-nums">{fmtCurrency(r.amount)}</span>
-                            <p className="text-[10px] text-white/40 mt-0.5">{r.trips} trip{r.trips > 1 ? 's' : ''}</p>
-                          </td>
-                          <td className="px-3 py-3 align-middle hidden sm:table-cell">
-                            <button
-                              type="button"
-                              className="cursor-pointer"
-                              onClick={() => setSelectedRecord(r)}
-                            >
-                              <FileStackBadge files={r.files} />
-                            </button>
-                          </td>
-                          <td className="px-3 py-3 align-middle">
-                            <span
-                              className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border"
-                              style={{ color: st.color, borderColor: st.border, background: st.bg }}
-                            >
-                              {st.icon}
-                              {fmtLabel(r.status)}
-                            </span>
-                          </td>
-                          <td className="px-3 py-3 align-middle text-right">
-                            <button
-                              type="button"
-                              onClick={() => setSelectedRecord(r)}
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-white/10 text-[11px] font-semibold text-white/70 hover:bg-white/5 transition-colors"
-                            >
-                              <Eye size={13} />
-                              View
-                            </button>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="shrink-0 flex items-center justify-between px-3 py-2 border-t border-white/[0.07] text-xs text-white/50">
-                <span>
-                  {filtered.length === 0
-                    ? '0'
-                    : `${pageSafe * PAGE_SIZE + 1}–${Math.min((pageSafe + 1) * PAGE_SIZE, filtered.length)}`
-                  }{' '}
-                  of {filtered.length} records
-                </span>
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    disabled={pageSafe <= 0}
-                    onClick={() => setPage((p) => Math.max(0, p - 1))}
-                    className="p-1.5 rounded-md border border-white/10 disabled:opacity-30 hover:bg-white/5 transition-colors"
-                  >
-                    <ChevronLeft size={15} />
+              {/* Footer */}
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                paddingTop: 14, borderTop: "1px solid #2a2a2a",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <FileText size={13} color="#555" />
+                  <span style={{ fontSize: 12, color: "#555" }}>Submitted File: </span>
+                  <span style={{ fontSize: 12, color: "#ccc", fontWeight: 500 }}>{displayed.fileName}</span>
+                </div>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button style={{
+                    display: "flex", alignItems: "center", gap: 6,
+                    background: "transparent", border: "none", color: "#888",
+                    fontSize: 12, cursor: "pointer",
+                  }}>
+                    <Download size={13} /> Download File
                   </button>
-                  <span className="px-2 tabular-nums">{pageSafe + 1} / {pageCount}</span>
-                  <button
-                    type="button"
-                    disabled={pageSafe >= pageCount - 1}
-                    onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
-                    className="p-1.5 rounded-md border border-white/10 disabled:opacity-30 hover:bg-white/5 transition-colors"
-                  >
-                    <ChevronRight size={15} />
+                  <button style={{
+                    display: "flex", alignItems: "center", gap: 6,
+                    background: "transparent", border: "none", color: "#888",
+                    fontSize: 12, cursor: "pointer",
+                  }}>
+                    <FileDown size={13} /> Export Invoice
                   </button>
                 </div>
               </div>
-            </>
+            </div>
+          ) : (
+            <div style={{
+              background: "#1c1c1c", border: "1px solid #2a2a2a", borderRadius: 14,
+              padding: 40, textAlign: "center", color: "#555", fontSize: 13,
+            }}>
+              No invoices in this category.
+            </div>
           )}
+
+          {/* More invoices in category */}
+          {filtered.length > 1 && (
+            <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+              {filtered.slice(1).map(inv => (
+                <div key={inv.id} style={{
+                  background: "#1a1a1a", border: "1px solid #252525", borderRadius: 10,
+                  padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between",
+                  cursor: "pointer",
+                }}>
+                  <div>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: "#22d3ee" }}>{inv.id}</span>
+                    <span style={{ fontSize: 12, color: "#555", marginLeft: 8 }}>{inv.bookingRef} · {inv.client}</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>{fmt(inv.totalAmount)}</span>
+                    <StatusBadge status={inv.status} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Right: Workflow Summary + Billing Notes */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {/* Workflow Summary */}
+          <div style={{
+            background: "#1c1c1c", border: "1px solid #2a2a2a",
+            borderRadius: 14, padding: 20,
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#fff" }}>Workflow Summary</h3>
+                <p style={{ margin: "3px 0 0", fontSize: 12, color: "#555" }}>Billing operations at a glance</p>
+              </div>
+              <CheckCircle size={16} color="#22d3ee" />
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {[
+                { label: "Reviewed this week", value: "18 invoices" },
+                { label: "OR generated",        value: "34 receipts" },
+                { label: "Exports completed",   value: "96 files" },
+              ].map(({ label, value }) => (
+                <div key={label} style={{
+                  background: "#232323", border: "1px solid #2e2e2e",
+                  borderRadius: 8, padding: "11px 14px",
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                }}>
+                  <span style={{ fontSize: 13, color: "#777" }}>{label}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>{value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Billing Notes */}
+          <div style={{
+            background: "#1c1c1c", border: "1px solid #2a2a2a",
+            borderRadius: 14, padding: 20, flex: 1,
+          }}>
+            <h3 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 700, color: "#fff" }}>Billing Notes</h3>
+            <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 10 }}>
+              {[
+                "Paid invoices can be downloaded or exported instantly.",
+                "Pending invoices allow official receipt generation before closing the transaction.",
+                "Overdue invoices stay exportable for collection follow-up.",
+                "Under review invoices support approval or rejection with remarks.",
+              ].map((note, i) => (
+                <li key={i} style={{ display: "flex", gap: 8, fontSize: 12, color: "#666", lineHeight: 1.5 }}>
+                  <span style={{ color: "#333", flexShrink: 0 }}>•</span>
+                  {note}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Expenses Module ──────────────────────────────────────────────────────────
+
+function ExpensesModule() {
+  const [activeFilter, setActiveFilter] = useState<ExpenseFilter>("All Expenses");
+  const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("");
+  const [payee, setPayee] = useState("");
+  const [amount, setAmount] = useState("");
+  const [paymentStatus, setPaymentStatus] = useState("");
+
+  const paidCount   = invoices.filter(i => i.status === "Paid").length;
+  const pendingCount = invoices.filter(i => i.status === "Pending").length;
+  const overdueCount = invoices.filter(i => i.status === "Overdue").length;
+  const expensesMTD = expenses.reduce((s, e) => s + e.amount, 0);
+
+  const searchLower = search.toLowerCase();
+  const filtered = useMemo(() => expenses.filter(e => {
+    const matchFilter =
+      activeFilter === "All Expenses" ||
+      (activeFilter === "Paid" && e.status === "Paid") ||
+      (activeFilter === "Pending" && e.status === "Pending") ||
+      (activeFilter === "Review" && e.status === "Review");
+    if (!matchFilter) return false;
+    if (!searchLower) return true;
+    return (
+      e.id.toLowerCase().includes(searchLower) ||
+      e.category.toLowerCase().includes(searchLower) ||
+      e.payee.toLowerCase().includes(searchLower)
+    );
+  }), [activeFilter, searchLower]);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      {/* Header bar */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#fff" }}>Expenses Module</h2>
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          {EXPENSE_FILTERS.map(f => (
+            <button key={f} onClick={() => setActiveFilter(f)} style={{
+              background: activeFilter === f ? "#22d3ee" : "#1c1c1c",
+              border: `1px solid ${activeFilter === f ? "#22d3ee" : "#2a2a2a"}`,
+              color: activeFilter === f ? "#000" : "#888",
+              borderRadius: 99, padding: "7px 16px",
+              fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "all 0.15s",
+            }}>{f}</button>
+          ))}
+          <button style={{
+            display: "flex", alignItems: "center", gap: 6,
+            background: "#1c1c1c", border: "1px solid #2a2a2a", borderRadius: 8,
+            color: "#888", padding: "7px 14px", fontSize: 12, cursor: "pointer",
+          }}>
+            <RefreshCw size={13} /> Sync
+          </button>
+          <button style={{
+            display: "flex", alignItems: "center", gap: 6,
+            background: "#22d3ee", border: "none", borderRadius: 8,
+            color: "#000", padding: "7px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer",
+          }}>
+            <Plus size={13} /> New Expense
+          </button>
+          <button style={{
+            display: "flex", alignItems: "center", gap: 6,
+            background: "#1c1c1c", border: "1px solid #2a2a2a", borderRadius: 8,
+            color: "#888", padding: "7px 14px", fontSize: 12, cursor: "pointer",
+          }}>
+            <ArrowDownToLine size={13} /> Export Records
+          </button>
         </div>
       </div>
 
-      <AnimatePresence>
-        {selectedRecord && !confirmKind && (
-          <BillingDetailPanel
-            record={selectedRecord}
-            onClose={() => setSelectedRecord(null)}
-            onApprove={() => setConfirmKind('approve')}
-            onReject={() => setConfirmKind('reject')}
-            onGenerate={() => setConfirmKind('generate')}
-          />
-        )}
-      </AnimatePresence>
+      {/* KPI row */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
+        <StatCard label="Paid Invoices"       value={paidCount}    icon={<CheckCircle size={17} />}    accent="#4ade80" />
+        <StatCard label="Pending Review"      value={pendingCount} icon={<Clock size={17} />}          accent="#fbbf24" />
+        <StatCard label="Overdue Items"       value={overdueCount} icon={<AlertTriangle size={17} />}  accent="#ef4444" />
+        <StatCard label="Expenses This Month" value={fmt(expensesMTD)} icon={<Wallet size={17} />}    accent="#22d3ee" />
+      </div>
 
-      {confirmConfig && (
-        <ReusableModal
-          open={!!confirmKind}
-          title={confirmConfig.title}
-          description={confirmConfig.description}
-          confirmLabel={confirmConfig.confirmLabel}
-          cancelLabel={confirmConfig.cancelLabel}
-          onConfirm={handleAction}
-          onCancel={() => { if (!actionBusy) setConfirmKind(null) }}
-          disableBackdropClose={actionBusy}
-        />
-      )}
+      {/* Main content */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 16, alignItems: "start" }}>
+        {/* Expense Records table */}
+        <div style={{
+          background: "#1c1c1c", border: "1px solid #2a2a2a",
+          borderRadius: 14, overflow: "hidden",
+        }}>
+          <div style={{ padding: "16px 20px", borderBottom: "1px solid #2a2a2a", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#fff" }}>Expense Records</h3>
+              <p style={{ margin: "3px 0 0", fontSize: 12, color: "#555" }}>View and manage company expense transactions</p>
+            </div>
+            <div style={{
+              display: "flex", alignItems: "center", gap: 8,
+              background: "#232323", border: "1px solid #2e2e2e",
+              borderRadius: 8, padding: "8px 12px",
+            }}>
+              <Search size={13} color="#555" />
+              <input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Search by category, payee, or reference"
+                style={{
+                  background: "transparent", border: "none", outline: "none",
+                  color: "#fff", fontSize: 12, width: 220,
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Table header */}
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "100px 1fr 1fr 100px 120px 90px",
+            padding: "10px 20px",
+            borderBottom: "1px solid #252525",
+            background: "#1a1a1a",
+          }}>
+            {["Expense ID", "Category", "Payee", "Amount", "Payment Method", "Status"].map(h => (
+              <span key={h} style={{ fontSize: 10, color: "#444", fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase" }}>{h}</span>
+            ))}
+          </div>
+
+          {/* Rows */}
+          {filtered.length === 0 ? (
+            <div style={{ padding: "32px 20px", textAlign: "center", color: "#555", fontSize: 13 }}>
+              No expenses match your filters.
+            </div>
+          ) : (
+            filtered.map((e, i) => (
+              <div key={e.id} style={{
+                display: "grid",
+                gridTemplateColumns: "100px 1fr 1fr 100px 120px 90px",
+                padding: "14px 20px",
+                borderBottom: i < filtered.length - 1 ? "1px solid #222" : "none",
+                alignItems: "center",
+                cursor: "pointer",
+                transition: "background 0.12s",
+              }}
+                onMouseEnter={el => (el.currentTarget.style.background = "#232323")}
+                onMouseLeave={el => (el.currentTarget.style.background = "transparent")}
+              >
+                <span style={{ fontSize: 12, fontWeight: 600, color: "#22d3ee" }}>{e.id}</span>
+                <div>
+                  <div style={{ fontSize: 13, color: "#fff", fontWeight: 500 }}>{e.category}</div>
+                  <div style={{ fontSize: 11, color: "#555", marginTop: 2 }}>{e.date}</div>
+                </div>
+                <span style={{ fontSize: 13, color: "#ccc" }}>{e.payee}</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>{fmt(e.amount)}</span>
+                <span style={{ fontSize: 12, color: "#777" }}>{e.paymentMethod}</span>
+                <StatusBadge status={e.status} />
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Right: New Expense Entry + Expense Controls */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {/* New Expense Entry form */}
+          <div style={{
+            background: "#1c1c1c", border: "1px solid #2a2a2a",
+            borderRadius: 14, padding: 20,
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#fff" }}>New Expense Entry</h3>
+                <p style={{ margin: "3px 0 0", fontSize: 12, color: "#555" }}>Quick create form</p>
+              </div>
+              <Receipt size={16} color="#fbbf24" />
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {[
+                { label: "Expense Category",  value: category,       setter: setCategory,       placeholder: "Fuel / Repair / Office" },
+                { label: "Payee / Vendor",    value: payee,          setter: setPayee,          placeholder: "Enter company name" },
+                { label: "Amount",            value: amount,         setter: setAmount,         placeholder: "₱0.00" },
+                { label: "Payment Status",    value: paymentStatus,  setter: setPaymentStatus,  placeholder: "Paid / Pending / Review" },
+              ].map(({ label, value, setter, placeholder }) => (
+                <div key={label}>
+                  <div style={{ fontSize: 10, color: "#555", letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 600, marginBottom: 6 }}>
+                    {label}
+                  </div>
+                  <input
+                    value={value}
+                    onChange={e => setter(e.target.value)}
+                    placeholder={placeholder}
+                    style={{
+                      width: "100%", boxSizing: "border-box",
+                      background: "#242424", border: "1px solid #303030",
+                      borderRadius: 8, padding: "9px 12px",
+                      color: "#fff", fontSize: 13, outline: "none",
+                    }}
+                  />
+                </div>
+              ))}
+
+              {/* Upload area */}
+              <div style={{
+                background: "#242424", border: "1px dashed #333",
+                borderRadius: 8, padding: "14px 12px", textAlign: "center",
+                cursor: "pointer", marginTop: 2,
+              }}>
+                <span style={{ fontSize: 12, color: "#555" }}>Attach receipt or proof of payment here</span>
+              </div>
+
+              {/* Action buttons */}
+              <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
+                <button style={{
+                  flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                  background: "#22d3ee", border: "none", borderRadius: 8,
+                  color: "#000", padding: "9px 0", fontSize: 12, fontWeight: 700, cursor: "pointer",
+                }}>
+                  <Plus size={14} /> Create Expense
+                </button>
+                <button style={{
+                  flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                  background: "#232323", border: "1px solid #2e2e2e", borderRadius: 8,
+                  color: "#888", padding: "9px 0", fontSize: 12, cursor: "pointer",
+                }}>
+                  <CreditCard size={14} /> Upload File
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Expense Controls */}
+          <div style={{
+            background: "#1c1c1c", border: "1px solid #2a2a2a",
+            borderRadius: 14, padding: 20,
+          }}>
+            <h3 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 700, color: "#fff" }}>Expense Controls</h3>
+            <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 10 }}>
+              {[
+                "Update payment status as records are settled.",
+                "Export filtered expense records for accounting review.",
+                "Keep supporting files attached for easy auditing.",
+                "Create new expense entries without leaving the module.",
+              ].map((note, i) => (
+                <li key={i} style={{ display: "flex", gap: 8, fontSize: 12, color: "#666", lineHeight: 1.5 }}>
+                  <span style={{ color: "#333", flexShrink: 0 }}>•</span>
+                  {note}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
     </div>
-  )
+  );
+}
+
+// ─── Root ─────────────────────────────────────────────────────────────────────
+
+export default function BillingManagementView() {
+  const [activeTab, setActiveTab] = useState<Tab>("billing");
+
+  return (
+    <div style={{
+      background: "#141414",
+      flex: 1,
+      minHeight: 0,
+      display: "flex",
+      flexDirection: "column",
+      fontFamily: "'Inter', system-ui, sans-serif",
+      color: "#fff",
+      overflow: "hidden",
+    }}>
+      {/* Header — fixed height, never scrolls */}
+      <div style={{
+        flexShrink: 0,
+        background: "#181818",
+        borderBottom: "1px solid #222",
+        padding: "20px 28px 18px",
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
+          <div>
+            <h1 style={{ margin: "0 0 6px", fontSize: 24, fontWeight: 800, color: "#fff", letterSpacing: -0.5 }}>
+              Billing Management Module
+            </h1>
+          </div>
+
+          {/* Tab switcher */}
+          <div style={{ display: "flex", gap: 6, background: "#1c1c1c", border: "1px solid #2a2a2a", borderRadius: 10, padding: 4, flexShrink: 0 }}>
+            <button
+              onClick={() => setActiveTab("billing")}
+              style={{
+                display: "flex", alignItems: "center", gap: 7,
+                background: activeTab === "billing" ? "#22d3ee18" : "transparent",
+                border: activeTab === "billing" ? "1px solid #22d3ee40" : "1px solid transparent",
+                borderRadius: 8, padding: "8px 16px",
+                color: activeTab === "billing" ? "#22d3ee" : "#666",
+                fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "all 0.15s",
+              }}
+            >
+              <Receipt size={14} /> Billing Management
+            </button>
+            <button
+              onClick={() => setActiveTab("expenses")}
+              style={{
+                display: "flex", alignItems: "center", gap: 7,
+                background: activeTab === "expenses" ? "#22d3ee18" : "transparent",
+                border: activeTab === "expenses" ? "1px solid #22d3ee40" : "1px solid transparent",
+                borderRadius: 8, padding: "8px 16px",
+                color: activeTab === "expenses" ? "#22d3ee" : "#666",
+                fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "all 0.15s",
+              }}
+            >
+              <Wallet size={14} /> Expenses Module
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Scrollable content area — fills remaining height */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "22px 28px 32px" }}>
+        {activeTab === "billing"   && <BillingModule />}
+        {activeTab === "expenses"  && <ExpensesModule />}
+      </div>
+    </div>
+  );
 }
