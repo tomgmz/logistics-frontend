@@ -1,6 +1,11 @@
 import proxyApi, { initCsrf } from '@/lib/api/auth.api'
-
-// ─── Response wrapper ────────────────────────────────────────────────────────
+import type {
+  ConversationWithDetails,
+  MessageRow,
+  MessagableUser,
+  GroupRaw,
+  GroupMessageRaw,
+} from '@/app/types/messaging/messaging.types'
 
 interface ApiResponse<T> {
   success: boolean
@@ -8,7 +13,7 @@ interface ApiResponse<T> {
   message?: string
 }
 
-// ─── Types (mirror backend messaging.types.ts) ───────────────────────────────
+export type { ConversationWithDetails, MessageRow, MessagableUser }
 
 export type ConversationContextType = 'direct' | 'booking_transit'
 
@@ -49,36 +54,6 @@ export interface ConversationRow {
   last_message_at: string | null
 }
 
-export interface ConversationWithDetails extends ConversationRow {
-  other_user: ConversationParticipant
-  last_message: ConversationLastMessage | null
-  unread_count: number
-}
-
-export interface MessageRow {
-  message_id: string
-  conversation_id: string
-  sender_id: string
-  receiver_id: string
-  content: string
-  is_read: boolean
-  sent_at: string
-  read_at: string | null
-  deleted_by_sender: boolean
-  deleted_by_receiver: boolean
-}
-
-export interface MessagableUser {
-  user_id: string
-  first_name: string | null
-  last_name: string | null
-  role: UserRole
-  email: string
-  booking_id?: string
-}
-
-// ─── Request payloads ────────────────────────────────────────────────────────
-
 export interface CreateConversationPayload {
   target_user_id: string
   booking_id?: string
@@ -90,10 +65,8 @@ export interface SendMessagePayload {
 
 export interface GetMessagesQuery {
   limit?: number
-  before?: string // ISO datetime string
+  before?: string
 }
-
-// ─── HTTP helpers ────────────────────────────────────────────────────────────
 
 async function get<T>(url: string, params?: Record<string, string | number | undefined>): Promise<T> {
   const { data } = await proxyApi.get<ApiResponse<T>>(url, { params })
@@ -118,59 +91,48 @@ async function del<T>(url: string): Promise<T> {
   return data.data
 }
 
-// ─── Base path ───────────────────────────────────────────────────────────────
-
 const B = '/messaging'
 
-// ─── Service ─────────────────────────────────────────────────────────────────
-
 export const messagingService = {
-  /**
-   * Get all conversations for the current user, ordered by last message.
-   */
   getConversations: () =>
     get<ConversationWithDetails[]>(`${B}/conversations`),
 
-  /**
-   * Start a new conversation or return an existing one with target_user_id.
-   * For clients, target must be a driver assigned to an in-transit booking.
-   */
   createOrGetConversation: (payload: CreateConversationPayload) =>
     post<ConversationRow>(`${B}/conversations`, payload),
 
-  /**
-   * Fetch messages for a conversation with cursor-based pagination.
-   * Pass `before` (ISO datetime) to load older messages.
-   */
   getMessages: (conversationId: string, query?: GetMessagesQuery) =>
     get<MessageRow[]>(`${B}/conversations/${conversationId}/messages`, {
       limit: query?.limit,
       before: query?.before,
     }),
 
-  /**
-   * Send a message in a conversation.
-   */
   sendMessage: (conversationId: string, payload: SendMessagePayload) =>
     post<MessageRow>(`${B}/conversations/${conversationId}/messages`, payload),
 
-  /**
-   * Mark all unread messages in a conversation as read.
-   */
   markAsRead: (conversationId: string) =>
     patch<void>(`${B}/conversations/${conversationId}/read`),
 
-  /**
-   * Soft-delete a message (hides it only for the calling user).
-   */
   deleteMessage: (messageId: string) =>
     del<void>(`${B}/messages/${messageId}`),
 
-  /**
-   * Get the list of users you are allowed to message.
-   * - Staff/admin: all active users
-   * - Client: only drivers assigned to their in-transit bookings
-   */
   getMessagableUsers: () =>
     get<MessagableUser[]>(`${B}/users`),
+
+  getGroups: () =>
+    get<GroupRaw[]>(`${B}/groups`),
+
+  createGroup: (payload: { name: string; member_ids: string[] }) =>
+    post<{ group_id: string }>(`${B}/groups`, payload),
+
+  respondToGroupInvite: (groupId: string, accept: boolean) =>
+    patch<void>(`${B}/groups/${groupId}/invite/respond`, { accept }),
+
+  getGroupMessages: (groupId: string) =>
+    get<GroupMessageRaw[]>(`${B}/groups/${groupId}/messages`),
+
+  sendGroupMessage: (groupId: string, payload: { content: string }) =>
+    post<GroupMessageRaw>(`${B}/groups/${groupId}/messages`, payload),
+
+  markGroupRead: (groupId: string, messageIds: string[]) =>
+    patch<void>(`${B}/groups/${groupId}/read`, { message_ids: messageIds }),
 }

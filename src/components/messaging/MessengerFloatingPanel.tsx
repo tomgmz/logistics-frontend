@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Edit, Search, Loader2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
@@ -34,11 +34,10 @@ export default function MessengerFloatingPanel() {
       const raw = await messagingService.getConversations()
       const mapped = raw.map(toConversation)
       setConversations(mapped)
-      // Sync total unread to store so the header badge stays accurate
       const total = mapped.reduce((sum, c) => sum + c.unread_count, 0)
       setTotalUnread(total)
     } catch {
-      // silently fail; user can reopen panel to retry
+      // silently fail
     } finally {
       setLoading(false)
     }
@@ -202,7 +201,8 @@ export default function MessengerFloatingPanel() {
                   key={conv.id}
                   conv={conv}
                   onSelect={() => {
-                    openChat(conv.id)
+                    // Pass unread count so the store badge decrements immediately
+                    openChat(conv.id, conv.unread_count)
                     closePanel()
                   }}
                 />

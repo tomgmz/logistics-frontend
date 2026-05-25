@@ -7,7 +7,7 @@ interface MessengerStore {
   totalUnread: number
   togglePanel: () => void
   closePanel: () => void
-  openChat: (id: string) => void
+  openChat: (id: string, unreadCount?: number) => void
   closeChat: (id: string) => void
   toggleMinimizeChat: (id: string) => void
   setTotalUnread: (count: number) => void
@@ -24,13 +24,14 @@ export const useMessengerStore = create<MessengerStore>((set) => ({
   togglePanel: () => set(s => ({ isPanelOpen: !s.isPanelOpen })),
   closePanel: () => set({ isPanelOpen: false }),
 
-  openChat: (id) =>
+  openChat: (id, unreadCount = 0) =>
     set(s => ({
       isPanelOpen: false,
       openChatIds: s.openChatIds.includes(id)
         ? s.openChatIds
         : [...s.openChatIds.slice(-2), id],
       minimizedChatIds: s.minimizedChatIds.filter(i => i !== id),
+      totalUnread: Math.max(0, s.totalUnread - unreadCount),
     })),
 
   closeChat: (id) =>
