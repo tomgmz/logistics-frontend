@@ -1,49 +1,95 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
-import { ArrowLeft, MoreVertical, Phone, Video } from 'lucide-react'
+import { useEffect, useRef, useState, useCallback } from 'react'
+import { ArrowLeft, MoreVertical, Phone, Video, Loader2 } from 'lucide-react'
 import type { Conversation, Message } from '@/app/types/messaging/messaging.types'
+import { toMessage } from '@/app/types/messaging/messaging.types'
+import { messagingService } from '@/lib/services/messaging.service'
 import MessageBubble from './MessageBubble'
 import MessageInput from './MessageInput'
 import { groupMessagesByDate } from '@/app/utils/messaging.utils'
 
 interface ChatWindowProps {
   conversation: Conversation
-  messages: Message[]
   currentUserId: string
   onBack: () => void
+  onMessageSent?: (conversationId: string, body: string, senderId: string) => void
 }
 
-export default function ChatWindow({ conversation, messages, currentUserId, onBack }: ChatWindowProps) {
+export default function ChatWindow({
+  conversation,
+  currentUserId,
+  onBack,
+  onMessageSent,
+}: ChatWindowProps) {
   const participant = conversation.participants[0]
-  const initials = `${participant.first_name[0]}${participant.last_name[0]}`.toUpperCase()
+  const initials = `${participant.first_name[0] ?? '?'}${participant.last_name[0] ?? '?'}`.toUpperCase()
   const bottomRef = useRef<HTMLDivElement>(null)
-  const [localMessages, setLocalMessages] = useState<Message[]>(messages)
+
+  const [messages, setMessages] = useState<Message[]>([])
+  const [loading, setLoading] = useState(true)
+  const [sending, setSending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // ── Fetch messages ──────────────────────────────────────────────────────────
+  const fetchMessages = useCallback(async () => {
+    try {
+      setError(null)
+      setLoading(true)
+      const raw = await messagingService.getMessages(conversation.id)
+      setMessages(raw.map(toMessage))
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to load messages'
+      setError(msg)
+    } finally {
+      setLoading(false)
+    }
+  }, [conversation.id])
 
   useEffect(() => {
-    setLocalMessages(messages)
-  }, [messages])
+    fetchMessages()
+  }, [fetchMessages])
 
+  // ── Scroll to bottom ────────────────────────────────────────────────────────
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [localMessages])
+  }, [messages])
 
-  const handleSend = (body: string) => {
-    const newMsg: Message = {
-      id: `local-${Date.now()}`,
+  // ── Send message ────────────────────────────────────────────────────────────
+  const handleSend = async (body: string) => {
+    // Optimistic update
+    const optimisticMsg: Message = {
+      id: `optimistic-${Date.now()}`,
       conversation_id: conversation.id,
       sender_id: currentUserId,
       body,
       created_at: new Date().toISOString(),
       read_at: null,
     }
-    setLocalMessages(prev => [...prev, newMsg])
+    setMessages(prev => [...prev, optimisticMsg])
+    onMessageSent?.(conversation.id, body, currentUserId)
+
+    try {
+      setSending(true)
+      const saved = await messagingService.sendMessage(conversation.id, { content: body })
+      // Replace optimistic with real message from server
+      setMessages(prev =>
+        prev.map(m => (m.id === optimisticMsg.id ? toMessage(saved) : m))
+      )
+    } catch {
+      // Roll back optimistic message on failure
+      setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id))
+    } finally {
+      setSending(false)
+    }
   }
 
-  const groups = groupMessagesByDate(localMessages)
+  const groups = groupMessagesByDate(messages)
 
+  // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col h-full min-h-0">
+      {/* Header */}
       <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-white/[0.07] bg-[var(--color-bg)]">
         <button
           type="button"
@@ -75,27 +121,19 @@ export default function ChatWindow({ conversation, messages, currentUserId, onBa
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
-          <button
-            type="button"
-            className="p-2 rounded-lg hover:bg-white/5 text-white/30 hover:text-white/70 transition-colors"
-          >
+          <button type="button" className="p-2 rounded-lg hover:bg-white/5 text-white/30 hover:text-white/70 transition-colors">
             <Phone size={15} />
           </button>
-          <button
-            type="button"
-            className="p-2 rounded-lg hover:bg-white/5 text-white/30 hover:text-white/70 transition-colors"
-          >
+          <button type="button" className="p-2 rounded-lg hover:bg-white/5 text-white/30 hover:text-white/70 transition-colors">
             <Video size={15} />
           </button>
-          <button
-            type="button"
-            className="p-2 rounded-lg hover:bg-white/5 text-white/30 hover:text-white/70 transition-colors"
-          >
+          <button type="button" className="p-2 rounded-lg hover:bg-white/5 text-white/30 hover:text-white/70 transition-colors">
             <MoreVertical size={15} />
           </button>
         </div>
       </div>
 
+      {/* Messages */}
       <div className="
         flex-1 min-h-0 overflow-y-auto px-4 py-5 space-y-1
         [&::-webkit-scrollbar]:w-[3px]
@@ -105,7 +143,26 @@ export default function ChatWindow({ conversation, messages, currentUserId, onBa
         hover:[&::-webkit-scrollbar-thumb]:bg-white/20
         bg-[var(--color-surface)]
       ">
-        {groups.length === 0 && (
+        {loading && (
+          <div className="flex items-center justify-center h-full">
+            <Loader2 size={18} className="animate-spin text-[var(--color-cyan)]/40" />
+          </div>
+        )}
+
+        {!loading && error && (
+          <div className="flex flex-col items-center justify-center h-full gap-2">
+            <p className="ff-body text-white/30 text-xs">{error}</p>
+            <button
+              type="button"
+              onClick={fetchMessages}
+              className="ff-body text-xs text-[var(--color-cyan)]/60 hover:text-[var(--color-cyan)] transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
+        {!loading && !error && groups.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full gap-2 text-center">
             <div className="w-10 h-10 rounded-full bg-[var(--color-surface-dark)] border border-white/10 flex items-center justify-center">
               <span className="font-card text-[0.7rem] text-white/50">{initials}</span>
@@ -116,13 +173,11 @@ export default function ChatWindow({ conversation, messages, currentUserId, onBa
           </div>
         )}
 
-        {groups.map(({ date, messages: groupMsgs }) => (
+        {!loading && !error && groups.map(({ date, messages: groupMsgs }) => (
           <div key={date} className="space-y-2.5">
             <div className="flex items-center gap-3 py-2">
               <div className="flex-1 h-px bg-white/[0.04]" />
-              <span className="ff-body text-[10px] text-white/20 uppercase tracking-widest shrink-0">
-                {date}
-              </span>
+              <span className="ff-body text-[10px] text-white/20 uppercase tracking-widest shrink-0">{date}</span>
               <div className="flex-1 h-px bg-white/[0.04]" />
             </div>
 
@@ -146,7 +201,7 @@ export default function ChatWindow({ conversation, messages, currentUserId, onBa
         <div ref={bottomRef} className="h-1" />
       </div>
 
-      <MessageInput onSend={handleSend} />
+      <MessageInput onSend={handleSend} disabled={sending} />
     </div>
   )
 }

@@ -1,7 +1,7 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { Search } from 'lucide-react'
+import { Search, SquarePen } from 'lucide-react'
 import type { Conversation } from '@/app/types/messaging/messaging.types'
 import { formatConversationTime } from '@/app/utils/messaging.utils'
 
@@ -11,6 +11,7 @@ interface ConversationListProps {
   search: string
   onSearchChange: (s: string) => void
   onSelect: (c: Conversation) => void
+  onNewConversation: () => void
   currentUserId: string
 }
 
@@ -20,14 +21,26 @@ export default function ConversationList({
   search,
   onSearchChange,
   onSelect,
+  onNewConversation,
   currentUserId,
 }: ConversationListProps) {
   return (
     <div className="flex flex-col h-full min-h-0">
       <div className="px-4 pt-5 pb-3 shrink-0">
-        <h2 className="font-spartan text-white text-sm tracking-[0.2em] uppercase mb-3">
-          Messages
-        </h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-spartan text-white text-sm tracking-[0.2em] uppercase">
+            Messages
+          </h2>
+          <button
+            type="button"
+            onClick={onNewConversation}
+            title="New conversation"
+            className="p-1.5 rounded-lg hover:bg-white/5 text-white/35 hover:text-[var(--color-cyan)] transition-colors"
+          >
+            <SquarePen size={15} />
+          </button>
+        </div>
+
         <div className="relative">
           <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/25 pointer-events-none" />
           <input
@@ -56,7 +69,25 @@ export default function ConversationList({
         hover:[&::-webkit-scrollbar-thumb]:bg-white/20
       ">
         {conversations.length === 0 ? (
-          <p className="ff-body text-white/20 text-xs text-center py-10">No conversations found</p>
+          <div className="flex flex-col items-center gap-3 py-10 text-center px-4">
+            <p className="ff-body text-white/20 text-xs">
+              {search ? 'No conversations match your search' : 'No conversations yet'}
+            </p>
+            {!search && (
+              <button
+                type="button"
+                onClick={onNewConversation}
+                className="
+                  ff-body text-xs px-3 py-1.5 rounded-lg
+                  text-[var(--color-cyan)]/60 hover:text-[var(--color-cyan)]
+                  border border-white/[0.07] hover:border-[var(--color-cyan)]/20
+                  transition-colors
+                "
+              >
+                Start a conversation
+              </button>
+            )}
+          </div>
         ) : (
           conversations.map((conv, i) => (
             <ConversationItem
@@ -84,7 +115,7 @@ interface ConversationItemProps {
 
 function ConversationItem({ conv, index, isSelected, currentUserId, onSelect }: ConversationItemProps) {
   const participant = conv.participants[0]
-  const initials = `${participant.first_name[0]}${participant.last_name[0]}`.toUpperCase()
+  const initials = `${participant.first_name[0] ?? '?'}${participant.last_name[0] ?? '?'}`.toUpperCase()
   const lastMsg = conv.last_message
   const hasUnread = conv.unread_count > 0
   const isMyLastMsg = lastMsg?.sender_id === currentUserId
@@ -132,7 +163,9 @@ function ConversationItem({ conv, index, isSelected, currentUserId, onSelect }: 
             {isMyLastMsg && (
               <span className="text-[var(--color-cyan)]/50">You: </span>
             )}
-            {lastMsg?.body ?? 'No messages yet'}
+            {lastMsg?.body ?? (
+              <span className="italic">No messages yet</span>
+            )}
           </p>
           {hasUnread && (
             <span className="shrink-0 min-w-[18px] h-[18px] rounded-full bg-[var(--color-cyan)] flex items-center justify-center px-1">

@@ -1,19 +1,47 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Edit, Search } from 'lucide-react'
+import { X, Edit, Search, Loader2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useMessengerStore } from '@/lib/store/messenger.store'
-import { MOCK_CONVERSATIONS } from '@/lib/data/messaging.mock'
+import { messagingService } from '@/lib/services/messaging.service'
+import { toConversation } from '@/app/types/messaging/messaging.types'
 import { formatConversationTime } from '@/app/utils/messaging.utils'
 import type { Conversation } from '@/app/types/messaging/messaging.types'
+
+type TabFilter = 'All' | 'Unread'
 
 export default function MessengerFloatingPanel() {
   const { isPanelOpen, closePanel, openChat } = useMessengerStore()
   const panelRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
 
+  const [conversations, setConversations] = useState<Conversation[]>([])
+  const [loading, setLoading] = useState(false)
+  const [search, setSearch] = useState('')
+  const [tab, setTab] = useState<TabFilter>('All')
+
+  // ── Fetch conversations whenever panel opens ─────────────────────────────
+  // useCallback keeps the function stable so the effect dep array is satisfied.
+  // Moving setLoading inside the async body avoids synchronous setState-in-effect.
+  const fetchConversations = useCallback(async () => {
+    setLoading(true)
+    try {
+      const raw = await messagingService.getConversations()
+      setConversations(raw.map(toConversation))
+    } catch {
+      // silently fail; user can reopen panel to retry
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (isPanelOpen) fetchConversations()
+  }, [isPanelOpen, fetchConversations])
+
+  // ── Close on outside click ───────────────────────────────────────────────
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
@@ -28,6 +56,15 @@ export default function MessengerFloatingPanel() {
     closePanel()
     router.push('/messages')
   }
+
+  // ── Filter ───────────────────────────────────────────────────────────────
+  const filtered = conversations.filter(c => {
+    const p = c.participants[0]
+    const name = `${p.first_name} ${p.last_name}`.toLowerCase()
+    const matchesSearch = name.includes(search.toLowerCase())
+    const matchesTab = tab === 'All' || (tab === 'Unread' && c.unread_count > 0)
+    return matchesSearch && matchesTab
+  })
 
   return (
     <AnimatePresence>
@@ -47,6 +84,7 @@ export default function MessengerFloatingPanel() {
             flex flex-col
           "
         >
+          {/* Header */}
           <div className="px-4 pt-4 pb-2 flex items-center justify-between shrink-0">
             <h3 className="font-spartan text-white text-sm tracking-[0.15em] uppercase">
               Chats
@@ -70,11 +108,14 @@ export default function MessengerFloatingPanel() {
             </div>
           </div>
 
+          {/* Search */}
           <div className="px-3 pb-2 shrink-0">
             <div className="relative">
               <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/25 pointer-events-none" />
               <input
                 type="text"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
                 placeholder="Search"
                 className="
                   w-full bg-white/[0.04] border border-white/[0.07] rounded-xl
@@ -86,26 +127,29 @@ export default function MessengerFloatingPanel() {
             </div>
           </div>
 
+          {/* Tabs — `i` removed, key={t} is sufficient */}
           <div className="px-3 pb-2 flex items-center gap-1.5 shrink-0">
-            {(['All', 'Unread', 'Groups'] as const).map((tab, i) => (
+            {(['All', 'Unread'] as TabFilter[]).map(t => (
               <button
-                key={tab}
+                key={t}
                 type="button"
+                onClick={() => setTab(t)}
                 className={`
                   ff-body text-xs px-3 py-1 rounded-full transition-colors
-                  ${i === 0
+                  ${tab === t
                     ? 'bg-[var(--color-cyan)]/12 text-[var(--color-cyan)] border border-[var(--color-cyan)]/20'
                     : 'text-white/40 hover:bg-white/5 hover:text-white/60'
                   }
                 `}
               >
-                {tab}
+                {t}
               </button>
             ))}
           </div>
 
           <div className="sep-x-cyan mx-3 mb-1 shrink-0" />
 
+          {/* List */}
           <div className="
             flex-1 overflow-y-auto px-2 pb-2
             [&::-webkit-scrollbar]:w-[3px]
@@ -114,15 +158,29 @@ export default function MessengerFloatingPanel() {
             [&::-webkit-scrollbar-thumb]:rounded-full
             hover:[&::-webkit-scrollbar-thumb]:bg-white/20
           ">
-            {MOCK_CONVERSATIONS.map(conv => (
-              <PanelConversationItem
-                key={conv.id}
-                conv={conv}
-                onSelect={() => openChat(conv.id)}
-              />
-            ))}
+            {loading ? (
+              <div className="flex items-center justify-center py-10">
+                <Loader2 size={16} className="animate-spin text-[var(--color-cyan)]/40" />
+              </div>
+            ) : filtered.length === 0 ? (
+              <p className="ff-body text-white/20 text-xs text-center py-10">
+                {search ? 'No results found' : 'No conversations yet'}
+              </p>
+            ) : (
+              filtered.map(conv => (
+                <PanelConversationItem
+                  key={conv.id}
+                  conv={conv}
+                  onSelect={() => {
+                    openChat(conv.id)
+                    closePanel()
+                  }}
+                />
+              ))
+            )}
           </div>
 
+          {/* Footer */}
           <div className="px-4 py-2.5 border-t border-white/[0.05] shrink-0">
             <button
               type="button"
@@ -146,10 +204,9 @@ function PanelConversationItem({
   onSelect: () => void
 }) {
   const participant = conv.participants[0]
-  const initials = `${participant.first_name[0]}${participant.last_name[0]}`.toUpperCase()
+  const initials = `${participant.first_name[0] ?? '?'}${participant.last_name[0] ?? '?'}`.toUpperCase()
   const lastMsg = conv.last_message
   const hasUnread = conv.unread_count > 0
-  const isMyLastMsg = lastMsg?.sender_id === 'current'
 
   return (
     <motion.button
@@ -180,7 +237,6 @@ function PanelConversationItem({
         </div>
         <div className="flex items-center gap-1.5">
           <p className={`ff-body text-[11px] truncate flex-1 ${hasUnread ? 'text-white/55' : 'text-white/22'}`}>
-            {isMyLastMsg && <span className="text-[var(--color-cyan)]/40">You: </span>}
             {lastMsg?.body ?? ''}
           </p>
           {hasUnread && (
