@@ -63,10 +63,10 @@ export default function ChatWindow({ conversation, messages, currentUserId, onBa
         </div>
 
         <div className="flex-1 min-w-0">
-          <p className="font-body text-sm text-white leading-tight truncate">
+          <p className="ff-body text-sm text-white leading-tight truncate">
             {participant.first_name} {participant.last_name}
           </p>
-          <p className="font-body text-[11px] leading-tight">
+          <p className="ff-body text-[11px] leading-tight">
             {participant.is_online
               ? <span className="text-[var(--color-green)]">Active now</span>
               : <span className="text-[var(--color-muted)] capitalize">{participant.role.replace(/_/g, ' ')}</span>
@@ -110,7 +110,7 @@ export default function ChatWindow({ conversation, messages, currentUserId, onBa
             <div className="w-10 h-10 rounded-full bg-[var(--color-surface-dark)] border border-white/10 flex items-center justify-center">
               <span className="font-card text-[0.7rem] text-white/50">{initials}</span>
             </div>
-            <p className="font-body text-white/20 text-xs">
+            <p className="ff-body text-white/20 text-xs">
               No messages yet. Say something to {participant.first_name}.
             </p>
           </div>
@@ -120,7 +120,7 @@ export default function ChatWindow({ conversation, messages, currentUserId, onBa
           <div key={date} className="space-y-2.5">
             <div className="flex items-center gap-3 py-2">
               <div className="flex-1 h-px bg-white/[0.04]" />
-              <span className="font-body text-[10px] text-white/20 uppercase tracking-widest shrink-0">
+              <span className="ff-body text-[10px] text-white/20 uppercase tracking-widest shrink-0">
                 {date}
               </span>
               <div className="flex-1 h-px bg-white/[0.04]" />

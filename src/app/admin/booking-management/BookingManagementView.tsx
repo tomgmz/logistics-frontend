@@ -634,7 +634,7 @@ export default function BookingManagementView() {
   const cargoItems: CargoItem[] = d?.booking_cargo_items ?? []
 
   return (
-    <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-hidden ff-body bg-[var(--color-bg)]">
+    <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-hidden ff-sc bg-[var(--color-bg)]">
 
       <ReusableModal
         open={approveModalOpen}

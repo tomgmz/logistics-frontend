@@ -86,11 +86,11 @@ export default function MessengerChatBubble({ conversationId, index }: Messenger
         </div>
 
         <div className="flex-1 min-w-0 text-left">
-          <p className="font-body text-xs text-white truncate">
+          <p className="ff-body text-xs text-white truncate">
             {participant.first_name} {participant.last_name}
           </p>
           {participant.is_online && (
-            <p className="font-body text-[9px] text-[var(--color-green)]">Active now</p>
+            <p className="ff-body text-[9px] text-[var(--color-green)]">Active now</p>
           )}
         </div>
 
@@ -130,14 +130,14 @@ export default function MessengerChatBubble({ conversationId, index }: Messenger
             " style={{ height: 270 }}>
               {groups.map(({ date, messages: groupMsgs }) => (
                 <div key={date} className="space-y-2">
-                  <p className="font-body text-[9px] text-white/18 text-center uppercase tracking-widest">{date}</p>
+                  <p className="ff-body text-[9px] text-white/18 text-center uppercase tracking-widest">{date}</p>
                   {groupMsgs.map(msg => {
                     const isMine = msg.sender_id === 'current'
                     return (
                       <div key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
                         <div className={`flex flex-col gap-0.5 max-w-[85%]`}>
                           <div className={`
-                            px-3 py-1.5 rounded-2xl font-body text-[11.5px] leading-relaxed break-words
+                            px-3 py-1.5 rounded-2xl ff-body text-[11.5px] leading-relaxed break-words
                             ${isMine
                               ? 'bg-[var(--color-cyan)] text-[var(--color-bg)] rounded-br-sm'
                               : 'glass-surface text-white border border-white/[0.06] rounded-bl-sm'
@@ -146,7 +146,7 @@ export default function MessengerChatBubble({ conversationId, index }: Messenger
                             {msg.body}
                           </div>
                           <div className={`flex items-center gap-1 ${isMine ? 'justify-end' : ''}`}>
-                            <span className="font-body text-[9px] text-white/18">
+                            <span className="ff-body text-[9px] text-white/18">
                               {formatMessageTime(msg.created_at)}
                             </span>
                             {isMine && (
@@ -174,7 +174,7 @@ export default function MessengerChatBubble({ conversationId, index }: Messenger
                 placeholder="Aa"
                 className="
                   flex-1 bg-white/[0.05] border border-white/[0.07] rounded-full
-                  px-3 py-1.5 font-body text-xs text-white placeholder:text-white/20
+                  px-3 py-1.5 ff-body text-xs text-white placeholder:text-white/20
                   focus:outline-none focus:border-[var(--color-cyan)]/30
                   transition-colors
                 "

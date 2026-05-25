@@ -51,13 +51,6 @@
 }
 
 @layer utilities {
-  .ff-body {
-    font-family: var(--font-alegreya), 'Alegreya Sans', sans-serif;
-  }
-
-  .font-body {
-    font-family: var(--font-alegreya-sans-sc), 'Alegreya Sans SC', sans-serif;
-  }
 
   .font-display {
     font-family: var(--font-eurostile), 'Eurostile Extended', 'Franklin Gothic Heavy', sans-serif;
@@ -95,46 +88,42 @@
     }
   }
 
-  /* ─── font-body ───────────────────────────────────────────────────────────────
-     Kept reasonable for UI forms. 1.5rem at lg was causing bloat on 150%-scaled
-     laptops (which report ~1280px logical width and land right on the lg breakpoint).
-  ─────────────────────────────────────────────────────────────────────────────── */
-  .font-body {
+  .ff-body {
     font-family: var(--font-alegreya), 'Alegreya Sans', sans-serif;
     font-size: 0.875rem;
   }
 
   .ff-sc {
-    font-family: var(--font-alegreya-sans-sc), 'Alegreya Sans SC', sans-serif;
+    font-family: var(--font-alegreya-sc), 'Alegreya Sans SC', sans-serif;
     font-size: 0.875rem;
   }
 
   @media (min-width: 640px) {
-    .font-body {
+    .ff-body {
       font-size: 0.875rem;
     }
   }
 
   @media (min-width: 768px) {
-    .font-body {
+    .ff-body {
       font-size: 1rem;
     }
   }
 
   @media (min-width: 1024px) {
-    .font-body {
+    .ff-body {
       font-size: 1rem;
     }
   }
 
   @media (min-width: 1280px) {
-    .font-body {
+    .ff-body {
       font-size: 1.125rem;
     }
   }
 
   @media (min-width: 1536px) {
-    .font-body {
+    .ff-body {
       font-size: 1.25rem;
     }
   }

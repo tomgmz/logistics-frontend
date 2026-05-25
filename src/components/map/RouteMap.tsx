@@ -87,7 +87,8 @@ function BookingListItem({
       )}
 
       <div className="flex justify-end mb-1">
-        <span className="ff-sc text-[11px] font-bold" style={{ color }}>{label}</span>
+        <span className=" text-[11px] font-bold" style={{ fontFamily: "var(--font-alegreya-sc), 'Alegreya Sans SC', sans-serif", color }}>{label}</span>
+        
       </div>
 
       <div className="flex items-center gap-1.5 mb-2">
@@ -117,9 +118,9 @@ function BookingListItem({
       </div>
 
       <div className="flex justify-between items-end">
-        <span className="ff-sc text-white text-[12px] truncate max-w-[50%]">{origin}</span>
+        <span className=" text-white text-[12px] truncate max-w-[50%]" style={{ fontFamily: "var(--font-alegreya-sc), 'Alegreya Sans SC', sans-serif" }}>{origin}</span>
         <div className="text-right">
-          <div className="ff-sc text-white text-[12px] truncate max-w-[100px]">{dest}</div>
+          <div className="text-white text-[12px] truncate max-w-[100px]" style={{ fontFamily: "var(--font-alegreya-sc), 'Alegreya Sans SC', sans-serif" }}>{dest}</div>
           <div className="text-[11px]" style={{ color: '#9f9c9c' }}>{booking.schedule_date}</div>
         </div>
       </div>
@@ -191,7 +192,7 @@ function EmptyMapState() {
         <LocalShippingIcon sx={{ fontSize: 64, color: 'var(--color-surface-dark)' }} />
       </motion.div>
       <div className="text-center">
-        <p className="ff-sc text-gray-600 text-lg font-bold">Select a booking to track</p>
+        <p className=" text-gray-600 text-lg font-bold" style={{ fontFamily: "var(--font-alegreya-sc), 'Alegreya Sans SC', sans-serif" }}>Select a booking to track</p>
         <p className="text-gray-700 text-sm mt-1">Choose a delivery from the list on the left</p>
       </div>
     </div>
@@ -485,8 +486,8 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
     <APIProvider apiKey={GOOGLE_MAPS_KEY} libraries={['routes']}>
 
       <div
-        className="hidden lg:flex h-screen overflow-hidden flex-col ff-body"
-        style={{ background: 'var(--color-bg)' }}
+        className="hidden lg:flex h-screen overflow-hidden flex-col"
+        style={{ fontFamily: "var(--font-alegreya-sc), 'Alegreya Sans SC', sans-serif", background: 'var(--color-bg)' }}
       >
         <div
           className="h-16 flex items-center justify-end px-6 flex-shrink-0 border-b"
@@ -556,8 +557,8 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
       </div>
 
       <div
-        className="hidden md:flex lg:hidden h-screen overflow-hidden flex-col ff-body"
-        style={{ background: 'var(--color-bg)' }}
+        className="hidden md:flex lg:hidden h-screen overflow-hidden flex-col"
+        style={{ fontFamily: "var(--font-alegreya-sc), 'Alegreya Sans SC', sans-serif", background: 'var(--color-bg)' }}
       >
         <div className="h-14 flex items-center justify-end px-4 flex-shrink-0 border-b"
           style={{ borderColor: 'var(--color-surface-dark)' }}>
@@ -590,8 +591,8 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
       </div>
 
       <div
-        className="flex md:hidden h-screen overflow-hidden flex-col ff-body"
-        style={{ background: 'var(--color-bg)' }}
+        className="flex md:hidden h-screen overflow-hidden flex-col"
+        style={{ fontFamily: "var(--font-alegreya-sc), 'Alegreya Sans SC', sans-serif",background: 'var(--color-bg)' }}
       >
         <div className="h-12 flex items-center justify-between px-4 flex-shrink-0 border-b"
           style={{ borderColor: 'var(--color-surface-dark)' }}>
@@ -613,10 +614,11 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
             <button
               key={key}
               onClick={() => setMobileView(key)}
-              className="flex-1 py-2.5 text-xs font-bold uppercase tracking-widest transition-colors border-b-2 ff-sc"
+              className="flex-1 py-2.5 text-xs font-bold uppercase tracking-widest transition-colors border-b-2"
               style={{
                 color:       mobileView === key ? 'var(--color-cyan)' : '#555',
                 borderColor: mobileView === key ? 'var(--color-cyan)' : 'transparent',
+                fontFamily: "var(--font-alegreya-sc), 'Alegreya Sans SC', sans-serif",
               }}
             >
               {key === 'list' ? 'Bookings' : 'Map'}

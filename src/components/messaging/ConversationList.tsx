@@ -37,7 +37,7 @@ export default function ConversationList({
             placeholder="Search conversations…"
             className="
               w-full bg-white/[0.04] border border-white/[0.07] rounded-xl
-              pl-9 pr-3 py-2.5 font-body text-sm text-white placeholder:text-white/20
+              pl-9 pr-3 py-2.5 ff-body text-sm text-white placeholder:text-white/20
               focus:outline-none focus:border-[var(--color-cyan)]/30 focus:bg-white/[0.06]
               transition-all
             "
@@ -56,7 +56,7 @@ export default function ConversationList({
         hover:[&::-webkit-scrollbar-thumb]:bg-white/20
       ">
         {conversations.length === 0 ? (
-          <p className="font-body text-white/20 text-xs text-center py-10">No conversations found</p>
+          <p className="ff-body text-white/20 text-xs text-center py-10">No conversations found</p>
         ) : (
           conversations.map((conv, i) => (
             <ConversationItem
@@ -117,18 +117,18 @@ function ConversationItem({ conv, index, isSelected, currentUserId, onSelect }: 
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2 mb-0.5">
-          <span className={`font-body text-[13px] truncate ${hasUnread ? 'text-white' : 'text-white/75'}`}>
+          <span className={`ff-body text-[13px] truncate ${hasUnread ? 'text-white' : 'text-white/75'}`}>
             {participant.first_name} {participant.last_name}
           </span>
           {lastMsg && (
-            <span className="font-body text-[10px] text-white/25 shrink-0">
+            <span className="ff-body text-[10px] text-white/25 shrink-0">
               {formatConversationTime(lastMsg.created_at)}
             </span>
           )}
         </div>
 
         <div className="flex items-center gap-1.5">
-          <p className={`font-body text-[11px] truncate flex-1 leading-snug ${hasUnread ? 'text-white/55' : 'text-white/28'}`}>
+          <p className={`ff-body text-[11px] truncate flex-1 leading-snug ${hasUnread ? 'text-white/55' : 'text-white/28'}`}>
             {isMyLastMsg && (
               <span className="text-[var(--color-cyan)]/50">You: </span>
             )}
@@ -136,7 +136,7 @@ function ConversationItem({ conv, index, isSelected, currentUserId, onSelect }: 
           </p>
           {hasUnread && (
             <span className="shrink-0 min-w-[18px] h-[18px] rounded-full bg-[var(--color-cyan)] flex items-center justify-center px-1">
-              <span className="font-body text-[9px] font-bold text-[var(--color-bg)] leading-none">
+              <span className="ff-body text-[9px] font-bold text-[var(--color-bg)] leading-none">
                 {conv.unread_count > 9 ? '9+' : conv.unread_count}
               </span>
             </span>

@@ -82,7 +82,7 @@ function EmptyState() {
         <p className="font-spartan text-white/50 text-xs tracking-[0.2em] uppercase">
           Select a conversation
         </p>
-        <p className="font-body text-white/20 text-xs">
+        <p className="ff-body text-white/20 text-xs">
           Choose from your list to start messaging
         </p>
       </div>

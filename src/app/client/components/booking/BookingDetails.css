@@ -1,5 +1,4 @@
 .booking-text {
-  font-family: var(--font-alegreya), 'Alegreya Sans', sans-serif;
   font-size: clamp(0.7rem, 1.1vw, 0.875rem);
 }
 

@@ -60,7 +60,7 @@ export default function MessageInput({ onSend, disabled }: MessageInputProps) {
             disabled={disabled}
             className="
               w-full bg-transparent px-3.5 py-3 pr-10
-              font-body text-sm text-white placeholder:text-white/25
+              ff-body text-sm text-white placeholder:text-white/25
               resize-none focus:outline-none
               overflow-y-auto
               [&::-webkit-scrollbar]:w-[3px]

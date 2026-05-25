@@ -75,7 +75,7 @@ export default function ReusableHeader({ sidebarOpen, onToggleSidebar }: Reusabl
                 animate={{ scale: 1 }}
                 className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 rounded-full bg-[var(--color-cyan)] flex items-center justify-center px-0.5"
               >
-                <span className="font-body text-[9px] font-bold text-[var(--color-bg)] leading-none">
+                <span className="ff-sc text-[9px] font-bold text-[var(--color-bg)] leading-none">
                   {totalUnread > 9 ? '9+' : totalUnread}
                 </span>
               </motion.span>

@@ -75,10 +75,10 @@ export default function MessengerFloatingPanel() {
               <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/25 pointer-events-none" />
               <input
                 type="text"
-                placeholder="Search Messenger"
+                placeholder="Search"
                 className="
                   w-full bg-white/[0.04] border border-white/[0.07] rounded-xl
-                  pl-9 pr-3 py-2 font-body text-xs text-white placeholder:text-white/20
+                  pl-9 pr-3 py-2 ff-body text-xs text-white placeholder:text-white/20
                   focus:outline-none focus:border-[var(--color-cyan)]/30
                   transition-colors
                 "
@@ -92,7 +92,7 @@ export default function MessengerFloatingPanel() {
                 key={tab}
                 type="button"
                 className={`
-                  font-body text-xs px-3 py-1 rounded-full transition-colors
+                  ff-body text-xs px-3 py-1 rounded-full transition-colors
                   ${i === 0
                     ? 'bg-[var(--color-cyan)]/12 text-[var(--color-cyan)] border border-[var(--color-cyan)]/20'
                     : 'text-white/40 hover:bg-white/5 hover:text-white/60'
@@ -127,7 +127,7 @@ export default function MessengerFloatingPanel() {
             <button
               type="button"
               onClick={handleOpenFullMessenger}
-              className="font-body text-[11px] text-[var(--color-cyan)]/60 hover:text-[var(--color-cyan)] transition-colors"
+              className="ff-body text-[11px] text-[var(--color-cyan)]/60 hover:text-[var(--color-cyan)] transition-colors"
             >
               See all →
             </button>
@@ -169,23 +169,23 @@ function PanelConversationItem({
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2">
-          <span className={`font-body text-[13px] truncate ${hasUnread ? 'text-white' : 'text-white/65'}`}>
+          <span className={`ff-body text-[13px] truncate ${hasUnread ? 'text-white' : 'text-white/65'}`}>
             {participant.first_name} {participant.last_name}
           </span>
           {lastMsg && (
-            <span className="font-body text-[10px] text-white/22 shrink-0">
+            <span className="ff-body text-[10px] text-white/22 shrink-0">
               {formatConversationTime(lastMsg.created_at)}
             </span>
           )}
         </div>
         <div className="flex items-center gap-1.5">
-          <p className={`font-body text-[11px] truncate flex-1 ${hasUnread ? 'text-white/55' : 'text-white/22'}`}>
+          <p className={`ff-body text-[11px] truncate flex-1 ${hasUnread ? 'text-white/55' : 'text-white/22'}`}>
             {isMyLastMsg && <span className="text-[var(--color-cyan)]/40">You: </span>}
             {lastMsg?.body ?? ''}
           </p>
           {hasUnread && (
             <span className="shrink-0 w-4 h-4 rounded-full bg-[var(--color-cyan)] flex items-center justify-center">
-              <span className="font-body text-[9px] font-bold text-[var(--color-bg)]">
+              <span className="ff-body text-[9px] font-bold text-[var(--color-bg)]">
                 {conv.unread_count > 9 ? '9+' : conv.unread_count}
               </span>
             </span>

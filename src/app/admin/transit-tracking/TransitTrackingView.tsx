@@ -26,6 +26,8 @@ import type { OptimizedStop, OptimizeRouteResponse } from '@/app/types/maps/rout
 const GOOGLE_MAPS_KEY    = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
 const GOOGLE_MAPS_MAP_ID = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID
 
+const SC = { fontFamily: "var(--font-alegreya-sc), 'Alegreya Sans SC', sans-serif" } as const
+
 const FILTERS = ['All', 'Active', 'Pending', 'Completed'] as const
 type FilterKey = (typeof FILTERS)[number]
 
@@ -101,7 +103,7 @@ function TransitBookingRow({
       )}
 
       <div className="flex justify-end mb-1">
-        <span className="ff-sc text-[11px] font-bold" style={{ color }}>{label}</span>
+        <span className="text-[11px] font-bold" style={{ ...SC, color }}>{label}</span>
       </div>
 
       <div className="flex items-center gap-1.5 mb-2">
@@ -128,9 +130,9 @@ function TransitBookingRow({
       </div>
 
       <div className="flex justify-between items-end gap-2">
-        <span className="ff-sc text-white text-[12px] truncate max-w-[50%]">{origin}</span>
+        <span className="text-white text-[12px] truncate max-w-[50%]" style={SC}>{origin}</span>
         <div className="text-right min-w-0">
-          <div className="ff-sc text-white text-[12px] truncate max-w-[120px]">{dest}</div>
+          <div className="text-white text-[12px] truncate max-w-[120px]" style={SC}>{dest}</div>
           <div className="text-[11px] text-white/45">{booking.schedule_date}</div>
         </div>
       </div>
@@ -222,9 +224,9 @@ export default function TransitTrackingView() {
   const detailLoading   = useAppSelector((s) => s.routeMap.detailLoading)
   const detailError     = useAppSelector((s) => s.routeMap.detailError)
 
-  const [search,       setSearch]       = useState('')
-  const [activeFilter, setActiveFilter] = useState<FilterKey>('Active')
-  const [detailOpen,   setDetailOpen]   = useState(true)
+  const [search,        setSearch]        = useState('')
+  const [activeFilter,  setActiveFilter]  = useState<FilterKey>('Active')
+  const [detailOpen,    setDetailOpen]    = useState(true)
   const [totalDuration, setTotalDuration] = useState(0)
 
   const loadBookings = useCallback(() => {
@@ -331,7 +333,7 @@ export default function TransitTrackingView() {
 
   return (
     <APIProvider apiKey={GOOGLE_MAPS_KEY} libraries={['routes']}>
-      <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-hidden ff-body">
+      <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-hidden" style={SC}>
         <header className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 py-3 border-b border-white/[0.07] bg-[var(--color-bg)]">
           <div>
             <h1 className="text-lg font-bold text-white tracking-tight">Transit tracking</h1>
