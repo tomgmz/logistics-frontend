@@ -55,7 +55,7 @@
     font-family: var(--font-alegreya), 'Alegreya Sans', sans-serif;
   }
 
-  .ff-sc {
+  .font-body {
     font-family: var(--font-alegreya-sans-sc), 'Alegreya Sans SC', sans-serif;
   }
 
@@ -104,6 +104,11 @@
     font-size: 0.875rem;
   }
 
+  .ff-sc {
+    font-family: var(--font-alegreya-sans-sc), 'Alegreya Sans SC', sans-serif;
+    font-size: 0.875rem;
+  }
+
   @media (min-width: 640px) {
     .font-body {
       font-size: 0.875rem;
@@ -130,6 +135,36 @@
 
   @media (min-width: 1536px) {
     .font-body {
+      font-size: 1.25rem;
+    }
+  }
+
+    @media (min-width: 640px) {
+    .ff-sc {
+      font-size: 0.875rem;
+    }
+  }
+
+  @media (min-width: 768px) {
+    .ff-sc {
+      font-size: 1rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .ff-sc {
+      font-size: 1rem;
+    }
+  }
+
+  @media (min-width: 1280px) {
+    .ff-sc {
+      font-size: 1.125rem;
+    }
+  }
+
+  @media (min-width: 1536px) {
+    .ff-sc {
       font-size: 1.25rem;
     }
   }

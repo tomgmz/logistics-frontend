@@ -18,7 +18,7 @@ export default function AboutSection() {
           initial={{ opacity: 0, y: 20 }}
           animate={inView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6 }}
-          className="font-body text-white leading-relaxed tracking-wide"
+          className="ff-sc text-white leading-relaxed tracking-wide"
         >
           Discover powerful tools for fast, transparent, and reliable logistics.
           Manage every step with ease and confidence.
@@ -147,7 +147,7 @@ export default function AboutSection() {
           transition={{ duration: 0.6, delay: 0.18 }}
           className="relative z-30 max-w-[26%] min-w-[240px] pt-4"
         >
-          <p className="font-body text-white leading-relaxed tracking-wide">
+          <p className="ff-sc text-white leading-relaxed tracking-wide">
             Discover powerful tools for fast, transparent, and reliable logistics.
             Manage every step with ease and confidence.
           </p>

@@ -53,7 +53,7 @@ export default function BookingWizard() {
                       px-4 lg:px-6 h-auto py-3 lg:py-0 lg:h-[62px]
                       grid grid-cols-[1fr_auto_1fr] items-center gap-4">
 
-        <h1 className="font-body booking-text text-white text-base lg:text-xl tracking-wider whitespace-nowrap">
+        <h1 className="ff-sc booking-text text-white text-base lg:text-xl tracking-wider whitespace-nowrap">
           New Booking
           {service && (
             <>
@@ -86,7 +86,7 @@ export default function BookingWizard() {
           ))}
         </div>
 
-        <span className="sm:hidden justify-self-end font-body text-sm whitespace-nowrap text-white">
+        <span className="sm:hidden justify-self-end ff-sc text-sm whitespace-nowrap text-white">
           {STEPS.find((s) => s.id === step)?.label}
         </span>
 
@@ -161,7 +161,7 @@ function StepPip({
           </span>
         )}
       </motion.div>
-      <span className={`font-body booking-text text-xs lg:text-sm transition-colors whitespace-nowrap
+      <span className={`ff-sc booking-text text-xs lg:text-sm transition-colors whitespace-nowrap
         ${isActive ? 'text-white' : isDone ? 'text-[var(--color-cyan)]' : 'text-[var(--color-muted)]'}`}>
         {step.label}
       </span>

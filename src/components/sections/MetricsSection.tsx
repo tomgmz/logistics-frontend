@@ -97,7 +97,7 @@ export default function MetricsSection() {
           initial={{ opacity: 0, y: 20 }}
           animate={inView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6, delay: 0.12 }}
-          className="font-body text-[#818181]
+          className="ff-sc text-[#818181]
             text-center max-w-2xl mx-auto mb-10 sm:mb-14 md:mb-16 tracking-wide leading-relaxed"
         >
           See how our logistics solutions deliver speed, reliability, and satisfaction for every shipment.

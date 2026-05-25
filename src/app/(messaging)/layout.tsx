@@ -2,14 +2,13 @@
 
 import { ReactNode, useEffect } from 'react'
 import { useAuthStore } from '@/lib/store/auth.store'
-import ReusableDashboardShell from '@/components/layout/ReusableDashboardShell'
-import { NAV_ITEMS_BY_ROLE } from '@/lib/config/nav.config'
+import ReusableHeader from '@/components/layout/ReusableHeader'
+import { useState } from 'react'
 
 export default function MessagingLayout({ children }: { children: ReactNode }) {
   const user = useAuthStore(s => s.user)
   const hasHydrated = useAuthStore(s => s.hasHydrated)
-
-  console.log('MessagingLayout:', { hasHydrated, user })
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   useEffect(() => {
     if (!hasHydrated) return
@@ -20,11 +19,18 @@ export default function MessagingLayout({ children }: { children: ReactNode }) {
     return <div className="min-h-screen bg-[#0a0a0a]" />
   }
 
-  const navItems = NAV_ITEMS_BY_ROLE[user.role] ?? []
-
   return (
-    <ReusableDashboardShell navItems={navItems}>
-      {children}
-    </ReusableDashboardShell>
+    <div
+      className="flex flex-col bg-[var(--color-bg)] overflow-hidden"
+      style={{ height: '100dvh' }}
+    >
+      <ReusableHeader
+        sidebarOpen={sidebarOpen}
+        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+      />
+      <main className="flex flex-1 min-h-0 overflow-hidden">
+        {children}
+      </main>
+    </div>
   )
 }

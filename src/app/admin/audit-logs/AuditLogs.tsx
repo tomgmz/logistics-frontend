@@ -131,12 +131,12 @@ export default function AuditLogsPage() {
               placeholder="Search actions or descriptions…"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="flex-1 min-w-[180px] bg-[#2a2a2a]/60 border border-[#424242] rounded-lg px-3 py-2 text-sm text-white placeholder-[#818181] outline-none focus:border-[#4df9ed] focus:ring-1 focus:ring-[#4df9ed]/20 transition-colors font-body"
+              className="flex-1 min-w-[180px] bg-[#2a2a2a]/60 border border-[#424242] rounded-lg px-3 py-2 text-sm text-white placeholder-[#818181] outline-none focus:border-[#4df9ed] focus:ring-1 focus:ring-[#4df9ed]/20 transition-colors ff-sc"
             />
             <select
               value={logType}
               onChange={e => setLogType(e.target.value as LogType | '')}
-              className="bg-[#2a2a2a]/60 border border-[#424242] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-[#4df9ed] cursor-pointer font-body"
+              className="bg-[#2a2a2a]/60 border border-[#424242] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-[#4df9ed] cursor-pointer ff-sc"
             >
               <option value="">All Types</option>
               <option value="user_activity">User Activity</option>
@@ -149,7 +149,7 @@ export default function AuditLogsPage() {
             <select
               value={sort}
               onChange={e => setSort(e.target.value as 'asc' | 'desc')}
-              className="bg-[#2a2a2a]/60 border border-[#424242] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-[#4df9ed] cursor-pointer font-body"
+              className="bg-[#2a2a2a]/60 border border-[#424242] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-[#4df9ed] cursor-pointer ff-sc"
             >
               <option value="desc">Newest First</option>
               <option value="asc">Oldest First</option>

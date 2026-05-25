@@ -35,7 +35,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       lang="en" 
       className={cn("scroll-smooth", alegreyaSansSC.variable, alegreyaSans.variable, aboreto.variable, fredoka.variable, leagueSpartan.variable, eurostile.variable, "font-sans", geist.variable)}
     >
-      <body suppressHydrationWarning className={`bg-[#0a0a0a] text-white overflow-x-hidden ${alegreyaSans.className}`}>
+      <body suppressHydrationWarning className={`bg-[#0a0a0a] text-white overflow-x-hidden ${alegreyaSansSC.className}`}>
         <CsrfInit />
         <StoreProvider>
           <AuthRehydrator />

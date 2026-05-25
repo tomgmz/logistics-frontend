@@ -166,7 +166,7 @@
 //       type={type}
 //       disabled={loading || disabled}
 //       onClick={onClick}
-//       className="w-full mt-2 py-4 font-body tracking-[0.2em] uppercase !text-[0.82rem]
+//       className="w-full mt-2 py-4 ff-sc tracking-[0.2em] uppercase !text-[0.82rem]
 //         rounded-2xl transition-all duration-200 cursor-pointer
 //         hover:bg-[#e0e0e0] active:scale-[0.98]
 //         disabled:opacity-40 disabled:cursor-not-allowed"
@@ -1162,7 +1162,7 @@
 //                 </button>
 
 //                 <div className="mb-10">
-//                   <h2 className="text-white font-body tracking-[0.15em] uppercase leading-tight">
+//                   <h2 className="text-white ff-sc tracking-[0.15em] uppercase leading-tight">
 //                     Sign In Your Account
 //                   </h2>
 
@@ -1402,7 +1402,7 @@ function PrimaryButton({
       type={type}
       disabled={loading || disabled}
       onClick={onClick}
-      className="w-full mt-2 py-4 font-body tracking-[0.2em] uppercase !text-[0.82rem]
+      className="w-full mt-2 py-4 ff-sc tracking-[0.2em] uppercase !text-[0.82rem]
         rounded-2xl transition-all duration-200 cursor-pointer
         hover:bg-[#e0e0e0] active:scale-[0.98]
         disabled:opacity-40 disabled:cursor-not-allowed"
@@ -2423,7 +2423,7 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
                 </button>
 
                 <div className="mb-10">
-                  <h2 className="text-white font-body tracking-[0.15em] uppercase leading-tight">
+                  <h2 className="text-white ff-sc tracking-[0.15em] uppercase leading-tight">
                     Sign In Your Account
                   </h2>
 

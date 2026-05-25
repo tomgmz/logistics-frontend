@@ -100,12 +100,12 @@ export default function Sidebar() {
                 transition={{ duration: 0.2 }}
                 className="overflow-hidden"
               >
-                <p className="font-body sm:!text-[0.8rem] md:!text-[0.9rem] lg:!text-[1.1rem] text-white whitespace-nowrap">
+                <p className="ff-sc sm:!text-[0.8rem] md:!text-[0.9rem] lg:!text-[1.1rem] text-white whitespace-nowrap">
                   {user?.first_name && user?.last_name
                     ? `${user.first_name} ${user.last_name}`
                     : user?.email ?? 'User'}
                 </p>
-                <p className="font-body sm:!text-[0.8rem] md:!text-[0.9rem] lg:!text-[1.1rem] text-white/40 whitespace-nowrap capitalize">
+                <p className="ff-sc sm:!text-[0.8rem] md:!text-[0.9rem] lg:!text-[1.1rem] text-white/40 whitespace-nowrap capitalize">
                   {user?.role ?? ''}
                 </p>
               </motion.div>
@@ -139,7 +139,7 @@ export default function Sidebar() {
                 <motion.span
                   animate={{ opacity: sidebarOpen ? 1 : 0, width: sidebarOpen ? 'auto' : 0 }}
                   transition={{ duration: 0.2 }}
-                  className="font-body booking-text text-[15px] whitespace-nowrap overflow-hidden"
+                  className="ff-sc booking-text text-[15px] whitespace-nowrap overflow-hidden"
                 >
                   Sign out
                 </motion.span>
@@ -210,7 +210,7 @@ function NavItem({ item, isActive, index, expanded, onNavigate }: NavItemProps) 
         <motion.span
           animate={{ opacity: expanded ? 1 : 0, width: expanded ? 'auto' : 0 }}
           transition={{ duration: 0.2 }}
-          className="relative z-10 font-body booking-text text-[15px] whitespace-nowrap overflow-hidden"
+          className="relative z-10 ff-sc booking-text text-[15px] whitespace-nowrap overflow-hidden"
         >
           {item.label}
         </motion.span>

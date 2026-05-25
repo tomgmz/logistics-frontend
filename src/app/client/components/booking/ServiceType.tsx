@@ -35,10 +35,10 @@ export default function StepServiceType({ selected, setSelected, onNext }: Props
 
       {/* Heading */}
       <motion.div variants={stagger} initial="hidden" animate="show" className="mb-7 lg:mb-10 self-start">
-        <motion.h2 variants={fadeUp} className="font-body text-white text-2xl lg:text-4xl mb-1 lg:mb-2">
+        <motion.h2 variants={fadeUp} className="ff-sc text-white text-2xl lg:text-4xl mb-1 lg:mb-2">
           SELECT SERVICE TYPE
         </motion.h2>
-        <motion.p variants={fadeUp} className="font-body sm:!text-lg text-[var(--color-muted)]">
+        <motion.p variants={fadeUp} className="ff-sc sm:!text-lg text-[var(--color-muted)]">
           Choose the delivery method for this booking
         </motion.p>
       </motion.div>
@@ -77,10 +77,10 @@ export default function StepServiceType({ selected, setSelected, onNext }: Props
                 {/* Body */}
                 <div className="flex-1 p-4 lg:p-5 flex flex-col justify-between">
                   <div>
-                    <h3 className={`font-body text-xl lg:text-2xl mb-1.5 ${isSelected ? 'text-[var(--color-bg)]' : 'text-white'}`}>
+                    <h3 className={`ff-sc text-xl lg:text-2xl mb-1.5 ${isSelected ? 'text-[var(--color-bg)]' : 'text-white'}`}>
                       {svc.title}
                     </h3>
-                    <p className="font-body sm:!text-lg text-[var(--color-muted)] leading-snug text-sm lg:text-base">
+                    <p className="ff-sc sm:!text-lg text-[var(--color-muted)] leading-snug text-sm lg:text-base">
                       {svc.description}
                     </p>
                   </div>
@@ -101,7 +101,7 @@ export default function StepServiceType({ selected, setSelected, onNext }: Props
                       whileTap={{ scale: 0.95 }}
                       className="flex items-center gap-2 px-4 py-2 rounded-xl
                                  bg-[var(--color-cyan)] text-[var(--color-bg)]
-                                 font-body text-sm lg:text-base font-semibold
+                                 ff-sc text-sm lg:text-base font-semibold
                                  shadow-[0_0_16px_rgba(77,249,237,0.35)] cursor-pointer"
                     >
                       Proceed <ArrowRight size={15} strokeWidth={2.5} />

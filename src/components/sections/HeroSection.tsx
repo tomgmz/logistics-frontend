@@ -26,7 +26,7 @@ export default function HeroSection() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.1 }}
-          className="font-body text-[#9f9c9c] mb-2 tracking-wide justify-center sm:justify-start"
+          className="ff-sc text-[#9f9c9c] mb-2 tracking-wide justify-center sm:justify-start"
         >
           Premium logistics. Industrial precision.
         </motion.p>
@@ -63,7 +63,7 @@ export default function HeroSection() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.5 }}
-          className="font-body text-white max-w-[90%] sm:max-w-xl md:max-w-2xl lg:max-w-3xl leading-relaxed mb-8 sm:mb-10 tracking-wide justify-self-center sm:justify-self-start"
+          className="ff-sc text-white max-w-[90%] sm:max-w-xl md:max-w-2xl lg:max-w-3xl leading-relaxed mb-8 sm:mb-10 tracking-wide justify-self-center sm:justify-self-start"
         >
           Book, track, and manage deliveries in one place. Real-time updates,
           seamless booking, and efficient support for all your logistics needs.
@@ -77,7 +77,7 @@ export default function HeroSection() {
         >
           <a
             href="#contact"
-            className="font-body glass border border-white/30 text-white px-5 sm:px-8 py-3 sm:py-4 rounded-[12px] sm:rounded-[15px]
+            className="ff-sc glass border border-white/30 text-white px-5 sm:px-8 py-3 sm:py-4 rounded-[12px] sm:rounded-[15px]
              text-sm sm:text-sm md:text-base lg:text-xl tracking-wider
               hover:bg-white/[0.15] hover:border-white/60 transition-all duration-300 no-underline inline-block"
           >

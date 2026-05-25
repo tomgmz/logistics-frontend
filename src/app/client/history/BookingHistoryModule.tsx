@@ -263,7 +263,7 @@ function SectionHeader({ icon, title }: { icon: React.ReactNode; title: string }
   return (
     <div className="flex items-center gap-2">
       <span className="text-white">{icon}</span>
-      <h3 className="font-body text-white font-bold tracking-wide text-sm">{title}</h3>
+      <h3 className="ff-sc text-white font-bold tracking-wide text-sm">{title}</h3>
     </div>
   )
 }

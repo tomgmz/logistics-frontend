@@ -94,10 +94,6 @@ export default function MessageInput({ onSend, disabled }: MessageInputProps) {
           <Send size={14} />
         </motion.button>
       </div>
-
-      <p className="font-body text-[10px] text-white/[0.12] text-center mt-1.5">
-        Shift + Enter for new line
-      </p>
     </div>
   )
 }

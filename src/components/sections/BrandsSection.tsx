@@ -71,7 +71,7 @@ export default function BrandsSection() {
               WITH US
             </h2>
 
-            <p className="font-body text-[#818181] leading-relaxed
+            <p className="ff-sc text-[#818181] leading-relaxed
               tracking-wide max-w-[340px] mb-10">
               Move nationwide with unmatched precision
             </p>

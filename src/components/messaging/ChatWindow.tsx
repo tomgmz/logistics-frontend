@@ -68,7 +68,7 @@ export default function ChatWindow({ conversation, messages, currentUserId, onBa
           </p>
           <p className="font-body text-[11px] leading-tight">
             {participant.is_online
-              ? <span className="text-[var(--color-green)]">● Active now</span>
+              ? <span className="text-[var(--color-green)]">Active now</span>
               : <span className="text-[var(--color-muted)] capitalize">{participant.role.replace(/_/g, ' ')}</span>
             }
           </p>

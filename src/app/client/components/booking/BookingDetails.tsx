@@ -305,7 +305,7 @@ function DatePickerPopup({
                 className="p-1 rounded hover:bg-white/10 transition-colors cursor-pointer text-white/60 hover:text-white">
                 <ChevronLeft size={15} />
               </button>
-              <span className="font-body text-xs font-bold text-white tracking-wider">
+              <span className="ff-sc text-xs font-bold text-white tracking-wider">
                 {MONTHS[viewMonth]} {viewYear}
               </span>
               <button type="button" onClick={nextMonth}
@@ -316,7 +316,7 @@ function DatePickerPopup({
 
             <div className="grid grid-cols-7 mb-1">
               {DOW.map(d => (
-                <div key={d} className="text-center font-body text-[10px] text-white/30 py-0.5">{d}</div>
+                <div key={d} className="text-center ff-sc text-[10px] text-white/30 py-0.5">{d}</div>
               ))}
             </div>
 
@@ -333,7 +333,7 @@ function DatePickerPopup({
                     type="button"
                     disabled={disabled}
                     onClick={() => selectDay(d)}
-                    className="h-8 w-full flex items-center justify-center rounded-md text-xs font-body
+                    className="h-8 w-full flex items-center justify-center rounded-md text-xs ff-sc
                                transition-all cursor-pointer"
                     style={{
                       background:  isSelected ? CYAN : isToday ? 'rgba(77,249,237,0.12)' : 'transparent',
@@ -358,7 +358,7 @@ function DatePickerPopup({
                   onChange(toDateStr(todayY, todayM, todayD))
                   setOpen(false)
                 }}
-                className="font-body text-xs cursor-pointer transition-colors"
+                className="ff-sc text-xs cursor-pointer transition-colors"
                 style={{ color: CYAN }}
               >
                 Today
@@ -440,7 +440,7 @@ function TimePickerPopup({
             }}
           >
             <div className="px-3 py-2 border-b border-white/[0.07]">
-              <span className="font-body text-[10px] text-white/40 uppercase tracking-widest">
+              <span className="ff-sc text-[10px] text-white/40 uppercase tracking-widest">
                 Select Time
               </span>
             </div>
@@ -452,7 +452,7 @@ function TimePickerPopup({
                     key={slot}
                     type="button"
                     onClick={() => { onChange(slot); setOpen(false) }}
-                    className="flex items-center justify-between px-4 py-2 text-sm font-body
+                    className="flex items-center justify-between px-4 py-2 text-sm ff-sc
                                transition-colors cursor-pointer text-left"
                     style={{
                       background: selected ? `${CYAN}1A` : 'transparent',
@@ -673,7 +673,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
             <SectionHeader icon={<CalendarDays size={16} />} title="Transit Schedule" />
 
             <div className="flex flex-col gap-1">
-              <span className="font-body booking-text text-xs">Date<Req /></span>
+              <span className="ff-sc booking-text text-xs">Date<Req /></span>
               <DatePickerPopup
                 value={date}
                 onChange={(v) => dispatch(setDate(v))}
@@ -683,7 +683,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
             </div>
 
             <div className="flex flex-col gap-1">
-              <span className="font-body booking-text text-xs">Time<Req /></span>
+              <span className="ff-sc booking-text text-xs">Time<Req /></span>
               <TimePickerPopup
                 value={time}
                 onChange={(v) => dispatch(setTime(v))}
@@ -742,7 +742,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
               ))}
               {dropoffs.length < 3 && (
                 <button onClick={handleAddDropoff}
-                  className="flex items-center gap-1 text-[var(--color-cyan)] font-body booking-text
+                  className="flex items-center gap-1 text-[var(--color-cyan)] ff-sc booking-text
                              text-xs mt-1 hover:opacity-80 transition-opacity cursor-pointer w-fit">
                   <Plus size={13} /> Add drop-off
                 </button>
@@ -805,7 +805,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
           <div className="flex items-center gap-6 border-b border-white/[0.07]">
             {(['loose', 'palletized'] as CargoMode[]).map((m) => (
               <button key={m} onClick={() => dispatch(setMode(m))}
-                className={`pb-2 font-body booking-text text-sm capitalize transition-colors cursor-pointer
+                className={`pb-2 ff-sc booking-text text-sm capitalize transition-colors cursor-pointer
                   ${mode === m ? 'text-white border-b-2 border-white -mb-px' : 'text-[var(--color-muted)] hover:text-white'}`}>
                 {m.charAt(0).toUpperCase() + m.slice(1)}
               </button>
@@ -837,7 +837,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                     <div className="flex flex-col gap-1">
                       <div className="flex items-center gap-2">
                         <MapPin size={13} className="text-white/40 shrink-0" />
-                        <span className="font-body booking-text text-sm text-white/80 truncate">{dropoffLabel}</span>
+                        <span className="ff-sc booking-text text-sm text-white/80 truncate">{dropoffLabel}</span>
                       </div>
                       <div className="border-b border-white/[0.12] w-full" />
                     </div>
@@ -854,7 +854,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                               className="bg-[#424242] rounded-xl p-3 lg:p-4 border border-white/[0.07]"
                             >
                               <div className="flex items-center justify-between mb-3">
-                                <span className="font-body booking-text text-sm font-bold text-[var(--color-cyan)]">
+                                <span className="ff-sc booking-text text-sm font-bold text-[var(--color-cyan)]">
                                   Product #{idx + 1}
                                 </span>
                                 {idx > 0 && (
@@ -881,7 +881,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                               {mode === 'loose' && (
                                 <div className="grid grid-cols-[90px_1fr] gap-x-2 gap-y-3 lg:flex lg:items-start lg:gap-2">
                                   <div className="flex flex-col gap-1">
-                                    <label className="font-body booking-text text-xs whitespace-nowrap">Pieces<Req /></label>
+                                    <label className="ff-sc booking-text text-xs whitespace-nowrap">Pieces<Req /></label>
                                     <TextField value={g.pieces}
                                       onChange={(e) => handleUpdateGroup(section.dropoffIndex, g.id, { pieces: e.target.value })}
                                       placeholder="0" variant="outlined" error={!!gErr.pieces}
@@ -890,7 +890,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                                   </div>
 
                                   <div className="flex flex-col gap-1 min-w-0">
-                                    <label className="font-body booking-text text-xs whitespace-nowrap">
+                                    <label className="ff-sc booking-text text-xs whitespace-nowrap">
                                       Dimensions <span className="text-white/20">(cm)</span><Req />
                                     </label>
                                     <div className="flex gap-1.5">
@@ -908,7 +908,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                                   </div>
 
                                   <div className="flex flex-col gap-1 col-span-2 lg:col-span-1 lg:shrink-0">
-                                    <label className="font-body booking-text text-xs whitespace-nowrap">Weight<Req /></label>
+                                    <label className="ff-sc booking-text text-xs whitespace-nowrap">Weight<Req /></label>
                                     <div className="flex gap-1.5">
                                       <div className="flex flex-col gap-0.5">
                                         <TextField value={g.weight}
@@ -948,7 +948,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                               {mode === 'palletized' && (
                                 <div className="flex flex-wrap items-start gap-2">
                                   <div className="flex flex-col gap-1 w-full sm:w-[140px]">
-                                    <label className="font-body booking-text text-xs whitespace-nowrap">No. of Pallets<Req /></label>
+                                    <label className="ff-sc booking-text text-xs whitespace-nowrap">No. of Pallets<Req /></label>
                                     <TextField fullWidth value={g.numPallets}
                                       onChange={(e) => handleUpdateGroup(section.dropoffIndex, g.id, { numPallets: e.target.value })}
                                       placeholder="0" variant="outlined" error={!!gErr.numPallets}
@@ -957,7 +957,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                                   </div>
 
                                   <div className="flex flex-col gap-1 w-full sm:w-[180px]">
-                                    <label className="font-body booking-text text-xs whitespace-nowrap">Pallet Type</label>
+                                    <label className="ff-sc booking-text text-xs whitespace-nowrap">Pallet Type</label>
                                     <Select value={g.palletType}
                                       onChange={(e: SelectChangeEvent) => {
                                         const type = e.target.value as ItemGroup['palletType']
@@ -972,7 +972,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                                   </div>
 
                                   <div className="flex flex-col gap-1 w-full min-w-[220px] flex-1">
-                                    <label className="font-body booking-text text-xs whitespace-nowrap">
+                                    <label className="ff-sc booking-text text-xs whitespace-nowrap">
                                       Dimensions <span className="text-white/20">(cm)</span><Req />
                                     </label>
                                     <div className="flex gap-1.5 items-start">
@@ -999,7 +999,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                                   </div>
 
                                   <div className="flex flex-col gap-1 w-full sm:w-[180px]">
-                                    <label className="font-body booking-text text-xs whitespace-nowrap">Gross weight / pallet<Req /></label>
+                                    <label className="ff-sc booking-text text-xs whitespace-nowrap">Gross weight / pallet<Req /></label>
                                     <div className="relative inline-flex">
                                       <TextField fullWidth value={g.grossWeightPerPallet}
                                         onChange={(e) => handleUpdateGroup(section.dropoffIndex, g.id, { grossWeightPerPallet: e.target.value })}
@@ -1019,7 +1019,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                                   </div>
 
                                   <div className="flex flex-col gap-1 w-full sm:w-[180px]">
-                                    <label className="font-body booking-text text-xs whitespace-nowrap">Net weight / pallet<Req /></label>
+                                    <label className="ff-sc booking-text text-xs whitespace-nowrap">Net weight / pallet<Req /></label>
                                     <div className="relative inline-flex">
                                       <TextField fullWidth value={g.netWeightPerPallet}
                                         onChange={(e) => handleUpdateGroup(section.dropoffIndex, g.id, { netWeightPerPallet: e.target.value })}
@@ -1060,7 +1060,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                                         onChange={(v) => handleUpdateGroup(section.dropoffIndex, g.id, { oversize: v })}
                                         label="Oversize" />
                                       {g.oversize && (
-                                        <span className="font-body booking-text text-xs text-[var(--color-cyan)]">
+                                        <span className="ff-sc booking-text text-xs text-[var(--color-cyan)]">
                                           Oversize may incur extra charges
                                         </span>
                                       )}
@@ -1076,7 +1076,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                       <motion.button onClick={() => handleAddGroup(section.dropoffIndex)}
                         whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
                         className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-white/10
-                                   font-body booking-text text-sm text-white/50 hover:border-white/20 hover:text-white/80
+                                   ff-sc booking-text text-sm text-white/50 hover:border-white/20 hover:text-white/80
                                    transition-all cursor-pointer">
                         Add another product
                       </motion.button>
@@ -1093,7 +1093,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
         >
           <SectionHeader icon={<File size={16} />} title="Transaction Summary" />
 
-          <p className="font-body booking-text text-sm text-white/80">
+          <p className="ff-sc booking-text text-sm text-white/80">
             Upload your transaction summary here — files will be attached when your booking is confirmed.
           </p>
 
@@ -1119,12 +1119,12 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
           >
             <Upload size={24} style={{ color: isDragging ? CYAN : 'rgba(255,255,255,0.4)' }} />
             <div className="flex items-center gap-1 text-sm">
-              <span className="font-body booking-text" style={{ color: CYAN, textDecoration: 'underline', textUnderlineOffset: 3 }}>
+              <span className="ff-sc booking-text" style={{ color: CYAN, textDecoration: 'underline', textUnderlineOffset: 3 }}>
                 Click to browse
               </span>
-              <span className="font-body booking-text text-white/80">or drag and drop</span>
+              <span className="ff-sc booking-text text-white/80">or drag and drop</span>
             </div>
-            <p className="font-body booking-text text-xs text-white/50 text-center">
+            <p className="ff-sc booking-text text-xs text-white/50 text-center">
               .pdf, .docx, or .xlsx · max 10 MB each · up to 3 files
             </p>
             <input
@@ -1140,12 +1140,12 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
             />
           </div>
 
-          {docError && <p className="font-body booking-text text-xs text-red-400">{docError}</p>}
+          {docError && <p className="ff-sc booking-text text-xs text-red-400">{docError}</p>}
           {touched && rawErrors.documents && !docError && (
-            <p className="font-body booking-text text-xs text-red-400">{rawErrors.documents}</p>
+            <p className="ff-sc booking-text text-xs text-red-400">{rawErrors.documents}</p>
           )}
           {files.length >= MAX_DOC_COUNT && (
-            <p className="font-body booking-text text-xs text-white/40 text-center">
+            <p className="ff-sc booking-text text-xs text-white/40 text-center">
               Maximum of {MAX_DOC_COUNT} files reached
             </p>
           )}
@@ -1160,8 +1160,8 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                   <div className="flex items-center gap-2 flex-1 min-w-0 mr-2">
                     <File size={13} className="text-white/40 shrink-0" />
                     <div className="flex flex-col flex-1 min-w-0">
-                      <span className="font-body booking-text text-xs text-white/80 truncate">{file.name}</span>
-                      <span className="font-body booking-text text-[10px] text-white/40">
+                      <span className="ff-sc booking-text text-xs text-white/80 truncate">{file.name}</span>
+                      <span className="ff-sc booking-text text-[10px] text-white/40">
                         {formatBytes(file.size)} · queued for upload
                       </span>
                     </div>
@@ -1176,7 +1176,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
           )}
 
           {files.length > 0 && (
-            <p className="font-body booking-text text-xs text-white/30 flex items-center gap-1.5">
+            <p className="ff-sc booking-text text-xs text-white/30 flex items-center gap-1.5">
               <Check size={11} className="text-[var(--color-cyan)]" />
               {files.length} file{files.length !== 1 ? 's' : ''} will be uploaded when you confirm your booking
             </p>
@@ -1187,7 +1187,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
           className="bg-[#2A2828] rounded-md border border-white/[0.07] p-4 flex flex-col gap-4"
         >
           <SectionHeader icon={<CreditCard size={16} />} title="Payment Terms" />
-          <p className="font-body booking-text text-sm text-white/80">Select your payment terms</p>
+          <p className="ff-sc booking-text text-sm text-white/80">Select your payment terms</p>
           <Select
             value={paymentTerms}
             onChange={(e: SelectChangeEvent) => dispatch(setPaymentTerms(e.target.value))}
@@ -1215,7 +1215,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
             <span className="pill-cyan !rounded-sm !bg-[#4DF9ED] !text-black w-fit uppercase tracking-widest">
               {mode} Cargo
             </span>
-            <p className="font-body booking-text text-[11px] lg:!text-[0.9rem] uppercase tracking-[0.15em]">
+            <p className="ff-sc booking-text text-[11px] lg:!text-[0.9rem] uppercase tracking-[0.15em]">
               {summary.totalPieces > 0
                 ? mode === 'palletized'
                   ? `${summary.totalPieces} pallet${summary.totalPieces !== 1 ? 's' : ''} across ${allGroups.length} group${allGroups.length !== 1 ? 's' : ''}`
@@ -1238,19 +1238,19 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
             {mode === 'loose' ? (
               <>
                 {allGroups.some((g) => g.nonTiltable) && (
-                  <p className="font-body booking-text text-[11px] lg:!text-[1rem] uppercase tracking-[0.12em]">· Non-tiltable items present</p>
+                  <p className="ff-sc booking-text text-[11px] lg:!text-[1rem] uppercase tracking-[0.12em]">· Non-tiltable items present</p>
                 )}
                 {allGroups.some((g) => g.nonStackable) && (
-                  <p className="font-body booking-text text-[11px] lg:!text-[1rem] uppercase tracking-[0.12em]">· Non-stackable items present</p>
+                  <p className="ff-sc booking-text text-[11px] lg:!text-[1rem] uppercase tracking-[0.12em]">· Non-stackable items present</p>
                 )}
               </>
             ) : (
               <>
                 {allGroups.some((g) => g.stackable) && (
-                  <p className="font-body booking-text text-[11px] lg:!text-[1rem] uppercase tracking-[0.12em]">· Stackable pallets</p>
+                  <p className="ff-sc booking-text text-[11px] lg:!text-[1rem] uppercase tracking-[0.12em]">· Stackable pallets</p>
                 )}
                 {allGroups.some((g) => g.oversize) && (
-                  <p className="font-body booking-text text-[11px] lg:!text-[1rem] uppercase tracking-[0.12em]">· Oversize pallets</p>
+                  <p className="ff-sc booking-text text-[11px] lg:!text-[1rem] uppercase tracking-[0.12em]">· Oversize pallets</p>
                 )}
               </>
             )}
@@ -1323,7 +1323,7 @@ function ComboboxField({
 
   return (
     <div ref={ref} className="flex flex-col gap-1 relative">
-      <label className="font-body booking-text text-xs">
+      <label className="ff-sc booking-text text-xs">
         {label}{required && <span style={{ color: ERROR_COLOR, marginLeft: 2 }}>*</span>}
       </label>
       <div
@@ -1539,7 +1539,7 @@ function SectionHeader({ icon, title }: { icon: React.ReactNode; title: string }
   return (
     <div className="flex items-center gap-2">
       <span className="text-white">{icon}</span>
-      <h3 className="font-body booking-text text-white font-bold tracking-wide">{title}</h3>
+      <h3 className="ff-sc booking-text text-white font-bold tracking-wide">{title}</h3>
     </div>
   )
 }
@@ -1552,7 +1552,7 @@ function CheckRow({ checked, onChange, label }: { checked: boolean; onChange: (v
           ${checked ? 'bg-[var(--color-cyan)] border-[var(--color-cyan)]' : 'bg-transparent border-white/30 hover:border-white/60'}`}>
         {checked && <Check size={10} strokeWidth={3} className="text-[var(--color-bg)]" />}
       </div>
-      <span className="font-body booking-text text-xs lg:text-sm">{label}</span>
+      <span className="ff-sc booking-text text-xs lg:text-sm">{label}</span>
     </label>
   )
 }
@@ -1560,8 +1560,8 @@ function CheckRow({ checked, onChange, label }: { checked: boolean; onChange: (v
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-sm border border-[#4DF9ED] bg-white p-3 lg:p-4 flex flex-col gap-2">
-      <p className="font-body booking-text text-[#818181] text-[10px] lg:!text-[0.9rem] uppercase tracking-widest leading-none">{label}</p>
-      <p className="font-body booking-text text-black text-2xl lg:text-3xl leading-none tracking-wide whitespace-nowrap truncate">{value}</p>
+      <p className="ff-sc booking-text text-[#818181] text-[10px] lg:!text-[0.9rem] uppercase tracking-widest leading-none">{label}</p>
+      <p className="ff-sc booking-text text-black text-2xl lg:text-3xl leading-none tracking-wide whitespace-nowrap truncate">{value}</p>
     </div>
   )
 }

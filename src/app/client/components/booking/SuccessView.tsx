@@ -28,14 +28,14 @@ export default function SuccessView({
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.35 }}
       >
-        <h2 className="font-body booking-text text-white text-3xl lg:text-5xl font-bold mb-3 uppercase tracking-widest">
+        <h2 className="ff-sc booking-text text-white text-3xl lg:text-5xl font-bold mb-3 uppercase tracking-widest">
           Booking Confirmed!
         </h2>
-        <p className="font-body booking-text text-[var(--color-muted)] text-base lg:text-xl">
+        <p className="ff-sc booking-text text-[var(--color-muted)] text-base lg:text-xl">
           Your shipment has been scheduled successfully.
         </p>
         {bookingReference && (
-          <p className="font-body booking-text text-[var(--color-cyan)] text-sm lg:text-lg mt-2">
+          <p className="ff-sc booking-text text-[var(--color-cyan)] text-sm lg:text-lg mt-2">
             Reference Number: {bookingReference}
           </p>
         )}
@@ -48,7 +48,7 @@ export default function SuccessView({
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         onClick={onNewBooking}
-        className="mt-2 px-8 py-3 rounded-xl font-body booking-text font-bold uppercase tracking-widest
+        className="mt-2 px-8 py-3 rounded-xl ff-sc booking-text font-bold uppercase tracking-widest
                    text-base lg:text-lg text-[var(--color-bg)] bg-[var(--color-cyan)]
                    cursor-pointer hover:opacity-90 transition-opacity"
       >
