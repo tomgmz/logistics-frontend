@@ -7,7 +7,6 @@ import { useRouter, usePathname } from 'next/navigation'
 import { ASSETS } from '@/lib/data'
 import NotificationIcon from '@/components/ui/NotificationIcon'
 import { useMessengerStore } from '@/lib/store/messenger.store'
-import { MOCK_CONVERSATIONS } from '@/lib/data/messaging.mock'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { ROLE_ROUTES } from '@/constants/roles'
 
@@ -17,12 +16,11 @@ interface ReusableHeaderProps {
 }
 
 export default function ReusableHeader({ sidebarOpen, onToggleSidebar }: ReusableHeaderProps) {
-  const { togglePanel, isPanelOpen } = useMessengerStore()
+  const { togglePanel, isPanelOpen, totalUnread } = useMessengerStore()
   const router = useRouter()
   const pathname = usePathname()
   const user = useAuthStore(s => s.user)
 
-  const totalUnread = MOCK_CONVERSATIONS.reduce((sum, c) => sum + c.unread_count, 0)
   const isMessagesPage = pathname === '/messages'
   const backHref = ROLE_ROUTES[user?.role ?? ''] ?? '/'
 
@@ -75,7 +73,7 @@ export default function ReusableHeader({ sidebarOpen, onToggleSidebar }: Reusabl
                 animate={{ scale: 1 }}
                 className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 rounded-full bg-[var(--color-cyan)] flex items-center justify-center px-0.5"
               >
-                <span className="ff-sc text-[9px] font-bold text-[var(--color-bg)] leading-none">
+                <span className="font-body text-[9px] font-bold text-[var(--color-bg)] leading-none">
                   {totalUnread > 9 ? '9+' : totalUnread}
                 </span>
               </motion.span>

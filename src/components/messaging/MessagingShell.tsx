@@ -5,7 +5,9 @@ import { MessageCircle, Loader2 } from 'lucide-react'
 import type { Conversation } from '@/app/types/messaging/messaging.types'
 import { toConversation } from '@/app/types/messaging/messaging.types'
 import { messagingService } from '@/lib/services/messaging.service'
+import type { MessageRow } from '@/lib/services/messaging.service'
 import { useAuthStore } from '@/lib/store/auth.store'
+import { useMessagingRealtime } from '@/lib/hooks/useMessagingRealtime'
 import ConversationList from './ConversationList'
 import ChatWindow from './ChatWindow'
 import NewConversationModal from './NewConversationModal'
@@ -38,6 +40,30 @@ export default function MessagingShell() {
   useEffect(() => {
     fetchConversations()
   }, [fetchConversations])
+
+  // ── Realtime: update conversation list on new messages ──────────────────────
+  useMessagingRealtime({
+    currentUserId,
+    onNewMessage: (raw: MessageRow) => {
+      setConversations(prev =>
+        prev.map(c => {
+          if (c.id !== raw.conversation_id) return c
+          const isOpen = c.id === selectedConvId
+          return {
+            ...c,
+            last_message: {
+              message_id: raw.message_id,
+              body: raw.content,
+              created_at: raw.sent_at,
+              sender_id: raw.sender_id,
+            },
+            // Only bump unread count if this conversation isn't currently open
+            unread_count: isOpen ? c.unread_count : c.unread_count + 1,
+          }
+        })
+      )
+    },
+  })
 
   // ── Derived state ───────────────────────────────────────────────────────────
   const selectedConv = conversations.find(c => c.id === selectedConvId) ?? null
@@ -79,8 +105,6 @@ export default function MessagingShell() {
     )
   }
 
-  // Called by NewConversationModal once the backend returns a conversation_id.
-  // Refreshes the list so the new conversation appears, then opens it.
   const handleConversationReady = async (conversationId: string) => {
     setShowNewModal(false)
     await fetchConversations()

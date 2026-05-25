@@ -5,7 +5,10 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, Edit, Search, Loader2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useMessengerStore } from '@/lib/store/messenger.store'
+import { useAuthStore } from '@/lib/store/auth.store'
 import { messagingService } from '@/lib/services/messaging.service'
+import type { MessageRow } from '@/lib/services/messaging.service'
+import { useMessagingRealtime } from '@/lib/hooks/useMessagingRealtime'
 import { toConversation } from '@/app/types/messaging/messaging.types'
 import { formatConversationTime } from '@/app/utils/messaging.utils'
 import type { Conversation } from '@/app/types/messaging/messaging.types'
@@ -13,7 +16,9 @@ import type { Conversation } from '@/app/types/messaging/messaging.types'
 type TabFilter = 'All' | 'Unread'
 
 export default function MessengerFloatingPanel() {
-  const { isPanelOpen, closePanel, openChat } = useMessengerStore()
+  const { isPanelOpen, closePanel, openChat, setTotalUnread, incrementUnread } = useMessengerStore()
+  const { user } = useAuthStore()
+  const currentUserId = user?.user_id ?? ''
   const panelRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
 
@@ -22,26 +27,51 @@ export default function MessengerFloatingPanel() {
   const [search, setSearch] = useState('')
   const [tab, setTab] = useState<TabFilter>('All')
 
-  // ── Fetch conversations whenever panel opens ─────────────────────────────
-  // useCallback keeps the function stable so the effect dep array is satisfied.
-  // Moving setLoading inside the async body avoids synchronous setState-in-effect.
+  // ── Fetch conversations whenever panel opens ──────────────────────────────
   const fetchConversations = useCallback(async () => {
     setLoading(true)
     try {
       const raw = await messagingService.getConversations()
-      setConversations(raw.map(toConversation))
+      const mapped = raw.map(toConversation)
+      setConversations(mapped)
+      // Sync total unread to store so the header badge stays accurate
+      const total = mapped.reduce((sum, c) => sum + c.unread_count, 0)
+      setTotalUnread(total)
     } catch {
       // silently fail; user can reopen panel to retry
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [setTotalUnread])
 
   useEffect(() => {
     if (isPanelOpen) fetchConversations()
   }, [isPanelOpen, fetchConversations])
 
-  // ── Close on outside click ───────────────────────────────────────────────
+  // ── Realtime: live unread counts and last message preview ─────────────────
+  useMessagingRealtime({
+    currentUserId,
+    onNewMessage: (raw: MessageRow) => {
+      setConversations(prev =>
+        prev.map(c => {
+          if (c.id !== raw.conversation_id) return c
+          return {
+            ...c,
+            last_message: {
+              message_id: raw.message_id,
+              body: raw.content,
+              created_at: raw.sent_at,
+              sender_id: raw.sender_id,
+            },
+            unread_count: c.unread_count + 1,
+          }
+        })
+      )
+      incrementUnread()
+    },
+  })
+
+  // ── Close on outside click ────────────────────────────────────────────────
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
@@ -57,7 +87,7 @@ export default function MessengerFloatingPanel() {
     router.push('/messages')
   }
 
-  // ── Filter ───────────────────────────────────────────────────────────────
+  // ── Filter ────────────────────────────────────────────────────────────────
   const filtered = conversations.filter(c => {
     const p = c.participants[0]
     const name = `${p.first_name} ${p.last_name}`.toLowerCase()
@@ -127,7 +157,7 @@ export default function MessengerFloatingPanel() {
             </div>
           </div>
 
-          {/* Tabs — `i` removed, key={t} is sufficient */}
+          {/* Tabs */}
           <div className="px-3 pb-2 flex items-center gap-1.5 shrink-0">
             {(['All', 'Unread'] as TabFilter[]).map(t => (
               <button

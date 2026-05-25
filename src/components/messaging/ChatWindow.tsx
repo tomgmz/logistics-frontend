@@ -5,6 +5,8 @@ import { ArrowLeft, MoreVertical, Phone, Video, Loader2 } from 'lucide-react'
 import type { Conversation, Message } from '@/app/types/messaging/messaging.types'
 import { toMessage } from '@/app/types/messaging/messaging.types'
 import { messagingService } from '@/lib/services/messaging.service'
+import type { MessageRow } from '@/lib/services/messaging.service'
+import { useMessagingRealtime } from '@/lib/hooks/useMessagingRealtime'
 import MessageBubble from './MessageBubble'
 import MessageInput from './MessageInput'
 import { groupMessagesByDate } from '@/app/utils/messaging.utils'
@@ -50,6 +52,23 @@ export default function ChatWindow({
     fetchMessages()
   }, [fetchMessages])
 
+  // ── Realtime: incoming messages ─────────────────────────────────────────────
+  useMessagingRealtime({
+    currentUserId,
+    conversationId: conversation.id,
+    onNewMessage: (raw: MessageRow) => {
+      const incoming = toMessage(raw)
+      setMessages(prev => {
+        if (prev.some(m => m.id === incoming.id)) return prev
+        return [...prev, incoming]
+      })
+      // Auto mark as read since this window is open
+      if (raw.sender_id !== currentUserId) {
+        messagingService.markAsRead(conversation.id).catch(() => {})
+      }
+    },
+  })
+
   // ── Scroll to bottom ────────────────────────────────────────────────────────
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -57,7 +76,6 @@ export default function ChatWindow({
 
   // ── Send message ────────────────────────────────────────────────────────────
   const handleSend = async (body: string) => {
-    // Optimistic update
     const optimisticMsg: Message = {
       id: `optimistic-${Date.now()}`,
       conversation_id: conversation.id,
@@ -72,12 +90,10 @@ export default function ChatWindow({
     try {
       setSending(true)
       const saved = await messagingService.sendMessage(conversation.id, { content: body })
-      // Replace optimistic with real message from server
       setMessages(prev =>
         prev.map(m => (m.id === optimisticMsg.id ? toMessage(saved) : m))
       )
     } catch {
-      // Roll back optimistic message on failure
       setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id))
     } finally {
       setSending(false)
@@ -86,7 +102,6 @@ export default function ChatWindow({
 
   const groups = groupMessagesByDate(messages)
 
-  // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col h-full min-h-0">
       {/* Header */}
