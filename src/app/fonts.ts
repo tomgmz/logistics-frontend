@@ -1,8 +1,16 @@
-import { Aboreto, Fredoka, League_Spartan, Alegreya_Sans_SC } from 'next/font/google';
+import { Aboreto, Fredoka, League_Spartan, Alegreya_Sans_SC, Alegreya_Sans } from 'next/font/google';
 import localFont from 'next/font/local';
 
-// Alegreya Sans SC - Body text
 export const alegreyaSansSC = Alegreya_Sans_SC({
+  weight: ['300', '400', '500', '700'],
+  style: ['normal', 'italic'],
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-alegreya-sc',
+});
+
+// Alegreya Sans - Body text (not small caps)
+export const alegreyaSans = Alegreya_Sans({
   weight: ['300', '400', '500', '700'],
   style: ['normal', 'italic'],
   subsets: ['latin'],

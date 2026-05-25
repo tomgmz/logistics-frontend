@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ROLE_ROUTES } from './constants/roles'
 
-const PUBLIC_PATHS = ['/', '/favicon.ico', '/_next', '/api', '/change-password']
+const PUBLIC_PATHS = ['/', '/favicon.ico', '/_next', '/api', '/change-password', '/messages']
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'))

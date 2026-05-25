@@ -5,6 +5,8 @@ import { MessageCircle, Menu } from 'lucide-react'
 import Image from 'next/image'
 import { ASSETS } from '@/lib/data'
 import NotificationIcon from '@/components/ui/NotificationIcon'
+import { useMessengerStore } from '@/lib/store/messenger.store'
+import { MOCK_CONVERSATIONS } from '@/lib/data/messaging.mock'
 
 interface ReusableHeaderProps {
   sidebarOpen: boolean
@@ -12,6 +14,10 @@ interface ReusableHeaderProps {
 }
 
 export default function ReusableHeader({ sidebarOpen, onToggleSidebar }: ReusableHeaderProps) {
+  const { togglePanel, isPanelOpen } = useMessengerStore()
+
+  const totalUnread = MOCK_CONVERSATIONS.reduce((sum, c) => sum + c.unread_count, 0)
+
   return (
     <motion.header
       initial={{ y: -80, opacity: 0 }}
@@ -31,27 +37,36 @@ export default function ReusableHeader({ sidebarOpen, onToggleSidebar }: Reusabl
       </div>
 
       <div className="flex items-center gap-2 lg:gap-3">
-        <IconBtn>
+        <motion.button
+          whileHover={{ scale: 1.08 }}
+          whileTap={{ scale: 0.94 }}
+          onClick={togglePanel}
+          className={`
+            relative w-9 h-9 lg:w-10 lg:h-10 rounded-full glass
+            flex items-center justify-center transition-colors
+            ${isPanelOpen
+              ? 'border-[var(--color-cyan)]/40 text-[var(--color-cyan)]'
+              : 'hover:border-[var(--color-cyan)]/30'
+            }
+          `}
+        >
           <MessageCircle size={16} />
-        </IconBtn>
+          {totalUnread > 0 && (
+            <motion.span
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 rounded-full bg-[var(--color-cyan)] flex items-center justify-center px-0.5"
+            >
+              <span className="font-body text-[9px] font-bold text-[var(--color-bg)] leading-none">
+                {totalUnread > 9 ? '9+' : totalUnread}
+              </span>
+            </motion.span>
+          )}
+        </motion.button>
 
         <NotificationIcon />
       </div>
     </motion.header>
-  )
-}
-
-function IconBtn({ children }: { children: React.ReactNode }) {
-  return (
-    <motion.button
-      whileHover={{ scale: 1.08 }}
-      whileTap={{ scale: 0.94 }}
-      className="relative w-9 h-9 lg:w-10 lg:h-10 rounded-full glass
-                 flex items-center justify-center
-                 hover:border-[var(--color-cyan)]/30 transition-colors"
-    >
-      {children}
-    </motion.button>
   )
 }
 

@@ -3,6 +3,8 @@
 import { ReactNode, useState } from 'react'
 import ReusableHeader from './ReusableHeader'
 import ReusableSidebar from './ReusableSidebar'
+import MessengerFloatingPanel from '@/components/messaging/MessengerFloatingPanel'
+import MessengerBubbleContainer from '@/components/messaging/MessengerBubbleContainer'
 
 interface NavItem {
   href: string
@@ -33,11 +35,13 @@ export default function ReusableDashboardShell({ children, navItems }: ReusableD
           setSidebarOpen={setSidebarOpen}
         />
 
-        <main className="min-w-0 flex-1 overflow-y-auto flex flex-col bg-[var(--color-surface)]">
-
+        <main className="min-w-0 flex-1 overflow-hidden flex flex-col bg-[var(--color-surface)]">
           {children}
         </main>
       </div>
+
+      <MessengerFloatingPanel />
+      <MessengerBubbleContainer />
     </div>
   )
 }
