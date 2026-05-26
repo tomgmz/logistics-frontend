@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Edit, Search, Loader2, Users } from 'lucide-react'
+import { X, Edit, Search, Loader2, Users, Expand } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useMessengerStore } from '@/lib/store/messenger.store'
 import { useAuthStore } from '@/lib/store/auth.store'
@@ -167,7 +167,7 @@ export default function MessengerFloatingPanel() {
                 title="Open full Messenger"
                 className="p-1.5 rounded-lg hover:bg-white/5 text-white/40 hover:text-white transition-colors"
               >
-                <Edit size={14} />
+                <Expand size={14} />
               </button>
               <button
                 type="button"
