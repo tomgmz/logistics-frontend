@@ -2,39 +2,51 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Edit, Search, Loader2 } from 'lucide-react'
+import { X, Edit, Search, Loader2, Users } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useMessengerStore } from '@/lib/store/messenger.store'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { messagingService } from '@/lib/services/messaging.service'
 import type { MessageRow } from '@/lib/services/messaging.service'
 import { useMessagingRealtime } from '@/lib/hooks/useMessagingRealtime'
-import { toConversation } from '@/app/types/messaging/messaging.types'
+import { toConversation, toGroup } from '@/app/types/messaging/messaging.types'
 import { formatConversationTime } from '@/app/utils/messaging.utils'
-import type { Conversation } from '@/app/types/messaging/messaging.types'
+import type { Conversation, Group } from '@/app/types/messaging/messaging.types'
 
 type TabFilter = 'All' | 'Unread'
 
+// Unified item for the panel list
+type PanelItem =
+  | { kind: 'dm'; data: Conversation; lastAt: string }
+  | { kind: 'group'; data: Group; lastAt: string }
+
 export default function MessengerFloatingPanel() {
-  const { isPanelOpen, closePanel, openChat, setTotalUnread, incrementUnread } = useMessengerStore()
+  const { isPanelOpen, closePanel, openChat, openGroupChat, setTotalUnread, incrementUnread } = useMessengerStore()
   const { user } = useAuthStore()
   const currentUserId = user?.user_id ?? ''
   const panelRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
 
   const [conversations, setConversations] = useState<Conversation[]>([])
+  const [groups, setGroups] = useState<Group[]>([])
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
   const [tab, setTab] = useState<TabFilter>('All')
 
-  // ── Fetch conversations whenever panel opens ──────────────────────────────
-  const fetchConversations = useCallback(async () => {
+  const fetchAll = useCallback(async () => {
     setLoading(true)
     try {
-      const raw = await messagingService.getConversations()
-      const mapped = raw.map(toConversation)
-      setConversations(mapped)
-      const total = mapped.reduce((sum, c) => sum + c.unread_count, 0)
+      const [rawConvs, rawGroups] = await Promise.all([
+        messagingService.getConversations(),
+        messagingService.getGroups(),
+      ])
+      const mappedConvs = rawConvs.map(toConversation)
+      const mappedGroups = rawGroups.map(toGroup)
+      setConversations(mappedConvs)
+      setGroups(mappedGroups)
+      const total =
+        mappedConvs.reduce((s, c) => s + c.unread_count, 0) +
+        mappedGroups.reduce((s, g) => s + g.unread_count, 0)
       setTotalUnread(total)
     } catch {
       // silently fail
@@ -44,10 +56,10 @@ export default function MessengerFloatingPanel() {
   }, [setTotalUnread])
 
   useEffect(() => {
-    if (isPanelOpen) fetchConversations()
-  }, [isPanelOpen, fetchConversations])
+    if (isPanelOpen) fetchAll()
+  }, [isPanelOpen, fetchAll])
 
-  // ── Realtime: live unread counts and last message preview ─────────────────
+  // Realtime: update DM previews + unread
   useMessagingRealtime({
     currentUserId,
     onNewMessage: (raw: MessageRow) => {
@@ -68,14 +80,30 @@ export default function MessengerFloatingPanel() {
       )
       incrementUnread()
     },
+    onGroupMessage: (raw) => {
+      setGroups(prev =>
+        prev.map(g => {
+          if (g.id !== raw.group_id) return g
+          return {
+            ...g,
+            last_message: {
+              message_id: raw.message_id,
+              body: raw.content,
+              created_at: raw.sent_at,
+              sender_id: raw.sender_id,
+            },
+            unread_count: g.unread_count + 1,
+          }
+        })
+      )
+      incrementUnread()
+    },
   })
 
-  // ── Close on outside click ────────────────────────────────────────────────
+  // Close on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
-        closePanel()
-      }
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) closePanel()
     }
     if (isPanelOpen) document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
@@ -86,12 +114,28 @@ export default function MessengerFloatingPanel() {
     router.push('/messages')
   }
 
-  // ── Filter ────────────────────────────────────────────────────────────────
-  const filtered = conversations.filter(c => {
-    const p = c.participants[0]
-    const name = `${p.first_name} ${p.last_name}`.toLowerCase()
-    const matchesSearch = name.includes(search.toLowerCase())
-    const matchesTab = tab === 'All' || (tab === 'Unread' && c.unread_count > 0)
+  // Merge + sort by last message time
+  const unified: PanelItem[] = [
+    ...conversations.map(c => ({
+      kind: 'dm' as const,
+      data: c,
+      lastAt: c.last_message?.created_at ?? '',
+    })),
+    ...groups.map(g => ({
+      kind: 'group' as const,
+      data: g,
+      lastAt: g.last_message?.created_at ?? g.created_at,
+    })),
+  ].sort((a, b) => b.lastAt.localeCompare(a.lastAt))
+
+  const filtered = unified.filter(item => {
+    const q = search.toLowerCase()
+    const name =
+      item.kind === 'dm'
+        ? `${item.data.participants[0].first_name} ${item.data.participants[0].last_name}`.toLowerCase()
+        : item.data.name.toLowerCase()
+    const matchesSearch = name.includes(q)
+    const matchesTab = tab === 'All' || (tab === 'Unread' && item.data.unread_count > 0)
     return matchesSearch && matchesTab
   })
 
@@ -115,9 +159,7 @@ export default function MessengerFloatingPanel() {
         >
           {/* Header */}
           <div className="px-4 pt-4 pb-2 flex items-center justify-between shrink-0">
-            <h3 className="font-spartan text-white text-sm tracking-[0.15em] uppercase">
-              Chats
-            </h3>
+            <h3 className="font-spartan text-white text-sm tracking-[0.15em] uppercase">Chats</h3>
             <div className="flex items-center gap-1">
               <button
                 type="button"
@@ -149,8 +191,7 @@ export default function MessengerFloatingPanel() {
                 className="
                   w-full bg-white/[0.04] border border-white/[0.07] rounded-xl
                   pl-9 pr-3 py-2 ff-body text-xs text-white placeholder:text-white/20
-                  focus:outline-none focus:border-[var(--color-cyan)]/30
-                  transition-colors
+                  focus:outline-none focus:border-[var(--color-cyan)]/30 transition-colors
                 "
               />
             </div>
@@ -196,17 +237,29 @@ export default function MessengerFloatingPanel() {
                 {search ? 'No results found' : 'No conversations yet'}
               </p>
             ) : (
-              filtered.map(conv => (
-                <PanelConversationItem
-                  key={conv.id}
-                  conv={conv}
-                  onSelect={() => {
-                    // Pass unread count so the store badge decrements immediately
-                    openChat(conv.id, conv.unread_count)
-                    closePanel()
-                  }}
-                />
-              ))
+              filtered.map(item =>
+                item.kind === 'dm' ? (
+                  <PanelDmItem
+                    key={`dm-${item.data.id}`}
+                    conv={item.data}
+                    currentUserId={currentUserId}
+                    onSelect={() => {
+                      openChat(item.data.id, item.data.unread_count)
+                      closePanel()
+                    }}
+                  />
+                ) : (
+                  <PanelGroupItem
+                    key={`group-${item.data.id}`}
+                    group={item.data}
+                    onSelect={() => {
+                      // Groups open in the full messenger for now
+                      closePanel()
+                      openGroupChat(item.data.id, item.data.unread_count) 
+                    }}
+                  />
+                )
+              )
             )}
           </div>
 
@@ -226,17 +279,22 @@ export default function MessengerFloatingPanel() {
   )
 }
 
-function PanelConversationItem({
+// ─── DM item ─────────────────────────────────────────────────────────────────
+
+function PanelDmItem({
   conv,
+  currentUserId,
   onSelect,
 }: {
   conv: Conversation
+  currentUserId: string
   onSelect: () => void
 }) {
   const participant = conv.participants[0]
   const initials = `${participant.first_name[0] ?? '?'}${participant.last_name[0] ?? '?'}`.toUpperCase()
   const lastMsg = conv.last_message
   const hasUnread = conv.unread_count > 0
+  const isMyLastMsg = lastMsg?.sender_id === currentUserId
 
   return (
     <motion.button
@@ -267,12 +325,73 @@ function PanelConversationItem({
         </div>
         <div className="flex items-center gap-1.5">
           <p className={`ff-body text-[11px] truncate flex-1 ${hasUnread ? 'text-white/55' : 'text-white/22'}`}>
+            {isMyLastMsg && <span className="text-[var(--color-cyan)]/50">You: </span>}
             {lastMsg?.body ?? ''}
           </p>
           {hasUnread && (
             <span className="shrink-0 w-4 h-4 rounded-full bg-[var(--color-cyan)] flex items-center justify-center">
               <span className="ff-body text-[9px] font-bold text-[var(--color-bg)]">
                 {conv.unread_count > 9 ? '9+' : conv.unread_count}
+              </span>
+            </span>
+          )}
+        </div>
+      </div>
+    </motion.button>
+  )
+}
+
+// ─── Group item ───────────────────────────────────────────────────────────────
+
+function PanelGroupItem({
+  group,
+  onSelect,
+}: {
+  group: Group
+  onSelect: () => void
+}) {
+  const lastMsg = group.last_message
+  const hasUnread = group.unread_count > 0
+  const isPending = group.my_status === 'pending'
+
+  return (
+    <motion.button
+      whileHover={{ backgroundColor: 'rgba(255,255,255,0.04)' }}
+      whileTap={{ scale: 0.98 }}
+      onClick={onSelect}
+      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors"
+    >
+      <div className="relative shrink-0">
+        <div className="w-10 h-10 rounded-full bg-[var(--color-surface-dark)] border border-white/10 flex items-center justify-center">
+          <Users size={15} className="text-white/50" />
+        </div>
+        {isPending && (
+          <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-amber-400 border-2 border-[var(--color-bg)]" />
+        )}
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between gap-2">
+          <span className={`ff-body text-[13px] truncate ${hasUnread ? 'text-white' : 'text-white/65'}`}>
+            {group.name}
+          </span>
+          {lastMsg && (
+            <span className="ff-body text-[10px] text-white/22 shrink-0">
+              {formatConversationTime(lastMsg.created_at)}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5">
+          <p className={`ff-body text-[11px] truncate flex-1 ${hasUnread ? 'text-white/55' : 'text-white/22'}`}>
+            {isPending
+              ? <span className="text-amber-400/70">Invite pending</span>
+              : lastMsg?.body ?? <span className="text-white/20 italic">{group.members.filter(m => m.status === 'accepted').length} members</span>
+            }
+          </p>
+          {hasUnread && (
+            <span className="shrink-0 w-4 h-4 rounded-full bg-[var(--color-cyan)] flex items-center justify-center">
+              <span className="ff-body text-[9px] font-bold text-[var(--color-bg)]">
+                {group.unread_count > 9 ? '9+' : group.unread_count}
               </span>
             </span>
           )}

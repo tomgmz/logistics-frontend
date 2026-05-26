@@ -2,58 +2,72 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { X, Send, Check, CheckCheck, Loader2, Minus } from 'lucide-react'
+import { X, Send, Loader2, Minus, Users } from 'lucide-react'
 import { useMessengerStore } from '@/lib/store/messenger.store'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { messagingService } from '@/lib/services/messaging.service'
 import { groupMessagesByDate, formatMessageTime } from '@/app/utils/messaging.utils'
-import { toConversation, toMessage } from '@/app/types/messaging/messaging.types'
-import type { Message, Conversation } from '@/app/types/messaging/messaging.types'
+import { toGroup, toGroupMessage } from '@/app/types/messaging/messaging.types'
+import type { Group, GroupMessage, GroupMessageRaw } from '@/app/types/messaging/messaging.types'
+import { useMessagingRealtime } from '@/lib/hooks/useMessagingRealtime'
 
 const BUBBLE_WIDTH = 338
 const BUBBLE_GAP = 10
 const MINIMIZED_COLUMN_WIDTH = 82
 
-interface MessengerChatBubbleProps {
-  conversationId: string
+type GroupMsg = GroupMessage & {
+  reply_to: null
+  reactions: []
+}
+
+interface MessengerGroupBubbleProps {
+  groupId: string
   index: number
 }
 
-export default function MessengerChatBubble({ conversationId, index }: MessengerChatBubbleProps) {
+export default function MessengerGroupBubble({ groupId, index }: MessengerGroupBubbleProps) {
   const { closeChat, minimizeChat } = useMessengerStore()
   const { user } = useAuthStore()
   const currentUserId = user?.user_id ?? ''
 
-  const [conv, setConv] = useState<Conversation | null>(null)
-  const [messages, setMessages] = useState<Message[]>([])
-  const [loadingConv, setLoadingConv] = useState(true)
+  const rightOffset = MINIMIZED_COLUMN_WIDTH + index * (BUBBLE_WIDTH + BUBBLE_GAP)
+
+  const [group, setGroup] = useState<Group | null>(null)
+  const [messages, setMessages] = useState<GroupMsg[]>([])
+  const [loadingGroup, setLoadingGroup] = useState(true)
   const [loadingMsgs, setLoadingMsgs] = useState(true)
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const pendingOptimisticIds = useRef<Set<string>>(new Set())
+
+  const toGroupMsg = useCallback((r: GroupMessageRaw): GroupMsg => ({
+    ...toGroupMessage(r),
+    reply_to: null,
+    reactions: [],
+  }), [])
 
   useEffect(() => {
-    messagingService
-      .getConversations()
+    messagingService.getGroups()
       .then(raw => {
-        const found = raw.find(c => c.conversation_id === conversationId)
-        if (found) setConv(toConversation(found))
+        const found = raw.find(g => g.group_id === groupId)
+        if (found) setGroup(toGroup(found))
       })
       .catch(() => {})
-      .finally(() => setLoadingConv(false))
-  }, [conversationId])
+      .finally(() => setLoadingGroup(false))
+  }, [groupId])
 
   const fetchMessages = useCallback(async () => {
     try {
-      const raw = await messagingService.getMessages(conversationId)
-      setMessages(raw.map(toMessage))
+      const raw = await messagingService.getGroupMessages(groupId)
+      setMessages(raw.map(toGroupMsg))
     } catch {
       // silent
     } finally {
       setLoadingMsgs(false)
     }
-  }, [conversationId])
+  }, [groupId, toGroupMsg])
 
   useEffect(() => { fetchMessages() }, [fetchMessages])
 
@@ -62,32 +76,56 @@ export default function MessengerChatBubble({ conversationId, index }: Messenger
   }, [messages])
 
   useEffect(() => {
-    messagingService.markAsRead(conversationId).catch(() => {})
-  }, [conversationId])
+    messagingService.markGroupRead(groupId, []).catch(() => {})
+  }, [groupId])
+
+  const { broadcastTyping } = useMessagingRealtime({
+    currentUserId,
+    conversationId: `group:${groupId}`,
+    onGroupMessage: (raw: GroupMessageRaw) => {
+      if (raw.group_id !== groupId) return
+      const incoming = toGroupMsg(raw)
+      setMessages(prev => {
+        const matchedId = [...pendingOptimisticIds.current].find(id =>
+          prev.some(m => m.id === id && m.body === incoming.body)
+        )
+        if (matchedId) {
+          pendingOptimisticIds.current.delete(matchedId)
+          return prev.map(m => m.id === matchedId ? incoming : m)
+        }
+        if (prev.some(m => m.id === incoming.id)) return prev
+        return [...prev, incoming]
+      })
+    },
+  })
 
   const handleSend = async () => {
     const trimmed = text.trim()
     if (!trimmed || sending) return
 
     const optimisticId = `optimistic-${Date.now()}`
-    const optimisticMsg: Message = {
+    const optimistic: GroupMsg = {
       id: optimisticId,
-      conversation_id: conversationId,
+      group_id: groupId,
       sender_id: currentUserId,
       body: trimmed,
       created_at: new Date().toISOString(),
-      read_at: null,
+      reply_to: null,
+      reactions: [],
     }
 
-    setMessages(prev => [...prev, optimisticMsg])
+    pendingOptimisticIds.current.add(optimisticId)
+    setMessages(prev => [...prev, optimistic])
     setText('')
     inputRef.current?.focus()
 
     try {
       setSending(true)
-      const saved = await messagingService.sendMessage(conversationId, { content: trimmed })
-      setMessages(prev => prev.map(m => m.id === optimisticId ? toMessage(saved) : m))
+      const saved = await messagingService.sendGroupMessage(groupId, { content: trimmed })
+      setMessages(prev => prev.map(m => m.id === optimisticId ? toGroupMsg(saved) : m))
+      pendingOptimisticIds.current.delete(optimisticId)
     } catch {
+      pendingOptimisticIds.current.delete(optimisticId)
       setMessages(prev => prev.filter(m => m.id !== optimisticId))
       setText(trimmed)
     } finally {
@@ -99,12 +137,11 @@ export default function MessengerChatBubble({ conversationId, index }: Messenger
     if (e.key === 'Enter') { e.preventDefault(); handleSend() }
   }
 
-  const participant = conv?.participants[0]
-  const initials = participant
-    ? `${participant.first_name[0] ?? '?'}${participant.last_name[0] ?? '?'}`.toUpperCase()
-    : '??'
-  const rightOffset = MINIMIZED_COLUMN_WIDTH + index * (BUBBLE_WIDTH + BUBBLE_GAP)
-  const groups = groupMessagesByDate(messages)
+  const memberMap = Object.fromEntries(
+    (group?.members ?? []).map(m => [m.user_id, m])
+  )
+
+  const dateGroups = groupMessagesByDate(messages)
 
   return (
     <motion.div
@@ -119,27 +156,22 @@ export default function MessengerChatBubble({ conversationId, index }: Messenger
       <div className="w-full flex items-center gap-2.5 px-3 py-2.5 shrink-0 bg-[var(--color-bg)] border-b border-white/[0.06]">
         <div className="relative shrink-0">
           <div className="w-8 h-8 rounded-full bg-[var(--color-surface-dark)] border border-white/10 flex items-center justify-center">
-            {loadingConv
+            {loadingGroup
               ? <Loader2 size={10} className="animate-spin text-white/30" />
-              : <span className="font-card text-[0.56rem] text-white/75">{initials}</span>
+              : <Users size={13} className="text-white/60" />
             }
           </div>
-          {participant?.is_online && (
-            <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-[var(--color-green)] border-[1.5px] border-[var(--color-bg)]" />
-          )}
         </div>
 
         <div className="flex-1 min-w-0 text-left">
-          {loadingConv ? (
+          {loadingGroup ? (
             <p className="ff-body text-xs text-white/30">Loading…</p>
           ) : (
             <>
-              <p className="ff-body text-xs text-white truncate">
-                {participant?.first_name} {participant?.last_name}
+              <p className="ff-body text-xs text-white truncate">{group?.name}</p>
+              <p className="ff-body text-[9px] text-white/30">
+                {group?.members.filter(m => m.status === 'accepted').length ?? 0} members
               </p>
-              {participant?.is_online && (
-                <p className="ff-body text-[9px] text-[var(--color-green)]">Active now</p>
-              )}
             </>
           )}
         </div>
@@ -147,7 +179,7 @@ export default function MessengerChatBubble({ conversationId, index }: Messenger
         <div className="flex items-center gap-0.5 shrink-0">
           <button
             type="button"
-            onClick={() => minimizeChat(conversationId)}
+            onClick={() => minimizeChat(groupId)}
             className="p-1.5 rounded-lg hover:bg-white/5 text-white/30 hover:text-white/60 transition-colors"
             aria-label="Minimize"
           >
@@ -155,7 +187,7 @@ export default function MessengerChatBubble({ conversationId, index }: Messenger
           </button>
           <button
             type="button"
-            onClick={() => closeChat(conversationId)}
+            onClick={() => closeChat(groupId)}
             className="p-1.5 rounded-lg hover:bg-white/5 text-white/30 hover:text-red-400 transition-colors"
             aria-label="Close"
           >
@@ -173,32 +205,39 @@ export default function MessengerChatBubble({ conversationId, index }: Messenger
             </div>
           )}
 
-          {!loadingMsgs && groups.map(({ date, messages: groupMsgs }) => (
+          {!loadingMsgs && dateGroups.map(({ date, messages: groupMsgs }) => (
             <div key={date} className="space-y-2">
               <p className="ff-body text-[9px] text-white/20 text-center uppercase tracking-widest">{date}</p>
-              {groupMsgs.map(msg => {
+              {groupMsgs.map((msg, i) => {
                 const isMine = msg.sender_id === currentUserId
+                const sender = memberMap[msg.sender_id]
+                const prevMsg = groupMsgs[i - 1]
+                const showName = !isMine && prevMsg?.sender_id !== msg.sender_id
+                const senderName = sender
+                  ? `${sender.first_name} ${sender.last_name}`
+                  : 'Unknown'
+
                 return (
-                  <div key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
-                    <div className="flex flex-col gap-0.5 max-w-[85%]">
-                      <div className={`
-                        px-3 py-1.5 rounded-2xl ff-body text-[11.5px] leading-relaxed break-words
-                        ${isMine
-                          ? 'bg-[var(--color-cyan)] text-[var(--color-bg)] rounded-br-sm'
-                          : 'glass-surface text-white border border-white/[0.06] rounded-bl-sm'
-                        }
-                      `}>
-                        {msg.body}
-                      </div>
-                      <div className={`flex items-center gap-1 ${isMine ? 'justify-end' : ''}`}>
-                        <span className="ff-body text-[9px] text-white/20">
-                          {formatMessageTime(msg.created_at)}
-                        </span>
-                        {isMine && (
-                          msg.read_at
-                            ? <CheckCheck size={9} className="text-[var(--color-cyan)]" />
-                            : <Check size={9} className="text-white/20" />
-                        )}
+                  <div key={msg.id} className={`flex flex-col ${isMine ? 'items-end' : 'items-start'}`}>
+                    {showName && (
+                      <span className="ff-body text-[9px] text-white/30 px-1 mb-0.5">{senderName}</span>
+                    )}
+                    <div className={`flex ${isMine ? 'justify-end' : 'justify-start'} w-full`}>
+                      <div className="flex flex-col gap-0.5 max-w-[85%]">
+                        <div className={`
+                          px-3 py-1.5 rounded-2xl ff-body text-[11.5px] leading-relaxed break-words
+                          ${isMine
+                            ? 'bg-[var(--color-cyan)] text-[var(--color-bg)] rounded-br-sm'
+                            : 'glass-surface text-white border border-white/[0.06] rounded-bl-sm'
+                          }
+                        `}>
+                          {msg.body}
+                        </div>
+                        <div className={`flex items-center gap-1 ${isMine ? 'justify-end' : ''}`}>
+                          <span className="ff-body text-[9px] text-white/20">
+                            {formatMessageTime(msg.created_at)}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>

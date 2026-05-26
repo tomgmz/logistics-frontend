@@ -136,7 +136,7 @@ export default function MessageInput({
             placeholder="Type a message…"
             rows={1}
             disabled={disabled}
-            className="w-full bg-transparent px-3.5 py-3 ff-body text-sm text-white placeholder:text-white/25 resize-none focus:outline-none overflow-y-auto [&::-webkit-scrollbar]:w-[3px] [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full"
+            className="w-full bg-transparent px-3.5 py-[13px] ff-body text-sm text-white placeholder:text-white/25 resize-none focus:outline-none overflow-y-auto [&::-webkit-scrollbar]:w-[3px] [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full"
             style={{ minHeight: '44px', maxHeight: '120px' }}
           />
         </div>

@@ -1,10 +1,22 @@
+function parseDate(isoString: string): Date {
+  if (!isoString) return new Date(NaN)
+  // Already has timezone info
+  if (isoString.endsWith('Z') || isoString.includes('+')) {
+    return new Date(isoString)
+  }
+  // Postgres timestamps without timezone — treat as UTC
+  return new Date(`${isoString}Z`)
+}
+
 export function formatMessageTime(isoString: string): string {
-  const date = new Date(isoString.endsWith('Z') ? isoString : `${isoString}Z`)
+  const date = parseDate(isoString)
+  if (isNaN(date.getTime())) return ''
   return date.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', hour12: true })
 }
 
 export function formatConversationTime(isoString: string): string {
-  const date = new Date(isoString.endsWith('Z') ? isoString : `${isoString}Z`)
+  const date = parseDate(isoString)
+  if (isNaN(date.getTime())) return ''
   const now = new Date()
   const diffMs = now.getTime() - date.getTime()
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
@@ -22,7 +34,8 @@ export function groupMessagesByDate<T extends { created_at: string }>(
 ): { date: string; messages: T[] }[] {
   const groups: Record<string, T[]> = {}
   for (const msg of messages) {
-    const date = new Date(msg.created_at.endsWith('Z') ? msg.created_at : `${msg.created_at}Z`)
+    const date = parseDate(msg.created_at)
+    if (isNaN(date.getTime())) continue
     const key = date.toLocaleDateString('en-PH', {
       year: 'numeric',
       month: 'long',
