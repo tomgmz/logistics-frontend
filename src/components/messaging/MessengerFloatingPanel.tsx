@@ -268,9 +268,9 @@ export default function MessengerFloatingPanel() {
             <button
               type="button"
               onClick={handleOpenFullMessenger}
-              className="ff-body text-[11px] text-[var(--color-cyan)]/60 hover:text-[var(--color-cyan)] transition-colors"
+              className="ff-body text-[11px] text-[var(--color-cyan)]/60 hover:text-[var(--color-cyan)] transition-colors text-center w-full"
             >
-              See all →
+              See all
             </button>
           </div>
         </motion.div>
