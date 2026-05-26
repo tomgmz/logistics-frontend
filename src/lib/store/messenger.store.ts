@@ -1,4 +1,15 @@
+'use client'
+
 import { create } from 'zustand'
+
+// Max open chat windows by screen size (enforced in openChat)
+export const MAX_BUBBLES_LG = 3   // ≥1280px
+export const MAX_BUBBLES_MD = 2   // ≥768px
+
+function getMaxBubbles(): number {
+  if (typeof window === 'undefined') return MAX_BUBBLES_LG
+  return window.innerWidth >= 1280 ? MAX_BUBBLES_LG : MAX_BUBBLES_MD
+}
 
 interface MessengerStore {
   isPanelOpen: boolean
@@ -25,14 +36,19 @@ export const useMessengerStore = create<MessengerStore>((set) => ({
   closePanel: () => set({ isPanelOpen: false }),
 
   openChat: (id, unreadCount = 0) =>
-    set(s => ({
-      isPanelOpen: false,
-      openChatIds: s.openChatIds.includes(id)
+    set(s => {
+      const max = getMaxBubbles()
+      const already = s.openChatIds.includes(id)
+      const newIds = already
         ? s.openChatIds
-        : [...s.openChatIds.slice(-2), id],
-      minimizedChatIds: s.minimizedChatIds.filter(i => i !== id),
-      totalUnread: Math.max(0, s.totalUnread - unreadCount),
-    })),
+        : [...s.openChatIds.slice(-(max - 1)), id]
+      return {
+        isPanelOpen: false,
+        openChatIds: newIds,
+        minimizedChatIds: s.minimizedChatIds.filter(i => i !== id),
+        totalUnread: Math.max(0, s.totalUnread - unreadCount),
+      }
+    }),
 
   closeChat: (id) =>
     set(s => ({

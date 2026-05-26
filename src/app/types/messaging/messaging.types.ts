@@ -249,3 +249,7 @@ export function unifiedLastMessageAt(item: UnifiedListItem): string | null {
   const msg = item.kind === 'dm' ? item.data.last_message : item.data.last_message
   return msg?.created_at ?? null
 }
+
+export interface MessageReaction { emoji: string; user_id: string }
+export interface MessageReplyTo { message_id: string; content: string; sender_id: string }
+export type RichMessage = Message & { reply_to: MessageReplyTo | null; reactions: MessageReaction[] }

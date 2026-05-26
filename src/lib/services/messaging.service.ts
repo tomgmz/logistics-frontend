@@ -15,59 +15,6 @@ interface ApiResponse<T> {
 
 export type { ConversationWithDetails, MessageRow, MessagableUser }
 
-export type ConversationContextType = 'direct' | 'booking_transit'
-
-export type UserRole =
-  | 'admin'
-  | 'general_manager'
-  | 'fleet_admin'
-  | 'operations_admin'
-  | 'accountant'
-  | 'client'
-  | 'driver'
-  | 'vendor'
-  | 'it_admin'
-
-export interface ConversationParticipant {
-  user_id: string
-  first_name: string | null
-  last_name: string | null
-  role: UserRole
-  email: string
-}
-
-export interface ConversationLastMessage {
-  message_id: string
-  content: string
-  sent_at: string
-  sender_id: string
-}
-
-export interface ConversationRow {
-  conversation_id: string
-  participant_a_id: string
-  participant_b_id: string
-  context_type: ConversationContextType
-  booking_id: string | null
-  created_at: string
-  updated_at: string
-  last_message_at: string | null
-}
-
-export interface CreateConversationPayload {
-  target_user_id: string
-  booking_id?: string
-}
-
-export interface SendMessagePayload {
-  content: string
-}
-
-export interface GetMessagesQuery {
-  limit?: number
-  before?: string
-}
-
 async function get<T>(url: string, params?: Record<string, string | number | undefined>): Promise<T> {
   const { data } = await proxyApi.get<ApiResponse<T>>(url, { params })
   return data.data
@@ -97,16 +44,16 @@ export const messagingService = {
   getConversations: () =>
     get<ConversationWithDetails[]>(`${B}/conversations`),
 
-  createOrGetConversation: (payload: CreateConversationPayload) =>
-    post<ConversationRow>(`${B}/conversations`, payload),
+  createOrGetConversation: (payload: { target_user_id: string; booking_id?: string }) =>
+    post<{ conversation_id: string }>(`${B}/conversations`, payload),
 
-  getMessages: (conversationId: string, query?: GetMessagesQuery) =>
+  getMessages: (conversationId: string, query?: { limit?: number; before?: string }) =>
     get<MessageRow[]>(`${B}/conversations/${conversationId}/messages`, {
       limit: query?.limit,
       before: query?.before,
     }),
 
-  sendMessage: (conversationId: string, payload: SendMessagePayload) =>
+  sendMessage: (conversationId: string, payload: { content: string; reply_to_message_id?: string }) =>
     post<MessageRow>(`${B}/conversations/${conversationId}/messages`, payload),
 
   markAsRead: (conversationId: string) =>
@@ -114,6 +61,9 @@ export const messagingService = {
 
   deleteMessage: (messageId: string) =>
     del<void>(`${B}/messages/${messageId}`),
+
+  reactToMessage: (conversationId: string, messageId: string, emoji: string) =>
+    post<{ action: 'added' | 'removed' }>(`${B}/conversations/${conversationId}/messages/${messageId}/react`, { emoji }),
 
   getMessagableUsers: () =>
     get<MessagableUser[]>(`${B}/users`),
@@ -127,12 +77,18 @@ export const messagingService = {
   respondToGroupInvite: (groupId: string, accept: boolean) =>
     patch<void>(`${B}/groups/${groupId}/invite/respond`, { accept }),
 
-  getGroupMessages: (groupId: string) =>
-    get<GroupMessageRaw[]>(`${B}/groups/${groupId}/messages`),
+  getGroupMessages: (groupId: string, query?: { limit?: number; before?: string }) =>
+    get<GroupMessageRaw[]>(`${B}/groups/${groupId}/messages`, {
+      limit: query?.limit,
+      before: query?.before,
+    }),
 
-  sendGroupMessage: (groupId: string, payload: { content: string }) =>
+  sendGroupMessage: (groupId: string, payload: { content: string; reply_to_message_id?: string }) =>
     post<GroupMessageRaw>(`${B}/groups/${groupId}/messages`, payload),
 
   markGroupRead: (groupId: string, messageIds: string[]) =>
     patch<void>(`${B}/groups/${groupId}/read`, { message_ids: messageIds }),
+
+  reactToGroupMessage: (groupId: string, messageId: string, emoji: string) =>
+    post<{ action: 'added' | 'removed' }>(`${B}/groups/${groupId}/messages/${messageId}/react`, { emoji }),
 }

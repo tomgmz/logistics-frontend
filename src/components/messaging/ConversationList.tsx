@@ -16,6 +16,7 @@ interface ConversationListProps {
   onNewConversation: () => void
   onNewGroup: () => void
   currentUserId: string
+  onlineUserIds?: string[]
 }
 
 export default function ConversationList({
@@ -29,6 +30,7 @@ export default function ConversationList({
   onNewConversation,
   onNewGroup,
   currentUserId,
+  onlineUserIds = [],
 }: ConversationListProps) {
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -61,9 +63,7 @@ export default function ConversationList({
       <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-4 [&::-webkit-scrollbar]:w-[3px] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-white/20">
         {items.length === 0 ? (
           <div className="flex flex-col items-center gap-3 py-10 text-center px-4">
-            <p className="ff-body text-white/20 text-xs">
-              {search ? 'No conversations match your search' : 'No conversations yet'}
-            </p>
+            <p className="ff-body text-white/20 text-xs">{search ? 'No conversations match your search' : 'No conversations yet'}</p>
             {!search && (
               <button type="button" onClick={onNewConversation} className="ff-body text-xs px-3 py-1.5 rounded-lg text-[var(--color-cyan)]/60 hover:text-[var(--color-cyan)] border border-white/[0.07] hover:border-[var(--color-cyan)]/20 transition-colors">
                 Start a conversation
@@ -80,6 +80,7 @@ export default function ConversationList({
                 isSelected={selectedConvId === item.data.id}
                 currentUserId={currentUserId}
                 onSelect={onSelectDm}
+                isOnline={onlineUserIds.includes(item.data.participants[0]?.user_id)}
               />
             ) : (
               <GroupItem
@@ -97,23 +98,23 @@ export default function ConversationList({
   )
 }
 
-// ── DM item ───────────────────────────────────────────────────────────────────
-
 function DmItem({
   conv,
   index,
   isSelected,
   currentUserId,
   onSelect,
+  isOnline,
 }: {
   conv: Conversation
   index: number
   isSelected: boolean
   currentUserId: string
   onSelect: (c: Conversation) => void
+  isOnline: boolean
 }) {
   const participant = conv.participants[0]
-  const initials = `${participant.first_name[0] ?? '?'}${participant.last_name[0] ?? '?'}`.toUpperCase()
+  const initials = `${participant.first_name?.[0] ?? '?'}${participant.last_name?.[0] ?? '?'}`.toUpperCase()
   const lastMsg = conv.last_message
   const hasUnread = conv.unread_count > 0
   const isMyLastMsg = lastMsg?.sender_id === currentUserId
@@ -123,7 +124,6 @@ function DmItem({
       initial={{ opacity: 0, x: -10 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: index * 0.03, duration: 0.2 }}
-      whileHover={{ x: isSelected ? 0 : 2 }}
       whileTap={{ scale: 0.98 }}
       onClick={() => onSelect(conv)}
       className={`relative w-full flex items-center gap-3 px-3 py-3 rounded-xl mb-0.5 text-left transition-colors cursor-pointer ${isSelected ? 'glass-surface border border-[var(--color-cyan)]/20' : 'hover:bg-white/[0.04] border border-transparent'}`}
@@ -132,7 +132,8 @@ function DmItem({
         <div className="w-10 h-10 rounded-full bg-[var(--color-surface-dark)] border border-white/10 flex items-center justify-center">
           <span className="font-card text-[0.68rem] text-white/75">{initials}</span>
         </div>
-        {participant.is_online && (
+        {/* 🟢 Online dot in sidebar */}
+        {isOnline && (
           <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-[var(--color-green)] border-2 border-[var(--color-bg)]" />
         )}
       </div>
@@ -141,9 +142,7 @@ function DmItem({
           <span className={`ff-body text-[13px] truncate ${hasUnread ? 'text-white' : 'text-white/75'}`}>
             {participant.first_name} {participant.last_name}
           </span>
-          {lastMsg && (
-            <span className="ff-body text-[10px] text-white/25 shrink-0">{formatConversationTime(lastMsg.created_at)}</span>
-          )}
+          {lastMsg && <span className="ff-body text-[10px] text-white/25 shrink-0">{formatConversationTime(lastMsg.created_at)}</span>}
         </div>
         <div className="flex items-center gap-1.5">
           <p className={`ff-body text-[11px] truncate flex-1 leading-snug ${hasUnread ? 'text-white/55' : 'text-white/28'}`}>
@@ -160,8 +159,6 @@ function DmItem({
     </motion.button>
   )
 }
-
-// ── Group item ────────────────────────────────────────────────────────────────
 
 function GroupItem({
   group,
@@ -183,7 +180,6 @@ function GroupItem({
       initial={{ opacity: 0, x: -10 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: index * 0.03, duration: 0.2 }}
-      whileHover={{ x: isSelected ? 0 : 2 }}
       whileTap={{ scale: 0.98 }}
       onClick={() => onSelect(group)}
       className={`relative w-full flex items-center gap-3 px-3 py-3 rounded-xl mb-0.5 text-left transition-colors cursor-pointer ${isSelected ? 'glass-surface border border-[var(--color-cyan)]/20' : 'hover:bg-white/[0.04] border border-transparent'}`}
@@ -192,19 +188,14 @@ function GroupItem({
         <div className="w-10 h-10 rounded-full bg-[var(--color-surface-dark)] border border-white/10 flex items-center justify-center">
           <Users size={15} className="text-white/50" />
         </div>
-        {/* Group pending invite badge */}
         {group.my_status === 'pending' && (
           <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-amber-400 border-2 border-[var(--color-bg)]" />
         )}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2 mb-0.5">
-          <span className={`ff-body text-[13px] truncate ${hasUnread ? 'text-white' : 'text-white/75'}`}>
-            {group.name}
-          </span>
-          {lastMsg && (
-            <span className="ff-body text-[10px] text-white/25 shrink-0">{formatConversationTime(lastMsg.created_at)}</span>
-          )}
+          <span className={`ff-body text-[13px] truncate ${hasUnread ? 'text-white' : 'text-white/75'}`}>{group.name}</span>
+          {lastMsg && <span className="ff-body text-[10px] text-white/25 shrink-0">{formatConversationTime(lastMsg.created_at)}</span>}
         </div>
         <div className="flex items-center gap-1.5">
           <p className={`ff-body text-[11px] truncate flex-1 leading-snug ${hasUnread ? 'text-white/55' : 'text-white/28'}`}>

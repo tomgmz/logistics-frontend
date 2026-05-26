@@ -6,6 +6,7 @@ import type { Conversation, Group, UnifiedListItem } from '@/app/types/messaging
 import { toConversation, toGroup } from '@/app/types/messaging/messaging.types'
 import { messagingService } from '@/lib/services/messaging.service'
 import { useAuthStore } from '@/lib/store/auth.store'
+import { useMessagingRealtime } from '@/lib/hooks/useMessagingRealtime'
 import ConversationList from './ConversationList'
 import ChatWindow from './ChatWindow'
 import GroupChatWindow from './GroupChatWindow'
@@ -25,8 +26,8 @@ export default function MessagingShell() {
   const [error, setError] = useState<string | null>(null)
   const [showNewModal, setShowNewModal] = useState(false)
   const [showGroupModal, setShowGroupModal] = useState(false)
+  const [onlineUserIds, setOnlineUserIds] = useState<string[]>([])
 
-  // ── Load conversations + groups ─────────────────────────────────────────────
   const fetchAll = useCallback(async () => {
     try {
       setError(null)
@@ -45,15 +46,44 @@ export default function MessagingShell() {
 
   useEffect(() => { fetchAll() }, [fetchAll])
 
-  // ── Unified list ─────────────────────────────────────────────────────────────
+  // Global user channel for cross-device new message sync
+  useMessagingRealtime({
+    currentUserId,
+    onNewMessage: (raw) => {
+      // Update conversation last_message in sidebar list when message arrives on any device
+      setConversations(prev => prev.map(c => {
+        if (c.id !== raw.conversation_id) return c
+        const isIncoming = raw.sender_id !== currentUserId
+        return {
+          ...c,
+          last_message: { message_id: raw.message_id, body: raw.content, created_at: raw.sent_at, sender_id: raw.sender_id },
+          unread_count: (isIncoming && selectedConvId !== c.id) ? c.unread_count + 1 : c.unread_count,
+        }
+      }))
+    },
+    onGroupMessage: (raw) => {
+      setGroups(prev => prev.map(g => {
+        if (g.id !== raw.group_id) return g
+        const isIncoming = raw.sender_id !== currentUserId
+        return {
+          ...g,
+          last_message: { message_id: raw.message_id, body: raw.content, created_at: raw.sent_at, sender_id: raw.sender_id },
+          unread_count: (isIncoming && selectedGroup?.id !== g.id) ? g.unread_count + 1 : g.unread_count,
+        }
+      }))
+    },
+    onGroupInvite: () => { fetchAll() },
+    onPresenceChange: (ids) => setOnlineUserIds(ids),
+  })
+
   const selectedConv = conversations.find(c => c.id === selectedConvId) ?? null
 
   const unifiedItems: UnifiedListItem[] = [
     ...conversations.map(c => ({ kind: 'dm' as const, data: c })),
     ...groups.map(g => ({ kind: 'group' as const, data: g })),
   ].sort((a, b) => {
-    const aTime = a.data.last_message?.created_at ?? (a.kind === 'dm' ? '' : (a.data as Group).created_at)
-    const bTime = b.data.last_message?.created_at ?? (b.kind === 'dm' ? '' : (b.data as Group).created_at)
+    const aTime = a.data.last_message?.created_at ?? (a.kind === 'group' ? (a.data as Group).created_at : '')
+    const bTime = b.data.last_message?.created_at ?? (b.kind === 'group' ? (b.data as Group).created_at : '')
     return bTime.localeCompare(aTime)
   })
 
@@ -66,7 +96,6 @@ export default function MessagingShell() {
     return item.data.name.toLowerCase().includes(q)
   })
 
-  // ── Handlers ─────────────────────────────────────────────────────────────────
   const handleSelectDm = (conv: Conversation) => {
     setSelectedConvId(conv.id)
     setSelectedGroup(null)
@@ -86,26 +115,22 @@ export default function MessagingShell() {
   }
 
   const handleMessageSent = (conversationId: string, body: string, senderId: string) => {
-    setConversations(prev =>
-      prev.map(c =>
-        c.id === conversationId
-          ? { ...c, last_message: { message_id: `local-${Date.now()}`, body, created_at: new Date().toISOString(), sender_id: senderId } }
-          : c
-      )
-    )
+    setConversations(prev => prev.map(c =>
+      c.id === conversationId
+        ? { ...c, last_message: { message_id: `local-${Date.now()}`, body, created_at: new Date().toISOString(), sender_id: senderId } }
+        : c
+    ))
   }
 
   const handleInviteResponded = (groupId: string, accepted: boolean) => {
-  if (!accepted) {
-    // Remove from list and deselect
-    setGroups(prev => prev.filter(g => g.id !== groupId))
-    setSelectedGroup(null)
-  } else {
-    // Update status in list so the amber badge disappears
-    setGroups(prev => prev.map(g => g.id === groupId ? { ...g, my_status: 'accepted' } : g))
-    setSelectedGroup(prev => prev?.id === groupId ? { ...prev, my_status: 'accepted' } : prev)
+    if (!accepted) {
+      setGroups(prev => prev.filter(g => g.id !== groupId))
+      setSelectedGroup(null)
+    } else {
+      setGroups(prev => prev.map(g => g.id === groupId ? { ...g, my_status: 'accepted' } : g))
+      setSelectedGroup(prev => prev?.id === groupId ? { ...prev, my_status: 'accepted' } : prev)
+    }
   }
-}
 
   const handleConversationReady = async (conversationId: string) => {
     setShowNewModal(false)
@@ -117,9 +142,6 @@ export default function MessagingShell() {
 
   const handleGroupCreated = async (groupId: string) => {
     setShowGroupModal(false)
-    await fetchAll()
-    const created = groups.find(g => g.id === groupId) ?? null
-    // Re-fetch to get the newly created group
     try {
       const rawGroups = await messagingService.getGroups()
       const mapped = rawGroups.map(toGroup)
@@ -142,9 +164,7 @@ export default function MessagingShell() {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
         <p className="ff-body text-white/30 text-xs">{error}</p>
-        <button type="button" onClick={fetchAll} className="ff-body text-xs text-[var(--color-cyan)]/60 hover:text-[var(--color-cyan)] transition-colors">
-          Try again
-        </button>
+        <button type="button" onClick={fetchAll} className="ff-body text-xs text-[var(--color-cyan)]/60 hover:text-[var(--color-cyan)] transition-colors">Try again</button>
       </div>
     )
   }
@@ -154,6 +174,7 @@ export default function MessagingShell() {
   return (
     <>
       <div className="flex flex-1 min-h-0 h-full overflow-hidden">
+        {/* Sidebar — hidden on mobile when chat is open */}
         <div className={`shrink-0 border-r border-white/[0.07] bg-[var(--color-bg)] flex flex-col w-full lg:w-[300px] ${hasActiveChat ? 'hidden lg:flex' : 'flex'}`}>
           <ConversationList
             items={filteredItems}
@@ -166,9 +187,11 @@ export default function MessagingShell() {
             onNewConversation={() => setShowNewModal(true)}
             onNewGroup={() => setShowGroupModal(true)}
             currentUserId={currentUserId}
+            onlineUserIds={onlineUserIds}
           />
         </div>
 
+        {/* Chat panel — messages left (theirs) / right (mine), Facebook style */}
         <div className={`flex-1 min-w-0 flex flex-col ${hasActiveChat ? 'flex' : 'hidden lg:flex'} bg-[var(--color-surface)]`}>
           {selectedGroup ? (
             <GroupChatWindow
@@ -213,12 +236,8 @@ function EmptyState({ onNewConversation, onNewGroup }: { onNewConversation: () =
         <p className="ff-body text-white/20 text-xs">Choose from your list or start a new one</p>
       </div>
       <div className="flex items-center gap-2">
-        <button type="button" onClick={onNewConversation} className="ff-body text-xs px-4 py-2 rounded-xl bg-[var(--color-cyan)]/10 text-[var(--color-cyan)] border border-[var(--color-cyan)]/20 hover:bg-[var(--color-cyan)]/15 transition-colors">
-          New conversation
-        </button>
-        <button type="button" onClick={onNewGroup} className="ff-body text-xs px-4 py-2 rounded-xl bg-white/[0.04] text-white/50 border border-white/[0.08] hover:bg-white/[0.07] hover:text-white/70 transition-colors">
-          New group
-        </button>
+        <button type="button" onClick={onNewConversation} className="ff-body text-xs px-4 py-2 rounded-xl bg-[var(--color-cyan)]/10 text-[var(--color-cyan)] border border-[var(--color-cyan)]/20 hover:bg-[var(--color-cyan)]/15 transition-colors">New conversation</button>
+        <button type="button" onClick={onNewGroup} className="ff-body text-xs px-4 py-2 rounded-xl bg-white/[0.04] text-white/50 border border-white/[0.08] hover:bg-white/[0.07] hover:text-white/70 transition-colors">New group</button>
       </div>
     </div>
   )
