@@ -60,6 +60,7 @@ export default function MessengerChatBubble({ conversationId, index }: Messenger
   const hoverTimeout         = useRef<ReturnType<typeof setTimeout> | null>(null)
   const typingTimeoutRef     = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pendingOptimisticIds = useRef<Set<string>>(new Set())
+  const seenMessageIds = useRef<Set<string>>(new Set())
 
   const toRichMessage = (r: MessageRowExtended): RichMessage => ({
     ...toMessage(r),
@@ -94,43 +95,48 @@ export default function MessengerChatBubble({ conversationId, index }: Messenger
 
   const participant = conv?.participants[0]
 
-  const { broadcastTyping } = useMessagingRealtime({
-    currentUserId,
-    conversationId,
-    onNewMessage: (raw: MessageRow) => {
-      const incoming = toRichMessage(raw as MessageRowExtended)
-      setMessages(prev => {
-        const matchedId = [...pendingOptimisticIds.current].find(id =>
-          prev.some(m => m.id === id && m.body === incoming.body)
-        )
-        if (matchedId) {
-          pendingOptimisticIds.current.delete(matchedId)
-          return prev.map(m => m.id === matchedId ? incoming : m)
-        }
-        if (prev.some(m => m.id === incoming.id)) return prev
-        return [...prev, incoming]
-      })
-      if (raw.sender_id !== currentUserId) {
-        messagingService.markAsRead(conversationId).catch(() => {})
+const { broadcastTyping } = useMessagingRealtime({
+  currentUserId,
+  conversationId,
+  onNewMessage: (raw: MessageRow) => {
+    const incoming = toRichMessage(raw as MessageRowExtended)
+
+    // Deduplicate messages delivered via both channels
+    if (seenMessageIds.current.has(incoming.id)) return
+    seenMessageIds.current.add(incoming.id)
+
+    setMessages(prev => {
+      const matchedId = [...pendingOptimisticIds.current].find(id =>
+        prev.some(m => m.id === id && m.body === incoming.body)
+      )
+      if (matchedId) {
+        pendingOptimisticIds.current.delete(matchedId)
+        return prev.map(m => m.id === matchedId ? incoming : m)
       }
-    },
-    onReadReceipt: ({ conversation_id, read_at }) => {
-      if (conversation_id !== conversationId) return
-      setMessages(prev => prev.map(m =>
-        m.sender_id === currentUserId && !m.read_at ? { ...m, read_at } : m
-      ))
-    },
-    onTyping: (userId, isTyping) => {
-      if (userId === participant?.user_id) {
-        setIsOtherTyping(isTyping)
-        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
-        if (isTyping) typingTimeoutRef.current = setTimeout(() => setIsOtherTyping(false), 3000)
-      }
-    },
-    onPresenceChange: (onlineIds) => {
-      if (participant) setIsOnline(onlineIds.includes(participant.user_id))
-    },
-  })
+      if (prev.some(m => m.id === incoming.id)) return prev
+      return [...prev, incoming]
+    })
+    if (raw.sender_id !== currentUserId) {
+      messagingService.markAsRead(conversationId).catch(() => {})
+    }
+  },
+  onReadReceipt: ({ conversation_id, read_at }) => {
+    if (conversation_id !== conversationId) return
+    setMessages(prev => prev.map(m =>
+      m.sender_id === currentUserId && !m.read_at ? { ...m, read_at } : m
+    ))
+  },
+  onTyping: (userId, isTyping) => {
+    if (userId === participant?.user_id) {
+      setIsOtherTyping(isTyping)
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
+      if (isTyping) typingTimeoutRef.current = setTimeout(() => setIsOtherTyping(false), 3000)
+    }
+  },
+  onPresenceChange: (onlineIds) => {
+    if (participant) setIsOnline(onlineIds.includes(participant.user_id))
+  },
+})
 
   const handleSend = async (body: string, replyToMessageId?: string) => {
     const optimisticId = `optimistic-${Date.now()}`
