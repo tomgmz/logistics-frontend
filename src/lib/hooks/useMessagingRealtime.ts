@@ -10,6 +10,13 @@ interface ReadReceiptPayload {
   read_at: string
 }
 
+// Fired when any member reads a group — used to update seen-by avatars in real time
+export interface GroupReadReceiptPayload {
+  group_id: string
+  user_id: string
+  read_at: string
+}
+
 interface GroupInvitePayload {
   group_id: string
   group_name: string
@@ -25,6 +32,7 @@ interface UseMessagingRealtimeOptions {
   onNewMessage?: (message: MessageRow) => void
   onReadReceipt?: (payload: ReadReceiptPayload) => void
   onGroupMessage?: (message: GroupMessageRaw) => void
+  onGroupReadReceipt?: (payload: GroupReadReceiptPayload) => void
   onGroupInvite?: (payload: GroupInvitePayload) => void
   onTyping?: (userId: string, isTyping: boolean) => void
   onPresenceChange?: (onlineUserIds: string[]) => void
@@ -36,25 +44,28 @@ export function useMessagingRealtime({
   onNewMessage,
   onReadReceipt,
   onGroupMessage,
+  onGroupReadReceipt,
   onGroupInvite,
   onTyping,
   onPresenceChange,
   conversationId,
 }: UseMessagingRealtimeOptions) {
-  const onNewMessageRef = useRef(onNewMessage)
-  const onReadReceiptRef = useRef(onReadReceipt)
-  const onGroupMessageRef = useRef(onGroupMessage)
-  const onGroupInviteRef = useRef(onGroupInvite)
-  const onTypingRef = useRef(onTyping)
-  const onPresenceChangeRef = useRef(onPresenceChange)
-  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+  const onNewMessageRef       = useRef(onNewMessage)
+  const onReadReceiptRef      = useRef(onReadReceipt)
+  const onGroupMessageRef     = useRef(onGroupMessage)
+  const onGroupReadReceiptRef = useRef(onGroupReadReceipt)
+  const onGroupInviteRef      = useRef(onGroupInvite)
+  const onTypingRef           = useRef(onTyping)
+  const onPresenceChangeRef   = useRef(onPresenceChange)
+  const channelRef            = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
-  useEffect(() => { onNewMessageRef.current = onNewMessage }, [onNewMessage])
-  useEffect(() => { onReadReceiptRef.current = onReadReceipt }, [onReadReceipt])
-  useEffect(() => { onGroupMessageRef.current = onGroupMessage }, [onGroupMessage])
-  useEffect(() => { onGroupInviteRef.current = onGroupInvite }, [onGroupInvite])
-  useEffect(() => { onTypingRef.current = onTyping }, [onTyping])
-  useEffect(() => { onPresenceChangeRef.current = onPresenceChange }, [onPresenceChange])
+  useEffect(() => { onNewMessageRef.current       = onNewMessage },       [onNewMessage])
+  useEffect(() => { onReadReceiptRef.current      = onReadReceipt },      [onReadReceipt])
+  useEffect(() => { onGroupMessageRef.current     = onGroupMessage },     [onGroupMessage])
+  useEffect(() => { onGroupReadReceiptRef.current = onGroupReadReceipt }, [onGroupReadReceipt])
+  useEffect(() => { onGroupInviteRef.current      = onGroupInvite },      [onGroupInvite])
+  useEffect(() => { onTypingRef.current           = onTyping },           [onTyping])
+  useEffect(() => { onPresenceChangeRef.current   = onPresenceChange },   [onPresenceChange])
 
   useEffect(() => {
     if (!currentUserId) return
@@ -80,6 +91,11 @@ export function useMessagingRealtime({
       .on('broadcast', { event: 'new_group_message' }, ({ payload }: { payload: GroupMessageRaw }) => {
         onGroupMessageRef.current?.(payload)
       })
+      // ── Seen-by: fired by server when any member calls markGroupRead ──────
+      .on('broadcast', { event: 'group_read_receipt' }, ({ payload }: { payload: GroupReadReceiptPayload }) => {
+        if (payload.user_id === currentUserId) return // ignore own echoes
+        onGroupReadReceiptRef.current?.(payload)
+      })
       .on('broadcast', { event: 'group_invite' }, ({ payload }: { payload: GroupInvitePayload }) => {
         onGroupInviteRef.current?.(payload)
       })
@@ -89,14 +105,13 @@ export function useMessagingRealtime({
       })
       .on('presence', { event: 'sync' }, () => {
         const state = channel.presenceState<PresenceState>()
-        const onlineIds = Object.keys(state)
-        onPresenceChangeRef.current?.(onlineIds)
+        onPresenceChangeRef.current?.(Object.keys(state))
       })
-      .on('presence', { event: 'join' }, ({ key }: { key: string }) => {
+      .on('presence', { event: 'join' }, () => {
         const state = channel.presenceState<PresenceState>()
         onPresenceChangeRef.current?.(Object.keys(state))
       })
-      .on('presence', { event: 'leave' }, ({ key }: { key: string }) => {
+      .on('presence', { event: 'leave' }, () => {
         const state = channel.presenceState<PresenceState>()
         onPresenceChangeRef.current?.(Object.keys(state))
       })
@@ -114,7 +129,6 @@ export function useMessagingRealtime({
     }
   }, [currentUserId, conversationId])
 
-  // Expose a function to broadcast typing state
   const broadcastTyping = useCallback((isTyping: boolean) => {
     channelRef.current?.send({
       type: 'broadcast',

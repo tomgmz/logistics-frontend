@@ -17,6 +17,7 @@ interface MessageInputProps {
   disabled?: boolean
   replyTo?: ReplyTo | null
   onCancelReply?: () => void
+  compact?: boolean
 }
 
 export default function MessageInput({
@@ -97,7 +98,11 @@ export default function MessageInput({
                 <p className="ff-body text-[10px] text-[var(--color-cyan)]/70 truncate">{replyTo.senderName}</p>
                 <p className="ff-body text-[11px] text-white/40 truncate">{replyTo.content}</p>
               </div>
-              <button type="button" onClick={onCancelReply} className="p-1 rounded-lg hover:bg-white/5 text-white/30 hover:text-white/60 transition-colors">
+              <button
+                type="button"
+                onClick={onCancelReply}
+                className="p-1 rounded-lg hover:bg-white/5 text-white/30 hover:text-white/60 transition-colors"
+              >
                 <X size={12} />
               </button>
             </div>

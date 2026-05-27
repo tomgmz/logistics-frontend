@@ -1,3 +1,5 @@
+'use client'
+
 export type ConversationContextType = 'direct' | 'booking_transit'
 
 export type UserRole =
@@ -145,6 +147,8 @@ export interface GroupMessageRaw {
 export interface GroupMemberRaw {
   status: 'pending' | 'accepted' | 'declined'
   invited_by: string
+  // ── Added by migration ──────────────────────────────────────────────────
+  last_read_at: string | null
   user: {
     user_id: string
     first_name: string | null
@@ -188,6 +192,8 @@ export interface GroupMember {
   email: string
   status: 'pending' | 'accepted' | 'declined'
   invited_by: string
+  // ── For seen-by UI ─────────────────────────────────────────────────────
+  last_read_at: string | null
 }
 
 export interface Group {
@@ -216,6 +222,7 @@ export function toGroup(raw: GroupRaw): Group {
       email: m.user.email,
       status: m.status,
       invited_by: m.invited_by,
+      last_read_at: m.last_read_at ?? null,
     })),
     last_message: raw.last_message
       ? {

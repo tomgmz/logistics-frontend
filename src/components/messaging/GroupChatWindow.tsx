@@ -7,7 +7,7 @@ import { messagingService } from '@/lib/services/messaging.service'
 import { useMessagingRealtime } from '@/lib/hooks/useMessagingRealtime'
 import MessageInput from './MessageInput'
 import { groupMessagesByDate } from '@/app/utils/messaging.utils'
-import type { Group, GroupMessage, GroupMessageRaw } from '@/app/types/messaging/messaging.types'
+import type { Group, GroupMessage, GroupMessageRaw, GroupMember } from '@/app/types/messaging/messaging.types'
 import { toGroupMessage } from '@/app/types/messaging/messaging.types'
 import { QuickReactBar } from './EmojiPicker'
 import { formatMessageTime } from '@/app/utils/messaging.utils'
@@ -47,27 +47,75 @@ type RawWithExtras = GroupMessageRaw & {
   reactions?: GroupMsgReaction[]
 }
 
+// ─── Seen-by helper ───────────────────────────────────────────────────────────
+// Returns members (excluding sender + current user) who have read at least this message.
+function getSeenBy(
+  members: GroupMember[],
+  msgCreatedAt: string,
+  senderId: string,
+  currentUserId: string
+): GroupMember[] {
+  return members.filter(
+    m =>
+      m.status === 'accepted' &&
+      m.user_id !== senderId &&
+      m.user_id !== currentUserId &&
+      m.last_read_at !== null &&
+      m.last_read_at >= msgCreatedAt
+  )
+}
+
+// Small avatar strip shown under a message — max 3 + overflow count
+function SeenByAvatars({ seenBy }: { seenBy: GroupMember[] }) {
+  if (seenBy.length === 0) return null
+  const visible = seenBy.slice(0, 3)
+  const overflow = seenBy.length - visible.length
+  return (
+    <div className="flex items-center gap-0.5 mt-0.5 justify-end">
+      {visible.map(m => (
+        <div
+          key={m.user_id}
+          title={`${m.first_name} ${m.last_name}`}
+          className="w-3.5 h-3.5 rounded-full bg-[var(--color-surface-dark)] border border-white/20 flex items-center justify-center"
+        >
+          <span className="font-card text-[0.35rem] text-white/70 leading-none">
+            {(m.first_name[0] ?? '?').toUpperCase()}
+          </span>
+        </div>
+      ))}
+      {overflow > 0 && (
+        <span className="ff-body text-[9px] text-white/30">+{overflow}</span>
+      )}
+    </div>
+  )
+}
+
 export default function GroupChatWindow({ group, currentUserId, onBack, onInviteResponded }: GroupChatWindowProps) {
-  const bottomRef = useRef<HTMLDivElement>(null)
-  const [messages, setMessages] = useState<GroupMsg[]>([])
-  const [loading, setLoading] = useState(true)
-  const [sending, setSending] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [typingUsers, setTypingUsers] = useState<Record<string, string>>({})
-  const [onlineUserIds, setOnlineUserIds] = useState<string[]>([])
-  const typingTimeoutsRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
-  const pendingOptimisticIds = useRef<Set<string>>(new Set())
-  const [inviteStatus, setInviteStatus] = useState<'pending' | 'accepted' | 'declined'>(group.my_status)
-  const [inviteResponding, setInviteResponding] = useState<'accept' | 'decline' | null>(null)
-  const [replyTo, setReplyTo] = useState<ReplyTo | null>(null)
-  const [hoveredMsgId, setHoveredMsgId] = useState<string | null>(null)
+  const bottomRef    = useRef<HTMLDivElement>(null)
   const hoverTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const isPending = inviteStatus === 'pending'
-  const acceptedMembers = group.members.filter(m => m.status === 'accepted')
-  const memberMap = Object.fromEntries(group.members.map(m => [m.user_id, m]))
-  const invitedByMember = memberMap[group.members.find(m => m.user_id === currentUserId)?.invited_by ?? '']
-  const invitedByName = invitedByMember ? `${invitedByMember.first_name} ${invitedByMember.last_name}` : 'Someone'
+  const [messages, setMessages]           = useState<GroupMsg[]>([])
+  const [loading, setLoading]             = useState(true)
+  const [sending, setSending]             = useState(false)
+  const [error, setError]                 = useState<string | null>(null)
+  const [typingUsers, setTypingUsers]     = useState<Record<string, string>>({})
+  const [onlineUserIds, setOnlineUserIds] = useState<string[]>([])
+  const [inviteStatus, setInviteStatus]   = useState<'pending' | 'accepted' | 'declined'>(group.my_status)
+  const [inviteResponding, setInviteResponding] = useState<'accept' | 'decline' | null>(null)
+  const [replyTo, setReplyTo]             = useState<ReplyTo | null>(null)
+  const [hoveredMsgId, setHoveredMsgId]   = useState<string | null>(null)
+
+  // Local copy of members so we can update last_read_at in real time for seen-by
+  const [members, setMembers]             = useState<GroupMember[]>(group.members)
+
+  const typingTimeoutsRef      = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const pendingOptimisticIds   = useRef<Set<string>>(new Set())
+
+  const isPending       = inviteStatus === 'pending'
+  const acceptedMembers = members.filter(m => m.status === 'accepted')
+  const memberMap       = Object.fromEntries(members.map(m => [m.user_id, m]))
+  const invitedByMember = memberMap[members.find(m => m.user_id === currentUserId)?.invited_by ?? '']
+  const invitedByName   = invitedByMember ? `${invitedByMember.first_name} ${invitedByMember.last_name}` : 'Someone'
 
   const toGroupMsg = useCallback((r: GroupMessageRaw): GroupMsg => {
     const raw = r as RawWithExtras
@@ -86,7 +134,9 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
       const raw = await messagingService.getGroupMessages(group.id)
       const msgs = raw.map(toGroupMsg)
       setMessages(msgs)
-      if (msgs.length > 0) messagingService.markGroupRead(group.id, msgs.map(m => m.id)).catch(() => {})
+      if (msgs.length > 0) {
+        messagingService.markGroupRead(group.id, msgs.map(m => m.id)).catch(() => {})
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load messages')
     } finally {
@@ -128,13 +178,24 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
         if (prev.some(m => m.id === incoming.id)) return prev
         return [...prev, incoming]
       })
-      if (raw.sender_id !== currentUserId) messagingService.markGroupRead(group.id, [incoming.id]).catch(() => {})
+      if (raw.sender_id !== currentUserId) {
+        messagingService.markGroupRead(group.id, [incoming.id]).catch(() => {})
+      }
+    },
+    // ── Real-time seen-by: update the member's last_read_at when they read ──
+    onGroupReadReceipt: ({ user_id, read_at }) => {
+      setMembers(prev => prev.map(m =>
+        m.user_id === user_id ? { ...m, last_read_at: read_at } : m
+      ))
     },
     onTyping: (userId, isTyping) => {
       if (userId === currentUserId) return
       const member = memberMap[userId]
       const name = member ? member.first_name : 'Someone'
-      if (typingTimeoutsRef.current[userId]) { clearTimeout(typingTimeoutsRef.current[userId]); delete typingTimeoutsRef.current[userId] }
+      if (typingTimeoutsRef.current[userId]) {
+        clearTimeout(typingTimeoutsRef.current[userId])
+        delete typingTimeoutsRef.current[userId]
+      }
       if (isTyping) {
         setTypingUsers(prev => ({ ...prev, [userId]: name }))
         typingTimeoutsRef.current[userId] = setTimeout(() => {
@@ -177,22 +238,37 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
   }
 
   const handleReact = async (messageId: string, emoji: string) => {
+    // Optimistic update: replace existing reaction for this user or add new
     setMessages(prev => prev.map(m => {
       if (m.id !== messageId) return m
-      const existing = m.reactions.find(r => r.user_id === currentUserId && r.emoji === emoji)
-      const newReactions: GroupMsgReaction[] = existing
-        ? m.reactions.filter(r => !(r.user_id === currentUserId && r.emoji === emoji))
-        : [...m.reactions, { emoji, user_id: currentUserId }]
+      const hasOtherReaction = m.reactions.some(r => r.user_id === currentUserId && r.emoji !== emoji)
+      const hasSameReaction  = m.reactions.some(r => r.user_id === currentUserId && r.emoji === emoji)
+      let newReactions: GroupMsgReaction[]
+      if (hasSameReaction) {
+        // Toggle off
+        newReactions = m.reactions.filter(r => !(r.user_id === currentUserId && r.emoji === emoji))
+      } else if (hasOtherReaction) {
+        // Replace
+        newReactions = [
+          ...m.reactions.filter(r => r.user_id !== currentUserId),
+          { emoji, user_id: currentUserId },
+        ]
+      } else {
+        // Add new
+        newReactions = [...m.reactions, { emoji, user_id: currentUserId }]
+      }
       return { ...m, reactions: newReactions }
     }))
     try {
       await messagingService.reactToGroupMessage(group.id, messageId, emoji)
-    } catch { fetchMessages() }
+    } catch {
+      fetchMessages()
+    }
   }
 
   const typingNames = Object.values(typingUsers)
-  const typingLabel = typingNames.length === 1
-    ? `${typingNames[0]} is typing`
+  const typingLabel =
+    typingNames.length === 1 ? `${typingNames[0]} is typing`
     : typingNames.length === 2 ? `${typingNames[0]} and ${typingNames[1]} are typing`
     : typingNames.length > 2 ? 'Several people are typing' : null
 
@@ -293,21 +369,29 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
                   <div className="flex-1 h-px bg-white/[0.04]" />
                 </div>
                 {groupMsgs.map((msg, i) => {
-                  const isMine = msg.sender_id === currentUserId
-                  const sender = memberMap[msg.sender_id]
-                  const prevMsg = groupMsgs[i - 1]
-                  const showName = !isMine && prevMsg?.sender_id !== msg.sender_id
-                  const showAvatar = !isMine && (groupMsgs[i + 1]?.sender_id !== msg.sender_id || i === groupMsgs.length - 1)
-                  const senderInitials = sender ? `${sender.first_name?.[0] ?? '?'}${sender.last_name?.[0] ?? '?'}`.toUpperCase() : '?'
-                  const isSenderOnline = sender ? onlineUserIds.includes(sender.user_id) : false
+                  const isMine            = msg.sender_id === currentUserId
+                  const sender            = memberMap[msg.sender_id]
+                  const prevMsg           = groupMsgs[i - 1]
+                  const showName          = !isMine && prevMsg?.sender_id !== msg.sender_id
+                  const showAvatar        = !isMine && (groupMsgs[i + 1]?.sender_id !== msg.sender_id || i === groupMsgs.length - 1)
+                  const senderInitials    = sender ? `${sender.first_name?.[0] ?? '?'}${sender.last_name?.[0] ?? '?'}`.toUpperCase() : '?'
+                  const isSenderOnline    = sender ? onlineUserIds.includes(sender.user_id) : false
+                  const isOptimistic      = msg.id.startsWith('optimistic-')
+
                   const groupedReactions = [...new Map(msg.reactions.map(r => [r.emoji, null])).keys()].map(emoji => ({
                     emoji,
                     count: msg.reactions.filter(r => r.emoji === emoji).length,
                     reacted: msg.reactions.some(r => r.emoji === emoji && r.user_id === currentUserId),
                   }))
+
                   const replyToSenderName = msg.reply_to
                     ? (msg.reply_to.sender_id === currentUserId ? 'You' : memberMap[msg.reply_to.sender_id]?.first_name ?? 'Someone')
                     : undefined
+
+                  // ── Seen-by: only for non-optimistic messages sent by me ──────────
+                  const seenBy = (!isOptimistic && isMine)
+                    ? getSeenBy(members, msg.created_at, msg.sender_id, currentUserId)
+                    : []
 
                   return (
                     <div
@@ -365,7 +449,7 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
                               className="p-1.5 rounded-lg hover:bg-white/5 text-white/25 hover:text-white/60 transition-colors"
                             ><ReplyIcon size={13} /></motion.button>
                           )}
-                          <div className={`px-3 py-2 rounded-2xl ff-body text-[13px] leading-relaxed break-words ${isMine ? 'bg-[var(--color-cyan)] text-[var(--color-bg)] rounded-br-sm' : 'glass-surface text-white border border-white/[0.06] rounded-bl-sm'}`}>
+                          <div className={`px-3 py-2 rounded-2xl ff-body text-[13px] leading-relaxed break-words ${isMine ? 'bg-[var(--color-cyan)] text-[var(--color-bg)] rounded-br-sm' : 'glass-surface text-white border border-white/[0.06] rounded-bl-sm'} ${isOptimistic ? 'opacity-70' : ''}`}>
                             {msg.body}
                           </div>
                           {!isMine && hoveredMsgId === msg.id && (
@@ -384,12 +468,15 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
                               <button key={r.emoji} type="button" onClick={() => handleReact(msg.id, r.emoji)}
                                 className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border transition-all ${r.reacted ? 'bg-[var(--color-cyan)]/15 border-[var(--color-cyan)]/30' : 'bg-white/[0.05] border-white/10 hover:bg-white/10'}`}
                               >
-                                <span className="text-[13px] leading-none" style={{ fontFamily: 'Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif' }}>{r.emoji}</span>
+                                <span className="text-[13px] leading-none">{r.emoji}</span>
                                 {r.count > 1 && <span className="ff-body text-[10px] text-white/50">{r.count}</span>}
                               </button>
                             ))}
                           </div>
                         )}
+
+                        {/* ── Seen-by avatars ──────────────────────────────── */}
+                        {isMine && <SeenByAvatars seenBy={seenBy} />}
                       </div>
                     </div>
                   )
