@@ -1,4 +1,4 @@
-'use client'
+// ─── Shared ───────────────────────────────────────────────────────────────────
 
 export type ConversationContextType = 'direct' | 'booking_transit'
 
@@ -13,20 +13,10 @@ export type UserRole =
   | 'vendor'
   | 'it_admin'
 
-export interface ConversationParticipant {
-  user_id: string
-  first_name: string | null
-  last_name: string | null
-  role: UserRole
-  email: string
-}
+export interface MessageReaction  { emoji: string; user_id: string }
+export interface MessageReplyTo   { message_id: string; content: string; sender_id: string }
 
-export interface ConversationLastMessage {
-  message_id: string
-  content: string
-  sent_at: string
-  sender_id: string
-}
+// ─── DM raw (mirrors backend API) ────────────────────────────────────────────
 
 export interface ConversationWithDetails {
   conversation_id: string
@@ -37,8 +27,14 @@ export interface ConversationWithDetails {
   created_at: string
   updated_at: string
   last_message_at: string | null
-  other_user: ConversationParticipant
-  last_message: ConversationLastMessage | null
+  other_user: {
+    user_id: string
+    first_name: string | null
+    last_name: string | null
+    role: UserRole
+    email: string
+  }
+  last_message: { message_id: string; content: string; sent_at: string; sender_id: string } | null
   unread_count: number
 }
 
@@ -53,6 +49,9 @@ export interface MessageRow {
   read_at: string | null
   deleted_by_sender: boolean
   deleted_by_receiver: boolean
+  reply_to_message_id: string | null
+  reply_to: MessageReplyTo | null
+  reactions: MessageReaction[]
 }
 
 export interface MessagableUser {
@@ -63,6 +62,8 @@ export interface MessagableUser {
   email: string
   booking_id?: string
 }
+
+// ─── DM UI ────────────────────────────────────────────────────────────────────
 
 export interface MessageParticipant {
   user_id: string
@@ -80,17 +81,14 @@ export interface Message {
   body: string
   created_at: string
   read_at: string | null
+  reply_to: MessageReplyTo | null
+  reactions: MessageReaction[]
 }
 
 export interface Conversation {
   id: string
   participants: MessageParticipant[]
-  last_message: {
-    message_id: string
-    body: string
-    created_at: string
-    sender_id: string
-  } | null
+  last_message: { message_id: string; body: string; created_at: string; sender_id: string } | null
   unread_count: number
   context_type: ConversationContextType
   booking_id: string | null
@@ -99,42 +97,40 @@ export interface Conversation {
 export function toConversation(raw: ConversationWithDetails): Conversation {
   return {
     id: raw.conversation_id,
-    participants: [
-      {
-        user_id: raw.other_user.user_id,
-        first_name: raw.other_user.first_name ?? '',
-        last_name: raw.other_user.last_name ?? '',
-        role: raw.other_user.role,
-        email: raw.other_user.email,
-        is_online: false,
-      },
-    ],
-    last_message: raw.last_message
-      ? {
-          message_id: raw.last_message.message_id,
-          body: raw.last_message.content,
-          created_at: raw.last_message.sent_at,
-          sender_id: raw.last_message.sender_id,
-        }
-      : null,
+    participants: [{
+      user_id: raw.other_user.user_id,
+      first_name: raw.other_user.first_name ?? '',
+      last_name:  raw.other_user.last_name  ?? '',
+      role:       raw.other_user.role,
+      email:      raw.other_user.email,
+      is_online:  false,
+    }],
+    last_message: raw.last_message ? {
+      message_id: raw.last_message.message_id,
+      body:       raw.last_message.content,
+      created_at: raw.last_message.sent_at,
+      sender_id:  raw.last_message.sender_id,
+    } : null,
     unread_count: raw.unread_count,
     context_type: raw.context_type,
-    booking_id: raw.booking_id,
+    booking_id:   raw.booking_id,
   }
 }
 
 export function toMessage(raw: MessageRow): Message {
   return {
-    id: raw.message_id,
+    id:              raw.message_id,
     conversation_id: raw.conversation_id,
-    sender_id: raw.sender_id,
-    body: raw.content,
-    created_at: raw.sent_at,
-    read_at: raw.read_at,
+    sender_id:       raw.sender_id,
+    body:            raw.content,
+    created_at:      raw.sent_at,
+    read_at:         raw.read_at,
+    reply_to:        raw.reply_to,
+    reactions:       raw.reactions ?? [],
   }
 }
 
-// ─── Group raw shapes (mirrors backend API response) ─────────────────────────
+// ─── Group raw (mirrors backend API) ─────────────────────────────────────────
 
 export interface GroupMessageRaw {
   message_id: string
@@ -142,13 +138,15 @@ export interface GroupMessageRaw {
   sender_id: string
   content: string
   sent_at: string
+  reply_to_message_id: string | null
+  reply_to: MessageReplyTo | null
+  reactions: MessageReaction[]
 }
 
 export interface GroupMemberRaw {
   status: 'pending' | 'accepted' | 'declined'
   invited_by: string
-  // ── Added by migration ──────────────────────────────────────────────────
-  last_read_at: string | null
+  last_read_at: string | null        // Used for seen-by UI
   user: {
     user_id: string
     first_name: string | null
@@ -164,17 +162,12 @@ export interface GroupRaw {
   created_by: string
   created_at: string
   members: GroupMemberRaw[]
-  last_message: {
-    message_id: string
-    content: string
-    sent_at: string
-    sender_id: string
-  } | null
+  last_message: { message_id: string; content: string; sent_at: string; sender_id: string } | null
   unread_count: number
   my_status: 'pending' | 'accepted' | 'declined'
 }
 
-// ─── Group UI shapes ──────────────────────────────────────────────────────────
+// ─── Group UI ─────────────────────────────────────────────────────────────────
 
 export interface GroupMessage {
   id: string
@@ -182,6 +175,8 @@ export interface GroupMessage {
   sender_id: string
   body: string
   created_at: string
+  reply_to: MessageReplyTo | null
+  reactions: MessageReaction[]
 }
 
 export interface GroupMember {
@@ -192,7 +187,6 @@ export interface GroupMember {
   email: string
   status: 'pending' | 'accepted' | 'declined'
   invited_by: string
-  // ── For seen-by UI ─────────────────────────────────────────────────────
   last_read_at: string | null
 }
 
@@ -207,56 +201,54 @@ export interface Group {
   created_at: string
 }
 
-// ─── Group adapters ───────────────────────────────────────────────────────────
-
 export function toGroup(raw: GroupRaw): Group {
   return {
-    id: raw.group_id,
-    name: raw.name,
+    id:         raw.group_id,
+    name:       raw.name,
     created_by: raw.created_by,
-    members: raw.members.map((m: GroupMemberRaw) => ({
-      user_id: m.user.user_id,
-      first_name: m.user.first_name ?? '',
-      last_name: m.user.last_name ?? '',
-      role: m.user.role,
-      email: m.user.email,
-      status: m.status,
-      invited_by: m.invited_by,
+    created_at: raw.created_at,
+    members: raw.members.map(m => ({
+      user_id:      m.user.user_id,
+      first_name:   m.user.first_name ?? '',
+      last_name:    m.user.last_name  ?? '',
+      role:         m.user.role,
+      email:        m.user.email,
+      status:       m.status,
+      invited_by:   m.invited_by,
       last_read_at: m.last_read_at ?? null,
     })),
-    last_message: raw.last_message
-      ? {
-          message_id: raw.last_message.message_id,
-          body: raw.last_message.content,
-          created_at: raw.last_message.sent_at,
-          sender_id: raw.last_message.sender_id,
-        }
-      : null,
+    last_message: raw.last_message ? {
+      message_id: raw.last_message.message_id,
+      body:       raw.last_message.content,
+      created_at: raw.last_message.sent_at,
+      sender_id:  raw.last_message.sender_id,
+    } : null,
     unread_count: raw.unread_count ?? 0,
-    my_status: raw.my_status ?? 'pending',
-    created_at: raw.created_at,
+    my_status:    raw.my_status   ?? 'pending',
   }
 }
 
 export function toGroupMessage(raw: GroupMessageRaw): GroupMessage {
   return {
-    id: raw.message_id,
-    group_id: raw.group_id,
-    sender_id: raw.sender_id,
-    body: raw.content,
+    id:         raw.message_id,
+    group_id:   raw.group_id,
+    sender_id:  raw.sender_id,
+    body:       raw.content,
     created_at: raw.sent_at,
+    reply_to:   raw.reply_to   ?? null,
+    reactions:  raw.reactions  ?? [],
   }
 }
 
+// ─── Unified list ─────────────────────────────────────────────────────────────
+
 export type UnifiedListItem =
-  | { kind: 'dm'; data: Conversation }
+  | { kind: 'dm';    data: Conversation }
   | { kind: 'group'; data: Group }
 
-export function unifiedLastMessageAt(item: UnifiedListItem): string | null {
-  const msg = item.kind === 'dm' ? item.data.last_message : item.data.last_message
-  return msg?.created_at ?? null
-}
+// ─── Realtime payloads ────────────────────────────────────────────────────────
 
-export interface MessageReaction { emoji: string; user_id: string }
-export interface MessageReplyTo { message_id: string; content: string; sender_id: string }
-export type RichMessage = Message & { reply_to: MessageReplyTo | null; reactions: MessageReaction[] }
+export interface ReadReceiptPayload      { conversation_id: string; read_at: string }
+export interface GroupReadReceiptPayload { group_id: string; user_id: string; read_at: string }
+export interface GroupInvitePayload      { group_id: string; group_name: string }
+export interface ReactionTogglePayload   { message_id: string; user_id: string; emoji: string; action: 'added' | 'removed'; group_id?: string }

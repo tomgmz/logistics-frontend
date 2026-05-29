@@ -10,119 +10,94 @@ function getMaxBubbles(): number {
   return window.innerWidth >= 1280 ? MAX_BUBBLES_LG : MAX_BUBBLES_MD
 }
 
-export type ChatEntry =
-  | { kind: 'dm'; id: string }
-  | { kind: 'group'; id: string }
+export type ChatEntry = { kind: 'dm'; id: string } | { kind: 'group'; id: string }
 
 interface MessengerStore {
-  isPanelOpen: boolean
-  openChats: ChatEntry[]
+  isPanelOpen:    boolean
+  openChats:      ChatEntry[]
   minimizedChats: ChatEntry[]
-  totalUnread: number
-  togglePanel: () => void
-  closePanel: () => void
-  openChat: (id: string, unreadCount?: number) => void
-  openGroupChat: (id: string, unreadCount?: number) => void
-  closeChat: (id: string) => void
-  minimizeChat: (id: string) => void
+  totalUnread:    number
+  togglePanel:        () => void
+  closePanel:         () => void
+  openChat:           (id: string, unreadCount?: number) => void
+  openGroupChat:      (id: string, unreadCount?: number) => void
+  closeChat:          (id: string) => void
+  minimizeChat:       (id: string) => void
   toggleMinimizeChat: (id: string) => void
-  setTotalUnread: (count: number) => void
-  incrementUnread: () => void
-  decrementUnread: (by: number) => void
-  // legacy compat
-  openChatIds: string[]
-  minimizedChatIds: string[]
+  setTotalUnread:     (count: number) => void
+  incrementUnread:    () => void
+  decrementUnread:    (by: number) => void
 }
 
 export const useMessengerStore = create<MessengerStore>((set, get) => ({
-  isPanelOpen: false,
-  openChats: [],
+  isPanelOpen:    false,
+  openChats:      [],
   minimizedChats: [],
-  totalUnread: 0,
-
-  get openChatIds() {
-    return get().openChats.map(c => c.id)
-  },
-  get minimizedChatIds() {
-    return get().minimizedChats.map(c => c.id)
-  },
+  totalUnread:    0,
 
   togglePanel: () => set(s => ({ isPanelOpen: !s.isPanelOpen })),
-  closePanel: () => set({ isPanelOpen: false }),
+  closePanel:  () => set({ isPanelOpen: false }),
 
-  openChat: (id, unreadCount = 0) =>
-    set(s => {
-      const max = getMaxBubbles()
-      const already = s.openChats.some(c => c.id === id)
-      const entry: ChatEntry = { kind: 'dm', id }
-      const newChats = already
-        ? s.openChats
-        : [...s.openChats.slice(-(max - 1)), entry]
-      return {
-        isPanelOpen: false,
-        openChats: newChats,
-        minimizedChats: s.minimizedChats.filter(c => c.id !== id),
-        totalUnread: Math.max(0, s.totalUnread - unreadCount),
-      }
-    }),
-
-  openGroupChat: (id, unreadCount = 0) =>
-    set(s => {
-      const max = getMaxBubbles()
-      const already = s.openChats.some(c => c.id === id)
-      const entry: ChatEntry = { kind: 'group', id }
-      const newChats = already
-        ? s.openChats
-        : [...s.openChats.slice(-(max - 1)), entry]
-      return {
-        isPanelOpen: false,
-        openChats: newChats,
-        minimizedChats: s.minimizedChats.filter(c => c.id !== id),
-        totalUnread: Math.max(0, s.totalUnread - unreadCount),
-      }
-    }),
-
-  closeChat: (id) =>
-    set(s => ({
-      openChats: s.openChats.filter(c => c.id !== id),
+  openChat: (id, unreadCount = 0) => set(s => {
+    const max = getMaxBubbles()
+    if (s.openChats.some(c => c.id === id)) return { isPanelOpen: false }
+    const entry: ChatEntry = { kind: 'dm', id }
+    return {
+      isPanelOpen:    false,
+      openChats:      [...s.openChats.slice(-(max - 1)), entry],
       minimizedChats: s.minimizedChats.filter(c => c.id !== id),
-    })),
+      totalUnread:    Math.max(0, s.totalUnread - unreadCount),
+    }
+  }),
 
-  minimizeChat: (id) =>
-    set(s => {
-      const entry = s.openChats.find(c => c.id === id)
-      if (!entry) return {}
+  openGroupChat: (id, unreadCount = 0) => set(s => {
+    const max = getMaxBubbles()
+    if (s.openChats.some(c => c.id === id)) return { isPanelOpen: false }
+    const entry: ChatEntry = { kind: 'group', id }
+    return {
+      isPanelOpen:    false,
+      openChats:      [...s.openChats.slice(-(max - 1)), entry],
+      minimizedChats: s.minimizedChats.filter(c => c.id !== id),
+      totalUnread:    Math.max(0, s.totalUnread - unreadCount),
+    }
+  }),
+
+  closeChat: (id) => set(s => ({
+    openChats:      s.openChats.filter(c => c.id !== id),
+    minimizedChats: s.minimizedChats.filter(c => c.id !== id),
+  })),
+
+  minimizeChat: (id) => set(s => {
+    const entry = s.openChats.find(c => c.id === id)
+    if (!entry) return {}
+    return {
+      openChats:      s.openChats.filter(c => c.id !== id),
+      minimizedChats: s.minimizedChats.some(c => c.id === id)
+        ? s.minimizedChats
+        : [...s.minimizedChats.slice(-2), entry],
+    }
+  }),
+
+  toggleMinimizeChat: (id) => set(s => {
+    if (s.minimizedChats.some(c => c.id === id)) {
+      const max   = getMaxBubbles()
+      const entry = s.minimizedChats.find(c => c.id === id)!
       return {
-        openChats: s.openChats.filter(c => c.id !== id),
-        minimizedChats: s.minimizedChats.some(c => c.id === id)
-          ? s.minimizedChats
-          : [...s.minimizedChats.slice(-2), entry],
-      }
-    }),
-
-  toggleMinimizeChat: (id) =>
-    set(s => {
-      const isMinimized = s.minimizedChats.some(c => c.id === id)
-      if (isMinimized) {
-        const max = getMaxBubbles()
-        const entry = s.minimizedChats.find(c => c.id === id)!
-        const newOpen = s.openChats.some(c => c.id === id)
+        openChats:      s.openChats.some(c => c.id === id)
           ? s.openChats
-          : [...s.openChats.slice(-(max - 1)), entry]
-        return {
-          openChats: newOpen,
-          minimizedChats: s.minimizedChats.filter(c => c.id !== id),
-        }
+          : [...s.openChats.slice(-(max - 1)), entry],
+        minimizedChats: s.minimizedChats.filter(c => c.id !== id),
       }
-      const entry = s.openChats.find(c => c.id === id)
-      if (!entry) return {}
-      return {
-        openChats: s.openChats.filter(c => c.id !== id),
-        minimizedChats: [...s.minimizedChats.slice(-2), entry],
-      }
-    }),
+    }
+    const entry = s.openChats.find(c => c.id === id)
+    if (!entry) return {}
+    return {
+      openChats:      s.openChats.filter(c => c.id !== id),
+      minimizedChats: [...s.minimizedChats.slice(-2), entry],
+    }
+  }),
 
-  setTotalUnread: (count) => set({ totalUnread: count }),
-  incrementUnread: () => set(s => ({ totalUnread: s.totalUnread + 1 })),
-  decrementUnread: (by) => set(s => ({ totalUnread: Math.max(0, s.totalUnread - by) })),
+  setTotalUnread:  (count) => set({ totalUnread: count }),
+  incrementUnread: ()      => set(s => ({ totalUnread: s.totalUnread + 1 })),
+  decrementUnread: (by)    => set(s => ({ totalUnread: Math.max(0, s.totalUnread - by) })),
 }))

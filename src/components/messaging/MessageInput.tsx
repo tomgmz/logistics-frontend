@@ -5,19 +5,20 @@ import { Send, Smile, X, CornerUpLeft } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import EmojiPicker from './EmojiPicker'
 
-interface ReplyTo {
+export interface ReplyToPreview {
   messageId: string
   content: string
   senderName: string
 }
 
 interface MessageInputProps {
-  onSend: (body: string, replyToMessageId?: string) => void
+  onSend:          (body: string, replyToMessageId?: string) => void
   onTypingChange?: (isTyping: boolean) => void
-  disabled?: boolean
-  replyTo?: ReplyTo | null
-  onCancelReply?: () => void
-  compact?: boolean
+  disabled?:       boolean
+  replyTo?:        ReplyToPreview | null
+  onCancelReply?:  () => void
+  /** compact=true: used inside floating bubbles — tighter padding, single-line feel */
+  compact?:        boolean
 }
 
 export default function MessageInput({
@@ -26,45 +27,48 @@ export default function MessageInput({
   disabled,
   replyTo,
   onCancelReply,
+  compact = false,
 }: MessageInputProps) {
-  const [text, setText] = useState('')
+  const [text, setText]           = useState('')
   const [showEmoji, setShowEmoji] = useState(false)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const isTypingRef = useRef(false)
+  const textareaRef               = useRef<HTMLTextAreaElement>(null)
+  const typingTimeout             = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isTyping                  = useRef(false)
 
   const stopTyping = useCallback(() => {
-    if (isTypingRef.current) {
-      isTypingRef.current = false
-      onTypingChange?.(false)
-    }
+    if (!isTyping.current) return
+    isTyping.current = false
+    onTypingChange?.(false)
   }, [onTypingChange])
 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setText(e.target.value)
+    // Auto-grow
     e.target.style.height = 'auto'
-    e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`
-    if (!isTypingRef.current && e.target.value.trim()) {
-      isTypingRef.current = true
+    e.target.style.height = `${Math.min(e.target.scrollHeight, compact ? 80 : 120)}px`
+
+    if (e.target.value.trim() && !isTyping.current) {
+      isTyping.current = true
       onTypingChange?.(true)
     }
     if (!e.target.value.trim()) stopTyping()
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
-    typingTimeoutRef.current = setTimeout(stopTyping, 2500)
+    if (typingTimeout.current) clearTimeout(typingTimeout.current)
+    typingTimeout.current = setTimeout(stopTyping, 2500)
   }
 
-  const handleSend = () => {
+  const handleSend = useCallback(() => {
     const trimmed = text.trim()
     if (!trimmed || disabled) return
     stopTyping()
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
+    if (typingTimeout.current) clearTimeout(typingTimeout.current)
     onSend(trimmed, replyTo?.messageId)
     setText('')
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto'
       textareaRef.current.focus()
     }
-  }
+    setShowEmoji(false)
+  }, [text, disabled, replyTo, onSend, stopTyping])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -79,6 +83,7 @@ export default function MessageInput({
   }
 
   const hasText = text.trim().length > 0
+  const px      = compact ? 'px-2.5 py-2' : 'px-4 py-3'
 
   return (
     <div className="shrink-0 border-t border-white/[0.07] bg-[var(--color-bg)]">
@@ -98,11 +103,7 @@ export default function MessageInput({
                 <p className="ff-body text-[10px] text-[var(--color-cyan)]/70 truncate">{replyTo.senderName}</p>
                 <p className="ff-body text-[11px] text-white/40 truncate">{replyTo.content}</p>
               </div>
-              <button
-                type="button"
-                onClick={onCancelReply}
-                className="p-1 rounded-lg hover:bg-white/5 text-white/30 hover:text-white/60 transition-colors"
-              >
+              <button type="button" onClick={onCancelReply} className="p-1 rounded-lg hover:bg-white/5 text-white/30 hover:text-white/60 transition-colors">
                 <X size={12} />
               </button>
             </div>
@@ -110,15 +111,15 @@ export default function MessageInput({
         )}
       </AnimatePresence>
 
-      <div className="px-4 py-3 flex items-end gap-2">
-        {/* Emoji button */}
-        <div className="relative shrink-0 mb-1">
+      <div className={`${px} flex items-end gap-2`}>
+        {/* Emoji trigger */}
+        <div className="relative shrink-0 mb-0.5">
           <button
             type="button"
             onClick={() => setShowEmoji(v => !v)}
-            className={`p-2 rounded-lg transition-colors ${showEmoji ? 'bg-[var(--color-cyan)]/10 text-[var(--color-cyan)]' : 'hover:bg-white/5 text-white/30 hover:text-white/60'}`}
+            className={`p-1.5 rounded-lg transition-colors ${showEmoji ? 'bg-[var(--color-cyan)]/10 text-[var(--color-cyan)]' : 'hover:bg-white/5 text-white/30 hover:text-white/60'}`}
           >
-            <Smile size={16} />
+            <Smile size={compact ? 14 : 16} />
           </button>
           <AnimatePresence>
             {showEmoji && (
@@ -132,7 +133,7 @@ export default function MessageInput({
         </div>
 
         {/* Textarea */}
-        <div className="flex-1 relative glass rounded-xl border border-white/[0.08] focus-within:border-[var(--color-cyan)]/30 transition-colors overflow-hidden">
+        <div className="flex-1 glass rounded-xl border border-white/[0.08] focus-within:border-[var(--color-cyan)]/30 transition-colors overflow-hidden">
           <textarea
             ref={textareaRef}
             value={text}
@@ -141,8 +142,8 @@ export default function MessageInput({
             placeholder="Type a message…"
             rows={1}
             disabled={disabled}
-            className="w-full bg-transparent px-3.5 py-[13px] ff-body text-sm text-white placeholder:text-white/25 resize-none focus:outline-none overflow-y-auto [&::-webkit-scrollbar]:w-[3px] [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full"
-            style={{ minHeight: '44px', maxHeight: '120px' }}
+            className="w-full bg-transparent px-3 py-2.5 ff-body text-sm text-white placeholder:text-white/25 resize-none focus:outline-none overflow-y-auto [&::-webkit-scrollbar]:w-[3px] [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full"
+            style={{ minHeight: compact ? '36px' : '44px', maxHeight: compact ? '80px' : '120px' }}
           />
         </div>
 
@@ -153,9 +154,9 @@ export default function MessageInput({
           whileTap={hasText ? { scale: 0.94 } : {}}
           onClick={handleSend}
           disabled={!hasText || disabled}
-          className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all mb-1 ${hasText ? 'bg-[var(--color-cyan)] text-[var(--color-bg)] glow-cyan' : 'bg-white/[0.05] text-white/20 cursor-not-allowed'}`}
+          className={`shrink-0 rounded-full flex items-center justify-center transition-all mb-0.5 ${compact ? 'w-8 h-8' : 'w-10 h-10'} ${hasText ? 'bg-[var(--color-cyan)] text-[var(--color-bg)] glow-cyan' : 'bg-white/[0.05] text-white/20 cursor-not-allowed'}`}
         >
-          <Send size={14} />
+          <Send size={compact ? 12 : 14} />
         </motion.button>
       </div>
     </div>

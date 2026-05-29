@@ -7,11 +7,7 @@ import type {
   GroupMessageRaw,
 } from '@/app/types/messaging/messaging.types'
 
-interface ApiResponse<T> {
-  success: boolean
-  data: T
-  message?: string
-}
+interface ApiResponse<T> { success: boolean; data: T; message?: string }
 
 export type { ConversationWithDetails, MessageRow, MessagableUser }
 
@@ -20,7 +16,7 @@ async function get<T>(url: string, params?: Record<string, string | number | und
   return data.data
 }
 
-async function post<T>(url: string, payload: unknown): Promise<T> {
+async function post<T>(url: string, payload?: unknown): Promise<T> {
   await initCsrf()
   const { data } = await proxyApi.post<ApiResponse<T>>(url, payload)
   return data.data
@@ -41,6 +37,7 @@ async function del<T>(url: string): Promise<T> {
 const B = '/messaging'
 
 export const messagingService = {
+  // ── DM ─────────────────────────────────────────────────────────────────────
   getConversations: () =>
     get<ConversationWithDetails[]>(`${B}/conversations`),
 
@@ -68,6 +65,7 @@ export const messagingService = {
   getMessagableUsers: () =>
     get<MessagableUser[]>(`${B}/users`),
 
+  // ── Groups ──────────────────────────────────────────────────────────────────
   getGroups: () =>
     get<GroupRaw[]>(`${B}/groups`),
 
@@ -86,7 +84,8 @@ export const messagingService = {
   sendGroupMessage: (groupId: string, payload: { content: string; reply_to_message_id?: string }) =>
     post<GroupMessageRaw>(`${B}/groups/${groupId}/messages`, payload),
 
-  markGroupRead: (groupId: string, messageIds: string[]) =>
+  // message_ids defaults to [] on the backend — calling with [] updates last_read_at only
+  markGroupRead: (groupId: string, messageIds: string[] = []) =>
     patch<void>(`${B}/groups/${groupId}/read`, { message_ids: messageIds }),
 
   reactToGroupMessage: (groupId: string, messageId: string, emoji: string) =>
