@@ -504,6 +504,9 @@ const AdminDashboard = memo(function AdminDashboard() {
             min-width: 620px;
           }
         }
+        @media (max-width: 400px) {
+          .dash-kpi-grid { grid-template-columns: repeat(1, 1fr); }
+        }
       `}</style>
 
       {/* KPI tiles */}

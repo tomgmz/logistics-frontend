@@ -51,7 +51,7 @@ function StatCard({ value, label, index }: { value: string; label: string; index
         <AnimatedValue raw={value} />
       </span>
 
-      <span className="font-alegreya text-[#555]
+      <span className="ff-sc text-[#555]
         tracking-wider leading-snug uppercase">
         {label}
       </span>

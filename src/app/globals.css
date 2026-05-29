@@ -395,6 +395,7 @@
 }
 
 @theme inline {
+  --breakpoint-xs:     480px;
   --font-heading:      var(--font-sans);
   --font-sans:      var(--font-sans);
   --color-sidebar-ring:      var(--sidebar-ring);

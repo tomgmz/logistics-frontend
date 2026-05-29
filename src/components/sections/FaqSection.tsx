@@ -38,7 +38,7 @@ function FaqItem({
           cursor-pointer bg-transparent border-0 group"
       >
         <span
-          className={`font-'Alegreysa Sans SC, sans-serif'flex-1 text-sm sm:text-base md:text-lg lg:text-[1.1rem]
+          className={`flex-1 text-sm sm:text-base md:text-lg lg:text-[1.1rem]
             tracking-wide transition-colors duration-200
             ${isOpen ? 'text-white' : 'text-white/80 group-hover:text-white'}`}
         >
