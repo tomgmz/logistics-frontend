@@ -2,30 +2,38 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { MessageCircle, Loader2 } from 'lucide-react'
-import type { Conversation, Group, UnifiedListItem } from '@/app/types/messaging/messaging.types'
-import { toConversation, toGroup } from '@/app/types/messaging/messaging.types'
 import { messagingService } from '@/lib/services/messaging.service'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { useMessagingRealtime } from '@/lib/hooks/useMessagingRealtime'
-import ConversationList from './ConversationList'
-import ChatWindow from './ChatWindow'
-import GroupChatWindow from './GroupChatWindow'
+import {
+  toConversation,
+  toGroup,
+} from '@/app/types/messaging/messaging.types'
+import type {
+  Conversation,
+  Group,
+  UnifiedListItem,
+  MessageRow,
+} from '@/app/types/messaging/messaging.types'
+import ConversationList  from './ConversationList'
+import ChatWindow        from './ChatWindow'
+import GroupChatWindow   from './GroupChatWindow'
 import NewConversationModal from './NewConversationModal'
-import NewGroupModal from './NewGroupModal'
+import NewGroupModal     from './NewGroupModal'
 
 export default function MessagingShell() {
-  const { user } = useAuthStore()
-  const currentUserId = user?.user_id ?? ''
+  const { user }        = useAuthStore()
+  const currentUserId   = user?.user_id ?? ''
 
   const [conversations, setConversations] = useState<Conversation[]>([])
-  const [groups, setGroups] = useState<Group[]>([])
-  const [selectedConvId, setSelectedConvId] = useState<string | null>(null)
-  const [selectedGroup, setSelectedGroup] = useState<Group | null>(null)
-  const [search, setSearch] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [showNewModal, setShowNewModal] = useState(false)
-  const [showGroupModal, setShowGroupModal] = useState(false)
+  const [groups, setGroups]               = useState<Group[]>([])
+  const [selectedConvId, setSelectedConvId]   = useState<string | null>(null)
+  const [selectedGroup, setSelectedGroup]     = useState<Group | null>(null)
+  const [search, setSearch]               = useState('')
+  const [loading, setLoading]             = useState(true)
+  const [error, setError]                 = useState<string | null>(null)
+  const [showNewDm, setShowNewDm]         = useState(false)
+  const [showNewGroup, setShowNewGroup]   = useState(false)
   const [onlineUserIds, setOnlineUserIds] = useState<string[]>([])
 
   const fetchAll = useCallback(async () => {
@@ -46,81 +54,69 @@ export default function MessagingShell() {
 
   useEffect(() => { fetchAll() }, [fetchAll])
 
-  // Global user channel for cross-device new message sync
+  // Global user channel — keeps sidebar in sync across tabs / devices
   useMessagingRealtime({
     currentUserId,
-    onNewMessage: (raw) => {
-      // Update conversation last_message in sidebar list when message arrives on any device
+    onNewMessage: (raw: MessageRow) => {
       setConversations(prev => prev.map(c => {
         if (c.id !== raw.conversation_id) return c
-        const isIncoming = raw.sender_id !== currentUserId
         return {
           ...c,
           last_message: { message_id: raw.message_id, body: raw.content, created_at: raw.sent_at, sender_id: raw.sender_id },
-          unread_count: (isIncoming && selectedConvId !== c.id) ? c.unread_count + 1 : c.unread_count,
+          unread_count: raw.sender_id !== currentUserId && selectedConvId !== c.id
+            ? c.unread_count + 1
+            : c.unread_count,
         }
       }))
     },
     onGroupMessage: (raw) => {
       setGroups(prev => prev.map(g => {
         if (g.id !== raw.group_id) return g
-        const isIncoming = raw.sender_id !== currentUserId
         return {
           ...g,
           last_message: { message_id: raw.message_id, body: raw.content, created_at: raw.sent_at, sender_id: raw.sender_id },
-          unread_count: (isIncoming && selectedGroup?.id !== g.id) ? g.unread_count + 1 : g.unread_count,
+          unread_count: raw.sender_id !== currentUserId && selectedGroup?.id !== g.id
+            ? g.unread_count + 1
+            : g.unread_count,
         }
       }))
     },
-    onGroupInvite: () => { fetchAll() },
-    onPresenceChange: (ids) => setOnlineUserIds(ids),
+    onGroupInvite: () => fetchAll(),
+    onPresenceChange: setOnlineUserIds,
   })
 
-  const selectedConv = conversations.find(c => c.id === selectedConvId) ?? null
-
-  const unifiedItems: UnifiedListItem[] = [
-    ...conversations.map(c => ({ kind: 'dm' as const, data: c })),
-    ...groups.map(g => ({ kind: 'group' as const, data: g })),
+  // ── Unified sorted list ────────────────────────────────────────────────────
+  const unified: UnifiedListItem[] = [
+    ...conversations.map(c => ({ kind: 'dm'    as const, data: c })),
+    ...groups.map(g       => ({ kind: 'group'  as const, data: g })),
   ].sort((a, b) => {
-    const aTime = a.data.last_message?.created_at ?? (a.kind === 'group' ? (a.data as Group).created_at : '')
-    const bTime = b.data.last_message?.created_at ?? (b.kind === 'group' ? (b.data as Group).created_at : '')
-    return bTime.localeCompare(aTime)
+    const aT = a.data.last_message?.created_at ?? (a.kind === 'group' ? (a.data as Group).created_at : '')
+    const bT = b.data.last_message?.created_at ?? (b.kind === 'group' ? (b.data as Group).created_at : '')
+    return bT.localeCompare(aT)
   })
 
-  const filteredItems = unifiedItems.filter(item => {
+  const filtered = unified.filter(item => {
     const q = search.toLowerCase()
-    if (item.kind === 'dm') {
-      const p = item.data.participants[0]
-      return `${p.first_name} ${p.last_name}`.toLowerCase().includes(q)
-    }
-    return item.data.name.toLowerCase().includes(q)
+    return item.kind === 'dm'
+      ? `${item.data.participants[0].first_name} ${item.data.participants[0].last_name}`.toLowerCase().includes(q)
+      : item.data.name.toLowerCase().includes(q)
   })
 
-  const handleSelectDm = (conv: Conversation) => {
+  // ── Handlers ──────────────────────────────────────────────────────────────
+  const selectDm = (conv: Conversation) => {
     setSelectedConvId(conv.id)
     setSelectedGroup(null)
     setConversations(prev => prev.map(c => c.id === conv.id ? { ...c, unread_count: 0 } : c))
     messagingService.markAsRead(conv.id).catch(() => {})
   }
 
-  const handleSelectGroup = (group: Group) => {
-    setSelectedGroup(group)
+  const selectGroup = (g: Group) => {
+    setSelectedGroup(g)
     setSelectedConvId(null)
-    setGroups(prev => prev.map(g => g.id === group.id ? { ...g, unread_count: 0 } : g))
+    setGroups(prev => prev.map(gr => gr.id === g.id ? { ...gr, unread_count: 0 } : gr))
   }
 
-  const handleBack = () => {
-    setSelectedConvId(null)
-    setSelectedGroup(null)
-  }
-
-  const handleMessageSent = (conversationId: string, body: string, senderId: string) => {
-    setConversations(prev => prev.map(c =>
-      c.id === conversationId
-        ? { ...c, last_message: { message_id: `local-${Date.now()}`, body, created_at: new Date().toISOString(), sender_id: senderId } }
-        : c
-    ))
-  }
+  const handleBack = () => { setSelectedConvId(null); setSelectedGroup(null) }
 
   const handleInviteResponded = (groupId: string, accepted: boolean) => {
     if (!accepted) {
@@ -132,8 +128,8 @@ export default function MessagingShell() {
     }
   }
 
-  const handleConversationReady = async (conversationId: string) => {
-    setShowNewModal(false)
+  const handleConvReady = async (conversationId: string) => {
+    setShowNewDm(false)
     await fetchAll()
     setSelectedConvId(conversationId)
     setSelectedGroup(null)
@@ -141,16 +137,17 @@ export default function MessagingShell() {
   }
 
   const handleGroupCreated = async (groupId: string) => {
-    setShowGroupModal(false)
-    try {
-      const rawGroups = await messagingService.getGroups()
-      const mapped = rawGroups.map(toGroup)
-      setGroups(mapped)
-      const found = mapped.find(g => g.id === groupId) ?? null
-      setSelectedGroup(found)
-      setSelectedConvId(null)
-    } catch { /* silently fail */ }
+    setShowNewGroup(false)
+    const rawGroups  = await messagingService.getGroups().catch(() => [])
+    const mapped     = rawGroups.map(toGroup)
+    setGroups(mapped)
+    const found      = mapped.find(g => g.id === groupId) ?? null
+    setSelectedGroup(found)
+    setSelectedConvId(null)
   }
+
+  const selectedConv   = conversations.find(c => c.id === selectedConvId) ?? null
+  const hasActiveChat  = !!selectedConvId || !!selectedGroup
 
   if (loading) {
     return (
@@ -169,29 +166,27 @@ export default function MessagingShell() {
     )
   }
 
-  const hasActiveChat = !!selectedConvId || !!selectedGroup
-
   return (
     <>
       <div className="flex flex-1 min-h-0 h-full overflow-hidden">
-        {/* Sidebar — hidden on mobile when chat is open */}
+        {/* Sidebar */}
         <div className={`shrink-0 border-r border-white/[0.07] bg-[var(--color-bg)] flex flex-col w-full lg:w-[300px] ${hasActiveChat ? 'hidden lg:flex' : 'flex'}`}>
           <ConversationList
-            items={filteredItems}
+            items={filtered}
             selectedConvId={selectedConvId}
             selectedGroupId={selectedGroup?.id ?? null}
             search={search}
             onSearchChange={setSearch}
-            onSelectDm={handleSelectDm}
-            onSelectGroup={handleSelectGroup}
-            onNewConversation={() => setShowNewModal(true)}
-            onNewGroup={() => setShowGroupModal(true)}
+            onSelectDm={selectDm}
+            onSelectGroup={selectGroup}
+            onNewConversation={() => setShowNewDm(true)}
+            onNewGroup={() => setShowNewGroup(true)}
             currentUserId={currentUserId}
             onlineUserIds={onlineUserIds}
           />
         </div>
 
-        {/* Chat panel — messages left (theirs) / right (mine), Facebook style */}
+        {/* Chat panel */}
         <div className={`flex-1 min-w-0 flex flex-col ${hasActiveChat ? 'flex' : 'hidden lg:flex'} bg-[var(--color-surface)]`}>
           {selectedGroup ? (
             <GroupChatWindow
@@ -207,20 +202,22 @@ export default function MessagingShell() {
               conversation={selectedConv}
               currentUserId={currentUserId}
               onBack={handleBack}
-              onMessageSent={handleMessageSent}
+              onMessageSent={(convId, body, senderId) =>
+                setConversations(prev => prev.map(c =>
+                  c.id === convId
+                    ? { ...c, last_message: { message_id: `local-${Date.now()}`, body, created_at: new Date().toISOString(), sender_id: senderId } }
+                    : c
+                ))
+              }
             />
           ) : (
-            <EmptyState onNewConversation={() => setShowNewModal(true)} onNewGroup={() => setShowGroupModal(true)} />
+            <EmptyState onNewConversation={() => setShowNewDm(true)} onNewGroup={() => setShowNewGroup(true)} />
           )}
         </div>
       </div>
 
-      {showNewModal && (
-        <NewConversationModal onClose={() => setShowNewModal(false)} onConversationReady={handleConversationReady} />
-      )}
-      {showGroupModal && (
-        <NewGroupModal onClose={() => setShowGroupModal(false)} onGroupCreated={handleGroupCreated} />
-      )}
+      {showNewDm    && <NewConversationModal onClose={() => setShowNewDm(false)}    onConversationReady={handleConvReady} />}
+      {showNewGroup && <NewGroupModal        onClose={() => setShowNewGroup(false)} onGroupCreated={handleGroupCreated} />}
     </>
   )
 }
@@ -237,7 +234,7 @@ function EmptyState({ onNewConversation, onNewGroup }: { onNewConversation: () =
       </div>
       <div className="flex items-center gap-2">
         <button type="button" onClick={onNewConversation} className="ff-body text-xs px-4 py-2 rounded-xl bg-[var(--color-cyan)]/10 text-[var(--color-cyan)] border border-[var(--color-cyan)]/20 hover:bg-[var(--color-cyan)]/15 transition-colors">New conversation</button>
-        <button type="button" onClick={onNewGroup} className="ff-body text-xs px-4 py-2 rounded-xl bg-white/[0.04] text-white/50 border border-white/[0.08] hover:bg-white/[0.07] hover:text-white/70 transition-colors">New group</button>
+        <button type="button" onClick={onNewGroup}        className="ff-body text-xs px-4 py-2 rounded-xl bg-white/[0.04] text-white/50 border border-white/[0.08] hover:bg-white/[0.07] hover:text-white/70 transition-colors">New group</button>
       </div>
     </div>
   )

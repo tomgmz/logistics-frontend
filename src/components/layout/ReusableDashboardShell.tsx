@@ -1,20 +1,20 @@
 'use client'
 
 import { ReactNode, useState } from 'react'
-import ReusableHeader from './ReusableHeader'
+import ReusableHeader  from './ReusableHeader'
 import ReusableSidebar from './ReusableSidebar'
-import MessengerFloatingPanel from '@/components/messaging/MessengerFloatingPanel'
-import MessengerBubbleContainer from '@/components/messaging/MessengerBubbleContainer'
+import MessengerFloatingPanel        from '@/components/messaging/MessengerFloatingPanel'
+import { MessengerBubbleContainer }  from '@/components/messaging/MessengerBubbleContainer'
 
 interface NavItem {
-  href: string
+  href:  string
   label: string
-  icon: React.ReactNode
+  icon:  ReactNode
 }
 
 interface ReusableDashboardShellProps {
-  children: ReactNode
-  navItems: NavItem[]
+  children:  ReactNode
+  navItems:  NavItem[]
 }
 
 export default function ReusableDashboardShell({ children, navItems }: ReusableDashboardShellProps) {
@@ -29,11 +29,7 @@ export default function ReusableDashboardShell({ children, navItems }: ReusableD
       <ReusableHeader sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
 
       <div className="flex flex-1 min-h-0 overflow-hidden">
-        <ReusableSidebar
-          navItems={navItems}
-          sidebarOpen={sidebarOpen}
-          setSidebarOpen={setSidebarOpen}
-        />
+        <ReusableSidebar navItems={navItems} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
         <main className="min-w-0 flex-1 overflow-hidden flex flex-col bg-[var(--color-surface)]">
           {children}

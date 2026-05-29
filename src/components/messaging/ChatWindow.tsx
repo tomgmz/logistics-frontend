@@ -26,6 +26,8 @@ interface ChatWindowProps {
   onMessageSent?:  (conversationId: string, body: string, senderId: string) => void
 }
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
 function applyReactionToggle(
   messages: Message[],
   payload: ReactionTogglePayload,
@@ -46,6 +48,8 @@ function toMessage2(raw: MessageRow): Message {
   return toMessage(raw)
 }
 
+// ─── Typing dots ──────────────────────────────────────────────────────────────
+
 function TypingDots() {
   return (
     <span className="flex items-center gap-[3px]">
@@ -56,6 +60,8 @@ function TypingDots() {
     </span>
   )
 }
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ChatWindow({ conversation, currentUserId, onBack, onMessageSent }: ChatWindowProps) {
   const participant = conversation.participants[0]

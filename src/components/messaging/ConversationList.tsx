@@ -6,31 +6,23 @@ import type { Conversation, Group, UnifiedListItem } from '@/app/types/messaging
 import { formatConversationTime } from '@/app/utils/messaging.utils'
 
 interface ConversationListProps {
-  items: UnifiedListItem[]
-  selectedConvId: string | null
-  selectedGroupId: string | null
-  search: string
-  onSearchChange: (s: string) => void
-  onSelectDm: (c: Conversation) => void
-  onSelectGroup: (g: Group) => void
-  onNewConversation: () => void
-  onNewGroup: () => void
-  currentUserId: string
-  onlineUserIds?: string[]
+  items:              UnifiedListItem[]
+  selectedConvId:     string | null
+  selectedGroupId:    string | null
+  search:             string
+  onSearchChange:     (s: string) => void
+  onSelectDm:         (c: Conversation) => void
+  onSelectGroup:      (g: Group) => void
+  onNewConversation:  () => void
+  onNewGroup:         () => void
+  currentUserId:      string
+  onlineUserIds?:     string[]
 }
 
 export default function ConversationList({
-  items,
-  selectedConvId,
-  selectedGroupId,
-  search,
-  onSearchChange,
-  onSelectDm,
-  onSelectGroup,
-  onNewConversation,
-  onNewGroup,
-  currentUserId,
-  onlineUserIds = [],
+  items, selectedConvId, selectedGroupId, search, onSearchChange,
+  onSelectDm, onSelectGroup, onNewConversation, onNewGroup,
+  currentUserId, onlineUserIds = [],
 }: ConversationListProps) {
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -49,9 +41,7 @@ export default function ConversationList({
         <div className="relative">
           <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/25 pointer-events-none" />
           <input
-            type="text"
-            value={search}
-            onChange={e => onSearchChange(e.target.value)}
+            type="text" value={search} onChange={e => onSearchChange(e.target.value)}
             placeholder="Search conversations…"
             className="w-full bg-white/[0.04] border border-white/[0.07] rounded-xl pl-9 pr-3 py-2.5 ff-body text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[var(--color-cyan)]/30 focus:bg-white/[0.06] transition-all"
           />
@@ -98,31 +88,21 @@ export default function ConversationList({
   )
 }
 
-function DmItem({
-  conv,
-  index,
-  isSelected,
-  currentUserId,
-  onSelect,
-  isOnline,
-}: {
-  conv: Conversation
-  index: number
-  isSelected: boolean
-  currentUserId: string
-  onSelect: (c: Conversation) => void
-  isOnline: boolean
+// ─── DM item ──────────────────────────────────────────────────────────────────
+
+function DmItem({ conv, index, isSelected, currentUserId, onSelect, isOnline }: {
+  conv: Conversation; index: number; isSelected: boolean
+  currentUserId: string; onSelect: (c: Conversation) => void; isOnline: boolean
 }) {
-  const participant = conv.participants[0]
-  const initials = `${participant.first_name?.[0] ?? '?'}${participant.last_name?.[0] ?? '?'}`.toUpperCase()
-  const lastMsg = conv.last_message
-  const hasUnread = conv.unread_count > 0
-  const isMyLastMsg = lastMsg?.sender_id === currentUserId
+  const p          = conv.participants[0]
+  const initials   = `${p.first_name?.[0] ?? '?'}${p.last_name?.[0] ?? '?'}`.toUpperCase()
+  const last       = conv.last_message
+  const hasUnread  = conv.unread_count > 0
+  const isMyLast   = last?.sender_id === currentUserId
 
   return (
     <motion.button
-      initial={{ opacity: 0, x: -10 }}
-      animate={{ opacity: 1, x: 0 }}
+      initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
       transition={{ delay: index * 0.03, duration: 0.2 }}
       whileTap={{ scale: 0.98 }}
       onClick={() => onSelect(conv)}
@@ -132,22 +112,17 @@ function DmItem({
         <div className="w-10 h-10 rounded-full bg-[var(--color-surface-dark)] border border-white/10 flex items-center justify-center">
           <span className="font-card text-[0.68rem] text-white/75">{initials}</span>
         </div>
-        {/* 🟢 Online dot in sidebar */}
-        {isOnline && (
-          <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-[var(--color-green)] border-2 border-[var(--color-bg)]" />
-        )}
+        {isOnline && <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-[var(--color-green)] border-2 border-[var(--color-bg)]" />}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2 mb-0.5">
-          <span className={`ff-body text-[13px] truncate ${hasUnread ? 'text-white' : 'text-white/75'}`}>
-            {participant.first_name} {participant.last_name}
-          </span>
-          {lastMsg && <span className="ff-body text-[10px] text-white/25 shrink-0">{formatConversationTime(lastMsg.created_at)}</span>}
+          <span className={`ff-body text-[13px] truncate ${hasUnread ? 'text-white' : 'text-white/75'}`}>{p.first_name} {p.last_name}</span>
+          {last && <span className="ff-body text-[10px] text-white/25 shrink-0">{formatConversationTime(last.created_at)}</span>}
         </div>
         <div className="flex items-center gap-1.5">
           <p className={`ff-body text-[11px] truncate flex-1 leading-snug ${hasUnread ? 'text-white/55' : 'text-white/28'}`}>
-            {isMyLastMsg && <span className="text-[var(--color-cyan)]/50">You: </span>}
-            {lastMsg?.body ?? <span className="italic">No messages yet</span>}
+            {isMyLast && <span className="text-[var(--color-cyan)]/50">You: </span>}
+            {last?.body ?? <span className="italic">No messages yet</span>}
           </p>
           {hasUnread && (
             <span className="shrink-0 min-w-[18px] h-[18px] rounded-full bg-[var(--color-cyan)] flex items-center justify-center px-1">
@@ -160,25 +135,18 @@ function DmItem({
   )
 }
 
-function GroupItem({
-  group,
-  index,
-  isSelected,
-  onSelect,
-}: {
-  group: Group
-  index: number
-  isSelected: boolean
-  onSelect: (g: Group) => void
+// ─── Group item ───────────────────────────────────────────────────────────────
+
+function GroupItem({ group, index, isSelected, onSelect }: {
+  group: Group; index: number; isSelected: boolean; onSelect: (g: Group) => void
 }) {
-  const hasUnread = group.unread_count > 0
-  const lastMsg = group.last_message
-  const acceptedCount = group.members.filter(m => m.status === 'accepted').length
+  const last         = group.last_message
+  const hasUnread    = group.unread_count > 0
+  const acceptedCount= group.members.filter(m => m.status === 'accepted').length
 
   return (
     <motion.button
-      initial={{ opacity: 0, x: -10 }}
-      animate={{ opacity: 1, x: 0 }}
+      initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
       transition={{ delay: index * 0.03, duration: 0.2 }}
       whileTap={{ scale: 0.98 }}
       onClick={() => onSelect(group)}
@@ -195,11 +163,11 @@ function GroupItem({
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2 mb-0.5">
           <span className={`ff-body text-[13px] truncate ${hasUnread ? 'text-white' : 'text-white/75'}`}>{group.name}</span>
-          {lastMsg && <span className="ff-body text-[10px] text-white/25 shrink-0">{formatConversationTime(lastMsg.created_at)}</span>}
+          {last && <span className="ff-body text-[10px] text-white/25 shrink-0">{formatConversationTime(last.created_at)}</span>}
         </div>
         <div className="flex items-center gap-1.5">
           <p className={`ff-body text-[11px] truncate flex-1 leading-snug ${hasUnread ? 'text-white/55' : 'text-white/28'}`}>
-            {lastMsg?.body ?? <span className="italic">{acceptedCount} member{acceptedCount !== 1 ? 's' : ''}</span>}
+            {last?.body ?? <span className="italic">{acceptedCount} member{acceptedCount !== 1 ? 's' : ''}</span>}
           </p>
           {hasUnread && (
             <span className="shrink-0 min-w-[18px] h-[18px] rounded-full bg-[var(--color-cyan)] flex items-center justify-center px-1">
