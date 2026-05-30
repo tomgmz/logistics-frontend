@@ -125,7 +125,8 @@ export function toMessage(raw: MessageRow): Message {
     body:            raw.content,
     created_at:      raw.sent_at,
     read_at:         raw.read_at,
-    reply_to:        raw.reply_to,
+    // Guard against PostgREST returning {} instead of null for null FK joins
+    reply_to:        raw.reply_to?.message_id ? raw.reply_to : null,
     reactions:       raw.reactions ?? [],
   }
 }
@@ -235,7 +236,7 @@ export function toGroupMessage(raw: GroupMessageRaw): GroupMessage {
     sender_id:  raw.sender_id,
     body:       raw.content,
     created_at: raw.sent_at,
-    reply_to:   raw.reply_to   ?? null,
+    reply_to:   raw.reply_to?.message_id ? raw.reply_to : null,
     reactions:  raw.reactions  ?? [],
   }
 }

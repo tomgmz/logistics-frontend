@@ -63,9 +63,9 @@ export default function MessagingShell() {
         return {
           ...c,
           last_message: { message_id: raw.message_id, body: raw.content, created_at: raw.sent_at, sender_id: raw.sender_id },
-          unread_count: raw.sender_id !== currentUserId && selectedConvId !== c.id
-            ? c.unread_count + 1
-            : c.unread_count,
+          unread_count: raw.sender_id === currentUserId
+            ? 0
+            : selectedConvId !== c.id ? c.unread_count + 1 : c.unread_count,
         }
       }))
     },
@@ -75,9 +75,9 @@ export default function MessagingShell() {
         return {
           ...g,
           last_message: { message_id: raw.message_id, body: raw.content, created_at: raw.sent_at, sender_id: raw.sender_id },
-          unread_count: raw.sender_id !== currentUserId && selectedGroup?.id !== g.id
-            ? g.unread_count + 1
-            : g.unread_count,
+          unread_count: raw.sender_id === currentUserId
+            ? 0
+            : selectedGroup?.id !== g.id ? g.unread_count + 1 : g.unread_count,
         }
       }))
     },

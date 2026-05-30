@@ -19,7 +19,7 @@ type PanelItem =
   | { kind: 'group'; data: Group;        lastAt: string }
 
 export default function MessengerFloatingPanel() {
-  const { isPanelOpen, closePanel, openChat, openGroupChat, setTotalUnread, incrementUnread } = useMessengerStore()
+  const { isPanelOpen, closePanel, openChat, openGroupChat, setTotalUnread, incrementUnread, decrementUnread } = useMessengerStore()
   const { user }        = useAuthStore()
   const currentUserId   = user?.user_id ?? ''
   const panelRef        = useRef<HTMLDivElement>(null)
@@ -56,20 +56,32 @@ export default function MessengerFloatingPanel() {
   useMessagingRealtime({
     currentUserId,
     onNewMessage: (raw: MessageRow) => {
+      const isMyMessage = raw.sender_id === currentUserId
+      const existing = conversations.find(c => c.id === raw.conversation_id)
       setConversations(prev => prev.map(c => c.id !== raw.conversation_id ? c : {
         ...c,
         last_message: { message_id: raw.message_id, body: raw.content, created_at: raw.sent_at, sender_id: raw.sender_id },
-        unread_count: raw.sender_id !== currentUserId ? c.unread_count + 1 : c.unread_count,
+        unread_count: isMyMessage ? 0 : c.unread_count + 1,
       }))
-      if (raw.sender_id !== currentUserId) incrementUnread()
+      if (isMyMessage) {
+        if (existing && existing.unread_count > 0) decrementUnread(existing.unread_count)
+      } else {
+        incrementUnread()
+      }
     },
     onGroupMessage: (raw) => {
+      const isMyMessage = raw.sender_id === currentUserId
+      const existing = groups.find(g => g.id === raw.group_id)
       setGroups(prev => prev.map(g => g.id !== raw.group_id ? g : {
         ...g,
         last_message: { message_id: raw.message_id, body: raw.content, created_at: raw.sent_at, sender_id: raw.sender_id },
-        unread_count: raw.sender_id !== currentUserId ? g.unread_count + 1 : g.unread_count,
+        unread_count: isMyMessage ? 0 : g.unread_count + 1,
       }))
-      if (raw.sender_id !== currentUserId) incrementUnread()
+      if (isMyMessage) {
+        if (existing && existing.unread_count > 0) decrementUnread(existing.unread_count)
+      } else {
+        incrementUnread()
+      }
     },
   })
 
