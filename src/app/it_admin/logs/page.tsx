@@ -601,13 +601,6 @@ export default function LogsPage() {
       .catch(() => {})
   }, [])
 
-  // TODO: uncomment once systemLogsService exists
-  // useEffect(() => {
-  //   systemLogsService.getStats()
-  //     .then(setSystemStats)
-  //     .catch(() => {})
-  // }, [])
-
   return (
     <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-hidden bg-[#0a0a0a] text-white">
       <div className="flex flex-col flex-1 min-h-0 px-3 py-3 lg:px-4 gap-4 overflow-hidden">

@@ -28,8 +28,6 @@ interface GroupChatWindowProps {
   onInviteResponded?: (groupId: string, accepted: boolean) => void
 }
 
-// ─── Seen-by ──────────────────────────────────────────────────────────────────
-
 function getSeenBy(members: GroupMember[], msgCreatedAt: string, senderId: string, currentUserId: string): GroupMember[] {
   return members.filter(m =>
     m.status === 'accepted' &&
@@ -57,8 +55,6 @@ function SeenByAvatars({ seenBy }: { seenBy: GroupMember[] }) {
   )
 }
 
-// ─── Reaction helpers ─────────────────────────────────────────────────────────
-
 interface ReactionGroup { emoji: string; count: number; reacted: boolean }
 
 function groupReactions(reactions: MessageReaction[], userId: string): ReactionGroup[] {
@@ -81,8 +77,6 @@ function applyReactionToggle(msgs: GroupMessage[], payload: ReactionTogglePayloa
   })
 }
 
-// ─── Typing dots ──────────────────────────────────────────────────────────────
-
 function TypingDots() {
   return (
     <span className="flex items-center gap-[3px]">
@@ -93,8 +87,6 @@ function TypingDots() {
     </span>
   )
 }
-
-// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function GroupChatWindow({ group, currentUserId, onBack, onInviteResponded }: GroupChatWindowProps) {
   const bottomRef    = useRef<HTMLDivElement>(null)
@@ -110,7 +102,7 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
   const [inviteLoading, setInviteLoading] = useState<'accept' | 'decline' | null>(null)
   const [replyTo, setReplyTo]             = useState<ReplyTo | null>(null)
   const [hoveredId, setHoveredId]         = useState<string | null>(null)
-  const [members, setMembers]             = useState<GroupMember[]>(group.members)  // local copy for live seen-by
+  const [members, setMembers]             = useState<GroupMember[]>(group.members)
 
   const typingTimeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const pendingIds     = useRef<Set<string>>(new Set())

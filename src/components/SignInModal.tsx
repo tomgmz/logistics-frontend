@@ -26,8 +26,6 @@ function getFallbackRoute(role: string): string {
   return ROLE_ROUTES[role] ?? '/'
 }
 
-// ─── Icons ───────────────────────────────────────────────────────────────────
-
 function IconMail() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
@@ -113,8 +111,6 @@ function IconKey() {
     </svg>
   )
 }
-
-// ─── Shared components ────────────────────────────────────────────────────────
 
 function GlassInput({
   icon,
@@ -212,8 +208,6 @@ function ErrorMessage({ message }: { message: string }) {
   )
 }
 
-// ─── Permanent lock screen ────────────────────────────────────────────────────
-
 function PermanentLockScreen({ onBack }: { onBack: () => void }) {
   return (
     <motion.div
@@ -262,8 +256,6 @@ function PermanentLockScreen({ onBack }: { onBack: () => void }) {
     </motion.div>
   )
 }
-
-// ─── Step 1: Email ────────────────────────────────────────────────────────────
 
 function EmailStep({ onSuccess }: { onSuccess: (email: string) => void }) {
   const [email,   setEmail]   = useState('')
@@ -318,8 +310,6 @@ function EmailStep({ onSuccess }: { onSuccess: (email: string) => void }) {
     </motion.div>
   )
 }
-
-// ─── Step 2: Method selection ─────────────────────────────────────────────────
 
 function MethodStep({
   email,
@@ -465,8 +455,6 @@ function MethodStep({
     </motion.div>
   )
 }
-
-// ─── Step 3a: OTP ─────────────────────────────────────────────────────────────
 
 function OtpStep({
   email,
@@ -786,8 +774,6 @@ function OtpStep({
     </motion.div>
   )
 }
-
-// ─── Step 3b: Password ────────────────────────────────────────────────────────
 
 function PasswordStep({
   email,

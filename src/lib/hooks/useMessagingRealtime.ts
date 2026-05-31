@@ -27,8 +27,6 @@ export interface UseMessagingRealtimeOptions {
 }
 
 export function useMessagingRealtime(opts: UseMessagingRealtimeOptions) {
-  // Single ref holds the whole options bag — only ever read inside effects/handlers,
-  // never during render. useLayoutEffect is allowed to write refs (it's not render).
   const optsRef = useRef(opts)
   useLayoutEffect(() => { optsRef.current = opts })
 

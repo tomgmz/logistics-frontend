@@ -2,12 +2,10 @@
 
 import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Check, CheckCheck, Reply, CornerUpLeft } from 'lucide-react'
+import { Check, CheckCheck, Reply, CornerUpLeft, Trash2 } from 'lucide-react'
 import { formatMessageTime } from '@/app/utils/messaging.utils'
 import { QuickReactBar } from './EmojiPicker'
 import type { Message, MessageReaction, MessageParticipant } from '@/app/types/messaging/messaging.types'
-
-// ─── Reaction grouping helper ─────────────────────────────────────────────────
 
 interface ReactionGroup { emoji: string; count: number; reacted: boolean }
 
@@ -20,8 +18,6 @@ function groupReactions(reactions: MessageReaction[], userId: string): ReactionG
   return [...map.entries()].map(([emoji, v]) => ({ emoji, ...v }))
 }
 
-// ─── Props ────────────────────────────────────────────────────────────────────
-
 interface MessageBubbleProps {
   message:          Message
   isMine:           boolean
@@ -32,10 +28,9 @@ interface MessageBubbleProps {
   showSeen?:        boolean
   onReply?:         (msg: Message) => void
   onReact?:         (messageId: string, emoji: string) => void
+  onDelete?:        (messageId: string) => void
   replyToSenderName?: string
 }
-
-// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function MessageBubble({
   message,
@@ -47,6 +42,7 @@ export default function MessageBubble({
   showSeen       = false,
   onReply,
   onReact,
+  onDelete,
   replyToSenderName,
 }: MessageBubbleProps) {
   const [hovered, setHovered] = useState(false)
@@ -58,6 +54,24 @@ export default function MessageBubble({
 
   const onEnter = () => { hoverTimeout.current = setTimeout(() => setHovered(true), 60) }
   const onLeave = () => { if (hoverTimeout.current) clearTimeout(hoverTimeout.current); setHovered(false) }
+  
+  const actions = (onReply || onDelete) ? (
+    <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }}
+      className="flex items-center gap-0.5 shrink-0">
+      {onReply && (
+        <button type="button" onClick={() => onReply(message)} title="Reply"
+          className="p-1.5 rounded-lg hover:bg-white/5 text-white/25 hover:text-white/60 transition-colors">
+          <Reply size={13} />
+        </button>
+      )}
+      {onDelete && (
+        <button type="button" onClick={() => onDelete(message.id)} title="Delete for me"
+          className="p-1.5 rounded-lg hover:bg-white/5 text-white/25 hover:text-[var(--color-red,#f87171)] transition-colors">
+          <Trash2 size={13} />
+        </button>
+      )}
+    </motion.div>
+  ) : null
 
   return (
     <motion.div
@@ -117,12 +131,7 @@ export default function MessageBubble({
 
         {/* Bubble row */}
         <div className="flex items-center gap-1">
-          {isMine && hovered && onReply && (
-            <motion.button initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }}
-              type="button" onClick={() => onReply(message)}
-              className="p-1.5 rounded-lg hover:bg-white/5 text-white/25 hover:text-white/60 transition-colors"
-            ><Reply size={13} /></motion.button>
-          )}
+          {isMine && hovered && actions}
 
           <div className={`px-3.5 py-2.5 ff-body text-[13px] leading-relaxed break-words max-w-full ${
             isMine
@@ -132,12 +141,7 @@ export default function MessageBubble({
             {message.body}
           </div>
 
-          {!isMine && hovered && onReply && (
-            <motion.button initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }}
-              type="button" onClick={() => onReply(message)}
-              className="p-1.5 rounded-lg hover:bg-white/5 text-white/25 hover:text-white/60 transition-colors"
-            ><Reply size={13} /></motion.button>
-          )}
+          {!isMine && hovered && actions}
         </div>
 
         {/* Time + read receipt */}

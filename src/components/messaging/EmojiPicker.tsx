@@ -3,10 +3,7 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Search } from 'lucide-react'
-// @emoji-mart/data — install with: npm install @emoji-mart/data
 import emojiData from '@emoji-mart/data/sets/15/native.json'
-
-// ─── Types ─────────────────────────────────────────────────────────────────────
 
 interface EmojiSkin {
   unified: string
@@ -28,8 +25,6 @@ interface EmojiDataShape {
 
 const data = emojiData as EmojiDataShape
 
-// ─── Category config ───────────────────────────────────────────────────────────
-
 const CATEGORY_META: Record<string, { label: string; icon: string }> = {
   people:   { label: 'Smileys & People', icon: '😀' },
   nature:   { label: 'Animals & Nature', icon: '🐵' },
@@ -41,8 +36,6 @@ const CATEGORY_META: Record<string, { label: string; icon: string }> = {
   flags:    { label: 'Flags',            icon: '🏁' },
 }
 
-// ─── Skin tones ────────────────────────────────────────────────────────────────
-
 const SKIN_TONES: { label: string; index: number }[] = [
   { label: 'Default',      index: 0 },
   { label: 'Light',        index: 1 },
@@ -52,15 +45,11 @@ const SKIN_TONES: { label: string; index: number }[] = [
   { label: 'Dark',         index: 5 },
 ]
 
-// ─── Search index (built once at module load, not per-render) ──────────────────
-
 const searchIndex: Record<string, string> = {}
 for (const id of Object.keys(data.emojis)) {
   const e = data.emojis[id]
   searchIndex[id] = [e.name, ...(e.keywords ?? []), ...(e.emoticons ?? [])].join(' ').toLowerCase()
 }
-
-// ─── Helpers ───────────────────────────────────────────────────────────────────
 
 function getNative(id: string, skinIndex = 0): string {
   const e = data.emojis[id]
@@ -72,14 +61,10 @@ function hasSkins(id: string): boolean {
   return (data.emojis[id]?.skins.length ?? 1) > 1
 }
 
-// ─── Virtual grid ──────────────────────────────────────────────────────────────
-// Only renders rows that are visible in the scroll viewport + a small buffer.
-// This keeps DOM nodes ~50 instead of ~3000, eliminating the main lag source.
-
 const COLS = 8
-const ROW_H = 32  // px — matches h-8
-const CONTAINER_H = 208 // px — matches h-52
-const BUFFER = 3  // extra rows above/below viewport
+const ROW_H = 32
+const CONTAINER_H = 208
+const BUFFER = 3
 
 function useVirtualGrid(items: string[]) {
   const [scrollTop, setScrollTop] = useState(0)
@@ -96,11 +81,7 @@ function useVirtualGrid(items: string[]) {
   return { visibleItems, paddingTop, paddingBottom, totalHeight, setScrollTop }
 }
 
-// ─── Constants ─────────────────────────────────────────────────────────────────
-
 export const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '😡']
-
-// ─── EmojiPicker ───────────────────────────────────────────────────────────────
 
 interface EmojiPickerProps {
   onSelect: (emoji: string) => void
@@ -122,13 +103,11 @@ export default function EmojiPicker({ onSelect, onClose, position = 'top' }: Emo
   const searchRef = useRef<HTMLInputElement>(null)
   const gridRef   = useRef<HTMLDivElement>(null)
 
-  // ── Debounce search input (120ms) — prevents running filter on every keystroke
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 120)
     return () => clearTimeout(t)
   }, [search])
 
-  // ── Close on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) onClose()
@@ -137,7 +116,6 @@ export default function EmojiPicker({ onSelect, onClose, position = 'top' }: Emo
     return () => document.removeEventListener('mousedown', handler)
   }, [onClose])
 
-  // ── Auto-focus search
   useEffect(() => {
     const t = setTimeout(() => searchRef.current?.focus(), 50)
     return () => clearTimeout(t)
@@ -145,7 +123,6 @@ export default function EmojiPicker({ onSelect, onClose, position = 'top' }: Emo
 
   const categories = data.categories
 
-  // ── Derive emoji list — uses pre-built searchIndex, not inline recompute
   const displayEmojis = useMemo(() => {
     const q = debouncedSearch.trim().toLowerCase()
     if (!q) return categories[activeCatIndex]?.emojis ?? []
@@ -159,7 +136,6 @@ export default function EmojiPicker({ onSelect, onClose, position = 'top' }: Emo
     setScrollTop(e.currentTarget.scrollTop)
   }, [setScrollTop])
 
-  // Reset scroll when category or search changes
   useEffect(() => {
     gridRef.current?.scrollTo({ top: 0 })
     setScrollTop(0)
@@ -170,7 +146,6 @@ export default function EmojiPicker({ onSelect, onClose, position = 'top' }: Emo
     onClose()
   }, [onSelect, onClose, skinTone])
 
-  // Right-click (or long-press) → show per-emoji skin picker
   const handleContextMenu = useCallback((e: React.MouseEvent, id: string) => {
     if (!hasSkins(id)) return
     e.preventDefault()
@@ -201,7 +176,6 @@ export default function EmojiPicker({ onSelect, onClose, position = 'top' }: Emo
         ${position === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'}
       `}
     >
-      {/* ── Search + Global skin tone ───────────────────────────────────────── */}
       <div className="p-2 border-b border-white/[0.06] flex gap-1.5 items-center">
         <div className="relative flex-1">
           <Search size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
@@ -259,7 +233,6 @@ export default function EmojiPicker({ onSelect, onClose, position = 'top' }: Emo
         </div>
       </div>
 
-      {/* ── Category tabs ───────────────────────────────────────────────────── */}
       {!debouncedSearch && (
         <div className="
           flex items-center gap-0.5 px-2 py-1.5
@@ -286,20 +259,12 @@ export default function EmojiPicker({ onSelect, onClose, position = 'top' }: Emo
         </div>
       )}
 
-      {/* ── Category label (outside scroll area to keep totalHeight clean) ──── */}
       {!debouncedSearch && activeMeta && (
         <p className="ff-body text-[9px] text-white/25 uppercase tracking-widest px-3 pt-2 pb-0.5">
           {activeMeta.label}
         </p>
       )}
 
-      {/* ── Virtualized emoji grid ──────────────────────────────────────────── */}
-      {/*
-        KEY PERF FIX: Instead of rendering all N emojis (often 1500–3000),
-        we only render the ~50 that are visible in the 208px viewport.
-        paddingTop/paddingBottom trick maintains correct scroll height without
-        needing any extra DOM nodes.
-      */}
       <div
         ref={gridRef}
         onScroll={handleScroll}
@@ -313,15 +278,9 @@ export default function EmojiPicker({ onSelect, onClose, position = 'top' }: Emo
         {displayEmojis.length === 0 ? (
           <p className="ff-body text-white/20 text-xs text-center py-10">No emoji found</p>
         ) : (
-          /* Outer div maintains full scroll height */
           <div style={{ height: totalHeight }}>
             {/* Inner div offsets to the visible window */}
             <div style={{ paddingTop, paddingBottom }}>
-              {/*
-                KEY PERF FIX: No motion.button per emoji.
-                Hover/tap effects are pure CSS (transform + transition).
-                Going from ~1500 Framer Motion subscribers to 0 is a huge win.
-              */}
               <div className="grid grid-cols-8 gap-0.5">
                 {visibleItems.map(id => {
                   const native = getNative(id, skinTone)
@@ -349,7 +308,6 @@ export default function EmojiPicker({ onSelect, onClose, position = 'top' }: Emo
         )}
       </div>
 
-      {/* ── Per-emoji skin tone picker (right-click on any skinnable emoji) ─── */}
       <AnimatePresence>
         {emojiSkins && (
           <>
@@ -365,7 +323,7 @@ export default function EmojiPicker({ onSelect, onClose, position = 'top' }: Emo
               transition={{ duration: 0.1 }}
               style={{
                 position: 'absolute',
-                left: Math.min(emojiSkins.x, 220), // clamp so it doesn't overflow right edge
+                left: Math.min(emojiSkins.x, 220),
                 top: Math.max(0, emojiSkins.y - 44),
               }}
               className="
@@ -399,8 +357,6 @@ export default function EmojiPicker({ onSelect, onClose, position = 'top' }: Emo
     </motion.div>
   )
 }
-
-// ─── QuickReactBar ─────────────────────────────────────────────────────────────
 
 interface QuickReactBarProps {
   onReact: (emoji: string) => void

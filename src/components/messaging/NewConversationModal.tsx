@@ -21,10 +21,9 @@ export default function NewConversationModal({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
-  const [starting, setStarting] = useState<string | null>(null) // user_id being opened
+  const [starting, setStarting] = useState<string | null>(null)
   const searchRef = useRef<HTMLInputElement>(null)
 
-  // ── Load messagable users ─────────────────────────────────────────────────
   useEffect(() => {
     messagingService
       .getMessagableUsers()
@@ -32,11 +31,9 @@ export default function NewConversationModal({
       .catch(() => setError('Could not load contacts'))
       .finally(() => setLoading(false))
 
-    // Focus search on open
     setTimeout(() => searchRef.current?.focus(), 80)
   }, [])
 
-  // ── Filter ────────────────────────────────────────────────────────────────
   const filtered = users.filter(u => {
     const name = `${u.first_name ?? ''} ${u.last_name ?? ''}`.toLowerCase()
     const role = u.role.toLowerCase()
@@ -44,13 +41,10 @@ export default function NewConversationModal({
     return name.includes(q) || role.includes(q)
   })
 
-  // ── Start conversation ────────────────────────────────────────────────────
   const handleSelect = async (user: MessagableUser) => {
     if (starting) return
     setStarting(user.user_id)
     try {
-      // Resolve without creating: open the existing conversation if one exists,
-      // otherwise open a local draft that is only persisted on first send.
       const { conversation_id } = await messagingService.resolveConversation(user.user_id)
       if (conversation_id) onConversationReady(conversation_id)
       else onDraftReady(user)
@@ -59,7 +53,6 @@ export default function NewConversationModal({
     }
   }
 
-  // ── Close on backdrop click ───────────────────────────────────────────────
   const handleBackdrop = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target === e.currentTarget) onClose()
   }

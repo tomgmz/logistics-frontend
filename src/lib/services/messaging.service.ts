@@ -37,19 +37,15 @@ async function del<T>(url: string): Promise<T> {
 const B = '/messaging'
 
 export const messagingService = {
-  // ── DM ─────────────────────────────────────────────────────────────────────
   getConversations: () =>
     get<ConversationWithDetails[]>(`${B}/conversations`),
 
   createOrGetConversation: (payload: { target_user_id: string; booking_id?: string }) =>
     post<{ conversation_id: string }>(`${B}/conversations`, payload),
 
-  // Returns the existing conversation id for this user pair, or null. Does not create
-  // a row — conversations are created lazily when the first message is sent.
   resolveConversation: (target_user_id: string) =>
     get<{ conversation_id: string | null }>(`${B}/conversations/resolve`, { target_user_id }),
 
-  // Sends the first message to a target user, lazily creating the conversation.
   sendDirectMessage: (payload: { target_user_id: string; content: string; reply_to_message_id?: string; booking_id?: string }) =>
     post<MessageRow>(`${B}/conversations/direct`, payload),
 
@@ -74,7 +70,6 @@ export const messagingService = {
   getMessagableUsers: () =>
     get<MessagableUser[]>(`${B}/users`),
 
-  // ── Groups ──────────────────────────────────────────────────────────────────
   getGroups: () =>
     get<GroupRaw[]>(`${B}/groups`),
 

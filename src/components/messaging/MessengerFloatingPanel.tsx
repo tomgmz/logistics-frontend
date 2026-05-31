@@ -9,6 +9,7 @@ import { useAuthStore } from '@/lib/store/auth.store'
 import { messagingService } from '@/lib/services/messaging.service'
 import type { MessageRow } from '@/lib/services/messaging.service'
 import { useMessagingRealtime } from '@/lib/hooks/useMessagingRealtime'
+import { useGlobalPresence } from '@/lib/hooks/useGlobalPresence'
 import { useIsMobile } from '@/lib/hooks/useIsMobile'
 import { toConversation, toGroup } from '@/app/types/messaging/messaging.types'
 import { formatConversationTime } from '@/app/utils/messaging.utils'
@@ -26,6 +27,7 @@ export default function MessengerFloatingPanel() {
   const panelRef        = useRef<HTMLDivElement>(null)
   const router          = useRouter()
   const isMobile        = useIsMobile()
+  const onlineUserIds   = useGlobalPresence(currentUserId)
 
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [groups, setGroups]               = useState<Group[]>([])
@@ -44,8 +46,6 @@ export default function MessengerFloatingPanel() {
       const grps   = rawGroups.map(toGroup)
       setConversations(convs)
       setGroups(grps)
-      // Count a pending group invite as one unread item so being added to a group
-      // ticks the header badge even before any message is sent in it.
       const pendingInvites = grps.filter(g => g.my_status === 'pending').length
       setTotalUnread(
         convs.reduce((s, c) => s + c.unread_count, 0) +
@@ -64,8 +64,6 @@ export default function MessengerFloatingPanel() {
     onNewMessage: (raw: MessageRow) => {
       const isMyMessage = raw.sender_id === currentUserId
       const existing = conversations.find(c => c.id === raw.conversation_id)
-      // Brand-new DM we don't have yet: pull the list so it appears here and the
-      // header badge recomputes from the fresh totals.
       if (!existing) { fetchAll(); return }
       setConversations(prev => prev.map(c => c.id !== raw.conversation_id ? c : {
         ...c,
@@ -179,6 +177,7 @@ export default function MessengerFloatingPanel() {
               filtered.map(item =>
                 item.kind === 'dm' ? (
                   <PanelDmItem key={`dm-${item.data.id}`} conv={item.data} currentUserId={currentUserId}
+                    isOnline={onlineUserIds.includes(item.data.participants[0]?.user_id)}
                     onSelect={() => { openChat(item.data.id, item.data.unread_count); closePanel() }} />
                 ) : (
                   <PanelGroupItem key={`group-${item.data.id}`} group={item.data}
@@ -201,9 +200,7 @@ export default function MessengerFloatingPanel() {
   )
 }
 
-// ─── Panel items ──────────────────────────────────────────────────────────────
-
-function PanelDmItem({ conv, currentUserId, onSelect }: { conv: Conversation; currentUserId: string; onSelect: () => void }) {
+function PanelDmItem({ conv, currentUserId, isOnline, onSelect }: { conv: Conversation; currentUserId: string; isOnline: boolean; onSelect: () => void }) {
   const p        = conv.participants[0]
   const initials = `${p.first_name?.[0] ?? '?'}${p.last_name?.[0] ?? '?'}`.toUpperCase()
   const last     = conv.last_message
@@ -216,7 +213,7 @@ function PanelDmItem({ conv, currentUserId, onSelect }: { conv: Conversation; cu
         <div className="w-10 h-10 rounded-full bg-[var(--color-surface-dark)] border border-white/10 flex items-center justify-center">
           <span className="font-card text-[0.65rem] text-white/75">{initials}</span>
         </div>
-        {p.is_online && <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-[var(--color-green)] border-2 border-[var(--color-bg)]" />}
+        {isOnline && <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-[var(--color-green)] border-2 border-[var(--color-bg)]" />}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2">

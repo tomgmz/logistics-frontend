@@ -28,8 +28,6 @@ const MIN_COL_W  = 82
 
 interface Props { groupId: string; index: number }
 
-// ─── Seen-by helpers ──────────────────────────────────────────────────────────
-
 function getSeenBy(members: GroupMember[], msgCreatedAt: string, senderId: string, currentUserId: string): GroupMember[] {
   return members.filter(m =>
     m.status === 'accepted' &&
@@ -57,8 +55,6 @@ function SeenByAvatars({ seenBy }: { seenBy: GroupMember[] }) {
   )
 }
 
-// ─── Reaction helpers ─────────────────────────────────────────────────────────
-
 interface ReactionGroup { emoji: string; count: number; reacted: boolean }
 
 function groupReactions(reactions: MessageReaction[], userId: string): ReactionGroup[] {
@@ -78,8 +74,6 @@ function applyReactionToggle(msgs: GroupMessage[], payload: ReactionTogglePayloa
   })
 }
 
-// ─── Typing dots ──────────────────────────────────────────────────────────────
-
 function TypingDots() {
   return (
     <span className="flex items-center gap-[3px]">
@@ -91,8 +85,6 @@ function TypingDots() {
   )
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
-
 export default function MessengerGroupBubble({ groupId, index }: Props) {
   const { closeChat, minimizeChat } = useMessengerStore()
   const { user }                    = useAuthStore()
@@ -102,7 +94,7 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
 
   const [group, setGroup]         = useState<Group | null>(null)
   const [messages, setMessages]   = useState<GroupMessage[]>([])
-  const [members, setMembers]     = useState<GroupMember[]>([])   // live copy for seen-by
+  const [members, setMembers]     = useState<GroupMember[]>([])
   const [loadingGroup, setLG]     = useState(true)
   const [loadingMsgs, setLM]      = useState(true)
   const [sending, setSending]     = useState(false)
@@ -141,7 +133,6 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
     finally { setLM(false) }
   }, [groupId, coerce])
 
-  // Only pull messages once the invite is accepted — a pending member can't read them.
   useEffect(() => {
     if (inviteStatus === 'accepted') fetchMessages()
     else if (inviteStatus) setLM(false)
@@ -232,7 +223,6 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
   const invitedBy     = memberMap[members.find(m => m.user_id === currentUserId)?.invited_by ?? '']
   const invitedByName = invitedBy ? `${invitedBy.first_name} ${invitedBy.last_name}` : 'Someone'
 
-  // On mobile chats go full-screen like the native app, so only the top one shows.
   if (isMobile && index !== 0) return null
 
   return (
@@ -277,7 +267,6 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
         </div>
       </div>
 
-      {/* Invite banner — pending member must accept before reading / sending */}
       {isPending ? (
         <div className="flex flex-col flex-1 overflow-y-auto bg-[var(--color-surface)] min-h-0">
           <div className="m-3 p-3.5 rounded-2xl bg-amber-400/[0.06] border border-amber-400/20 flex flex-col gap-3">

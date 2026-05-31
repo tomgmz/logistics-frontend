@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
-import { ArrowLeft, MoreVertical, Phone, Video, Loader2 } from 'lucide-react'
+import { ArrowLeft, Loader2 } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { messagingService } from '@/lib/services/messaging.service'
 import type { MessageRow } from '@/lib/services/messaging.service'
@@ -25,6 +25,7 @@ interface ChatWindowProps {
   conversation?:          Conversation
   draftUser?:             MessagableUser
   currentUserId:          string
+  isParticipantOnline?:   boolean
   onBack:                 () => void
   onMessageSent?:         (conversationId: string, body: string, senderId: string) => void
   onConversationCreated?: (conversationId: string) => void
@@ -50,8 +51,6 @@ function toMessage2(raw: MessageRow): Message {
   return toMessage(raw)
 }
 
-// ─── Typing dots ──────────────────────────────────────────────────────────────
-
 function TypingDots() {
   return (
     <span className="flex items-center gap-[3px]">
@@ -63,10 +62,8 @@ function TypingDots() {
   )
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
 
-export default function ChatWindow({ conversation, draftUser, currentUserId, onBack, onMessageSent, onConversationCreated }: ChatWindowProps) {
-  // Draft mode: no conversation row exists yet — it is created on first send.
+export default function ChatWindow({ conversation, draftUser, currentUserId, isParticipantOnline = false, onBack, onMessageSent, onConversationCreated }: ChatWindowProps) {
   const isDraft     = !conversation
   const convId      = conversation?.id ?? ''
   const participant: MessageParticipant = conversation
@@ -79,7 +76,6 @@ export default function ChatWindow({ conversation, draftUser, currentUserId, onB
         email:      draftUser!.email,
         is_online:  false,
       }
-  // Unique non-conversation channel for drafts so we don't double-subscribe the user channel.
   const realtimeConvId = convId || `draft:${participant.user_id}`
   const initials    = `${participant.first_name?.[0] ?? '?'}${participant.last_name?.[0] ?? '?'}`.toUpperCase()
   const bottomRef   = useRef<HTMLDivElement>(null)
@@ -89,7 +85,8 @@ export default function ChatWindow({ conversation, draftUser, currentUserId, onB
   const [sending, setSending]                 = useState(false)
   const [error, setError]                     = useState<string | null>(null)
   const [isOtherTyping, setIsOtherTyping]     = useState(false)
-  const [isOnline, setIsOnline]               = useState(participant.is_online ?? false)
+
+  const isOnline                              = isParticipantOnline
   const [replyTo, setReplyTo]                 = useState<ReplyTo | null>(null)
   const [otherLastReadAt, setOtherLastReadAt] = useState<string | null>(() => {
     if (!conversation) return null
@@ -134,7 +131,6 @@ export default function ChatWindow({ conversation, draftUser, currentUserId, onB
     onNewMessage: (raw) => {
       const incoming = toMessage2(raw)
       setMessages(prev => {
-        // Replace optimistic match if exists
         const match = [...pendingIds.current].find(id => prev.some(m => m.id === id && m.body === incoming.body))
         if (match) { pendingIds.current.delete(match); return prev.map(m => m.id === match ? incoming : m) }
         if (prev.some(m => m.id === incoming.id)) return prev
@@ -155,12 +151,9 @@ export default function ChatWindow({ conversation, draftUser, currentUserId, onB
       if (typingTimeout.current) clearTimeout(typingTimeout.current)
       if (isTypingNow) typingTimeout.current = setTimeout(() => setIsOtherTyping(false), 3000)
     },
-    onPresenceChange: (ids) => setIsOnline(ids.includes(participant.user_id)),
   })
 
   const handleSend = async (body: string, replyToMessageId?: string) => {
-    // Draft: the first message lazily creates the conversation. Hand the new id back
-    // to the shell, which swaps the draft for the real conversation.
     if (isDraft) {
       setReplyTo(null)
       try {
@@ -178,7 +171,7 @@ export default function ChatWindow({ conversation, draftUser, currentUserId, onB
       return
     }
 
-    const oid = `optimistic-${Date.now()}`
+    const oid = `optimistic-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
     const optimistic: Message = {
       id: oid, conversation_id: convId, sender_id: currentUserId,
       body, created_at: new Date().toISOString(),
@@ -201,17 +194,23 @@ export default function ChatWindow({ conversation, draftUser, currentUserId, onB
   }
 
   const handleReact = async (messageId: string, emoji: string) => {
-    // Optimistic: replace or add reaction for current user
     setMessages(prev => prev.map(m => {
       if (m.id !== messageId) return m
       const base      = m.reactions.filter(r => r.user_id !== currentUserId)
       const existing  = m.reactions.find(r => r.user_id === currentUserId)
       const reactions = existing?.emoji === emoji
-        ? base  // toggle off
-        : [...base, { emoji, user_id: currentUserId }]  // add/replace
+        ? base
+        : [...base, { emoji, user_id: currentUserId }]
       return { ...m, reactions }
     }))
     try { await messagingService.reactToMessage(convId, messageId, emoji) }
+    catch { fetchMessages() }
+  }
+
+  const handleDelete = async (messageId: string) => {
+    if (messageId.startsWith('optimistic-')) return
+    setMessages(prev => prev.filter(m => m.id !== messageId))
+    try { await messagingService.deleteMessage(messageId) }
     catch { fetchMessages() }
   }
 
@@ -251,11 +250,6 @@ export default function ChatWindow({ conversation, draftUser, currentUserId, onB
               </motion.p>
             )}
           </AnimatePresence>
-        </div>
-        <div className="flex items-center gap-1 shrink-0">
-          <button type="button" className="p-2 rounded-lg hover:bg-white/5 text-white/30 hover:text-white/70 transition-colors"><Phone size={15} /></button>
-          <button type="button" className="p-2 rounded-lg hover:bg-white/5 text-white/30 hover:text-white/70 transition-colors"><Video size={15} /></button>
-          <button type="button" className="p-2 rounded-lg hover:bg-white/5 text-white/30 hover:text-white/70 transition-colors"><MoreVertical size={15} /></button>
         </div>
       </div>
 
@@ -300,6 +294,7 @@ export default function ChatWindow({ conversation, draftUser, currentUserId, onB
                     showSeen={msg.id === lastSeenId}
                     onReply={handleReply}
                     onReact={handleReact}
+                    onDelete={handleDelete}
                     replyToSenderName={msg.reply_to
                       ? (msg.reply_to.sender_id === currentUserId ? 'You' : participant.first_name)
                       : undefined}

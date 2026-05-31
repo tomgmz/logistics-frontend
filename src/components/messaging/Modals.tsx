@@ -1,19 +1,10 @@
 'use client'
 
-// ─────────────────────────────────────────────────────────────────────────────
-// NewConversationModal — start a 1-on-1 DM
-// NewGroupModal        — create a group chat
-// Combined because they share the same design system, user list fetching,
-// and search pattern. Splitting them would be more files with more duplication.
-// ─────────────────────────────────────────────────────────────────────────────
-
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Search, Loader2, Users, Check, MessageCirclePlus } from 'lucide-react'
 import { messagingService } from '@/lib/services/messaging.service'
 import type { MessagableUser } from '@/lib/services/messaging.service'
-
-// ─── Shared modal shell ───────────────────────────────────────────────────────
 
 function ModalShell({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
   return (
@@ -35,8 +26,6 @@ function ModalShell({ onClose, children }: { onClose: () => void; children: Reac
     </AnimatePresence>
   )
 }
-
-// ─── NewConversationModal ─────────────────────────────────────────────────────
 
 interface NewConversationModalProps {
   onClose:              () => void
@@ -120,8 +109,6 @@ export function NewConversationModal({ onClose, onConversationReady }: NewConver
     </ModalShell>
   )
 }
-
-// ─── NewGroupModal ────────────────────────────────────────────────────────────
 
 interface NewGroupModalProps {
   onClose:        () => void

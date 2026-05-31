@@ -5,13 +5,12 @@ import { X, Users } from 'lucide-react'
 import { useMessengerStore } from '@/lib/store/messenger.store'
 import type { ChatEntry } from '@/lib/store/messenger.store'
 import { useAuthStore } from '@/lib/store/auth.store'
+import { useGlobalPresence } from '@/lib/hooks/useGlobalPresence'
 import { messagingService } from '@/lib/services/messaging.service'
 import { toConversation, toGroup, toGroupMessage, toMessage } from '@/app/types/messaging/messaging.types'
 import type { Conversation, Group, GroupMessage, Message } from '@/app/types/messaging/messaging.types'
 import MessengerChatBubble  from './MessengerChatBubble'
 import MessengerGroupBubble from './MessengerGroupBubble'
-
-// ─── Bubble container ────────────────────────────────────────────────────────
 
 export function MessengerBubbleContainer() {
   const { openChats } = useMessengerStore()
@@ -33,8 +32,6 @@ export function MessengerBubbleContainer() {
   )
 }
 
-// ─── Minimized bubbles ────────────────────────────────────────────────────────
-
 const BUBBLE_SIZE   = 56
 const BUBBLE_GAP    = 10
 const RIGHT_OFFSET  = 16
@@ -44,6 +41,7 @@ function MinimizedBubbleItem({ chat, stackIndex }: { chat: ChatEntry; stackIndex
   const { closeChat, toggleMinimizeChat } = useMessengerStore()
   const { user }      = useAuthStore()
   const currentUserId = user?.user_id ?? ''
+  const onlineUserIds = useGlobalPresence(currentUserId)
 
   const [hovered, setHovered]   = useState(false)
   const [conv, setConv]         = useState<Conversation | null>(null)
@@ -132,7 +130,7 @@ function MinimizedBubbleItem({ chat, stackIndex }: { chat: ChatEntry; stackIndex
           }
         </motion.div>
 
-        {!isGroup && p?.is_online && (
+        {!isGroup && p && onlineUserIds.includes(p.user_id) && (
           <span className="absolute bottom-0.5 right-0.5 w-3 h-3 rounded-full bg-[var(--color-green)] border-2 border-[var(--color-bg)]" />
         )}
 

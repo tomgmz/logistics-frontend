@@ -88,8 +88,6 @@ export default function ConversationList({
   )
 }
 
-// ─── DM item ──────────────────────────────────────────────────────────────────
-
 function DmItem({ conv, index, isSelected, currentUserId, onSelect, isOnline }: {
   conv: Conversation; index: number; isSelected: boolean
   currentUserId: string; onSelect: (c: Conversation) => void; isOnline: boolean
@@ -134,8 +132,6 @@ function DmItem({ conv, index, isSelected, currentUserId, onSelect, isOnline }: 
     </motion.button>
   )
 }
-
-// ─── Group item ───────────────────────────────────────────────────────────────
 
 function GroupItem({ group, index, isSelected, onSelect }: {
   group: Group; index: number; isSelected: boolean; onSelect: (g: Group) => void

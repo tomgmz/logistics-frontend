@@ -1,5 +1,3 @@
-// ─── Shared ───────────────────────────────────────────────────────────────────
-
 export type ConversationContextType = 'direct' | 'booking_transit'
 
 export type UserRole =
@@ -15,8 +13,6 @@ export type UserRole =
 
 export interface MessageReaction  { emoji: string; user_id: string }
 export interface MessageReplyTo   { message_id: string; content: string; sender_id: string }
-
-// ─── DM raw (mirrors backend API) ────────────────────────────────────────────
 
 export interface ConversationWithDetails {
   conversation_id: string
@@ -62,8 +58,6 @@ export interface MessagableUser {
   email: string
   booking_id?: string
 }
-
-// ─── DM UI ────────────────────────────────────────────────────────────────────
 
 export interface MessageParticipant {
   user_id: string
@@ -131,13 +125,10 @@ export function toMessage(raw: MessageRow): Message {
     sender_id:       raw.sender_id,
     body:            raw.content,
     created_at:      raw.sent_at,
-    // Guard against PostgREST returning {} instead of null for null FK joins
     reply_to:        raw.reply_to?.message_id ? raw.reply_to : null,
     reactions:       raw.reactions ?? [],
   }
 }
-
-// ─── Group raw (mirrors backend API) ─────────────────────────────────────────
 
 export interface GroupMessageRaw {
   message_id: string
@@ -153,7 +144,7 @@ export interface GroupMessageRaw {
 export interface GroupMemberRaw {
   status: 'pending' | 'accepted' | 'declined'
   invited_by: string
-  last_read_at: string | null        // Used for seen-by UI
+  last_read_at: string | null
   user: {
     user_id: string
     first_name: string | null
@@ -173,8 +164,6 @@ export interface GroupRaw {
   unread_count: number
   my_status: 'pending' | 'accepted' | 'declined'
 }
-
-// ─── Group UI ─────────────────────────────────────────────────────────────────
 
 export interface GroupMessage {
   id: string
@@ -247,13 +236,9 @@ export function toGroupMessage(raw: GroupMessageRaw): GroupMessage {
   }
 }
 
-// ─── Unified list ─────────────────────────────────────────────────────────────
-
 export type UnifiedListItem =
   | { kind: 'dm';    data: Conversation }
   | { kind: 'group'; data: Group }
-
-// ─── Realtime payloads ────────────────────────────────────────────────────────
 
 export interface ReadReceiptPayload      { conversation_id: string; reader_id: string; last_read_at: string }
 export interface GroupReadReceiptPayload { group_id: string; user_id: string; read_at: string }

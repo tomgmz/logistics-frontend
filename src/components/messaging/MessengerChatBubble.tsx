@@ -16,6 +16,7 @@ import type {
   ReactionTogglePayload,
 } from '@/app/types/messaging/messaging.types'
 import { useMessagingRealtime } from '@/lib/hooks/useMessagingRealtime'
+import { useGlobalPresence } from '@/lib/hooks/useGlobalPresence'
 import { useIsMobile } from '@/lib/hooks/useIsMobile'
 import { QuickReactBar } from './EmojiPicker'
 import MessageInput from './MessageInput'
@@ -51,6 +52,7 @@ export default function MessengerChatBubble({ conversationId, index }: Props) {
   const { user }                    = useAuthStore()
   const currentUserId               = user?.user_id ?? ''
   const isMobile                    = useIsMobile()
+  const onlineUserIds               = useGlobalPresence(currentUserId)
   const rightOffset                 = MIN_COL_W + index * (BUBBLE_W + BUBBLE_GAP)
 
   const [conv, setConv]               = useState<Conversation | null>(null)
@@ -59,7 +61,6 @@ export default function MessengerChatBubble({ conversationId, index }: Props) {
   const [loadingMsgs, setLMsgs]       = useState(true)
   const [sending, setSending]         = useState(false)
   const [isTyping, setIsTyping]       = useState(false)
-  const [isOnline, setIsOnline]       = useState(false)
   const [otherLastReadAt, setOtherLastReadAt] = useState<string | null>(null)
   const [replyTo, setReplyTo]         = useState<{ messageId: string; content: string; senderName: string } | null>(null)
 
@@ -104,6 +105,8 @@ export default function MessengerChatBubble({ conversationId, index }: Props) {
   useEffect(() => { setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50) }, [messages, isTyping])
 
   const participant = conv?.participants[0]
+  // Online status from the app-wide presence channel (not the per-conversation one).
+  const isOnline    = !!participant && onlineUserIds.includes(participant.user_id)
 
   const { broadcastTyping } = useMessagingRealtime({
     currentUserId,
@@ -129,7 +132,6 @@ export default function MessengerChatBubble({ conversationId, index }: Props) {
       if (typingTimer.current) clearTimeout(typingTimer.current)
       if (t) typingTimer.current = setTimeout(() => setIsTyping(false), 3000)
     },
-    onPresenceChange: ids => { if (participant) setIsOnline(ids.includes(participant.user_id)) },
   })
 
   const handleSend = async (body: string, replyToMessageId?: string) => {

@@ -5,6 +5,7 @@ import { MessageCircle, Loader2 } from 'lucide-react'
 import { messagingService } from '@/lib/services/messaging.service'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { useMessagingRealtime } from '@/lib/hooks/useMessagingRealtime'
+import { useGlobalPresence } from '@/lib/hooks/useGlobalPresence'
 import {
   toConversation,
   toGroup,
@@ -36,7 +37,9 @@ export default function MessagingShell() {
   const [error, setError]                 = useState<string | null>(null)
   const [showNewDm, setShowNewDm]         = useState(false)
   const [showNewGroup, setShowNewGroup]   = useState(false)
-  const [onlineUserIds, setOnlineUserIds] = useState<string[]>([])
+
+  // App-wide online presence (shared channel) — drives online dots + chat header status.
+  const onlineUserIds = useGlobalPresence(currentUserId)
 
   const fetchAll = useCallback(async () => {
     try {
@@ -96,10 +99,8 @@ export default function MessagingShell() {
       if (!known) fetchAll()
     },
     onGroupInvite: () => fetchAll(),
-    onPresenceChange: setOnlineUserIds,
   })
 
-  // ── Unified sorted list ────────────────────────────────────────────────────
   const unified: UnifiedListItem[] = [
     ...conversations.map(c => ({ kind: 'dm'    as const, data: c })),
     ...groups.map(g       => ({ kind: 'group'  as const, data: g })),
@@ -116,7 +117,6 @@ export default function MessagingShell() {
       : item.data.name.toLowerCase().includes(q)
   })
 
-  // ── Handlers ──────────────────────────────────────────────────────────────
   const selectDm = (conv: Conversation) => {
     setSelectedConvId(conv.id)
     setSelectedGroup(null)
@@ -134,8 +134,6 @@ export default function MessagingShell() {
 
   const handleBack = () => { setSelectedConvId(null); setSelectedGroup(null); setDraftUser(null) }
 
-  // First message in a draft persisted the conversation — swap the draft for the real
-  // conversation and refresh the list so it shows up everywhere.
   const handleDraftCreated = async (conversationId: string) => {
     setDraftUser(null)
     await fetchAll()
@@ -235,6 +233,7 @@ export default function MessagingShell() {
               key={selectedConv.id}
               conversation={selectedConv}
               currentUserId={currentUserId}
+              isParticipantOnline={onlineUserIds.includes(selectedConv.participants[0]?.user_id)}
               onBack={handleBack}
               onMessageSent={(convId, body, senderId) =>
                 setConversations(prev => prev.map(c =>
@@ -249,6 +248,7 @@ export default function MessagingShell() {
               key={`draft-${draftUser.user_id}`}
               draftUser={draftUser}
               currentUserId={currentUserId}
+              isParticipantOnline={onlineUserIds.includes(draftUser.user_id)}
               onBack={handleBack}
               onConversationCreated={handleDraftCreated}
             />
