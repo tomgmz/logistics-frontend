@@ -15,7 +15,7 @@ import type {
   UserTab, AnyUser, UserStatus, AdminUser,
 } from '@/app/types/admin/user-management.types'
 import {
-  userService,
+  userService, adminService,
   accountantService, generalManagerService,
   fleetAdminService, operationsAdminService,
 } from '@/lib/services/admin/user-management.service'
@@ -25,17 +25,21 @@ import UserFormModal from '@/app/admin/user-management/UserFormModal'
 
 type AdminMgmtTab = Extract<
   UserTab,
-  'accountants' | 'general-managers' | 'fleet-admins' | 'operations-admins'
+  'admins' | 'accountants' | 'general-managers' | 'fleet-admins' | 'operations-admins'
 >
 type TabValue = AdminMgmtTab | 'all'
 
 const TABS: { key: TabValue; label: string }[] = [
   { key: 'all',                label: 'All Administrators'           },
+  { key: 'admins',             label: 'System Admins'       },
   { key: 'accountants',        label: 'Accountants'         },
   { key: 'general-managers',   label: 'General Managers'    },
   { key: 'fleet-admins',       label: 'Fleet Managers'      },
   { key: 'operations-admins',  label: 'Operations Managers' },
 ]
+
+// Roles aggregated by the "All Administrators" view and the stats cards.
+const ADMIN_ROLE_FILTER = 'admin,accountant,general_manager,fleet_admin,operations_admin'
 
 const muiTheme = createTheme({
   palette: {
@@ -49,6 +53,7 @@ const PAGE_SIZE = 10
 
 async function fetchByTab(tab: AdminMgmtTab): Promise<AnyUser[]> {
   switch (tab) {
+    case 'admins':            return adminService.getAll()           as Promise<AnyUser[]>
     case 'accountants':       return accountantService.getAll()      as Promise<AnyUser[]>
     case 'general-managers':  return generalManagerService.getAll()  as Promise<AnyUser[]>
     case 'fleet-admins':      return fleetAdminService.getAll()      as Promise<AnyUser[]>
@@ -58,6 +63,7 @@ async function fetchByTab(tab: AdminMgmtTab): Promise<AnyUser[]> {
 
 async function updateStatus(tab: AdminMgmtTab, id: string, status: UserStatus): Promise<void> {
   const svcMap = {
+    admins:              adminService,
     accountants:         accountantService,
     'general-managers':  generalManagerService,
     'fleet-admins':      fleetAdminService,
@@ -75,6 +81,7 @@ async function updateStatus(tab: AdminMgmtTab, id: string, status: UserStatus): 
 
 function tabFromRole(role: string): AdminMgmtTab {
   switch (role) {
+    case 'admin':            return 'admins'
     case 'accountant':       return 'accountants'
     case 'general_manager':  return 'general-managers'
     case 'fleet_admin':      return 'fleet-admins'
@@ -92,6 +99,7 @@ const STATUS_CFG: Record<UserStatus, { label: string; cls: string }> = {
 }
 
 const ROLE_COLORS: Record<string, string> = {
+  admin:            'bg-red-500/15 text-red-400 border-red-500/30',
   it_admin:         'bg-blue-500/15 text-blue-400 border-blue-500/30',
   general_manager:  'bg-cyan-500/15 text-cyan-400 border-cyan-500/30',
   fleet_admin:      'bg-orange-500/15 text-orange-400 border-orange-500/30',
@@ -100,6 +108,7 @@ const ROLE_COLORS: Record<string, string> = {
 }
 
 const ROLE_LABELS: Record<string, string> = {
+  admin:            'System Admin',
   it_admin:         'IT Admin',
   general_manager:  'General Manager',
   fleet_admin:      'Fleet Manager',
@@ -253,6 +262,7 @@ const SHARED_HEADERS = ['Name', 'Email', 'Phone', 'Role', 'Status']
 
 const HEADERS: Record<TabValue, string[]> = {
   all:                 SHARED_HEADERS,
+  admins:              SHARED_HEADERS,
   accountants:         SHARED_HEADERS,
   'general-managers':  SHARED_HEADERS,
   'fleet-admins':      SHARED_HEADERS,
@@ -301,8 +311,8 @@ export default function AdminManagementClient() {
     setError(null)
     try {
       const [result, statsResult] = await Promise.all([
-        userService.getAll({ search: searchQuery || undefined, role: 'accountant,general_manager,fleet_admin,operations_admin' }),
-        userService.getStats('accountant,general_manager,fleet_admin,operations_admin')
+        userService.getAll({ search: searchQuery || undefined, role: ADMIN_ROLE_FILTER }),
+        userService.getStats(ADMIN_ROLE_FILTER)
       ])
       setAllRows(result.data)
       setServerTotal(result.total)
@@ -323,7 +333,7 @@ export default function AdminManagementClient() {
     try {
       const [rows, statsResult] = await Promise.all([
         fetchByTab(tab),
-        userService.getStats('accountant,general_manager,fleet_admin,operations_admin')
+        userService.getStats(ADMIN_ROLE_FILTER)
       ])
       setAllRows(rows)
       setStats({ total: statsResult.total, active: statsResult.active, archived: statsResult.archived })
@@ -482,9 +492,9 @@ export default function AdminManagementClient() {
                         color: activeTab === t.key ? '#4df9ed' : '#818181',
                         bgcolor: activeTab === t.key ? '#4df9ed0d' : 'transparent',
                         display: 'flex', alignItems: 'center', gap: '10px',
-                        borderTop: t.key === 'accountants' ? '1px solid #2a2a2a' : 'none',
-                        marginTop: t.key === 'accountants' ? '4px' : '0',
-                        paddingTop: t.key === 'accountants' ? '8px' : undefined,
+                        borderTop: t.key === 'admins' ? '1px solid #2a2a2a' : 'none',
+                        marginTop: t.key === 'admins' ? '4px' : '0',
+                        paddingTop: t.key === 'admins' ? '8px' : undefined,
                         '&:hover': {
                           bgcolor: activeTab === t.key ? '#4df9ed1a' : '#2a2a2a',
                           color: activeTab === t.key ? '#4df9ed' : '#ffffff',

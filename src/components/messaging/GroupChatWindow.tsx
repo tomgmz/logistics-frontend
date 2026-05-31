@@ -131,7 +131,7 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
       const raw  = await messagingService.getGroupMessages(group.id)
       const msgs = raw.map(coerce)
       setMessages(msgs)
-      if (msgs.length) messagingService.markGroupRead(group.id, msgs.map(m => m.id)).catch(() => {})
+      if (msgs.length) messagingService.markGroupRead(group.id).catch(() => {})
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load messages')
     } finally { setLoading(false) }
@@ -162,7 +162,7 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
         if (prev.some(m => m.id === incoming.id)) return prev
         return [...prev, incoming]
       })
-      if (raw.sender_id !== currentUserId) messagingService.markGroupRead(group.id, [incoming.id]).catch(() => {})
+      if (raw.sender_id !== currentUserId) messagingService.markGroupRead(group.id).catch(() => {})
     },
     onGroupReadReceipt: ({ user_id, read_at }) => {
       // Update local member last_read_at so seen-by updates in real time

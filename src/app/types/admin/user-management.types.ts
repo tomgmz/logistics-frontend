@@ -12,6 +12,7 @@ export type UserStatus = 'active' | 'inactive' | 'deactivated' | 'archived' | 'p
 export type DriverAvailability = 'available' | 'assigned' | 'on_leave' | 'inactive'
 
 export type UserTab =
+  | 'admins'
   | 'clients'
   | 'drivers'
   | 'vendors'
@@ -83,14 +84,13 @@ export interface VendorUser extends BaseUser {
 export type AnyUser = AdminUser | ClientUser | DriverUser | VendorUser
 
 export interface CreateAdminPayload {
-  email: string
-  password: string
-  phone?: string
-  first_name?: string
-  last_name?: string
+  email:        string
+  phone?:       string
+  first_name?:  string
+  last_name?:   string
   middle_name?: string
-  suffix?: string
-  role: AdminRole
+  suffix?:      string
+  created_by?:  string | null
 }
 
 export interface CreateClientPayload {

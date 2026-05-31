@@ -209,6 +209,8 @@ export const updateVendorSchema = z
     { path: ['company_name'], message: 'Company name is required for company vendors' },
   )
 
+export const createAdminSchema           = z.object(baseCreateFields)
+export const updateAdminSchema           = z.object(baseUpdateFields)
 export const createAccountantSchema      = z.object(baseCreateFields)
 export const updateAccountantSchema      = z.object(baseUpdateFields)
 export const createGeneralManagerSchema  = z.object(baseCreateFields)
@@ -227,6 +229,7 @@ import type { UserTab } from '@/app/types/admin/user-management.types'
 type SchemaPair = { create: z.ZodTypeAny; update: z.ZodTypeAny }
 
 export const FORM_SCHEMAS: Record<UserTab, SchemaPair> = {
+  admins:              { create: createAdminSchema,           update: updateAdminSchema           },
   clients:             { create: createClientSchema,          update: updateClientSchema          },
   drivers:             { create: createDriverSchema,          update: updateDriverSchema          },
   vendors:             { create: createVendorSchema,          update: updateVendorSchema          },

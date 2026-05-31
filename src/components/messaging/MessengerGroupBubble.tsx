@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Loader2, Minus, Users, CornerUpLeft } from 'lucide-react'
+import { X, Loader2, Minus, Users, CornerUpLeft, Check } from 'lucide-react'
 import { useMessengerStore } from '@/lib/store/messenger.store'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { messagingService } from '@/lib/services/messaging.service'
+import { useIsMobile } from '@/lib/hooks/useIsMobile'
 import { groupMessagesByDate, formatMessageTime } from '@/app/utils/messaging.utils'
 import { toGroup, toGroupMessage } from '@/app/types/messaging/messaging.types'
 import type {
@@ -96,6 +97,7 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
   const { closeChat, minimizeChat } = useMessengerStore()
   const { user }                    = useAuthStore()
   const currentUserId               = user?.user_id ?? ''
+  const isMobile                    = useIsMobile()
   const rightOffset                 = MIN_COL_W + index * (BUBBLE_W + BUBBLE_GAP)
 
   const [group, setGroup]         = useState<Group | null>(null)
@@ -104,6 +106,8 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
   const [loadingGroup, setLG]     = useState(true)
   const [loadingMsgs, setLM]      = useState(true)
   const [sending, setSending]     = useState(false)
+  const [inviteStatus, setInviteStatus]   = useState<Group['my_status'] | null>(null)
+  const [inviteLoading, setInviteLoading] = useState<'accept' | 'decline' | null>(null)
   const [typingUsers, setTyping]  = useState<Record<string, string>>({})
   const [onlineIds, setOnline]    = useState<string[]>([])
   const [hoveredId, setHovered]   = useState<string | null>(null)
@@ -121,7 +125,7 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
     messagingService.getGroups()
       .then(raw => {
         const found = raw.find(g => g.group_id === groupId)
-        if (found) { const g = toGroup(found); setGroup(g); setMembers(g.members) }
+        if (found) { const g = toGroup(found); setGroup(g); setMembers(g.members); setInviteStatus(g.my_status) }
       })
       .catch(() => {})
       .finally(() => setLG(false))
@@ -132,12 +136,26 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
       const raw  = await messagingService.getGroupMessages(groupId)
       const msgs = raw.map(coerce)
       setMessages(msgs)
-      if (msgs.length) messagingService.markGroupRead(groupId, msgs.map(m => m.id)).catch(() => {})
+      if (msgs.length) messagingService.markGroupRead(groupId).catch(() => {})
     } catch { /* silent */ }
     finally { setLM(false) }
   }, [groupId, coerce])
 
-  useEffect(() => { fetchMessages() }, [fetchMessages])
+  // Only pull messages once the invite is accepted — a pending member can't read them.
+  useEffect(() => {
+    if (inviteStatus === 'accepted') fetchMessages()
+    else if (inviteStatus) setLM(false)
+  }, [fetchMessages, inviteStatus])
+
+  const handleInvite = async (accept: boolean) => {
+    setInviteLoading(accept ? 'accept' : 'decline')
+    try {
+      await messagingService.respondToGroupInvite(groupId, accept)
+      if (accept) { setInviteStatus('accepted'); fetchMessages() }
+      else { closeChat(groupId) }
+    } catch { /* silent */ }
+    finally { setInviteLoading(null) }
+  }
   useEffect(() => { setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50) }, [messages, typingUsers])
 
   const memberMap = Object.fromEntries(members.map(m => [m.user_id, m]))
@@ -154,7 +172,7 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
         if (prev.some(m => m.id === inc.id)) return prev
         return [...prev, inc]
       })
-      if (raw.sender_id !== currentUserId) messagingService.markGroupRead(groupId, [inc.id]).catch(() => {})
+      if (raw.sender_id !== currentUserId) messagingService.markGroupRead(groupId).catch(() => {})
     },
     onGroupReadReceipt: ({ user_id, read_at }) => {
       setMembers(prev => prev.map(m => m.user_id === user_id ? { ...m, last_read_at: read_at } : m))
@@ -210,6 +228,12 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
 
   const dateGroups = groupMessagesByDate(messages)
   const acceptedCount = members.filter(m => m.status === 'accepted').length
+  const isPending     = inviteStatus === 'pending'
+  const invitedBy     = memberMap[members.find(m => m.user_id === currentUserId)?.invited_by ?? '']
+  const invitedByName = invitedBy ? `${invitedBy.first_name} ${invitedBy.last_name}` : 'Someone'
+
+  // On mobile chats go full-screen like the native app, so only the top one shows.
+  if (isMobile && index !== 0) return null
 
   return (
     <motion.div
@@ -217,8 +241,8 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: 30, scale: 0.92 }}
       transition={{ type: 'spring', stiffness: 400, damping: 32 }}
-      style={{ right: rightOffset, width: BUBBLE_W, height: 490 }}
-      className="fixed bottom-0 z-40 flex flex-col rounded-t-2xl overflow-hidden border border-b-0 border-white/[0.09] shadow-2xl"
+      style={isMobile ? { inset: 0, width: '100%', height: '100%' } : { right: rightOffset, width: BUBBLE_W, height: 490 }}
+      className={`fixed z-50 flex flex-col overflow-hidden shadow-2xl ${isMobile ? 'inset-0 rounded-none border-0' : 'bottom-0 rounded-t-2xl border border-b-0 border-white/[0.09]'}`}
     >
       {/* Header */}
       <div className="w-full flex items-center gap-2.5 px-3 py-2.5 shrink-0 bg-[var(--color-bg)] border-b border-white/[0.06]">
@@ -253,7 +277,33 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
         </div>
       </div>
 
-      {/* Messages */}
+      {/* Invite banner — pending member must accept before reading / sending */}
+      {isPending ? (
+        <div className="flex flex-col flex-1 overflow-y-auto bg-[var(--color-surface)] min-h-0">
+          <div className="m-3 p-3.5 rounded-2xl bg-amber-400/[0.06] border border-amber-400/20 flex flex-col gap-3">
+            <div className="flex items-start gap-2.5">
+              <div className="w-7 h-7 rounded-full bg-amber-400/10 border border-amber-400/20 flex items-center justify-center shrink-0 mt-0.5"><Users size={12} className="text-amber-400/70" /></div>
+              <div className="flex-1 min-w-0">
+                <p className="ff-body text-[12px] text-white leading-snug"><span className="text-amber-400">{invitedByName}</span> invited you to join <span className="font-medium">{group?.name}</span></p>
+                <p className="ff-body text-[10px] text-white/35 mt-0.5">{acceptedCount} member{acceptedCount !== 1 ? 's' : ''} · Accept to read and send messages</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <motion.button type="button" whileTap={{ scale: 0.96 }} onClick={() => handleInvite(true)} disabled={!!inviteLoading} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-[var(--color-cyan)] text-[var(--color-bg)] ff-body text-[11px] font-medium disabled:opacity-50 transition-opacity">
+                {inviteLoading === 'accept' ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}Accept
+              </motion.button>
+              <motion.button type="button" whileTap={{ scale: 0.96 }} onClick={() => handleInvite(false)} disabled={!!inviteLoading} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white/50 ff-body text-[11px] disabled:opacity-50 hover:bg-white/[0.08]">
+                {inviteLoading === 'decline' ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}Decline
+              </motion.button>
+            </div>
+          </div>
+          <div className="flex-1 flex flex-col items-center justify-center gap-2 text-center p-6">
+            <Users size={20} className="text-white/10" />
+            <p className="ff-body text-white/20 text-[11px]">Accept the invite to see messages and participate.</p>
+          </div>
+        </div>
+      ) : (
+      /* Messages */
       <div className="flex flex-col flex-1 overflow-hidden bg-[var(--color-surface)] min-h-0">
         <div className="flex-1 overflow-y-auto px-2.5 py-3 space-y-1.5 min-h-0 [&::-webkit-scrollbar]:w-[3px] [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full">
           {loadingMsgs && (
@@ -376,6 +426,7 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
           compact
         />
       </div>
+      )}
     </motion.div>
   )
 }

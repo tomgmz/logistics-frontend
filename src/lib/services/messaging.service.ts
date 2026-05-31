@@ -44,6 +44,15 @@ export const messagingService = {
   createOrGetConversation: (payload: { target_user_id: string; booking_id?: string }) =>
     post<{ conversation_id: string }>(`${B}/conversations`, payload),
 
+  // Returns the existing conversation id for this user pair, or null. Does not create
+  // a row — conversations are created lazily when the first message is sent.
+  resolveConversation: (target_user_id: string) =>
+    get<{ conversation_id: string | null }>(`${B}/conversations/resolve`, { target_user_id }),
+
+  // Sends the first message to a target user, lazily creating the conversation.
+  sendDirectMessage: (payload: { target_user_id: string; content: string; reply_to_message_id?: string; booking_id?: string }) =>
+    post<MessageRow>(`${B}/conversations/direct`, payload),
+
   getMessages: (conversationId: string, query?: { limit?: number; before?: string }) =>
     get<MessageRow[]>(`${B}/conversations/${conversationId}/messages`, {
       limit: query?.limit,
@@ -84,9 +93,8 @@ export const messagingService = {
   sendGroupMessage: (groupId: string, payload: { content: string; reply_to_message_id?: string }) =>
     post<GroupMessageRaw>(`${B}/groups/${groupId}/messages`, payload),
 
-  // message_ids defaults to [] on the backend — calling with [] updates last_read_at only
-  markGroupRead: (groupId: string, messageIds: string[] = []) =>
-    patch<void>(`${B}/groups/${groupId}/read`, { message_ids: messageIds }),
+  markGroupRead: (groupId: string) =>
+    patch<void>(`${B}/groups/${groupId}/read`),
 
   reactToGroupMessage: (groupId: string, messageId: string, emoji: string) =>
     post<{ action: 'added' | 'removed' }>(`${B}/groups/${groupId}/messages/${messageId}/react`, { emoji }),

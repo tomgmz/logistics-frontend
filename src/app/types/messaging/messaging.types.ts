@@ -27,6 +27,8 @@ export interface ConversationWithDetails {
   created_at: string
   updated_at: string
   last_message_at: string | null
+  participant_a_last_read_at: string | null
+  participant_b_last_read_at: string | null
   other_user: {
     user_id: string
     first_name: string | null
@@ -44,9 +46,7 @@ export interface MessageRow {
   sender_id: string
   receiver_id: string
   content: string
-  is_read: boolean
   sent_at: string
-  read_at: string | null
   deleted_by_sender: boolean
   deleted_by_receiver: boolean
   reply_to_message_id: string | null
@@ -80,13 +80,16 @@ export interface Message {
   sender_id: string
   body: string
   created_at: string
-  read_at: string | null
   reply_to: MessageReplyTo | null
   reactions: MessageReaction[]
 }
 
 export interface Conversation {
   id: string
+  participant_a_id: string
+  participant_b_id: string
+  participant_a_last_read_at: string | null
+  participant_b_last_read_at: string | null
   participants: MessageParticipant[]
   last_message: { message_id: string; body: string; created_at: string; sender_id: string } | null
   unread_count: number
@@ -96,9 +99,13 @@ export interface Conversation {
 
 export function toConversation(raw: ConversationWithDetails): Conversation {
   return {
-    id: raw.conversation_id,
+    id:                         raw.conversation_id,
+    participant_a_id:           raw.participant_a_id,
+    participant_b_id:           raw.participant_b_id,
+    participant_a_last_read_at: raw.participant_a_last_read_at,
+    participant_b_last_read_at: raw.participant_b_last_read_at,
     participants: [{
-      user_id: raw.other_user.user_id,
+      user_id:    raw.other_user.user_id,
       first_name: raw.other_user.first_name ?? '',
       last_name:  raw.other_user.last_name  ?? '',
       role:       raw.other_user.role,
@@ -124,7 +131,6 @@ export function toMessage(raw: MessageRow): Message {
     sender_id:       raw.sender_id,
     body:            raw.content,
     created_at:      raw.sent_at,
-    read_at:         raw.read_at,
     // Guard against PostgREST returning {} instead of null for null FK joins
     reply_to:        raw.reply_to?.message_id ? raw.reply_to : null,
     reactions:       raw.reactions ?? [],
@@ -249,7 +255,7 @@ export type UnifiedListItem =
 
 // ─── Realtime payloads ────────────────────────────────────────────────────────
 
-export interface ReadReceiptPayload      { conversation_id: string; read_at: string }
+export interface ReadReceiptPayload      { conversation_id: string; reader_id: string; last_read_at: string }
 export interface GroupReadReceiptPayload { group_id: string; user_id: string; read_at: string }
 export interface GroupInvitePayload      { group_id: string; group_name: string }
 export interface ReactionTogglePayload   { message_id: string; user_id: string; emoji: string; action: 'added' | 'removed'; group_id?: string }

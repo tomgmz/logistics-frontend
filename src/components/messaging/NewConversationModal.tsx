@@ -9,11 +9,13 @@ import type { MessagableUser } from '@/lib/services/messaging.service'
 interface NewConversationModalProps {
   onClose: () => void
   onConversationReady: (conversationId: string) => void
+  onDraftReady: (user: MessagableUser) => void
 }
 
 export default function NewConversationModal({
   onClose,
   onConversationReady,
+  onDraftReady,
 }: NewConversationModalProps) {
   const [users, setUsers] = useState<MessagableUser[]>([])
   const [loading, setLoading] = useState(true)
@@ -47,11 +49,11 @@ export default function NewConversationModal({
     if (starting) return
     setStarting(user.user_id)
     try {
-      const conv = await messagingService.createOrGetConversation({
-        target_user_id: user.user_id,
-        booking_id: user.booking_id,
-      })
-      onConversationReady(conv.conversation_id)
+      // Resolve without creating: open the existing conversation if one exists,
+      // otherwise open a local draft that is only persisted on first send.
+      const { conversation_id } = await messagingService.resolveConversation(user.user_id)
+      if (conversation_id) onConversationReady(conversation_id)
+      else onDraftReady(user)
     } catch {
       setStarting(null)
     }

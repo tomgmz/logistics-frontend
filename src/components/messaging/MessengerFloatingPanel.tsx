@@ -9,6 +9,7 @@ import { useAuthStore } from '@/lib/store/auth.store'
 import { messagingService } from '@/lib/services/messaging.service'
 import type { MessageRow } from '@/lib/services/messaging.service'
 import { useMessagingRealtime } from '@/lib/hooks/useMessagingRealtime'
+import { useIsMobile } from '@/lib/hooks/useIsMobile'
 import { toConversation, toGroup } from '@/app/types/messaging/messaging.types'
 import { formatConversationTime } from '@/app/utils/messaging.utils'
 import type { Conversation, Group } from '@/app/types/messaging/messaging.types'
@@ -24,6 +25,7 @@ export default function MessengerFloatingPanel() {
   const currentUserId   = user?.user_id ?? ''
   const panelRef        = useRef<HTMLDivElement>(null)
   const router          = useRouter()
+  const isMobile        = useIsMobile()
 
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [groups, setGroups]               = useState<Group[]>([])
@@ -42,9 +44,13 @@ export default function MessengerFloatingPanel() {
       const grps   = rawGroups.map(toGroup)
       setConversations(convs)
       setGroups(grps)
+      // Count a pending group invite as one unread item so being added to a group
+      // ticks the header badge even before any message is sent in it.
+      const pendingInvites = grps.filter(g => g.my_status === 'pending').length
       setTotalUnread(
         convs.reduce((s, c) => s + c.unread_count, 0) +
-        grps.reduce((s, g)  => s + g.unread_count,  0)
+        grps.reduce((s, g)  => s + g.unread_count,  0) +
+        pendingInvites
       )
     } catch { /* silent */ }
     finally { setLoading(false) }
@@ -58,13 +64,16 @@ export default function MessengerFloatingPanel() {
     onNewMessage: (raw: MessageRow) => {
       const isMyMessage = raw.sender_id === currentUserId
       const existing = conversations.find(c => c.id === raw.conversation_id)
+      // Brand-new DM we don't have yet: pull the list so it appears here and the
+      // header badge recomputes from the fresh totals.
+      if (!existing) { fetchAll(); return }
       setConversations(prev => prev.map(c => c.id !== raw.conversation_id ? c : {
         ...c,
         last_message: { message_id: raw.message_id, body: raw.content, created_at: raw.sent_at, sender_id: raw.sender_id },
         unread_count: isMyMessage ? 0 : c.unread_count + 1,
       }))
       if (isMyMessage) {
-        if (existing && existing.unread_count > 0) decrementUnread(existing.unread_count)
+        if (existing.unread_count > 0) decrementUnread(existing.unread_count)
       } else {
         incrementUnread()
       }
@@ -72,17 +81,20 @@ export default function MessengerFloatingPanel() {
     onGroupMessage: (raw) => {
       const isMyMessage = raw.sender_id === currentUserId
       const existing = groups.find(g => g.id === raw.group_id)
+      if (!existing) { fetchAll(); return }
       setGroups(prev => prev.map(g => g.id !== raw.group_id ? g : {
         ...g,
         last_message: { message_id: raw.message_id, body: raw.content, created_at: raw.sent_at, sender_id: raw.sender_id },
         unread_count: isMyMessage ? 0 : g.unread_count + 1,
       }))
       if (isMyMessage) {
-        if (existing && existing.unread_count > 0) decrementUnread(existing.unread_count)
+        if (existing.unread_count > 0) decrementUnread(existing.unread_count)
       } else {
         incrementUnread()
       }
     },
+    // A fresh group invite (no message yet) — refresh so it shows in the list.
+    onGroupInvite: () => fetchAll(),
   })
 
   // Close on outside click
@@ -117,7 +129,11 @@ export default function MessengerFloatingPanel() {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -8, scale: 0.96 }}
           transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-          className="fixed top-[88px] right-4 z-50 w-[340px] max-h-[520px] bg-[var(--color-bg)] border border-white/[0.08] rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+          className={`fixed z-50 bg-[var(--color-bg)] shadow-2xl overflow-hidden flex flex-col ${
+            isMobile
+              ? 'inset-0 w-full h-full max-h-none rounded-none border-0'
+              : 'top-[88px] right-4 w-[340px] max-h-[520px] border border-white/[0.08] rounded-2xl'
+          }`}
         >
           {/* Header */}
           <div className="px-4 pt-4 pb-2 flex items-center justify-between shrink-0">

@@ -29,6 +29,7 @@ interface MessageBubbleProps {
   sender?:          MessageParticipant & { is_online?: boolean }
   showSenderName?:  boolean
   showAvatar?:      boolean
+  showSeen?:        boolean
   onReply?:         (msg: Message) => void
   onReact?:         (messageId: string, emoji: string) => void
   replyToSenderName?: string
@@ -43,6 +44,7 @@ export default function MessageBubble({
   sender,
   showSenderName = false,
   showAvatar     = true,
+  showSeen       = false,
   onReply,
   onReact,
   replyToSenderName,
@@ -142,7 +144,7 @@ export default function MessageBubble({
         <div className={`flex items-center gap-1 px-1 ${isMine ? 'flex-row-reverse' : ''}`}>
           <span className="ff-body text-[10px] text-white/25">{formatMessageTime(message.created_at)}</span>
           {isMine && (
-            message.read_at
+            showSeen
               ? <CheckCheck size={11} className="text-[var(--color-cyan)]" />
               : <Check size={11} className="text-white/25" />
           )}

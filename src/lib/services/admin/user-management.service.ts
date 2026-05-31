@@ -1,6 +1,8 @@
 import proxyApi from '@/lib/api/auth.api'
 import type {
   AdminUser,
+  CreateAdminPayload,
+  UpdateAdminPayload,
   ClientUser,
   DriverUser,
   VendorUser,
@@ -91,6 +93,16 @@ export const userService = {
         proxyApi
           .get<ApiResponse<UserStatsResponse>>(`${B}/users/stats`, { params: roles ? { roles } : undefined })
           .then((r) => r.data.data),
+}
+
+export const adminService = {
+  getAll:     () => get<AdminUser[]>(`${B}/admins`),
+  getOne:     (id: string) => get<AdminUser>(`${B}/admins/${id}`),
+  create:     (p: CreateAdminPayload) => post<AdminUser>(`${B}/admins`, p),
+  update:     (id: string, p: UpdateAdminPayload) => patch<AdminUser>(`${B}/admins/${id}`, p),
+  remove:     (id: string) => del(`${B}/admins/${id}`),
+  activate:   (id: string) => patch<AdminUser>(`${B}/admins/${id}/activate`),
+  deactivate: (id: string) => patch<AdminUser>(`${B}/admins/${id}/deactivate`),
 }
 
 export const clientService = {

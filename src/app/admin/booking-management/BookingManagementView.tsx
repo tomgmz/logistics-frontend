@@ -432,7 +432,6 @@ export default function BookingManagementView() {
   const pageSafe  = Math.min(page, pageCount - 1)
   const totalRows = listMeta?.total ?? 0
 
-  // Assignments active on a different booking
   const busyElsewhere = useMemo(
     () =>
       allAssignments.filter(

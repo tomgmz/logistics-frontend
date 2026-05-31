@@ -19,6 +19,7 @@ import type {
 } from '@/app/types/admin/user-management.types'
 import { USER_SUFFIXES } from '@/lib/validation/user-management.validation'
 import {
+  adminService,
   clientService,
   driverService,
   vendorService,
@@ -47,6 +48,7 @@ interface UserFormModalProps {
 }
 
 const TAB_LABELS: Record<UserTab, string> = {
+  admins:              'Admin',
   clients:             'Client',
   drivers:             'Driver',
   vendors:             'Vendor',
@@ -157,6 +159,7 @@ async function submitForm(
   }
 
   switch (tab) {
+    case 'admins':            return editId ? adminService.update(editId, clean as never).then()            : adminService.create(clean as never).then()
     case 'clients':           return editId ? clientService.update(editId, clean as never).then()           : clientService.create(clean as never).then()
     case 'drivers':           return editId ? driverService.update(editId, clean as never).then()           : driverService.create(clean as never).then()
     case 'vendors':           return editId ? vendorService.update(editId, clean as never).then()           : vendorService.create(clean as never).then()

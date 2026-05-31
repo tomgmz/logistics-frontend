@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { ArrowLeft, MoreVertical, Phone, Video, Loader2 } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { messagingService } from '@/lib/services/messaging.service'
@@ -13,6 +13,8 @@ import type {
   Conversation,
   Message,
   MessageReaction,
+  MessageParticipant,
+  MessagableUser,
   ReactionTogglePayload,
 } from '@/app/types/messaging/messaging.types'
 import { toMessage } from '@/app/types/messaging/messaging.types'
@@ -20,13 +22,13 @@ import { toMessage } from '@/app/types/messaging/messaging.types'
 interface ReplyTo { messageId: string; content: string; senderName: string }
 
 interface ChatWindowProps {
-  conversation:    Conversation
-  currentUserId:   string
-  onBack:          () => void
-  onMessageSent?:  (conversationId: string, body: string, senderId: string) => void
+  conversation?:          Conversation
+  draftUser?:             MessagableUser
+  currentUserId:          string
+  onBack:                 () => void
+  onMessageSent?:         (conversationId: string, body: string, senderId: string) => void
+  onConversationCreated?: (conversationId: string) => void
 }
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function applyReactionToggle(
   messages: Message[],
@@ -63,8 +65,22 @@ function TypingDots() {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function ChatWindow({ conversation, currentUserId, onBack, onMessageSent }: ChatWindowProps) {
-  const participant = conversation.participants[0]
+export default function ChatWindow({ conversation, draftUser, currentUserId, onBack, onMessageSent, onConversationCreated }: ChatWindowProps) {
+  // Draft mode: no conversation row exists yet — it is created on first send.
+  const isDraft     = !conversation
+  const convId      = conversation?.id ?? ''
+  const participant: MessageParticipant = conversation
+    ? conversation.participants[0]
+    : {
+        user_id:    draftUser!.user_id,
+        first_name: draftUser!.first_name ?? '',
+        last_name:  draftUser!.last_name  ?? '',
+        role:       draftUser!.role,
+        email:      draftUser!.email,
+        is_online:  false,
+      }
+  // Unique non-conversation channel for drafts so we don't double-subscribe the user channel.
+  const realtimeConvId = convId || `draft:${participant.user_id}`
   const initials    = `${participant.first_name?.[0] ?? '?'}${participant.last_name?.[0] ?? '?'}`.toUpperCase()
   const bottomRef   = useRef<HTMLDivElement>(null)
 
@@ -75,29 +91,46 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
   const [isOtherTyping, setIsOtherTyping]     = useState(false)
   const [isOnline, setIsOnline]               = useState(participant.is_online ?? false)
   const [replyTo, setReplyTo]                 = useState<ReplyTo | null>(null)
+  const [otherLastReadAt, setOtherLastReadAt] = useState<string | null>(() => {
+    if (!conversation) return null
+    return conversation.participant_a_id === currentUserId
+      ? conversation.participant_b_last_read_at
+      : conversation.participant_a_last_read_at
+  })
   const typingTimeout                         = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const lastSeenId = useMemo(() => {
+    if (!otherLastReadAt) return null
+    const toMs = (iso: string) => new Date(iso.endsWith('Z') || iso.includes('+') ? iso : `${iso}Z`).getTime()
+    const readMs = toMs(otherLastReadAt)
+    return messages
+      .filter(m => m.sender_id === currentUserId && !m.id.startsWith('optimistic-') && toMs(m.created_at) <= readMs)
+      .at(-1)?.id ?? null
+  }, [messages, otherLastReadAt, currentUserId])
   const pendingIds                            = useRef<Set<string>>(new Set())
 
   const fetchMessages = useCallback(async () => {
+    // A draft has no conversation yet — nothing to load.
+    if (!convId) { setMessages([]); setLoading(false); return }
     try {
       setError(null)
       setLoading(true)
-      const raw = await messagingService.getMessages(conversation.id)
+      const raw = await messagingService.getMessages(convId)
       setMessages(raw.map(toMessage2))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load messages')
     } finally {
       setLoading(false)
     }
-  }, [conversation.id])
+  }, [convId])
 
   useEffect(() => { fetchMessages() }, [fetchMessages])
-  useEffect(() => { messagingService.markAsRead(conversation.id).catch(() => {}) }, [conversation.id])
+  useEffect(() => { if (convId) messagingService.markAsRead(convId).catch(() => {}) }, [convId])
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, isOtherTyping])
 
   const { broadcastTyping } = useMessagingRealtime({
     currentUserId,
-    conversationId: conversation.id,
+    conversationId: realtimeConvId,
     onNewMessage: (raw) => {
       const incoming = toMessage2(raw)
       setMessages(prev => {
@@ -107,11 +140,11 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
         if (prev.some(m => m.id === incoming.id)) return prev
         return [...prev, incoming]
       })
-      if (raw.sender_id !== currentUserId) messagingService.markAsRead(conversation.id).catch(() => {})
+      if (raw.sender_id !== currentUserId && convId) messagingService.markAsRead(convId).catch(() => {})
     },
-    onReadReceipt: ({ conversation_id, read_at }) => {
-      if (conversation_id !== conversation.id) return
-      setMessages(prev => prev.map(m => m.sender_id === currentUserId && !m.read_at ? { ...m, read_at } : m))
+    onReadReceipt: ({ conversation_id, reader_id, last_read_at }) => {
+      if (conversation_id !== convId) return
+      if (reader_id !== currentUserId) setOtherLastReadAt(last_read_at)
     },
     onReactionToggle: (payload) => {
       setMessages(prev => applyReactionToggle(prev, payload, currentUserId))
@@ -126,20 +159,39 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
   })
 
   const handleSend = async (body: string, replyToMessageId?: string) => {
+    // Draft: the first message lazily creates the conversation. Hand the new id back
+    // to the shell, which swaps the draft for the real conversation.
+    if (isDraft) {
+      setReplyTo(null)
+      try {
+        setSending(true)
+        const saved = await messagingService.sendDirectMessage({
+          target_user_id:      participant.user_id,
+          content:             body,
+          reply_to_message_id: replyToMessageId,
+          booking_id:          draftUser?.booking_id,
+        })
+        onConversationCreated?.(saved.conversation_id)
+      } catch {
+        setError('Failed to send message')
+      } finally { setSending(false) }
+      return
+    }
+
     const oid = `optimistic-${Date.now()}`
     const optimistic: Message = {
-      id: oid, conversation_id: conversation.id, sender_id: currentUserId,
-      body, created_at: new Date().toISOString(), read_at: null,
+      id: oid, conversation_id: convId, sender_id: currentUserId,
+      body, created_at: new Date().toISOString(),
       reply_to: replyTo ? { message_id: replyTo.messageId, content: replyTo.content, sender_id: '' } : null,
       reactions: [],
     }
     pendingIds.current.add(oid)
     setMessages(prev => [...prev, optimistic])
     setReplyTo(null)
-    onMessageSent?.(conversation.id, body, currentUserId)
+    onMessageSent?.(convId, body, currentUserId)
     try {
       setSending(true)
-      const saved = await messagingService.sendMessage(conversation.id, { content: body, reply_to_message_id: replyToMessageId })
+      const saved = await messagingService.sendMessage(convId, { content: body, reply_to_message_id: replyToMessageId })
       setMessages(prev => prev.map(m => m.id === oid ? toMessage2(saved) : m))
       pendingIds.current.delete(oid)
     } catch {
@@ -159,7 +211,7 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
         : [...base, { emoji, user_id: currentUserId }]  // add/replace
       return { ...m, reactions }
     }))
-    try { await messagingService.reactToMessage(conversation.id, messageId, emoji) }
+    try { await messagingService.reactToMessage(convId, messageId, emoji) }
     catch { fetchMessages() }
   }
 
@@ -225,36 +277,37 @@ export default function ChatWindow({ conversation, currentUserId, onBack, onMess
           </div>
         )}
         {!loading && !error && dateGroups.map(({ date, messages: msgs }) => (
-          <div key={date} className="space-y-2.5">
-            <div className="flex items-center gap-3 py-2">
-              <div className="flex-1 h-px bg-white/[0.04]" />
-              <span className="ff-body text-[10px] text-white/20 uppercase tracking-widest shrink-0">{date}</span>
-              <div className="flex-1 h-px bg-white/[0.04]" />
+            <div key={date} className="space-y-2.5">
+              <div className="flex items-center gap-3 py-2">
+                <div className="flex-1 h-px bg-white/[0.04]" />
+                <span className="ff-body text-[10px] text-white/20 uppercase tracking-widest shrink-0">{date}</span>
+                <div className="flex-1 h-px bg-white/[0.04]" />
+              </div>
+              {msgs.map((msg, i) => {
+                const isMine    = msg.sender_id === currentUserId
+                const prev      = msgs[i - 1]
+                const showAvatar= !isMine && (msgs[i + 1]?.sender_id !== msg.sender_id || i === msgs.length - 1)
+                const showName  = !isMine && prev?.sender_id !== msg.sender_id
+                return (
+                  <MessageBubble
+                    key={msg.id}
+                    message={msg}
+                    isMine={isMine}
+                    currentUserId={currentUserId}
+                    sender={isMine ? undefined : { ...participant, is_online: isOnline }}
+                    showSenderName={showName}
+                    showAvatar={showAvatar}
+                    showSeen={msg.id === lastSeenId}
+                    onReply={handleReply}
+                    onReact={handleReact}
+                    replyToSenderName={msg.reply_to
+                      ? (msg.reply_to.sender_id === currentUserId ? 'You' : participant.first_name)
+                      : undefined}
+                  />
+                )
+              })}
             </div>
-            {msgs.map((msg, i) => {
-              const isMine    = msg.sender_id === currentUserId
-              const prev      = msgs[i - 1]
-              const showAvatar= !isMine && (msgs[i + 1]?.sender_id !== msg.sender_id || i === msgs.length - 1)
-              const showName  = !isMine && prev?.sender_id !== msg.sender_id
-              return (
-                <MessageBubble
-                  key={msg.id}
-                  message={msg}
-                  isMine={isMine}
-                  currentUserId={currentUserId}
-                  sender={isMine ? undefined : { ...participant, is_online: isOnline }}
-                  showSenderName={showName}
-                  showAvatar={showAvatar}
-                  onReply={handleReply}
-                  onReact={handleReact}
-                  replyToSenderName={msg.reply_to
-                    ? (msg.reply_to.sender_id === currentUserId ? 'You' : participant.first_name)
-                    : undefined}
-                />
-              )
-            })}
-          </div>
-        ))}
+          ))}
 
         {/* Typing bubble */}
         <AnimatePresence>

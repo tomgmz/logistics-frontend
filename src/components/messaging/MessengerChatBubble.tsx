@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Loader2, Minus, CornerUpLeft } from 'lucide-react'
 import { useMessengerStore } from '@/lib/store/messenger.store'
@@ -16,6 +16,7 @@ import type {
   ReactionTogglePayload,
 } from '@/app/types/messaging/messaging.types'
 import { useMessagingRealtime } from '@/lib/hooks/useMessagingRealtime'
+import { useIsMobile } from '@/lib/hooks/useIsMobile'
 import { QuickReactBar } from './EmojiPicker'
 import MessageInput from './MessageInput'
 import MessageBubble from './MessageBubble'
@@ -49,28 +50,46 @@ export default function MessengerChatBubble({ conversationId, index }: Props) {
   const { closeChat, minimizeChat } = useMessengerStore()
   const { user }                    = useAuthStore()
   const currentUserId               = user?.user_id ?? ''
+  const isMobile                    = useIsMobile()
   const rightOffset                 = MIN_COL_W + index * (BUBBLE_W + BUBBLE_GAP)
 
-  const [conv, setConv]           = useState<Conversation | null>(null)
-  const [messages, setMessages]   = useState<Message[]>([])
-  const [loadingConv, setLConv]   = useState(true)
-  const [loadingMsgs, setLMsgs]   = useState(true)
-  const [sending, setSending]     = useState(false)
-  const [isTyping, setIsTyping]   = useState(false)
-  const [isOnline, setIsOnline]   = useState(false)
-  const [replyTo, setReplyTo]     = useState<{ messageId: string; content: string; senderName: string } | null>(null)
+  const [conv, setConv]               = useState<Conversation | null>(null)
+  const [messages, setMessages]       = useState<Message[]>([])
+  const [loadingConv, setLConv]       = useState(true)
+  const [loadingMsgs, setLMsgs]       = useState(true)
+  const [sending, setSending]         = useState(false)
+  const [isTyping, setIsTyping]       = useState(false)
+  const [isOnline, setIsOnline]       = useState(false)
+  const [otherLastReadAt, setOtherLastReadAt] = useState<string | null>(null)
+  const [replyTo, setReplyTo]         = useState<{ messageId: string; content: string; senderName: string } | null>(null)
 
   const bottomRef    = useRef<HTMLDivElement>(null)
   const typingTimer  = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pendingIds   = useRef<Set<string>>(new Set())
 
-  // Load conversation metadata
+  const lastSeenId = useMemo(() => {
+    if (!otherLastReadAt) return null
+    const toMs = (iso: string) => new Date(iso.endsWith('Z') || iso.includes('+') ? iso : `${iso}Z`).getTime()
+    const readMs = toMs(otherLastReadAt)
+    return messages
+      .filter(m => m.sender_id === currentUserId && !m.id.startsWith('optimistic-') && toMs(m.created_at) <= readMs)
+      .at(-1)?.id ?? null
+  }, [messages, otherLastReadAt, currentUserId])
+
+  // Load conversation metadata + initialise otherLastReadAt
   useEffect(() => {
     messagingService.getConversations()
-      .then(raw => { const f = raw.find(c => c.conversation_id === conversationId); if (f) setConv(toConversation(f)) })
+      .then(raw => {
+        const f = raw.find(c => c.conversation_id === conversationId)
+        if (f) {
+          setConv(toConversation(f))
+          const myId = currentUserId
+          setOtherLastReadAt(f.participant_a_id === myId ? f.participant_b_last_read_at : f.participant_a_last_read_at)
+        }
+      })
       .catch(() => {})
       .finally(() => setLConv(false))
-  }, [conversationId])
+  }, [conversationId, currentUserId])
 
   const fetchMessages = useCallback(async () => {
     try {
@@ -99,9 +118,9 @@ export default function MessengerChatBubble({ conversationId, index }: Props) {
       })
       if (raw.sender_id !== currentUserId) messagingService.markAsRead(conversationId).catch(() => {})
     },
-    onReadReceipt: ({ conversation_id, read_at }) => {
+    onReadReceipt: ({ conversation_id, reader_id, last_read_at }) => {
       if (conversation_id !== conversationId) return
-      setMessages(prev => prev.map(m => m.sender_id === currentUserId && !m.read_at ? { ...m, read_at } : m))
+      if (reader_id !== currentUserId) setOtherLastReadAt(last_read_at)
     },
     onReactionToggle: payload => setMessages(prev => applyReactionToggle(prev, payload)),
     onTyping: (uid, t) => {
@@ -118,7 +137,7 @@ export default function MessengerChatBubble({ conversationId, index }: Props) {
     pendingIds.current.add(oid)
     setMessages(prev => [...prev, {
       id: oid, conversation_id: conversationId, sender_id: currentUserId,
-      body, created_at: new Date().toISOString(), read_at: null,
+      body, created_at: new Date().toISOString(),
       reply_to: replyTo ? { message_id: replyTo.messageId, content: replyTo.content, sender_id: '' } : null,
       reactions: [],
     }])
@@ -149,14 +168,18 @@ export default function MessengerChatBubble({ conversationId, index }: Props) {
 
   const dateGroups = groupMessagesByDate(messages)
 
+  // On mobile every open chat goes full-screen (like the native app), so only the
+  // top-most one is visible — skip rendering the stacked ones underneath it.
+  if (isMobile && index !== 0) return null
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 40, scale: 0.88 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: 30, scale: 0.92 }}
       transition={{ type: 'spring', stiffness: 400, damping: 32 }}
-      style={{ right: rightOffset, width: BUBBLE_W, height: 490 }}
-      className="fixed bottom-0 z-40 flex flex-col rounded-t-2xl overflow-hidden border border-b-0 border-white/[0.09] shadow-2xl"
+      style={isMobile ? { inset: 0, width: '100%', height: '100%' } : { right: rightOffset, width: BUBBLE_W, height: 490 }}
+      className={`fixed z-50 flex flex-col overflow-hidden shadow-2xl ${isMobile ? 'inset-0 rounded-none border-0' : 'bottom-0 rounded-t-2xl border border-b-0 border-white/[0.09]'}`}
     >
       {/* Header */}
       <div className="w-full flex items-center gap-2.5 px-3 py-2.5 shrink-0 bg-[var(--color-bg)] border-b border-white/[0.06]">
@@ -220,6 +243,7 @@ export default function MessengerChatBubble({ conversationId, index }: Props) {
                     sender={isMine ? undefined : { ...participant!, is_online: isOnline }}
                     showSenderName={showName}
                     showAvatar={showAvatar}
+                    showSeen={msg.id === lastSeenId}
                     onReply={m => setReplyTo({ messageId: m.id, content: m.body, senderName: m.sender_id === currentUserId ? 'You' : participant?.first_name ?? 'Them' })}
                     onReact={handleReact}
                     replyToSenderName={msg.reply_to ? (msg.reply_to.sender_id === currentUserId ? 'You' : participant?.first_name ?? 'Them') : undefined}

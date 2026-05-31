@@ -14,6 +14,7 @@ import type {
   Group,
   UnifiedListItem,
   MessageRow,
+  MessagableUser,
 } from '@/app/types/messaging/messaging.types'
 import ConversationList  from './ConversationList'
 import ChatWindow        from './ChatWindow'
@@ -29,6 +30,7 @@ export default function MessagingShell() {
   const [groups, setGroups]               = useState<Group[]>([])
   const [selectedConvId, setSelectedConvId]   = useState<string | null>(null)
   const [selectedGroup, setSelectedGroup]     = useState<Group | null>(null)
+  const [draftUser, setDraftUser]             = useState<MessagableUser | null>(null)
   const [search, setSearch]               = useState('')
   const [loading, setLoading]             = useState(true)
   const [error, setError]                 = useState<string | null>(null)
@@ -58,28 +60,40 @@ export default function MessagingShell() {
   useMessagingRealtime({
     currentUserId,
     onNewMessage: (raw: MessageRow) => {
-      setConversations(prev => prev.map(c => {
-        if (c.id !== raw.conversation_id) return c
-        return {
-          ...c,
-          last_message: { message_id: raw.message_id, body: raw.content, created_at: raw.sent_at, sender_id: raw.sender_id },
-          unread_count: raw.sender_id === currentUserId
-            ? 0
-            : selectedConvId !== c.id ? c.unread_count + 1 : c.unread_count,
-        }
-      }))
+      // Unknown conversation (e.g. a brand-new DM whose first message just arrived):
+      // pull the full list so it appears without a manual reload.
+      let known = false
+      setConversations(prev => {
+        known = prev.some(c => c.id === raw.conversation_id)
+        return prev.map(c => {
+          if (c.id !== raw.conversation_id) return c
+          return {
+            ...c,
+            last_message: { message_id: raw.message_id, body: raw.content, created_at: raw.sent_at, sender_id: raw.sender_id },
+            unread_count: raw.sender_id === currentUserId
+              ? 0
+              : selectedConvId !== c.id ? c.unread_count + 1 : c.unread_count,
+          }
+        })
+      })
+      if (!known) fetchAll()
     },
     onGroupMessage: (raw) => {
-      setGroups(prev => prev.map(g => {
-        if (g.id !== raw.group_id) return g
-        return {
-          ...g,
-          last_message: { message_id: raw.message_id, body: raw.content, created_at: raw.sent_at, sender_id: raw.sender_id },
-          unread_count: raw.sender_id === currentUserId
-            ? 0
-            : selectedGroup?.id !== g.id ? g.unread_count + 1 : g.unread_count,
-        }
-      }))
+      let known = false
+      setGroups(prev => {
+        known = prev.some(g => g.id === raw.group_id)
+        return prev.map(g => {
+          if (g.id !== raw.group_id) return g
+          return {
+            ...g,
+            last_message: { message_id: raw.message_id, body: raw.content, created_at: raw.sent_at, sender_id: raw.sender_id },
+            unread_count: raw.sender_id === currentUserId
+              ? 0
+              : selectedGroup?.id !== g.id ? g.unread_count + 1 : g.unread_count,
+          }
+        })
+      })
+      if (!known) fetchAll()
     },
     onGroupInvite: () => fetchAll(),
     onPresenceChange: setOnlineUserIds,
@@ -106,6 +120,7 @@ export default function MessagingShell() {
   const selectDm = (conv: Conversation) => {
     setSelectedConvId(conv.id)
     setSelectedGroup(null)
+    setDraftUser(null)
     setConversations(prev => prev.map(c => c.id === conv.id ? { ...c, unread_count: 0 } : c))
     messagingService.markAsRead(conv.id).catch(() => {})
   }
@@ -113,10 +128,21 @@ export default function MessagingShell() {
   const selectGroup = (g: Group) => {
     setSelectedGroup(g)
     setSelectedConvId(null)
+    setDraftUser(null)
     setGroups(prev => prev.map(gr => gr.id === g.id ? { ...gr, unread_count: 0 } : gr))
   }
 
-  const handleBack = () => { setSelectedConvId(null); setSelectedGroup(null) }
+  const handleBack = () => { setSelectedConvId(null); setSelectedGroup(null); setDraftUser(null) }
+
+  // First message in a draft persisted the conversation — swap the draft for the real
+  // conversation and refresh the list so it shows up everywhere.
+  const handleDraftCreated = async (conversationId: string) => {
+    setDraftUser(null)
+    await fetchAll()
+    setSelectedConvId(conversationId)
+    setSelectedGroup(null)
+    messagingService.markAsRead(conversationId).catch(() => {})
+  }
 
   const handleInviteResponded = (groupId: string, accepted: boolean) => {
     if (!accepted) {
@@ -130,10 +156,18 @@ export default function MessagingShell() {
 
   const handleConvReady = async (conversationId: string) => {
     setShowNewDm(false)
+    setDraftUser(null)
     await fetchAll()
     setSelectedConvId(conversationId)
     setSelectedGroup(null)
     messagingService.markAsRead(conversationId).catch(() => {})
+  }
+
+  const handleDraftReady = (user: MessagableUser) => {
+    setShowNewDm(false)
+    setSelectedConvId(null)
+    setSelectedGroup(null)
+    setDraftUser(user)
   }
 
   const handleGroupCreated = async (groupId: string) => {
@@ -147,7 +181,7 @@ export default function MessagingShell() {
   }
 
   const selectedConv   = conversations.find(c => c.id === selectedConvId) ?? null
-  const hasActiveChat  = !!selectedConvId || !!selectedGroup
+  const hasActiveChat  = !!selectedConvId || !!selectedGroup || !!draftUser
 
   if (loading) {
     return (
@@ -210,13 +244,21 @@ export default function MessagingShell() {
                 ))
               }
             />
+          ) : draftUser ? (
+            <ChatWindow
+              key={`draft-${draftUser.user_id}`}
+              draftUser={draftUser}
+              currentUserId={currentUserId}
+              onBack={handleBack}
+              onConversationCreated={handleDraftCreated}
+            />
           ) : (
             <EmptyState onNewConversation={() => setShowNewDm(true)} onNewGroup={() => setShowNewGroup(true)} />
           )}
         </div>
       </div>
 
-      {showNewDm    && <NewConversationModal onClose={() => setShowNewDm(false)}    onConversationReady={handleConvReady} />}
+      {showNewDm    && <NewConversationModal onClose={() => setShowNewDm(false)}    onConversationReady={handleConvReady} onDraftReady={handleDraftReady} />}
       {showNewGroup && <NewGroupModal        onClose={() => setShowNewGroup(false)} onGroupCreated={handleGroupCreated} />}
     </>
   )
