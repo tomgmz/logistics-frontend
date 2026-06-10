@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { LogOut, PanelLeftClose, PanelLeft } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { logout } from '@/lib/api/auth.api'
+import { unregisterWebPush } from '@/lib/push/web-push'
 import { useAuthStore } from '@/lib/store/auth.store'
 import ReusableModal from '@/components/layout/ReusableModal'
 
@@ -50,6 +51,7 @@ export default function ReusableSidebar({
 
   const handleLogout = async () => {
     try {
+      await unregisterWebPush()
       await logout()
     } catch {
     } finally {

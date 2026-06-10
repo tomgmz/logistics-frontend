@@ -5,6 +5,7 @@ import ReusableHeader  from './ReusableHeader'
 import ReusableSidebar from './ReusableSidebar'
 import MessengerFloatingPanel        from '@/components/messaging/MessengerFloatingPanel'
 import { MessengerBubbleContainer }  from '@/components/messaging/MessengerBubbleContainer'
+import PushProvider                  from '@/components/push/PushProvider'
 
 interface NavItem {
   href:  string
@@ -38,6 +39,7 @@ export default function ReusableDashboardShell({ children, navItems }: ReusableD
 
       <MessengerFloatingPanel />
       <MessengerBubbleContainer />
+      <PushProvider />
     </div>
   )
 }
