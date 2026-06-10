@@ -783,27 +783,6 @@ export default function VehicleManagementView() {
                       )
                     })}
                   </div>
-
-                  {/* Dropdown mirror */}
-                  <label className="block mt-2">
-                    <span className="sr-only">Select model from list</span>
-                    <select
-                      value={form.model_id}
-                      onChange={(e) => {
-                        if (e.target.value) applyModelPick(e.target.value)
-                        else clearModelPick()
-                      }}
-                      className="w-full rounded-lg border border-white/10 bg-[#111] px-3 py-2 text-sm text-white/80 outline-none"
-                      aria-label="Select model from list"
-                    >
-                      <option value="">— None —</option>
-                      {models.map((m) => (
-                        <option key={m.model_id} value={m.model_id}>
-                          {m.name} ({m.vehicle_type})
-                        </option>
-                      ))}
-                    </select>
-                  </label>
                 </div>
 
                 {/* Selected model preview */}

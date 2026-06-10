@@ -708,28 +708,26 @@ export default function BookingManagementView() {
                 className="bg-transparent border-none outline-none text-sm flex-1 text-white/80 placeholder:text-white/35"
               />
             </div>
-            <div className="flex flex-wrap gap-1.5">
-              {(['all', 'pending', 'approved', 'assigned', 'in_transit', 'completed', 'cancelled'] as const).map((key) => {
-                const label  = key === 'all' ? 'All' : fmtStatus(key)
-                const count  = key === 'all' ? statusCounts.all : statusCounts[key] ?? 0
-                const active = statusFilter === key
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => { setStatusFilter(key); setPage(0) }}
-                    className="px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-colors"
-                    style={{
-                      background:  active ? 'rgba(77,249,237,0.12)' : 'transparent',
-                      borderColor: active ? 'rgba(77,249,237,0.35)' : 'rgba(255,255,255,0.08)',
-                      color:       active ? 'var(--color-cyan)' : '#888',
-                    }}
-                  >
-                    {label}
-                    <span className="ml-1 opacity-70">({count})</span>
-                  </button>
-                )
-              })}
+            <div className="flex items-center gap-2 shrink-0">
+              <label htmlFor="booking-status-filter" className="text-[10px] uppercase tracking-wider text-white/35">
+                Status
+              </label>
+              <select
+                id="booking-status-filter"
+                value={statusFilter}
+                onChange={(e) => { setStatusFilter(e.target.value); setPage(0) }}
+                className="rounded-lg border border-white/10 bg-[#1a1a1a] text-xs font-bold text-white/80 px-3 py-2 outline-none focus:border-[var(--color-cyan)]/50 cursor-pointer"
+              >
+                {(['all', ...BOOKING_STATUSES] as const).map((key) => {
+                  const label = key === 'all' ? 'All' : fmtStatus(key)
+                  const count = key === 'all' ? statusCounts.all : statusCounts[key] ?? 0
+                  return (
+                    <option key={key} value={key}>
+                      {label} ({count})
+                    </option>
+                  )
+                })}
+              </select>
             </div>
           </div>
 

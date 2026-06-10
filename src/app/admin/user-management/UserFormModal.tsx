@@ -86,6 +86,13 @@ function formatPhone(digits: string): string {
   return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7, 10)}`
 }
 
+// Name fields auto-capitalize the first letter of each word as the user types / from OCR autofill.
+const NAME_FIELDS = new Set(['first_name', 'last_name', 'middle_name'])
+
+function toNameCase(value: string): string {
+  return value.replace(/(^|[\s'-])(\p{L})/gu, (_, sep, ch) => sep + ch.toUpperCase())
+}
+
 function buildInitialState(tab: UserTab, user: AnyUser | null): FormState {
   const base: FormState = {
     first_name:  user?.first_name  ?? '',
@@ -330,9 +337,9 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
       const result = await ocrService.scanLicense(file)
       setForm(prev => ({
         ...prev,
-        ...(result.first_name     && { first_name:     result.first_name }),
-        ...(result.last_name      && { last_name:      result.last_name }),
-        ...(result.middle_name    && { middle_name:    result.middle_name }),
+        ...(result.first_name     && { first_name:     toNameCase(result.first_name) }),
+        ...(result.last_name      && { last_name:      toNameCase(result.last_name) }),
+        ...(result.middle_name    && { middle_name:    toNameCase(result.middle_name) }),
         ...(result.suffix         && { suffix:         result.suffix }),
         ...(result.license_number && { license_number: result.license_number }),
         ...(result.license_expiry && { license_expiry: result.license_expiry }),
@@ -416,6 +423,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
   }
 
   function set(key: string, value: string | boolean | number | null) {
+    if (typeof value === 'string' && NAME_FIELDS.has(key)) value = toNameCase(value)
     setForm(prev => {
       const next = { ...prev, [key]: value }
       if (key === 'is_vendor_driver' && value === false) next.vendor_id = ''
@@ -511,6 +519,73 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
           </div>
 
           <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5 px-6 py-6">
+
+            {tab === 'drivers' && (
+              <div className="rounded-xl border border-dashed border-[#424242] bg-[#2a2a2a]/30 px-4 py-4">
+
+                {/* Header */}
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="text-[10px] font-bold tracking-[0.12em] uppercase text-[#818181]">
+                    License Image
+                  </p>
+                  {licenseFile && (
+                    <span className="text-[10px] text-[#4df9ed] font-medium truncate max-w-[180px]">
+                      {licenseFile.name}
+                    </span>
+                  )}
+                </div>
+
+                {!isEdit && (
+                  <p className="mb-3 text-[11px] leading-snug text-[#818181]">
+                    Upload the driver&apos;s license first — scanning auto-fills the full name and license details below.
+                  </p>
+                )}
+
+                {(licensePreview ?? storedLicenseUrl) && (
+                  <div className="mb-3 overflow-hidden rounded-lg border border-[#424242]">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={licensePreview ?? storedLicenseUrl!}
+                      alt="License preview"
+                      className="h-32 w-full object-cover"
+                    />
+                  </div>
+                )}
+
+                {/* Action buttons */}
+                <div className="flex flex-wrap items-center gap-2">
+
+                  {!isEdit && (
+                    <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-[#424242] bg-[#1b1b1b] px-4 py-2 text-sm text-[#818181] transition hover:border-[#4df9ed50] hover:text-white">
+                      {scanLoading
+                        ? <Loader2 size={14} className="animate-spin" />
+                        : scanDone
+                        ? <CheckCircle size={14} className="text-[#4df9ed]" />
+                        : <ScanLine size={14} />}
+                      <span>
+                        {scanLoading ? 'Scanning…' : scanDone ? 'Re-scan' : 'Scan & auto-fill'}
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        className="sr-only"
+                        onChange={handleLicenseScan}
+                        disabled={scanLoading}
+                      />
+                    </label>
+                  )}
+
+                  {scanError && (
+                    <p className="w-full text-[11px] text-red-400">{scanError}</p>
+                  )}
+                </div>
+
+                {fe.license_image && (
+                  <p className="mt-2 text-[11px] text-red-400">{fe.license_image}</p>
+                )}
+
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <Field label="First Name" required error={fe.first_name}>
@@ -646,65 +721,6 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
             </>)}
 
             {tab === 'drivers' && (<>
-
-              <div className="rounded-xl border border-dashed border-[#424242] bg-[#2a2a2a]/30 px-4 py-4">
-
-                {/* Header */}
-                <div className="mb-3 flex items-center justify-between">
-                  <p className="text-[10px] font-bold tracking-[0.12em] uppercase text-[#818181]">
-                    License Image
-                  </p>
-                  {licenseFile && (
-                    <span className="text-[10px] text-[#4df9ed] font-medium truncate max-w-[180px]">
-                      {licenseFile.name}
-                    </span>
-                  )}
-                </div>
-
-                {(licensePreview ?? storedLicenseUrl) && (
-                  <div className="mb-3 overflow-hidden rounded-lg border border-[#424242]">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={licensePreview ?? storedLicenseUrl!}
-                      alt="License preview"
-                      className="h-32 w-full object-cover"
-                    />
-                  </div>
-                )}
-
-                {/* Action buttons */}
-                <div className="flex flex-wrap items-center gap-2">
-
-                  {!isEdit && (
-                    <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-[#424242] bg-[#1b1b1b] px-4 py-2 text-sm text-[#818181] transition hover:border-[#4df9ed50] hover:text-white">
-                      {scanLoading
-                        ? <Loader2 size={14} className="animate-spin" />
-                        : scanDone
-                        ? <CheckCircle size={14} className="text-[#4df9ed]" />
-                        : <ScanLine size={14} />}
-                      <span>
-                        {scanLoading ? 'Scanning…' : scanDone ? 'Re-scan' : 'Scan & auto-fill'}
-                      </span>
-                      <input
-                        type="file"
-                        accept="image/jpeg,image/png,image/webp"
-                        className="sr-only"
-                        onChange={handleLicenseScan}
-                        disabled={scanLoading}
-                      />
-                    </label>
-                  )}
-
-                  {scanError && (
-                    <p className="w-full text-[11px] text-red-400">{scanError}</p>
-                  )}
-                </div>
-
-                {fe.license_image && (
-                  <p className="mt-2 text-[11px] text-red-400">{fe.license_image}</p>
-                )}
-
-              </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <Field label="License Number" required error={fe.license_number}>

@@ -8,7 +8,6 @@ import {
   CalendarCheck,
   MapPin,
   CreditCard,
-  BanknoteArrowDown,
   History,
   Layers,
   LayoutDashboard
@@ -67,11 +66,6 @@ const adminNavItems = [
     href: '/admin/audit-logs',
     label: 'Audit Logs',
     icon: <ScrollText size={17} />,
-  },
-  {
-    href: '/admin/expenses',
-    label: 'Expenses',
-    icon: <BanknoteArrowDown size={17} />,
   },
 ]
 
