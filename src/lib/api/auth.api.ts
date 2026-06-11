@@ -126,6 +126,15 @@ proxyApi.interceptors.response.use(
   }
 )
 
+export interface ModulePermission {
+  module_key: string
+  can_view:   boolean
+  can_create: boolean
+  can_edit:   boolean
+  can_delete: boolean
+  can_export: boolean
+}
+
 export interface AuthUser {
   user_id:    string
   email:      string
@@ -134,6 +143,7 @@ export interface AuthUser {
   role:       string
   status:     string
   must_change_password: boolean
+  module_permissions?: ModulePermission[]
   clients?: {
     client_id:       string
     company_name:    string | null

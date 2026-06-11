@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ShieldCheck as ShieldCheckIcon, UserPlus, Search, RefreshCw, MoreVertical,
-  Pencil, ShieldCheck, ShieldOff, Archive,
+  Pencil, ShieldCheck, ShieldOff, Archive, SlidersHorizontal,
   ChevronLeft, ChevronRight, AlertTriangle,
 } from 'lucide-react'
 import Select, { SelectChangeEvent } from '@mui/material/Select'
@@ -21,7 +21,9 @@ import {
 } from '@/lib/services/admin/user-management.service'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
+import { isManagedRole } from '@/constants/modules'
 import UserFormModal from '@/app/admin/user-management/UserFormModal'
+import PermissionsModal from './PermissionsModal'
 
 type AdminMgmtTab = Extract<
   UserTab,
@@ -139,10 +141,11 @@ interface RowMenuProps {
   user: AnyUser
   tab: TabValue
   onEdit: () => void
+  onManageAccess: () => void
   onStatusChange: (s: UserStatus) => void
 }
 
-function RowMenu({ user, tab, onEdit, onStatusChange }: RowMenuProps) {
+function RowMenu({ user, tab, onEdit, onManageAccess, onStatusChange }: RowMenuProps) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -161,6 +164,7 @@ function RowMenu({ user, tab, onEdit, onStatusChange }: RowMenuProps) {
   ]).filter((a) => a.status !== user.status)
 
   const canEdit = tab !== 'all'
+  const canManageAccess = isManagedRole(user.role)
 
   return (
     <div ref={ref} className="relative">
@@ -188,9 +192,17 @@ function RowMenu({ user, tab, onEdit, onStatusChange }: RowMenuProps) {
                 <Pencil size={13} /> Edit
               </button>
             )}
+            {canManageAccess && (
+              <button
+                onClick={() => { setOpen(false); onManageAccess() }}
+                className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-[#4df9ed] transition hover:bg-[#4df9ed]/10"
+              >
+                <SlidersHorizontal size={13} /> Manage Access
+              </button>
+            )}
             {statusActions.length > 0 && (
               <>
-                {canEdit && <div className="my-1 border-t border-[#2a2a2a]" />}
+                {(canEdit || canManageAccess) && <div className="my-1 border-t border-[#2a2a2a]" />}
                 {statusActions.map((a) => (
                   <button
                     key={a.status}
@@ -298,6 +310,7 @@ export default function AdminManagementClient() {
   const [showForm,         setShowForm]         = useState(false)
   const [editUser,         setEditUser]         = useState<AnyUser | null>(null)
   const [formTab,          setFormTab]          = useState<AdminMgmtTab>('accountants')
+  const [permUser,         setPermUser]         = useState<AnyUser | null>(null)
 
   const isInitialAllFetch = useRef(true)
 
@@ -584,6 +597,7 @@ export default function AdminManagementClient() {
                               user={user}
                               tab={activeTab}
                               onEdit={() => openEdit(user)}
+                              onManageAccess={() => setPermUser(user)}
                               onStatusChange={(s) => handleStatusChange(user, s)}
                             />
                           </td>
@@ -646,12 +660,23 @@ export default function AdminManagementClient() {
         <UserFormModal
           tab={formTab}
           user={editUser}
+          enablePermissions
           onClose={() => setShowForm(false)}
           onSaved={async () => {
             setShowForm(false)
             if (activeTab === 'all') await fetchAllUsers(search, false)
             else await fetchTabUsers(activeTab)
           }}
+        />
+      )}
+
+      {permUser && (
+        <PermissionsModal
+          userId={permUser.user_id}
+          userName={
+            [permUser.first_name, permUser.last_name].filter(Boolean).join(' ') || permUser.email
+          }
+          onClose={() => setPermUser(null)}
         />
       )}
     </ThemeProvider>

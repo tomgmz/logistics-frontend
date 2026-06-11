@@ -35,6 +35,7 @@ export const useAuthStore = create<AuthStore>()(
                 role:       state.user.role,
                 status:     state.user.status,
                 clients:    state.user.clients ?? null,
+                module_permissions: state.user.module_permissions ?? undefined,
               },
             }
           : { user: null },

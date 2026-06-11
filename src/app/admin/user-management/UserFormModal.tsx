@@ -39,12 +39,18 @@ import { extractApiError } from '@/lib/api-error'
 import LandlineInputRow, { toLocalLandlineDigits } from './LandLineInputRow'
 import { ScanLine, CheckCircle } from 'lucide-react'
 import proxyApi from '@/lib/api/auth.api'
+import { EMPTY_FLAGS, MODULES_BY_ROLE, type ManagedRole, type ModuleFlags } from '@/constants/modules'
+import { permissionsService } from '@/lib/services/admin/permissions.service'
+import ModulePermissionMatrix from '@/app/it_admin/administrator-management/ModulePermissionMatrix'
 
 interface UserFormModalProps {
   tab: UserTab
   user: AnyUser | null
   onClose: () => void
   onSaved: () => void
+  // When set, a module-access matrix is shown on creation so the IT Admin can
+  // assign permissions up front (admin management).
+  enablePermissions?: boolean
 }
 
 const TAB_LABELS: Record<UserTab, string> = {
@@ -58,6 +64,16 @@ const TAB_LABELS: Record<UserTab, string> = {
   'fleet-admins':      'Fleet Manager',
   'operations-admins': 'Operations Manager',
   'it-admins':         'IT Admin',
+}
+
+// Maps an admin-management tab to its role so the create-time matrix only lists
+// the modules that role actually has pages for.
+const TAB_TO_ROLE: Partial<Record<UserTab, ManagedRole>> = {
+  admins:              'admin',
+  accountants:         'accountant',
+  'general-managers':  'general_manager',
+  'fleet-admins':      'fleet_admin',
+  'operations-admins': 'operations_admin',
 }
 
 type FormState = Record<string, string | boolean | number | null>
@@ -139,12 +155,13 @@ function buildInitialState(tab: UserTab, user: AnyUser | null): FormState {
   return base
 }
 
+// Returns the affected user's id (the new account's id on create, editId on edit).
 async function submitForm(
   tab: UserTab,
   form: FormState,
   licenseFile: File | null,
   editId?: string,
-): Promise<void> {
+): Promise<string | undefined> {
   const clean = Object.fromEntries(
     Object.entries(form).filter(([key, value]) =>
       value !== undefined && (value !== null ? (value !== '' ? true : key === 'suffix') : key === 'suffix'),
@@ -159,23 +176,25 @@ async function submitForm(
     if (licenseFile) fd.append('image', licenseFile)
     const url    = editId ? `/admin/drivers/${editId}` : '/admin/drivers'
     const method = editId ? 'patch' : 'post'
-    await proxyApi[method](url, fd, {
+    const res = await proxyApi[method](url, fd, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
-    return
+    return editId ?? (res.data?.data?.user_id as string | undefined)
   }
 
+  const newId = (u: unknown): string | undefined => (u as { user_id?: string })?.user_id
+
   switch (tab) {
-    case 'admins':            return editId ? adminService.update(editId, clean as never).then()            : adminService.create(clean as never).then()
-    case 'clients':           return editId ? clientService.update(editId, clean as never).then()           : clientService.create(clean as never).then()
-    case 'drivers':           return editId ? driverService.update(editId, clean as never).then()           : driverService.create(clean as never).then()
-    case 'vendors':           return editId ? vendorService.update(editId, clean as never).then()           : vendorService.create(clean as never).then()
-    case 'accountants':       return editId ? accountantService.update(editId, clean as never).then()       : accountantService.create(clean as never).then()
-    case 'general-managers':  return editId ? generalManagerService.update(editId, clean as never).then()   : generalManagerService.create(clean as never).then()
-    case 'human-resources':   return editId ? humanResourcesService.update(editId, clean as never).then()   : humanResourcesService.create(clean as never).then()
-    case 'fleet-admins':      return editId ? fleetAdminService.update(editId, clean as never).then()       : fleetAdminService.create(clean as never).then()
-    case 'operations-admins': return editId ? operationsAdminService.update(editId, clean as never).then()  : operationsAdminService.create(clean as never).then()
-    case 'it-admins':         return editId ? itAdminService.update(editId, clean as never).then()          : itAdminService.create(clean as never).then()
+    case 'admins':            return editId ? adminService.update(editId, clean as never).then(() => editId)            : adminService.create(clean as never).then(newId)
+    case 'clients':           return editId ? clientService.update(editId, clean as never).then(() => editId)           : clientService.create(clean as never).then(newId)
+    case 'drivers':           return editId ? driverService.update(editId, clean as never).then(() => editId)           : driverService.create(clean as never).then(newId)
+    case 'vendors':           return editId ? vendorService.update(editId, clean as never).then(() => editId)           : vendorService.create(clean as never).then(newId)
+    case 'accountants':       return editId ? accountantService.update(editId, clean as never).then(() => editId)       : accountantService.create(clean as never).then(newId)
+    case 'general-managers':  return editId ? generalManagerService.update(editId, clean as never).then(() => editId)   : generalManagerService.create(clean as never).then(newId)
+    case 'human-resources':   return editId ? humanResourcesService.update(editId, clean as never).then(() => editId)   : humanResourcesService.create(clean as never).then(newId)
+    case 'fleet-admins':      return editId ? fleetAdminService.update(editId, clean as never).then(() => editId)       : fleetAdminService.create(clean as never).then(newId)
+    case 'operations-admins': return editId ? operationsAdminService.update(editId, clean as never).then(() => editId)  : operationsAdminService.create(clean as never).then(newId)
+    case 'it-admins':         return editId ? itAdminService.update(editId, clean as never).then(() => editId)          : itAdminService.create(clean as never).then(newId)
   }
 }
 
@@ -288,10 +307,15 @@ function PhoneInputRow({
   )
 }
 
-export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormModalProps) {
+export default function UserFormModal({ tab, user, onClose, onSaved, enablePermissions = false }: UserFormModalProps) {
   const isEdit = Boolean(user)
+  const formRole    = TAB_TO_ROLE[tab]
+  const roleModules = formRole ? MODULES_BY_ROLE[formRole] : []
+  const showPermissions = enablePermissions && !isEdit && roleModules.length > 0
 
   const initialState = useMemo(() => buildInitialState(tab, user), [tab, user])
+
+  const [perms, setPerms] = useState<Record<string, ModuleFlags>>({})
 
   const [form, setForm]               = useState<FormState>(initialState)
   const [loading, setLoading]         = useState(false)
@@ -369,6 +393,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
 
   useEffect(() => {
     setForm(initialState)
+    setPerms({})
     setGlobalError(null)
     setFieldErrors({})
     setLicenseFile(null)
@@ -453,7 +478,25 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
     setGlobalError(null)
     setFieldErrors({})
     try {
-      await submitForm(tab, form, licenseFile, isEdit ? user!.user_id : undefined)
+      const newUserId = await submitForm(tab, form, licenseFile, isEdit ? user!.user_id : undefined)
+
+      // Persist the module-access matrix for newly created accounts. Only sent
+      // when at least one module is granted — otherwise the account keeps its
+      // default role access. A permissions failure must not undo the account.
+      if (showPermissions && newUserId) {
+        const anyGranted = Object.values(perms).some((f) => f.can_view)
+        if (anyGranted) {
+          try {
+            await permissionsService.save(
+              newUserId,
+              roleModules.map((m) => ({ module_name: m, ...(perms[m] ?? EMPTY_FLAGS) })),
+            )
+          } catch {
+            appToast.error('Account created, but saving module access failed. Set it via Manage Access.', { action: 'user-form-error' })
+          }
+        }
+      }
+
       appToast.success(
         isEdit
           ? `${TAB_LABELS[tab]} updated successfully.`
@@ -819,6 +862,22 @@ export default function UserFormModal({ tab, user, onClose, onSaved }: UserFormM
                 </Field>
               </div>
             </>)}
+
+            {showPermissions && (
+              <div className="rounded-xl border border-[#2a2a2a] bg-[#0f0f0f]/60 p-4">
+                <p className="text-[10px] font-bold tracking-[0.12em] uppercase text-[#4df9ed]">Module Access</p>
+                <p className="mt-1 mb-3 text-[11px] leading-snug text-[#818181]">
+                  Choose what this account can access on creation. The <b>Access</b> column makes a
+                  module visible (view-only); the rest add Create / Edit / Delete / Export. Leave all
+                  unchecked to keep default role access — you can change this later via Manage Access.
+                </p>
+                <ModulePermissionMatrix
+                  modules={roleModules}
+                  value={perms}
+                  onChange={(m, next) => setPerms((prev) => ({ ...prev, [m]: next }))}
+                />
+              </div>
+            )}
 
             {globalError && (
               <motion.div
