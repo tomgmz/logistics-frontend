@@ -16,7 +16,7 @@ interface ReusableHeaderProps {
 }
 
 export default function ReusableHeader({ sidebarOpen, onToggleSidebar }: ReusableHeaderProps) {
-  const { togglePanel, isPanelOpen, totalUnread } = useMessengerStore()
+  const { totalUnread } = useMessengerStore()
   const router = useRouter()
   const pathname = usePathname()
   const user = useAuthStore(s => s.user)
@@ -56,15 +56,12 @@ export default function ReusableHeader({ sidebarOpen, onToggleSidebar }: Reusabl
           <motion.button
             whileHover={{ scale: 1.08 }}
             whileTap={{ scale: 0.94 }}
-            onClick={togglePanel}
-            className={`
+            onClick={() => router.push('/messages')}
+            className="
               relative w-9 h-9 lg:w-10 lg:h-10 rounded-full glass
               flex items-center justify-center transition-colors
-              ${isPanelOpen
-                ? 'border-[var(--color-cyan)]/40 text-[var(--color-cyan)]'
-                : 'hover:border-[var(--color-cyan)]/30'
-              }
-            `}
+              hover:border-[var(--color-cyan)]/30
+            "
           >
             <MessageCircle size={16} />
             {totalUnread > 0 && (

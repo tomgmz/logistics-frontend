@@ -4,8 +4,6 @@ import { ReactNode, useMemo, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import ReusableHeader  from './ReusableHeader'
 import ReusableSidebar from './ReusableSidebar'
-import MessengerFloatingPanel        from '@/components/messaging/MessengerFloatingPanel'
-import { MessengerBubbleContainer }  from '@/components/messaging/MessengerBubbleContainer'
 import PushProvider                  from '@/components/push/PushProvider'
 import { ModuleAccessProvider, ModuleNoAccess } from './ModuleAccess'
 import { useAuthStore } from '@/lib/store/auth.store'
@@ -62,8 +60,6 @@ export default function ReusableDashboardShell({ children, navItems }: ReusableD
         </main>
       </div>
 
-      <MessengerFloatingPanel />
-      <MessengerBubbleContainer />
       <PushProvider />
     </div>
   )
