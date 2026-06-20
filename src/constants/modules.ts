@@ -25,6 +25,39 @@ export const ALL_FLAGS: ModuleFlags = {
   can_view: true, can_create: true, can_edit: true, can_delete: true, can_export: true,
 }
 
+// Tiered access model shown in the Administrator Management matrix. The 5 granular
+// flags above remain the source of truth in the DB + backend guard; these three
+// mutually-exclusive levels are just how an IT Admin assigns them:
+//   Read-only -> view only
+//   Manage    -> view + create + edit + export (day-to-day operations)
+//   All       -> Manage + delete (the destructive, top-tier privilege)
+export type AccessLevel = 'none' | 'read' | 'manage' | 'all'
+
+export const ACCESS_LEVELS: { key: Exclude<AccessLevel, 'none'>; label: string }[] = [
+  { key: 'read',   label: 'Read-only' },
+  { key: 'manage', label: 'Manage'    },
+  { key: 'all',    label: 'All'       },
+]
+
+// Expand a level into the concrete flag set persisted to module_permissions.
+export function levelToFlags(level: AccessLevel): ModuleFlags {
+  switch (level) {
+    case 'read':   return { can_view: true, can_create: false, can_edit: false, can_delete: false, can_export: false }
+    case 'manage': return { can_view: true, can_create: true,  can_edit: true,  can_delete: false, can_export: true  }
+    case 'all':    return { ...ALL_FLAGS }
+    default:       return { ...EMPTY_FLAGS }
+  }
+}
+
+// Collapse an arbitrary flag set back into a level. Tolerant of legacy/partial
+// rows: any destructive flag => All, any write/export flag => Manage, view => Read.
+export function flagsToLevel(f: ModuleFlags): AccessLevel {
+  if (!f.can_view) return 'none'
+  if (f.can_delete) return 'all'
+  if (f.can_create || f.can_edit || f.can_export) return 'manage'
+  return 'read'
+}
+
 // Roles an IT Admin can tailor — every account type in Administrator Management.
 export const MANAGED_ROLES = [
   'admin',
@@ -91,6 +124,56 @@ export const MODULES_BY_ROLE: Record<ManagedRole, ModuleKey[]> = {
   ],
   fleet_admin: ['vehicle-management', 'transit-tracking'],
   operations_admin: ['booking-management', 'document-management', 'transit-tracking'],
+}
+
+// Default access tier per role per module — mirror of the backend
+// ROLE_MODULE_DEFAULTS (keep in sync). Used to pre-fill the matrix for a user who
+// has no saved permissions yet, so the IT Admin sees the role's defaults.
+type DefaultTier = Exclude<AccessLevel, 'none'>
+export const ROLE_MODULE_DEFAULTS: Record<ManagedRole, Partial<Record<ModuleKey, DefaultTier>>> = {
+  admin: {
+    'user-management':     'all',
+    'booking-management':  'all',
+    'vehicle-management':  'all',
+    'billing-management':  'all',
+    'document-management': 'all',
+    'system-maintenance':  'all',
+    'transit-tracking':    'manage',
+    'transaction-history': 'read',
+    'audit-logs':          'read',
+  },
+  accountant: {
+    'billing-management':  'all',
+    'document-management': 'manage',
+    'booking-management':  'read',
+    'transaction-history': 'read',
+  },
+  general_manager: {
+    'booking-management':  'manage',
+    'billing-management':  'manage',
+    'vehicle-management':  'read',
+    'document-management': 'read',
+  },
+  fleet_admin: {
+    'vehicle-management': 'all',
+    'transit-tracking':   'manage',
+  },
+  operations_admin: {
+    'booking-management':  'all',
+    'document-management': 'manage',
+    'transit-tracking':    'manage',
+  },
+}
+
+// Build the default flag map for a role, keyed by module — used to seed the
+// matrix UI when a user has no saved rows.
+export function defaultFlagsForRole(role: string | undefined | null): Record<string, ModuleFlags> {
+  if (!isManagedRole(role)) return {}
+  const out: Record<string, ModuleFlags> = {}
+  for (const [moduleKey, tier] of Object.entries(ROLE_MODULE_DEFAULTS[role])) {
+    out[moduleKey] = levelToFlags(tier as DefaultTier)
+  }
+  return out
 }
 
 // Some routes live under a module without sharing its slug (e.g. the standalone

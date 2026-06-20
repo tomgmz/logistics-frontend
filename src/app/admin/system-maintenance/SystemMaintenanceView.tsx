@@ -5,6 +5,7 @@ import { Plus, RefreshCw, Tag, Layers, Package, Phone, Pencil, Trash2, X } from 
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { systemMaintenanceService } from '@/lib/services/admin/system-maintenance.service'
+import { useModuleAccess } from '@/components/layout/ModuleAccess'
 import type {
   Commodity,
   CreateCommodityPayload,
@@ -50,6 +51,9 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 export default function SystemMaintenanceView() {
+  // System-maintenance tier: hide the create/edit form and per-row write actions.
+  const { canCreate, canEdit, canDelete } = useModuleAccess()
+
   const [tab, setTab] = useState<TabKey>('handling')
 
   const [handlingCodes, setHandling]    = useState<HandlingCode[]>([])
@@ -529,6 +533,7 @@ export default function SystemMaintenanceView() {
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
+                  {canEdit && (
                   <button
                     type="button"
                     onClick={() => startEditLandline(pfx)}
@@ -538,6 +543,8 @@ export default function SystemMaintenanceView() {
                   >
                     <Pencil size={13} />
                   </button>
+                  )}
+                  {canDelete && (
                   <button
                     type="button"
                     onClick={() => void deletePrefix(pfx)}
@@ -550,6 +557,7 @@ export default function SystemMaintenanceView() {
                       : <Trash2 size={13} />
                     }
                   </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -607,7 +615,8 @@ export default function SystemMaintenanceView() {
       {/* body */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
 
-        {/* form panel */}
+        {/* form panel — only for users who can create/edit this module */}
+        {(canCreate || canEdit) && (
         <div className="w-[360px] shrink-0 border-r border-white/[0.07] flex flex-col">
           <div className="shrink-0 px-4 pt-4 pb-3 border-b border-white/[0.07]">
             <p className="text-[11px] font-bold uppercase tracking-widest text-white/35">
@@ -623,6 +632,7 @@ export default function SystemMaintenanceView() {
             {renderForm()}
           </div>
         </div>
+        )}
 
         {/* list panel */}
         <div className="flex-1 min-w-0 flex flex-col">

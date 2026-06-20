@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 
 import { statusColor } from '@/components/map/status.colors'
+import { useModuleAccess } from '@/components/layout/ModuleAccess'
 import type { BookingDetail } from '@/app/types/maps/routemap.types'
 import {
   bookingService,
@@ -353,6 +354,10 @@ export default function BookingManagementView() {
     totalPages: number
     statusCounts: Record<string, number>
   } | null>(null)
+
+  // Booking-management tier for this user (full access in the admin shell unless
+  // restricted). Write controls below are hidden when the user can't edit.
+  const { canEdit } = useModuleAccess()
 
   const [search, setSearch]               = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -1007,7 +1012,7 @@ export default function BookingManagementView() {
                           </span>
                         </div>
 
-                        {normalizeBookingStatus(detail.status) === 'pending' && (
+                        {normalizeBookingStatus(detail.status) === 'pending' && canEdit && (
                           <div className="flex gap-2">
                             <button
                               type="button"
@@ -1032,7 +1037,8 @@ export default function BookingManagementView() {
                       </div>
 
                       {/* Driver / vehicle assignment */}
-                      {(normalizeBookingStatus(detail.status) === 'approved' ||
+                      {canEdit &&
+                      (normalizeBookingStatus(detail.status) === 'approved' ||
                         normalizeBookingStatus(detail.status) === 'assigned') && (
                         <AssignmentPanel
                           detail={detail}

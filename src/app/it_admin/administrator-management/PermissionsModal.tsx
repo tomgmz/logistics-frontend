@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { X, ShieldCheck, Loader2, Lock } from 'lucide-react'
-import { EMPTY_FLAGS, ModuleFlags, ModuleKey } from '@/constants/modules'
+import { EMPTY_FLAGS, ModuleFlags, ModuleKey, defaultFlagsForRole } from '@/constants/modules'
 import { permissionsService } from '@/lib/services/admin/permissions.service'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
@@ -32,8 +32,11 @@ export default function PermissionsModal({ userId, userName, onClose, onSaved }:
       try {
         const res = await permissionsService.get(userId)
         if (!active) return
+        // A user with no saved rows is pre-filled from their role defaults so the
+        // IT Admin sees the starting tiers; otherwise we show what's stored.
+        const defaults = res.permissions.length === 0 ? defaultFlagsForRole(res.role) : {}
         const map: Record<string, ModuleFlags> = {}
-        for (const m of res.modules) map[m] = { ...EMPTY_FLAGS }
+        for (const m of res.modules) map[m] = defaults[m] ?? { ...EMPTY_FLAGS }
         for (const p of res.permissions) {
           map[p.module_key] = {
             can_view: p.can_view, can_create: p.can_create, can_edit: p.can_edit,
@@ -130,9 +133,10 @@ export default function PermissionsModal({ userId, userName, onClose, onSaved }:
                 </div>
               )}
               <p className="mb-4 text-xs text-[#818181]">
-                The <b>Access</b> column controls whether the user can open a module (view-only).
-                The remaining checkboxes add Create / Edit / Delete / Export. Leave every module
-                unchecked to keep the user on their default role access.
+                Pick one access level per module: <b>Read-only</b> (view only),
+                <b> Manage</b> (view, create, edit &amp; export), or <b>All</b> (Manage plus delete).
+                These start from the role&apos;s defaults — leaving a module unchecked removes the
+                user&apos;s access to it.
               </p>
               <ModulePermissionMatrix
                 modules={modules}

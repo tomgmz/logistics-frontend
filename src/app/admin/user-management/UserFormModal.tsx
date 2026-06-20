@@ -25,7 +25,6 @@ import {
   vendorService,
   accountantService,
   generalManagerService,
-  humanResourcesService,
   fleetAdminService,
   operationsAdminService,
   itAdminService,
@@ -60,7 +59,6 @@ const TAB_LABELS: Record<UserTab, string> = {
   vendors:             'Vendor',
   accountants:         'Accountant',
   'general-managers':  'General Manager',
-  'human-resources':   'HR Officer',
   'fleet-admins':      'Fleet Manager',
   'operations-admins': 'Operations Manager',
   'it-admins':         'IT Admin',
@@ -191,7 +189,6 @@ async function submitForm(
     case 'vendors':           return editId ? vendorService.update(editId, clean as never).then(() => editId)           : vendorService.create(clean as never).then(newId)
     case 'accountants':       return editId ? accountantService.update(editId, clean as never).then(() => editId)       : accountantService.create(clean as never).then(newId)
     case 'general-managers':  return editId ? generalManagerService.update(editId, clean as never).then(() => editId)   : generalManagerService.create(clean as never).then(newId)
-    case 'human-resources':   return editId ? humanResourcesService.update(editId, clean as never).then(() => editId)   : humanResourcesService.create(clean as never).then(newId)
     case 'fleet-admins':      return editId ? fleetAdminService.update(editId, clean as never).then(() => editId)       : fleetAdminService.create(clean as never).then(newId)
     case 'operations-admins': return editId ? operationsAdminService.update(editId, clean as never).then(() => editId)  : operationsAdminService.create(clean as never).then(newId)
     case 'it-admins':         return editId ? itAdminService.update(editId, clean as never).then(() => editId)          : itAdminService.create(clean as never).then(newId)

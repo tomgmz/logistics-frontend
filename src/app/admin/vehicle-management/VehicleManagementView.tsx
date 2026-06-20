@@ -26,6 +26,7 @@ import {
   adminFetchVendorsRaw,
 } from '@/lib/services/admin/trucks.service'
 import ReusableModal from '@/components/layout/ReusableModal'
+import { useModuleAccess } from '@/components/layout/ModuleAccess'
 import TruckModelFormModal from './TruckModelFormModal'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
@@ -209,6 +210,9 @@ export default function VehicleManagementView() {
     total: number
     totalPages: number
   } | null>(null)
+
+  // Vehicle-management tier: hide write controls the user isn't allowed to use.
+  const { canCreate, canEdit, canDelete } = useModuleAccess()
 
   const [modalMode,     setModalMode]     = useState<FormMode>(null)
   const [editingId,     setEditingId]     = useState<string | null>(null)
@@ -431,14 +435,16 @@ export default function VehicleManagementView() {
           <h1 className="text-lg font-bold text-white tracking-tight">Vehicle management</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setModelModalOpen(true)}
-            className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/5 transition-colors"
-          >
-            <Settings2 size={14} />
-            Manage models
-          </button>
+          {canEdit && (
+            <button
+              type="button"
+              onClick={() => setModelModalOpen(true)}
+              className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/5 transition-colors"
+            >
+              <Settings2 size={14} />
+              Manage models
+            </button>
+          )}
           <button
             type="button"
             onClick={() => void refreshAll()}
@@ -447,15 +453,17 @@ export default function VehicleManagementView() {
             <RefreshCw size={14} />
             Refresh
           </button>
-          <button
-            type="button"
-            onClick={openCreate}
-            className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-wide text-black"
-            style={{ background: 'var(--color-cyan)' }}
-          >
-            <Plus size={16} />
-            Add vehicle
-          </button>
+          {canCreate && (
+            <button
+              type="button"
+              onClick={openCreate}
+              className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-wide text-black"
+              style={{ background: 'var(--color-cyan)' }}
+            >
+              <Plus size={16} />
+              Add vehicle
+            </button>
+          )}
         </div>
       </header>
 
@@ -544,9 +552,11 @@ export default function VehicleManagementView() {
             <div className="flex-1 flex flex-col items-center justify-center gap-4 py-12 text-center px-4">
               <TruckIcon size={40} className="text-white/20" />
               <p className="text-sm text-white/45">No vehicles match your filters.</p>
-              <button type="button" onClick={openCreate} className="text-[var(--color-cyan)] text-sm font-bold">
-                Add your first vehicle
-              </button>
+              {canCreate && (
+                <button type="button" onClick={openCreate} className="text-[var(--color-cyan)] text-sm font-bold">
+                  Add your first vehicle
+                </button>
+              )}
             </div>
           ) : (
             <>
@@ -601,22 +611,26 @@ export default function VehicleManagementView() {
                           </td>
                           <td className="px-3 py-2.5 text-white/65 text-xs">{fmtLabel(t.owned_by)}</td>
                           <td className="px-3 py-2.5 text-right">
-                            <button
-                              type="button"
-                              onClick={() => openEdit(t)}
-                              className="p-1.5 rounded-md border border-white/10 text-white/70 hover:bg-white/5 mr-1"
-                              title="Edit"
-                            >
-                              <Pencil size={14} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteClick(t.truck_id)}
-                              className="p-1.5 rounded-md border border-red-500/25 text-red-400 hover:bg-red-500/10"
-                              title="Delete"
-                            >
-                              <Trash2 size={14} />
-                            </button>
+                            {canEdit && (
+                              <button
+                                type="button"
+                                onClick={() => openEdit(t)}
+                                className="p-1.5 rounded-md border border-white/10 text-white/70 hover:bg-white/5 mr-1"
+                                title="Edit"
+                              >
+                                <Pencil size={14} />
+                              </button>
+                            )}
+                            {canDelete && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteClick(t.truck_id)}
+                                className="p-1.5 rounded-md border border-red-500/25 text-red-400 hover:bg-red-500/10"
+                                title="Delete"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
                           </td>
                         </tr>
                       )
@@ -893,7 +907,7 @@ export default function VehicleManagementView() {
               </div>
 
               <div className="flex items-center justify-between gap-2 px-4 py-3 border-t border-white/[0.07]">
-                {modalMode === 'edit' && editingId && (
+                {modalMode === 'edit' && editingId && canDelete && (
                   <button
                     type="button"
                     onClick={() => handleDeleteClick(editingId)}

@@ -17,8 +17,6 @@ import type {
   UpdateAccountantPayload,
   CreateGeneralManagerPayload,
   UpdateGeneralManagerPayload,
-  CreateHumanResourcesPayload,
-  UpdateHumanResourcesPayload,
   CreateFleetAdminPayload,
   UpdateFleetAdminPayload,
   CreateOperationsAdminPayload,
@@ -153,16 +151,6 @@ export const generalManagerService = {
   remove: (id: string) => del(`${B}/general-managers/${id}`),
   activate:   (id: string) => patch<AdminUser>(`${B}/general-managers/${id}/activate`),
   deactivate: (id: string) => patch<AdminUser>(`${B}/general-managers/${id}/deactivate`),
-}
-
-export const humanResourcesService = {
-  getAll: () => get<AdminUser[]>(`${B}/human-resources`),
-  getOne: (id: string) => get<AdminUser>(`${B}/human-resources/${id}`),
-  create: (p: CreateHumanResourcesPayload) => post<AdminUser>(`${B}/human-resources`, p),
-  update: (id: string, p: UpdateHumanResourcesPayload) => patch<AdminUser>(`${B}/human-resources/${id}`, p),
-  remove: (id: string) => del(`${B}/human-resources/${id}`),
-  activate:   (id: string) => patch<AdminUser>(`${B}/human-resources/${id}/activate`),
-  deactivate: (id: string) => patch<AdminUser>(`${B}/human-resources/${id}/deactivate`),
 }
 
 export const fleetAdminService = {
