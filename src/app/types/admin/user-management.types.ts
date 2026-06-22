@@ -2,8 +2,8 @@ export type AdminRole =
   | 'admin'
   | 'it_admin'
   | 'general_manager'
-  | 'fleet_admin'
-  | 'operations_admin'
+  | 'fleet_manager'
+  | 'operations_manager'
   | 'accountant'
 
 export type UserRole = AdminRole | 'driver' | 'client' | 'vendor'

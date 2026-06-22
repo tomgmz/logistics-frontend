@@ -70,8 +70,8 @@ const TAB_TO_ROLE: Partial<Record<UserTab, ManagedRole>> = {
   admins:              'admin',
   accountants:         'accountant',
   'general-managers':  'general_manager',
-  'fleet-admins':      'fleet_admin',
-  'operations-admins': 'operations_admin',
+  'fleet-admins':      'fleet_manager',
+  'operations-admins': 'operations_manager',
 }
 
 type FormState = Record<string, string | boolean | number | null>

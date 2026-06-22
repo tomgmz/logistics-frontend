@@ -63,8 +63,8 @@ export const MANAGED_ROLES = [
   'admin',
   'accountant',
   'general_manager',
-  'fleet_admin',
-  'operations_admin',
+  'fleet_manager',
+  'operations_manager',
 ] as const
 export type ManagedRole = (typeof MANAGED_ROLES)[number]
 
@@ -122,8 +122,8 @@ export const MODULES_BY_ROLE: Record<ManagedRole, ModuleKey[]> = {
     'billing-management',
     'document-management',
   ],
-  fleet_admin: ['vehicle-management', 'transit-tracking'],
-  operations_admin: ['booking-management', 'document-management', 'transit-tracking'],
+  fleet_manager: ['vehicle-management', 'transit-tracking'],
+  operations_manager: ['booking-management', 'vehicle-management', 'document-management', 'transit-tracking'],
 }
 
 // Default access tier per role per module — mirror of the backend
@@ -154,12 +154,13 @@ export const ROLE_MODULE_DEFAULTS: Record<ManagedRole, Partial<Record<ModuleKey,
     'vehicle-management':  'read',
     'document-management': 'read',
   },
-  fleet_admin: {
+  fleet_manager: {
     'vehicle-management': 'all',
     'transit-tracking':   'manage',
   },
-  operations_admin: {
+  operations_manager: {
     'booking-management':  'all',
+    'vehicle-management':  'read',
     'document-management': 'manage',
     'transit-tracking':    'manage',
   },

@@ -23,7 +23,7 @@ export const NAV_ITEMS_BY_ROLE: Record<string, { href: string; label: string; ic
     { href: '/client/reverse-billing', label: 'Reverse Billing', icon: <CreditCard size={17} /> },
     { href: '/client/history', label: 'Transaction History', icon: <History size={17} /> },
   ],
-  fleet_admin: [
+  fleet_manager: [
     { href: '/fleet_admin/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={17} /> },
     { href: '/fleet_admin/vehicle-management', label: 'Vehicle Management', icon: <Truck size={17} /> },
     { href: '/fleet_admin/transit-tracking', label: 'Transit Tracking', icon: <Truck size={17} /> },
@@ -40,7 +40,7 @@ export const NAV_ITEMS_BY_ROLE: Record<string, { href: string; label: string; ic
     { href: '/it_admin/administrator-management', label: 'Admin Management', icon: <Users size={17} /> },
     { href: '/it_admin/logs', label: 'Audit Logs', icon: <Activity size={17} /> },
   ],
-  operations_admin: [
+  operations_manager: [
     { href: '/operations_admin/booking-management', label: 'Booking Management', icon: <CalendarCheck size={17} /> },
     { href: '/operations_admin/document-management', label: 'Document Management', icon: <FileSearch size={17} /> },
     { href: '/operations_admin/transit-tracking', label: 'Transit Tracking', icon: <MapPin size={17} /> },

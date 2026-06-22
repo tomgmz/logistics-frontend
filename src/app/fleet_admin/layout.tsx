@@ -1,12 +1,13 @@
 'use client'
 
 import { ReactNode, useEffect } from 'react'
-import { Truck, LayoutDashboard } from 'lucide-react'
+import { Truck, LayoutDashboard, ClipboardCheck } from 'lucide-react'
 import ReusableDashboardShell from '@/components/layout/ReusableDashboardShell'
 import { useAuthStore } from '@/lib/store/auth.store'
 
 const NAV_ITEMS = [
   { href: '/fleet_admin/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={17} /> },
+  { href: '/fleet_admin/booking-management', label: 'Booking Management', icon: <ClipboardCheck size={17} /> },
   { href: '/fleet_admin/vehicle-management', label: 'Vehicle Management', icon: <Truck size={17} /> },
   { href: '/fleet_admin/transit-tracking', label: 'Transit Tracking', icon: <Truck size={17} /> },
 ]
@@ -17,10 +18,10 @@ export default function FleetAdminLayout({ children }: { children: ReactNode }) 
 
   useEffect(() => {
     if (!hasHydrated) return
-    if (!user || user.role !== 'fleet_admin') window.location.replace('/')
+    if (!user || user.role !== 'fleet_manager') window.location.replace('/')
   }, [hasHydrated, user])
 
-  if (!hasHydrated || !user || user.role !== 'fleet_admin') {
+  if (!hasHydrated || !user || user.role !== 'fleet_manager') {
     return <div className="min-h-screen bg-[#0a0a0a]" />
   }
 

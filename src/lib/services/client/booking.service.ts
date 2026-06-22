@@ -179,6 +179,36 @@ export const bookingService = {
     await proxyApi.delete(`/booking/destinations/${destinationId}`)
   },
 
+  // --- approval workflow ---------------------------------------------------
+  accountingReview: async (
+    bookingId: string,
+    payload: { accounting_status: 'approved' | 'forwarded' | 'rejected'; rejection_reason?: string },
+  ) => {
+    await initCsrf()
+    return patch<unknown>(`/booking/${bookingId}/accounting-review`, payload)
+  },
+
+  gmReview: async (
+    bookingId: string,
+    payload: { gm_status: 'approved' | 'rejected'; rejection_reason?: string },
+  ) => {
+    await initCsrf()
+    return patch<unknown>(`/booking/${bookingId}/gm-review`, payload)
+  },
+
+  opsAssign: async (bookingId: string) => {
+    await initCsrf()
+    return patch<unknown>(`/booking/${bookingId}/ops-assign`, { ops_status: 'assigned' })
+  },
+
+  fleetReview: async (
+    bookingId: string,
+    payload: { decision: 'approved' | 'rejected'; rejection_reason?: string },
+  ) => {
+    await initCsrf()
+    return patch<unknown>(`/booking/${bookingId}/fleet-review`, payload)
+  },
+
   getBookingById: (bookingId: string) =>
     get<unknown>(`/booking/${bookingId}`),
 

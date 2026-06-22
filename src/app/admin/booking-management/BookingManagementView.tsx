@@ -55,12 +55,45 @@ const BOOKING_STATUSES: AdminBookingLifecycleStatus[] = [
 
 const DEST_STATUSES: DestinationDeliveryStatus[] = ['pending', 'delivered', 'failed']
 
+// Roles that share this view. Each non-admin role sees a filtered slice of
+// bookings and acts only on its own approval stage.
+export type BookingRoleView =
+  | 'admin'
+  | 'accountant'
+  | 'general_manager'
+  | 'operations_manager'
+  | 'fleet_manager'
+
+const ROLE_FORCED_STATUS: Partial<Record<BookingRoleView, AdminBookingLifecycleStatus>> = {
+  accountant:         'pending',
+  general_manager:    'pending',
+  fleet_manager:      'assigned',
+}
+
+// Operations sees every status EXCEPT pending (a booking only reaches ops once
+// approved). It keeps the status dropdown but with 'pending' removed.
+const ROLE_HIDE_PENDING: Partial<Record<BookingRoleView, boolean>> = {
+  operations_manager: true,
+}
+
+const ROLE_TITLE: Record<BookingRoleView, string> = {
+  admin:              'Booking management',
+  accountant:         'Bookings — accounting review',
+  general_manager:    'Bookings — GM approval',
+  operations_manager: 'Bookings — vehicle & driver assignment',
+  fleet_manager:      'Bookings — vehicle readiness (BLOWBAGETS)',
+}
+
 type DetailWithExtra = BookingDetail & {
   transaction_documents?: string[] | null
   required_weight_kg?: number | null
   required_volume_cbm?: number | null
   required_length_cm?: number | null
   stackable_required?: boolean | null
+  accounting_status?: 'pending' | 'approved' | 'rejected' | 'forwarded' | null
+  gm_status?:         'pending' | 'approved' | 'rejected' | null
+  ops_status?:        'pending' | 'assigned' | null
+  fleet_status?:      'pending' | 'approved' | 'rejected' | null
 }
 
 type CargoItem = NonNullable<BookingDetail['booking_cargo_items']>[number]
@@ -345,7 +378,13 @@ function TransactionDocs({ docs }: { docs: string[] }) {
   )
 }
 
-export default function BookingManagementView() {
+interface BookingManagementViewProps {
+  roleView?: BookingRoleView
+}
+
+export default function BookingManagementView({ roleView = 'admin' }: BookingManagementViewProps = {}) {
+  const forcedStatus = ROLE_FORCED_STATUS[roleView]
+  const hidePending  = !!ROLE_HIDE_PENDING[roleView]
   const [rawBookings, setRawBookings] = useState<Record<string, unknown>[]>([])
   const [listLoading, setListLoading] = useState(true)
   const [listError, setListError]     = useState<string | null>(null)
@@ -411,7 +450,7 @@ export default function BookingManagementView() {
       const res = await bookingService.fetchBookingsAdminPaginated({
         page:   page + 1,
         limit:  PAGE_SIZE,
-        status: statusFilter,
+        status: forcedStatus ?? statusFilter,
         search: debouncedSearch,
       })
       setRawBookings(res.rows)
@@ -432,7 +471,10 @@ export default function BookingManagementView() {
 
   useEffect(() => { void loadPage() }, [loadPage])
 
-  const listRows  = useMemo(() => toRows(rawBookings), [rawBookings])
+  const listRows  = useMemo(() => {
+    const rows = toRows(rawBookings)
+    return hidePending ? rows.filter((r) => normalizeBookingStatus(r.status) !== 'pending') : rows
+  }, [rawBookings, hidePending])
   const pageCount = Math.max(1, listMeta?.totalPages ?? 1)
   const pageSafe  = Math.min(page, pageCount - 1)
   const totalRows = listMeta?.total ?? 0
@@ -623,6 +665,71 @@ export default function BookingManagementView() {
     }
   }
 
+  const refreshAfterAction = useCallback(async () => {
+    if (selectedId) await openDetail(selectedId)
+    await loadPage()
+  }, [selectedId, openDetail, loadPage])
+
+  // Workflow stage actions. Each hits its dedicated endpoint, which fires the
+  // next-stage notification on the backend.
+  const handleAccountingReview = async (decision: 'approved' | 'rejected', remarks?: string) => {
+    if (!selectedId) return
+    if (decision === 'approved') setPendingStatus(true); else setPendingReject(true)
+    try {
+      await bookingService.accountingReview(selectedId, { accounting_status: decision, rejection_reason: remarks })
+      await refreshAfterAction()
+      appToast.success(decision === 'approved' ? 'Approved — forwarded for the next stage.' : 'Booking rejected.', { action: 'accounting-review', entityId: selectedId })
+    } catch (e) {
+      appToast.error(getApiErrorMessage(e, 'Request failed. Please try again.'), { action: 'accounting-review', entityId: selectedId })
+    } finally {
+      setPendingStatus(false); setPendingReject(false)
+    }
+  }
+
+  const handleGmReview = async (decision: 'approved' | 'rejected', remarks?: string) => {
+    if (!selectedId) return
+    if (decision === 'approved') setPendingStatus(true); else setPendingReject(true)
+    try {
+      await bookingService.gmReview(selectedId, { gm_status: decision, rejection_reason: remarks })
+      await refreshAfterAction()
+      appToast.success(decision === 'approved' ? 'Approved — sent to operations.' : 'Booking rejected.', { action: 'gm-review', entityId: selectedId })
+    } catch (e) {
+      appToast.error(getApiErrorMessage(e, 'Request failed. Please try again.'), { action: 'gm-review', entityId: selectedId })
+    } finally {
+      setPendingStatus(false); setPendingReject(false)
+    }
+  }
+
+  const handleFleetReview = async (decision: 'approved' | 'rejected', remarks?: string) => {
+    if (!selectedId) return
+    if (decision === 'approved') setPendingStatus(true); else setPendingReject(true)
+    try {
+      await bookingService.fleetReview(selectedId, { decision, rejection_reason: remarks })
+      await refreshAfterAction()
+      appToast.success(decision === 'approved' ? 'Vehicle cleared — driver notified.' : 'Sent back to operations.', { action: 'fleet-review', entityId: selectedId })
+    } catch (e) {
+      appToast.error(getApiErrorMessage(e, 'Request failed. Please try again.'), { action: 'fleet-review', entityId: selectedId })
+    } finally {
+      setPendingStatus(false); setPendingReject(false)
+    }
+  }
+
+  // Dispatch the generic Approve/Reject modals to the right stage per role.
+  const confirmApprove = () => {
+    setApproveModalOpen(false)
+    if (roleView === 'accountant')      return void handleAccountingReview('approved')
+    if (roleView === 'general_manager') return void handleGmReview('approved')
+    if (roleView === 'fleet_manager')   return void handleFleetReview('approved')
+    return void handleApprove()
+  }
+  const confirmReject = (remarks: string) => {
+    setRejectModalOpen(false)
+    if (roleView === 'accountant')      return void handleAccountingReview('rejected', remarks)
+    if (roleView === 'general_manager') return void handleGmReview('rejected', remarks)
+    if (roleView === 'fleet_manager')   return void handleFleetReview('rejected', remarks)
+    return void handleReject(remarks)
+  }
+
   const statusCounts = listMeta?.statusCounts ?? { all: 0 }
 
   const selectClass =
@@ -637,6 +744,17 @@ export default function BookingManagementView() {
   const d        = detail as DetailWithExtra | null
   const cargoItems: CargoItem[] = d?.booking_cargo_items ?? []
 
+  const accApprovedOrFwd = d?.accounting_status === 'approved' || d?.accounting_status === 'forwarded'
+  const showStageActions = !!detail && (
+    (roleView === 'admin'           && canEdit && normalizeBookingStatus(detail.status) === 'pending') ||
+    (roleView === 'accountant'      && d?.accounting_status === 'pending') ||
+    (roleView === 'general_manager' && d?.gm_status === 'pending' && accApprovedOrFwd) ||
+    (roleView === 'fleet_manager'   && d?.fleet_status === 'pending' && d?.ops_status === 'assigned')
+  )
+  const showAssignment = !!detail &&
+    (roleView === 'admin' || roleView === 'operations_manager') &&
+    (normalizeBookingStatus(detail.status) === 'approved' || normalizeBookingStatus(detail.status) === 'assigned')
+
   return (
     <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-hidden ff-sc bg-[var(--color-bg)]">
 
@@ -650,7 +768,7 @@ export default function BookingManagementView() {
         }
         confirmLabel="Approve"
         cancelLabel="Go back"
-        onConfirm={() => void handleApprove()}
+        onConfirm={confirmApprove}
         onCancel={() => setApproveModalOpen(false)}
         disableBackdropClose={pendingStatus}
       />
@@ -663,7 +781,7 @@ export default function BookingManagementView() {
         remarksPlaceholder="e.g. Incomplete documents, route not serviceable…"
         confirmLabel="Reject"
         cancelLabel="Go back"
-        onConfirm={(remarks) => void handleReject(remarks)}
+        onConfirm={confirmReject}
         onCancel={() => setRejectModalOpen(false)}
         disableBackdropClose={pendingReject}
         busy={pendingReject}
@@ -685,7 +803,7 @@ export default function BookingManagementView() {
       />
 
       <header className="shrink-0 px-3 py-3 lg:px-4 border-b border-white/[0.07] flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-        <h1 className="text-lg font-bold text-white tracking-tight">Booking management</h1>
+        <h1 className="text-lg font-bold text-white tracking-tight">{ROLE_TITLE[roleView]}</h1>
         <button
           type="button"
           onClick={() => void loadPage()}
@@ -713,27 +831,29 @@ export default function BookingManagementView() {
                 className="bg-transparent border-none outline-none text-sm flex-1 text-white/80 placeholder:text-white/35"
               />
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <label htmlFor="booking-status-filter" className="text-[10px] uppercase tracking-wider text-white/35">
-                Status
-              </label>
-              <select
-                id="booking-status-filter"
-                value={statusFilter}
-                onChange={(e) => { setStatusFilter(e.target.value); setPage(0) }}
-                className="rounded-lg border border-white/10 bg-[#1a1a1a] text-xs font-bold text-white/80 px-3 py-2 outline-none focus:border-[var(--color-cyan)]/50 cursor-pointer"
-              >
-                {(['all', ...BOOKING_STATUSES] as const).map((key) => {
-                  const label = key === 'all' ? 'All' : fmtStatus(key)
-                  const count = key === 'all' ? statusCounts.all : statusCounts[key] ?? 0
-                  return (
-                    <option key={key} value={key}>
-                      {label} ({count})
-                    </option>
-                  )
-                })}
-              </select>
-            </div>
+            {!forcedStatus && (
+              <div className="flex items-center gap-2 shrink-0">
+                <label htmlFor="booking-status-filter" className="text-[10px] uppercase tracking-wider text-white/35">
+                  Status
+                </label>
+                <select
+                  id="booking-status-filter"
+                  value={statusFilter}
+                  onChange={(e) => { setStatusFilter(e.target.value); setPage(0) }}
+                  className="rounded-lg border border-white/10 bg-[#1a1a1a] text-xs font-bold text-white/80 px-3 py-2 outline-none focus:border-[var(--color-cyan)]/50 cursor-pointer"
+                >
+                  {(['all', ...BOOKING_STATUSES.filter((s) => !hidePending || s !== 'pending')]).map((key) => {
+                    const label = key === 'all' ? (hidePending ? 'All (active)' : 'All') : fmtStatus(key)
+                    const count = key === 'all' ? statusCounts.all : statusCounts[key] ?? 0
+                    return (
+                      <option key={key} value={key}>
+                        {label} ({count})
+                      </option>
+                    )
+                  })}
+                </select>
+              </div>
+            )}
           </div>
 
           {/* Table */}
@@ -1012,7 +1132,7 @@ export default function BookingManagementView() {
                           </span>
                         </div>
 
-                        {normalizeBookingStatus(detail.status) === 'pending' && canEdit && (
+                        {showStageActions && (
                           <div className="flex gap-2">
                             <button
                               type="button"
@@ -1037,9 +1157,7 @@ export default function BookingManagementView() {
                       </div>
 
                       {/* Driver / vehicle assignment */}
-                      {canEdit &&
-                      (normalizeBookingStatus(detail.status) === 'approved' ||
-                        normalizeBookingStatus(detail.status) === 'assigned') && (
+                      {showAssignment && (
                         <AssignmentPanel
                           detail={detail}
                           drivers={availableDrivers}

@@ -17,10 +17,10 @@ export default function OperationsAdminLayout({ children }: { children: ReactNod
 
   useEffect(() => {
     if (!hasHydrated) return
-    if (!user || user.role !== 'operations_admin') window.location.replace('/')
+    if (!user || user.role !== 'operations_manager') window.location.replace('/')
   }, [hasHydrated, user])
 
-  if (!hasHydrated || !user || user.role !== 'operations_admin') {
+  if (!hasHydrated || !user || user.role !== 'operations_manager') {
     return <div className="min-h-screen bg-[#0a0a0a]" />
   }
 

@@ -41,7 +41,7 @@ const TABS: { key: TabValue; label: string }[] = [
 ]
 
 // Roles aggregated by the "All Administrators" view and the stats cards.
-const ADMIN_ROLE_FILTER = 'admin,accountant,general_manager,fleet_admin,operations_admin'
+const ADMIN_ROLE_FILTER = 'admin,accountant,general_manager,fleet_manager,operations_manager'
 
 const muiTheme = createTheme({
   palette: {
@@ -86,8 +86,8 @@ function tabFromRole(role: string): AdminMgmtTab {
     case 'admin':            return 'admins'
     case 'accountant':       return 'accountants'
     case 'general_manager':  return 'general-managers'
-    case 'fleet_admin':      return 'fleet-admins'
-    case 'operations_admin': return 'operations-admins'
+    case 'fleet_manager':      return 'fleet-admins'
+    case 'operations_manager': return 'operations-admins'
     default:                 return 'accountants'
   }
 }
@@ -104,8 +104,8 @@ const ROLE_COLORS: Record<string, string> = {
   admin:            'bg-red-500/15 text-red-400 border-red-500/30',
   it_admin:         'bg-blue-500/15 text-blue-400 border-blue-500/30',
   general_manager:  'bg-cyan-500/15 text-cyan-400 border-cyan-500/30',
-  fleet_admin:      'bg-orange-500/15 text-orange-400 border-orange-500/30',
-  operations_admin: 'bg-violet-500/15 text-violet-400 border-violet-500/30',
+  fleet_manager:      'bg-orange-500/15 text-orange-400 border-orange-500/30',
+  operations_manager: 'bg-violet-500/15 text-violet-400 border-violet-500/30',
   accountant:       'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
 }
 
@@ -113,8 +113,8 @@ const ROLE_LABELS: Record<string, string> = {
   admin:            'System Admin',
   it_admin:         'IT Admin',
   general_manager:  'General Manager',
-  fleet_admin:      'Fleet Manager',
-  operations_admin: 'Operations Manager',
+  fleet_manager:      'Fleet Manager',
+  operations_manager: 'Operations Manager',
   accountant:       'Accountant',
 }
 
