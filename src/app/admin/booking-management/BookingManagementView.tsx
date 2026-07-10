@@ -20,6 +20,8 @@ import {
   Weight,
   Layers,
   Ruler,
+  Check,
+  ClipboardCheck,
 } from 'lucide-react'
 
 import { statusColor } from '@/components/map/status.colors'
@@ -29,6 +31,9 @@ import {
   bookingService,
   type AdminBookingLifecycleStatus,
   type DestinationDeliveryStatus,
+  type BlowbagetsKey,
+  type BlowbagetsItems,
+  type BlowbagetsCheck,
 } from '@/lib/services/client/booking.service'
 import {
   assignmentService,
@@ -55,6 +60,22 @@ const BOOKING_STATUSES: AdminBookingLifecycleStatus[] = [
 ]
 
 const DEST_STATUSES: DestinationDeliveryStatus[] = ['pending', 'delivered', 'failed']
+
+// The fleet manager's pre-dispatch vehicle inspection. Every item must be
+// ticked before the booking can be approved for dispatch. `key` is the stable
+// state id (unique — note Battery and Brakes share the letter B).
+const BLOWBAGETS_ITEMS: { key: BlowbagetsKey; letter: string; label: string; hint: string }[] = [
+  { key: 'battery', letter: 'B', label: 'Battery', hint: 'Terminals clean, charge holding' },
+  { key: 'lights',  letter: 'L', label: 'Lights',  hint: 'Head, tail, signal & hazard working' },
+  { key: 'oil',     letter: 'O', label: 'Oil',     hint: 'Engine oil at proper level' },
+  { key: 'water',   letter: 'W', label: 'Water',   hint: 'Radiator coolant topped up' },
+  { key: 'brakes',  letter: 'B', label: 'Brakes',  hint: 'Pedal firm, no leaks' },
+  { key: 'air',     letter: 'A', label: 'Air',     hint: 'Tyre pressure within range' },
+  { key: 'gas',     letter: 'G', label: 'Gas',     hint: 'Fuel sufficient for the route' },
+  { key: 'engine',  letter: 'E', label: 'Engine',  hint: 'Starts clean, no warning lights' },
+  { key: 'tires',   letter: 'T', label: 'Tires',   hint: 'Tread & sidewalls sound, spare present' },
+  { key: 'self',    letter: 'S', label: 'Self',    hint: 'Driver fit, rested & licensed' },
+]
 
 // Roles that share this view. Each non-admin role sees a filtered slice of
 // bookings and acts only on its own approval stage.
@@ -95,6 +116,7 @@ type DetailWithExtra = BookingDetail & {
   gm_status?:         'pending' | 'approved' | 'rejected' | null
   ops_status?:        'pending' | 'assigned' | null
   fleet_status?:      'pending' | 'approved' | 'rejected' | null
+  blowbagets_check?:  BlowbagetsCheck | null
 }
 
 type CargoItem = NonNullable<BookingDetail['booking_cargo_items']>[number]
@@ -327,6 +349,144 @@ function AssignmentPanel({
   )
 }
 
+function BlowbagetsChecklist({
+  checked,
+  onToggle,
+  disabled,
+}: {
+  checked:  Record<string, boolean>
+  onToggle: (key: string) => void
+  disabled: boolean
+}) {
+  const doneCount = BLOWBAGETS_ITEMS.filter((it) => checked[it.key]).length
+  const total     = BLOWBAGETS_ITEMS.length
+  const complete  = doneCount === total
+
+  return (
+    <div className="rounded-xl border border-white/[0.08] p-3 space-y-3 bg-black/20">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <ClipboardCheck size={14} className="text-[var(--color-cyan)]" />
+          <h3 className="text-[11px] font-bold uppercase tracking-wider text-white/40">
+            BLOWBAGETS vehicle check
+          </h3>
+        </div>
+        <span
+          className="text-[10px] font-bold tabular-nums px-2 py-0.5 rounded-md border"
+          style={
+            complete
+              ? { color: 'var(--color-cyan)', borderColor: 'rgba(77,249,237,0.40)', background: 'rgba(77,249,237,0.12)' }
+              : { color: 'rgba(255,255,255,0.5)', borderColor: 'rgba(255,255,255,0.15)' }
+          }
+        >
+          {doneCount}/{total}
+        </span>
+      </div>
+
+      <ul className="space-y-1.5">
+        {BLOWBAGETS_ITEMS.map((it) => {
+          const on = !!checked[it.key]
+          return (
+            <li key={it.key}>
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={() => onToggle(it.key)}
+                aria-pressed={on}
+                className="w-full flex items-center gap-2.5 rounded-lg border px-2.5 py-2 text-left
+                           transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                style={
+                  on
+                    ? { borderColor: 'rgba(77,249,237,0.35)', background: 'rgba(77,249,237,0.08)' }
+                    : { borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(0,0,0,0.20)' }
+                }
+              >
+                <span
+                  className="shrink-0 w-5 h-5 rounded-md border flex items-center justify-center"
+                  style={
+                    on
+                      ? { borderColor: 'var(--color-cyan)', background: 'var(--color-cyan)', color: '#04201e' }
+                      : { borderColor: 'rgba(255,255,255,0.25)' }
+                  }
+                >
+                  {on && <Check size={13} strokeWidth={3} />}
+                </span>
+                <span
+                  className="shrink-0 w-4 text-center text-[12px] font-black"
+                  style={{ color: on ? 'var(--color-cyan)' : 'rgba(255,255,255,0.4)' }}
+                >
+                  {it.letter}
+                </span>
+                <span className="flex flex-col min-w-0">
+                  <span className={`text-sm font-semibold ${on ? 'text-white' : 'text-white/75'}`}>
+                    {it.label}
+                  </span>
+                  <span className="text-[10px] text-white/35 truncate">{it.hint}</span>
+                </span>
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+
+      {!complete && (
+        <p className="text-[11px] text-white/40 leading-snug">
+          Tick every item to enable approval. Found a fault? Reject to send the booking back to operations.
+        </p>
+      )}
+    </div>
+  )
+}
+
+// Read-only view of a previously recorded BLOWBAGETS inspection (shown once the
+// fleet review is done, e.g. to admins or when reopening an approved booking).
+function BlowbagetsRecord({ check }: { check: BlowbagetsCheck }) {
+  const failed = BLOWBAGETS_ITEMS.filter((it) => !check.items[it.key])
+  const when = (() => {
+    const d = new Date(check.checked_at)
+    return Number.isNaN(d.getTime()) ? check.checked_at : d.toLocaleString()
+  })()
+
+  return (
+    <div className="rounded-xl border border-white/[0.08] p-3 space-y-2.5 bg-black/20">
+      <div className="flex items-center gap-2">
+        <ClipboardCheck size={14} className="text-[var(--color-cyan)]" />
+        <h3 className="text-[11px] font-bold uppercase tracking-wider text-white/40">
+          BLOWBAGETS inspection recorded
+        </h3>
+      </div>
+
+      <div className="flex flex-wrap gap-1.5">
+        {BLOWBAGETS_ITEMS.map((it) => {
+          const on = !!check.items[it.key]
+          return (
+            <span
+              key={it.key}
+              title={`${it.label} — ${on ? 'passed' : 'failed'}`}
+              className="inline-flex items-center gap-1 text-[11px] font-bold px-1.5 py-0.5 rounded-md border"
+              style={
+                on
+                  ? { color: 'var(--color-cyan)', borderColor: 'rgba(77,249,237,0.35)', background: 'rgba(77,249,237,0.10)' }
+                  : { color: '#fca5a5', borderColor: 'rgba(248,113,113,0.35)', background: 'rgba(248,113,113,0.10)' }
+              }
+            >
+              {on ? <Check size={11} strokeWidth={3} /> : <X size={11} strokeWidth={3} />}
+              {it.label}
+            </span>
+          )
+        })}
+      </div>
+
+      {failed.length > 0 && (
+        <p className="text-[11px] text-[#fca5a5]/90 leading-snug">
+          {failed.length} item{failed.length > 1 ? 's' : ''} failed: {failed.map((f) => f.label).join(', ')}
+        </p>
+      )}
+      <p className="text-[10px] text-white/35">Checked {when}</p>
+    </div>
+  )
+}
+
 function TransactionDocs({ docs }: { docs: string[] }) {
   return (
     <div>
@@ -433,6 +593,11 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
   const [approveModalOpen, setApproveModalOpen] = useState(false)
   const [rejectModalOpen, setRejectModalOpen]   = useState(false)
   const [pendingReject, setPendingReject]       = useState(false)
+
+  // Fleet manager's BLOWBAGETS inspection state — reset whenever the detail
+  // panel opens/closes so each booking starts from an unchecked list.
+  const [blowbagetsChecked, setBlowbagetsChecked] = useState<Record<string, boolean>>({})
+  const blowbagetsComplete = BLOWBAGETS_ITEMS.every((it) => blowbagetsChecked[it.key])
 
   const [drivers, setDrivers]             = useState<DriverUser[]>([])
   const [trucks, setTrucks]               = useState<TruckType[]>([])
@@ -554,6 +719,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     setAssignDriverId('')
     setAssignTruckId('')
     setAssignEditMode(false)
+    setBlowbagetsChecked({})
     try {
       setDetailLoading(true)
       const [bookingResp, assignmentResp] = await Promise.allSettled([
@@ -589,6 +755,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     setAssignTruckId('')
     setAssignEditMode(false)
     setCommittedAssignment({ driverId: '', truckId: '' })
+    setBlowbagetsChecked({})
   }, [])
 
   const mergeListRow = useCallback((bookingId: string, patch: Partial<ListRow>) => {
@@ -720,8 +887,14 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
   const handleFleetReview = async (decision: 'approved' | 'rejected', remarks?: string) => {
     if (!selectedId) return
     if (decision === 'approved') setPendingStatus(true); else setPendingReject(true)
+    // Snapshot the checklist so the recorded inspection shows exactly which items
+    // passed — on a rejection this captures the fault(s) the fleet manager found.
+    const blowbagets = BLOWBAGETS_ITEMS.reduce((acc, it) => {
+      acc[it.key] = !!blowbagetsChecked[it.key]
+      return acc
+    }, {} as BlowbagetsItems)
     try {
-      await bookingService.fleetReview(selectedId, { decision, rejection_reason: remarks })
+      await bookingService.fleetReview(selectedId, { decision, rejection_reason: remarks, blowbagets })
       await refreshAfterAction()
       appToast.success(decision === 'approved' ? 'Vehicle cleared — driver notified.' : 'Sent back to operations.', { action: 'fleet-review', entityId: selectedId })
     } catch (e) {
@@ -782,13 +955,15 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
 
       <ReusableModal
         open={approveModalOpen}
-        title="Approve this booking?"
+        title={roleView === 'fleet_manager' ? 'Clear vehicle for dispatch?' : 'Approve this booking?'}
         description={
-          docCount > 0
-            ? `Please confirm you have reviewed all ${docCount} transaction document${docCount > 1 ? 's' : ''} submitted by the client before proceeding. Approving cannot be undone.`
-            : 'Please confirm you have reviewed all client-submitted documents and details before proceeding. Approving cannot be undone.'
+          roleView === 'fleet_manager'
+            ? `Confirm all ${BLOWBAGETS_ITEMS.length} BLOWBAGETS items have been physically inspected and passed. The assigned driver will be notified to proceed. This cannot be undone.`
+            : docCount > 0
+              ? `Please confirm you have reviewed all ${docCount} transaction document${docCount > 1 ? 's' : ''} submitted by the client before proceeding. Approving cannot be undone.`
+              : 'Please confirm you have reviewed all client-submitted documents and details before proceeding. Approving cannot be undone.'
         }
-        confirmLabel="Approve"
+        confirmLabel={roleView === 'fleet_manager' ? 'Clear & dispatch' : 'Approve'}
         cancelLabel="Go back"
         onConfirm={confirmApprove}
         onCancel={() => setApproveModalOpen(false)}
@@ -1154,16 +1329,30 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                           </span>
                         </div>
 
+                        {roleView === 'fleet_manager' && showStageActions && (
+                          <BlowbagetsChecklist
+                            checked={blowbagetsChecked}
+                            onToggle={(key) =>
+                              setBlowbagetsChecked((prev) => ({ ...prev, [key]: !prev[key] }))
+                            }
+                            disabled={pendingStatus || pendingReject}
+                          />
+                        )}
+
                         {showStageActions && (
                           <div className="flex gap-2">
                             <button
                               type="button"
-                              disabled={pendingStatus || pendingReject}
+                              disabled={pendingStatus || pendingReject || (roleView === 'fleet_manager' && !blowbagetsComplete)}
                               onClick={() => setApproveModalOpen(true)}
                               className="flex-1 py-2 rounded-lg text-sm font-bold transition-colors disabled:opacity-40"
                               style={{ background: 'rgba(77,249,237,0.12)', border: '1px solid rgba(77,249,237,0.30)', color: 'var(--color-cyan)' }}
                             >
-                              {pendingStatus ? 'Approving…' : 'Approve'}
+                              {pendingStatus
+                                ? 'Approving…'
+                                : roleView === 'fleet_manager'
+                                  ? 'Approve & dispatch'
+                                  : 'Approve'}
                             </button>
                             <button
                               type="button"
@@ -1177,6 +1366,11 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                           </div>
                         )}
                       </div>
+
+                      {/* Recorded BLOWBAGETS inspection (read-only, once reviewed) */}
+                      {d?.blowbagets_check && !(roleView === 'fleet_manager' && showStageActions) && (
+                        <BlowbagetsRecord check={d.blowbagets_check} />
+                      )}
 
                       {/* Driver / vehicle assignment */}
                       {showAssignment && (

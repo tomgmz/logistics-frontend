@@ -22,6 +22,20 @@ async function patch<T>(url: string, payload?: unknown): Promise<T> {
   return data.data
 }
 
+// Keys of the fleet manager's BLOWBAGETS pre-dispatch inspection. Must match the
+// backend `blowbagetsSchema` exactly.
+export type BlowbagetsKey =
+  | 'battery' | 'lights' | 'oil' | 'water' | 'brakes'
+  | 'air' | 'gas' | 'engine' | 'tires' | 'self'
+
+export type BlowbagetsItems = Record<BlowbagetsKey, boolean>
+
+export interface BlowbagetsCheck {
+  items:      BlowbagetsItems
+  checked_by: string | null
+  checked_at: string
+}
+
 export interface CargoItemPayload {
   commodity_id?:   string
   commodity_text?: string
@@ -203,7 +217,11 @@ export const bookingService = {
 
   fleetReview: async (
     bookingId: string,
-    payload: { decision: 'approved' | 'rejected'; rejection_reason?: string },
+    payload: {
+      decision: 'approved' | 'rejected'
+      rejection_reason?: string
+      blowbagets?: BlowbagetsItems
+    },
   ) => {
     await initCsrf()
     return patch<unknown>(`/booking/${bookingId}/fleet-review`, payload)
