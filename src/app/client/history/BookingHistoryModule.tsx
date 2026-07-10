@@ -1,7 +1,8 @@
 'use client'
 
 import { motion, Variants, AnimatePresence } from 'framer-motion'
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { Suspense, useState, useEffect, useRef, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
 import {
   History, Search, ChevronRight, ChevronLeft,
   MapPin, Truck, Package, Calendar, Hash,
@@ -649,6 +650,15 @@ function BookingDetail({ booking }: {
 
 type View = 'list' | 'detail'
 
+// Reads the ?booking=<id> deep-link (set by a rejection-notification tap) and
+// reports it up. Isolated so useSearchParams sits under its own Suspense boundary.
+function DeepLinkReader({ onId }: { onId: (id: string | null) => void }) {
+  const searchParams = useSearchParams()
+  const id = searchParams.get('booking')
+  useEffect(() => { onId(id) }, [id, onId])
+  return null
+}
+
 export default function BookingHistoryModule() {
   const clientId = useAuthStore((s) => s.user?.clients?.client_id)
 
@@ -681,6 +691,19 @@ export default function BookingHistoryModule() {
   }, [clientId])
 
   useEffect(() => { loadBookings() }, [loadBookings])
+
+  // Notification deep-link: once bookings load, open the one named in ?booking=.
+  const [deepLinkId, setDeepLinkId] = useState<string | null>(null)
+  const deepLinkAppliedRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!deepLinkId || deepLinkAppliedRef.current === deepLinkId) return
+    const match = bookings.find((b) => b.booking_id === deepLinkId)
+    if (match) {
+      deepLinkAppliedRef.current = deepLinkId
+      setSelected(match)
+      setView('detail')
+    }
+  }, [deepLinkId, bookings])
 
   const filtered = bookings
     .filter((b) => {
@@ -731,6 +754,10 @@ export default function BookingHistoryModule() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden" style={{ background: BG_PAGE, color: '#fff' }}>
+
+      <Suspense fallback={null}>
+        <DeepLinkReader onId={setDeepLinkId} />
+      </Suspense>
 
       {/* Header */}
       <div className="flex items-center gap-3 px-4 lg:px-6 py-4 border-b shrink-0"

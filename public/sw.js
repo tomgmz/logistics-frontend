@@ -25,7 +25,7 @@ self.addEventListener('push', (event) => {
         data,
         icon: '/8338-logo.png',
         badge: '/8338-logo.png',
-        tag: data.conversation_id || data.group_id || 'message',
+        tag: data.booking_id || data.conversation_id || data.group_id || 'message',
         renotify: true,
       })
     })()
@@ -35,7 +35,9 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
   const data = event.notification.data || {}
-  const url = '/messages'
+  // Booking-workflow notifications carry a deep-link (action_url) into the right
+  // module + booking; chat notifications fall back to the messages view.
+  const url = typeof data.action_url === 'string' ? data.action_url : '/messages'
 
   event.waitUntil(
     (async () => {
@@ -43,7 +45,7 @@ self.addEventListener('notificationclick', (event) => {
       for (const client of clientList) {
         if ('focus' in client) {
           await client.focus()
-          client.postMessage({ type: 'OPEN_CONVERSATION', data })
+          client.postMessage({ type: 'OPEN_NOTIFICATION', url, data })
           return
         }
       }

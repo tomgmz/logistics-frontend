@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Search,
@@ -382,6 +383,22 @@ interface BookingManagementViewProps {
   roleView?: BookingRoleView
 }
 
+// Reads the ?booking=<id> deep-link (set by a notification tap) and opens that
+// booking's detail once. Isolated so useSearchParams sits under its own Suspense
+// boundary, as this view has several role-specific page entry points.
+function BookingDeepLink({ onFocus }: { onFocus: (id: string) => void }) {
+  const searchParams = useSearchParams()
+  const focusBookingId = searchParams.get('booking')
+  const autoOpenedRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (focusBookingId && autoOpenedRef.current !== focusBookingId) {
+      autoOpenedRef.current = focusBookingId
+      onFocus(focusBookingId)
+    }
+  }, [focusBookingId, onFocus])
+  return null
+}
+
 export default function BookingManagementView({ roleView = 'admin' }: BookingManagementViewProps = {}) {
   const forcedStatus = ROLE_FORCED_STATUS[roleView]
   const hidePending  = !!ROLE_HIDE_PENDING[roleView]
@@ -757,6 +774,11 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
 
   return (
     <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-hidden ff-sc bg-[var(--color-bg)]">
+
+      {/* Notification deep-link: opens the booking named in ?booking=<id>. */}
+      <Suspense fallback={null}>
+        <BookingDeepLink onFocus={openDetail} />
+      </Suspense>
 
       <ReusableModal
         open={approveModalOpen}

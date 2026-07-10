@@ -7,7 +7,9 @@ import { registerWebPush } from '@/lib/push/web-push'
 
 /**
  * Registers web push for the signed-in user and routes notification taps to the
- * messages view. Mounted once inside the authenticated shell.
+ * right destination. Booking-workflow taps carry a deep-link (action_url) into
+ * the correct module + booking; chat taps fall back to the messages view.
+ * Mounted once inside the authenticated shell.
  */
 export default function PushProvider() {
   const userId = useAuthStore((s) => s.user?.user_id ?? null)
@@ -21,7 +23,12 @@ export default function PushProvider() {
   useEffect(() => {
     if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return
     const onMessage = (event: MessageEvent) => {
-      if (event.data?.type === 'OPEN_CONVERSATION') router.push('/messages')
+      if (event.data?.type === 'OPEN_NOTIFICATION') {
+        const url = typeof event.data.url === 'string' ? event.data.url : '/messages'
+        router.push(url)
+      } else if (event.data?.type === 'OPEN_CONVERSATION') {
+        router.push('/messages')
+      }
     }
     navigator.serviceWorker.addEventListener('message', onMessage)
     return () => navigator.serviceWorker.removeEventListener('message', onMessage)
