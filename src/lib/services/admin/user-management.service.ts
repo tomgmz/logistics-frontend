@@ -5,14 +5,11 @@ import type {
   UpdateAdminPayload,
   ClientUser,
   DriverUser,
-  VendorUser,
   AnyUser,
   CreateClientPayload,
   UpdateClientPayload,
   CreateDriverPayload,
   UpdateDriverPayload,
-  CreateVendorPayload,
-  UpdateVendorPayload,
   CreateAccountantPayload,
   UpdateAccountantPayload,
   CreateGeneralManagerPayload,
@@ -121,16 +118,6 @@ export const driverService = {
   remove: (id: string) => del(`${B}/drivers/${id}`),
   activate:   (id: string) => patch<DriverUser>(`${B}/drivers/${id}/activate`),
   deactivate: (id: string) => patch<DriverUser>(`${B}/drivers/${id}/deactivate`),
-}
-
-export const vendorService = {
-  getAll: () => get<VendorUser[]>(`${B}/vendors`),
-  getOne: (id: string) => get<VendorUser>(`${B}/vendors/${id}`),
-  create: (p: CreateVendorPayload) => post<VendorUser>(`${B}/vendors`, p),
-  update: (id: string, p: UpdateVendorPayload) => patch<VendorUser>(`${B}/vendors/${id}`, p),
-  remove: (id: string) => del(`${B}/vendors/${id}`),
-  activate:   (id: string) => patch<VendorUser>(`${B}/vendors/${id}/activate`),
-  deactivate: (id: string) => patch<VendorUser>(`${B}/vendors/${id}/deactivate`),
 }
 
 export const accountantService = {

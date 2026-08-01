@@ -23,7 +23,6 @@ import {
   adminUpdateTruck,
   adminDeleteTruck,
   adminFetchTruckModels,
-  adminFetchVendorsRaw,
 } from '@/lib/services/admin/trucks.service'
 import ReusableModal from '@/components/layout/ReusableModal'
 import { useModuleAccess } from '@/components/layout/ModuleAccess'
@@ -119,33 +118,6 @@ function statusStyle(status: string): { bg: string; color: string; border: strin
   }
 }
 
-interface VendorOption {
-  vendor_id: string
-  label: string
-}
-
-function parseVendorOptions(raw: unknown[]): VendorOption[] {
-  const out: VendorOption[] = []
-  for (const row of raw) {
-    if (!row || typeof row !== 'object') continue
-    const r       = row as Record<string, unknown>
-    const vendors = r.vendors as Record<string, unknown> | Record<string, unknown>[] | null | undefined
-    let vid = ''
-    if (Array.isArray(vendors) && vendors[0] && typeof vendors[0] === 'object') {
-      vid = String((vendors[0] as Record<string, unknown>).vendor_id ?? '')
-    } else if (vendors && typeof vendors === 'object' && !Array.isArray(vendors)) {
-      vid = String((vendors as Record<string, unknown>).vendor_id ?? '')
-    }
-    if (!vid) continue
-    const fn    = typeof r.first_name === 'string' ? r.first_name : ''
-    const ln    = typeof r.last_name  === 'string' ? r.last_name  : ''
-    const email = typeof r.email      === 'string' ? r.email      : ''
-    const label = `${fn} ${ln}`.trim() || email || vid
-    out.push({ vendor_id: vid, label })
-  }
-  return out.sort((a, b) => a.label.localeCompare(b.label))
-}
-
 function kgToTons(kg: number | null | undefined): string {
   if (kg == null) return ''
   const tons = kg / 1000
@@ -158,8 +130,6 @@ type ConfirmKind = 'save' | 'delete' | null
 interface TruckFormState {
   plate_number: string
   model_id:     string
-  owned_by:     'company' | 'vendor'
-  vendor_id:    string
   status:       Truck['status']
 }
 
@@ -167,8 +137,6 @@ function emptyForm(): TruckFormState {
   return {
     plate_number: '',
     model_id:     '',
-    owned_by:     'company',
-    vendor_id:    '',
     status:       'available',
   }
 }
@@ -177,8 +145,6 @@ function truckToForm(t: Truck): TruckFormState {
   return {
     plate_number: t.plate_number ?? '',
     model_id:     t.model_id ?? '',
-    owned_by:     t.owned_by,
-    vendor_id:    t.vendor_id ?? '',
     status:       t.status,
   }
 }
@@ -187,8 +153,6 @@ function formsEqual(a: TruckFormState, b: TruckFormState): boolean {
   return (
     a.plate_number === b.plate_number &&
     a.model_id     === b.model_id     &&
-    a.owned_by     === b.owned_by     &&
-    a.vendor_id    === b.vendor_id    &&
     a.status       === b.status
   )
 }
@@ -196,14 +160,12 @@ function formsEqual(a: TruckFormState, b: TruckFormState): boolean {
 export default function VehicleManagementView() {
   const [trucks,  setTrucks]  = useState<Truck[]>([])
   const [models,  setModels]  = useState<TruckModel[]>([])
-  const [vendors, setVendors] = useState<VendorOption[]>([])
 
   const [listLoading, setListLoading] = useState(true)
   const [listError,   setListError]   = useState<string | null>(null)
 
   const [search,          setSearch]          = useState('')
   const [statusFilter,    setStatusFilter]    = useState<string>('all')
-  const [ownerFilter,     setOwnerFilter]     = useState<string>('all')
   const [page,            setPage]            = useState(0)
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [listMeta,        setListMeta]        = useState<{
@@ -228,15 +190,11 @@ export default function VehicleManagementView() {
 
   const isUnchanged = modalMode === 'edit' && formsEqual(form, originalForm)
 
-  const loadModelsVendors = useCallback(async () => {
+  const loadModels = useCallback(async () => {
     try {
       setListError(null)
-      const [mList, vRaw] = await Promise.all([
-        adminFetchTruckModels(),
-        adminFetchVendorsRaw(),
-      ])
+      const mList = await adminFetchTruckModels()
       setModels(mList)
-      setVendors(parseVendorOptions(vRaw))
     } catch (e) {
       setListError(getApiErrorMessage(e, 'Request failed. Please try again.'))
     }
@@ -255,7 +213,6 @@ export default function VehicleManagementView() {
         page:     page + 1,
         limit:    PAGE_SIZE,
         status:   statusFilter,
-        owned_by: ownerFilter,
         search:   debouncedSearch,
       })
       setTrucks(res.rows)
@@ -268,19 +225,19 @@ export default function VehicleManagementView() {
     } finally {
       setListLoading(false)
     }
-  }, [page, statusFilter, ownerFilter, debouncedSearch])
+  }, [page, statusFilter, debouncedSearch])
 
   useEffect(() => {
-    void loadModelsVendors()
-  }, [loadModelsVendors])
+    void loadModels()
+  }, [loadModels])
 
   useEffect(() => {
     void loadTrucksPage()
   }, [loadTrucksPage])
 
   const refreshAll = useCallback(async () => {
-    await Promise.all([loadModelsVendors(), loadTrucksPage()])
-  }, [loadModelsVendors, loadTrucksPage])
+    await Promise.all([loadModels(), loadTrucksPage()])
+  }, [loadModels, loadTrucksPage])
 
   const pageCount = Math.max(1, listMeta?.totalPages ?? 1)
   const pageSafe  = Math.min(page, pageCount - 1)
@@ -331,10 +288,6 @@ export default function VehicleManagementView() {
       setFormError('Invalid plate format (e.g. ABC 1234). Only letters, and numbers allowed.')
       return false
     }
-    if (form.owned_by === 'vendor' && !form.vendor_id.trim()) {
-      setFormError('Select a vendor when ownership is Vendor.')
-      return false
-    }
     return true
   }
 
@@ -350,7 +303,6 @@ export default function VehicleManagementView() {
 
   const executeSave = async () => {
     const model_id  = form.model_id.trim() || null
-    const vendor_id = form.owned_by === 'vendor' ? form.vendor_id.trim() : null
 
     setActionBusy(true)
     try {
@@ -358,8 +310,6 @@ export default function VehicleManagementView() {
         const body: CreateTruckInput = {
           plate_number: form.plate_number.trim().toUpperCase(),
           model_id,
-          owned_by:     form.owned_by,
-          vendor_id,
         }
         await adminCreateTruck(body)
         appToast.success('Vehicle created.', { action: 'truck-save' })
@@ -368,8 +318,6 @@ export default function VehicleManagementView() {
           plate_number: form.plate_number.trim().toUpperCase(),
           model_id,
           status:       form.status,
-          owned_by:     form.owned_by,
-          vendor_id:    form.owned_by === 'vendor' ? vendor_id : null,
         }
         await adminUpdateTruck(editingId, body)
         appToast.success('Vehicle updated.', { action: 'truck-save', entityId: editingId })
@@ -507,28 +455,6 @@ export default function VehicleManagementView() {
             })}
           </div>
 
-          <div className="flex flex-wrap gap-1.5 items-center">
-            <span className="text-[10px] uppercase tracking-wider text-white/35 self-center mr-1">Owner</span>
-            {(['all', 'company', 'vendor'] as const).map((key) => {
-              const label  = key === 'all' ? 'All' : fmtLabel(key)
-              const active = ownerFilter === key
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => { setOwnerFilter(key); setPage(0) }}
-                  className="px-2 py-1 rounded-lg text-[11px] font-bold border transition-colors"
-                  style={{
-                    background:  active ? 'rgba(246,159,38,0.12)' : 'transparent',
-                    borderColor: active ? 'rgba(246,159,38,0.35)' : 'rgba(255,255,255,0.08)',
-                    color:       active ? '#fbbf24' : '#888',
-                  }}
-                >
-                  {label}
-                </button>
-              )
-            })}
-          </div>
         </div>
 
         {/* Table */}
@@ -570,7 +496,6 @@ export default function VehicleManagementView() {
                       <th className="px-3 py-2.5 font-bold hidden md:table-cell">Model</th>
                       <th className="px-3 py-2.5 font-bold hidden md:table-cell">Max weight</th>
                       <th className="px-3 py-2.5 font-bold">Status</th>
-                      <th className="px-3 py-2.5 font-bold">Owner</th>
                       <th className="px-3 py-2.5 font-bold text-right w-[100px]">Actions</th>
                     </tr>
                   </thead>
@@ -609,7 +534,6 @@ export default function VehicleManagementView() {
                               {fmtLabel(t.status)}
                             </span>
                           </td>
-                          <td className="px-3 py-2.5 text-white/65 text-xs">{fmtLabel(t.owned_by)}</td>
                           <td className="px-3 py-2.5 text-right">
                             {canEdit && (
                               <button
@@ -843,59 +767,18 @@ export default function VehicleManagementView() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                {modalMode === 'edit' && (
                   <label className="block">
-                    <span className="text-[11px] font-bold uppercase text-white/40">Owned by</span>
+                    <span className="text-[11px] font-bold uppercase text-white/40">Status</span>
                     <select
-                      value={form.owned_by}
-                      onChange={(e) =>
-                        setForm((f) => ({
-                          ...f,
-                          owned_by:  e.target.value as 'company' | 'vendor',
-                          vendor_id: e.target.value === 'company' ? '' : f.vendor_id,
-                        }))
-                      }
+                      value={form.status}
+                      onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as Truck['status'] }))}
                       className="mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-3 py-2.5 text-sm text-white outline-none"
                     >
-                      <option value="company">Company</option>
-                      <option value="vendor">Vendor</option>
-                    </select>
-                  </label>
-                  {modalMode === 'edit' && (
-                    <label className="block">
-                      <span className="text-[11px] font-bold uppercase text-white/40">Status</span>
-                      <select
-                        value={form.status}
-                        onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as Truck['status'] }))}
-                        className="mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-3 py-2.5 text-sm text-white outline-none"
-                      >
-                        {STATUSES.map((s) => (
-                          <option key={s} value={s}>{fmtLabel(s)}</option>
-                        ))}
-                      </select>
-                    </label>
-                  )}
-                </div>
-
-                {/* Vendor picker */}
-                {form.owned_by === 'vendor' && (
-                  <label className="block">
-                    <span className="text-[11px] font-bold uppercase text-white/40">Vendor</span>
-                    <select
-                      value={form.vendor_id}
-                      onChange={(e) => setForm((f) => ({ ...f, vendor_id: e.target.value }))}
-                      className="mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-3 py-2.5 text-sm text-white outline-none"
-                    >
-                      <option value="">Select vendor</option>
-                      {vendors.map((v) => (
-                        <option key={v.vendor_id} value={v.vendor_id}>{v.label}</option>
+                      {STATUSES.map((s) => (
+                        <option key={s} value={s}>{fmtLabel(s)}</option>
                       ))}
                     </select>
-                    {vendors.length === 0 && (
-                      <p className="text-[11px] text-amber-400/90 mt-1">
-                        No vendors loaded. Add vendors under user management first.
-                      </p>
-                    )}
                   </label>
                 )}
 

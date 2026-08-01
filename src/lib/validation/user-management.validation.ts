@@ -154,13 +154,7 @@ export const createDriverSchema = z
     ...baseCreateFields,
     license_number:   licenseNumber,
     license_expiry:   licenseExpiry,
-    is_vendor_driver: z.boolean().optional().default(false),
-    vendor_id:        z.string().uuid('Invalid vendor selection').optional().nullable(),
   })
-  .refine(
-    data => !data.is_vendor_driver || !!data.vendor_id,
-    { path: ['vendor_id'], message: 'Please select a vendor for this driver' },
-  )
 
 export const updateDriverSchema = z
   .object({
@@ -172,42 +166,7 @@ export const updateDriverSchema = z
       .refine(val => !val || !isNaN(new Date(val).getTime()), 'Invalid date')
       .refine(val => !val || new Date(val) > new Date(), 'License is already expired')
       .optional(),
-    is_vendor_driver: z.boolean().optional(),
-    vendor_id:        z.string().uuid('Invalid vendor selection').optional().nullable(),
   })
-  .refine(
-    data => !data.is_vendor_driver || !!data.vendor_id,
-    { path: ['vendor_id'], message: 'Please select a vendor for this driver' },
-  )
-
-export const createVendorSchema = z
-  .object({
-    ...baseCreateFields,
-    landline:        landlineOptional,
-    vendor_type:     z.enum(['individual', 'company'], { error: 'Vendor type is required' }),
-    company_name:    z.string().max(100).optional().nullable().transform(v => (v === '' ? null : v)),
-    business_permit: z.string().max(100).nullable().transform(v => (v === '' ? null : v)),
-  })
-  .refine(
-    data => data.vendor_type !== 'company' || !!data.company_name,
-    { path: ['company_name'], message: 'Company name is required for company vendors' },
-  )
-
-export const updateVendorSchema = z
-  .object({
-    ...baseUpdateFields,
-    landline:        landlineOptional,
-    vendor_type:     z.enum(['individual', 'company']).optional(),
-    company_name:    z.string().max(100).optional().nullable().transform(v => (v === '' ? null : v)),
-    business_permit: z.string().max(100).optional().nullable().transform(v => (v === '' ? null : v)),
-  })
-  .refine(
-    data => {
-      if (data.vendor_type === 'company') return !!data.company_name
-      return true
-    },
-    { path: ['company_name'], message: 'Company name is required for company vendors' },
-  )
 
 export const createAdminSchema           = z.object(baseCreateFields)
 export const updateAdminSchema           = z.object(baseUpdateFields)
@@ -230,7 +189,6 @@ export const FORM_SCHEMAS: Record<UserTab, SchemaPair> = {
   admins:              { create: createAdminSchema,           update: updateAdminSchema           },
   clients:             { create: createClientSchema,          update: updateClientSchema          },
   drivers:             { create: createDriverSchema,          update: updateDriverSchema          },
-  vendors:             { create: createVendorSchema,          update: updateVendorSchema          },
   accountants:         { create: createAccountantSchema,      update: updateAccountantSchema      },
   'general-managers':  { create: createGeneralManagerSchema,  update: updateGeneralManagerSchema  },
   'fleet-admins':      { create: createFleetAdminSchema,      update: updateFleetAdminSchema      },

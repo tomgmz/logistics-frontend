@@ -202,6 +202,36 @@ function fmtNum(n: number | null | undefined, unit: string, decimals = 2): strin
   return `${n.toFixed(decimals)} ${unit}`
 }
 
+interface VendorAssignForm {
+  vendor_name:           string
+  vendor_contact:        string
+  vendor_driver_name:    string
+  vendor_driver_license: string
+  vendor_driver_phone:   string
+  vendor_vehicle_plate:  string
+  vendor_vehicle_type:   string
+}
+
+const emptyVendorForm: VendorAssignForm = {
+  vendor_name:           '',
+  vendor_contact:        '',
+  vendor_driver_name:    '',
+  vendor_driver_license: '',
+  vendor_driver_phone:   '',
+  vendor_vehicle_plate:  '',
+  vendor_vehicle_type:   '',
+}
+
+const VENDOR_FIELDS: { key: keyof VendorAssignForm; label: string; required?: boolean }[] = [
+  { key: 'vendor_name',           label: 'Vendor / subcontractor' },
+  { key: 'vendor_contact',        label: 'Vendor contact' },
+  { key: 'vendor_driver_name',    label: 'Driver name', required: true },
+  { key: 'vendor_driver_license', label: 'Driver license #' },
+  { key: 'vendor_driver_phone',   label: 'Driver phone' },
+  { key: 'vendor_vehicle_plate',  label: 'Vehicle plate', required: true },
+  { key: 'vendor_vehicle_type',   label: 'Vehicle type' },
+]
+
 function AssignmentPanel({
   detail,
   drivers,
@@ -210,9 +240,13 @@ function AssignmentPanel({
   assignTruckId,
   assignBusy,
   assignEditMode,
+  vendorMode,
+  vendorForm,
   selectClass,
   onDriverChange,
   onTruckChange,
+  onVendorModeChange,
+  onVendorFieldChange,
   onAssign,
   onEditClick,
   onCancelEdit,
@@ -224,9 +258,13 @@ function AssignmentPanel({
   assignTruckId:   string
   assignBusy:      boolean
   assignEditMode:  boolean
+  vendorMode:      boolean
+  vendorForm:      VendorAssignForm
   selectClass:     string
   onDriverChange:  (id: string) => void
   onTruckChange:   (id: string) => void
+  onVendorModeChange:  (on: boolean) => void
+  onVendorFieldChange: (key: keyof VendorAssignForm, value: string) => void
   onAssign:        () => void
   onEditClick:     () => void
   onCancelEdit:    () => void
@@ -235,16 +273,25 @@ function AssignmentPanel({
   const locked     = isAssigned && !assignEditMode
 
   const driverLabel = (() => {
+    if (vendorMode) return vendorForm.vendor_driver_name || '—'
     const dr = drivers.find((d) => (d.drivers?.driver_id ?? d.user_id) === assignDriverId)
     if (!dr) return assignDriverId || '—'
     return `${dr.first_name} ${dr.last_name}${dr.drivers?.license_number ? ` · ${dr.drivers.license_number}` : ''}`
   })()
 
   const truckLabel = (() => {
+    if (vendorMode) {
+      return [vendorForm.vendor_vehicle_plate, vendorForm.vendor_vehicle_type]
+        .filter(Boolean).join(' · ') || '—'
+    }
     const t = trucks.find((t) => t.truck_id === assignTruckId)
     if (!t) return assignTruckId || '—'
     return `${t.plate_number}${t.vehicle_type ? ` · ${t.vehicle_type}` : ''}`
   })()
+
+  const canSubmit = vendorMode
+    ? !!vendorForm.vendor_driver_name.trim() && !!vendorForm.vendor_vehicle_plate.trim()
+    : !!assignDriverId && !!assignTruckId
 
   return (
     <div className="rounded-xl border border-white/[0.08] p-3 space-y-3 bg-black/20">
@@ -269,6 +316,12 @@ function AssignmentPanel({
 
       {locked ? (
         <div className="space-y-2 text-sm text-white/70">
+          {vendorMode && (
+            <span className="inline-flex text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border"
+              style={{ color: '#fbbf24', borderColor: 'rgba(246,159,38,0.35)', background: 'rgba(246,159,38,0.12)' }}>
+              Vendor-supplied
+            </span>
+          )}
           <div className="flex items-center gap-2">
             <User size={13} className="text-white/35 shrink-0" />
             <span>{driverLabel}</span>
@@ -277,45 +330,93 @@ function AssignmentPanel({
             <Truck size={13} className="text-white/35 shrink-0" />
             <span>{truckLabel}</span>
           </div>
+          {vendorMode && vendorForm.vendor_name && (
+            <div className="text-[11px] text-white/45">Vendor: {vendorForm.vendor_name}</div>
+          )}
         </div>
       ) : (
         <>
-          <div className="space-y-2">
-            <div>
-              <label className="text-[11px] text-white/40 block mb-1">Driver</label>
-              <select
-                value={assignDriverId}
-                disabled={assignBusy}
-                onChange={(e) => onDriverChange(e.target.value)}
-                className={selectClass}
-              >
-                <option value="">Select driver</option>
-                {drivers.map((dr) => (
-                  <option key={dr.user_id} value={dr.drivers?.driver_id ?? dr.user_id}>
-                    {dr.first_name} {dr.last_name}
-                    {dr.drivers?.license_number ? ` · ${dr.drivers.license_number}` : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-[11px] text-white/40 block mb-1">Vehicle</label>
-              <select
-                value={assignTruckId}
-                disabled={assignBusy}
-                onChange={(e) => onTruckChange(e.target.value)}
-                className={selectClass}
-              >
-                <option value="">Select vehicle</option>
-                {trucks.map((t) => (
-                  <option key={t.truck_id} value={t.truck_id}>
-                    {t.plate_number}
-                    {t.vehicle_type ? ` · ${t.vehicle_type}` : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
+          {/* Company vs vendor-supplied crew toggle */}
+          <div className="flex rounded-lg border border-white/10 p-0.5 text-[11px] font-bold">
+            <button
+              type="button"
+              disabled={assignBusy}
+              onClick={() => onVendorModeChange(false)}
+              className="flex-1 py-1.5 rounded-md transition-colors disabled:opacity-40"
+              style={!vendorMode
+                ? { background: 'rgba(77,249,237,0.14)', color: 'var(--color-cyan)' }
+                : { color: '#888' }}
+            >
+              Company fleet
+            </button>
+            <button
+              type="button"
+              disabled={assignBusy}
+              onClick={() => onVendorModeChange(true)}
+              className="flex-1 py-1.5 rounded-md transition-colors disabled:opacity-40"
+              style={vendorMode
+                ? { background: 'rgba(246,159,38,0.14)', color: '#fbbf24' }
+                : { color: '#888' }}
+            >
+              Vendor-supplied
+            </button>
           </div>
+
+          {vendorMode ? (
+            <div className="space-y-2">
+              {VENDOR_FIELDS.map(({ key, label, required }) => (
+                <div key={key}>
+                  <label className="text-[11px] text-white/40 block mb-1">
+                    {label}{required && <span className="text-red-400"> *</span>}
+                  </label>
+                  <input
+                    value={vendorForm[key]}
+                    disabled={assignBusy}
+                    onChange={(e) => onVendorFieldChange(key, e.target.value)}
+                    className={selectClass}
+                    placeholder={label}
+                  />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <div>
+                <label className="text-[11px] text-white/40 block mb-1">Driver</label>
+                <select
+                  value={assignDriverId}
+                  disabled={assignBusy}
+                  onChange={(e) => onDriverChange(e.target.value)}
+                  className={selectClass}
+                >
+                  <option value="">Select driver</option>
+                  {drivers.map((dr) => (
+                    <option key={dr.user_id} value={dr.drivers?.driver_id ?? dr.user_id}>
+                      {dr.first_name} {dr.last_name}
+                      {dr.drivers?.license_number ? ` · ${dr.drivers.license_number}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-[11px] text-white/40 block mb-1">Vehicle</label>
+                <select
+                  value={assignTruckId}
+                  disabled={assignBusy}
+                  onChange={(e) => onTruckChange(e.target.value)}
+                  className={selectClass}
+                >
+                  <option value="">Select vehicle</option>
+                  {trucks.map((t) => (
+                    <option key={t.truck_id} value={t.truck_id}>
+                      {t.plate_number}
+                      {t.vehicle_type ? ` · ${t.vehicle_type}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
 
           <div className="flex gap-2">
             {assignEditMode && (
@@ -331,7 +432,7 @@ function AssignmentPanel({
             )}
             <button
               type="button"
-              disabled={assignBusy || !assignDriverId || !assignTruckId}
+              disabled={assignBusy || !canSubmit}
               onClick={onAssign}
               className="flex-1 py-2 rounded-lg text-sm font-bold transition-colors disabled:opacity-40"
               style={{
@@ -607,6 +708,11 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
   const [assignBusy, setAssignBusy]         = useState(false)
   const [assignEditMode, setAssignEditMode] = useState(false)
 
+  // Vendor-supplied crew: entered ad-hoc and snapshotted onto the delivery instead
+  // of picking a registered driver/vehicle.
+  const [assignVendorMode, setAssignVendorMode] = useState(false)
+  const [vendorForm, setVendorForm]             = useState<VendorAssignForm>(emptyVendorForm)
+
   const [committedAssignment, setCommittedAssignment] = useState<{
     driverId: string
     truckId: string
@@ -698,11 +804,24 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     [trucks, busyTruckIds, assignTruckId],
   )
 
-  const restoreAssignment = useCallback((detail: BookingDetail, assignment?: { driver_id?: string | null; truck_id?: string | null }) => {
+  const restoreAssignment = useCallback((detail: BookingDetail, assignment?: AssignmentRecord | { driver_id?: string | null; truck_id?: string | null }) => {
+    const record = assignment as AssignmentRecord | undefined
+    const isVendor = record?.is_vendor_supplied === true
+    setAssignVendorMode(isVendor)
+    setVendorForm(isVendor ? {
+      vendor_name:           record?.vendor_name           ?? '',
+      vendor_contact:        record?.vendor_contact        ?? '',
+      vendor_driver_name:    record?.vendor_driver_name    ?? '',
+      vendor_driver_license: record?.vendor_driver_license ?? '',
+      vendor_driver_phone:   record?.vendor_driver_phone   ?? '',
+      vendor_vehicle_plate:  record?.vendor_vehicle_plate  ?? '',
+      vendor_vehicle_type:   record?.vendor_vehicle_type   ?? '',
+    } : emptyVendorForm)
+
     const fallback = getPrefillFromBookingDetail(detail, trucks)
     const ids = {
-      driverId: assignment?.driver_id ?? fallback.driverId,
-      truckId:  assignment?.truck_id  ?? fallback.truckId,
+      driverId: (isVendor ? '' : assignment?.driver_id) ?? fallback.driverId,
+      truckId:  (isVendor ? '' : assignment?.truck_id)  ?? fallback.truckId,
     }
     setAssignDriverId(ids.driverId)
     setAssignTruckId(ids.truckId)
@@ -718,6 +837,8 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     setRejectModalOpen(false)
     setAssignDriverId('')
     setAssignTruckId('')
+    setAssignVendorMode(false)
+    setVendorForm(emptyVendorForm)
     setAssignEditMode(false)
     setBlowbagetsChecked({})
     try {
@@ -753,6 +874,8 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     setRejectModalOpen(false)
     setAssignDriverId('')
     setAssignTruckId('')
+    setAssignVendorMode(false)
+    setVendorForm(emptyVendorForm)
     setAssignEditMode(false)
     setCommittedAssignment({ driverId: '', truckId: '' })
     setBlowbagetsChecked({})
@@ -796,13 +919,27 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
   }
 
   const handleAssign = async () => {
-    if (!selectedId || !assignDriverId || !assignTruckId) return
+    if (!selectedId) return
+    if (assignVendorMode) {
+      if (!vendorForm.vendor_driver_name.trim() || !vendorForm.vendor_vehicle_plate.trim()) return
+    } else if (!assignDriverId || !assignTruckId) {
+      return
+    }
     setAssignBusy(true)
     try {
-      await assignmentService.assignBooking(selectedId, {
-        driver_id: assignDriverId,
-        truck_id:  assignTruckId,
-      })
+      if (assignVendorMode) {
+        await assignmentService.assignBooking(selectedId, {
+          is_vendor_supplied: true,
+          ...Object.fromEntries(
+            Object.entries(vendorForm).map(([k, v]) => [k, v.trim() || undefined]),
+          ),
+        })
+      } else {
+        await assignmentService.assignBooking(selectedId, {
+          driver_id: assignDriverId,
+          truck_id:  assignTruckId,
+        })
+      }
       setCommittedAssignment({ driverId: assignDriverId, truckId: assignTruckId })
       setAssignEditMode(false)
       await openDetail(selectedId)
@@ -1382,9 +1519,15 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                           assignTruckId={assignTruckId}
                           assignBusy={assignBusy}
                           assignEditMode={assignEditMode}
+                          vendorMode={assignVendorMode}
+                          vendorForm={vendorForm}
                           selectClass={selectClass}
                           onDriverChange={setAssignDriverId}
                           onTruckChange={setAssignTruckId}
+                          onVendorModeChange={setAssignVendorMode}
+                          onVendorFieldChange={(key, value) =>
+                            setVendorForm((prev) => ({ ...prev, [key]: value }))
+                          }
                           onAssign={() => void handleAssign()}
                           onEditClick={() => setAssignEditMode(true)}
                           onCancelEdit={() => {

@@ -13,24 +13,23 @@ import FormControl from '@mui/material/FormControl'
 import { createTheme, ThemeProvider } from '@mui/material/styles'
 import type {
   UserTab, AnyUser, UserStatus,
-  ClientUser, DriverUser, VendorUser,
+  ClientUser, DriverUser,
 } from '@/app/types/admin/user-management.types'
 import {
   userService,
-  clientService, driverService, vendorService,
+  clientService, driverService,
 } from '@/lib/services/admin/user-management.service'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import UserFormModal from './UserFormModal'
 
-type UserMgmtTab = Extract<UserTab, 'clients' | 'drivers' | 'vendors'>
+type UserMgmtTab = Extract<UserTab, 'clients' | 'drivers'>
 type TabValue = UserMgmtTab | 'all'
 
 const TABS: { key: TabValue; label: string }[] = [
   { key: 'all',     label: 'All Users' },
   { key: 'clients', label: 'Clients'   },
   { key: 'drivers', label: 'Drivers'   },
-  { key: 'vendors', label: 'Vendors'   },
 ]
 
 const muiTheme = createTheme({
@@ -47,12 +46,11 @@ async function fetchByTab(tab: UserMgmtTab): Promise<AnyUser[]> {
   switch (tab) {
     case 'clients': return clientService.getAll() as Promise<AnyUser[]>
     case 'drivers': return driverService.getAll() as Promise<AnyUser[]>
-    case 'vendors': return vendorService.getAll() as Promise<AnyUser[]>
   }
 }
 
 async function updateStatus(tab: UserMgmtTab, id: string, status: UserStatus): Promise<void> {
-  const svc = tab === 'clients' ? clientService : tab === 'drivers' ? driverService : vendorService
+  const svc = tab === 'clients' ? clientService : driverService
 
   if (status === 'active')      return svc.activate(id).then()
   if (status === 'deactivated') return svc.deactivate(id).then()
@@ -63,7 +61,6 @@ async function updateStatus(tab: UserMgmtTab, id: string, status: UserStatus): P
 
 function tabFromRole(role: string): UserMgmtTab {
   if (role === 'driver') return 'drivers'
-  if (role === 'vendor') return 'vendors'
   return 'clients'
 }
 
@@ -224,12 +221,10 @@ function EmptyState({ tab, onAdd }: { tab: TabValue; onAdd: () => void }) {
 const ROLE_COLORS: Record<string, string> = {
   driver: 'bg-sky-500/15 text-sky-400 border-sky-500/30',
   client: 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30',
-  vendor: 'bg-lime-500/15 text-lime-400 border-lime-500/30',
 }
 const ROLE_LABELS: Record<string, string> = {
   driver: 'Driver',
   client: 'Client',
-  vendor: 'Vendor',
 }
 
 function RoleBadge({ role }: { role: string }) {
@@ -290,27 +285,6 @@ function renderCells(user: AnyUser, tab: TabValue) {
         </>
       )
     }
-    case 'vendors': {
-      const u = user as VendorUser
-      const name = [u.first_name, u.middle_name, u.last_name, u.suffix].filter(Boolean).join(' ') || '—'
-      return (
-        <>
-          <td className="px-4 py-3.5"><p className="font-medium text-white">{name}</p></td>
-          <td className="px-4 py-3.5 text-sm text-[#818181]">{u.email}</td>
-          <td className="px-4 py-3.5">
-            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${
-              u.vendors?.vendor_type === 'company'
-                ? 'border-[#4df9ed]/30 bg-[#4df9ed]/10 text-[#4df9ed]'
-                : 'border-[#818181]/30 bg-[#818181]/10 text-[#818181]'
-            }`}>
-              {u.vendors?.vendor_type ?? '—'}
-            </span>
-          </td>
-          <td className="px-4 py-3.5 text-sm text-[#818181]">{u.vendors?.company_name ?? '—'}</td>
-          <td className="px-4 py-3.5"><StatusBadge status={u.status} /></td>
-        </>
-      )
-    }
   }
 }
 
@@ -318,7 +292,6 @@ const HEADERS: Record<TabValue, string[]> = {
   all:     ['Name', 'Email', 'Phone', 'Role', 'Status'],
   clients: ['Name', 'Email', 'Company', 'Status', 'Last Login'],
   drivers: ['Name', 'License #', 'Expiry', 'Driver Status', 'Acct. Status'],
-  vendors: ['Name', 'Email', 'Type', 'Company', 'Status'],
 }
 
 export default function UserManagementClient() {
@@ -350,8 +323,8 @@ export default function UserManagementClient() {
     setError(null)
     try {
       const [result, statsResult] = await Promise.all([
-        userService.getAll({ search: searchQuery || undefined, role: 'client,driver,vendor' }),
-        userService.getStats('client,driver,vendor'),
+        userService.getAll({ search: searchQuery || undefined, role: 'client,driver' }),
+        userService.getStats('client,driver'),
       ])
       setAllRows(result.data)
       setServerTotal(result.total)
@@ -372,7 +345,7 @@ export default function UserManagementClient() {
     try {
       const [rows, statsResult] = await Promise.all([
         fetchByTab(tab),
-        userService.getStats('client,driver,vendor')
+        userService.getStats('client,driver')
       ])
       setAllRows(rows)
       setStats({ total: statsResult.total, active: statsResult.active, archived: statsResult.archived })

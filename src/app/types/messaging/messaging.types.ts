@@ -8,7 +8,6 @@ export type UserRole =
   | 'accountant'
   | 'client'
   | 'driver'
-  | 'vendor'
   | 'it_admin'
 
 export interface MessageReaction  { emoji: string; user_id: string }

@@ -14,7 +14,6 @@ import type {
   UserTab,
   ClientUser,
   DriverUser,
-  VendorUser,
   AnyUser,
 } from '@/app/types/admin/user-management.types'
 import { USER_SUFFIXES } from '@/lib/validation/user-management.validation'
@@ -22,7 +21,6 @@ import {
   adminService,
   clientService,
   driverService,
-  vendorService,
   accountantService,
   generalManagerService,
   fleetAdminService,
@@ -56,7 +54,6 @@ const TAB_LABELS: Record<UserTab, string> = {
   admins:              'Admin',
   clients:             'Client',
   drivers:             'Driver',
-  vendors:             'Vendor',
   accountants:         'Accountant',
   'general-managers':  'General Manager',
   'fleet-admins':      'Fleet Manager',
@@ -134,19 +131,6 @@ function buildInitialState(tab: UserTab, user: AnyUser | null): FormState {
       ...base,
       license_number:   d?.license_number                ?? '',
       license_expiry:   d?.license_expiry?.split('T')[0] ?? '',
-      is_vendor_driver: d?.is_vendor_driver              ?? false,
-      vendor_id:        d?.vendor_id                     ?? '',
-    }
-  }
-
-  if (tab === 'vendors') {
-    const v = (user as VendorUser | null)?.vendors
-    return {
-      ...base,
-      landline:        v?.landline ? toLocalLandlineDigits(v.landline) : '',
-      vendor_type:     v?.vendor_type     ?? 'individual',
-      company_name:    v?.company_name    ?? '',
-      business_permit: v?.business_permit ?? '',
     }
   }
 
@@ -186,7 +170,6 @@ async function submitForm(
     case 'admins':            return editId ? adminService.update(editId, clean as never).then(() => editId)            : adminService.create(clean as never).then(newId)
     case 'clients':           return editId ? clientService.update(editId, clean as never).then(() => editId)           : clientService.create(clean as never).then(newId)
     case 'drivers':           return editId ? driverService.update(editId, clean as never).then(() => editId)           : driverService.create(clean as never).then(newId)
-    case 'vendors':           return editId ? vendorService.update(editId, clean as never).then(() => editId)           : vendorService.create(clean as never).then(newId)
     case 'accountants':       return editId ? accountantService.update(editId, clean as never).then(() => editId)       : accountantService.create(clean as never).then(newId)
     case 'general-managers':  return editId ? generalManagerService.update(editId, clean as never).then(() => editId)   : generalManagerService.create(clean as never).then(newId)
     case 'fleet-admins':      return editId ? fleetAdminService.update(editId, clean as never).then(() => editId)       : fleetAdminService.create(clean as never).then(newId)
@@ -325,9 +308,6 @@ export default function UserFormModal({ tab, user, onClose, onSaved, enablePermi
   const [licenseFile,    setLicenseFile]    = useState<File | null>(null)
   const [licensePreview, setLicensePreview] = useState<string | null>(null)
 
-  const [vendorList,     setVendorList]     = useState<{ vendor_id: string; name: string }[]>([])
-  const [vendorsLoading, setVendorsLoading] = useState(false)
-
   const [scanLoading, setScanLoading] = useState(false)
   const [scanDone,    setScanDone]    = useState(false)
   const [scanError,   setScanError]   = useState<string | null>(null)
@@ -403,32 +383,11 @@ export default function UserFormModal({ tab, user, onClose, onSaved, enablePermi
     )
   }, [initialState])
 
-  useEffect(() => {
-    if (tab !== 'drivers') return
-    setVendorsLoading(true)
-    vendorService.getAll()
-      .then(data => {
-        setVendorList(
-          (data as VendorUser[])
-            .filter(v => v.vendors?.vendor_id)
-            .map(v => ({
-              vendor_id: v.vendors!.vendor_id,
-              name:
-                [v.first_name, v.last_name].filter(Boolean).join(' ') +
-                (v.vendors?.company_name ? ` (${v.vendors.company_name})` : ''),
-            }))
-        )
-      })
-      .catch(() => {})
-      .finally(() => setVendorsLoading(false))
-  }, [tab])
-
   function buildValidationPayload(currentForm: FormState): Record<string, unknown> {
     const payload: Record<string, unknown> = { ...currentForm }
     if (payload.phone)    payload.phone    = attachCountryCode(String(payload.phone))
     if (payload.landline) payload.landline = attachCountryCode(String(payload.landline))
     else                  delete payload.landline
-    if (tab === 'drivers' && !payload.is_vendor_driver) delete payload.vendor_id
     return payload
   }
 
@@ -448,7 +407,6 @@ export default function UserFormModal({ tab, user, onClose, onSaved, enablePermi
     if (typeof value === 'string' && NAME_FIELDS.has(key)) value = toNameCase(value)
     setForm(prev => {
       const next = { ...prev, [key]: value }
-      if (key === 'is_vendor_driver' && value === false) next.vendor_id = ''
       validateField(key, value, next)
       return next
     })
@@ -778,83 +736,6 @@ export default function UserFormModal({ tab, user, onClose, onSaved, enablePermi
                     onChange={e => set('license_expiry', e.target.value)}
                     error={fe.license_expiry}
                     className="[color-scheme:dark]"
-                  />
-                </Field>
-              </div>
-
-              <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-[#2a2a2a] bg-[#2a2a2a]/40 px-4 py-3">
-                <div className="relative mt-0.5 flex-shrink-0">
-                  <input
-                    type="checkbox"
-                    checked={form.is_vendor_driver as boolean}
-                    onChange={e => set('is_vendor_driver', e.target.checked)}
-                    className="peer sr-only"
-                  />
-                  <div className="h-4 w-4 rounded border border-[#424242] bg-[#1b1b1b] transition-colors peer-checked:border-[#4df9ed] peer-checked:bg-[#4df9ed]" />
-                  <svg
-                    className="pointer-events-none absolute inset-0 m-auto hidden h-2.5 w-2.5 text-[#0a0a0a] peer-checked:block"
-                    viewBox="0 0 10 10" fill="none"
-                  >
-                    <path d="M1.5 5l2.5 2.5 4.5-4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </div>
-                <span className="text-sm text-[#818181]">
-                  This driver belongs to a vendor / subcontractor
-                </span>
-              </label>
-
-              {form.is_vendor_driver && (
-                <Field label="Vendor" required error={fe.vendor_id}>
-                  <Select
-                    value={form.vendor_id as string}
-                    onChange={e => set('vendor_id', e.target.value)}
-                    error={fe.vendor_id}
-                    disabled={vendorsLoading}
-                  >
-                    <option value="">{vendorsLoading ? 'Loading vendors…' : 'Select a vendor'}</option>
-                    {vendorList.map(v => (
-                      <option key={v.vendor_id} value={v.vendor_id}>{v.name}</option>
-                    ))}
-                  </Select>
-                </Field>
-              )}
-            </>)}
-
-            {tab === 'vendors' && (<>
-              <Field label="Landline" hint="Optional — area code + subscriber, e.g. 32-XXXXXXX" error={fe.landline}>
-                <LandlineInputRow
-                  value={form.landline as string}
-                  onChange={digits => set('landline', digits)}
-                  error={fe.landline}
-                />
-              </Field>
-
-              <Field label="Vendor Type" required error={fe.vendor_type}>
-                <Select
-                  value={form.vendor_type as string}
-                  onChange={e => set('vendor_type', e.target.value)}
-                  error={fe.vendor_type}
-                >
-                  <option value="individual">Individual</option>
-                  <option value="company">Company</option>
-                </Select>
-              </Field>
-
-              <div className="grid grid-cols-2 gap-4">
-                <Field label="Company Name" required error={fe.company_name}>
-                  <Input
-                    value={form.company_name as string}
-                    onChange={e => set('company_name', e.target.value)}
-                    placeholder="Vendor Co."
-                    error={fe.company_name}
-                  />
-                </Field>
-                <Field label="Business Permit #" required error={fe.business_permit}>
-                  <Input
-                    value={form.business_permit as string}
-                    onChange={e => set('business_permit', e.target.value)}
-                    placeholder="BP-2024-XXXXX"
-                    error={fe.business_permit}
                   />
                 </Field>
               </div>

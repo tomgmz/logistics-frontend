@@ -13,7 +13,6 @@ export async function adminFetchTrucksPaginated(params: {
   page: number
   limit: number
   status: string
-  owned_by: string
   search: string
 }): Promise<{
   rows: Truck[]
@@ -28,7 +27,6 @@ export async function adminFetchTrucksPaginated(params: {
       page:     params.page,
       limit:    params.limit,
       status:   params.status,
-      owned_by: params.owned_by,
       search:   params.search || undefined,
     },
   })
@@ -108,9 +106,4 @@ export async function adminUpdateTruckModel(modelId: string, body: UpdateTruckMo
 export async function adminDeleteTruckModel(modelId: string): Promise<void> {
   await initCsrf()
   await authApi.delete(`${ADMIN}/truck-models/${modelId}`)
-}
-
-export async function adminFetchVendorsRaw(): Promise<unknown[]> {
-  const { data } = await authApi.get<{ data: unknown[] }>(`${ADMIN}/vendors`)
-  return data?.data ?? []
 }

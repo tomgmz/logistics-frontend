@@ -7,8 +7,17 @@ interface ApiResponse<T> {
 }
 
 export interface AssignBookingPayload {
-  driver_id: string
-  truck_id: string
+  driver_id?: string
+  truck_id?: string
+
+  is_vendor_supplied?: boolean
+  vendor_name?: string
+  vendor_contact?: string
+  vendor_driver_name?: string
+  vendor_driver_license?: string
+  vendor_driver_phone?: string
+  vendor_vehicle_plate?: string
+  vendor_vehicle_type?: string
 }
 
 export interface AssignmentRecord {
@@ -21,6 +30,15 @@ export interface AssignmentRecord {
   delivery_time: string | null
   created_at: string
   updated_at: string
+
+  is_vendor_supplied: boolean
+  vendor_name: string | null
+  vendor_contact: string | null
+  vendor_driver_name: string | null
+  vendor_driver_license: string | null
+  vendor_driver_phone: string | null
+  vendor_vehicle_plate: string | null
+  vendor_vehicle_type: string | null
 }
 
 export type DeliveryStatus = 'pending' | 'in_transit' | 'completed' | 'cancelled'

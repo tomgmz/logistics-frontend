@@ -6,7 +6,7 @@ export type AdminRole =
   | 'operations_manager'
   | 'accountant'
 
-export type UserRole = AdminRole | 'driver' | 'client' | 'vendor'
+export type UserRole = AdminRole | 'driver' | 'client'
 export type UserStatus = 'active' | 'inactive' | 'deactivated' | 'archived' | 'permanently_locked'
 export type DriverAvailability = 'available' | 'assigned' | 'on_leave' | 'inactive'
 
@@ -14,7 +14,6 @@ export type UserTab =
   | 'admins'
   | 'clients'
   | 'drivers'
-  | 'vendors'
   | 'accountants'
   | 'general-managers'
   | 'fleet-admins'
@@ -61,25 +60,12 @@ export interface DriverUser extends BaseUser {
     license_number: string
     license_expiry: string
     status: DriverAvailability
-    is_vendor_driver: boolean
-    vendor_id: string | null
     license_image_url: string | null
     profile_image_url: string | null
   } | null
 }
 
-export interface VendorUser extends BaseUser {
-  role: 'vendor'
-  vendors: {
-    vendor_id: string
-    vendor_type: 'individual' | 'company'
-    company_name: string | null
-    business_permit: string | null
-    landline: string | null
-  } | null
-}
-
-export type AnyUser = AdminUser | ClientUser | DriverUser | VendorUser
+export type AnyUser = AdminUser | ClientUser | DriverUser
 
 export interface CreateAdminPayload {
   email:        string
@@ -110,19 +96,6 @@ export interface CreateDriverPayload {
   last_name?: string
   license_number: string
   license_expiry: string
-  is_vendor_driver?: boolean
-  vendor_id?: string
-}
-
-export interface CreateVendorPayload {
-  email: string
-  password: string
-  phone?: string
-  first_name?: string
-  last_name?: string
-  vendor_type: 'individual' | 'company'
-  company_name?: string
-  business_permit?: string
 }
 
 export interface CreateAccountantPayload {
@@ -174,7 +147,6 @@ export interface CreateITAdminPayload {
 export type UpdateAdminPayload           = Partial<Omit<CreateAdminPayload, 'password'>>
 export type UpdateClientPayload          = Partial<Omit<CreateClientPayload, 'password'>>
 export type UpdateDriverPayload          = Partial<Omit<CreateDriverPayload, 'password'>>
-export type UpdateVendorPayload          = Partial<Omit<CreateVendorPayload, 'password'>>
 export type UpdateAccountantPayload      = Partial<Omit<CreateAccountantPayload, 'password'>>
 export type UpdateGeneralManagerPayload  = Partial<Omit<CreateGeneralManagerPayload, 'password'>>
 export type UpdateFleetAdminPayload      = Partial<Omit<CreateFleetAdminPayload, 'password'>>
