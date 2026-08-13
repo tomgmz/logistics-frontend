@@ -588,6 +588,40 @@ function BlowbagetsRecord({ check }: { check: BlowbagetsCheck }) {
   )
 }
 
+/**
+ * Proof of pickup / proof of delivery — the photo the driver took at the stop
+ * before confirming it in the app. Click through for the full-size image.
+ */
+function ProofPhoto({
+  url, at, label,
+}: { url: string; at?: string | null; label: string }) {
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={`${label} — open full size`}
+      className="flex items-center gap-2.5 rounded-lg border border-white/[0.08] bg-black/20 p-2
+                 hover:border-[var(--color-cyan)]/40 transition-colors group"
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={url}
+        alt={label}
+        className="h-12 w-12 shrink-0 rounded-md object-cover border border-white/10"
+      />
+      <span className="min-w-0 flex-1">
+        <span className="block text-xs font-semibold text-white/80 group-hover:text-white transition-colors">
+          {label}
+        </span>
+        <span className="block text-[11px] text-white/40">
+          {at ? new Date(at).toLocaleString() : 'Photo on file'}
+        </span>
+      </span>
+    </a>
+  )
+}
+
 function TransactionDocs({ docs }: { docs: string[] }) {
   return (
     <div>
@@ -1541,6 +1575,20 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                         />
                       )}
 
+                      {/* Proof of pickup, photographed by the driver at the origin. */}
+                      {d?.pickup_proof_photo_url && (
+                        <div>
+                          <h3 className="text-[11px] font-bold uppercase tracking-wider text-white/40 mb-2">
+                            Proof of pickup
+                          </h3>
+                          <ProofPhoto
+                            url={d.pickup_proof_photo_url}
+                            at={d.pickup_proof_at}
+                            label="Pickup confirmed by driver"
+                          />
+                        </div>
+                      )}
+
                       {/* Delivery stops */}
                       <div>
                         <h3 className="text-[11px] font-bold uppercase tracking-wider text-white/40 mb-2">
@@ -1576,6 +1624,18 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                                     </span>
                                   ))}
                                 </div>
+                                {/* Proof of delivery, photographed by the driver at this stop. */}
+                                {dest.proof_photo_url
+                                  ? (
+                                    <ProofPhoto
+                                      url={dest.proof_photo_url}
+                                      at={dest.proof_at ?? dest.delivered_at}
+                                      label="Proof of delivery"
+                                    />
+                                  )
+                                  : dest.status === 'delivered' && (
+                                    <p className="text-[11px] text-white/30">No proof photo on file.</p>
+                                  )}
                               </li>
                             ))}
                         </ul>

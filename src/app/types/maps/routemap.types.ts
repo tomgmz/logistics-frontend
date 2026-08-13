@@ -80,6 +80,10 @@ export interface BookingDetail {
   transaction_documents?:  string[] | null
   payment_terms?:          string | null
 
+  // Proof of pickup: photo the driver took at the origin when confirming it.
+  pickup_proof_photo_url?: string | null
+  pickup_proof_at?:        string | null
+
   driver?: {
     driver_id?: string
     name?:      string
@@ -95,6 +99,9 @@ export interface BookingDetail {
     sequence_order:  number
     status:          'pending' | 'delivered' | 'failed'
     delivered_at?:   string | null
+    // Proof of delivery: photo the driver took at this drop-off.
+    proof_photo_url?: string | null
+    proof_at?:        string | null
     latitude?:       number | null
     longitude?:      number | null
   }[]
