@@ -11,6 +11,9 @@ export interface BookingDestination {
 
 export interface BookingWithRelations {
   booking_id: string
+  // The booking number people quote. Declared explicitly so it survives the
+  // index signature below — read it through bookingRef(), never raw.
+  reference_number?: string | null
   origin?: string
   status: string
   schedule_date?: string

@@ -22,6 +22,7 @@ import {
   type BookingWithRelations,
 } from '@/lib/store/slice/routeMap.slice'
 import type { OptimizedStop, OptimizeRouteResponse } from '@/app/types/maps/routemap.types'
+import { bookingRef } from '@/lib/booking'
 
 const GOOGLE_MAPS_KEY    = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
 const GOOGLE_MAPS_MAP_ID = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID
@@ -102,8 +103,11 @@ function TransitBookingRow({
         </div>
       )}
 
-      <div className="flex justify-end mb-1">
-        <span className="text-[11px] font-bold" style={{ ...SC, color }}>{label}</span>
+      <div className="flex items-center justify-between gap-2 mb-1">
+        <span className="text-[11px] font-mono font-bold text-white/70 truncate">
+          {bookingRef(booking)}
+        </span>
+        <span className="text-[11px] font-bold shrink-0" style={{ ...SC, color }}>{label}</span>
       </div>
 
       <div className="flex items-center gap-1.5 mb-2">

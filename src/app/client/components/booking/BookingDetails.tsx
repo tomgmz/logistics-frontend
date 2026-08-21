@@ -255,10 +255,11 @@ function DatePickerPopup({
   const todayM = today.getMonth()
   const todayD = today.getDate()
 
+  // Tomorrow is the earliest bookable day, so today greys out with the past.
   const isDisabled = (d: number) => {
     const dt = new Date(viewYear, viewMonth, d)
     const td = new Date(todayY, todayM, todayD)
-    return dt < td
+    return dt <= td
   }
 
   const idleBorder   = hasError ? ERROR_BORDER : BORDER_PANEL

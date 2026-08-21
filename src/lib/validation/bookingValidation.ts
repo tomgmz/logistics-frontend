@@ -67,12 +67,13 @@ export function validateSchedule(date: string, time: string): ScheduleErrors {
 
     const serverNow = nowDate()
 
-    const oneWeekFromNow = new Date(serverNow)
-    oneWeekFromNow.setDate(oneWeekFromNow.getDate() + 7)
+    // Tomorrow at the earliest — same rule the API enforces.
+    const tomorrow = new Date(serverNow)
+    tomorrow.setDate(tomorrow.getDate() + 1)
     const earliestDate = new Date(
-      oneWeekFromNow.getFullYear(),
-      oneWeekFromNow.getMonth(),
-      oneWeekFromNow.getDate(),
+      tomorrow.getFullYear(),
+      tomorrow.getMonth(),
+      tomorrow.getDate(),
     )
 
     const maxDate = new Date(serverNow)
@@ -82,7 +83,7 @@ export function validateSchedule(date: string, time: string): ScheduleErrors {
     if (selectedDate < earliestDate) {
       const pad = (n: number) => String(n).padStart(2, '0')
       const earliest = `${earliestDate.getFullYear()}-${pad(earliestDate.getMonth() + 1)}-${pad(earliestDate.getDate())}`
-      errors.date = `Booking must be at least 1 week in advance (earliest: ${earliest})`
+      errors.date = `Booking must be at least a day ahead (earliest: ${earliest})`
     } else if (selectedDate > maxDateOnly) {
       errors.date = 'Date cannot be more than 1 year in the future'
     }

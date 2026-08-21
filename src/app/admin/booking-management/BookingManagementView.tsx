@@ -46,6 +46,7 @@ import { useAuthStore } from '@/lib/store/auth.store'
 import { nowDate } from '@/app/utils/serverTime'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
+import { bookingRef, bookingRefFromRecord } from '@/lib/booking'
 import ReusableModal, { RemarksModal } from '@/components/layout/ReusableModal'
 
 const PAGE_SIZE = 12
@@ -164,13 +165,10 @@ function toRows(raw: Record<string, unknown>[]): ListRow[] {
   return raw.map((b) => {
     const clients = b.clients as { company_name?: string | null } | undefined
     const dests   = b.booking_destinations as unknown[] | undefined
-    const referenceNumber = typeof b.reference_number === 'string' && b.reference_number.trim()
-      ? b.reference_number
-      : undefined
 
     return {
       booking_id:        String(b.booking_id ?? ''),
-      display_id:        referenceNumber ?? String(b.booking_id ?? '').slice(0, 8).toUpperCase(),
+      display_id:        bookingRefFromRecord(b),
       origin:            typeof b.origin === 'string' ? b.origin : undefined,
       status:            typeof b.status === 'string' ? b.status : 'pending',
       schedule_date:     typeof b.schedule_date === 'string' ? b.schedule_date : undefined,
@@ -1264,7 +1262,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                       {/* Booking info */}
                       <div className="rounded-xl border border-white/[0.08] p-3 space-y-2 bg-black/20">
                         <p className="text-[10px] font-mono text-white/35 break-all">
-                          {detail.reference_number ?? detail.booking_id}
+                          {bookingRef(detail)}
                         </p>
                         <div className="flex items-start gap-2 text-white/90 text-sm">
                           <MapPin size={16} className="text-[var(--color-cyan)] shrink-0 mt-0.5" />

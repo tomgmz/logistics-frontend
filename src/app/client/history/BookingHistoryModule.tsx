@@ -25,6 +25,7 @@ import type {
 } from '@/lib/store/slice/routeMap.slice'
 import type { ParsedCargoDetails } from '@/app/types/maps/routemap.types'
 import { type BookingStatus, asBookingStatus } from '@/app/types/maps/routemap.types'
+import { bookingRef } from '@/lib/booking'
 
 const BG_PAGE  = '#0a0a0a'
 const BG_PANEL = '#2A2828'
@@ -210,15 +211,6 @@ function getTruckModel(booking: BookingWithRelations): string | null {
   return m ? `${m.name ?? ''} (${m.vehicle_type ?? ''})` : null
 }
 
-function getBookingDisplayId(booking: BookingWithRelations | null | undefined): string {
-  if (!booking) return ''
-  const ref = booking.reference_number
-  if (typeof ref === 'string' && ref.trim() !== '') return ref
-  return typeof booking.booking_id === 'string'
-    ? booking.booking_id.slice(0, 8).toUpperCase()
-    : ''
-}
-
 function formatDate(iso: string | Date | null | undefined): string {
   if (!iso) return '—'
   return new Date(iso).toLocaleDateString('en-PH', {
@@ -338,7 +330,7 @@ function BookingCard({ booking, onSelect }: {
           <div className="flex items-center gap-2">
             <Hash size={12} style={{ color: CYAN }} />
             <span className="font-bold text-white text-sm tracking-wide font-mono">
-              {(booking.reference_number as string | null | undefined) ?? booking.booking_id.slice(0, 8).toUpperCase()}
+              {bookingRef(booking)}
             </span>
           </div>
           <div className="flex items-center gap-1.5 text-xs" style={{ color: MUTED }}>
@@ -494,7 +486,7 @@ function BookingDetail({ booking }: {
             <div className="flex items-center gap-2">
               <Hash size={13} style={{ color: CYAN }} />
               <span className="font-bold text-white tracking-wide font-mono">
-                {(booking.reference_number as string | null | undefined) ?? (booking.booking_id as string | null | undefined)?.slice(0, 8).toUpperCase()}
+                {bookingRef(booking)}
               </span>
             </div>
             <div className="flex items-center gap-1.5 text-xs" style={{ color: MUTED }}>
@@ -794,7 +786,7 @@ export default function BookingHistoryModule() {
         <div className="flex items-center gap-2">
           <History size={18} style={{ color: CYAN }} />
           <h1 className="font-bold text-white text-base tracking-wide">
-            {view === 'list' ? 'Transaction History' : getBookingDisplayId(selected)}
+            {view === 'list' ? 'Transaction History' : bookingRef(selected)}
           </h1>
         </div>
         {view === 'list' && !loading && (
@@ -825,7 +817,7 @@ export default function BookingHistoryModule() {
             Transaction History
           </button>
           <ChevronRight size={11} />
-          <span style={{ color: CYAN }}>{getBookingDisplayId(selected)}</span>
+          <span style={{ color: CYAN }}>{bookingRef(selected)}</span>
         </div>
       )}
 

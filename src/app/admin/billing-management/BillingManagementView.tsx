@@ -38,7 +38,7 @@ interface SubmittedFile {
 
 interface BillingRecord {
   billing_id: string
-  booking_id: string
+  reference_number: string
   client_name: string
   client_email: string
   amount: number
@@ -59,7 +59,7 @@ type ConfirmKind = 'approve' | 'reject' | 'generate' | null
 export const MOCK_BILLING: BillingRecord[] = [
   {
     billing_id: 'BL-001',
-    booking_id: 'BK-2026-0041',
+    reference_number: 'BK-2026-0041',
     client_name: 'Airspeed Corp.',
     client_email: 'billing@airspeed.ph',
     amount: 18500,
@@ -80,7 +80,7 @@ export const MOCK_BILLING: BillingRecord[] = [
   },
   {
     billing_id: 'BL-002',
-    booking_id: 'BK-2026-0038',
+    reference_number: 'BK-2026-0038',
     client_name: 'STA Warehouses Inc.',
     client_email: 'accounts@stawh.com',
     amount: 9200,
@@ -99,7 +99,7 @@ export const MOCK_BILLING: BillingRecord[] = [
   },
   {
     billing_id: 'BL-003',
-    booking_id: 'BK-2026-0035',
+    reference_number: 'BK-2026-0035',
     client_name: 'MTR Port Logistics',
     client_email: 'finance@mtrport.com',
     amount: 32400,
@@ -117,7 +117,7 @@ export const MOCK_BILLING: BillingRecord[] = [
   },
   {
     billing_id: 'BL-004',
-    booking_id: 'BK-2026-0030',
+    reference_number: 'BK-2026-0030',
     client_name: 'Greenfield Supply Co.',
     client_email: 'ops@greenfieldsupply.ph',
     amount: 7800,
@@ -132,7 +132,7 @@ export const MOCK_BILLING: BillingRecord[] = [
   },
   {
     billing_id: 'BL-005',
-    booking_id: 'BK-2026-0027',
+    reference_number: 'BK-2026-0027',
     client_name: 'Airspeed Corp.',
     client_email: 'billing@airspeed.ph',
     amount: 14600,
@@ -307,7 +307,7 @@ function BillingDetailPanel({
               </span>
             </div>
             <h2 className="text-lg font-bold text-white mt-1">{record.invoice_number}</h2>
-            <p className="text-xs text-white/45 mt-0.5">{record.booking_id} · {record.service_type}</p>
+            <p className="text-xs text-white/45 mt-0.5">{record.reference_number} · {record.service_type}</p>
           </div>
           <button
             type="button"
@@ -545,7 +545,7 @@ function ReverseBillingPanel() {
   const filtered = useMemo(() => {
     return records.filter((r) => {
       const q = search.trim().toLowerCase()
-      if (q && ![r.client_name, r.invoice_number, r.booking_id, r.service_type].some((s) => s.toLowerCase().includes(q))) return false
+      if (q && ![r.client_name, r.invoice_number, r.reference_number, r.service_type].some((s) => s.toLowerCase().includes(q))) return false
       if (statusFilter !== 'all' && r.status !== statusFilter) return false
       return true
     })
@@ -655,7 +655,7 @@ function ReverseBillingPanel() {
                     >
                       <td className="px-3 py-3 align-middle">
                         <p className="font-mono text-xs font-semibold text-white/90">{r.invoice_number}</p>
-                        <p className="text-[10px] text-white/40 mt-0.5">{r.booking_id} · {r.service_type}</p>
+                        <p className="text-[10px] text-white/40 mt-0.5">{r.reference_number} · {r.service_type}</p>
                       </td>
                       <td className="px-3 py-3 align-middle">
                         <p className="text-sm font-semibold text-white truncate max-w-[160px]">{r.client_name}</p>
