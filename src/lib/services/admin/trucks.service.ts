@@ -1,5 +1,6 @@
 import authApi, { initCsrf } from '../../api/auth.api'
-import type { Truck, CreateTruckInput, UpdateTruckInput, CreateTruckModelInput,UpdateTruckModelInput } from '@/app/types/truck.types'
+import type { Truck, TruckInspection, CreateTruckInput, UpdateTruckInput, CreateTruckModelInput,UpdateTruckModelInput } from '@/app/types/truck.types'
+import type { BlowbagetsItems } from '@/lib/services/client/booking.service'
 import type { TruckModel } from '@/app/types/truck-model'
 
 const ADMIN = '/admin'
@@ -61,6 +62,24 @@ export async function adminUpdateTruck(truckId: string, body: UpdateTruckInput):
 export async function adminDeleteTruck(truckId: string): Promise<void> {
   await initCsrf()
   await authApi.delete(`${ADMIN}/trucks/${truckId}`)
+}
+
+// --- BLOWBAGETS vehicle inspections ----------------------------------------
+// Recorded by the fleet manager against a vehicle. Only a vehicle whose latest
+// inspection passed can be assigned to a booking by operations.
+
+export async function adminFetchTruckInspections(truckId: string): Promise<TruckInspection[]> {
+  const { data } = await authApi.get<{ data: TruckInspection[] }>(`${ADMIN}/trucks/${truckId}/inspections`)
+  return data?.data ?? []
+}
+
+export async function adminRecordTruckInspection(
+  truckId: string,
+  body: { items: BlowbagetsItems; notes?: string | null },
+): Promise<TruckInspection> {
+  await initCsrf()
+  const { data } = await authApi.post<{ data: TruckInspection }>(`${ADMIN}/trucks/${truckId}/inspections`, body)
+  return data.data
 }
 
 export async function adminFetchTruckModels(): Promise<TruckModel[]> {

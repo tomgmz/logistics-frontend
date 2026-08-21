@@ -13,9 +13,10 @@ import {
   X,
   Truck as TruckIcon,
   Settings2,
+  ClipboardCheck,
 } from 'lucide-react'
 
-import type { Truck, CreateTruckInput, UpdateTruckInput } from '@/app/types/truck.types'
+import type { Truck, TruckInspection, CreateTruckInput, UpdateTruckInput } from '@/app/types/truck.types'
 import type { TruckModel } from '@/app/types/truck-model'
 import {
   adminFetchTrucksPaginated,
@@ -27,6 +28,7 @@ import {
 import ReusableModal from '@/components/layout/ReusableModal'
 import { useModuleAccess } from '@/components/layout/ModuleAccess'
 import TruckModelFormModal from './TruckModelFormModal'
+import BlowbagetsInspectionModal from './BlowbagetsInspectionModal'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 
@@ -157,6 +159,49 @@ function formsEqual(a: TruckFormState, b: TruckFormState): boolean {
   )
 }
 
+/**
+ * Whether this vehicle is cleared for operations to assign, from its most recent
+ * BLOWBAGETS inspection. A vehicle that has never been inspected reads the same
+ * as one that failed: it can't be picked.
+ */
+function InspectionBadge({ inspection }: { inspection: TruckInspection | null }) {
+  if (!inspection) {
+    return (
+      <span
+        className="inline-flex text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border"
+        style={{ color: 'rgba(255,255,255,0.45)', borderColor: 'rgba(255,255,255,0.15)' }}
+        title="Never inspected — cannot be assigned to a booking"
+      >
+        Not inspected
+      </span>
+    )
+  }
+
+  const when = new Date(inspection.inspected_at)
+  const whenLabel = Number.isNaN(when.getTime())
+    ? inspection.inspected_at
+    : when.toLocaleDateString()
+
+  return (
+    <span className="flex flex-col gap-0.5 items-start">
+      <span
+        className="inline-flex text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border"
+        style={
+          inspection.passed
+            ? { color: 'var(--color-cyan)', borderColor: 'rgba(77,249,237,0.40)', background: 'rgba(77,249,237,0.12)' }
+            : { color: '#fca5a5', borderColor: 'rgba(248,113,113,0.35)', background: 'rgba(248,113,113,0.10)' }
+        }
+        title={inspection.passed
+          ? 'Cleared — operations can assign this vehicle'
+          : 'Failed — blocked from assignment until it passes a re-check'}
+      >
+        {inspection.passed ? 'Passed' : 'Failed'}
+      </span>
+      <span className="text-[10px] text-white/30 tabular-nums">{whenLabel}</span>
+    </span>
+  )
+}
+
 export default function VehicleManagementView() {
   const [trucks,  setTrucks]  = useState<Truck[]>([])
   const [models,  setModels]  = useState<TruckModel[]>([])
@@ -245,6 +290,19 @@ export default function VehicleManagementView() {
 
   const selectedModel         = useMemo(() => models.find((m) => m.model_id === form.model_id) ?? null, [models, form.model_id])
   const selectedModelImageUrl = resolveModelImageUrl(selectedModel?.image_url ?? null)
+
+  // The vehicle whose BLOWBAGETS inspection is open, if any. Recording an
+  // inspection patches the row in place so readiness updates without a refetch.
+  const [inspectTruck, setInspectTruck] = useState<Truck | null>(null)
+
+  const applyInspection = useCallback((truckId: string, inspection: TruckInspection) => {
+    setTrucks((prev) =>
+      prev.map((t) => (t.truck_id === truckId ? { ...t, latest_inspection: inspection } : t)),
+    )
+    // A failed inspection also takes the vehicle out of service on the server, so
+    // pull the row back to pick up the new status.
+    if (!inspection.passed) void loadTrucksPage()
+  }, [loadTrucksPage])
 
   function applyModelPick(modelId: string) {
     setForm((f) => ({ ...f, model_id: modelId }))
@@ -496,7 +554,8 @@ export default function VehicleManagementView() {
                       <th className="px-3 py-2.5 font-bold hidden md:table-cell">Model</th>
                       <th className="px-3 py-2.5 font-bold hidden md:table-cell">Max weight</th>
                       <th className="px-3 py-2.5 font-bold">Status</th>
-                      <th className="px-3 py-2.5 font-bold text-right w-[100px]">Actions</th>
+                      <th className="px-3 py-2.5 font-bold">BLOWBAGETS</th>
+                      <th className="px-3 py-2.5 font-bold text-right w-[140px]">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -534,7 +593,22 @@ export default function VehicleManagementView() {
                               {fmtLabel(t.status)}
                             </span>
                           </td>
+                          {/* Readiness for assignment: operations can only pick a
+                              vehicle whose latest inspection passed. */}
+                          <td className="px-3 py-2.5">
+                            <InspectionBadge inspection={t.latest_inspection ?? null} />
+                          </td>
                           <td className="px-3 py-2.5 text-right">
+                            {canEdit && (
+                              <button
+                                type="button"
+                                onClick={() => setInspectTruck(t)}
+                                className="p-1.5 rounded-md border border-white/10 text-white/70 hover:bg-white/5 mr-1"
+                                title="Run BLOWBAGETS inspection"
+                              >
+                                <ClipboardCheck size={14} />
+                              </button>
+                            )}
                             {canEdit && (
                               <button
                                 type="button"
@@ -594,6 +668,16 @@ export default function VehicleManagementView() {
           )}
         </div>
       </div>
+
+      {/* BLOWBAGETS inspection — the gate on whether operations can assign this
+          vehicle to a booking. */}
+      <BlowbagetsInspectionModal
+        truck={inspectTruck}
+        onClose={() => setInspectTruck(null)}
+        onRecorded={(inspection) => {
+          if (inspectTruck) applyInspection(inspectTruck.truck_id, inspection)
+        }}
+      />
 
       {/* Model catalog modal */}
       <TruckModelFormModal

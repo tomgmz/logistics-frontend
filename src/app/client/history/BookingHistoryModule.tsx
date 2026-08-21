@@ -636,14 +636,35 @@ function BookingDetail({ booking }: {
         </div>
       )}
 
-      {/* Cancellation notice */}
-      {booking.status === 'CANCELLED' && (
-        <div className="flex items-start gap-2 rounded-xl px-4 py-3 text-sm"
-          style={{ background: `${ERROR}10`, border: `1px solid ${ERROR}30`, color: ERROR }}>
-          <AlertCircle size={15} className="mt-0.5 shrink-0" />
-          <span>This booking was cancelled. Contact support if you believe this was an error.</span>
-        </div>
-      )}
+      {/* Cancellation notice. A booking the general manager did not approve
+          carries their remarks — that reason is the actionable part for the
+          client, so show it instead of the generic line. */}
+      {booking.status === 'CANCELLED' && (() => {
+        // Only name the general manager when the GM actually made the call. An
+        // administrator can turn a booking down on their own authority without
+        // it ever reaching the GM, and that shows up as cancelled_by instead.
+        const rejectedByGm = booking.gm_status === 'rejected'
+        const remarks      = typeof booking.rejection_reason === 'string'
+          ? booking.rejection_reason.trim()
+          : ''
+        const headline = rejectedByGm
+          ? 'This booking was not approved by the general manager.'
+          : remarks || booking.cancelled_by
+            ? 'This booking was not approved.'
+            : 'This booking was cancelled.'
+        return (
+          <div className="flex items-start gap-2 rounded-xl px-4 py-3 text-sm"
+            style={{ background: `${ERROR}10`, border: `1px solid ${ERROR}30`, color: ERROR }}>
+            <AlertCircle size={15} className="mt-0.5 shrink-0" />
+            <span>
+              {headline}
+              {remarks
+                ? <><br /><span className="font-semibold">Remarks:</span> {remarks}</>
+                : ' Contact support if you believe this was an error.'}
+            </span>
+          </div>
+        )
+      })()}
     </motion.div>
   )
 }

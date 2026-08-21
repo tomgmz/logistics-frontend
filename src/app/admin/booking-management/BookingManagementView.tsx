@@ -31,8 +31,6 @@ import {
   bookingService,
   type AdminBookingLifecycleStatus,
   type DestinationDeliveryStatus,
-  type BlowbagetsKey,
-  type BlowbagetsItems,
   type BlowbagetsCheck,
 } from '@/lib/services/client/booking.service'
 import {
@@ -42,7 +40,9 @@ import {
 import { driverService } from '@/lib/services/admin/user-management.service'
 import { adminFetchTrucks } from '@/lib/services/admin/trucks.service'
 import type { DriverUser } from '@/app/types/admin/user-management.types'
-import type { Truck as TruckType } from '@/app/types/truck.types'
+import { isRoadworthy, type Truck as TruckType } from '@/app/types/truck.types'
+import { BLOWBAGETS_ITEMS } from '@/lib/blowbagets'
+import { useAuthStore } from '@/lib/store/auth.store'
 import { nowDate } from '@/app/utils/serverTime'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
@@ -61,24 +61,17 @@ const BOOKING_STATUSES: AdminBookingLifecycleStatus[] = [
 
 const DEST_STATUSES: DestinationDeliveryStatus[] = ['pending', 'delivered', 'failed']
 
-// The fleet manager's pre-dispatch vehicle inspection. Every item must be
-// ticked before the booking can be approved for dispatch. `key` is the stable
-// state id (unique — note Battery and Brakes share the letter B).
-const BLOWBAGETS_ITEMS: { key: BlowbagetsKey; letter: string; label: string; hint: string }[] = [
-  { key: 'battery', letter: 'B', label: 'Battery', hint: 'Terminals clean, charge holding' },
-  { key: 'lights',  letter: 'L', label: 'Lights',  hint: 'Head, tail, signal & hazard working' },
-  { key: 'oil',     letter: 'O', label: 'Oil',     hint: 'Engine oil at proper level' },
-  { key: 'water',   letter: 'W', label: 'Water',   hint: 'Radiator coolant topped up' },
-  { key: 'brakes',  letter: 'B', label: 'Brakes',  hint: 'Pedal firm, no leaks' },
-  { key: 'air',     letter: 'A', label: 'Air',     hint: 'Tyre pressure within range' },
-  { key: 'gas',     letter: 'G', label: 'Gas',     hint: 'Fuel sufficient for the route' },
-  { key: 'engine',  letter: 'E', label: 'Engine',  hint: 'Starts clean, no warning lights' },
-  { key: 'tires',   letter: 'T', label: 'Tires',   hint: 'Tread & sidewalls sound, spare present' },
-  { key: 'self',    letter: 'S', label: 'Self',    hint: 'Driver fit, rested & licensed' },
-]
-
 // Roles that share this view. Each non-admin role sees a filtered slice of
-// bookings and acts only on its own approval stage.
+// bookings and acts only on its own stage of the workflow:
+//
+//   client books -> general_manager approves (or rejects with remarks)
+//                -> operations_manager picks a vehicle + driver
+//                -> the driver is notified, and the fleet manager is told which
+//                   of their vehicles was taken.
+//
+// The accountant is no longer part of the chain — their view is read-only unless
+// the IT admin has appointed them as the GM's approval proxy. The fleet manager's
+// view is read-only too; their BLOWBAGETS inspections live in Vehicle Management.
 export type BookingRoleView =
   | 'admin'
   | 'accountant'
@@ -100,10 +93,10 @@ const ROLE_HIDE_PENDING: Partial<Record<BookingRoleView, boolean>> = {
 
 const ROLE_TITLE: Record<BookingRoleView, string> = {
   admin:              'Booking management',
-  accountant:         'Bookings — accounting review',
+  accountant:         'Bookings — awaiting GM approval',
   general_manager:    'Bookings — GM approval',
   operations_manager: 'Bookings — vehicle & driver assignment',
-  fleet_manager:      'Bookings — vehicle readiness (BLOWBAGETS)',
+  fleet_manager:      'Bookings — assigned vehicles',
 }
 
 type DetailWithExtra = BookingDetail & {
@@ -116,6 +109,8 @@ type DetailWithExtra = BookingDetail & {
   gm_status?:         'pending' | 'approved' | 'rejected' | null
   ops_status?:        'pending' | 'assigned' | null
   fleet_status?:      'pending' | 'approved' | 'rejected' | null
+  // The GM's remarks when a booking was not approved.
+  rejection_reason?:  string | null
   blowbagets_check?:  BlowbagetsCheck | null
 }
 
@@ -397,6 +392,13 @@ function AssignmentPanel({
                     </option>
                   ))}
                 </select>
+                {/* Only drivers who switched themselves on in the app appear here,
+                    so an empty list means nobody has accepted work — not a bug. */}
+                <p className="text-[10px] text-white/35 mt-1">
+                  {drivers.length === 0
+                    ? 'No driver has marked themselves available for a delivery yet.'
+                    : `${drivers.length} driver${drivers.length === 1 ? '' : 's'} available.`}
+                </p>
               </div>
               <div>
                 <label className="text-[11px] text-white/40 block mb-1">Vehicle</label>
@@ -414,6 +416,13 @@ function AssignmentPanel({
                     </option>
                   ))}
                 </select>
+                {/* Vehicles are gated on the fleet manager's inspection: only a
+                    vehicle whose latest BLOWBAGETS check passed is selectable. */}
+                <p className="text-[10px] text-white/35 mt-1">
+                  {trucks.length === 0
+                    ? 'No vehicle has a passing BLOWBAGETS inspection on file.'
+                    : `${trucks.length} vehicle${trucks.length === 1 ? '' : 's'} cleared by BLOWBAGETS.`}
+                </p>
               </div>
             </div>
           )}
@@ -450,97 +459,10 @@ function AssignmentPanel({
   )
 }
 
-function BlowbagetsChecklist({
-  checked,
-  onToggle,
-  disabled,
-}: {
-  checked:  Record<string, boolean>
-  onToggle: (key: string) => void
-  disabled: boolean
-}) {
-  const doneCount = BLOWBAGETS_ITEMS.filter((it) => checked[it.key]).length
-  const total     = BLOWBAGETS_ITEMS.length
-  const complete  = doneCount === total
-
-  return (
-    <div className="rounded-xl border border-white/[0.08] p-3 space-y-3 bg-black/20">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <ClipboardCheck size={14} className="text-[var(--color-cyan)]" />
-          <h3 className="text-[11px] font-bold uppercase tracking-wider text-white/40">
-            BLOWBAGETS vehicle check
-          </h3>
-        </div>
-        <span
-          className="text-[10px] font-bold tabular-nums px-2 py-0.5 rounded-md border"
-          style={
-            complete
-              ? { color: 'var(--color-cyan)', borderColor: 'rgba(77,249,237,0.40)', background: 'rgba(77,249,237,0.12)' }
-              : { color: 'rgba(255,255,255,0.5)', borderColor: 'rgba(255,255,255,0.15)' }
-          }
-        >
-          {doneCount}/{total}
-        </span>
-      </div>
-
-      <ul className="space-y-1.5">
-        {BLOWBAGETS_ITEMS.map((it) => {
-          const on = !!checked[it.key]
-          return (
-            <li key={it.key}>
-              <button
-                type="button"
-                disabled={disabled}
-                onClick={() => onToggle(it.key)}
-                aria-pressed={on}
-                className="w-full flex items-center gap-2.5 rounded-lg border px-2.5 py-2 text-left
-                           transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                style={
-                  on
-                    ? { borderColor: 'rgba(77,249,237,0.35)', background: 'rgba(77,249,237,0.08)' }
-                    : { borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(0,0,0,0.20)' }
-                }
-              >
-                <span
-                  className="shrink-0 w-5 h-5 rounded-md border flex items-center justify-center"
-                  style={
-                    on
-                      ? { borderColor: 'var(--color-cyan)', background: 'var(--color-cyan)', color: '#04201e' }
-                      : { borderColor: 'rgba(255,255,255,0.25)' }
-                  }
-                >
-                  {on && <Check size={13} strokeWidth={3} />}
-                </span>
-                <span
-                  className="shrink-0 w-4 text-center text-[12px] font-black"
-                  style={{ color: on ? 'var(--color-cyan)' : 'rgba(255,255,255,0.4)' }}
-                >
-                  {it.letter}
-                </span>
-                <span className="flex flex-col min-w-0">
-                  <span className={`text-sm font-semibold ${on ? 'text-white' : 'text-white/75'}`}>
-                    {it.label}
-                  </span>
-                  <span className="text-[10px] text-white/35 truncate">{it.hint}</span>
-                </span>
-              </button>
-            </li>
-          )
-        })}
-      </ul>
-
-      {!complete && (
-        <p className="text-[11px] text-white/40 leading-snug">
-          Tick every item to enable approval. Found a fault? Reject to send the booking back to operations.
-        </p>
-      )}
-    </div>
-  )
-}
-
-// Read-only view of a previously recorded BLOWBAGETS inspection (shown once the
-// fleet review is done, e.g. to admins or when reopening an approved booking).
+// Read-only view of a BLOWBAGETS inspection that was recorded against the booking
+// itself, back when the fleet manager reviewed each booking before dispatch.
+// Inspections now belong to the vehicle (Vehicle Management), so this only ever
+// renders for bookings created before that change.
 function BlowbagetsRecord({ check }: { check: BlowbagetsCheck }) {
   const failed = BLOWBAGETS_ITEMS.filter((it) => !check.items[it.key])
   const when = (() => {
@@ -697,6 +619,11 @@ function BookingDeepLink({ onFocus }: { onFocus: (id: string) => void }) {
 export default function BookingManagementView({ roleView = 'admin' }: BookingManagementViewProps = {}) {
   const forcedStatus = ROLE_FORCED_STATUS[roleView]
   const hidePending  = !!ROLE_HIDE_PENDING[roleView]
+
+  // An accountant is out of the approval chain unless the IT admin appointed
+  // them as the GM's proxy, in which case they act on the GM stage.
+  const isGmProxy   = useAuthStore((s) => s.user?.is_gm_proxy === true)
+  const actsAsGm    = roleView === 'general_manager' || (roleView === 'accountant' && isGmProxy)
   const [rawBookings, setRawBookings] = useState<Record<string, unknown>[]>([])
   const [listLoading, setListLoading] = useState(true)
   const [listError, setListError]     = useState<string | null>(null)
@@ -728,11 +655,6 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
   const [approveModalOpen, setApproveModalOpen] = useState(false)
   const [rejectModalOpen, setRejectModalOpen]   = useState(false)
   const [pendingReject, setPendingReject]       = useState(false)
-
-  // Fleet manager's BLOWBAGETS inspection state — reset whenever the detail
-  // panel opens/closes so each booking starts from an unchecked list.
-  const [blowbagetsChecked, setBlowbagetsChecked] = useState<Record<string, boolean>>({})
-  const blowbagetsComplete = BLOWBAGETS_ITEMS.every((it) => blowbagetsChecked[it.key])
 
   const [drivers, setDrivers]             = useState<DriverUser[]>([])
   const [trucks, setTrucks]               = useState<TruckType[]>([])
@@ -821,20 +743,29 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     [busyElsewhere],
   )
 
+  // Only drivers who switched themselves to 'available' in the mobile app can be
+  // picked. The driver already on this booking stays listed (they read as
+  // 'assigned', not 'available') so editing an assignment doesn't drop them.
   const availableDrivers = useMemo(
     () =>
       drivers.filter((dr) => {
         const id = dr.drivers?.driver_id ?? dr.user_id
-        return !busyDriverIds.has(id) || id === assignDriverId
+        if (id === assignDriverId) return true
+        if (busyDriverIds.has(id))  return false
+        return dr.drivers?.status === 'available'
       }),
     [drivers, busyDriverIds, assignDriverId],
   )
 
+  // Only vehicles whose most recent BLOWBAGETS inspection passed can be picked.
+  // The vehicle already on this booking stays listed for the same reason.
   const availableTrucks = useMemo(
     () =>
-      trucks.filter(
-        (t) => !busyTruckIds.has(t.truck_id) || t.truck_id === assignTruckId,
-      ),
+      trucks.filter((t) => {
+        if (t.truck_id === assignTruckId) return true
+        if (busyTruckIds.has(t.truck_id)) return false
+        return isRoadworthy(t)
+      }),
     [trucks, busyTruckIds, assignTruckId],
   )
 
@@ -874,7 +805,6 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     setAssignVendorMode(false)
     setVendorForm(emptyVendorForm)
     setAssignEditMode(false)
-    setBlowbagetsChecked({})
     try {
       setDetailLoading(true)
       const [bookingResp, assignmentResp] = await Promise.allSettled([
@@ -912,7 +842,6 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     setVendorForm(emptyVendorForm)
     setAssignEditMode(false)
     setCommittedAssignment({ driverId: '', truckId: '' })
-    setBlowbagetsChecked({})
   }, [])
 
   const mergeListRow = useCallback((bookingId: string, patch: Partial<ListRow>) => {
@@ -1008,8 +937,10 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     setRejectModalOpen(false)
     setPendingReject(true)
     try {
-      await bookingService.updateBookingStatusAdmin(selectedId, 'cancelled')
-      void remarks
+      // The administrator's own decision: their remarks are stored on the
+      // booking and sent to the client, and the record shows they made the call
+      // (not the GM, who may never have seen it).
+      await bookingService.updateBookingStatusAdmin(selectedId, 'cancelled', remarks)
       setDetail({ ...detail, status: 'cancelled' })
       mergeListRow(selectedId, { status: 'cancelled' })
       appToast.success('Booking rejected.', { action: 'booking-status', entityId: selectedId })
@@ -1025,22 +956,9 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     await loadPage()
   }, [selectedId, openDetail, loadPage])
 
-  // Workflow stage actions. Each hits its dedicated endpoint, which fires the
-  // next-stage notification on the backend.
-  const handleAccountingReview = async (decision: 'approved' | 'rejected', remarks?: string) => {
-    if (!selectedId) return
-    if (decision === 'approved') setPendingStatus(true); else setPendingReject(true)
-    try {
-      await bookingService.accountingReview(selectedId, { accounting_status: decision, rejection_reason: remarks })
-      await refreshAfterAction()
-      appToast.success(decision === 'approved' ? 'Approved — forwarded for the next stage.' : 'Booking rejected.', { action: 'accounting-review', entityId: selectedId })
-    } catch (e) {
-      appToast.error(getApiErrorMessage(e, 'Request failed. Please try again.'), { action: 'accounting-review', entityId: selectedId })
-    } finally {
-      setPendingStatus(false); setPendingReject(false)
-    }
-  }
-
+  // The GM decision — the single approval gate. Approving routes the booking to
+  // operations; rejecting cancels it and sends the remarks to the client. The
+  // same call serves an accountant appointed as GM proxy.
   const handleGmReview = async (decision: 'approved' | 'rejected', remarks?: string) => {
     if (!selectedId) return
     if (decision === 'approved') setPendingStatus(true); else setPendingReject(true)
@@ -1055,39 +973,16 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     }
   }
 
-  const handleFleetReview = async (decision: 'approved' | 'rejected', remarks?: string) => {
-    if (!selectedId) return
-    if (decision === 'approved') setPendingStatus(true); else setPendingReject(true)
-    // Snapshot the checklist so the recorded inspection shows exactly which items
-    // passed — on a rejection this captures the fault(s) the fleet manager found.
-    const blowbagets = BLOWBAGETS_ITEMS.reduce((acc, it) => {
-      acc[it.key] = !!blowbagetsChecked[it.key]
-      return acc
-    }, {} as BlowbagetsItems)
-    try {
-      await bookingService.fleetReview(selectedId, { decision, rejection_reason: remarks, blowbagets })
-      await refreshAfterAction()
-      appToast.success(decision === 'approved' ? 'Vehicle cleared — driver notified.' : 'Sent back to operations.', { action: 'fleet-review', entityId: selectedId })
-    } catch (e) {
-      appToast.error(getApiErrorMessage(e, 'Request failed. Please try again.'), { action: 'fleet-review', entityId: selectedId })
-    } finally {
-      setPendingStatus(false); setPendingReject(false)
-    }
-  }
-
-  // Dispatch the generic Approve/Reject modals to the right stage per role.
+  // Dispatch the generic Approve/Reject modals to the right stage. Both run from
+  // a click, so `decidesGmStage` below is already initialised by then.
   const confirmApprove = () => {
     setApproveModalOpen(false)
-    if (roleView === 'accountant')      return void handleAccountingReview('approved')
-    if (roleView === 'general_manager') return void handleGmReview('approved')
-    if (roleView === 'fleet_manager')   return void handleFleetReview('approved')
+    if (decidesGmStage) return void handleGmReview('approved')
     return void handleApprove()
   }
   const confirmReject = (remarks: string) => {
     setRejectModalOpen(false)
-    if (roleView === 'accountant')      return void handleAccountingReview('rejected', remarks)
-    if (roleView === 'general_manager') return void handleGmReview('rejected', remarks)
-    if (roleView === 'fleet_manager')   return void handleFleetReview('rejected', remarks)
+    if (decidesGmStage) return void handleGmReview('rejected', remarks)
     return void handleReject(remarks)
   }
 
@@ -1105,12 +1000,23 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
   const d        = detail as DetailWithExtra | null
   const cargoItems: CargoItem[] = d?.booking_cargo_items ?? []
 
-  const accApprovedOrFwd = d?.accounting_status === 'approved' || d?.accounting_status === 'forwarded'
+  /**
+   * Whether this user's Approve/Reject acts on the GM stage specifically.
+   *
+   * The administrator deliberately does NOT: in a small operation they approve
+   * or reject a booking on their own authority, without the GM being involved at
+   * all. Routing them through the GM endpoint would stamp `gm_status` and tell
+   * the client "rejected by the general manager" for a decision the GM never
+   * made, so the admin keeps the status endpoint — which now carries their
+   * remarks and records them as the decision-maker.
+   */
+  const decidesGmStage = actsAsGm
+
+  // Approve/reject is shown to whoever holds the GM authority on a booking that
+  // is still awaiting a decision, and to admins on the top-level status control.
   const showStageActions = !!detail && (
-    (roleView === 'admin'           && canEdit && normalizeBookingStatus(detail.status) === 'pending') ||
-    (roleView === 'accountant'      && d?.accounting_status === 'pending') ||
-    (roleView === 'general_manager' && d?.gm_status === 'pending' && accApprovedOrFwd) ||
-    (roleView === 'fleet_manager'   && d?.fleet_status === 'pending' && d?.ops_status === 'assigned')
+    (roleView === 'admin' && canEdit && normalizeBookingStatus(detail.status) === 'pending') ||
+    (actsAsGm && d?.gm_status === 'pending')
   )
   const showAssignment = !!detail &&
     (roleView === 'admin' || roleView === 'operations_manager') &&
@@ -1126,15 +1032,16 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
 
       <ReusableModal
         open={approveModalOpen}
-        title={roleView === 'fleet_manager' ? 'Clear vehicle for dispatch?' : 'Approve this booking?'}
+        title="Approve this booking?"
         description={
-          roleView === 'fleet_manager'
-            ? `Confirm all ${BLOWBAGETS_ITEMS.length} BLOWBAGETS items have been physically inspected and passed. The assigned driver will be notified to proceed. This cannot be undone.`
-            : docCount > 0
-              ? `Please confirm you have reviewed all ${docCount} transaction document${docCount > 1 ? 's' : ''} submitted by the client before proceeding. Approving cannot be undone.`
-              : 'Please confirm you have reviewed all client-submitted documents and details before proceeding. Approving cannot be undone.'
+          (docCount > 0
+            ? `Please confirm you have reviewed all ${docCount} transaction document${docCount > 1 ? 's' : ''} submitted by the client before proceeding.`
+            : 'Please confirm you have reviewed all client-submitted documents and details before proceeding.')
+          + (decidesGmStage
+            ? ' Operations will then be asked to select a vehicle and driver. This cannot be undone.'
+            : ' Approving cannot be undone.')
         }
-        confirmLabel={roleView === 'fleet_manager' ? 'Clear & dispatch' : 'Approve'}
+        confirmLabel="Approve"
         cancelLabel="Go back"
         onConfirm={confirmApprove}
         onCancel={() => setApproveModalOpen(false)}
@@ -1144,9 +1051,12 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
       <RemarksModal
         open={rejectModalOpen}
         title="Reject this booking?"
-        description="This booking will be marked as cancelled. Please provide a reason before proceeding."
-        remarksLabel="Reason for rejection"
-        remarksPlaceholder="e.g. Incomplete documents, route not serviceable…"
+        // Remarks are the point of a rejection on either path: the GM endpoint
+        // and the admin status endpoint both store them and send them on to the
+        // client with the rejection notification.
+        description="This booking will be cancelled and the client notified. Your remarks are sent to them, so explain why it was not approved."
+        remarksLabel="Remarks — why this booking was not approved"
+        remarksPlaceholder="e.g. Incomplete documents, route not serviceable, margin below threshold…"
         confirmLabel="Reject"
         cancelLabel="Go back"
         onConfirm={confirmReject}
@@ -1500,30 +1410,16 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                           </span>
                         </div>
 
-                        {roleView === 'fleet_manager' && showStageActions && (
-                          <BlowbagetsChecklist
-                            checked={blowbagetsChecked}
-                            onToggle={(key) =>
-                              setBlowbagetsChecked((prev) => ({ ...prev, [key]: !prev[key] }))
-                            }
-                            disabled={pendingStatus || pendingReject}
-                          />
-                        )}
-
                         {showStageActions && (
                           <div className="flex gap-2">
                             <button
                               type="button"
-                              disabled={pendingStatus || pendingReject || (roleView === 'fleet_manager' && !blowbagetsComplete)}
+                              disabled={pendingStatus || pendingReject}
                               onClick={() => setApproveModalOpen(true)}
                               className="flex-1 py-2 rounded-lg text-sm font-bold transition-colors disabled:opacity-40"
                               style={{ background: 'rgba(77,249,237,0.12)', border: '1px solid rgba(77,249,237,0.30)', color: 'var(--color-cyan)' }}
                             >
-                              {pendingStatus
-                                ? 'Approving…'
-                                : roleView === 'fleet_manager'
-                                  ? 'Approve & dispatch'
-                                  : 'Approve'}
+                              {pendingStatus ? 'Approving…' : 'Approve'}
                             </button>
                             <button
                               type="button"
@@ -1536,12 +1432,42 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                             </button>
                           </div>
                         )}
+
+                        {/* The accountant is out of the approval chain unless the
+                            IT admin appointed them as the GM's stand-in. */}
+                        {roleView === 'accountant' && !isGmProxy && (
+                          <p className="text-[11px] text-white/40 leading-snug">
+                            Read-only. Bookings are approved by the general manager — ask the IT admin
+                            to appoint you as GM proxy if you need to approve in their place.
+                          </p>
+                        )}
+
+                        {/* Fleet sees where each vehicle went; readiness is managed
+                            per vehicle in Vehicle Management, not per booking. */}
+                        {roleView === 'fleet_manager' && (
+                          <p className="text-[11px] text-white/40 leading-snug">
+                            Read-only. Run BLOWBAGETS inspections in Vehicle Management — only a vehicle
+                            whose latest inspection passed can be assigned to a booking.
+                          </p>
+                        )}
+
+                        {/* The GM's remarks on a rejected booking. */}
+                        {d?.gm_status === 'rejected' && d?.rejection_reason && (
+                          <div
+                            className="rounded-lg border px-2.5 py-2"
+                            style={{ borderColor: 'rgba(248,113,113,0.30)', background: 'rgba(248,113,113,0.08)' }}
+                          >
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-[#fca5a5]/80 mb-1">
+                              Rejected by the general manager
+                            </p>
+                            <p className="text-xs text-white/75 leading-snug">{d.rejection_reason}</p>
+                          </div>
+                        )}
                       </div>
 
-                      {/* Recorded BLOWBAGETS inspection (read-only, once reviewed) */}
-                      {d?.blowbagets_check && !(roleView === 'fleet_manager' && showStageActions) && (
-                        <BlowbagetsRecord check={d.blowbagets_check} />
-                      )}
+                      {/* Inspection recorded against the booking itself, on records
+                          predating the move to per-vehicle inspections. */}
+                      {d?.blowbagets_check && <BlowbagetsRecord check={d.blowbagets_check} />}
 
                       {/* Driver / vehicle assignment */}
                       {showAssignment && (

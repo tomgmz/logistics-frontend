@@ -8,7 +8,13 @@ export type AdminRole =
 
 export type UserRole = AdminRole | 'driver' | 'client'
 export type UserStatus = 'active' | 'inactive' | 'deactivated' | 'archived' | 'permanently_locked'
-export type DriverAvailability = 'available' | 'assigned' | 'on_leave' | 'inactive'
+/**
+ * A driver's own availability for delivery work. A new driver starts
+ * 'unavailable' and opts in from the mobile app; 'assigned' is system-owned and
+ * set while they are out on a delivery. Only 'available' drivers can be picked
+ * by operations.
+ */
+export type DriverAvailability = 'available' | 'unavailable' | 'assigned' | 'on_leave' | 'inactive'
 
 export type UserTab =
   | 'admins'
@@ -40,6 +46,9 @@ export interface BaseUser {
 
 export interface AdminUser extends BaseUser {
   role: AdminRole
+  // Only meaningful on accountants: appointed by the IT admin to stand in for
+  // the general manager on booking approvals.
+  is_gm_proxy?: boolean
 }
 
 export interface ClientUser extends BaseUser {

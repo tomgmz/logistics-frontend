@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ShieldCheck as ShieldCheckIcon, UserPlus, Search, RefreshCw, MoreVertical,
-  Pencil, ShieldCheck, ShieldOff, Archive, SlidersHorizontal,
+  Pencil, ShieldCheck, ShieldOff, Archive, SlidersHorizontal, Gavel,
   ChevronLeft, ChevronRight, AlertTriangle,
 } from 'lucide-react'
 import Select, { SelectChangeEvent } from '@mui/material/Select'
@@ -143,9 +143,10 @@ interface RowMenuProps {
   onEdit: () => void
   onManageAccess: () => void
   onStatusChange: (s: UserStatus) => void
+  onToggleGmProxy: () => void
 }
 
-function RowMenu({ user, tab, onEdit, onManageAccess, onStatusChange }: RowMenuProps) {
+function RowMenu({ user, tab, onEdit, onManageAccess, onStatusChange, onToggleGmProxy }: RowMenuProps) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -165,6 +166,10 @@ function RowMenu({ user, tab, onEdit, onManageAccess, onStatusChange }: RowMenuP
 
   const canEdit = tab !== 'all'
   const canManageAccess = isManagedRole(user.role)
+  // Bookings are approved by the general manager. Only an accountant can be
+  // appointed to stand in for them, so the action is offered on accountants only.
+  const isAccountant = user.role === 'accountant'
+  const isGmProxy    = (user as AdminUser).is_gm_proxy === true
 
   return (
     <div ref={ref} className="relative">
@@ -200,9 +205,22 @@ function RowMenu({ user, tab, onEdit, onManageAccess, onStatusChange }: RowMenuP
                 <SlidersHorizontal size={13} /> Manage Access
               </button>
             )}
+            {isAccountant && (
+              <button
+                onClick={() => { setOpen(false); onToggleGmProxy() }}
+                className={`flex w-full items-center gap-2.5 px-3.5 py-2 text-sm transition ${
+                  isGmProxy
+                    ? 'text-orange-400 hover:bg-orange-500/10'
+                    : 'text-[#818181] hover:bg-[#2a2a2a] hover:text-white'
+                }`}
+                title="Lets this accountant approve or reject bookings while the general manager is unavailable"
+              >
+                <Gavel size={13} /> {isGmProxy ? 'Revoke GM Proxy' : 'Appoint as GM Proxy'}
+              </button>
+            )}
             {statusActions.length > 0 && (
               <>
-                {(canEdit || canManageAccess) && <div className="my-1 border-t border-[#2a2a2a]" />}
+                {(canEdit || canManageAccess || isAccountant) && <div className="my-1 border-t border-[#2a2a2a]" />}
                 {statusActions.map((a) => (
                   <button
                     key={a.status}
@@ -289,7 +307,21 @@ function renderCells(user: AnyUser) {
       <td className="px-4 py-3.5"><p className="font-medium text-white">{name}</p></td>
       <td className="px-4 py-3.5 text-sm text-[#818181]">{u.email}</td>
       <td className="px-4 py-3.5 text-sm text-[#818181]">{u.phone ?? '—'}</td>
-      <td className="px-4 py-3.5"><RoleBadge role={u.role} /></td>
+      <td className="px-4 py-3.5">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <RoleBadge role={u.role} />
+          {/* Standing in for the general manager on booking approvals. */}
+          {u.is_gm_proxy && (
+            <span
+              className="inline-flex items-center gap-1 rounded-full border border-[#4df9ed]/30 bg-[#4df9ed]/10
+                         px-2 py-0.5 text-[11px] font-semibold tracking-wide text-[#4df9ed]"
+              title="Can approve or reject bookings in the general manager's place"
+            >
+              <Gavel size={10} /> GM Proxy
+            </span>
+          )}
+        </div>
+      </td>
       <td className="px-4 py-3.5"><StatusBadge status={u.status} /></td>
     </>
   )
@@ -402,6 +434,30 @@ export default function AdminManagementClient() {
           error:   (e) => getApiErrorMessage(e, 'Failed to update account.'),
         },
         { action: 'update-status', entityId: user.user_id },
+      )
+      if (activeTab === 'all') await fetchAllUsers(search, false)
+      else await fetchTabUsers(activeTab)
+    } catch { /* handled by toast */ }
+  }
+
+  /**
+   * Appoint or stand down an accountant as the general manager's proxy for
+   * booking approvals. While appointed they receive the GM's approval
+   * notifications and can approve or reject in the GM's place.
+   */
+  async function handleToggleGmProxy(user: AnyUser) {
+    const next = (user as AdminUser).is_gm_proxy !== true
+    try {
+      await appToast.promise(
+        accountantService.setGmProxy(user.user_id, next),
+        {
+          loading: next ? 'Appointing as GM proxy…' : 'Revoking GM proxy…',
+          success: next
+            ? 'Appointed — they can now approve bookings for the GM.'
+            : 'Revoked — they can no longer approve bookings.',
+          error:   (e) => getApiErrorMessage(e, 'Failed to update the GM proxy appointment.'),
+        },
+        { action: 'gm-proxy', entityId: user.user_id },
       )
       if (activeTab === 'all') await fetchAllUsers(search, false)
       else await fetchTabUsers(activeTab)
@@ -599,6 +655,7 @@ export default function AdminManagementClient() {
                               onEdit={() => openEdit(user)}
                               onManageAccess={() => setPermUser(user)}
                               onStatusChange={(s) => handleStatusChange(user, s)}
+                              onToggleGmProxy={() => void handleToggleGmProxy(user)}
                             />
                           </td>
                         </motion.tr>

@@ -22,14 +22,17 @@ async function patch<T>(url: string, payload?: unknown): Promise<T> {
   return data.data
 }
 
-// Keys of the fleet manager's BLOWBAGETS pre-dispatch inspection. Must match the
-// backend `blowbagetsSchema` exactly.
+// Keys of the fleet manager's BLOWBAGETS inspection. Must match the backend
+// `recordTruckInspectionSchema` exactly. The inspection is recorded against a
+// VEHICLE in Vehicle Management, not against a booking.
 export type BlowbagetsKey =
   | 'battery' | 'lights' | 'oil' | 'water' | 'brakes'
   | 'air' | 'gas' | 'engine' | 'tires' | 'self'
 
 export type BlowbagetsItems = Record<BlowbagetsKey, boolean>
 
+// Legacy per-booking inspection snapshot, still present on bookings recorded
+// before BLOWBAGETS moved onto the vehicle.
 export interface BlowbagetsCheck {
   items:      BlowbagetsItems
   checked_by: string | null
@@ -183,9 +186,20 @@ export const bookingService = {
     }
   },
 
-  updateBookingStatusAdmin: async (bookingId: string, status: AdminBookingLifecycleStatus) => {
+  // Drives the booking lifecycle directly. On 'cancelled' this is the
+  // administrator rejecting the booking on their own authority — `rejectionReason`
+  // is stored on the booking and sent to the client, and the backend records the
+  // admin as the decision-maker rather than touching the GM's sub-status.
+  updateBookingStatusAdmin: async (
+    bookingId: string,
+    status: AdminBookingLifecycleStatus,
+    rejectionReason?: string,
+  ) => {
     await initCsrf()
-    return patch<unknown>(`/booking/${bookingId}/status`, { status })
+    return patch<unknown>(`/booking/${bookingId}/status`, {
+      status,
+      ...(rejectionReason?.trim() && { rejection_reason: rejectionReason.trim() }),
+    })
   },
 
   deleteDestinationAdmin: async (destinationId: string) => {
@@ -194,37 +208,15 @@ export const bookingService = {
   },
 
   // --- approval workflow ---------------------------------------------------
-  accountingReview: async (
-    bookingId: string,
-    payload: { accounting_status: 'approved' | 'forwarded' | 'rejected'; rejection_reason?: string },
-  ) => {
-    await initCsrf()
-    return patch<unknown>(`/booking/${bookingId}/accounting-review`, payload)
-  },
-
+  // The general manager's decision is the only approval gate. An accountant the
+  // IT admin appointed as GM proxy calls the same endpoint. A rejection must
+  // carry remarks, which the client sees on the booking.
   gmReview: async (
     bookingId: string,
     payload: { gm_status: 'approved' | 'rejected'; rejection_reason?: string },
   ) => {
     await initCsrf()
     return patch<unknown>(`/booking/${bookingId}/gm-review`, payload)
-  },
-
-  opsAssign: async (bookingId: string) => {
-    await initCsrf()
-    return patch<unknown>(`/booking/${bookingId}/ops-assign`, { ops_status: 'assigned' })
-  },
-
-  fleetReview: async (
-    bookingId: string,
-    payload: {
-      decision: 'approved' | 'rejected'
-      rejection_reason?: string
-      blowbagets?: BlowbagetsItems
-    },
-  ) => {
-    await initCsrf()
-    return patch<unknown>(`/booking/${bookingId}/fleet-review`, payload)
   },
 
   getBookingById: (bookingId: string) =>

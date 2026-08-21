@@ -143,6 +143,9 @@ export interface AuthUser {
   role:       string
   status:     string
   must_change_password: boolean
+  // True for an accountant the IT admin appointed to stand in for the general
+  // manager on booking approvals — they get the GM's approve/reject controls.
+  is_gm_proxy?: boolean
   module_permissions?: ModulePermission[]
   clients?: {
     client_id:       string

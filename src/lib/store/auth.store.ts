@@ -34,6 +34,7 @@ export const useAuthStore = create<AuthStore>()(
                 last_name:  state.user.last_name,
                 role:       state.user.role,
                 status:     state.user.status,
+                is_gm_proxy: state.user.is_gm_proxy ?? false,
                 clients:    state.user.clients ?? null,
                 module_permissions: state.user.module_permissions ?? undefined,
               },
