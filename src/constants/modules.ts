@@ -180,17 +180,9 @@ export function defaultFlagsForRole(role: string | undefined | null): Record<str
   return out
 }
 
-// Some routes live under a module without sharing its slug (e.g. the standalone
-// Expenses page is governed by Billing Management, which contains expenses +
-// reverse billing — just like the admin Billing module).
-const HREF_ALIASES: Record<string, ModuleKey> = {
-  expenses: 'billing-management',
-}
-
 // Map a dashboard route href to its module key (used to gate nav items).
 // Matches the trailing segment, e.g. "/accountant/booking-management" -> "booking-management".
 export function moduleFromHref(href: string): ModuleKey | null {
   const seg = href.split('/').filter(Boolean).pop() ?? ''
-  if (seg in HREF_ALIASES) return HREF_ALIASES[seg]
   return (MODULE_KEYS as readonly string[]).includes(seg) ? (seg as ModuleKey) : null
 }

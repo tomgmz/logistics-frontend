@@ -8,7 +8,6 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
-  CreditCard,
   Download,
   CheckCircle2,
   XCircle,
@@ -24,7 +23,6 @@ import {
 } from 'lucide-react'
 import ReusableModal from '@/components/layout/ReusableModal'
 import { nowDate } from '@/app/utils/serverTime'
-import ExpensesView from './ExpensesView'
 
 
 type PaymentStatus = 'pending' | 'paid' | 'overdue' | 'cancelled' | 'under_review'
@@ -765,15 +763,7 @@ function ReverseBillingPanel() {
   )
 }
 
-type TabKey = 'reverse_billing' | 'expenses'
-
-const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
-  { key: 'reverse_billing', label: 'Reverse Billing', icon: <CreditCard size={15} /> },
-  { key: 'expenses', label: 'Expenses', icon: <Receipt size={15} /> },
-]
-
 export default function BillingManagementView() {
-  const [activeTab, setActiveTab] = useState<TabKey>('reverse_billing')
   const [loading, setLoading] = useState(false)
 
   const handleRefresh = useCallback(async () => {
@@ -808,67 +798,8 @@ export default function BillingManagementView() {
         </div>
       </header>
 
-      <div className="shrink-0 flex items-end gap-0 px-3 lg:px-4 pt-3 border-b border-white/[0.07]">
-        {TABS.map((tab) => {
-          const isActive = activeTab === tab.key
-          return (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => setActiveTab(tab.key)}
-              className="relative flex items-center gap-2 px-4 py-2.5 text-xs font-bold transition-all rounded-t-lg mr-1 select-none"
-              style={{
-                color: isActive ? '#4df9ed' : 'rgba(255,255,255,0.4)',
-                background: isActive ? 'rgba(77,249,237,0.07)' : 'transparent',
-                borderTop: isActive ? '1px solid rgba(77,249,237,0.25)' : '1px solid transparent',
-                borderLeft: isActive ? '1px solid rgba(77,249,237,0.25)' : '1px solid transparent',
-                borderRight: isActive ? '1px solid rgba(77,249,237,0.25)' : '1px solid transparent',
-                borderBottom: '1px solid transparent',
-                marginBottom: isActive ? '-1px' : '0',
-              }}
-            >
-              {tab.icon}
-              <span>{tab.label}</span>
-              {isActive && (
-                <motion.div
-                  layoutId="billing-tab-indicator"
-                  className="absolute bottom-0 left-0 right-0 h-[2px] rounded-t-full"
-                  style={{ background: '#4df9ed' }}
-                  transition={{ type: 'spring', damping: 30, stiffness: 400 }}
-                />
-              )}
-            </button>
-          )
-        })}
-      </div>
-
       <div className="flex flex-1 min-h-0 overflow-hidden">
-        <AnimatePresence mode="wait">
-          {activeTab === 'reverse_billing' && (
-            <motion.div
-              key="reverse_billing"
-              className="flex flex-1 min-h-0 flex-col overflow-hidden"
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.18 }}
-            >
-              <ReverseBillingPanel />
-            </motion.div>
-          )}
-          {activeTab === 'expenses' && (
-            <motion.div
-              key="expenses"
-              className="flex flex-1 min-h-0 flex-col overflow-hidden"
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.18 }}
-            >
-              <ExpensesView />
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <ReverseBillingPanel />
       </div>
     </div>
   )

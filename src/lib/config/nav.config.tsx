@@ -1,7 +1,7 @@
 import {
   Users, FileSearch, ScrollText, Truck, CalendarCheck,
   MapPin, CreditCard, History, Layers,
-  LayoutDashboard, Activity, ClipboardList
+  LayoutDashboard, Activity
 } from 'lucide-react'
 
 export const NAV_ITEMS_BY_ROLE: Record<string, { href: string; label: string; icon: React.ReactNode }[]> = {
@@ -26,14 +26,13 @@ export const NAV_ITEMS_BY_ROLE: Record<string, { href: string; label: string; ic
   fleet_manager: [
     { href: '/fleet_admin/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={17} /> },
     { href: '/fleet_admin/vehicle-management', label: 'Vehicle Management', icon: <Truck size={17} /> },
-    { href: '/fleet_admin/transit-tracking', label: 'Transit Tracking', icon: <Truck size={17} /> },
+    { href: '/fleet_admin/transit-tracking', label: 'Transit Tracking', icon: <MapPin size={17} /> },
   ],
   general_manager: [
-    { href: '/general-manager/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={17} /> },
+    { href: '/general_manager/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={17} /> },
+    { href: '/general_manager/booking-management', label: 'Booking Management', icon: <CalendarCheck size={17} /> },
     { href: '/general_manager/vehicle-management', label: 'Vehicle Management', icon: <Truck size={17} /> },
-    { href: '/general_manager/booking-management', label: 'Booking Management', icon: <ClipboardList size={17} /> },
-    { href: '/general_manager/billing-management', label: 'Billing Management', icon: <ClipboardList size={17} /> },
-    { href: '/general_manager/document-management', label: 'Document Management', icon: <ClipboardList size={17} /> },
+    { href: '/general_manager/document-management', label: 'Document Management', icon: <FileSearch size={17} /> },
   ],
   it_admin: [
     { href: '/it_admin/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={17} /> },
@@ -41,16 +40,18 @@ export const NAV_ITEMS_BY_ROLE: Record<string, { href: string; label: string; ic
     { href: '/it_admin/logs', label: 'Audit Logs', icon: <Activity size={17} /> },
   ],
   operations_manager: [
+    { href: '/operations_admin/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={17} /> },
     { href: '/operations_admin/booking-management', label: 'Booking Management', icon: <CalendarCheck size={17} /> },
-    { href: '/operations_admin/document-management', label: 'Document Management', icon: <FileSearch size={17} /> },
     { href: '/operations_admin/transit-tracking', label: 'Transit Tracking', icon: <MapPin size={17} /> },
+    { href: '/operations_admin/document-management', label: 'Document Management', icon: <FileSearch size={17} /> },
   ],
+  // Booking Management only appears for an accountant the IT admin has appointed
+  // as the GM's approval proxy — see NAV filtering in the accountant layout.
   accountant: [
     { href: '/accountant/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={17} /> },
-    { href: '/accountant/transaction-history', label: 'Transaction History', icon: <History size={17} /> },
-    { href: '/accountant/expenses', label: 'Expenses', icon: <CreditCard size={17} /> },
-    { href: '/accountant/document-management', label: 'Document Management', icon: <FileSearch size={17} /> },
     { href: '/accountant/booking-management', label: 'Booking Management', icon: <CalendarCheck size={17} /> },
     { href: '/accountant/billing-management', label: 'Billing Management', icon: <CreditCard size={17} /> },
+    { href: '/accountant/transaction-history', label: 'Transaction History', icon: <History size={17} /> },
+    { href: '/accountant/document-management', label: 'Document Management', icon: <FileSearch size={17} /> },
   ],
 }
