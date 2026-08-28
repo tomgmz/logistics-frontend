@@ -1,9 +1,11 @@
-import BillingManagementView from "./BillingManagementView"
+import BillingManagementView from './BillingManagementView'
 
-export default function BillingPayment() {
+export const metadata = { title: 'Billing Management' }
+
+export default function AdminBilling() {
   return (
     <div className="flex flex-1 min-h-0 flex-col bg-[var(--color-bg)]">
-      <BillingManagementView/>
+      <BillingManagementView roleView="admin" />
     </div>
   )
 }

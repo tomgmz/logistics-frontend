@@ -341,7 +341,6 @@ export default function TransitTrackingView() {
         <header className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 py-3 border-b border-white/[0.07] bg-[var(--color-bg)]">
           <div>
             <h1 className="text-lg font-bold text-white tracking-tight">Transit tracking</h1>
-            <p className="text-xs text-white/45 mt-0.5">Live route map, vehicle summary, and delivery stops for each booking.</p>
           </div>
           <div className="flex items-center gap-2">
             {bookingDetail && <StatusBadge status={bookingDetail.status} />}
