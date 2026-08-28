@@ -390,12 +390,13 @@ function AssignmentPanel({
                     </option>
                   ))}
                 </select>
-                {/* Only drivers who switched themselves on in the app appear here,
-                    so an empty list means nobody has accepted work — not a bug. */}
+                {/* The list is only ever the drivers who ticked THIS booking's day
+                    on their own calendar, so an empty one means nobody offered to
+                    work that day — not a bug, and not something to override here. */}
                 <p className="text-[10px] text-white/35 mt-1">
                   {drivers.length === 0
-                    ? 'No driver has marked themselves available for a delivery yet.'
-                    : `${drivers.length} driver${drivers.length === 1 ? '' : 's'} available.`}
+                    ? `No driver marked ${detail.schedule_date ?? 'this day'} as a day they can work.`
+                    : `${drivers.length} driver${drivers.length === 1 ? '' : 's'} available on ${detail.schedule_date}.`}
                 </p>
               </div>
               <div>
@@ -674,11 +675,28 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
 
   useEffect(() => {
     void Promise.all([
-      driverService.getAll().then(setDrivers).catch(() => setDrivers([])),
       adminFetchTrucks().then(setTrucks).catch(() => setTrucks([])),
       assignmentService.getAll().then(setAllAssignments).catch(() => setAllAssignments([])),
     ])
   }, [])
+
+  // Which drivers can be crewed depends on the day the booking runs — each
+  // driver ticks the days they can work, and those days are the whole of their
+  // opt-in. So the roster is re-read per booking rather than fetched once: a
+  // single list cannot be right for two bookings on different days.
+  const scheduleDay = detail?.schedule_date?.slice(0, 10) ?? null
+
+  useEffect(() => {
+    if (!scheduleDay) { setDrivers([]); return }
+
+    let cancelled = false
+    void driverService
+      .getAssignable(scheduleDay, committedAssignment.driverId || null)
+      .then((rows) => { if (!cancelled) setDrivers(rows) })
+      .catch(() => { if (!cancelled) setDrivers([]) })
+
+    return () => { cancelled = true }
+  }, [scheduleDay, committedAssignment.driverId])
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedSearch(search.trim()), 350)
@@ -721,13 +739,18 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
   const pageSafe  = Math.min(page, pageCount - 1)
   const totalRows = listMeta?.total ?? 0
 
+  // Crew tied up on another booking that is still live. This reads the BOOKING's
+  // status, not the delivery's: the delivery row is a second copy of the same
+  // fact and used to be left behind when a booking finished, which quietly held
+  // a free driver out of every dropdown with nothing on screen to explain it.
   const busyElsewhere = useMemo(
     () =>
-      allAssignments.filter(
-        (a) =>
-          a.booking_id !== selectedId &&
-          (a.status === 'pending' || a.status === 'in_transit'),
-      ),
+      allAssignments.filter((a) => {
+        if (a.booking_id === selectedId) return false
+        const bookingStatus = a.bookings?.status
+        if (!bookingStatus) return false
+        return bookingStatus !== 'completed' && bookingStatus !== 'cancelled'
+      }),
     [allAssignments, selectedId],
   )
 
@@ -741,16 +764,15 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     [busyElsewhere],
   )
 
-  // Only drivers who switched themselves to 'available' in the mobile app can be
-  // picked. The driver already on this booking stays listed (they read as
-  // 'assigned', not 'available') so editing an assignment doesn't drop them.
+  // `drivers` is already scoped to this booking's day by the server — it holds
+  // only those who ticked it on their calendar and are not otherwise stopped.
+  // All that is left is to drop anyone tied up on another live booking.
   const availableDrivers = useMemo(
     () =>
       drivers.filter((dr) => {
         const id = dr.drivers?.driver_id ?? dr.user_id
         if (id === assignDriverId) return true
-        if (busyDriverIds.has(id))  return false
-        return dr.drivers?.status === 'available'
+        return !busyDriverIds.has(id)
       }),
     [drivers, busyDriverIds, assignDriverId],
   )

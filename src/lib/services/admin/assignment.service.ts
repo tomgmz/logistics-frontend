@@ -39,9 +39,15 @@ export interface AssignmentRecord {
   vendor_driver_phone: string | null
   vendor_vehicle_plate: string | null
   vendor_vehicle_type: string | null
+
+  // The booking this delivery belongs to. Its status — not the delivery's — is
+  // what says whether the crew is still tied up.
+  bookings?: { booking_id: string; status: string; schedule_date?: string | null } | null
 }
 
-export type DeliveryStatus = 'pending' | 'in_transit' | 'completed' | 'cancelled'
+// The four values the database permits. 'completed'/'cancelled' were accepted
+// here and by the API, but writing either raised a constraint violation.
+export type DeliveryStatus = 'pending' | 'in_transit' | 'delivered' | 'failed'
 
 export interface UpdateDeliveryStatusPayload {
   status: DeliveryStatus

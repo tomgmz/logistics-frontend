@@ -112,6 +112,15 @@ export const clientService = {
 
 export const driverService = {
   getAll: () => get<DriverUser[]>(`${B}/drivers`),
+  // Who can be crewed onto a booking scheduled for `date`. The driver calendar
+  // decides that, so it is a per-booking question and cannot be answered from
+  // the full roster — hence a fetch rather than a filter over getAll(). Pass the
+  // driver already on the booking so editing an assignment never drops them.
+  getAssignable: (date: string, currentDriverId?: string | null) =>
+    get<DriverUser[]>(
+      `${B}/drivers/assignable?date=${encodeURIComponent(date)}` +
+      (currentDriverId ? `&current_driver_id=${encodeURIComponent(currentDriverId)}` : ''),
+    ),
   getOne: (id: string) => get<DriverUser>(`${B}/drivers/${id}`),
   create: (p: CreateDriverPayload) => post<DriverUser>(`${B}/drivers`, p),
   update: (id: string, p: UpdateDriverPayload) => patch<DriverUser>(`${B}/drivers/${id}`, p),
