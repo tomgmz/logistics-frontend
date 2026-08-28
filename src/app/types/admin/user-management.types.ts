@@ -7,6 +7,13 @@ export type AdminRole =
   | 'accountant'
 
 export type UserRole = AdminRole | 'driver' | 'client'
+
+/**
+ * Which reverse billing cycle a client's billing periods are cut on, taken from
+ * their contract and fixed at account creation. It is not a payment term: the
+ * 30/45/60 day term is chosen per booking on the booking form.
+ */
+export type BillingMode = 'weekly' | 'monthly'
 export type UserStatus = 'active' | 'inactive' | 'deactivated' | 'archived' | 'permanently_locked'
 /**
  * A driver's own availability for delivery work. A new driver starts
@@ -57,7 +64,7 @@ export interface ClientUser extends BaseUser {
     client_id: string
     company_name: string | null
     billing_address: string | null
-    payment_terms: number | null
+    billing_mode: BillingMode | null
     landline: string | null
   } | null
 }
@@ -94,7 +101,7 @@ export interface CreateClientPayload {
   last_name?: string
   company_name?: string
   billing_address?: string
-  payment_terms?: number
+  billing_mode?: BillingMode
 }
 
 export interface CreateDriverPayload {

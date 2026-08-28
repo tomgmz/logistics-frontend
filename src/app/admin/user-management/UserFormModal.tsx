@@ -121,7 +121,7 @@ function buildInitialState(tab: UserTab, user: AnyUser | null): FormState {
       landline:        c?.landline ? toLocalLandlineDigits(c.landline) : '',
       company_name:    c?.company_name    ?? '',
       billing_address: c?.billing_address ?? '',
-      payment_terms:   c?.payment_terms   ?? 30,
+      billing_mode:    c?.billing_mode    ?? 'monthly',
     }
   }
 
@@ -694,15 +694,19 @@ export default function UserFormModal({ tab, user, onClose, onSaved, enablePermi
                     error={fe.company_name}
                   />
                 </Field>
-                <Field label="Payment Terms (Days)" hint="Net days" error={fe.payment_terms}>
+                <Field
+                  label="Reverse Billing Mode"
+                  required
+                  hint="Billing cycle"
+                  error={fe.billing_mode}
+                >
                   <Select
-                    value={String(form.payment_terms)}
-                    onChange={e => set('payment_terms', Number(e.target.value))}
-                    error={fe.payment_terms}
+                    value={String(form.billing_mode)}
+                    onChange={e => set('billing_mode', e.target.value)}
+                    error={fe.billing_mode}
                   >
-                    <option value="30">30 days</option>
-                    <option value="45">45 days</option>
-                    <option value="60">60 days</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="weekly">Weekly</option>
                   </Select>
                 </Field>
               </div>

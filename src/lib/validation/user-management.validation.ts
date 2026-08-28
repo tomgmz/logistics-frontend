@@ -133,12 +133,10 @@ export const createClientSchema = z.object({
   billing_address: z
     .string({ error: 'Billing address is required' })
     .min(1, 'Billing address is required'),
-  payment_terms: z
-    .number({ error: 'Payment terms must be a number' })
-    .int()
-    .positive()
-    .default(30)
-    .optional(),
+  // The reverse billing arrangement from the client's contract: which cycle
+  // their periods are cut on. The 30/45/60 payment term is not set here — it is
+  // chosen per booking, on the booking form.
+  billing_mode: z.enum(['weekly', 'monthly'], { error: 'Reverse billing mode is required' }),
 })
 
 export const updateClientSchema = z.object({
@@ -146,7 +144,7 @@ export const updateClientSchema = z.object({
   landline:        landlineOptional,
   company_name:    z.string().max(100, 'Company name is too long').optional(),
   billing_address: z.string().optional(),
-  payment_terms:   z.number().int().positive().optional(),
+  billing_mode:    z.enum(['weekly', 'monthly']).optional(),
 })
 
 export const createDriverSchema = z
