@@ -23,6 +23,7 @@ import {
   type BillingStatus,
   type ConsolidationLineInput,
   type PeriodDetail,
+  type BillingPayment,
   type ServiceInvoice,
   type StaffAction,
 } from '@/lib/services/admin/billing.service'
@@ -96,12 +97,14 @@ const STATUS_FILTERS: { key: string; label: string }[] = [
 
 // ---------------------------------------------------------------------------
 
-function SummaryCards({ periods }: { periods: BillingPeriod[] }) {
+function SummaryCards({ periods, pendingProofs }: { periods: BillingPeriod[]; pendingProofs: number }) {
   const n = (fn: (p: BillingPeriod) => boolean) => periods.filter(fn).length
 
   const cards = [
     { label: 'Needs Action', value: n((p) => !['none', 'collect'].includes(staffAction(p))), sub: 'waiting on 8338', color: CYAN },
-    { label: 'With Client',  value: n((p) => ['awaiting_submission', 'awaiting_client_approval'].includes(p.status)), sub: 'awaiting their response', color: '#fbbf24' },
+    // Money a client says they sent that nobody has checked. Until it is
+    // verified the invoice stays unpaid, so this queue is what holds a cycle up.
+    { label: 'Proofs to Verify', value: pendingProofs, sub: 'client payments unchecked', color: '#fbbf24' },
     { label: 'Unpaid',       value: n((p) => p.status === 'invoiced'), sub: 'invoiced, not settled', color: '#f87171' },
     { label: 'Closed',       value: n((p) => p.status === 'closed'), sub: 'receipt issued', color: '#86efac' },
   ]
@@ -293,12 +296,103 @@ function InvoiceRow({
 // Detail modal
 // ---------------------------------------------------------------------------
 
+/**
+ * A client's payment claim, awaiting a decision.
+ *
+ * Their declared figure sits beside the invoice total because the two
+ * disagreeing is the whole reason a person looks at this. The date shown is
+ * when the client says the money left their account, which can be any day —
+ * the Friday 8338 accepts it is set on confirmation.
+ */
+function PendingProofRow({
+  payment,
+  invoiceTotal,
+  canVerify,
+  onVerify,
+}: {
+  payment: BillingPayment
+  invoiceTotal: number
+  canVerify: boolean
+  onVerify: (decision: 'confirm' | 'reject') => void
+}) {
+  const variance = Number(payment.amount_paid) - Number(invoiceTotal)
+
+  return (
+    <div className="rounded-xl border p-3 mt-2"
+      style={{ borderColor: 'rgba(246,159,38,0.3)', background: 'rgba(246,159,38,0.05)' }}>
+      <div className="flex items-center gap-2 mb-2">
+        <Clock size={12} className="text-amber-400" />
+        <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-amber-400/80">
+          Payment awaiting verification
+        </p>
+      </div>
+
+      <div className="grid grid-cols-3 gap-3 mb-2">
+        <div>
+          <p className="text-[10px] text-white/35">Client paid</p>
+          <p className="text-sm font-bold text-white tabular-nums">{fmtCurrency(Number(payment.amount_paid))}</p>
+        </div>
+        <div>
+          <p className="text-[10px] text-white/35">Invoice total</p>
+          <p className="text-sm font-bold text-white tabular-nums">{fmtCurrency(Number(invoiceTotal))}</p>
+        </div>
+        <div>
+          <p className="text-[10px] text-white/35">Variance</p>
+          <p className="text-sm font-bold tabular-nums"
+            style={{ color: Math.abs(variance) < 0.005 ? '#86efac' : '#fbbf24' }}>
+            {Math.abs(variance) < 0.005 ? 'Matches' : fmtCurrency(variance)}
+          </p>
+        </div>
+      </div>
+
+      <p className="text-[11px] text-white/50 mb-2">
+        {fmtLabel(payment.method)}
+        {payment.reference_no ? ` · ref ${payment.reference_no}` : ''}
+        {payment.client_declared_date ? ` · client says paid ${fmtDate(payment.client_declared_date)}` : ''}
+      </p>
+
+      {payment.proof_urls.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
+          {payment.proof_urls.map((url, i) => {
+            const name = decodeURIComponent(url.split('/').pop() ?? `proof-${i + 1}`)
+            const fi = fileIconConfig(name)
+            return (
+              <a key={url} href={url} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-2.5 px-3 py-2 rounded-lg border border-white/[0.07] bg-black/20 hover:border-[rgba(77,249,237,0.3)] transition-all group">
+                <div className="w-6 h-6 rounded-md flex items-center justify-center shrink-0"
+                  style={{ background: fi.bg, color: fi.color }}>{fi.icon}</div>
+                <p className="text-[11px] font-semibold text-white/85 truncate flex-1">{name}</p>
+                <Download size={11} className="text-white/30 group-hover:text-[#4df9ed] shrink-0" />
+              </a>
+            )
+          })}
+        </div>
+      )}
+
+      {canVerify && (
+        <div className="flex justify-end gap-2">
+          <button type="button" onClick={() => onVerify('reject')}
+            className="px-3 py-1.5 rounded-lg border border-red-500/25 text-[11px] font-bold text-red-400 hover:bg-red-500/10 transition-colors">
+            Reject
+          </button>
+          <button type="button" onClick={() => onVerify('confirm')}
+            className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-black hover:opacity-90"
+            style={{ background: CYAN }}>
+            Confirm Payment
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 type Dialog =
   | { kind: 'send' }
   | { kind: 'validate'; decision: 'accept' | 'reject' }
   | { kind: 'invoice' }
   | { kind: 'pay'; invoice: ServiceInvoice }
   | { kind: 'receipt'; invoice: ServiceInvoice }
+  | { kind: 'verify'; payment: BillingPayment; decision: 'confirm' | 'reject' }
   | null
 
 function PeriodDetailPanel({
@@ -525,17 +619,38 @@ function PeriodDetailPanel({
                     Service Invoices · one per booking
                   </p>
                   <div className="space-y-2">
-                    {detail.invoices.map((inv) => (
-                      <InvoiceRow
-                        key={inv.invoice_id} invoice={inv} canCreate={canCreate}
-                        onPay={() => {
-                          setPayAmount(String(inv.total_amount_due))
-                          setPayDate('')
-                          setDialog({ kind: 'pay', invoice: inv })
-                        }}
-                        onReceipt={() => setDialog({ kind: 'receipt', invoice: inv })}
-                      />
-                    ))}
+                    {detail.invoices.map((inv) => {
+                      // A client's claim sits under the invoice it settles, so
+                      // the figures being compared are next to each other.
+                      const pending = (inv.payments ?? []).find(
+                        (p) => p.status === 'pending_verification',
+                      )
+                      return (
+                        <div key={inv.invoice_id}>
+                          <InvoiceRow
+                            invoice={inv} canCreate={canCreate}
+                            onPay={() => {
+                              setPayAmount(String(inv.total_amount_due))
+                              setPayDate('')
+                              setDialog({ kind: 'pay', invoice: inv })
+                            }}
+                            onReceipt={() => setDialog({ kind: 'receipt', invoice: inv })}
+                          />
+                          {pending && (
+                            <PendingProofRow
+                              payment={pending}
+                              invoiceTotal={Number(inv.total_amount_due)}
+                              canVerify={canCreate}
+                              onVerify={(decision) => {
+                                setPayDate('')
+                                setRemarks('')
+                                setDialog({ kind: 'verify', payment: pending, decision })
+                              }}
+                            />
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
               )}
@@ -769,6 +884,66 @@ function PeriodDetailPanel({
         </div>
       )}
 
+      {dialog?.kind === 'verify' && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70"
+          onClick={() => !busy && setDialog(null)}>
+          <div className="w-full max-w-md rounded-2xl border border-white/10 p-5 space-y-4"
+            style={{ background: 'var(--color-surface)' }} onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-base font-bold text-white">
+              {dialog.decision === 'confirm' ? 'Confirm this payment?' : 'Reject this payment?'}
+            </h3>
+            <p className="text-xs text-white/50">
+              {dialog.decision === 'confirm'
+                ? `${fmtCurrency(Number(dialog.payment.amount_paid))} against this invoice. Confirming is what settles it — check the proof against the bank record first.`
+                : 'The client will be told why and can upload proof again.'}
+            </p>
+
+            {dialog.decision === 'confirm' ? (
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/40">
+                  Friday 8338 accepted it
+                </label>
+                <input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-3 py-2 text-sm text-white/80 outline-none focus:border-[rgba(77,249,237,0.4)]" />
+                {/* Not the client's transfer date — 8338 only accepts payment on
+                    Fridays, and the server refuses anything else. */}
+                <p className="text-[10px] text-white/35 mt-1">
+                  Must be a Friday.
+                  {dialog.payment.client_declared_date
+                    ? ` The client says they paid ${fmtDate(dialog.payment.client_declared_date)}.`
+                    : ''}
+                </p>
+              </div>
+            ) : (
+              <textarea rows={3} autoFocus value={remarks} onChange={(e) => setRemarks(e.target.value)}
+                placeholder="What does not match the bank record?"
+                className="w-full rounded-lg border border-white/10 bg-[#111] px-3 py-2 text-sm text-white/80 placeholder:text-white/30 outline-none focus:border-[rgba(77,249,237,0.4)] resize-none" />
+            )}
+
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => !busy && setDialog(null)}
+                className="px-4 py-2 rounded-lg border border-white/15 text-sm text-white/80">Cancel</button>
+              <button type="button"
+                disabled={busy || (dialog.decision === 'confirm' ? !payDate : !remarks.trim())}
+                onClick={() => run(
+                  () => billingService.verifyPayment(dialog.payment.payment_id, {
+                    decision: dialog.decision,
+                    payment_date: dialog.decision === 'confirm' ? payDate : undefined,
+                    remarks: dialog.decision === 'reject' ? remarks : undefined,
+                  }),
+                  dialog.decision === 'confirm' ? 'Payment confirmed.' : 'Sent back to the client.',
+                )}
+                className="px-4 py-2 rounded-lg text-sm font-bold disabled:opacity-50"
+                style={dialog.decision === 'confirm'
+                  ? { background: CYAN, color: '#000' }
+                  : { border: '1px solid rgba(239,68,68,.3)', color: '#f87171' }}>
+                {busy ? 'Working…' : dialog.decision === 'confirm' ? 'Confirm' : 'Reject'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {dialog?.kind === 'receipt' && (
         <ReusableModal
           open
@@ -800,6 +975,7 @@ export default function BillingManagementView({ roleView }: { roleView?: string 
   const { canView } = useModuleAccess()
 
   const [periods, setPeriods] = useState<BillingPeriod[]>([])
+  const [pendingProofs, setPendingProofs] = useState<BillingPayment[]>([])
   const [total, setTotal]     = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState<string | null>(null)
@@ -812,11 +988,15 @@ export default function BillingManagementView({ roleView }: { roleView?: string 
     setLoading(true)
     setError(null)
     try {
-      const res = await billingService.listPeriods({
-        status: status === 'all' ? undefined : status,
-        limit: 100,
-      })
+      const [res, proofs] = await Promise.all([
+        billingService.listPeriods({
+          status: status === 'all' ? undefined : status,
+          limit: 100,
+        }),
+        billingService.listPendingPayments(),
+      ])
       setPeriods(res.data ?? [])
+      setPendingProofs(proofs ?? [])
       setTotal(res.meta?.total ?? res.data?.length ?? 0)
     } catch (err) {
       setError(getApiErrorMessage(err))
@@ -858,7 +1038,7 @@ export default function BillingManagementView({ roleView }: { roleView?: string 
       </header>
 
       <div className="flex flex-1 min-h-0 flex-col p-3 lg:p-4 gap-3 overflow-hidden">
-        <SummaryCards periods={periods} />
+        <SummaryCards periods={periods} pendingProofs={pendingProofs.length} />
 
         <div className="flex flex-col xl:flex-row gap-2 xl:items-center shrink-0">
           <div className="flex items-center gap-2 rounded-[10px] px-3 py-2 flex-1 max-w-sm" style={{ background: '#2a2828' }}>

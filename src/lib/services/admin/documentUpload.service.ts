@@ -39,4 +39,21 @@ export const uploadService = {
       { 'Content-Type': 'multipart/form-data' },
     )
   },
+
+  /**
+   * Billing attachments: a client's billing summary, or proof that a payment
+   * made outside the system happened. Filed apart from booking paperwork so a
+   * finance audit does not have to sift delivery documents to find them.
+   */
+  uploadBillingDocuments: (files: File[], ref?: string) => {
+    const form = new FormData()
+    files.forEach((f) => form.append('documents', f))
+    if (ref) form.append('ref', ref)
+
+    return post<UploadDocumentsResponse>(
+      `${B}/billing-documents`,
+      form,
+      { 'Content-Type': 'multipart/form-data' },
+    )
+  },
 }

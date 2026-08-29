@@ -142,15 +142,35 @@ export interface ServiceInvoice {
   due_date: string
   payment_status: PaymentStatus
   pdf_url: string | null
+  /** Every payment against this invoice, confirmed or not. */
+  payments?: BillingPayment[]
 }
+
+export type PaymentVerificationStatus = 'pending_verification' | 'confirmed' | 'rejected'
 
 export interface BillingPayment {
   payment_id: string
   invoice_id: string
   amount_paid: number
-  payment_date: string
+  status: PaymentVerificationStatus
+  /** The Friday 8338 accepted it. Null while awaiting verification. */
+  payment_date: string | null
+  /** When the client says the transfer actually left their account. */
+  client_declared_date: string | null
   method: 'cash' | 'check'
   reference_no: string | null
+  notes: string | null
+  proof_urls: string[]
+  rejection_reason: string | null
+  submitted_at: string | null
+  /** Present on the pending queue, so a proof can be shown with its invoice. */
+  service_invoices?: {
+    invoice_id: string
+    si_number: string
+    period_id: string
+    total_amount_due: number
+    due_date: string
+  } | null
 }
 
 export interface PeriodDetail extends BillingPeriod {
@@ -231,6 +251,26 @@ export const billingService = {
       `${B}/invoices/${invoiceId}/payments`,
       payload,
     ),
+
+  /** The verification queue: client claims nobody has checked yet. */
+  listPendingPayments: (periodId?: string) =>
+    get<BillingPayment[]>(`${B}/payments/pending`, periodId ? { period_id: periodId } : undefined),
+
+  /**
+   * Confirm or reject a client's payment claim.
+   *
+   * `payment_date` is the FRIDAY 8338 accepted the money — not the date the
+   * client said they transferred it. Confirming is the only way a client-
+   * submitted payment ever counts toward an invoice.
+   */
+  verifyPayment: (
+    paymentId: string,
+    payload: { decision: 'confirm' | 'reject'; payment_date?: string; remarks?: string | null },
+  ) => post<{ payment: BillingPayment; settled: boolean }>(`${B}/payments/${paymentId}/verify`, payload),
+
+  /** Fills in a PDF that failed to render when the invoice was issued. */
+  regenerateInvoicePdf: (invoiceId: string) =>
+    post<{ invoice_id: string; pdf_url: string }>(`${B}/invoices/${invoiceId}/pdf`),
 
   issueReceipt: (
     paymentId: string,

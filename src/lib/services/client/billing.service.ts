@@ -78,6 +78,31 @@ export interface BillingSubmission {
   reviewed_at: string | null
 }
 
+export type PaymentVerificationStatus = 'pending_verification' | 'confirmed' | 'rejected'
+
+/**
+ * A payment recorded against an invoice.
+ *
+ * A client's own upload arrives as `pending_verification` and counts for
+ * nothing until 8338 confirms the money reached them — `payment_date` is the
+ * Friday they accepted it, and stays null until then.
+ */
+export interface BillingPayment {
+  payment_id: string
+  invoice_id: string
+  amount_paid: number
+  status: PaymentVerificationStatus
+  /** The Friday 8338 accepted it. Null while pending. */
+  payment_date: string | null
+  /** When the client says the transfer actually left their account. */
+  client_declared_date: string | null
+  method: 'cash' | 'check'
+  reference_no: string | null
+  proof_urls: string[]
+  rejection_reason: string | null
+  submitted_at: string | null
+}
+
 export interface ServiceInvoice {
   invoice_id: string
   booking_id: string | null
@@ -88,6 +113,17 @@ export interface ServiceInvoice {
   due_date: string
   payment_status: 'unpaid' | 'due' | 'overdue' | 'paid' | 'cancelled'
   pdf_url: string | null
+  /** Present on the single-invoice endpoint. */
+  payments?: BillingPayment[]
+}
+
+export interface SubmitProofPayload {
+  amount_paid: number
+  client_declared_date: string
+  method: 'cash' | 'check'
+  reference_no?: string | null
+  notes?: string | null
+  proof_urls: string[]
 }
 
 export interface BillingPeriod {
@@ -141,6 +177,43 @@ export const clientBillingService = {
     post<BillingPeriod>(`${B}/periods/${periodId}/review`, { decision, remarks }),
 
   getInvoice: (invoiceId: string) => get<ServiceInvoice>(`${B}/invoices/${invoiceId}`),
+
+  /**
+   * Tell 8338 an invoice has been paid, with evidence.
+   *
+   * Payment moves outside the system, so this is a claim, not a settlement —
+   * the invoice stays unpaid until 8338 confirms the money arrived.
+   */
+  submitPaymentProof: (invoiceId: string, payload: SubmitProofPayload) =>
+    post<BillingPayment>(`${B}/invoices/${invoiceId}/proof`, payload),
+}
+
+/** What the client can do about an invoice right now. */
+export function invoiceState(
+  invoice: ServiceInvoice,
+  payments: BillingPayment[] = [],
+): { label: string; tone: 'due' | 'pending' | 'rejected' | 'paid'; canUpload: boolean; reason?: string } {
+  if (invoice.payment_status === 'paid') {
+    return { label: 'Paid', tone: 'paid', canUpload: false }
+  }
+  const pending = payments.find((p) => p.status === 'pending_verification')
+  if (pending) {
+    return { label: 'Awaiting verification', tone: 'pending', canUpload: false }
+  }
+  const rejected = [...payments].reverse().find((p) => p.status === 'rejected')
+  if (rejected) {
+    return {
+      label: 'Payment not confirmed',
+      tone: 'rejected',
+      canUpload: true,
+      reason: rejected.rejection_reason ?? undefined,
+    }
+  }
+  return {
+    label: invoice.payment_status === 'overdue' ? 'Overdue' : 'Awaiting payment',
+    tone: 'due',
+    canUpload: true,
+  }
 }
 
 // ---------------------------------------------------------------------------

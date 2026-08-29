@@ -16,6 +16,7 @@ import { SxProps, Theme } from '@mui/material/styles'
 import {
   actionFor,
   clientBillingService,
+  invoiceState,
   periodLabel,
   statusExplanation,
   type BillingPeriod,
@@ -23,6 +24,7 @@ import {
   type BillingStatus,
   type PeriodAction,
   type PeriodDelivery,
+  type ServiceInvoice,
 } from '@/lib/services/client/billing.service'
 import { uploadService } from '@/lib/services/admin/documentUpload.service'
 import { appToast } from '@/lib/toast'
@@ -97,7 +99,10 @@ const slideIn: Variants = {
 
 const MAX_FILES      = 3
 const MAX_FILE_BYTES = 10 * 1024 * 1024
-const ALLOWED_EXTS   = ['.pdf', '.docx', '.xlsx', '.jpg', '.jpeg', '.png']
+// Kept in step with ALLOWED_MIMES in the backend's uploadDocuments middleware.
+// They drifted once — the screen advertised images the server then refused —
+// and proof of payment is almost always a phone photo.
+const ALLOWED_EXTS   = ['.pdf', '.docx', '.xlsx', '.jpg', '.jpeg', '.png', '.webp', '.heic']
 
 function formatBytes(b: number) {
   if (b < 1024)        return `${b} B`
@@ -682,7 +687,177 @@ function ReviewSummaryPanel({
 // Read-only detail (no action available)
 // ---------------------------------------------------------------------------
 
+/**
+ * Tell 8338 an invoice has been paid.
+ *
+ * The money moved outside the system, so this is a claim with evidence, not a
+ * settlement — the invoice stays unpaid until 8338 confirms it. The date asked
+ * for here is when the transfer actually left the client's account, which can
+ * be any day; the Friday rule governs when 8338 accepts payment, and that date
+ * is theirs to set.
+ */
+function ProofOfPaymentForm({
+  invoice,
+  onClose,
+  onDone,
+}: {
+  invoice: ServiceInvoice
+  onClose: () => void
+  onDone: () => void
+}) {
+  const today = new Date().toISOString().split('T')[0]
+
+  const [amount, setAmount]   = useState(String(invoice.total_amount_due))
+  const [paidOn, setPaidOn]   = useState(today)
+  const [method, setMethod]   = useState<'cash' | 'check'>('check')
+  const [refNo, setRefNo]     = useState('')
+  const [files, setFiles]     = useState<File[]>([])
+  const [fileErr, setFileErr] = useState<string | null>(null)
+  const [touched, setTouched] = useState(false)
+  const [dragging, setDragging] = useState(false)
+  const [busy, setBusy]       = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const amountNum = parseFloat(amount)
+  const errors = {
+    amount: !amount || isNaN(amountNum) || amountNum <= 0 ? 'Enter the amount you paid.' : undefined,
+    paidOn: !paidOn ? 'When did you pay?' : undefined,
+    files:  files.length === 0 ? 'Attach your deposit slip or transfer confirmation.' : undefined,
+  }
+  const hasErrors = Object.values(errors).some(Boolean)
+
+  const addFiles = useCallback((incoming: File[]) => {
+    setFileErr(null)
+    const accepted = incoming.slice(0, MAX_FILES - files.length)
+    for (const f of accepted) {
+      const ext = '.' + (f.name.split('.').pop()?.toLowerCase() ?? '')
+      if (!ALLOWED_EXTS.includes(ext)) { setFileErr(`"${f.name}" is not a supported type.`); return }
+      if (f.size > MAX_FILE_BYTES)     { setFileErr(`"${f.name}" exceeds 10 MB.`); return }
+    }
+    setFiles((prev) => [...prev, ...accepted])
+  }, [files.length])
+
+  async function submit() {
+    setTouched(true)
+    if (hasErrors || busy) return
+    setBusy(true)
+    try {
+      const { urls } = await uploadService.uploadBillingDocuments(files, invoice.si_number)
+      await clientBillingService.submitPaymentProof(invoice.invoice_id, {
+        amount_paid: amountNum,
+        client_declared_date: paidOn,
+        method,
+        reference_no: refNo || null,
+        proof_urls: urls,
+      })
+      appToast.success('Proof submitted. 8338 will verify it.')
+      onDone()
+    } catch (err) {
+      appToast.error(getApiErrorMessage(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70"
+      onClick={() => !busy && onClose()}>
+      <motion.div
+        initial={{ y: 12, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
+        className="w-full max-w-md rounded-2xl border p-5 space-y-4 max-h-[90vh] overflow-y-auto"
+        style={{ background: BG_PANEL, borderColor: BORDER_C }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div>
+          <h3 className="text-base font-bold text-white">Proof of payment</h3>
+          <p className="text-xs mt-1" style={{ color: MUTED }}>
+            SI {invoice.si_number} · {formatPeso(invoice.total_amount_due)} · due {formatDate(invoice.due_date)}
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs" style={{ color: MUTED }}>Amount paid <span style={{ color: ERROR }}>*</span></label>
+            <TextField fullWidth type="number" value={amount} onChange={(e) => setAmount(e.target.value)}
+              InputProps={{ startAdornment: <InputAdornment position="start"><span style={{ color: MUTED }}>₱</span></InputAdornment> }}
+              sx={fieldSx(BG_CARD, BORDER_C, touched && !!errors.amount)} />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs" style={{ color: MUTED }}>Date you paid <span style={{ color: ERROR }}>*</span></label>
+            <TextField fullWidth type="date" value={paidOn} onChange={(e) => setPaidOn(e.target.value)}
+              sx={fieldSx(BG_CARD, BORDER_C, touched && !!errors.paidOn)} />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs" style={{ color: MUTED }}>Method</label>
+            <select value={method} onChange={(e) => setMethod(e.target.value as 'cash' | 'check')}
+              className="h-9 rounded-lg px-2 text-sm outline-none border"
+              style={{ background: BG_CARD, borderColor: BORDER_C, color: '#fff' }}>
+              <option value="check">Check / bank transfer</option>
+              <option value="cash">Cash</option>
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs" style={{ color: MUTED }}>Reference no.</label>
+            <TextField fullWidth placeholder="Check or transaction no."
+              value={refNo} onChange={(e) => setRefNo(e.target.value)}
+              sx={fieldSx(BG_CARD, BORDER_C)} />
+          </div>
+        </div>
+
+        <div
+          onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={(e) => { e.preventDefault(); setDragging(false); addFiles(Array.from(e.dataTransfer.files)) }}
+          onClick={() => { if (files.length < MAX_FILES) fileRef.current?.click() }}
+          className="flex flex-col items-center gap-2 rounded-lg px-4 py-4 border border-dashed cursor-pointer"
+          style={{
+            background: BG_CARD,
+            borderColor: dragging ? CYAN : (touched && errors.files && !fileErr) ? ERROR_B : '#818181',
+            opacity: files.length >= MAX_FILES ? 0.5 : 1,
+          }}
+        >
+          <Upload size={20} style={{ color: dragging ? CYAN : 'rgba(255,255,255,0.35)' }} />
+          <p className="text-xs text-center" style={{ color: MUTED }}>
+            Deposit slip, transfer screenshot or check photo — JPG, PNG, HEIC or PDF
+          </p>
+          <input ref={fileRef} type="file" accept={ALLOWED_EXTS.join(',')} multiple className="sr-only"
+            onChange={(e) => { addFiles(Array.from(e.target.files ?? [])); e.target.value = '' }} />
+        </div>
+
+        {fileErr && <p className="text-xs" style={{ color: ERROR }}>{fileErr}</p>}
+        {touched && errors.files && !fileErr && (
+          <p className="text-xs" style={{ color: ERROR }}>{errors.files}</p>
+        )}
+
+        {files.map((f, i) => (
+          <div key={`${f.name}-${i}`} className="flex items-center justify-between rounded-lg px-3 py-2 border"
+            style={{ background: BG_CARD, borderColor: BORDER_C }}>
+            <span className="text-xs text-white/80 truncate mr-2">{f.name}</span>
+            <button onClick={() => setFiles((p) => p.filter((_, j) => j !== i))}
+              className="hover:text-red-400 shrink-0"><X size={13} /></button>
+          </div>
+        ))}
+
+        <p className="text-[11px] leading-relaxed" style={{ color: MUTED }}>
+          8338 will check this against their records before the invoice is marked paid. Enter the
+          date the money actually left your account — 8338 records their own acceptance date
+          separately.
+        </p>
+
+        <div className="flex justify-end gap-2">
+          <WizBtn onClick={onClose} variant="back">Cancel</WizBtn>
+          <WizBtn onClick={submit} variant="next" disabled={busy}>
+            {busy ? 'Submitting…' : 'Submit Proof'}
+          </WizBtn>
+        </div>
+      </motion.div>
+    </div>
+  )
+}
+
 function PeriodDetailPanel({ detail, onDone }: { detail: BillingPeriodDetail; onDone: () => void }) {
+  const [payingFor, setPayingFor] = useState<ServiceInvoice | null>(null)
+
   return (
     <motion.div variants={slideIn} initial="hidden" animate="show" className="flex flex-col gap-4 pb-4">
       <div className="rounded-xl border p-4 flex flex-col gap-3"
@@ -701,10 +876,19 @@ function PeriodDetailPanel({ detail, onDone }: { detail: BillingPeriodDetail; on
             One invoice per delivery, each with its own payment term and due date. 8338 accepts
             payment on Fridays only.
           </p>
-          {detail.invoices.map((inv) => (
+          {detail.invoices.map((inv) => {
+            const state = invoiceState(inv, inv.payments ?? [])
+            const tone =
+              state.tone === 'paid'     ? '#86efac'
+            : state.tone === 'pending'  ? AMBER
+            : state.tone === 'rejected' ? ERROR
+            : MUTED
+
+            return (
             <div key={inv.invoice_id}
-              className="flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 border"
+              className="flex flex-col gap-2 rounded-lg px-3 py-2.5 border"
               style={{ background: BG_CARD, borderColor: BORDER_C }}>
+              <div className="flex items-center justify-between gap-3">
               <div className="flex flex-col min-w-0">
                 <span className="text-xs font-bold text-white font-mono">SI {inv.si_number}</span>
                 <span className="text-[10px]" style={{ color: MUTED }}>
@@ -721,8 +905,39 @@ function PeriodDetailPanel({ detail, onDone }: { detail: BillingPeriodDetail; on
                   </a>
                 )}
               </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-2 pt-1.5 border-t" style={{ borderColor: BORDER }}>
+                <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: tone }}>
+                  {state.label}
+                </span>
+                {state.canUpload && (
+                  <button onClick={() => setPayingFor(inv)}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold
+                               uppercase tracking-wider cursor-pointer"
+                    style={{ background: `${CYAN}18`, border: `1px solid ${CYAN}50`, color: CYAN }}>
+                    <Upload size={12} /> Upload Proof
+                  </button>
+                )}
+              </div>
+
+              {state.reason && (
+                <div className="flex items-start gap-2 rounded-md px-2.5 py-2 text-[11px]"
+                  style={{ background: `${ERROR}14`, border: `1px solid ${ERROR}30`, color: ERROR }}>
+                  <AlertCircle size={12} className="mt-0.5 shrink-0" />
+                  <span>{state.reason}</span>
+                </div>
+              )}
             </div>
-          ))}
+            )
+          })}
+          {payingFor && (
+            <ProofOfPaymentForm
+              invoice={payingFor}
+              onClose={() => setPayingFor(null)}
+              onDone={() => { setPayingFor(null); onDone() }}
+            />
+          )}
         </div>
       )}
 
