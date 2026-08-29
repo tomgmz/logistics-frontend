@@ -203,6 +203,48 @@ export interface IssueInvoicesPayload {
   overrides?: Record<string, { si_number?: string; withholding_tax_rate?: number }>
 }
 
+/**
+ * One BIR-registered pad: its serial counter and the Authority to Print block
+ * printed in its footer.
+ *
+ * The ATP fields are stored and printed verbatim — the date is a string because
+ * the requirement is to reproduce the pad exactly, and reformatting it risks
+ * showing something different from the paper.
+ */
+export interface BookletSettings {
+  series_key: 'service_invoice' | 'acknowledgement_receipt'
+  next_number: number
+  booklet_start: number | null
+  booklet_end: number | null
+  /** Zero-padding: the AR pad prints 0015, the SI prints 151. */
+  pad_width: number
+  atp_number: string | null
+  atp_date: string | null
+  booklet_label: string | null
+  printer_name: string | null
+  printer_address: string | null
+  printer_vat: string | null
+  printer_accreditation: string | null
+  printer_issued: string | null
+  printer_expiry: string | null
+  updated_at: string
+}
+
+export type BookletUpdate = Partial<Omit<BookletSettings, 'series_key' | 'updated_at'>> & {
+  acknowledge_warnings?: boolean
+}
+
+/**
+ * A risky serial change comes back unapplied, with what is risky about it, and
+ * has to be re-sent acknowledged. Neither case can be forbidden outright — a
+ * fresh pad legitimately resets the count — so they warn rather than block.
+ */
+export interface BookletSaveResult {
+  requires_confirmation: boolean
+  warnings: string[]
+  series: BookletSettings
+}
+
 export const billingService = {
   listPeriods: (params?: {
     status?: string; mode?: BillingMode; client_id?: string; limit?: number; offset?: number
@@ -271,6 +313,12 @@ export const billingService = {
   /** Fills in a PDF that failed to render when the invoice was issued. */
   regenerateInvoicePdf: (invoiceId: string) =>
     post<{ invoice_id: string; pdf_url: string }>(`${B}/invoices/${invoiceId}/pdf`),
+
+  /** Both BIR booklets in use. */
+  listBooklets: () => get<BookletSettings[]>(`${B}/document-series`),
+
+  saveBooklet: (key: string, payload: BookletUpdate) =>
+    put<BookletSaveResult>(`${B}/document-series/${key}`, payload),
 
   issueReceipt: (
     paymentId: string,

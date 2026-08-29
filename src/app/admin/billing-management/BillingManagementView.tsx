@@ -6,8 +6,10 @@ import {
   Search, RefreshCw, X, ChevronLeft, ChevronRight, Download, CheckCircle2,
   XCircle, Clock, Eye, AlertTriangle, Receipt, Paperclip, FileText, FileImage,
   FileSpreadsheet, File, Inbox, Send, Calculator, Banknote, Plus, Trash2, Lock,
+  BookOpen,
 } from 'lucide-react'
 import ReusableModal from '@/components/layout/ReusableModal'
+import BookletSettings from './BookletSettings'
 import { useModuleAccess } from '@/components/layout/ModuleAccess'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
@@ -983,6 +985,7 @@ export default function BillingManagementView({ roleView }: { roleView?: string 
   const [status, setStatus]   = useState('all')
   const [page, setPage]       = useState(0)
   const [openId, setOpenId]   = useState<string | null>(null)
+  const [showBooklets, setShowBooklets] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -1030,11 +1033,21 @@ export default function BillingManagementView({ roleView }: { roleView?: string 
         <div>
           <h1 className="text-lg font-bold text-white tracking-tight">Billing Management</h1>
         </div>
-        <button type="button" onClick={() => void load()}
-          className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/5 transition-colors">
-          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-          Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          {/* The ATP block and serial counter printed on every generated
+              document. Kept here rather than in system settings because it is
+              the accountant who replaces the pad. */}
+          <button type="button" onClick={() => setShowBooklets(true)}
+            className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/5 transition-colors">
+            <BookOpen size={14} />
+            Booklet Settings
+          </button>
+          <button type="button" onClick={() => void load()}
+            className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/5 transition-colors">
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            Refresh
+          </button>
+        </div>
       </header>
 
       <div className="flex flex-1 min-h-0 flex-col p-3 lg:p-4 gap-3 overflow-hidden">
@@ -1185,6 +1198,10 @@ export default function BillingManagementView({ roleView }: { roleView?: string 
           </div>
         </div>
       </div>
+
+      <AnimatePresence>
+        {showBooklets && <BookletSettings onClose={() => setShowBooklets(false)} />}
+      </AnimatePresence>
 
       <AnimatePresence>
         {openId && (
