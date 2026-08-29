@@ -93,6 +93,13 @@ const MONTHS = [
 ]
 const DOW = ['Su','Mo','Tu','We','Th','Fr','Sa']
 
+/**
+ * Sunday. The fleet does not run, no driver can tick it on the availability
+ * calendar, and the API rejects a Sunday `schedule_date` outright — so the
+ * picker must not offer one in the first place.
+ */
+const REST_WEEKDAY = 0
+
 function calDays(year: number, month: number) {
   const first = new Date(year, month, 1).getDay()
   const total = new Date(year, month + 1, 0).getDate()
@@ -256,11 +263,21 @@ function DatePickerPopup({
   const todayD = today.getDate()
 
   // Tomorrow is the earliest bookable day, so today greys out with the past.
+  // Sundays grey out on every page of the calendar: the fleet rests, so one
+  // would sit in the queue uncrewable.
   const isDisabled = (d: number) => {
     const dt = new Date(viewYear, viewMonth, d)
+    if (dt.getDay() === REST_WEEKDAY) return true
     const td = new Date(todayY, todayM, todayD)
     return dt <= td
   }
+
+  // The first day that actually is selectable: tomorrow, pushed past a Sunday.
+  const nextAvailable = (() => {
+    const dt = new Date(todayY, todayM, todayD + 1)
+    while (dt.getDay() === REST_WEEKDAY) dt.setDate(dt.getDate() + 1)
+    return dt
+  })()
 
   const idleBorder   = hasError ? ERROR_BORDER : BORDER_PANEL
   const activeBorder = hasError ? ERROR_COLOR   : `${CYAN}66`
@@ -316,8 +333,15 @@ function DatePickerPopup({
             </div>
 
             <div className="grid grid-cols-7 mb-1">
-              {DOW.map(d => (
-                <div key={d} className="text-center ff-sc text-[10px] text-white/30 py-0.5">{d}</div>
+              {DOW.map((d, i) => (
+                <div
+                  key={d}
+                  className={`text-center ff-sc text-[10px] py-0.5 ${
+                    i === REST_WEEKDAY ? 'text-white/15' : 'text-white/30'
+                  }`}
+                >
+                  {d}
+                </div>
               ))}
             </div>
 
@@ -352,18 +376,23 @@ function DatePickerPopup({
               })}
             </div>
 
-            <div className="mt-3 pt-2 border-t border-white/[0.07] text-center">
+            <div className="mt-3 pt-2 border-t border-white/[0.07] flex flex-col items-center gap-1">
               <button
                 type="button"
                 onClick={() => {
-                  onChange(toDateStr(todayY, todayM, todayD))
+                  const y = nextAvailable.getFullYear()
+                  const m = nextAvailable.getMonth()
+                  onChange(toDateStr(y, m, nextAvailable.getDate()))
+                  setViewYear(y)
+                  setViewMonth(m)
                   setOpen(false)
                 }}
                 className="ff-sc text-xs cursor-pointer transition-colors"
                 style={{ color: CYAN }}
               >
-                Today
+                Next available
               </button>
+              <span className="ff-sc text-[10px] text-white/30">No deliveries on Sundays</span>
             </div>
           </motion.div>
         )}

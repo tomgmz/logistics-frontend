@@ -46,6 +46,9 @@ export interface BookingErrors {
   touched:       boolean
 }
 
+/** Sunday — the fleet's rest day. The API rejects a Sunday `schedule_date`. */
+const REST_WEEKDAY = 0
+
 function isPositiveNumber(val: string): boolean {
   const n = Number(val)
   return val.trim() !== '' && Number.isFinite(n) && n > 0
@@ -80,7 +83,11 @@ export function validateSchedule(date: string, time: string): ScheduleErrors {
     maxDate.setFullYear(maxDate.getFullYear() + 1)
     const maxDateOnly = new Date(maxDate.getFullYear(), maxDate.getMonth(), maxDate.getDate())
 
-    if (selectedDate < earliestDate) {
+    // The picker cannot offer a Sunday, but a date restored from a stale draft
+    // still can be — catch it here rather than losing the wizard to a 400.
+    if (selectedDate.getDay() === REST_WEEKDAY) {
+      errors.date = 'Deliveries are not scheduled on Sundays — please pick another day'
+    } else if (selectedDate < earliestDate) {
       const pad = (n: number) => String(n).padStart(2, '0')
       const earliest = `${earliestDate.getFullYear()}-${pad(earliestDate.getMonth() + 1)}-${pad(earliestDate.getDate())}`
       errors.date = `Booking must be at least a day ahead (earliest: ${earliest})`

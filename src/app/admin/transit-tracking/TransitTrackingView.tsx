@@ -23,6 +23,8 @@ import {
 } from '@/lib/store/slice/routeMap.slice'
 import type { OptimizedStop, OptimizeRouteResponse } from '@/app/types/maps/routemap.types'
 import { bookingRef } from '@/lib/booking'
+import { useLiveDriverPosition } from '@/lib/hooks/useLiveDriverPosition'
+import { LiveTruckMarker } from '@/components/map/LiveTruckMarker'
 
 const GOOGLE_MAPS_KEY    = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
 const GOOGLE_MAPS_MAP_ID = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID
@@ -56,14 +58,16 @@ function getEncodedPolyline(routeData: OptimizeRouteResponse | null): string | n
   return ext.encoded_polyline ?? ext.encodedPolyline ?? null
 }
 
-function vehicleMarkerPosition(routeData: OptimizeRouteResponse, stops: OptimizedStop[]): { lat: number; lng: number } {
-  const pending = stops.find((s) => s.status === 'pending')
-  if (pending) return { lat: pending.latitude, lng: pending.longitude }
-  if (stops.length > 0) {
-    const last = stops[stops.length - 1]
-    return { lat: last.latitude, lng: last.longitude }
-  }
-  return { lat: routeData.origin.latitude, lng: routeData.origin.longitude }
+/**
+ * How far along a booking is, from its stops. Replaces a hard-coded 35% that
+ * made every in-transit truck look a third of the way through its route.
+ */
+function progressOf(booking: BookingWithRelations): number {
+  if (booking.status === 'completed') return 100
+  const stops = booking.booking_destinations ?? []
+  if (stops.length === 0) return 0
+  const done = stops.filter((d) => (d as { status?: string }).status === 'delivered').length
+  return Math.round((done / stops.length) * 100)
 }
 
 function TransitBookingRow({
@@ -119,14 +123,18 @@ function TransitBookingRow({
           <div
             className="absolute left-0 h-[2px] rounded-full transition-all duration-1000"
             style={{
-              width:      booking.status === 'in_transit' ? '35%' : booking.status === 'completed' ? '100%' : '0%',
+              width:      `${progressOf(booking)}%`,
               background: color,
             }}
           />
           {booking.status === 'in_transit' && (
             <div
-              className="absolute w-2.5 h-2.5 rounded-full border border-white"
-              style={{ left: '32%', background: color, boxShadow: `0 0 6px ${color}` }}
+              className="absolute w-2.5 h-2.5 rounded-full border border-white transition-all duration-1000"
+              style={{
+                left: `calc(${progressOf(booking)}% - 5px)`,
+                background: color,
+                boxShadow: `0 0 6px ${color}`,
+              }}
             />
           )}
         </div>
@@ -147,11 +155,9 @@ function TransitBookingRow({
 function RouteMarkers({
   routeData,
   stops,
-  vehiclePos,
 }: {
   routeData:  OptimizeRouteResponse
   stops:      OptimizedStop[]
-  vehiclePos: { lat: number; lng: number }
 }) {
   return (
     <>
@@ -198,17 +204,6 @@ function RouteMarkers({
         )
       })}
 
-      <AdvancedMarker position={vehiclePos} title="Assigned vehicle (estimated position)">
-        <div className="flex flex-col items-center">
-          <div
-            className="rounded-full p-1.5 border-2 border-white shadow-lg"
-            style={{ background: '#f69f26', boxShadow: '0 0 14px rgba(246,159,38,0.55)' }}
-          >
-            <LocalShippingIcon sx={{ fontSize: 22, color: '#111' }} />
-          </div>
-          <span className="mt-1 text-[9px] font-bold uppercase tracking-wide text-white/90 drop-shadow-md">Vehicle</span>
-        </div>
-      </AdvancedMarker>
     </>
   )
 }
@@ -268,6 +263,11 @@ export default function TransitTrackingView() {
   const totalStops         = stops.length
   const progressPercentage = totalStops > 0 ? (completedStops / totalStops) * 100 : 0
 
+  // Only a booking on the road can have a live position; anything else would
+  // open a channel and poll an endpoint that can only answer null.
+  const isInTransit = bookingDetail?.status === 'in_transit'
+  const live = useLiveDriverPosition(selectedId, isInTransit)
+
   const detailPanel = routeData && bookingDetail ? (
     <DetailsPanelContent
       routeData={{
@@ -278,6 +278,8 @@ export default function TransitTrackingView() {
       completedStops={completedStops}
       totalStops={totalStops}
       progressPercentage={progressPercentage}
+      etaByStop={live.etaByStop}
+      nextEta={live.nextEta}
     />
   ) : detailLoading ? (
     <div className="flex flex-col items-center justify-center py-16 gap-3">
@@ -300,17 +302,24 @@ export default function TransitTrackingView() {
     <p className="text-sm text-white/45 text-center py-8">Select a booking to view route and delivery details.</p>
   )
 
-  const vehiclePos = routeData ? vehicleMarkerPosition(routeData, stops) : null
-
-  const mapInner = routeData && vehiclePos ? (
+  const mapInner = routeData ? (
     <Map
       mapId={GOOGLE_MAPS_MAP_ID}
-      defaultCenter={{ lat: vehiclePos.lat, lng: vehiclePos.lng }}
+      defaultCenter={{ lat: routeData.origin.latitude, lng: routeData.origin.longitude }}
       defaultZoom={11}
       gestureHandling="greedy"
       className="w-full h-full min-h-[240px]"
     >
-      <RouteMarkers routeData={routeData} stops={stops} vehiclePos={vehiclePos} />
+      <RouteMarkers routeData={routeData} stops={stops} />
+      {isInTransit && (
+        <LiveTruckMarker
+          position={live.position}
+          latest={live.latest}
+          isStale={live.isStale}
+          ageMs={live.ageMs}
+          nextEta={live.nextEta}
+        />
+      )}
       <DirectionsRenderer
         encodedPolyline={encodedPolyline}
         origin={routeData.origin}

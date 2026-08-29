@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import type { OptimizeRouteResponse, BookingDetail } from '@/app/types/maps/routemap.types'
 import { fetchTruckModels } from '@/lib/api/client/truck-model'
+import { formatEta, formatEtaClock, type StopEta } from '@/lib/hooks/useLiveDriverPosition'
 
 const SC = { fontFamily: "var(--font-alegreya-sc), 'Alegreya Sans SC', sans-serif" } as const
 
@@ -89,12 +90,22 @@ interface Props {
   completedStops:     number
   totalStops:         number
   progressPercentage: number
+  /**
+   * Server-computed arrival times per remaining stop, from the driver's live
+   * position. Empty when the booking isn't in transit or the truck hasn't
+   * reported yet — the panel falls back to the planned figures rather than
+   * inventing one.
+   */
+  etaByStop?:         Map<string, StopEta>
+  nextEta?:           StopEta | null
 }
 
 export function DetailsPanelContent({
   routeData,
   bookingDetail,
   progressPercentage,
+  etaByStop,
+  nextEta,
 }: Props) {
   const isLoading = bookingDetail === null
 
@@ -114,9 +125,23 @@ export function DetailsPanelContent({
   const plateNumber = bookingDetail?.driver?.truck?.plate_number ?? '—'
   const totalCost   = bookingDetail?.total_cost != null ? `₱${bookingDetail.total_cost}` : '—'
   const estDelivery = bookingDetail?.estimated_delivery ?? scheduleDate
-  const travelTime  = routeData.total_duration
-    ? `${Math.floor(routeData.total_duration / 60)}HR ${routeData.total_duration % 60}MINS`
+
+  // The final stop's live ETA, which is what "estimate arrival" has always meant
+  // on this panel and never actually showed — `estimated_arrival` was a declared
+  // field the backend never populated, so this rendered an em dash for everyone.
+  const destEta = destStop ? etaByStop?.get(destStop.destination_id) : undefined
+
+  const arrivalLabel = destEta
+    ? `${formatEtaClock(destEta.eta_at)} · ${formatEta(destEta.eta_seconds)}`
     : '—'
+
+  // Time still to run, live, falling back to the planned duration before the
+  // truck starts reporting.
+  const travelTime = nextEta
+    ? `${formatEta(nextEta.eta_seconds)} to next stop`
+    : routeData.total_duration
+      ? `${Math.floor(routeData.total_duration / 60)}HR ${routeData.total_duration % 60}MINS`
+      : '—'
 
   const subCity = (full: string) => full.split(',').slice(1).join(',').trim() || full
 
@@ -246,8 +271,11 @@ export function DetailsPanelContent({
           <div className="mt-1.5">
             <div className="flex justify-between">
               <span className="text-white text-[10px]">Estimate Arrival</span>
-              <span className="text-white text-[10px]">
-                {isLoading ? <Skeleton style={{ width: '3rem', height: '0.6em' }} /> : destStop?.estimated_arrival ?? '—'}
+              <span
+                className="text-[10px]"
+                style={{ color: destEta ? 'var(--color-cyan)' : '#ffffff' }}
+              >
+                {isLoading ? <Skeleton style={{ width: '3rem', height: '0.6em' }} /> : arrivalLabel}
               </span>
             </div>
           </div>

@@ -18,6 +18,7 @@ export const NAV_ITEMS_BY_ROLE: Record<string, { href: string; label: string; ic
     { href: '/admin/audit-logs', label: 'Audit Logs', icon: <ScrollText size={17} /> },
   ],
   client: [
+    { href: '/client/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={17} /> },
     { href: '/client/booking', label: 'Booking', icon: <CalendarCheck size={17} /> },
     { href: '/client/tracking', label: 'Delivery Tracking', icon: <MapPin size={17} /> },
     { href: '/client/reverse-billing', label: 'Reverse Billing', icon: <CreditCard size={17} /> },

@@ -22,6 +22,8 @@ import {
 } from '@/lib/store/slice/routeMap.slice'
 import { statusColor } from './status.colors'
 import { bookingRef } from '@/lib/booking'
+import { useLiveDriverPosition, formatAge } from '@/lib/hooks/useLiveDriverPosition'
+import { LiveTruckMarker } from './LiveTruckMarker'
 
 const GOOGLE_MAPS_KEY    = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!
 const GOOGLE_MAPS_MAP_ID = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID!
@@ -47,6 +49,21 @@ function addressAbbr(address: string | undefined, fallback: string): string {
   return address.match(/\b[A-Z]{2,4}\b/)?.[0] ?? address.split(',')[0].slice(0, 3).toUpperCase()
 }
 
+/**
+ * How far along a booking is, from its stops.
+ *
+ * This used to be a literal 35% for anything in transit, which made every truck
+ * on the list look a third of the way through its route regardless of how many
+ * drop-offs it had actually made.
+ */
+function progressOf(booking: BookingWithRelations): number {
+  if (booking.status === 'completed') return 100
+  const stops = booking.booking_destinations ?? []
+  if (stops.length === 0) return booking.status === 'in_transit' ? 0 : 0
+  const done = stops.filter((d) => (d as { status?: string }).status === 'delivered').length
+  return Math.round((done / stops.length) * 100)
+}
+
 function BookingListItem({
   booking,
   selected,
@@ -61,6 +78,7 @@ function BookingListItem({
   const color  = statusColor(booking.status)
   const label  = fmtStatus(booking.status)
   const origin = booking.origin?.split(',')[0] ?? '—'
+  const pct    = progressOf(booking)
 
   const lastDestAddress =
     booking.booking_destinations?.[booking.booking_destinations.length - 1]?.address
@@ -104,16 +122,16 @@ function BookingListItem({
           </div>
           <div
             className="absolute left-0 h-[2px] rounded-full transition-all duration-1000"
-            style={{
-              width: booking.status === 'in_transit' ? '35%'
-                : booking.status === 'completed'     ? '100%' : '0%',
-              background: color,
-            }}
+            style={{ width: `${pct}%`, background: color }}
           />
           {booking.status === 'in_transit' && (
             <div
-              className="absolute w-2.5 h-2.5 rounded-full border border-white"
-              style={{ left: '32%', background: color, boxShadow: `0 0 6px ${color}` }}
+              className="absolute w-2.5 h-2.5 rounded-full border border-white transition-all duration-1000"
+              style={{
+                left: `calc(${pct}% - 5px)`,
+                background: color,
+                boxShadow: `0 0 6px ${color}`,
+              }}
             />
           )}
         </div>
@@ -184,6 +202,49 @@ function MapMarkers({ routeData, stops }: { routeData: OptimizeRouteResponse; st
   )
 }
 
+/**
+ * The header pill, which used to read "Live Tracking" with a pulsing dot at all
+ * times — including on a pending booking with no driver, and on a page that did
+ * no polling and held no subscription. It now says what is actually true.
+ */
+function LiveTrackingPill({
+  active,
+  hasFix,
+  isStale,
+  ageMs,
+}: {
+  active:  boolean
+  hasFix:  boolean
+  isStale: boolean
+  ageMs:   number | null
+}) {
+  const isLive = active && hasFix && !isStale
+
+  const label = !active ? 'Not in transit'
+    : !hasFix  ? 'Awaiting driver position'
+    : isStale  ? `No signal · ${formatAge(ageMs)}`
+    : `Live · ${formatAge(ageMs)}`
+
+  const color = isLive ? 'var(--color-cyan)' : '#9f9c9c'
+
+  return (
+    <div
+      className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full border whitespace-nowrap"
+      style={{
+        color,
+        borderColor: isLive ? 'rgba(77,249,237,0.35)' : 'rgba(159,156,156,0.3)',
+        background:  isLive ? 'rgba(77,249,237,0.12)' : 'transparent',
+      }}
+    >
+      <span
+        className={`w-1.5 h-1.5 rounded-full ${isLive ? 'animate-pulse' : ''}`}
+        style={{ background: color }}
+      />
+      {label}
+    </div>
+  )
+}
+
 function EmptyMapState() {
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center gap-4"
@@ -244,6 +305,12 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
   const totalStops         = stops.length
   const progressPercentage = totalStops > 0 ? (completedStops / totalStops) * 100 : 0
 
+  // Only a booking that is actually on the road can have a live position. Asking
+  // for one on a pending or completed booking would open a channel and poll an
+  // endpoint that can only ever answer null.
+  const isInTransit = bookingDetail?.status === 'in_transit'
+  const live = useLiveDriverPosition(selectedId, isInTransit)
+
   const loadBookings = useCallback(() => {
     dispatch(fetchBookings(user))
   }, [dispatch, user])
@@ -296,6 +363,8 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
       completedStops={completedStops}
       totalStops={totalStops}
       progressPercentage={progressPercentage}
+      etaByStop={live.etaByStop}
+      nextEta={live.nextEta}
     />
   ) : detailLoading ? (
     <div className="flex-1 flex items-center justify-center min-h-[400px]">
@@ -327,6 +396,15 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
       className="w-full h-full"
     >
       <MapMarkers routeData={routeData} stops={stops} />
+      {isInTransit && (
+        <LiveTruckMarker
+          position={live.position}
+          latest={live.latest}
+          isStale={live.isStale}
+          ageMs={live.ageMs}
+          nextEta={live.nextEta}
+        />
+      )}
       <DirectionsRenderer
         encodedPolyline={encodedPolyline}
         origin={routeData.origin}
@@ -497,10 +575,12 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
           style={{ borderColor: 'var(--color-surface-dark)', background: 'var(--color-bg)' }}
         >
           <div className="flex items-center gap-2">
-            <div className="pill-cyan">
-              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: 'var(--color-cyan)' }} />
-              Live Tracking
-            </div>
+            <LiveTrackingPill
+              active={isInTransit}
+              hasFix={!!live.latest}
+              isStale={live.isStale}
+              ageMs={live.ageMs}
+            />
             <button
               onClick={loadBookings}
               className="w-8 h-8 rounded-full flex items-center justify-center border hover:opacity-70 transition-opacity"
