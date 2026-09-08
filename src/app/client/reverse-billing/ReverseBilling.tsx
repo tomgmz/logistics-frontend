@@ -901,7 +901,17 @@ function PeriodDetailPanel({ detail, onDone }: { detail: BillingPeriodDetail; on
                   <a href={inv.pdf_url} target="_blank" rel="noopener noreferrer"
                     className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider cursor-pointer"
                     style={{ color: CYAN }}>
-                    <Download size={13} /> PDF
+                    <Download size={13} /> Invoice
+                  </a>
+                )}
+                {/* The receipt that closes this invoice. Only exists once 8338
+                    has confirmed the payment and issued it. */}
+                {inv.receipt?.pdf_url && (
+                  <a href={inv.receipt.pdf_url} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider cursor-pointer"
+                    style={{ color: '#86efac' }}
+                    title={`Acknowledgement Receipt ${inv.receipt.ar_number}`}>
+                    <Download size={13} /> Receipt
                   </a>
                 )}
               </div>
@@ -910,6 +920,11 @@ function PeriodDetailPanel({ detail, onDone }: { detail: BillingPeriodDetail; on
               <div className="flex items-center justify-between gap-2 pt-1.5 border-t" style={{ borderColor: BORDER }}>
                 <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: tone }}>
                   {state.label}
+                  {inv.receipt && (
+                    <span className="ml-2 font-normal normal-case" style={{ color: MUTED }}>
+                      AR {inv.receipt.ar_number}
+                    </span>
+                  )}
                 </span>
                 {state.canUpload && (
                   <button onClick={() => setPayingFor(inv)}

@@ -282,13 +282,28 @@ function InvoiceRow({
             Record Payment
           </button>
         )}
-        {canCreate && invoice.payment_status === 'paid' && (
+        {/* Once a receipt exists the cycle is closed for this invoice, so the
+            action becomes a link to it rather than an offer to issue a second. */}
+        {invoice.receipt ? (
+          invoice.receipt.pdf_url ? (
+            <a href={invoice.receipt.pdf_url} target="_blank" rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-[11px] font-bold"
+              style={{ color: '#86efac' }}
+              title={`Acknowledgement Receipt ${invoice.receipt.ar_number}`}>
+              <Download size={13} /> AR {invoice.receipt.ar_number}
+            </a>
+          ) : (
+            <span className="text-[11px] font-bold" style={{ color: '#86efac' }}>
+              AR {invoice.receipt.ar_number}
+            </span>
+          )
+        ) : canCreate && invoice.payment_status === 'paid' ? (
           <button type="button" onClick={onReceipt}
             className="px-2.5 py-1 rounded-lg text-[11px] font-bold text-black transition-opacity hover:opacity-90"
             style={{ background: CYAN }}>
             Issue AR
           </button>
-        )}
+        ) : null}
       </div>
     </div>
   )

@@ -122,6 +122,16 @@ export interface BillingSubmission {
   reviewed_at: string | null
 }
 
+/** The receipt that closes an invoice, once its payment is confirmed. */
+export interface AcknowledgementReceipt {
+  ar_id: string
+  ar_number: string
+  receipt_date: string
+  total_paid_amount: number
+  amount_in_words: string | null
+  pdf_url: string | null
+}
+
 export interface ServiceInvoice {
   invoice_id: string
   period_id: string
@@ -144,6 +154,8 @@ export interface ServiceInvoice {
   pdf_url: string | null
   /** Every payment against this invoice, confirmed or not. */
   payments?: BillingPayment[]
+  /** Null until the Acknowledgement Receipt is issued. */
+  receipt?: AcknowledgementReceipt | null
 }
 
 export type PaymentVerificationStatus = 'pending_verification' | 'confirmed' | 'rejected'

@@ -103,6 +103,16 @@ export interface BillingPayment {
   submitted_at: string | null
 }
 
+/** The receipt that closes out an invoice, once its payment is confirmed. */
+export interface AcknowledgementReceipt {
+  ar_id: string
+  ar_number: string
+  receipt_date: string
+  total_paid_amount: number
+  amount_in_words: string | null
+  pdf_url: string | null
+}
+
 export interface ServiceInvoice {
   invoice_id: string
   booking_id: string | null
@@ -115,6 +125,8 @@ export interface ServiceInvoice {
   pdf_url: string | null
   /** Present on the single-invoice endpoint. */
   payments?: BillingPayment[]
+  /** Null until 8338 issues the receipt that closes this invoice. */
+  receipt?: AcknowledgementReceipt | null
 }
 
 export interface SubmitProofPayload {
