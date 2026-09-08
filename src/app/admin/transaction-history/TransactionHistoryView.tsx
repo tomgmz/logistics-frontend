@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
-  AlertCircle, BarChart3, ChevronDown, ChevronLeft, ChevronRight,
+  AlertCircle, ChevronLeft, ChevronRight,
   Download, History, RefreshCw, Search, X,
 } from 'lucide-react'
 
@@ -34,8 +34,8 @@ import {
  *
  * The client page browses one company's bookings as cards and filters them in
  * memory. That does not survive contact with every company at once, so this is
- * a dense table over a server-side query, with the totals and the per-company
- * rollup computed under exactly the same filters as the rows.
+ * a dense table over a server-side query, with the totals computed under
+ * exactly the same filters as the rows.
  *
  * Rendered by both /admin/transaction-history and
  * /accountant/transaction-history. The dashboard shell resolves the
@@ -115,7 +115,6 @@ export default function TransactionHistoryView() {
   const [loading, setLoading]     = useState(true)
   const [error, setError]         = useState<string | null>(null)
   const [exporting, setExporting] = useState(false)
-  const [showBreakdown, setShowBreakdown] = useState(false)
   const [selected, setSelected]   = useState<BookingWithRelations | null>(null)
 
   useEffect(() => {
@@ -330,62 +329,6 @@ export default function TransactionHistoryView() {
               accent={summary && summary.cancellationRate > 0.1 ? ERROR : undefined}
               sub={summary ? `${summary.cancelled.toLocaleString()} cancelled` : undefined} />
           </div>
-
-          {/* Per-company rollup */}
-          {summary && summary.breakdown.length > 0 && (
-            <div className="shrink-0 overflow-hidden rounded-xl border border-white/[0.08] bg-[#141414]">
-              <button type="button" onClick={() => setShowBreakdown((v) => !v)}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors
-                           hover:bg-white/[0.03] cursor-pointer">
-                <BarChart3 size={14} style={{ color: CYAN }} />
-                <span className="text-xs font-bold uppercase tracking-wider text-white/70">
-                  By company
-                </span>
-                <span className="text-[11px] text-white/35">
-                  {summary.breakdown.length} row{summary.breakdown.length !== 1 ? 's' : ''}
-                </span>
-                <ChevronDown size={14}
-                  className={`ml-auto text-white/40 transition-transform ${showBreakdown ? 'rotate-180' : ''}`} />
-              </button>
-
-              {showBreakdown && (
-                <div className="max-h-[220px] overflow-y-auto border-t border-white/[0.07]">
-                  {summary.breakdown.map((r) => {
-                    const share = summary.grossValue > 0 ? r.grossValue / summary.grossValue : 0
-                    // The "Other companies" remainder has no id and nothing to
-                    // drill into.
-                    const drillable = r.clientId !== null
-                    return (
-                      <div
-                        key={r.clientId ?? '__other__'}
-                        role={drillable ? 'button' : undefined}
-                        tabIndex={drillable ? 0 : undefined}
-                        onClick={drillable ? () => { setClientIds([r.clientId!]); setPage(0) } : undefined}
-                        onKeyDown={drillable ? (e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault(); setClientIds([r.clientId!]); setPage(0)
-                          }
-                        } : undefined}
-                        className={`flex items-center gap-3 border-b border-white/[0.04] px-3 py-2 text-sm
-                                    ${drillable ? 'cursor-pointer hover:bg-white/[0.04]' : ''}`}
-                      >
-                        <span className="min-w-0 flex-1 truncate text-white/80">{r.companyName}</span>
-                        <span className="w-24 shrink-0 text-right text-xs tabular-nums text-white/50">
-                          {r.count.toLocaleString()} txn
-                        </span>
-                        <span className="w-32 shrink-0 text-right tabular-nums text-white/85">
-                          {formatPesoExact(r.grossValue)}
-                        </span>
-                        <span className="w-12 shrink-0 text-right text-xs tabular-nums" style={{ color: MUTED }}>
-                          {(share * 100).toFixed(0)}%
-                        </span>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-          )}
 
           {/* Status tabs */}
           <div className="scrollbar-none flex shrink-0 items-center gap-0 overflow-x-auto border-b"

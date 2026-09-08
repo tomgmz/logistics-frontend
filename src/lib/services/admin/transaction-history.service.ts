@@ -130,13 +130,13 @@ export const transactionHistoryService = {
   },
 }
 
-const CSV_COLUMNS: { key: keyof ExportRow; label: string }[] = [
+const CSV_COLUMNS: { key: keyof ExportRow; label: string; date?: true }[] = [
   { key: 'reference_number', label: 'Reference' },
   { key: 'company_name',     label: 'Company' },
   { key: 'status',           label: 'Status' },
-  { key: 'booked_date',      label: 'Booked Date' },
-  { key: 'schedule_date',    label: 'Scheduled Date' },
-  { key: 'completed_date',   label: 'Completed Date' },
+  { key: 'booked_date',      label: 'Booked Date',    date: true },
+  { key: 'schedule_date',    label: 'Scheduled Date', date: true },
+  { key: 'completed_date',   label: 'Completed Date', date: true },
   { key: 'origin',           label: 'Pick Up' },
   { key: 'destinations',     label: 'Drop Offs' },
   { key: 'truck_type',       label: 'Truck Type' },
@@ -153,9 +153,25 @@ function csvCell(value: unknown): string {
   return /[",\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe
 }
 
+/**
+ * A bare YYYY-MM-DD is re-parsed by Excel as a real date and re-rendered in the
+ * machine's short-date format, which is wider than the default column and shows
+ * as `#######` until every date column is widened by hand. A CSV carries no
+ * column widths, so the only fix is to keep the cell text: Excel reads
+ * ="2026-09-09" as a formula returning a string, and text overflows the column
+ * instead of hashing out. ISO text still sorts chronologically.
+ */
+function csvDateCell(value: unknown): string {
+  if (value === null || value === undefined || value === '') return ''
+  // Emitted as the already-escaped CSV field so csvCell's formula guard, which
+  // exists for user-supplied text, does not neutralise our own formula.
+  return `"=""${String(value).replace(/"/g, '')}"""`
+}
+
 export function buildTransactionCsv(rows: ExportRow[]): string {
   const header = CSV_COLUMNS.map((c) => csvCell(c.label)).join(',')
-  const body   = rows.map((r) => CSV_COLUMNS.map((c) => csvCell(r[c.key])).join(','))
+  const body   = rows.map((r) =>
+    CSV_COLUMNS.map((c) => (c.date ? csvDateCell(r[c.key]) : csvCell(r[c.key]))).join(','))
   // BOM so Excel opens the peso amounts and Filipino place names as UTF-8.
   return '﻿' + [header, ...body].join('\r\n')
 }
