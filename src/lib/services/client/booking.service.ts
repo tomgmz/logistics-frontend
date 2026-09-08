@@ -40,6 +40,14 @@ export interface BlowbagetsCheck {
 }
 
 export interface CargoItemPayload {
+  /**
+   * The `sequence_order` of the drop-off this line is for.
+   *
+   * The wizard has always collected cargo per destination; until now that
+   * grouping was flattened away at submit, so nobody downstream could tell which
+   * goods came off at which stop.
+   */
+  dropoff_sequence_order?: number
   commodity_id?:   string
   commodity_text?: string
   product_id?:     string
@@ -58,7 +66,10 @@ export interface CargoItemPayload {
 }
 
 export interface CreateBookingPayload {
-  client_id:              string
+  // Minted per booking attempt and reused across its retries, so a request that
+  // timed out client-side after the server had in fact created the booking
+  // returns that same booking instead of a duplicate trip.
+  idempotency_key:        string
   origin:                 string
   origin_latitude?:       number
   origin_longitude?:      number
@@ -68,7 +79,8 @@ export interface CreateBookingPayload {
   required_volume_cbm?:   number
   required_weight_kg?:    number
   required_length_cm?:    number
-  stackable_required?:    boolean
+  required_net_weight_kg?: number
+  non_stackable_cargo?:   boolean
   payment_terms?:         string
   transaction_documents?: string[]
   cargo_items?:           CargoItemPayload[]
@@ -118,8 +130,12 @@ export const bookingService = {
     return data.data
   },
 
-  createBooking: (input: CreateBookingPayload) =>
-    post<CreateBookingResult>('/booking', input),
+  createBooking: async (input: CreateBookingPayload) => {
+    // Every other mutating call primes the CSRF cookie first; this one did not,
+    // which left the header off whenever nothing else had primed it yet.
+    await initCsrf()
+    return post<CreateBookingResult>('/booking', input)
+  },
 
   updateBooking: (bookingId: string, payload: UpdateBookingPayload) =>
     patch<unknown>(`/booking/${bookingId}`, payload),

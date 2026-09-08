@@ -1253,16 +1253,23 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                 : 'No pieces added yet'}
             </p>
           </div>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mt-1">
+          {/* Density is shown in BOTH modes now. It used to be hidden for
+              palletized cargo, which is exactly where it matters most: a pallet
+              of bottled water and a pallet of crisps occupy the same space and
+              behave completely differently on a truck. */}
+          <div className={`grid grid-cols-2 gap-2 mt-1 ${mode === 'palletized' ? 'lg:grid-cols-5' : 'lg:grid-cols-4'}`}>
             <StatCard label={mode === 'palletized' ? 'Total Pallets' : 'Total Pieces'}
               value={summary.totalPieces > 0 ? String(summary.totalPieces) : '—'} />
             <StatCard label="Gross Weight"
-              value={summary.grossWeight > 0 ? `${summary.grossWeight.toFixed(1)} KG` : '—'} />
+              value={summary.grossWeightKg > 0 ? `${summary.grossWeightKg.toFixed(1)} KG` : '—'} />
             <StatCard label="Volume"
-              value={summary.volume > 0 ? `${summary.volume.toFixed(2)} CBM` : '—'} />
-            {mode === 'palletized'
-              ? <StatCard label="Net Weight" value={summary.netWeight > 0 ? `${summary.netWeight.toFixed(1)} KG` : '—'} />
-              : <StatCard label="Density"    value={summary.density > 0 ? `${summary.density.toFixed(2)} KG/CBM` : '—'} />}
+              value={summary.volumeCbm > 0 ? `${summary.volumeCbm.toFixed(2)} CBM` : '—'} />
+            {mode === 'palletized' && (
+              <StatCard label="Net Weight"
+                value={summary.netWeightKg > 0 ? `${summary.netWeightKg.toFixed(1)} KG` : '—'} />
+            )}
+            <StatCard label="Density"
+              value={summary.densityKgCbm > 0 ? `${summary.densityKgCbm.toFixed(2)} KG/CBM` : '—'} />
           </div>
           <div className="flex flex-wrap gap-x-6 gap-y-1 mt-1">
             {mode === 'loose' ? (
@@ -1288,13 +1295,10 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }} className="flex justify-between gap-3 pt-2"
+          transition={{ delay: 0.5 }}
+          className={`flex gap-3 pt-2 ${onBack ? 'justify-between' : 'justify-end'}`}
         >
-          {onBack ? (
-            <WizBtn onClick={onBack} variant="back">BACK</WizBtn>
-          ) : (
-            <span />
-          )}
+          {onBack && <WizBtn onClick={onBack} variant="back">BACK</WizBtn>}
           <WizBtn onClick={handleNext} variant="next">NEXT</WizBtn>
         </motion.div>
 
@@ -1353,11 +1357,11 @@ function ComboboxField({
 
   return (
     <div ref={ref} className="flex flex-col gap-1 relative">
-      <label className="ff-sc booking-text text-xs">
+      <label className="ff-sc booking-text text-xs leading-tight min-h-[1.875rem]">
         {label}{required && <span style={{ color: ERROR_COLOR, marginLeft: 2 }}>*</span>}
       </label>
       <div
-        className="flex items-center rounded-lg border transition-colors"
+        className="relative flex items-center rounded-lg border transition-colors"
         style={{
           background:    INPUT_BG_CARD,
           borderColor:   open ? activeBorder : idleBorder,
@@ -1374,7 +1378,7 @@ function ComboboxField({
           }}
           onFocus={() => setOpen(true)}
           placeholder={placeholder ?? 'Search or type…'}
-          className="flex-1 bg-transparent outline-none px-3 text-sm text-white placeholder:text-white/25"
+          className="flex-1 min-w-0 bg-transparent outline-none px-3 text-sm text-white placeholder:text-white/25 text-ellipsis"
           style={{ height: 36 }}
         />
         {inputValue && (
@@ -1394,23 +1398,18 @@ function ComboboxField({
         {isCustom && (
           <span className="px-2 text-[10px] text-white/30 shrink-0 font-mono">custom</span>
         )}
-      </div>
 
-      {hasError && errorMsg && (
-        <FormHelperText sx={HELPER_SX}>{errorMsg}</FormHelperText>
-      )}
-
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, y: -4, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0,  scale: 1 }}
-            exit={{   opacity: 0, y: -4,  scale: 0.98 }}
-            transition={{ duration: 0.12 }}
-            className="absolute top-[62px] left-0 right-0 z-50 rounded-lg shadow-2xl overflow-hidden"
-            style={{ background: '#1E1C1C', border: `1px solid ${BORDER_PANEL}` }}
-          >
-            <div className="max-h-[200px] overflow-y-auto">
+        <AnimatePresence>
+          {open && (
+            <motion.div
+              initial={{ opacity: 0, y: -4, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0,  scale: 1 }}
+              exit={{   opacity: 0, y: -4,  scale: 0.98 }}
+              transition={{ duration: 0.12 }}
+              className="absolute top-full mt-1 left-0 right-0 z-50 rounded-lg shadow-2xl overflow-hidden"
+              style={{ background: '#1E1C1C', border: `1px solid ${BORDER_PANEL}` }}
+            >
+              <div className="max-h-[200px] overflow-y-auto">
               {filtered.length > 0 ? (
                 filtered.map((o) => (
                   <button
@@ -1447,10 +1446,15 @@ function ComboboxField({
                   </button>
                 </>
               )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {hasError && errorMsg && (
+        <FormHelperText sx={HELPER_SX}>{errorMsg}</FormHelperText>
+      )}
     </div>
   )
 }
@@ -1527,7 +1531,7 @@ function ProductFieldsRow({
         errorMsg={errors.product}
       />
 
-      {/* SHC */}
+      {/* Special Handling Code */}
       <ComboboxField
         label="Special Handling Code"
         required
@@ -1539,15 +1543,14 @@ function ProductFieldsRow({
         }}
         onType={(text) => onUpdate({ shc: text, shcId: '' })}
         onClear={() => onUpdate({ shc: '', shcId: '' })}
-        placeholder="Search SHC…"
+        placeholder="Search code…"
         hasError={!!errors.shc}
         errorMsg={errors.shc}
       />
 
-      {/* Additional SHC */}
+      {/* Additional Special Handling Code */}
       <ComboboxField
-        label="Additional SHC"
-        required
+        label="Additional Special Handling Code"
         options={shcAdditionalOptions}
         value={group.ashcId}
         inputValue={group.additionalShc}
@@ -1556,9 +1559,7 @@ function ProductFieldsRow({
         }}
         onType={(text) => onUpdate({ additionalShc: text, ashcId: '' })}
         onClear={() => onUpdate({ additionalShc: '', ashcId: '' })}
-        placeholder="Search additional SHC…"
-        hasError={!!errors.additionalShc}
-        errorMsg={errors.additionalShc}
+        placeholder="Search code…"
       />
 
     </div>

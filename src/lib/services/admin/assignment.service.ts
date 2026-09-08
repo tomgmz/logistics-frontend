@@ -72,6 +72,20 @@ async function patch<T>(url: string, payload: unknown): Promise<T> {
   return data.data
 }
 
+/**
+ * Why the server thinks this vehicle may not carry this load. Server-side mirror
+ * of the client wizard's own check, run at assignment time — the point where a
+ * real vehicle is finally chosen.
+ */
+export interface CapacityWarning {
+  reasons:         string[]
+  overWeight:      boolean
+  overVolume:      boolean
+  overLength:      boolean
+  overFloorSpace:  boolean
+  usableVolumeCbm: number | null
+}
+
 const B = '/admin/assignments'
 
 export const assignmentService = {
@@ -81,8 +95,14 @@ export const assignmentService = {
 
   getHistoryByBookingId: (bookingId: string) => get<AssignmentRecord[]>(`${B}/${bookingId}/history`),
 
+  /**
+   * Crew a booking. The reply carries `capacity_warning` when the chosen vehicle
+   * may not actually fit the load — advisory, so the assignment still happened.
+   */
   assignBooking: (bookingId: string, payload: AssignBookingPayload) =>
-    post<AssignmentRecord>(`${B}/${bookingId}`, payload),
+    post<AssignmentRecord & { capacity_warning?: CapacityWarning | null }>(
+      `${B}/${bookingId}`, payload,
+    ),
 
   updateDeliveryStatus: (bookingId: string, payload: UpdateDeliveryStatusPayload) =>
     patch<AssignmentRecord>(`${B}/${bookingId}/status`, payload),

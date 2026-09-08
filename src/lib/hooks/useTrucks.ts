@@ -8,6 +8,10 @@ export interface VehicleData {
   maxWeightKG: number
   maxVolumeCBM: number
   maxLengthCM: number
+  /** Cargo bed dimensions in mm, used to count pallet floor positions. */
+  bedLengthMM: number | null
+  bedWidthMM: number | null
+  bedHeightMM: number | null
   bodyType: string
   dimension: string
   suitableFor: string
@@ -48,6 +52,9 @@ function mapTruckModelToVehicle(model: TruckModel): VehicleData {
     maxWeightKG:       model.max_weight_kg ?? 0,
     maxVolumeCBM:      model.max_volume_cbm ?? 0,
     maxLengthCM:       model.max_length_cm ?? 0,
+    bedLengthMM:       model.length_mm ?? null,
+    bedWidthMM:        model.width_mm  ?? null,
+    bedHeightMM:       model.height_mm ?? null,
     bodyType:          model.vehicle_type ?? 'Standard',
     dimension:         model.dimension_mm
                          ? `${model.dimension_mm}mm (L×W×H)`

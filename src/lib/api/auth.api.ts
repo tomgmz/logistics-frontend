@@ -43,10 +43,24 @@ export async function initCsrf(): Promise<void> {
   return csrfPromise
 }
 
+/**
+ * Attach the CSRF header to every write, fetching a token first if we have none.
+ *
+ * This used to attach the header only when the cookie already happened to exist,
+ * leaving each call site responsible for calling `initCsrf()` beforehand — and
+ * `createBooking`, among others, did not. That was survivable only because the
+ * API was not checking the header at all. Now that it is, the guarantee has to
+ * live here, where no new call site can forget it.
+ */
 proxyApi.interceptors.request.use(
-  (config) => {
+  async (config) => {
     const method = config.method?.toLowerCase() ?? ''
     if (['post', 'put', 'patch', 'delete'].includes(method)) {
+      if (!getCsrfToken()) {
+        // Best effort: a failure here should surface as the real request's
+        // error, not as an opaque one from the token fetch.
+        await initCsrf().catch(() => {})
+      }
       const token = getCsrfToken()
       if (token) config.headers['X-CSRF-Token'] = token
     }

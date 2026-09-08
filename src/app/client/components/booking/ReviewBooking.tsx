@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Truck } from 'lucide-react'
 import Image from 'next/image'
@@ -8,9 +8,9 @@ import { useAppSelector, useAppDispatch } from '@/lib/hooks/hooks'
 import type { ServiceType, DropoffSection, CargoMode } from '@/lib/store/slice/booking.slice'
 import { resetBooking } from '@/lib/store/slice/booking.slice'
 import { bookingService } from '@/lib/services/client/booking.service'
+import { calcCargoSummary, palletizedGroup, looseGroup } from '@/lib/cargo/summary'
 import type { CargoItemPayload } from '@/lib/services/client/booking.service'
 import { uploadService } from '@/lib/services/admin/documentUpload.service'
-import { getMe } from '@/lib/api/auth.api'
 import { appToast } from '@/lib/toast'
 import './BookingDetails.css'
 import SuccessView from './SuccessView'
@@ -33,43 +33,25 @@ const stagger = {
   show:   { transition: { staggerChildren: 0.08 } },
 }
 
-function calcSummary(sections: DropoffSection[], mode: CargoMode) {
-  let grossWeight       = 0
-  let volume            = 0
-  let stackableRequired = false
-
-  for (const section of sections) {
-    for (const g of section.groups) {
-      if (mode === 'palletized') {
-        const pallets = Number(g.numPallets) || 0
-        if (pallets <= 0) continue
-        grossWeight += pallets * (Number(g.grossWeightPerPallet) || 0)
-        if (g.stackable) stackableRequired = true
-      } else {
-        const pieces = Number(g.pieces)
-        const l      = Number(g.looseLength)
-        const w      = Number(g.looseWidth)
-        const h      = Number(g.looseHeight)
-        const wt     = Number(g.weight)
-        if (!Number.isFinite(pieces) || pieces <= 0) continue
-        if (!Number.isFinite(l) || l <= 0 ||
-            !Number.isFinite(w) || w <= 0 ||
-            !Number.isFinite(h) || h <= 0) continue
-        if (!Number.isFinite(wt) || wt <= 0) continue
-        const weightKG = g.weightUnit === 'lbs' ? wt * 0.453592 : wt
-        grossWeight += g.perItem === 'Per Item' ? pieces * weightKG : weightKG
-        volume      += pieces * (l * w * h) / 1_000_000
-      }
-    }
-  }
-
-  return { grossWeight, volume, stackableRequired }
-}
-
-function buildCargoItems(sections: DropoffSection[], mode: CargoMode): CargoItemPayload[] {
+/**
+ * The per-line cargo rows.
+ *
+ * Derived from the same `palletizedGroup` / `looseGroup` helpers that produce
+ * the booking-level totals, so a line and the header cannot drift apart — which
+ * they did, in both directions: the header ignored the pounds/kilograms toggle
+ * that these rows honoured, and skipped palletized volume that these rows
+ * recorded.
+ */
+function buildCargoItems(
+  sections: DropoffSection[],
+  mode: CargoMode,
+  /** Wizard drop-off index -> the `sequence_order` that stop is submitted with. */
+  sequenceByDropoff: Map<number, number>,
+): CargoItemPayload[] {
   const items: CargoItemPayload[] = []
 
   for (const section of sections) {
+    const dropoffSequence = sequenceByDropoff.get(section.dropoffIndex)
     for (const g of section.groups) {
       const catalogFields: Partial<CargoItemPayload> = {
         ...(g.commodityId   ? { commodity_id:   g.commodityId   } : g.commodity     ? { commodity_text: g.commodity     } : {}),
@@ -78,68 +60,18 @@ function buildCargoItems(sections: DropoffSection[], mode: CargoMode): CargoItem
         ...(g.ashcId        ? { ashc_id:        g.ashcId        } : g.additionalShc ? { ashc_text:       g.additionalShc } : {}),
       }
 
-      let quantity:   number | undefined
-      let weight_kg:  number | undefined
-      let volume_cbm: number | undefined
-      let length_cm:  number | undefined
-      let width_cm:   number | undefined
-      let height_cm:  number | undefined
-
-      if (mode === 'palletized') {
-        const pallets = Number(g.numPallets) || 0
-        const gross   = Number(g.grossWeightPerPallet) || 0
-        const l       = Number(g.palletLength) || 0
-        const w       = Number(g.palletWidth)  || 0
-        const h       = Number(g.palletHeight) || 0
-
-        if (pallets > 0) {
-          quantity  = pallets
-          const grossKG = g.palletWeightUnit === 'lbs' ? gross * 0.453592 : gross
-          if (grossKG > 0) weight_kg = parseFloat((pallets * grossKG).toFixed(2))
-          if (l > 0 && w > 0 && h > 0) {
-            volume_cbm = parseFloat((pallets * (l * w * h) / 1_000_000).toFixed(4))
-          }
-          if (l > 0) length_cm = l
-          if (w > 0) width_cm  = w
-          if (h > 0) height_cm = h
-        }
-      } else {
-        const pieces = Number(g.pieces)
-        const l      = Number(g.looseLength)
-        const w      = Number(g.looseWidth)
-        const h      = Number(g.looseHeight)
-        const wt     = Number(g.weight)
-
-        if (Number.isFinite(pieces) && pieces > 0) quantity = pieces
-
-        if (Number.isFinite(wt) && wt > 0 && Number.isFinite(pieces) && pieces > 0) {
-          const weightKG = g.weightUnit === 'lbs' ? wt * 0.453592 : wt
-          weight_kg = parseFloat(
-            (g.perItem === 'Per Item' ? pieces * weightKG : weightKG).toFixed(2),
-          )
-        }
-
-        if (
-          Number.isFinite(l) && l > 0 &&
-          Number.isFinite(w) && w > 0 &&
-          Number.isFinite(h) && h > 0 &&
-          Number.isFinite(pieces) && pieces > 0
-        ) {
-          volume_cbm = parseFloat((pieces * (l * w * h) / 1_000_000).toFixed(4))
-          length_cm  = l
-          width_cm   = w
-          height_cm  = h
-        }
-      }
+      const r = mode === 'palletized' ? palletizedGroup(g) : looseGroup(g)
+      if (!r) continue
 
       items.push({
         ...catalogFields,
-        ...(quantity   !== undefined && { quantity }),
-        ...(weight_kg  !== undefined && { weight_kg }),
-        ...(volume_cbm !== undefined && { volume_cbm }),
-        ...(length_cm  !== undefined && { length_cm }),
-        ...(width_cm   !== undefined && { width_cm }),
-        ...(height_cm  !== undefined && { height_cm }),
+        ...(dropoffSequence != null && { dropoff_sequence_order: dropoffSequence }),
+        quantity: r.count,
+        ...(r.grossWeightKg > 0 && { weight_kg:  parseFloat(r.grossWeightKg.toFixed(2)) }),
+        ...(r.volumeCbm     > 0 && { volume_cbm: parseFloat(r.volumeCbm.toFixed(4)) }),
+        ...(r.lengthCm !== null && { length_cm: r.lengthCm }),
+        ...(r.widthCm  !== null && { width_cm:  r.widthCm  }),
+        ...(r.heightCm !== null && { height_cm: r.heightCm }),
       })
     }
   }
@@ -170,7 +102,26 @@ export default function StepReview({ selectedService, pendingFiles, onBack, onNe
 
   const allGroups = sections.flatMap((s) => s.groups)
 
-  let docsFailed = false
+  /**
+   * Documents already in Cloudinary for THIS attempt.
+   *
+   * The upload runs before the booking is created, so a create that failed used
+   * to send the same files up again on every press of the button, piling up
+   * duplicates in Cloudinary that nothing ever cleaned away. Holding the URLs
+   * means the retry reuses what already landed.
+   */
+  const [uploadedUrls, setUploadedUrls] = useState<string[] | null>(null)
+
+  /**
+   * One key per booking attempt, reused by every retry of it.
+   *
+   * If the request times out on our side after the server has already committed
+   * the booking, pressing the button again would otherwise book the same trip
+   * twice. The server matches on this key and returns the original instead.
+   * Cleared once a booking is successfully created, so a genuinely new booking
+   * from the same screen mints a fresh one.
+   */
+  const attemptKey = useRef<string | null>(null)
 
   const confirm = async () => {
     if (!vehicle) return
@@ -182,41 +133,55 @@ export default function StepReview({ selectedService, pendingFiles, onBack, onNe
     setError(null)
 
     try {
-      const me = await getMe()
-      const clientId = me.clients?.client_id
-      if (!clientId) {
-        setError('Client profile not found. Please contact support.')
-        setLoading(false)
-        return
-      }
-
-      let transactionUrls: string[] = []
-      if (pendingFiles.length > 0) {
+      // Upload once per attempt, then reuse.
+      let transactionUrls = uploadedUrls
+      if (!transactionUrls) {
         setDocUploadState('uploading')
         try {
           const uploadResult = await uploadService.uploadBookingDocuments(pendingFiles)
           transactionUrls = uploadResult.urls
+          setUploadedUrls(transactionUrls)
           setDocUploadState('done')
         } catch (uploadErr) {
           console.error('Document upload failed:', uploadErr)
-          docsFailed = true
           setDocUploadState('failed')
+          // The API requires at least one document, so there is no "book it
+          // anyway" path — submitting without them is a guaranteed rejection.
+          // Say so plainly instead of letting it fail as a validation error.
+          setError(
+            'Your transaction documents could not be uploaded, and a booking cannot be ' +
+            'submitted without them. Check your connection and try again.',
+          )
+          return
         }
       }
 
-      const { grossWeight, volume, stackableRequired } = calcSummary(sections, mode)
-      const cargoItems = buildCargoItems(sections, mode)
+      if (transactionUrls.length === 0) {
+        setError('At least one transaction document is required.')
+        return
+      }
 
-      const maxLength = Math.max(
-        ...sections.flatMap((s) =>
-          s.groups.map((g) =>
-            mode === 'palletized' ? Number(g.palletLength) || 0 : Number(g.looseLength) || 0,
-          ),
-        ),
+      // Exactly the figures the client was shown — same function, same numbers.
+      const cargo = calcCargoSummary(sections, mode)
+
+      // Built once, so the cargo sections and the destinations agree on which
+      // stop is which. A blank drop-off is filtered out, which shifts the
+      // positions of everything after it — the wizard index a cargo section
+      // carries is therefore NOT its sequence_order, and has to be mapped.
+      const activeDropoffs = dropoffs
+        .map((address, dropoffIndex) => ({ address, dropoffIndex }))
+        .filter((d) => Boolean(d.address))
+
+      const sequenceByDropoff = new Map(
+        activeDropoffs.map((d, i) => [d.dropoffIndex, i + 1] as const),
       )
 
+      const cargoItems = buildCargoItems(sections, mode, sequenceByDropoff)
+
+      if (!attemptKey.current) attemptKey.current = crypto.randomUUID()
+
       const payload = {
-        client_id:         clientId,
+        idempotency_key:   attemptKey.current,
         origin:            pickup,
         ...(pickupLat != null && { origin_latitude:  pickupLat }),
         ...(pickupLng != null && { origin_longitude: pickupLng }),
@@ -224,39 +189,43 @@ export default function StepReview({ selectedService, pendingFiles, onBack, onNe
         schedule_date:     date,
         call_time:         time,
         ...(paymentTerms            && { payment_terms:       paymentTerms }),
-        ...(grossWeight > 0         && { required_weight_kg:  parseFloat(grossWeight.toFixed(2)) }),
-        ...(volume      > 0         && { required_volume_cbm: parseFloat(volume.toFixed(4)) }),
-        ...(maxLength   > 0         && { required_length_cm:  maxLength }),
-        stackable_required: stackableRequired,
-        ...(transactionUrls.length > 0 && { transaction_documents: transactionUrls }),
+        ...(cargo.grossWeightKg  > 0 && { required_weight_kg:     parseFloat(cargo.grossWeightKg.toFixed(2)) }),
+        ...(cargo.volumeCbm      > 0 && { required_volume_cbm:    parseFloat(cargo.volumeCbm.toFixed(4)) }),
+        ...(cargo.netWeightKg    > 0 && { required_net_weight_kg: parseFloat(cargo.netWeightKg.toFixed(2)) }),
+        // The longest edge of any single item, whichever axis it was entered on.
+        ...(cargo.maxDimensionCm > 0 && { required_length_cm:     cargo.maxDimensionCm }),
+        non_stackable_cargo: cargo.hasNonStackable,
+        transaction_documents: transactionUrls,
         ...(cargoItems.length > 0      && { cargo_items:           cargoItems }),
-        destinations: dropoffs
-          .filter(Boolean)
-          .map((address, i) => ({
-            address,
-            sequence_order: i + 1,
-            ...(dropoffCoords[i]?.lat != null && { latitude:  dropoffCoords[i].lat }),
-            ...(dropoffCoords[i]?.lng != null && { longitude: dropoffCoords[i].lng }),
-          })),
+        destinations: activeDropoffs.map(({ address, dropoffIndex }, i) => ({
+          address,
+          sequence_order: i + 1,
+          // Coordinates are stored against the ORIGINAL wizard index, so they
+          // must be read with that index, not the post-filter one. They were
+          // read with the filtered index before, which silently attached the
+          // wrong coordinates to every stop after a blank one.
+          ...(dropoffCoords[dropoffIndex]?.lat != null && { latitude:  dropoffCoords[dropoffIndex].lat }),
+          ...(dropoffCoords[dropoffIndex]?.lng != null && { longitude: dropoffCoords[dropoffIndex].lng }),
+        })),
       }
 
       const result = await bookingService.createBooking(payload)
       const bookingReference = result?.reference_number ?? result?.booking_id ?? null
+
+      // Booked. Release the attempt key and the cached uploads so "New booking"
+      // starts genuinely fresh rather than resolving back to this one.
+      attemptKey.current = null
+      setUploadedUrls(null)
 
       setBookingId(bookingReference)
       dispatch(resetBooking())
       onClearFiles()
       setSubmitted(true)
 
-      appToast.success(
-        docsFailed
-          ? 'Booking submitted, but document upload failed. Contact support.'
-          : 'Booking submitted successfully.',
-        {
-          action: 'booking-create',
-          ...(result?.booking_id != null ? { entityId: result.booking_id } : {}),
-        },
-      )
+      appToast.success('Booking submitted successfully.', {
+        action: 'booking-create',
+        ...(result?.booking_id != null ? { entityId: result.booking_id } : {}),
+      })
 
     } catch (err: unknown) {
       console.error('Booking failed:', err)
@@ -463,8 +432,8 @@ export default function StepReview({ selectedService, pendingFiles, onBack, onNe
 
                               {g.commodity     && <DetailRow label="Commodity"      value={g.commodity} />}
                               {g.product       && <DetailRow label="Product"        value={g.product} />}
-                              {g.shc           && <DetailRow label="SHC"            value={g.shc} />}
-                              {g.additionalShc && <DetailRow label="Additional SHC" value={g.additionalShc} />}
+                              {g.shc           && <DetailRow label="Special Handling Code"            value={g.shc} />}
+                              {g.additionalShc && <DetailRow label="Additional Special Handling Code" value={g.additionalShc} />}
 
                               {mode === 'loose' && (
                                 <>
@@ -620,8 +589,8 @@ function InfoBox({
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between px-4 py-2.5">
-      <span className="ff-sc booking-text text-xs lg:text-sm uppercase tracking-wider">{label}</span>
+    <div className="flex items-center justify-between gap-3 px-4 py-2.5">
+      <span className="ff-sc booking-text text-xs lg:text-sm uppercase tracking-wider leading-tight">{label}</span>
       <span className="ff-sc booking-text text-white text-sm lg:text-base text-right">{value}</span>
     </div>
   )

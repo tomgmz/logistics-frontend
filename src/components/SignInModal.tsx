@@ -264,7 +264,7 @@ function EmailStep({ onSuccess }: { onSuccess: (email: string) => void }) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!email.trim()) return
+    if (loading || !email.trim()) return
     setLoading(true); setError('')
     try {
       onSuccess(email.trim().toLowerCase())
@@ -326,6 +326,7 @@ function MethodStep({
   const [error,   setError]   = useState('')
 
   const handleOtp = async () => {
+    if (loading) return
     setLoading('otp'); setError('')
     try {
       await requestOtp(email)
@@ -468,6 +469,7 @@ function OtpStep({
   onBack: () => void
 }) {
   const lockExpiresAt                     = useRef<number>(0)
+  const submitting                        = useRef(false)
   const [otp,           setOtp]           = useState<string[]>(Array(OTP_LENGTH).fill(''))
   const [loading,       setLoading]       = useState(false)
   const [error,         setError]         = useState('')
@@ -580,11 +582,15 @@ function OtpStep({
   const code = otp.join('')
 
   const handleSubmit = useCallback(async () => {
+    if (submitting.current) return
     if (code.length !== OTP_LENGTH || lockState !== 'none') return
+    submitting.current = true
     setLoading(true); setError('')
+    let succeeded = false
     try {
       const res = await verifyOtp(email, code)
       const destination = res.portalUrl ?? getFallbackRoute(res.user.role)
+      succeeded = true
       onSuccess(res.user, destination)
     } catch (err) {
       const message = extractErrorMessage(err, 'Invalid or expired code. Please try again.')
@@ -610,7 +616,11 @@ function OtpStep({
 
       if (detected === 'none') focusInput(0)
     } finally {
-      setLoading(false)
+      // on success keep the button disabled until the modal leaves this step
+      if (!succeeded) {
+        submitting.current = false
+        setLoading(false)
+      }
     }
   }, [code, email, onSuccess, lockState])
 
@@ -785,6 +795,7 @@ function PasswordStep({
   onBack: () => void
 }) {
   const lockExpiresAt = useRef<number>(0)
+  const submitting    = useRef(false)
   const [password,      setPassword]      = useState('')
   const [showPassword,  setShowPassword]  = useState(false)
   const [loading,       setLoading]       = useState(false)
@@ -824,11 +835,15 @@ function PasswordStep({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (submitting.current) return
     if (!password || lockState !== 'none') return
+    submitting.current = true
     setLoading(true); setError('')
+    let succeeded = false
     try {
       const res = await loginWithPassword(email, password)
       const destination = res.portalUrl ?? getFallbackRoute(res.user.role)
+      succeeded = true
       onSuccess(res.user, destination)
     } catch (err) {
       const message = extractErrorMessage(err, 'Incorrect password. Please try again.')
@@ -852,7 +867,11 @@ function PasswordStep({
         }
       }
     } finally {
-      setLoading(false)
+      // on success keep the button disabled until the modal leaves this step
+      if (!succeeded) {
+        submitting.current = false
+        setLoading(false)
+      }
     }
   }
 

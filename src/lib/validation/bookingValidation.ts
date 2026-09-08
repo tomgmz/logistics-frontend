@@ -1,5 +1,6 @@
 import type { CargoMode, ItemGroup, DropoffSection } from '@/lib/store/slice/booking.slice'
 import { nowDate } from '@/app/utils/serverTime'
+import { phDayPlus, phDayPlusYear, dayOfWeek } from '@/lib/ph-date'
 
 export interface ScheduleErrors {
   date?: string
@@ -29,7 +30,6 @@ export interface GroupErrors {
   commodity?: string
   product?: string
   shc?: string
-  additionalShc?: string
 }
 
 export interface SectionErrors {
@@ -65,33 +65,23 @@ export function validateSchedule(date: string, time: string): ScheduleErrors {
   if (!date.trim()) {
     errors.date = 'Date is required'
   } else {
-    const [year, month, day] = date.split('-').map(Number)
-    const selectedDate = new Date(year, month - 1, day)
-
+    // Compared as Philippine calendar days — plain YYYY-MM-DD strings, which
+    // sort correctly — exactly as the API does. Doing this in browser-local time
+    // meant a device in another zone disagreed with the server about which day
+    // "tomorrow" is, and about which dates are Sundays.
+    const selected = date.slice(0, 10)
     const serverNow = nowDate()
 
-    // Tomorrow at the earliest — same rule the API enforces.
-    const tomorrow = new Date(serverNow)
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    const earliestDate = new Date(
-      tomorrow.getFullYear(),
-      tomorrow.getMonth(),
-      tomorrow.getDate(),
-    )
-
-    const maxDate = new Date(serverNow)
-    maxDate.setFullYear(maxDate.getFullYear() + 1)
-    const maxDateOnly = new Date(maxDate.getFullYear(), maxDate.getMonth(), maxDate.getDate())
+    const earliest = phDayPlus(serverNow, 1)
+    const latest   = phDayPlusYear(serverNow)
 
     // The picker cannot offer a Sunday, but a date restored from a stale draft
     // still can be — catch it here rather than losing the wizard to a 400.
-    if (selectedDate.getDay() === REST_WEEKDAY) {
+    if (dayOfWeek(selected) === REST_WEEKDAY) {
       errors.date = 'Deliveries are not scheduled on Sundays — please pick another day'
-    } else if (selectedDate < earliestDate) {
-      const pad = (n: number) => String(n).padStart(2, '0')
-      const earliest = `${earliestDate.getFullYear()}-${pad(earliestDate.getMonth() + 1)}-${pad(earliestDate.getDate())}`
+    } else if (selected < earliest) {
       errors.date = `Booking must be at least a day ahead (earliest: ${earliest})`
-    } else if (selectedDate > maxDateOnly) {
+    } else if (selected > latest) {
       errors.date = 'Date cannot be more than 1 year in the future'
     }
   }
@@ -114,8 +104,7 @@ export function validateGroup(group: ItemGroup, mode: CargoMode): GroupErrors {
 
   if (!group.commodity.trim())    errors.commodity    = 'Commodity is required'
   if (!group.product.trim())      errors.product      = 'Product is required'
-  if (!group.shc.trim())          errors.shc          = 'SHC is required'
-  if (!group.additionalShc.trim()) errors.additionalShc = 'Additional SHC is required'
+  if (!group.shc.trim())          errors.shc          = 'Special Handling Code is required'
 
   if (mode === 'loose') {
     if (!isPositiveNumber(group.pieces))      errors.pieces      = 'Enter a valid piece count'

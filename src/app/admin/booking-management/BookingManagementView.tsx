@@ -106,6 +106,9 @@ type DetailWithExtra = BookingDetail & {
   required_volume_cbm?: number | null
   required_length_cm?: number | null
   stackable_required?: boolean | null
+  non_stackable_cargo?: boolean | null
+  cargo_density_kg_cbm?: number | null
+  required_net_weight_kg?: number | null
   accounting_status?: 'pending' | 'approved' | 'rejected' | 'forwarded' | null
   gm_status?:         'pending' | 'approved' | 'rejected' | null
   ops_status?:        'pending' | 'assigned' | null
@@ -910,25 +913,34 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     }
     setAssignBusy(true)
     try {
-      if (assignVendorMode) {
-        await assignmentService.assignBooking(selectedId, {
-          is_vendor_supplied: true,
-          ...Object.fromEntries(
-            Object.entries(vendorForm).map(([k, v]) => [k, v.trim() || undefined]),
-          ),
-        })
-      } else {
-        await assignmentService.assignBooking(selectedId, {
-          driver_id: assignDriverId,
-          truck_id:  assignTruckId,
-        })
-      }
+      const result = assignVendorMode
+        ? await assignmentService.assignBooking(selectedId, {
+            is_vendor_supplied: true,
+            ...Object.fromEntries(
+              Object.entries(vendorForm).map(([k, v]) => [k, v.trim() || undefined]),
+            ),
+          })
+        : await assignmentService.assignBooking(selectedId, {
+            driver_id: assignDriverId,
+            truck_id:  assignTruckId,
+          })
       setCommittedAssignment({ driverId: assignDriverId, truckId: assignTruckId })
       setAssignEditMode(false)
       await openDetail(selectedId)
       await loadPage()
       assignmentService.getAll().then(setAllAssignments).catch(() => null)
-      appToast.success('Driver and vehicle assigned.', { action: 'assign', entityId: selectedId })
+      // The assignment stands either way — operations may know something the
+      // recorded figures do not — but an overloaded vehicle must not go by
+      // silently. It is on the audit log too, not just this toast.
+      const warning = result?.capacity_warning
+      if (warning?.reasons?.length) {
+        appToast.warn(
+          `Assigned, but this vehicle may not fit the load. ${warning.reasons[0]}`,
+          { action: 'assign', entityId: selectedId },
+        )
+      } else {
+        appToast.success('Driver and vehicle assigned.', { action: 'assign', entityId: selectedId })
+      }
     } catch (e) {
       appToast.error(getApiErrorMessage(e, 'Request failed. Please try again.'), { action: 'assign', entityId: selectedId })
     } finally {
@@ -1358,11 +1370,21 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                               </div>
                             )}
                           </div>
-                          {d.stackable_required && (
+                          {/* The constraint worth flagging is cargo that must NOT
+                              be stacked — it dictates how the truck is loaded.
+                              `stackable_required` is the old field, set with the
+                              opposite sense and never populated for loose cargo;
+                              it is still read so historical bookings keep their
+                              note. */}
+                          {d.non_stackable_cargo ? (
+                            <p className="text-[11px] text-amber-400 mt-1.5 flex items-center gap-1.5">
+                              <Layers size={11} />Contains non-stackable cargo
+                            </p>
+                          ) : d.stackable_required ? (
                             <p className="text-[11px] text-[var(--color-cyan)] mt-1.5 flex items-center gap-1.5">
                               <Layers size={11} />Stackable pallets included
                             </p>
-                          )}
+                          ) : null}
                         </div>
                       )}
 
@@ -1398,8 +1420,8 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                                   <div className="divide-y divide-white/[0.04]">
                                     {commodity  && <CargoRow label="Commodity" value={commodity} />}
                                     {product    && <CargoRow label="Product"   value={product} />}
-                                    {shc        && <CargoRow label="SHC"       value={shc}  mono />}
-                                    {ashc       && <CargoRow label="Add. SHC"  value={ashc} mono />}
+                                    {shc        && <CargoRow label="Special Handling Code"            value={shc}  mono />}
+                                    {ashc       && <CargoRow label="Additional Special Handling Code" value={ashc} mono />}
                                     {weightStr  && <CargoRow label="Weight"    value={weightStr} accent />}
                                     {volumeStr  && <CargoRow label="Volume"    value={volumeStr} accent />}
                                     {dimsStr    && <CargoRow label="L × W × H" value={dimsStr} />}
@@ -1614,7 +1636,7 @@ function CargoRow({
 }) {
   return (
     <div className="flex items-center justify-between px-2.5 py-1.5 gap-3">
-      <span className="text-[10px] uppercase tracking-wider text-white/30 shrink-0">{label}</span>
+      <span className="text-[10px] uppercase tracking-wider text-white/30 leading-tight">{label}</span>
       <span
         className={`text-xs text-right truncate ${mono ? 'font-mono' : ''}`}
         style={{ color: accent ? 'var(--color-cyan)' : 'rgba(255,255,255,0.75)' }}

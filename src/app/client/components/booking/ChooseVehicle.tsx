@@ -10,30 +10,17 @@ import { useTrucks } from '@/lib/hooks/useTrucks'
 import './BookingDetails.css'
 import WizBtn from '../WizButton'
 import { selectCargoSummary, selectAllGroups } from '@/lib/store/bookingSelectors'
+import { assessFit } from '@/lib/cargo/capacity'
 
 interface Props {
   onNext: () => void
   onBack: () => void
 }
 
-function getStatus(
-  v: { maxWeightKG: number; maxVolumeCBM: number },
-  grossWeight: number,
-  volume: number,
-) {
-  const wOver = grossWeight > v.maxWeightKG && v.maxWeightKG > 0
-  const vOver = volume > v.maxVolumeCBM && v.maxVolumeCBM > 0
-  const isOverloaded = wOver || vOver
-  let tripsNeeded = 1
-  if (v.maxWeightKG > 0 && grossWeight > 0)
-    tripsNeeded = Math.max(tripsNeeded, Math.ceil(grossWeight / v.maxWeightKG))
-  if (v.maxVolumeCBM > 0 && volume > 0)
-    tripsNeeded = Math.max(tripsNeeded, Math.ceil(volume / v.maxVolumeCBM))
-  const wUtil = v.maxWeightKG > 0 ? grossWeight / v.maxWeightKG : 0
-  const vUtil = v.maxVolumeCBM > 0 ? volume / v.maxVolumeCBM : 0
-  const isSuggested = !isOverloaded && (wUtil > 0 || vUtil > 0) && wUtil <= 0.8 && vUtil <= 0.8
-  return { isOverloaded, isSuggested, tripsNeeded }
-}
+/* Fit is assessed in `lib/cargo/capacity`, against USABLE volume (a truck body
+ * is never loaded to 100% of its cube) and, for palletized freight, against the
+ * floor positions the bed actually offers. It stays advisory: the badge warns,
+ * it does not block. */
 
 const slideV = {
   enter:  (d: number) => ({ x: d > 0 ? 80 : -80, opacity: 0 }),
@@ -64,7 +51,7 @@ export default function StepVehicle({ onNext, onBack }: Props) {
   }
 
   const vehicle = vehicles[idx]
-  const status  = vehicle ? getStatus(vehicle, summary.grossWeight, summary.volume) : null
+  const status  = vehicle ? assessFit(vehicle, summary) : null
 
   const handleReviewBooking = () => {
     if (!vehicle) return
@@ -151,14 +138,15 @@ export default function StepVehicle({ onNext, onBack }: Props) {
             <StatCard label={mode === 'palletized' ? 'Total Pallets' : 'Total Pieces'}
               value={summary.totalPieces > 0 ? String(summary.totalPieces) : '—'} />
             <StatCard label="Gross Weight"
-              value={summary.grossWeight > 0 ? `${summary.grossWeight.toFixed(1)} KG` : '—'} />
+              value={summary.grossWeightKg > 0 ? `${summary.grossWeightKg.toFixed(1)} KG` : '—'} />
             <StatCard label="Volume"
-              value={summary.volume > 0 ? `${summary.volume.toFixed(2)} CBM` : '—'} />
-            {mode === 'palletized'
-              ? <StatCard label="Net Weight"
-                  value={summary.netWeight > 0 ? `${summary.netWeight.toFixed(1)} KG` : '—'} />
-              : <StatCard label="Density"
-                  value={summary.density > 0 ? `${summary.density.toFixed(2)} KG/CBM` : '—'} />}
+              value={summary.volumeCbm > 0 ? `${summary.volumeCbm.toFixed(2)} CBM` : '—'} />
+            {mode === 'palletized' && (
+              <StatCard label="Net Weight"
+                value={summary.netWeightKg > 0 ? `${summary.netWeightKg.toFixed(1)} KG` : '—'} />
+            )}
+            <StatCard label="Density"
+              value={summary.densityKgCbm > 0 ? `${summary.densityKgCbm.toFixed(2)} KG/CBM` : '—'} />
           </div>
           <div className="flex flex-col gap-1 mt-1">
             {mode === 'loose' ? (
@@ -254,9 +242,34 @@ export default function StepVehicle({ onNext, onBack }: Props) {
                     </motion.span>
                   )}
                 </AnimatePresence>
-                {status.isOverloaded && status.tripsNeeded > 1 && (
-                  <p className="ff-sc booking-text !text-[10px] sm:!text-xs lg:!text-sm uppercase tracking-[0.10em] text-white/50">
-                    · {status.tripsNeeded} trips needed for this cargo volume
+                {/* Say WHICH limit is the problem, and lead with the one that
+                    no amount of splitting solves: an item that will not go into
+                    this body at all. Reporting that as a shortage of floor
+                    positions, alongside a trip count, told the client to split a
+                    load that cannot be split. */}
+                {status.doesNotFit ? (
+                  <p className="ff-sc booking-text !text-[10px] sm:!text-xs lg:!text-sm uppercase tracking-[0.10em] text-red-400">
+                    {status.overLength
+                      ? `· item is ${summary.maxDimensionCm} cm long — this body takes ${vehicle.maxLengthCM} cm`
+                      : '· an item this size will not fit inside this body in any orientation'}
+                  </p>
+                ) : (
+                  <>
+                    {status.tripsNeeded > 1 && (
+                      <p className="ff-sc booking-text !text-[10px] sm:!text-xs lg:!text-sm uppercase tracking-[0.10em] text-white/50">
+                        · {status.tripsNeeded} trips needed for this cargo
+                      </p>
+                    )}
+                    {status.overFloorSpace && status.positionsNeeded != null && status.positionsAvailable != null && (
+                      <p className="ff-sc booking-text !text-[10px] sm:!text-xs lg:!text-sm uppercase tracking-[0.10em] text-amber-400/80">
+                        · needs {status.positionsNeeded} floor positions, bed fits {status.positionsAvailable}
+                      </p>
+                    )}
+                  </>
+                )}
+                {status.stackingMismatch && (
+                  <p className="ff-sc booking-text !text-[10px] sm:!text-xs lg:!text-sm uppercase tracking-[0.10em] text-amber-400/80">
+                    · load contains non-stackable items and this body is not stackable-friendly
                   </p>
                 )}
               </div>
@@ -267,10 +280,10 @@ export default function StepVehicle({ onNext, onBack }: Props) {
                 exit={{ opacity: 0 }} transition={{ duration: 0.22 }} className="grid grid-cols-3 gap-2 sm:gap-3">
                 <CapCard label="Maximum Volume Capacity"
                   value={vehicle.maxVolumeCBM > 0 ? `${vehicle.maxVolumeCBM} CBM` : '—'}
-                  overloaded={summary.volume > vehicle.maxVolumeCBM && vehicle.maxVolumeCBM > 0} />
+                  overloaded={!!status?.overVolume} />
                 <CapCard label="Maximum Weight Capacity"
                   value={`${vehicle.maxWeightKG.toLocaleString()} KG`}
-                  overloaded={summary.grossWeight > vehicle.maxWeightKG && vehicle.maxWeightKG > 0} />
+                  overloaded={!!status?.overWeight} />
                 <CapCard label="Maximum Length Capacity"
                   value={vehicle.maxLengthCM > 0 ? `${vehicle.maxLengthCM} CM` : '0'}
                   overloaded={false} />
