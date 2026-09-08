@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useRouter } from 'next/navigation'
 import { AxiosError } from 'axios'
 import { requestOtp, verifyOtp, loginWithPassword, getMe, getAuthStatus, AuthUser } from '@/lib/api/auth.api'
 import { useAuthStore } from '@/lib/store/auth.store'
@@ -589,7 +588,9 @@ function OtpStep({
     let succeeded = false
     try {
       const res = await verifyOtp(email, code)
-      const destination = res.portalUrl ?? getFallbackRoute(res.user.role)
+      // The API's portalUrl is the `/portal/*` namespace, which this app does
+      // not route; ROLE_ROUTES is the web app's own map.
+      const destination = getFallbackRoute(res.user.role)
       succeeded = true
       onSuccess(res.user, destination)
     } catch (err) {
@@ -842,7 +843,9 @@ function PasswordStep({
     let succeeded = false
     try {
       const res = await loginWithPassword(email, password)
-      const destination = res.portalUrl ?? getFallbackRoute(res.user.role)
+      // The API's portalUrl is the `/portal/*` namespace, which this app does
+      // not route; ROLE_ROUTES is the web app's own map.
+      const destination = getFallbackRoute(res.user.role)
       succeeded = true
       onSuccess(res.user, destination)
     } catch (err) {
@@ -1062,11 +1065,15 @@ interface SignInModalProps {
 }
 
 export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
-  const router              = useRouter()
   const [step,   setStep]   = useState<Step>('email')
   const [email,  setEmail]  = useState('')
   const [method, setMethod] = useState<'otp' | 'password' | null>(null)
   const resendExpiresAt     = useRef<number>(0)
+  const redirectTimer       = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => () => {
+    if (redirectTimer.current) clearTimeout(redirectTimer.current)
+  }, [])
 
   const handleClose = useCallback(() => {
     onClose()
@@ -1111,26 +1118,31 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
       // keep original login response user
     }
 
-    useAuthStore.getState().setUser(finalUser)
-
     const shouldChangePassword = finalUser.must_change_password
 
     setStep('success')
-    setTimeout(() => {
+
+    // Commit the user only once the success animation is done, and let
+    // AuthRehydrator own the redirect (it already routes on `user` for both
+    // the portal and the must-change-password case). Setting the user or
+    // navigating from here as well produced two replaces to the same route,
+    // so the portal mounted and then immediately remounted.
+    redirectTimer.current = setTimeout(() => {
+      redirectTimer.current = null
+
+      if (!shouldChangePassword) {
+        const ch = new BroadcastChannel(`auth_sync_${finalUser.user_id}`)
+        ch.postMessage({ type: 'LOGIN', user: finalUser, portalUrl })
+        ch.close()
+      }
+
+      useAuthStore.getState().setUser(finalUser)
+
       handleClose()
       setStep('email')
       setEmail('')
       setMethod(null)
       resendExpiresAt.current = 0
-
-      if (shouldChangePassword) {
-        router.replace(`/change-password?redirect=${encodeURIComponent(portalUrl)}`)
-      } else {
-        const ch = new BroadcastChannel(`auth_sync_${finalUser.user_id}`)
-        ch.postMessage({ type: 'LOGIN', user: finalUser, portalUrl })
-        ch.close()
-        router.replace(portalUrl)
-      }
     }, 1800)
   }
 

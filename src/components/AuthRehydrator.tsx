@@ -2,13 +2,32 @@
 
 import { useEffect, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { getMe } from '@/lib/api/auth.api'
+import { getMe, type AuthUser } from '@/lib/api/auth.api'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { syncServerTime } from '@/app/utils/serverTime'
 import { ROLE_ROUTES } from '@/constants/roles'
 import axios from 'axios'
 
 const PUBLIC_PATHS = ['/']
+
+/**
+ * Every setUser() hands subscribers a new object identity, re-rendering each
+ * `useAuthStore((s) => s.user)` consumer. Skip the commit when getMe() returned
+ * exactly what the store already holds — the 401-then-refresh retry and any
+ * remount would otherwise re-render the whole tree for identical data.
+ *
+ * Note this cannot dedupe the first commit after a cold load: `partialize`
+ * persists a subset of AuthUser, so the rehydrated value legitimately differs
+ * from the full one getMe() returns.
+ */
+function commitUser(
+  next: AuthUser,
+  setUser: (user: AuthUser) => void,
+): void {
+  const current = useAuthStore.getState().user
+  if (current && JSON.stringify(current) === JSON.stringify(next)) return
+  setUser(next)
+}
 
 export default function AuthRehydrator() {
   const setUser     = useAuthStore((s) => s.setUser)
@@ -138,7 +157,7 @@ export default function AuthRehydrator() {
       try {
         const user = await getMe()
         if (cancelled) return
-        setUser(user)
+        commitUser(user, setUser)
         openChannel(user.user_id)
         return
       } catch (err) {
@@ -150,7 +169,7 @@ export default function AuthRehydrator() {
         await axios.post('/api/auth/refresh', {}, { withCredentials: true })
         const user = await getMe()
         if (cancelled) return
-        setUser(user)
+        commitUser(user, setUser)
         openChannel(user.user_id)
         return
       } catch {
