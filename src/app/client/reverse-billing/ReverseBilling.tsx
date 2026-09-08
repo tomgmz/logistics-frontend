@@ -771,7 +771,7 @@ function ProofOfPaymentForm({
         <div>
           <h3 className="text-base font-bold text-white">Proof of payment</h3>
           <p className="text-xs mt-1" style={{ color: MUTED }}>
-            SI {invoice.si_number} · {formatPeso(invoice.total_amount_due)} · due {formatDate(invoice.due_date)}
+            Service Invoice {invoice.si_number} · {formatPeso(invoice.total_amount_due)} · due {formatDate(invoice.due_date)}
           </p>
         </div>
 
@@ -890,7 +890,7 @@ function PeriodDetailPanel({ detail, onDone }: { detail: BillingPeriodDetail; on
               style={{ background: BG_CARD, borderColor: BORDER_C }}>
               <div className="flex items-center justify-between gap-3">
               <div className="flex flex-col min-w-0">
-                <span className="text-xs font-bold text-white font-mono">SI {inv.si_number}</span>
+                <span className="text-xs font-bold text-white">Service Invoice <span className="font-mono">{inv.si_number}</span></span>
                 <span className="text-[10px]" style={{ color: MUTED }}>
                   {inv.payment_terms_days}-day terms · due {formatDate(inv.due_date)}
                 </span>
@@ -901,7 +901,7 @@ function PeriodDetailPanel({ detail, onDone }: { detail: BillingPeriodDetail; on
                   <a href={inv.pdf_url} target="_blank" rel="noopener noreferrer"
                     className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider cursor-pointer"
                     style={{ color: CYAN }}>
-                    <Download size={13} /> Invoice
+                    <Download size={13} /> Service Invoice
                   </a>
                 )}
                 {/* The receipt that closes this invoice. Only exists once 8338
@@ -910,8 +910,8 @@ function PeriodDetailPanel({ detail, onDone }: { detail: BillingPeriodDetail; on
                   <a href={inv.receipt.pdf_url} target="_blank" rel="noopener noreferrer"
                     className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider cursor-pointer"
                     style={{ color: '#86efac' }}
-                    title={`Acknowledgement Receipt ${inv.receipt.ar_number}`}>
-                    <Download size={13} /> Receipt
+                    title={`Acknowledgement Receipt ${inv.receipt.ar_number} — opens the PDF`}>
+                    <Download size={13} /> Acknowledgement Receipt
                   </a>
                 )}
               </div>
@@ -922,7 +922,7 @@ function PeriodDetailPanel({ detail, onDone }: { detail: BillingPeriodDetail; on
                   {state.label}
                   {inv.receipt && (
                     <span className="ml-2 font-normal normal-case" style={{ color: MUTED }}>
-                      AR {inv.receipt.ar_number}
+                      Acknowledgement Receipt {inv.receipt.ar_number}
                     </span>
                   )}
                 </span>

@@ -262,7 +262,7 @@ function InvoiceRow({
   return (
     <div className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.07] bg-black/20 px-3 py-2.5">
       <div className="min-w-0">
-        <p className="text-xs font-bold text-white font-mono">SI {invoice.si_number}</p>
+        <p className="text-xs font-bold text-white">Service Invoice <span className="font-mono">{invoice.si_number}</span></p>
         <p className={`text-[10px] mt-0.5 ${overdue ? 'text-red-400' : 'text-white/40'}`}>
           {invoice.payment_terms_days}-day terms · due {fmtDate(invoice.due_date)}
           {overdue ? ' · overdue' : ''}
@@ -290,18 +290,18 @@ function InvoiceRow({
               className="inline-flex items-center gap-1 text-[11px] font-bold"
               style={{ color: '#86efac' }}
               title={`Acknowledgement Receipt ${invoice.receipt.ar_number}`}>
-              <Download size={13} /> AR {invoice.receipt.ar_number}
+              <Download size={13} /> Acknowledgement Receipt {invoice.receipt.ar_number}
             </a>
           ) : (
             <span className="text-[11px] font-bold" style={{ color: '#86efac' }}>
-              AR {invoice.receipt.ar_number}
+              Acknowledgement Receipt {invoice.receipt.ar_number}
             </span>
           )
         ) : canCreate && invoice.payment_status === 'paid' ? (
           <button type="button" onClick={onReceipt}
             className="px-2.5 py-1 rounded-lg text-[11px] font-bold text-black transition-opacity hover:opacity-90"
             style={{ background: CYAN }}>
-            Issue AR
+            Issue Acknowledgement Receipt
           </button>
         ) : null}
       </div>
@@ -846,7 +846,7 @@ function PeriodDetailPanel({
           onClick={() => !busy && setDialog(null)}>
           <div className="w-full max-w-md rounded-2xl border border-white/10 p-5 space-y-4"
             style={{ background: 'var(--color-surface)' }} onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-base font-bold text-white">Record payment · SI {dialog.invoice.si_number}</h3>
+            <h3 className="text-base font-bold text-white">Record payment · Service Invoice {dialog.invoice.si_number}</h3>
             {/* The server rejects a non-Friday and names the next one; this is the
                 nudge, not the rule. */}
             <p className="text-xs text-white/50">
@@ -965,8 +965,8 @@ function PeriodDetailPanel({
         <ReusableModal
           open
           title="Issue the Acknowledgement Receipt?"
-          description={`Closes the cycle for SI ${dialog.invoice.si_number}. The serial comes from the AR booklet counter; a hard copy still follows separately.`}
-          confirmLabel={busy ? 'Issuing…' : 'Issue AR'}
+          description={`Closes the cycle for Service Invoice ${dialog.invoice.si_number}. The serial comes from the Acknowledgement Receipt booklet counter; a hard copy still follows separately.`}
+          confirmLabel={busy ? 'Issuing…' : 'Issue Acknowledgement Receipt'}
           cancelLabel="Cancel"
           onConfirm={() => run(async () => {
             // The receipt hangs off the PAYMENT, not the invoice, so resolve the

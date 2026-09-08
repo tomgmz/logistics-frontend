@@ -228,7 +228,7 @@ export interface BookletSettings {
   next_number: number
   booklet_start: number | null
   booklet_end: number | null
-  /** Zero-padding: the AR pad prints 0015, the SI prints 151. */
+  /** Zero-padding: the receipt pad prints 0015, the invoice pad prints 151. */
   pad_width: number
   atp_number: string | null
   atp_date: string | null
