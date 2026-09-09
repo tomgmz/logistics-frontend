@@ -48,6 +48,7 @@ import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { bookingRef, bookingRefFromRecord } from '@/lib/booking'
 import ReusableModal, { RemarksModal } from '@/components/layout/ReusableModal'
+import TripPlanner from './TripPlanner'
 
 const PAGE_SIZE = 12
 
@@ -1054,6 +1055,19 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     (roleView === 'admin' || roleView === 'operations_manager') &&
     (normalizeBookingStatus(detail.status) === 'approved' || normalizeBookingStatus(detail.status) === 'assigned')
 
+  /**
+   * The trip planner appears once a vehicle is actually on the booking, and
+   * stays visible for the rest of the job.
+   *
+   * Not on `approved`: the whole question is how many times THIS truck has to go
+   * back and forth, which cannot be answered before one is chosen. And not
+   * hidden again once the run starts — the panel is where operations reads the
+   * per-run proof of loading, which only exists after the driver is moving.
+   */
+  const showTripPlanner = !!detail &&
+    (roleView === 'admin' || roleView === 'operations_manager') &&
+    ['assigned', 'in_transit', 'completed'].includes(normalizeBookingStatus(detail.status))
+
   return (
     <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-hidden ff-sc bg-[var(--color-bg)]">
 
@@ -1541,6 +1555,13 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                             setAssignTruckId(restore.truckId)
                           }}
                         />
+                      )}
+
+                      {/* How many runs the assigned vehicle makes. Only once a
+                          vehicle actually exists: until then there is no body to
+                          compare the load against, and nothing to plan around. */}
+                      {showTripPlanner && (
+                        <TripPlanner detail={detail} canEdit={canEdit} />
                       )}
 
                       {/* Proof of pickup, photographed by the driver at the origin. */}

@@ -118,6 +118,10 @@ export interface BookingDetail {
 
     booking_cargo_items?: {
     item_id:         string
+    // Which drop-off this line is bound for. Null on bookings taken before
+    // cargo was recorded per destination — the trip planner shows those under
+    // no particular bay rather than guessing one.
+    destination_id?: string | null
     commodity_id?:   string | null
     commodity_text?: string | null
     product_id?:     string | null
