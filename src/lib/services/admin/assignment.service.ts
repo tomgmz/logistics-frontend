@@ -41,8 +41,14 @@ export interface AssignmentRecord {
   vendor_vehicle_type: string | null
 
   // The booking this delivery belongs to. Its status — not the delivery's — is
-  // what says whether the crew is still tied up.
-  bookings?: { booking_id: string; status: string; schedule_date?: string | null } | null
+  // what says whether the crew is still tied up, and a completed booking keeps
+  // holding them until `fleet_return_at` says the vehicle reached the yard.
+  bookings?: {
+    booking_id:       string
+    status:           string
+    schedule_date?:   string | null
+    fleet_return_at?: string | null
+  } | null
 }
 
 // The four values the database permits. 'completed'/'cancelled' were accepted

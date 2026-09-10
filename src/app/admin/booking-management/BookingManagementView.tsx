@@ -24,6 +24,8 @@ import {
   ClipboardCheck,
 } from 'lucide-react'
 
+import { supabase } from '@/lib/supabase'
+import { pickDriver, pickTruck, type CrewSelection, type PairFilled } from '@/lib/crew-pairing'
 import { statusColor } from '@/components/map/status.colors'
 import { useModuleAccess } from '@/components/layout/ModuleAccess'
 import type { BookingDetail } from '@/app/types/maps/routemap.types'
@@ -690,17 +692,47 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
   // single list cannot be right for two bookings on different days.
   const scheduleDay = detail?.schedule_date?.slice(0, 10) ?? null
 
+  const reloadAssignableDrivers = useCallback(
+    async (signal?: { cancelled: boolean }) => {
+      if (!scheduleDay) { setDrivers([]); return }
+      try {
+        const rows = await driverService.getAssignable(scheduleDay, committedAssignment.driverId || null)
+        if (!signal?.cancelled) setDrivers(rows)
+      } catch {
+        if (!signal?.cancelled) setDrivers([])
+      }
+    },
+    [scheduleDay, committedAssignment.driverId],
+  )
+
   useEffect(() => {
-    if (!scheduleDay) { setDrivers([]); return }
+    const signal = { cancelled: false }
+    void reloadAssignableDrivers(signal)
+    return () => { signal.cancelled = true }
+  }, [reloadAssignableDrivers])
 
-    let cancelled = false
-    void driverService
-      .getAssignable(scheduleDay, committedAssignment.driverId || null)
-      .then((rows) => { if (!cancelled) setDrivers(rows) })
-      .catch(() => { if (!cancelled) setDrivers([]) })
+  // A driver ticking a day changes who operations may pick, and the operator is
+  // usually already sitting on the booking when it happens. The driver app
+  // pushes on `fleet:availability`; the signal only says "the pool moved", so we
+  // re-ask the API rather than patching the list from the payload — the server
+  // also applies the status and unreturned-vehicle gates, which this component
+  // has no way to evaluate.
+  useEffect(() => {
+    if (!scheduleDay) return
 
-    return () => { cancelled = true }
-  }, [scheduleDay, committedAssignment.driverId])
+    const channel = supabase
+      .channel('fleet:availability')
+      .on('broadcast', { event: 'driver_availability_changed' }, (msg) => {
+        // A write only ever rewrites one month, so a booking scheduled outside
+        // it cannot have been affected.
+        const month = (msg.payload as { month?: string })?.month
+        if (month && month !== scheduleDay.slice(0, 7)) return
+        void reloadAssignableDrivers()
+      })
+      .subscribe()
+
+    return () => { void supabase.removeChannel(channel) }
+  }, [scheduleDay, reloadAssignableDrivers])
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedSearch(search.trim()), 350)
@@ -753,7 +785,13 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
         if (a.booking_id === selectedId) return false
         const bookingStatus = a.bookings?.status
         if (!bookingStatus) return false
-        return bookingStatus !== 'completed' && bookingStatus !== 'cancelled'
+        if (bookingStatus === 'cancelled') return false
+        // A completed booking still holds its crew until the vehicle is
+        // confirmed back in the 8338 lot — the cargo being off the truck does
+        // not put the truck in the yard. The server refuses these assignments
+        // either way; this keeps the dropdowns from offering them first.
+        if (bookingStatus === 'completed') return !a.bookings?.fleet_return_at
+        return true
       }),
     [allAssignments, selectedId],
   )
@@ -793,6 +831,57 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     [trucks, busyTruckIds, assignTruckId],
   )
 
+  /**
+   * Driver and vehicle, kept in step with the fleet's pairing.
+   *
+   * The decision itself lives in lib/crew-pairing so it can be tested without
+   * rendering this screen; everything here is wiring. `pairFilled` travels with
+   * the selection and records which field the SYSTEM filled — see that module
+   * for why that distinction is the whole point.
+   */
+  const [pairFilled, setPairFilled] = useState<PairFilled>(null)
+
+  const pairedDriverOf = useCallback(
+    (truckId: string) => trucks.find((t) => t.truck_id === truckId)?.assigned_driver_id ?? null,
+    [trucks],
+  )
+
+  const pairedTruckOf = useCallback(
+    (driverId: string) => trucks.find((t) => t.assigned_driver_id === driverId)?.truck_id ?? null,
+    [trucks],
+  )
+
+  // "Pickable" is exactly "in the dropdown", which is already filtered by the
+  // calendar, the fleet return and BLOWBAGETS.
+  const truckPickable  = useCallback(
+    (id: string) => availableTrucks.some((t) => t.truck_id === id),
+    [availableTrucks],
+  )
+  const driverPickable = useCallback(
+    (id: string) => availableDrivers.some((d) => (d.drivers?.driver_id ?? d.user_id) === id),
+    [availableDrivers],
+  )
+
+  const applyCrew = useCallback((next: CrewSelection) => {
+    setAssignDriverId(next.driverId)
+    setAssignTruckId(next.truckId)
+    setPairFilled(next.filled)
+  }, [])
+
+  const handleDriverChange = useCallback((driverId: string) => {
+    applyCrew(pickDriver(
+      { driverId: assignDriverId, truckId: assignTruckId, filled: pairFilled },
+      driverId, pairedTruckOf, truckPickable,
+    ))
+  }, [applyCrew, assignDriverId, assignTruckId, pairFilled, pairedTruckOf, truckPickable])
+
+  const handleTruckChange = useCallback((truckId: string) => {
+    applyCrew(pickTruck(
+      { driverId: assignDriverId, truckId: assignTruckId, filled: pairFilled },
+      truckId, pairedDriverOf, driverPickable,
+    ))
+  }, [applyCrew, assignDriverId, assignTruckId, pairFilled, pairedDriverOf, driverPickable])
+
   const restoreAssignment = useCallback((detail: BookingDetail, assignment?: AssignmentRecord | { driver_id?: string | null; truck_id?: string | null }) => {
     const record = assignment as AssignmentRecord | undefined
     const isVendor = record?.is_vendor_supplied === true
@@ -814,6 +903,9 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     }
     setAssignDriverId(ids.driverId)
     setAssignTruckId(ids.truckId)
+    // These came off the booking, not out of the pairing, so nothing here may be
+    // moved or cleared by a later change to the other field.
+    setPairFilled(null)
     setCommittedAssignment(ids)
   }, [trucks])
 
@@ -826,6 +918,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     setRejectModalOpen(false)
     setAssignDriverId('')
     setAssignTruckId('')
+    setPairFilled(null)
     setAssignVendorMode(false)
     setVendorForm(emptyVendorForm)
     setAssignEditMode(false)
@@ -862,6 +955,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     setRejectModalOpen(false)
     setAssignDriverId('')
     setAssignTruckId('')
+    setPairFilled(null)
     setAssignVendorMode(false)
     setVendorForm(emptyVendorForm)
     setAssignEditMode(false)
@@ -1538,8 +1632,8 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                           vendorMode={assignVendorMode}
                           vendorForm={vendorForm}
                           selectClass={selectClass}
-                          onDriverChange={setAssignDriverId}
-                          onTruckChange={setAssignTruckId}
+                          onDriverChange={handleDriverChange}
+                          onTruckChange={handleTruckChange}
                           onVendorModeChange={setAssignVendorMode}
                           onVendorFieldChange={(key, value) =>
                             setVendorForm((prev) => ({ ...prev, [key]: value }))
@@ -1553,6 +1647,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                               : getPrefillFromBookingDetail(detail, trucks)
                             setAssignDriverId(restore.driverId)
                             setAssignTruckId(restore.truckId)
+                            setPairFilled(null)
                           }}
                         />
                       )}

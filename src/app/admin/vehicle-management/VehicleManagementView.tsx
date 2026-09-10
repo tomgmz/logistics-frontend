@@ -16,7 +16,7 @@ import {
   ClipboardCheck,
 } from 'lucide-react'
 
-import type { Truck, TruckInspection, CreateTruckInput, UpdateTruckInput } from '@/app/types/truck.types'
+import { assignedDriverName, needsReinspection, type Truck, type TruckInspection, type CreateTruckInput, type UpdateTruckInput } from '@/app/types/truck.types'
 import type { TruckModel } from '@/app/types/truck-model'
 import {
   adminFetchTrucksPaginated,
@@ -25,6 +25,8 @@ import {
   adminDeleteTruck,
   adminFetchTruckModels,
 } from '@/lib/services/admin/trucks.service'
+import { driverService } from '@/lib/services/admin/user-management.service'
+import type { DriverUser } from '@/app/types/admin/user-management.types'
 import ReusableModal from '@/components/layout/ReusableModal'
 import { useModuleAccess } from '@/components/layout/ModuleAccess'
 import TruckModelFormModal from './TruckModelFormModal'
@@ -133,6 +135,8 @@ interface TruckFormState {
   plate_number: string
   model_id:     string
   status:       Truck['status']
+  /** The vehicle's regular driver. '' means it has none. */
+  assigned_driver_id: string
 }
 
 function emptyForm(): TruckFormState {
@@ -140,6 +144,7 @@ function emptyForm(): TruckFormState {
     plate_number: '',
     model_id:     '',
     status:       'available',
+    assigned_driver_id: '',
   }
 }
 
@@ -148,6 +153,7 @@ function truckToForm(t: Truck): TruckFormState {
     plate_number: t.plate_number ?? '',
     model_id:     t.model_id ?? '',
     status:       t.status,
+    assigned_driver_id: t.assigned_driver_id ?? '',
   }
 }
 
@@ -155,7 +161,8 @@ function formsEqual(a: TruckFormState, b: TruckFormState): boolean {
   return (
     a.plate_number === b.plate_number &&
     a.model_id     === b.model_id     &&
-    a.status       === b.status
+    a.status       === b.status       &&
+    a.assigned_driver_id === b.assigned_driver_id
   )
 }
 
@@ -164,7 +171,7 @@ function formsEqual(a: TruckFormState, b: TruckFormState): boolean {
  * BLOWBAGETS inspection. A vehicle that has never been inspected reads the same
  * as one that failed: it can't be picked.
  */
-function InspectionBadge({ inspection }: { inspection: TruckInspection | null }) {
+function InspectionBadge({ inspection, dueRecheck }: { inspection: TruckInspection | null; dueRecheck?: boolean }) {
   if (!inspection) {
     return (
       <span
@@ -181,6 +188,24 @@ function InspectionBadge({ inspection }: { inspection: TruckInspection | null })
   const whenLabel = Number.isNaN(when.getTime())
     ? inspection.inspected_at
     : when.toLocaleDateString()
+
+  // A pass that predates the vehicle's last homecoming is spent: it cleared the
+  // job the truck has already done. Saying "Passed" here would leave the fleet
+  // manager wondering why operations cannot pick it.
+  if (inspection.passed && dueRecheck) {
+    return (
+      <span className="flex flex-col gap-0.5 items-start">
+        <span
+          className="inline-flex text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border"
+          style={{ color: '#fbbf24', borderColor: 'rgba(246,159,38,0.35)', background: 'rgba(246,159,38,0.12)' }}
+          title="Back from a booking since its last check — inspect it again before it can be assigned"
+        >
+          Re-check due
+        </span>
+        <span className="text-[10px] text-white/30 tabular-nums">last {whenLabel}</span>
+      </span>
+    )
+  }
 
   return (
     <span className="flex flex-col gap-0.5 items-start">
@@ -205,6 +230,10 @@ function InspectionBadge({ inspection }: { inspection: TruckInspection | null })
 export default function VehicleManagementView() {
   const [trucks,  setTrucks]  = useState<Truck[]>([])
   const [models,  setModels]  = useState<TruckModel[]>([])
+  // The full driver roster, for the "regular driver" picker. Deliberately NOT
+  // the per-booking assignable pool: pairing says who normally drives this
+  // vehicle, a standing fact that does not depend on any one day's calendar.
+  const [drivers, setDrivers] = useState<DriverUser[]>([])
 
   const [listLoading, setListLoading] = useState(true)
   const [listError,   setListError]   = useState<string | null>(null)
@@ -277,6 +306,10 @@ export default function VehicleManagementView() {
   }, [loadModels])
 
   useEffect(() => {
+    void driverService.getAll().then(setDrivers).catch(() => setDrivers([]))
+  }, [])
+
+  useEffect(() => {
     void loadTrucksPage()
   }, [loadTrucksPage])
 
@@ -287,6 +320,18 @@ export default function VehicleManagementView() {
   const pageCount = Math.max(1, listMeta?.totalPages ?? 1)
   const pageSafe  = Math.min(page, pageCount - 1)
   const totalRows = listMeta?.total ?? 0
+
+  // driver_id -> the plate it is already paired with, excluding the vehicle
+  // being edited. One driver has one truck, so the picker greys out the rest
+  // instead of letting the save fail on the unique index.
+  const pairedElsewhere = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const t of trucks) {
+      if (!t.assigned_driver_id || t.truck_id === editingId) continue
+      map.set(t.assigned_driver_id, t.plate_number)
+    }
+    return map
+  }, [trucks, editingId])
 
   const selectedModel         = useMemo(() => models.find((m) => m.model_id === form.model_id) ?? null, [models, form.model_id])
   const selectedModelImageUrl = resolveModelImageUrl(selectedModel?.image_url ?? null)
@@ -376,6 +421,9 @@ export default function VehicleManagementView() {
           plate_number: form.plate_number.trim().toUpperCase(),
           model_id,
           status:       form.status,
+          // null, not undefined: clearing the dropdown must unpair the vehicle
+          // rather than silently leave the old driver in place.
+          assigned_driver_id: form.assigned_driver_id || null,
         }
         await adminUpdateTruck(editingId, body)
         appToast.success('Vehicle updated.', { action: 'truck-save', entityId: editingId })
@@ -553,6 +601,7 @@ export default function VehicleManagementView() {
                       <th className="px-3 py-2.5 font-bold">Vehicle type</th>
                       <th className="px-3 py-2.5 font-bold hidden md:table-cell">Model</th>
                       <th className="px-3 py-2.5 font-bold hidden md:table-cell">Max weight</th>
+                      <th className="px-3 py-2.5 font-bold hidden lg:table-cell">Driver</th>
                       <th className="px-3 py-2.5 font-bold">Status</th>
                       <th className="px-3 py-2.5 font-bold">BLOWBAGETS</th>
                       <th className="px-3 py-2.5 font-bold text-right w-[140px]">Actions</th>
@@ -585,6 +634,20 @@ export default function VehicleManagementView() {
                               ? `${t.truck_model.max_weight_kg.toLocaleString()} kg · ${kgToTons(t.truck_model.max_weight_kg)} t`
                               : '—'}
                           </td>
+                          <td className="px-3 py-2.5 text-xs hidden lg:table-cell">
+                            {assignedDriverName(t)
+                              ? (
+                                <span className="text-white/70">
+                                  {assignedDriverName(t)}
+                                  {t.assigned_driver?.license_number && (
+                                    <span className="block text-[10px] text-white/30 font-mono">
+                                      {t.assigned_driver.license_number}
+                                    </span>
+                                  )}
+                                </span>
+                              )
+                              : <span className="text-white/25">Unassigned</span>}
+                          </td>
                           <td className="px-3 py-2.5">
                             <span
                               className="inline-flex text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border"
@@ -596,7 +659,7 @@ export default function VehicleManagementView() {
                           {/* Readiness for assignment: operations can only pick a
                               vehicle whose latest inspection passed. */}
                           <td className="px-3 py-2.5">
-                            <InspectionBadge inspection={t.latest_inspection ?? null} />
+                            <InspectionBadge inspection={t.latest_inspection ?? null} dueRecheck={needsReinspection(t)} />
                           </td>
                           <td className="px-3 py-2.5 text-right">
                             {canEdit && (
@@ -863,6 +926,38 @@ export default function VehicleManagementView() {
                         <option key={s} value={s}>{fmtLabel(s)}</option>
                       ))}
                     </select>
+                  </label>
+                )}
+
+                {/* The vehicle's regular driver. Edit only: a truck is paired
+                    once it exists, and pairing at creation would mean picking a
+                    driver before anyone has seen the vehicle on the list. */}
+                {modalMode === 'edit' && (
+                  <label className="block">
+                    <span className="text-[11px] font-bold uppercase text-white/40">Assigned driver</span>
+                    <select
+                      value={form.assigned_driver_id}
+                      onChange={(e) => setForm((f) => ({ ...f, assigned_driver_id: e.target.value }))}
+                      className="mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-3 py-2.5 text-sm text-white outline-none"
+                    >
+                      <option value="">No regular driver</option>
+                      {drivers.map((d) => {
+                        const id    = d.drivers?.driver_id
+                        const taken = id ? pairedElsewhere.get(id) : undefined
+                        if (!id) return null
+                        return (
+                          <option key={id} value={id} disabled={!!taken}>
+                            {d.first_name} {d.last_name}
+                            {d.drivers?.license_number ? ` · ${d.drivers.license_number}` : ''}
+                            {taken ? ` — already on ${taken}` : ''}
+                          </option>
+                        )
+                      })}
+                    </select>
+                    <p className="text-[10px] text-white/25 mt-1">
+                      Who normally drives this vehicle. Operations still picks the crew per booking —
+                      this fills it in for them, it does not lock the vehicle to one person.
+                    </p>
                   </label>
                 )}
 
