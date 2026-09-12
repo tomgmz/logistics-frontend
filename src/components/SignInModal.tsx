@@ -3,9 +3,12 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { AxiosError } from 'axios'
-import { requestOtp, verifyOtp, loginWithPassword, getMe, getAuthStatus, AuthUser } from '@/lib/api/auth.api'
+import {
+  requestOtp, verifyOtp, loginWithPassword, getMe, getAuthStatus,
+  requestPasswordReset, AuthUser,
+} from '@/lib/api/auth.api'
 import { useAuthStore } from '@/lib/store/auth.store'
-import { ROLE_ROUTES, ADMIN_EMAIL } from '@/constants/roles'
+import { ROLE_ROUTES } from '@/constants/roles'
 import { now } from '@/app/utils/serverTime'
 
 const OTP_LENGTH  = 6
@@ -207,7 +210,27 @@ function ErrorMessage({ message }: { message: string }) {
   )
 }
 
-function PermanentLockScreen({ onBack }: { onBack: () => void }) {
+/**
+ * Which admin handles this person's reset. Mirrors handlerGroupFor() on the
+ * backend — drivers and clients belong to the Company Admin, everyone with a desk
+ * to the IT Admin. Naming the right one is the difference between "someone will
+ * deal with it" and knowing who to chase.
+ */
+function approverLabel(role?: string | null): string {
+  if (!role)                                  return 'administrator'
+  if (role === 'driver' || role === 'client') return 'Company Admin'
+  return 'IT Admin'
+}
+
+function PermanentLockScreen({
+  onBack,
+  onRequestReset,
+  role,
+}: {
+  onBack: () => void
+  onRequestReset: () => void
+  role?: string | null
+}) {
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
@@ -239,19 +262,116 @@ function PermanentLockScreen({ onBack }: { onBack: () => void }) {
           Your account has been permanently locked due to too many failed login attempts.
         </span>
         <span>
-          Please contact your administrator at{' '}
-          <a
-            href={`mailto:${ADMIN_EMAIL}`}
-            className="underline underline-offset-2 hover:opacity-80 transition-opacity"
-            style={{ color: 'rgba(239,68,68,1)' }}
-          >
-            {ADMIN_EMAIL}
-          </a>{' '}
-          to regain access.
+          Request a password reset and your {approverLabel(role)} will send you a link to set a
+          new password. That also unlocks your account.
         </span>
       </div>
 
+      <PrimaryButton onClick={onRequestReset}>Request A Password Reset</PrimaryButton>
+
       <BackButton onClick={onBack} label="Change email" />
+    </motion.div>
+  )
+}
+
+/**
+ * Raise a reset request from inside the app.
+ *
+ * The response is deliberately the same whether or not the address has an
+ * account, so this screen must never imply it learned anything — the confirmation
+ * is phrased to be true either way.
+ */
+function ForgotPasswordStep({
+  email,
+  role,
+  onBack,
+}: {
+  email: string
+  role?: string | null
+  onBack: () => void
+}) {
+  const [loading, setLoading] = useState(false)
+  const [sent,    setSent]    = useState(false)
+  const [error,   setError]   = useState('')
+
+  async function handleRequest() {
+    if (loading) return
+    setLoading(true); setError('')
+    try {
+      await requestPasswordReset(email)
+      setSent(true)
+    } catch (err) {
+      setError(extractErrorMessage(err, 'Could not submit your request. Please try again.'))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <motion.div
+      key="forgot-step"
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -20 }}
+      transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
+      className="flex flex-col gap-6"
+    >
+      <div className="flex items-center gap-2 text-white/55">
+        <IconKey />
+        <span
+          className="text-[0.72rem] font-semibold tracking-[0.18em] uppercase"
+          style={{ fontFamily: "'League Spartan', sans-serif" }}
+        >
+          {sent ? 'Request Submitted' : 'Password Reset'}
+        </span>
+      </div>
+
+      {sent ? (
+        <>
+          <div
+            className="rounded-xl px-4 py-4 text-[0.8rem] leading-relaxed flex flex-col gap-2.5"
+            style={{
+              background: 'rgba(77,249,237,0.07)',
+              border: '1px solid rgba(77,249,237,0.22)',
+              color: 'rgba(255,255,255,0.7)',
+              fontFamily: "'League Spartan', sans-serif",
+            }}
+          >
+            <span>
+              If <span className="text-[#4df9ed]/80">{email}</span> has an account, your{' '}
+              {approverLabel(role)} has been notified and will email you a reset link.
+            </span>
+            <span className="text-white/40 text-[0.76rem]">
+              The link works once and expires an hour after it is sent. You can close this window —
+              check your email.
+            </span>
+          </div>
+
+          <BackButton onClick={onBack} label="Back to sign in" />
+        </>
+      ) : (
+        <>
+          <p
+            className="text-[0.82rem] leading-relaxed text-white/50"
+            style={{ fontFamily: "'League Spartan', sans-serif" }}
+          >
+            Password resets go through an administrator. We will let your{' '}
+            <span className="text-white/75">{approverLabel(role)}</span> know that{' '}
+            <span className="text-[#4df9ed]/80">{email}</span> needs a reset, and they will send a
+            one-time link to that address.
+          </p>
+
+          <AnimatePresence>
+            {error && <ErrorMessage message={error} />}
+          </AnimatePresence>
+
+          <PrimaryButton loading={loading} onClick={handleRequest}>
+            Request Reset Link
+          </PrimaryButton>
+
+          <BackButton onClick={onBack} label="Back" />
+        </>
+      )}
     </motion.div>
   )
 }
@@ -461,11 +581,15 @@ function OtpStep({
   resendExpiresAt,
   onSuccess,
   onBack,
+  onRequestReset,
+  role,
 }: {
   email: string
   resendExpiresAt: React.MutableRefObject<number>
   onSuccess: (user: AuthUser, portalUrl: string) => void
   onBack: () => void
+  onRequestReset: () => void
+  role?: string | null
 }) {
   const lockExpiresAt                     = useRef<number>(0)
   const submitting                        = useRef(false)
@@ -659,7 +783,7 @@ function OtpStep({
   }
 
   if (lockState === 'permanent') {
-    return <PermanentLockScreen onBack={onBack} />
+    return <PermanentLockScreen onBack={onBack} onRequestReset={onRequestReset} role={role} />
   }
 
   return (
@@ -790,10 +914,14 @@ function PasswordStep({
   email,
   onSuccess,
   onBack,
+  onRequestReset,
+  role,
 }: {
   email: string
   onSuccess: (user: AuthUser, portalUrl: string) => void
   onBack: () => void
+  onRequestReset: () => void
+  role?: string | null
 }) {
   const lockExpiresAt = useRef<number>(0)
   const submitting    = useRef(false)
@@ -879,7 +1007,7 @@ function PasswordStep({
   }
 
   if (lockState === 'permanent') {
-    return <PermanentLockScreen onBack={onBack} />
+    return <PermanentLockScreen onBack={onBack} onRequestReset={onRequestReset} role={role} />
   }
 
   return (
@@ -977,18 +1105,19 @@ function PasswordStep({
 
       <div className="flex items-center justify-between">
         <BackButton onClick={onBack} label="Back" />
-        <a
-          href={`mailto:${ADMIN_EMAIL}?subject=Password%20Reset%20Request`}
-          className="text-[0.75rem] transition-colors no-underline"
+        <button
+          type="button"
+          onClick={onRequestReset}
+          className="text-[0.75rem] transition-colors no-underline bg-transparent border-none cursor-pointer p-0"
           style={{
             color: 'rgba(255,255,255,0.28)',
             fontFamily: "'League Spartan', sans-serif",
           }}
-          onMouseEnter={e => ((e.currentTarget as HTMLAnchorElement).style.color = 'rgba(77,249,237,0.65)')}
-          onMouseLeave={e => ((e.currentTarget as HTMLAnchorElement).style.color = 'rgba(255,255,255,0.28)')}
+          onMouseEnter={e => ((e.currentTarget as HTMLButtonElement).style.color = 'rgba(77,249,237,0.65)')}
+          onMouseLeave={e => ((e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.28)')}
         >
           Forgot password?
-        </a>
+        </button>
       </div>
 
       <p
@@ -998,14 +1127,7 @@ function PasswordStep({
           fontFamily: "'League Spartan', sans-serif",
         }}
       >
-        Password resets are managed by your administrator.{' '}
-        <a
-          href={`mailto:${ADMIN_EMAIL}?subject=Password%20Reset%20Request`}
-          className="underline underline-offset-2 transition-opacity hover:opacity-80"
-          style={{ color: 'rgba(77,249,237,0.45)', textDecoration: 'underline' }}
-        >
-          {ADMIN_EMAIL}
-        </a>
+        Password resets are approved by your {approverLabel(role)}.
       </p>
     </motion.div>
   )
@@ -1054,7 +1176,10 @@ function SuccessStep() {
   )
 }
 
-type Step = 'email' | 'method' | 'otp' | 'password' | 'success'
+// 'forgot' is deliberately absent from the STEP_ORDERs below: it is a side trip
+// off the password/OTP step, not a stage of signing in, so it must not add a dot
+// to the progress indicator.
+type Step = 'email' | 'method' | 'otp' | 'password' | 'forgot' | 'success'
 
 const STEP_ORDER:    Step[] = ['email', 'method', 'otp',      'success']
 const STEP_ORDER_PW: Step[] = ['email', 'method', 'password', 'success']
@@ -1068,6 +1193,9 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
   const [step,   setStep]   = useState<Step>('email')
   const [email,  setEmail]  = useState('')
   const [method, setMethod] = useState<'otp' | 'password' | null>(null)
+  // Only used to name the right approver ("your Company Admin" vs "your IT Admin")
+  // on the reset screens. Best effort — the copy falls back to "administrator".
+  const [role,   setRole]   = useState<string | null>(null)
   const resendExpiresAt     = useRef<number>(0)
   const redirectTimer       = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -1093,6 +1221,10 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
 
   const handleEmailSuccess = (e: string) => {
     setEmail(e)
+    setRole(null)
+    // Fire and forget: this only decides which admin the reset copy names, so a
+    // failure must not hold up the sign-in flow.
+    void getAuthStatus(e).then((s) => setRole(s.role ?? null)).catch(() => {})
     setStep('method')
   }
 
@@ -1241,6 +1373,14 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
                       onBack={() => setStep('email')}
                     />
                   )}
+                  {step === 'forgot' && (
+                    <ForgotPasswordStep
+                      key="forgot"
+                      email={email}
+                      role={role}
+                      onBack={() => setStep(method === 'password' ? 'password' : 'otp')}
+                    />
+                  )}
                   {step === 'otp' && (
                     <OtpStep
                       key="otp"
@@ -1248,6 +1388,8 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
                       resendExpiresAt={resendExpiresAt}
                       onSuccess={handleAuthSuccess}
                       onBack={() => setStep('method')}
+                      onRequestReset={() => setStep('forgot')}
+                      role={role}
                     />
                   )}
                   {step === 'password' && (
@@ -1256,6 +1398,8 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
                       email={email}
                       onSuccess={handleAuthSuccess}
                       onBack={() => setStep('method')}
+                      onRequestReset={() => setStep('forgot')}
+                      role={role}
                     />
                   )}
                   {step === 'success' && (

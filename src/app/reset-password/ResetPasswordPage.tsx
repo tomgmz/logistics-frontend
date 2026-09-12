@@ -1,13 +1,12 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useAuthStore } from '@/lib/store/auth.store'
-import { changePassword } from '@/lib/api/auth.api'
-import { ROLE_ROUTES } from '@/constants/roles'
 import Image from 'next/image'
+import Link from 'next/link'
 import { ASSETS } from '@/lib/data'
+import { completePasswordReset, verifyResetToken } from '@/lib/api/auth.api'
 import {
   IconEye,
   IconLock,
@@ -16,6 +15,21 @@ import {
   getStrength,
   meetsRequirements,
 } from '@/components/auth/password-fields'
+
+/**
+ * The page an administrator's reset link lands on.
+ *
+ * Public by necessity — whoever opens this has no session and is very likely
+ * permanently locked out, which is why '/reset-password' is listed in
+ * PUBLIC_PATHS in src/proxy.ts. The token in the query string is the only
+ * credential involved.
+ *
+ * The token is checked before the form is shown, so a link that has expired or
+ * already been spent says so rather than letting someone compose a password and
+ * lose it to an error on submit.
+ */
+
+type TokenState = 'checking' | 'valid' | 'invalid'
 
 function LogoMark() {
   return (
@@ -31,13 +45,18 @@ function LogoMark() {
   )
 }
 
-export default function ChangePasswordPage() {
+function extractErrorMessage(err: unknown, fallback: string): string {
+  const res = (err as { response?: { data?: { message?: string } } })?.response
+  return res?.data?.message ?? (err instanceof Error ? err.message : fallback)
+}
+
+export default function ResetPasswordPage() {
   const router       = useRouter()
   const searchParams = useSearchParams()
-  const user         = useAuthStore(s => s.user)
-  const setUser      = useAuthStore(s => s.setUser)
-  const hasHydrated  = useAuthStore(s => s.hasHydrated)
+  const token        = searchParams.get('token') ?? ''
 
+  const [tokenState,   setTokenState]   = useState<TokenState>('checking')
+  const [maskedEmail,  setMaskedEmail]  = useState<string | null>(null)
   const [password,     setPassword]     = useState('')
   const [confirm,      setConfirm]      = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -51,18 +70,20 @@ export default function ChangePasswordPage() {
   const passwordsMatch = password === confirm && confirm.length > 0
   const canSubmit      = allMet && passwordsMatch && !loading
 
-  const destination = useCallback(() => {
-    const redirect = searchParams.get('redirect')
-    if (redirect) return redirect
-    if (user?.role) return ROLE_ROUTES[user.role] ?? '/'
-    return '/'
-  }, [searchParams, user])
-
   useEffect(() => {
-    if (!hasHydrated) return
-    if (!user) { router.replace('/'); return }
-    if (!user.must_change_password) router.replace(destination())
-  }, [hasHydrated, user, router, destination])
+    if (!token) { setTokenState('invalid'); return }
+
+    let cancelled = false
+    verifyResetToken(token)
+      .then(res => {
+        if (cancelled) return
+        setTokenState(res.valid ? 'valid' : 'invalid')
+        setMaskedEmail(res.email ?? null)
+      })
+      .catch(() => { if (!cancelled) setTokenState('invalid') })
+
+    return () => { cancelled = true }
+  }, [token])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -70,37 +91,23 @@ export default function ChangePasswordPage() {
     setLoading(true)
     setError('')
     try {
-      await changePassword(password)
-
-      await fetch('/api/auth/clear-must-change', { method: 'POST' })
-
-      setUser({ ...user!, must_change_password: false })
-
-      if (user?.user_id) {
-        const ch = new BroadcastChannel(`auth_sync_${user.user_id}`)
-        ch.postMessage({ type: 'PASSWORD_CHANGED', portalUrl: destination() })
-        ch.close()
-      }
-
+      await completePasswordReset(token, password)
       setDone(true)
-      setTimeout(() => router.replace(destination()), 1800)
+      // Back to the landing page, where the sign-in modal lives.
+      setTimeout(() => router.replace('/'), 2200)
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to update password. Please try again.'
-      setError(msg)
+      const msg = extractErrorMessage(err, 'Failed to reset password. Please try again.')
+      // A token rejected at submit time is spent or expired; swap the whole form
+      // for the dead-link view rather than leaving a password typed into it.
+      if (/invalid|expired|no longer active/i.test(msg)) {
+        setTokenState('invalid')
+        setError(msg)
+      } else {
+        setError(msg)
+      }
     } finally {
       setLoading(false)
     }
-  }
-
-  if (!hasHydrated || !user) {
-    return (
-      <div
-        className="bg-[#0a0a0a] flex items-center justify-center"
-        style={{ minHeight: '100dvh' }}
-      >
-        <span className="inline-block w-5 h-5 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
-      </div>
-    )
   }
 
   const confirmBorder =
@@ -131,13 +138,28 @@ export default function ChangePasswordPage() {
           transition={{ delay: 0.4 }}
           className="font-spartan text-[0.6rem] sm:text-[0.68rem] tracking-[0.2em] uppercase text-white/20"
         >
-          Security Setup
+          Password Reset
         </motion.span>
       </header>
 
       <main className="flex-1 flex items-center justify-center px-5 py-6 sm:py-10">
         <AnimatePresence mode="wait">
-          {done ? (
+          {tokenState === 'checking' ? (
+            <motion.div
+              key="checking"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex flex-col items-center gap-4"
+            >
+              <span className="inline-block w-5 h-5 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
+              <span className="font-spartan text-white/30 text-[0.75rem] tracking-wider uppercase">
+                Checking your link…
+              </span>
+            </motion.div>
+          ) : tokenState === 'invalid' ? (
+            <InvalidLinkView key="invalid" reason={error} />
+          ) : done ? (
             <SuccessView key="success" />
           ) : (
             <motion.div
@@ -172,12 +194,18 @@ export default function ChangePasswordPage() {
 
                   <div className="flex flex-col gap-0.5">
                     <h1 className="ff-sc text-white text-[1.05rem] sm:text-[1.25rem] tracking-[0.12em] uppercase leading-tight">
-                      One Time Change Password
+                      Set A New Password
                     </h1>
                     <p className="font-spartan text-white/35 text-[0.73rem] sm:text-[0.78rem] leading-relaxed">
-                      Welcome,{' '}
-                      <span className="text-[#4df9ed]/70">{user.first_name ?? user.email}</span>.
-                      {' '}A new password is required to continue.
+                      {maskedEmail ? (
+                        <>
+                          Resetting the password for{' '}
+                          <span className="text-[#4df9ed]/70">{maskedEmail}</span>.
+                          {' '}This also unlocks your account.
+                        </>
+                      ) : (
+                        'Choose a new password. This also unlocks your account.'
+                      )}
                     </p>
                   </div>
                 </motion.div>
@@ -201,6 +229,7 @@ export default function ChangePasswordPage() {
                         placeholder="Create a strong password"
                         required
                         autoFocus
+                        autoComplete="new-password"
                         className="font-spartan w-full bg-transparent text-white text-[0.88rem] outline-none placeholder-white/20"
                       />
                       <button
@@ -252,6 +281,7 @@ export default function ChangePasswordPage() {
                         onChange={e => { setConfirm(e.target.value); setError('') }}
                         placeholder="Repeat your password"
                         required
+                        autoComplete="new-password"
                         className="font-spartan w-full bg-transparent text-white text-[0.88rem] outline-none placeholder-white/20"
                       />
                       <button
@@ -315,7 +345,7 @@ export default function ChangePasswordPage() {
                   >
                     {loading ? (
                       <span className="inline-block w-4 h-4 border-2 border-black/20 border-t-black/70 rounded-full animate-spin" />
-                    ) : 'Set Password & Continue'}
+                    ) : 'Reset Password'}
                   </motion.button>
                 </form>
               </div>
@@ -326,13 +356,67 @@ export default function ChangePasswordPage() {
                 transition={{ delay: 0.5 }}
                 className="font-spartan text-center text-white/20 text-[0.66rem] tracking-wider mt-4"
               >
-                You will only need to do this once.
+                This link works once and then expires.
               </motion.p>
             </motion.div>
           )}
         </AnimatePresence>
       </main>
     </div>
+  )
+}
+
+function InvalidLinkView({ reason }: { reason?: string }) {
+  return (
+    <motion.div
+      key="invalid"
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.4 }}
+      className="w-full max-w-[420px] mx-auto"
+    >
+      <div
+        className="glass rounded-3xl px-7 sm:px-9 py-8 flex flex-col gap-5 items-center text-center"
+        style={{ boxShadow: '0 24px 48px rgba(0,0,0,0.4)' }}
+      >
+        <div
+          className="w-14 h-14 rounded-full flex items-center justify-center"
+          style={{
+            background: 'rgba(239,68,68,0.08)',
+            border: '1px solid rgba(239,68,68,0.25)',
+          }}
+        >
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="1.6">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8"  x2="12" y2="13" strokeLinecap="round" />
+            <line x1="12" y1="16" x2="12" y2="16" strokeLinecap="round" />
+          </svg>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <h1 className="ff-sc text-white text-[1.05rem] tracking-[0.12em] uppercase">
+            Link No Longer Valid
+          </h1>
+          <p className="font-spartan text-white/40 text-[0.8rem] leading-relaxed">
+            {reason
+              ? reason
+              : 'This reset link has already been used or has expired. Reset links work once and last for one hour.'}
+          </p>
+          <p className="font-spartan text-white/30 text-[0.76rem] leading-relaxed mt-1">
+            Request a new one from the sign-in screen and your administrator will send a fresh link.
+          </p>
+        </div>
+
+        <Link
+          href="/"
+          className="font-spartan w-full py-3 tracking-[0.18em] uppercase text-[0.78rem] rounded-xl
+                     transition-all duration-200 hover:bg-[#e0e0e0] no-underline text-center"
+          style={{ background: '#ffffff', color: '#0a0a0a' }}
+        >
+          Back To Sign In
+        </Link>
+      </div>
+    </motion.div>
   )
 }
 
@@ -368,10 +452,10 @@ function SuccessView() {
         transition={{ delay: 0.25 }}
       >
         <h2 className="ff-sc text-white text-xl sm:text-[1.3rem] tracking-[0.15em] uppercase">
-          Password Updated
+          Password Reset
         </h2>
         <p className="font-spartan text-white/35 text-[0.8rem]">
-          Redirecting to your dashboard…
+          Your account is unlocked. Taking you to sign in…
         </p>
       </motion.div>
 

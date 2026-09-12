@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Users, UserPlus, Search, RefreshCw, MoreVertical,
   Pencil, ShieldCheck, ShieldOff, Archive,
-  ChevronLeft, ChevronRight, AlertTriangle,
+  ChevronLeft, ChevronRight, AlertTriangle, KeyRound,
 } from 'lucide-react'
 import Select, { SelectChangeEvent } from '@mui/material/Select'
 import MenuItem from '@mui/material/MenuItem'
@@ -22,14 +23,19 @@ import {
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import UserFormModal from './UserFormModal'
+import PasswordResetQueue from '@/components/admin/PasswordResetQueue'
 
 type UserMgmtTab = Extract<UserTab, 'clients' | 'drivers'>
-type TabValue = UserMgmtTab | 'all'
+// 'password-resets' is a queue, not a user list, so it bypasses the fetch/search/
+// paginate machinery below and renders its own panel.
+const RESETS_TAB = 'password-resets'
+type TabValue = UserMgmtTab | 'all' | typeof RESETS_TAB
 
 const TABS: { key: TabValue; label: string }[] = [
-  { key: 'all',     label: 'All Users' },
-  { key: 'clients', label: 'Clients'   },
-  { key: 'drivers', label: 'Drivers'   },
+  { key: 'all',        label: 'All Users'       },
+  { key: 'clients',    label: 'Clients'         },
+  { key: 'drivers',    label: 'Drivers'         },
+  { key: RESETS_TAB,   label: 'Password Resets' },
 ]
 
 const muiTheme = createTheme({
@@ -288,14 +294,22 @@ function renderCells(user: AnyUser, tab: TabValue) {
   }
 }
 
-const HEADERS: Record<TabValue, string[]> = {
+// Only the user-list tabs have table headers; the resets tab brings its own table.
+const HEADERS: Record<Exclude<TabValue, typeof RESETS_TAB>, string[]> = {
   all:     ['Name', 'Email', 'Phone', 'Role', 'Status'],
   clients: ['Name', 'Email', 'Company', 'Status', 'Last Login'],
   drivers: ['Name', 'License #', 'Expiry', 'Driver Status', 'Acct. Status'],
 }
 
 export default function UserManagementClient() {
-  const [activeTab,        setActiveTab]        = useState<TabValue>('clients')
+  const searchParams = useSearchParams()
+  // A password-reset notification deep-links here as ?tab=password-resets&request=…
+  const deepLinkTab     = searchParams.get('tab')
+  const focusRequestId  = searchParams.get('request')
+
+  const [activeTab,        setActiveTab]        = useState<TabValue>(
+    deepLinkTab === RESETS_TAB ? RESETS_TAB : 'clients',
+  )
   const [allRows,          setAllRows]          = useState<AnyUser[]>([])
   const [loading,          setLoading]          = useState(true)
   const [fetching,         setFetching]         = useState(false)
@@ -361,6 +375,8 @@ export default function UserManagementClient() {
     setPage(1)
     setSearch('')
     setSearchInput('')
+    // The resets tab loads its own data and has no user list to fetch.
+    if (activeTab === RESETS_TAB) { setLoading(false); return }
     if (activeTab === 'all') fetchAllUsers('', true)
     else fetchTabUsers(activeTab)
   }, [activeTab]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -371,7 +387,16 @@ export default function UserManagementClient() {
     fetchAllUsers(search, false)
   }, [search, activeTab, fetchAllUsers])
 
-  const filtered = activeTab === 'all'
+  const isResetsTab = activeTab === RESETS_TAB
+
+  /** Reload whichever user list is showing. A no-op on the resets tab, which owns its own data. */
+  const refetchCurrentTab = useCallback(async () => {
+    if (activeTab === RESETS_TAB) return
+    if (activeTab === 'all') await fetchAllUsers(search, false)
+    else await fetchTabUsers(activeTab)
+  }, [activeTab, search, fetchAllUsers, fetchTabUsers])
+
+  const filtered = activeTab === 'all' || isResetsTab
     ? allRows
     : allRows.filter((u) => {
         if (!search) return true
@@ -391,7 +416,9 @@ export default function UserManagementClient() {
     : filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
   async function handleStatusChange(user: AnyUser, status: UserStatus) {
-    const serviceTab = activeTab === 'all' ? tabFromRole(user.role) : activeTab as UserMgmtTab
+    const serviceTab = activeTab === 'clients' || activeTab === 'drivers'
+      ? activeTab
+      : tabFromRole(user.role)
     try {
       await appToast.promise(
         updateStatus(serviceTab, user.user_id, status),
@@ -402,30 +429,30 @@ export default function UserManagementClient() {
         },
         { action: 'update-status', entityId: user.user_id },
       )
-      if (activeTab === 'all') await fetchAllUsers(search, false)
-      else await fetchTabUsers(activeTab)
+      await refetchCurrentTab()
     } catch { /* handled by toast */ }
   }
 
   function openEdit(user: AnyUser) {
-    const tab = activeTab === 'all' ? tabFromRole(user.role) : activeTab as UserMgmtTab
+    const tab = activeTab === 'clients' || activeTab === 'drivers'
+      ? activeTab
+      : tabFromRole(user.role)
     setFormTab(tab)
     setEditUser(user)
     setShowForm(true)
   }
 
   function openCreate() {
-    setFormTab(activeTab === 'all' ? 'clients' : activeTab as UserMgmtTab)
+    setFormTab(activeTab === 'clients' || activeTab === 'drivers' ? activeTab : 'clients')
     setEditUser(null)
     setShowForm(true)
   }
 
   function handleRefresh() {
-    if (activeTab === 'all') fetchAllUsers(search, false)
-    else fetchTabUsers(activeTab)
+    void refetchCurrentTab()
   }
 
-  const colCount = HEADERS[activeTab].length + 1
+  const colCount = isResetsTab ? 1 : HEADERS[activeTab].length + 1
 
   return (
     <ThemeProvider theme={muiTheme}>
@@ -435,12 +462,14 @@ export default function UserManagementClient() {
           {/* Header */}
           <div className="flex items-start justify-between shrink-0">
             <h1 className="mt-1 text-2xl font-bold tracking-tight text-white">User Management</h1>
-            <button
-              onClick={openCreate}
-              className="flex items-center gap-2 rounded-xl bg-[#4df9ed] px-5 py-2.5 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5] active:scale-95"
-            >
-              <UserPlus size={15} /> Add User
-            </button>
+            {!isResetsTab && (
+              <button
+                onClick={openCreate}
+                className="flex items-center gap-2 rounded-xl bg-[#4df9ed] px-5 py-2.5 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5] active:scale-95"
+              >
+                <UserPlus size={15} /> Add User
+              </button>
+            )}
           </div>
 
           {/* Stats */}
@@ -488,7 +517,7 @@ export default function UserManagementClient() {
                     const tab = TABS.find((t) => t.key === value)!
                     return (
                       <span style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#4df9ed', fontSize: '13px', fontWeight: 500 }}>
-                        <Users size={14} /> {tab.label}
+                        {value === RESETS_TAB ? <KeyRound size={14} /> : <Users size={14} />} {tab.label}
                       </span>
                     )
                   }}
@@ -513,7 +542,7 @@ export default function UserManagementClient() {
                       }}
                     >
                       <span style={{ color: activeTab === t.key ? '#4df9ed' : '#818181', display: 'flex' }}>
-                        <Users size={14} />
+                        {t.key === RESETS_TAB ? <KeyRound size={14} /> : <Users size={14} />}
                       </span>
                       {t.label}
                       {activeTab === t.key && (
@@ -525,6 +554,10 @@ export default function UserManagementClient() {
               </FormControl>
             </div>
 
+            {isResetsTab ? (
+              <PasswordResetQueue focusRequestId={focusRequestId} />
+            ) : (
+            <>
             {/* Search + refresh bar */}
             <div className="flex items-center gap-3 border-b border-[#2a2a2a] px-4 py-3 shrink-0">
               <div className="relative flex-1 max-w-sm">
@@ -648,6 +681,8 @@ export default function UserManagementClient() {
                 </div>
               </div>
             )}
+            </>
+            )}
           </div>
         </div>
       </div>
@@ -659,8 +694,7 @@ export default function UserManagementClient() {
           onClose={() => setShowForm(false)}
           onSaved={async () => {
             setShowForm(false)
-            if (activeTab === 'all') await fetchAllUsers(search, false)
-            else await fetchTabUsers(activeTab)
+            await refetchCurrentTab()
           }}
         />
       )}

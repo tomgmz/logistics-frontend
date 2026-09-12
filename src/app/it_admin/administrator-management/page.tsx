@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ShieldCheck as ShieldCheckIcon, UserPlus, Search, RefreshCw, MoreVertical,
   Pencil, ShieldCheck, ShieldOff, Archive, SlidersHorizontal, Gavel,
-  ChevronLeft, ChevronRight, AlertTriangle,
+  ChevronLeft, ChevronRight, AlertTriangle, KeyRound,
 } from 'lucide-react'
 import Select, { SelectChangeEvent } from '@mui/material/Select'
 import MenuItem from '@mui/material/MenuItem'
@@ -24,20 +25,25 @@ import { getApiErrorMessage } from '@/lib/api-error'
 import { isManagedRole } from '@/constants/modules'
 import UserFormModal from '@/app/admin/user-management/UserFormModal'
 import PermissionsModal from './PermissionsModal'
+import PasswordResetQueue from '@/components/admin/PasswordResetQueue'
 
 type AdminMgmtTab = Extract<
   UserTab,
   'admins' | 'accountants' | 'general-managers' | 'fleet-admins' | 'operations-admins'
 >
-type TabValue = AdminMgmtTab | 'all'
+// 'password-resets' is a queue, not a user list, so it renders its own panel and
+// skips the fetch/search/paginate machinery below.
+const RESETS_TAB = 'password-resets'
+type TabValue = AdminMgmtTab | 'all' | typeof RESETS_TAB
 
 const TABS: { key: TabValue; label: string }[] = [
-  { key: 'all',                label: 'All Administrators'           },
-  { key: 'admins',             label: 'System Admins'       },
+  { key: 'all',                label: 'All Administrators'  },
+  { key: 'admins',             label: 'Company Admins'      },
   { key: 'accountants',        label: 'Accountants'         },
   { key: 'general-managers',   label: 'General Managers'    },
   { key: 'fleet-admins',       label: 'Fleet Managers'      },
   { key: 'operations-admins',  label: 'Operations Managers' },
+  { key: RESETS_TAB,           label: 'Password Resets'     },
 ]
 
 // Roles aggregated by the "All Administrators" view and the stats cards.
@@ -110,7 +116,7 @@ const ROLE_COLORS: Record<string, string> = {
 }
 
 const ROLE_LABELS: Record<string, string> = {
-  admin:            'System Admin',
+  admin:            'Company Admin',
   it_admin:         'IT Admin',
   general_manager:  'General Manager',
   fleet_manager:      'Fleet Manager',
@@ -290,7 +296,8 @@ function EmptyState({ tab, onAdd }: { tab: TabValue; onAdd: () => void }) {
 
 const SHARED_HEADERS = ['Name', 'Email', 'Phone', 'Role', 'Status']
 
-const HEADERS: Record<TabValue, string[]> = {
+// Only the user-list tabs have table headers; the resets tab brings its own table.
+const HEADERS: Record<Exclude<TabValue, typeof RESETS_TAB>, string[]> = {
   all:                 SHARED_HEADERS,
   admins:              SHARED_HEADERS,
   accountants:         SHARED_HEADERS,
@@ -328,7 +335,14 @@ function renderCells(user: AnyUser) {
 }
 
 export default function AdminManagementClient() {
-  const [activeTab,        setActiveTab]        = useState<TabValue>('accountants')
+  const searchParams = useSearchParams()
+  // A password-reset notification deep-links here as ?tab=password-resets&request=…
+  const deepLinkTab    = searchParams.get('tab')
+  const focusRequestId = searchParams.get('request')
+
+  const [activeTab,        setActiveTab]        = useState<TabValue>(
+    deepLinkTab === RESETS_TAB ? RESETS_TAB : 'accountants',
+  )
   const [allRows,          setAllRows]          = useState<AnyUser[]>([])
   const [loading,          setLoading]          = useState(true)
   const [fetching,         setFetching]         = useState(false)
@@ -394,6 +408,8 @@ export default function AdminManagementClient() {
     setPage(1)
     setSearch('')
     setSearchInput('')
+    // The resets tab loads its own data and has no user list to fetch.
+    if (activeTab === RESETS_TAB) { setLoading(false); return }
     if (activeTab === 'all') fetchAllUsers('', true)
     else fetchTabUsers(activeTab)
   }, [activeTab]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -404,7 +420,16 @@ export default function AdminManagementClient() {
     fetchAllUsers(search, false)
   }, [search, activeTab, fetchAllUsers])
 
-  const filtered = activeTab === 'all'
+  const isResetsTab = activeTab === RESETS_TAB
+
+  /** Reload whichever user list is showing. A no-op on the resets tab, which owns its own data. */
+  const refetchCurrentTab = useCallback(async () => {
+    if (activeTab === RESETS_TAB) return
+    if (activeTab === 'all') await fetchAllUsers(search, false)
+    else await fetchTabUsers(activeTab)
+  }, [activeTab, search, fetchAllUsers, fetchTabUsers])
+
+  const filtered = activeTab === 'all' || isResetsTab
     ? allRows
     : allRows.filter((u) => {
         if (!search) return true
@@ -424,7 +449,9 @@ export default function AdminManagementClient() {
     : filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
   async function handleStatusChange(user: AnyUser, status: UserStatus) {
-    const serviceTab = activeTab === 'all' ? tabFromRole(user.role) : activeTab as AdminMgmtTab
+    const serviceTab = activeTab === 'all' || activeTab === RESETS_TAB
+      ? tabFromRole(user.role)
+      : activeTab
     try {
       await appToast.promise(
         updateStatus(serviceTab, user.user_id, status),
@@ -435,8 +462,7 @@ export default function AdminManagementClient() {
         },
         { action: 'update-status', entityId: user.user_id },
       )
-      if (activeTab === 'all') await fetchAllUsers(search, false)
-      else await fetchTabUsers(activeTab)
+      await refetchCurrentTab()
     } catch { /* handled by toast */ }
   }
 
@@ -459,30 +485,30 @@ export default function AdminManagementClient() {
         },
         { action: 'gm-proxy', entityId: user.user_id },
       )
-      if (activeTab === 'all') await fetchAllUsers(search, false)
-      else await fetchTabUsers(activeTab)
+      await refetchCurrentTab()
     } catch { /* handled by toast */ }
   }
 
   function openEdit(user: AnyUser) {
-    const tab = activeTab === 'all' ? tabFromRole(user.role) : activeTab as AdminMgmtTab
+    const tab = activeTab === 'all' || activeTab === RESETS_TAB
+      ? tabFromRole(user.role)
+      : activeTab
     setFormTab(tab)
     setEditUser(user)
     setShowForm(true)
   }
 
   function openCreate() {
-    setFormTab(activeTab === 'all' ? 'accountants' : activeTab as AdminMgmtTab)
+    setFormTab(activeTab === 'all' || activeTab === RESETS_TAB ? 'accountants' : activeTab)
     setEditUser(null)
     setShowForm(true)
   }
 
   function handleRefresh() {
-    if (activeTab === 'all') fetchAllUsers(search, false)
-    else fetchTabUsers(activeTab)
+    void refetchCurrentTab()
   }
 
-  const colCount = HEADERS[activeTab].length + 1
+  const colCount = isResetsTab ? 1 : HEADERS[activeTab].length + 1
 
   return (
     <ThemeProvider theme={muiTheme}>
@@ -494,12 +520,14 @@ export default function AdminManagementClient() {
             <div>
               <h1 className="mt-1 text-2xl font-bold tracking-tight text-white">Administrator Management</h1>
             </div>
+            {!isResetsTab && (
             <button
               onClick={openCreate}
               className="flex items-center gap-2 rounded-xl bg-[#4df9ed] px-5 py-2.5 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5] active:scale-95"
             >
               <UserPlus size={15} /> Add Account
             </button>
+            )}
           </div>
 
           {/* Stats */}
@@ -572,7 +600,7 @@ export default function AdminManagementClient() {
                       }}
                     >
                       <span style={{ color: activeTab === t.key ? '#4df9ed' : '#818181', display: 'flex' }}>
-                        <ShieldCheckIcon size={14} />
+                        {t.key === RESETS_TAB ? <KeyRound size={14} /> : <ShieldCheckIcon size={14} />}
                       </span>
                       {t.label}
                       {activeTab === t.key && (
@@ -584,6 +612,10 @@ export default function AdminManagementClient() {
               </FormControl>
             </div>
 
+            {isResetsTab ? (
+              <PasswordResetQueue focusRequestId={focusRequestId} />
+            ) : (
+            <>
             {/* Search + refresh bar */}
             <div className="flex items-center gap-3 border-b border-[#2a2a2a] px-4 py-3 shrink-0">
               <div className="relative flex-1 max-w-sm">
@@ -709,6 +741,8 @@ export default function AdminManagementClient() {
                 </div>
               </div>
             )}
+            </>
+            )}
           </div>
         </div>
       </div>
@@ -721,8 +755,7 @@ export default function AdminManagementClient() {
           onClose={() => setShowForm(false)}
           onSaved={async () => {
             setShowForm(false)
-            if (activeTab === 'all') await fetchAllUsers(search, false)
-            else await fetchTabUsers(activeTab)
+            await refetchCurrentTab()
           }}
         />
       )}

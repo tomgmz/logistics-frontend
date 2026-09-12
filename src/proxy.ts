@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ROLE_ROUTES } from './constants/roles'
+import { SIGNED_OUT_PARAM } from './lib/auth-redirect'
 
-const PUBLIC_PATHS = ['/', '/favicon.ico', '/_next', '/api', '/change-password', '/messages']
+// '/reset-password' has to be public: whoever opens a reset link has no session
+// (and may be permanently locked), so the guard would otherwise bounce them to
+// '/' before they ever see the form.
+const PUBLIC_PATHS = ['/', '/favicon.ico', '/_next', '/api', '/change-password', '/reset-password', '/messages']
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'))
@@ -26,6 +30,18 @@ function getRoleFromToken(token: string): string | null {
 
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
+
+  // A client that has given up on its session arrives here. Take it at its word:
+  // render the landing page and drop the cookies, rather than reading them and
+  // sending the browser back to the portal it just fled — the two disagreeing
+  // is what turns a stale cookie into an endless reload.
+  if (pathname === '/' && req.nextUrl.searchParams.get(SIGNED_OUT_PARAM) === '1') {
+    const res = NextResponse.next()
+    res.cookies.delete('access_token')
+    res.cookies.delete('refresh_token')
+    res.cookies.delete('must_change_pw')
+    return res
+  }
 
   const mustChangePw = req.cookies.get('must_change_pw')?.value === '1'
   if (mustChangePw && !isPublicPath(pathname)) {

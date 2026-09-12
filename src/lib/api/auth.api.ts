@@ -1,6 +1,8 @@
 import axios, { AxiosInstance, AxiosError } from 'axios'
 import { getApiUrl } from './api-url'
 import { AuthStatusResponse } from '@/app/types/auth/auth.types'
+import { useAuthStore } from '@/lib/store/auth.store'
+import { goHomeSignedOut } from '@/lib/auth-redirect'
 
 const directApi: AxiosInstance = axios.create({
   baseURL: getApiUrl(),
@@ -86,9 +88,16 @@ function processQueue(error: unknown): void {
   failedQueue = []
 }
 
+/**
+ * The channel is per user — `auth_sync_<user_id>` — because that is what
+ * AuthRehydrator subscribes to. Posting to a bare 'auth_sync' reached nobody, so
+ * a session that died here never cleared the store in this tab or any other.
+ */
 function broadcastLogout(): void {
   if (typeof window === 'undefined') return
-  const ch = new BroadcastChannel('auth_sync')
+  const userId = useAuthStore.getState().user?.user_id
+  if (!userId) return
+  const ch = new BroadcastChannel(`auth_sync_${userId}`)
   ch.postMessage({ type: 'LOGOUT' })
   ch.close()
 }
@@ -131,7 +140,7 @@ proxyApi.interceptors.response.use(
         isRefreshing = false
         failedQueue = []
         broadcastLogout()
-        if (typeof window !== 'undefined') window.location.href = '/'
+        goHomeSignedOut()
         return Promise.reject(refreshError)
       }
     }
@@ -225,6 +234,40 @@ export async function loginWithPassword(
 
 export async function changePassword(password: string): Promise<void> {
   await proxyApi.post('/auth/change-password', { password })
+}
+
+/**
+ * Ask an administrator to send a reset link.
+ *
+ * Resolves the same way whether or not the address has an account — the API
+ * answers neutrally on purpose, so the UI must not try to infer anything from it.
+ * Goes direct (like getAuthStatus/requestOtp) rather than through the Next route
+ * handlers: there is no session and no cookie to set.
+ */
+export async function requestPasswordReset(email: string): Promise<string> {
+  const { data } = await directApi.post<{ status: string; message: string }>(
+    '/auth/forgot-password',
+    { email }
+  )
+  return data.message
+}
+
+export interface ResetTokenStatus {
+  valid:       boolean
+  email?:      string
+  expires_at?: string
+}
+
+export async function verifyResetToken(token: string): Promise<ResetTokenStatus> {
+  const { data } = await directApi.post<{ status: string; data: ResetTokenStatus }>(
+    '/auth/reset-password/verify',
+    { token }
+  )
+  return data.data
+}
+
+export async function completePasswordReset(token: string, password: string): Promise<void> {
+  await directApi.post('/auth/reset-password', { token, password })
 }
 
 export async function getMe(): Promise<AuthUser> {
