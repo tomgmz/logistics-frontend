@@ -4,6 +4,7 @@ import { ReactNode, useEffect, useMemo } from 'react'
 import { CalendarCheck, CreditCard, FileSearch, History, LayoutDashboard } from 'lucide-react'
 import ReusableDashboardShell from '@/components/layout/ReusableDashboardShell'
 import { useAuthStore } from '@/lib/store/auth.store'
+import { goHomeSignedOut } from '@/lib/auth-redirect'
 
 const DASHBOARD = { href: '/accountant/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={17} /> }
 // Bookings are the GM's stage; an accountant only sees them while the IT admin
@@ -27,7 +28,7 @@ export default function AccountantLayout({ children }: { children: ReactNode }) 
 
   useEffect(() => {
     if (!hasHydrated) return
-    if (!user || user.role !== 'accountant') window.location.replace('/')
+    if (!user || user.role !== 'accountant') goHomeSignedOut()
   }, [hasHydrated, user])
 
   if (!hasHydrated || !user || user.role !== 'accountant') {

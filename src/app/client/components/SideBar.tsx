@@ -50,10 +50,15 @@ export default function Sidebar() {
       await logout()
     } catch {
     } finally {
+      // Per-user channel: AuthRehydrator listens on `auth_sync_<user_id>`, so a
+      // message on a bare 'auth_sync' would reach none of the other tabs.
+      const userId = useAuthStore.getState().user?.user_id
       clearUser()
-      const ch = new BroadcastChannel('auth_sync')
-      ch.postMessage({ type: 'LOGOUT' })
-      ch.close()
+      if (userId) {
+        const ch = new BroadcastChannel(`auth_sync_${userId}`)
+        ch.postMessage({ type: 'LOGOUT' })
+        ch.close()
+      }
       if (typeof window !== 'undefined') {
         localStorage.removeItem('auth-user')
         window.location.href = '/'

@@ -4,6 +4,7 @@ import { ReactNode, useEffect } from 'react'
 import { Activity, LayoutDashboard, Users } from 'lucide-react'
 import ReusableDashboardShell from '@/components/layout/ReusableDashboardShell'
 import { useAuthStore } from '@/lib/store/auth.store'
+import { goHomeSignedOut } from '@/lib/auth-redirect'
 
 const NAV_ITEMS = [
   { href: '/it_admin/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={17} /> },
@@ -17,7 +18,7 @@ export default function ItAdminLayout({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!hasHydrated) return
-    if (!user || user.role !== 'it_admin') window.location.replace('/')
+    if (!user || user.role !== 'it_admin') goHomeSignedOut()
   }, [hasHydrated, user])
 
   if (!hasHydrated || !user || user.role !== 'it_admin') {

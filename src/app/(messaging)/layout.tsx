@@ -2,6 +2,7 @@
 
 import { ReactNode, useEffect } from 'react'
 import { useAuthStore } from '@/lib/store/auth.store'
+import { goHomeSignedOut } from '@/lib/auth-redirect'
 import ReusableHeader from '@/components/layout/ReusableHeader'
 import { useState } from 'react'
 
@@ -12,7 +13,7 @@ export default function MessagingLayout({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!hasHydrated) return
-    if (!user) window.location.replace('/')
+    if (!user) goHomeSignedOut()
   }, [hasHydrated, user])
 
   if (!hasHydrated || !user) {

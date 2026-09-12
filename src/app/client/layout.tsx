@@ -3,6 +3,7 @@
 import { ReactNode, useEffect } from 'react'
 import ReusableDashboardShell from '@/components/layout/ReusableDashboardShell'
 import { useAuthStore } from '@/lib/store/auth.store'
+import { goHomeSignedOut } from '@/lib/auth-redirect'
 import { History, CalendarCheck, MapPin, CreditCard, LayoutDashboard } from 'lucide-react'
 
 const NAV_ITEMS = [
@@ -20,7 +21,7 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!hasHydrated) return
     if (!user || user.role !== 'client') {
-      window.location.replace('/')
+      goHomeSignedOut()
     }
   }, [hasHydrated, user])
 

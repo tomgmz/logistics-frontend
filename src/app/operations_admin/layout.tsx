@@ -4,6 +4,7 @@ import { ReactNode, useEffect } from 'react'
 import { CalendarCheck, FileSearch, MapPin, LayoutDashboard } from 'lucide-react'
 import ReusableDashboardShell from '@/components/layout/ReusableDashboardShell'
 import { useAuthStore } from '@/lib/store/auth.store'
+import { goHomeSignedOut } from '@/lib/auth-redirect'
 
 const NAV_ITEMS = [
   { href: '/operations_admin/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={17} /> },
@@ -18,7 +19,7 @@ export default function OperationsAdminLayout({ children }: { children: ReactNod
 
   useEffect(() => {
     if (!hasHydrated) return
-    if (!user || user.role !== 'operations_manager') window.location.replace('/')
+    if (!user || user.role !== 'operations_manager') goHomeSignedOut()
   }, [hasHydrated, user])
 
   if (!hasHydrated || !user || user.role !== 'operations_manager') {

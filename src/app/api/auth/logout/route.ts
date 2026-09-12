@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import axios from 'axios'
-import { API_URL, cookieClearOptions, getForwardHeaders, handleError } from '../_proxy'
+import { API_URL, cookieClearOptions, getForwardHeaders } from '../_proxy'
 
 export async function POST(req: NextRequest) {
   try {
     await axios.post(`${API_URL}/auth/logout`, {}, {
       headers: getForwardHeaders(req),
     })
-  } catch (error: unknown) {
-    if (axios.isAxiosError(error) && error.response?.status !== 401) {
-      return handleError(error)
-    }
+  } catch {
+    // Whatever the backend said — or failed to say — the cookies still go. An
+    // early return here used to leave them behind, and cookies that outlive the
+    // client's session are what proxy.ts bounces back to the portal forever.
   }
 
   const res = NextResponse.json({ status: 'success', message: 'Logged out successfully' })
