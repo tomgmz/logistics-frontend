@@ -55,6 +55,19 @@ export default function ResetPasswordPage() {
   const searchParams = useSearchParams()
   const token        = searchParams.get('token') ?? ''
 
+  /**
+   * Driver links carry ?app=1 (set in buildResetUrl). Drivers work entirely out
+   * of the mobile app, so their reset belongs there — this page becomes a
+   * doorway rather than the form.
+   *
+   * The email still has to point here: mail clients cannot be trusted to follow
+   * a custom scheme, and the phone may not have the app. So the link resolves in
+   * a browser first and the hand-off happens from a page that always loads,
+   * with a way to carry on here for whoever opens it on a desktop.
+   */
+  const wantsApp = searchParams.get('app') === '1'
+  const [handingOff, setHandingOff] = useState(wantsApp)
+
   const [tokenState,   setTokenState]   = useState<TokenState>('checking')
   const [maskedEmail,  setMaskedEmail]  = useState<string | null>(null)
   const [password,     setPassword]     = useState('')
@@ -84,6 +97,14 @@ export default function ResetPasswordPage() {
 
     return () => { cancelled = true }
   }, [token])
+
+  // Fire the app link once, and only on a phone — on a desktop the scheme goes
+  // nowhere, and a silent failed navigation is worse than the button.
+  useEffect(() => {
+    if (!handingOff || !token) return
+    if (!/android|iphone|ipad|ipod/i.test(navigator.userAgent)) return
+    window.location.href = appLink(token)
+  }, [handingOff, token])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -159,6 +180,12 @@ export default function ResetPasswordPage() {
             </motion.div>
           ) : tokenState === 'invalid' ? (
             <InvalidLinkView key="invalid" reason={error} />
+          ) : handingOff ? (
+            <AppHandoffView
+              key="handoff"
+              token={token}
+              onContinueHere={() => setHandingOff(false)}
+            />
           ) : done ? (
             <SuccessView key="success" />
           ) : (
@@ -363,6 +390,75 @@ export default function ResetPasswordPage() {
         </AnimatePresence>
       </main>
     </div>
+  )
+}
+
+/** The app's deep link for a reset token. Mirrors app/reset-password in mobile. */
+function appLink(token: string): string {
+  return `logistics-mobile://reset-password?token=${encodeURIComponent(token)}`
+}
+
+/**
+ * What a driver sees instead of the form: a door into the app, and a way past
+ * it if the app is not on this device.
+ *
+ * The escape hatch is not decoration. A driver may open the mail on a desktop,
+ * or on a phone that has not installed the app yet, and a dead end here locks
+ * out the one person the whole flow exists to let back in.
+ */
+function AppHandoffView({
+  token, onContinueHere,
+}: {
+  token:          string
+  onContinueHere: () => void
+}) {
+  return (
+    <motion.div
+      key="handoff"
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -12 }}
+      transition={{ duration: 0.4 }}
+      className="w-full max-w-[400px] sm:max-w-[460px] mx-auto"
+    >
+      <div
+        className="glass rounded-3xl px-6 sm:px-9 py-8 flex flex-col items-center gap-5 text-center"
+        style={{ boxShadow: '0 24px 48px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06)' }}
+      >
+        <div
+          className="w-12 h-12 rounded-2xl flex items-center justify-center"
+          style={{ background: 'rgba(77,249,237,0.1)', border: '1px solid rgba(77,249,237,0.2)' }}
+        >
+          <IconLock />
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <h1 className="font-spartan text-white text-lg sm:text-xl tracking-[0.15em] uppercase">
+            Reset in the app
+          </h1>
+          <p className="text-white/40 text-[0.8rem] leading-relaxed">
+            Your password is set in the 8338 Logistics app on your phone. Open it
+            there and you will be signed straight back in.
+          </p>
+        </div>
+
+        <a
+          href={appLink(token)}
+          className="w-full rounded-xl py-3 font-spartan text-[0.8rem] tracking-[0.12em] uppercase text-[#062b28] transition-opacity hover:opacity-85"
+          style={{ background: '#4df9ed' }}
+        >
+          Open the app
+        </a>
+
+        <button
+          type="button"
+          onClick={onContinueHere}
+          className="text-white/30 hover:text-white/60 text-[0.72rem] tracking-wide underline underline-offset-4 transition-colors"
+        >
+          The app is not on this device — continue here
+        </button>
+      </div>
+    </motion.div>
   )
 }
 
