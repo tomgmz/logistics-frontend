@@ -42,6 +42,13 @@ const STATUS_CFG: Record<ResetRequestStatus, { label: string; cls: string }> = {
   expired:   { label: 'Link expired',  cls: 'bg-orange-500/15 text-orange-400 border-orange-500/30' },
 }
 
+// Rows an admin can still issue a link for. 'expired' counts: the previous link
+// timed out unused and the person behind it is still locked out.
+const SENDABLE: ResetRequestStatus[] = ['pending', 'expired']
+const CANCELLABLE: ResetRequestStatus[] = ['pending', 'sent', 'expired']
+
+
+
 function fullName(r: PasswordResetRequest): string {
   return [r.first_name, r.last_name].filter(Boolean).join(' ') || '—'
 }
@@ -124,7 +131,8 @@ export default function PasswordResetQueue({
     }
   }
 
-  const pendingCount = rows.filter((r) => r.status === 'pending').length
+  // Anything an admin still has to act on, not just untouched requests.
+  const pendingCount = rows.filter((r) => SENDABLE.includes(r.status)).length
 
   return (
     <>
@@ -235,27 +243,28 @@ export default function PasswordResetQueue({
                           <span className={`inline-flex w-fit items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold tracking-wide ${cfg.cls}`}>
                             {cfg.label}
                           </span>
-                          {r.status === 'sent' && (
-                            <span className="text-[10px] text-[#818181]">
-                              {left !== null
-                                ? `expires in ${left}m`
-                                : 'expired — cancel to let them ask again'}
+                          {r.status === 'sent' && left !== null && (
+                            <span className="text-[10px] text-[#818181]">expires in {left}m</span>
+                          )}
+                          {(r.status === 'expired' || (r.status === 'sent' && left === null)) && (
+                            <span className="text-[10px] text-orange-400/70">
+                              never used — send a new link
                             </span>
                           )}
                         </div>
                       </td>
                       <td className="px-4 py-3.5">
                         <div className="flex items-center justify-end gap-2">
-                          {r.status === 'pending' && (
+                          {SENDABLE.includes(r.status) && (
                             <button
                               onClick={() => setPending({ kind: 'send', request: r })}
                               disabled={busy}
                               className="flex items-center gap-1.5 rounded-lg bg-[#4df9ed] px-3 py-1.5 text-xs font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5] active:scale-95 disabled:opacity-40"
                             >
-                              <Send size={12} /> Send reset link
+                              <Send size={12} /> {r.status === 'expired' ? 'Send a new link' : 'Send reset link'}
                             </button>
                           )}
-                          {(r.status === 'pending' || r.status === 'sent') && (
+                          {CANCELLABLE.includes(r.status) && (
                             <button
                               onClick={() => setPending({ kind: 'cancel', request: r })}
                               disabled={busy}
@@ -278,15 +287,28 @@ export default function PasswordResetQueue({
 
       <ReusableModal
         open={!!pending}
-        title={pending?.kind === 'send' ? 'Send reset link?' : 'Cancel this request?'}
+        title={
+          pending?.kind !== 'send'
+            ? 'Cancel this request?'
+            : pending.request.status === 'expired'
+              ? 'Send a new reset link?'
+              : 'Send reset link?'
+        }
         description={
           pending?.kind === 'send'
-            ? `A one-time reset link will be emailed to ${pending.request.email}. It works once and expires in 60 minutes. Their account unlocks only when they finish setting a new password.`
+            ? `${pending.request.status === 'expired'
+                 ? `The previous link expired unused. A fresh one will be emailed to ${pending.request.email}, and the old one stops working.`
+                 : `A one-time reset link will be emailed to ${pending.request.email}.`
+               } It works once and expires in 60 minutes. Their account unlocks only when they finish setting a new password.`
             : pending
               ? `${fullName(pending.request)} will not get a reset link. Any link already sent stops working, and they can request again from the sign-in screen.`
               : undefined
         }
-        confirmLabel={pending?.kind === 'send' ? 'Send link' : 'Cancel request'}
+        confirmLabel={
+          pending?.kind !== 'send'
+            ? 'Cancel request'
+            : pending.request.status === 'expired' ? 'Send new link' : 'Send link'
+        }
         onConfirm={() => { if (pending) void runAction(pending) }}
         onCancel={() => setPending(null)}
       />
