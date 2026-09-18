@@ -182,6 +182,22 @@ export const itAdminService = {
   remove: (id: string) => del(`${B}/it-admins/${id}`),
   activate:   (id: string) => patch<AdminUser>(`${B}/it-admins/${id}/activate`),
   deactivate: (id: string) => patch<AdminUser>(`${B}/it-admins/${id}/deactivate`),
+  // Hand the role to a successor. The outgoing account is not named — the system
+  // allows exactly one active IT Admin, so the API resolves who is being replaced
+  // and retires them in the same transaction that creates the incoming account.
+  // Root administrator only; anyone else gets a 403.
+  transition: (p: TransitionITAdminPayload) =>
+    post<ITAdminTransitionResult>(`${B}/it-admins/transition`, p),
+}
+
+export interface TransitionITAdminPayload extends CreateITAdminPayload {
+  /** Why the handover is happening. Goes on the audit record. */
+  reason: string
+}
+
+export interface ITAdminTransitionResult {
+  outgoing: { user_id: string; email: string; status: string }
+  incoming: AdminUser
 }
 
 export interface VehicleEligibility {

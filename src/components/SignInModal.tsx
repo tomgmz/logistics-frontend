@@ -2,10 +2,11 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useRouter } from 'next/navigation'
 import { AxiosError } from 'axios'
 import {
   requestOtp, verifyOtp, loginWithPassword, getMe, getAuthStatus,
-  requestPasswordReset, AuthUser,
+  requestPasswordReset, requestItAdminResetOtp, verifyItAdminResetOtp, AuthUser,
 } from '@/lib/api/auth.api'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { ROLE_ROUTES } from '@/constants/roles'
@@ -222,6 +223,15 @@ function approverLabel(role?: string | null): string {
   return 'IT Admin'
 }
 
+/**
+ * Whether this person resets themselves with a code instead of waiting for an
+ * admin. Mirrors canSelfResetByOtp() on the backend, which is the only place the
+ * rule is enforced — this one decides which screen to show, nothing more.
+ */
+function selfResetsByOtp(role?: string | null): boolean {
+  return role === 'it_admin'
+}
+
 function PermanentLockScreen({
   onBack,
   onRequestReset,
@@ -262,14 +272,247 @@ function PermanentLockScreen({
           Your account has been permanently locked due to too many failed login attempts.
         </span>
         <span>
-          Request a password reset and your {approverLabel(role)} will send you a link to set a
-          new password. That also unlocks your account.
+          {selfResetsByOtp(role)
+            ? 'Reset your password with an emailed code and set a new one yourself. That also unlocks your account.'
+            : `Request a password reset and your ${approverLabel(role)} will send you a link to set a new password. That also unlocks your account.`}
         </span>
       </div>
 
-      <PrimaryButton onClick={onRequestReset}>Request A Password Reset</PrimaryButton>
+      <PrimaryButton onClick={onRequestReset}>
+        {selfResetsByOtp(role) ? 'Reset My Password' : 'Request A Password Reset'}
+      </PrimaryButton>
 
       <BackButton onClick={onBack} label="Change email" />
+    </motion.div>
+  )
+}
+
+/**
+ * The IT Admin's self-service reset.
+ *
+ * Everyone else raises a request and waits for an admin to press Send. The IT
+ * Admin cannot, because the queue they would be waiting on is the one they staff
+ * — so they prove control of the registered mailbox with a 6-digit code.
+ *
+ * Verifying the code does not set a password here. It hands back the same
+ * one-time token an emailed link would have carried, and this screen forwards to
+ * /reset-password with it, so the password is chosen on the one page that does
+ * that job and by the one endpoint that finishes a reset.
+ */
+function ItAdminOtpResetStep({
+  email,
+  onBack,
+}: {
+  email: string
+  onBack: () => void
+}) {
+  const router = useRouter()
+  const submitting = useRef(false)
+  const codeSentAt = useRef<number>(0)
+
+  const [stage,     setStage]     = useState<'intro' | 'code'>('intro')
+  const [code,      setCode]      = useState<string[]>(Array(OTP_LENGTH).fill(''))
+  const [sending,   setSending]   = useState(false)
+  const [verifying, setVerifying] = useState(false)
+  const [resendSec, setResendSec] = useState(0)
+  const [error,     setError]     = useState('')
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([])
+
+  const joined = code.join('')
+
+  useEffect(() => {
+    if (resendSec <= 0) return
+    const interval = setInterval(() => {
+      setResendSec(Math.max(0, Math.ceil((codeSentAt.current + RESEND_SECS * 1000 - now()) / 1000)))
+    }, 500)
+    return () => clearInterval(interval)
+  }, [resendSec])
+
+  const focusInput = (idx: number) => inputRefs.current[idx]?.focus()
+
+  const handleSend = async () => {
+    if (sending) return
+    setSending(true); setError('')
+    try {
+      await requestItAdminResetOtp(email)
+      codeSentAt.current = now()
+      setResendSec(RESEND_SECS)
+      setCode(Array(OTP_LENGTH).fill(''))
+      setStage('code')
+      setTimeout(() => focusInput(0), 120)
+    } catch (err) {
+      setError(extractErrorMessage(err, 'Could not send a code. Please try again.'))
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const handleChange = (idx: number, val: string) => {
+    const char = val.replace(/\D/g, '').slice(-1)
+    const next = [...code]; next[idx] = char; setCode(next); setError('')
+    if (char && idx < OTP_LENGTH - 1) focusInput(idx + 1)
+  }
+
+  const handleKeyDown = (idx: number, e: React.KeyboardEvent) => {
+    if (e.key === 'Backspace') {
+      if (code[idx]) { const n = [...code]; n[idx] = ''; setCode(n) }
+      else if (idx > 0) focusInput(idx - 1)
+    } else if (e.key === 'ArrowLeft'  && idx > 0)              focusInput(idx - 1)
+      else if (e.key === 'ArrowRight' && idx < OTP_LENGTH - 1) focusInput(idx + 1)
+  }
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, OTP_LENGTH)
+    if (!pasted) return
+    e.preventDefault()
+    const next = Array(OTP_LENGTH).fill('')
+    pasted.split('').forEach((c, i) => { next[i] = c })
+    setCode(next)
+    focusInput(Math.min(pasted.length, OTP_LENGTH - 1))
+  }
+
+  const handleVerify = useCallback(async () => {
+    if (submitting.current) return
+    if (joined.length !== OTP_LENGTH) return
+    submitting.current = true
+    setVerifying(true); setError('')
+    try {
+      const { token } = await verifyItAdminResetOtp(email, joined)
+      // Deliberately a navigation, not a third screen in this modal. The reset
+      // page already checks the token, enforces the password rules and reports a
+      // token that died on the way — duplicating that here would be a second
+      // implementation of the only step that actually changes a password.
+      router.push(`/reset-password?token=${encodeURIComponent(token)}`)
+    } catch (err) {
+      setError(extractErrorMessage(err, 'That code did not work. Please try again.'))
+      setCode(Array(OTP_LENGTH).fill(''))
+      focusInput(0)
+      submitting.current = false
+      setVerifying(false)
+    }
+    // On success the ref stays latched: the page is navigating away, and a second
+    // submission would spend a code that has already been traded for a token.
+  }, [email, joined, router])
+
+  useEffect(() => {
+    if (joined.length === OTP_LENGTH) handleVerify()
+  }, [joined, handleVerify])
+
+  return (
+    <motion.div
+      key="it-admin-reset"
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -20 }}
+      transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
+      className="flex flex-col gap-6"
+    >
+      <div className="flex items-center gap-2 text-white/55">
+        <IconShield />
+        <span
+          className="text-[0.72rem] font-semibold tracking-[0.18em] uppercase"
+          style={{ fontFamily: "'League Spartan', sans-serif" }}
+        >
+          {stage === 'intro' ? 'IT Admin Reset' : 'Enter Your Code'}
+        </span>
+      </div>
+
+      {stage === 'intro' ? (
+        <>
+          <p
+            className="text-[0.82rem] leading-relaxed text-white/50"
+            style={{ fontFamily: "'League Spartan', sans-serif" }}
+          >
+            As IT Admin you reset your own password — there is no queue above you to
+            approve it. We will email a 6-digit code to{' '}
+            <span className="text-[#4df9ed]/80">{email}</span>, and you set a new password
+            once it checks out.
+          </p>
+
+          <AnimatePresence>
+            {error && <ErrorMessage message={error} />}
+          </AnimatePresence>
+
+          <PrimaryButton loading={sending} onClick={handleSend}>
+            Email Me A Code
+          </PrimaryButton>
+
+          <BackButton onClick={onBack} label="Back" />
+        </>
+      ) : (
+        <>
+          <p
+            className="text-white/40 text-[0.8rem] leading-relaxed"
+            style={{ fontFamily: "'League Spartan', sans-serif" }}
+          >
+            6-digit code sent to{' '}
+            <span className="text-[#4df9ed]/70 break-all" style={{ fontFamily: 'monospace' }}>
+              {email}
+            </span>
+            . It expires in 10 minutes.
+          </p>
+
+          <div className="flex gap-2" onPaste={handlePaste}>
+            {code.map((digit, i) => (
+              <motion.input
+                key={i}
+                ref={el => { inputRefs.current[i] = el }}
+                type="text"
+                inputMode="numeric"
+                maxLength={1}
+                value={digit}
+                onChange={e => handleChange(i, e.target.value)}
+                onKeyDown={e => handleKeyDown(i, e)}
+                onFocus={e => e.target.select()}
+                disabled={verifying}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.04 }}
+                className={`flex-1 min-w-0 h-14 text-center text-xl font-bold outline-none
+                  rounded-2xl transition-all duration-200
+                  disabled:opacity-40 disabled:cursor-not-allowed
+                  ${error ? 'shake' : ''}`}
+                style={{
+                  background: digit ? 'rgba(77,249,237,0.08)' : 'rgba(255,255,255,0.08)',
+                  border: digit
+                    ? '1px solid rgba(77,249,237,0.4)'
+                    : '1px solid rgba(255,255,255,0.13)',
+                  backdropFilter: 'blur(12px)',
+                  color: digit ? '#4df9ed' : '#fff',
+                  fontFamily: 'monospace',
+                }}
+              />
+            ))}
+          </div>
+
+          <AnimatePresence>
+            {error && <ErrorMessage message={error} />}
+          </AnimatePresence>
+
+          <PrimaryButton
+            loading={verifying}
+            disabled={joined.length !== OTP_LENGTH}
+            onClick={handleVerify}
+          >
+            Verify & Set New Password
+          </PrimaryButton>
+
+          <div className="flex items-center justify-between">
+            <BackButton onClick={onBack} label="Back" />
+
+            <button
+              onClick={handleSend}
+              disabled={resendSec > 0 || sending || verifying}
+              className="text-[0.78rem] bg-transparent border-none cursor-pointer transition-colors
+                disabled:text-white/25 disabled:cursor-not-allowed
+                enabled:text-[#4df9ed]/70 enabled:hover:text-[#4df9ed]"
+              style={{ fontFamily: "'League Spartan', sans-serif" }}
+            >
+              {sending ? 'Sending…' : resendSec > 0 ? `Resend in ${resendSec}s` : 'Resend code'}
+            </button>
+          </div>
+        </>
+      )}
     </motion.div>
   )
 }
@@ -1374,12 +1617,20 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
                     />
                   )}
                   {step === 'forgot' && (
-                    <ForgotPasswordStep
-                      key="forgot"
-                      email={email}
-                      role={role}
-                      onBack={() => setStep(method === 'password' ? 'password' : 'otp')}
-                    />
+                    selfResetsByOtp(role) ? (
+                      <ItAdminOtpResetStep
+                        key="forgot-otp"
+                        email={email}
+                        onBack={() => setStep(method === 'password' ? 'password' : 'otp')}
+                      />
+                    ) : (
+                      <ForgotPasswordStep
+                        key="forgot"
+                        email={email}
+                        role={role}
+                        onBack={() => setStep(method === 'password' ? 'password' : 'otp')}
+                      />
+                    )
                   )}
                   {step === 'otp' && (
                     <OtpStep

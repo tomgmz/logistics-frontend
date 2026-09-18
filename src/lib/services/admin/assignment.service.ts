@@ -18,6 +18,8 @@ export interface AssignBookingPayload {
   vendor_driver_phone?: string
   vendor_vehicle_plate?: string
   vendor_vehicle_type?: string
+  /** Optional. Supplying it provisions a passkey-only app account for this driver. */
+  vendor_driver_email?: string
 }
 
 export interface AssignmentRecord {
@@ -39,6 +41,9 @@ export interface AssignmentRecord {
   vendor_driver_phone: string | null
   vendor_vehicle_plate: string | null
   vendor_vehicle_type: string | null
+  vendor_driver_email: string | null
+  /** The provisioned account, when this driver was given app access. */
+  vendor_driver_user_id: string | null
 
   // The booking this delivery belongs to. Its status — not the delivery's — is
   // what says whether the crew is still tied up, and a completed booking keeps

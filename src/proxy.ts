@@ -5,7 +5,12 @@ import { SIGNED_OUT_PARAM } from './lib/auth-redirect'
 // '/reset-password' has to be public: whoever opens a reset link has no session
 // (and may be permanently locked), so the guard would otherwise bounce them to
 // '/' before they ever see the form.
-const PUBLIC_PATHS = ['/', '/favicon.ico', '/_next', '/api', '/change-password', '/reset-password', '/messages']
+// '/driver-setup' is public for the same reason '/reset-password' is: whoever
+// opens it has no session yet, and the one-time token in the query string is the
+// only credential involved. '/.well-known' must be reachable unauthenticated too
+// — Android fetches assetlinks.json itself to verify the app may use passkeys
+// for this domain, and it sends no cookies.
+const PUBLIC_PATHS = ['/', '/favicon.ico', '/_next', '/api', '/change-password', '/reset-password', '/driver-setup', '/.well-known', '/messages']
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'))
