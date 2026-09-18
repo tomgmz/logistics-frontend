@@ -22,6 +22,7 @@ import {
   Ruler,
   Check,
   ClipboardCheck,
+  KeyRound,
 } from 'lucide-react'
 
 import { supabase } from '@/lib/supabase'
@@ -49,6 +50,7 @@ import { nowDate } from '@/app/utils/serverTime'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { bookingRef, bookingRefFromRecord } from '@/lib/booking'
+import { externalDriverService, type ExternalDriverAccess } from '@/lib/services/admin/external-driver.service'
 import ReusableModal, { RemarksModal } from '@/components/layout/ReusableModal'
 import TripPlanner from './TripPlanner'
 
@@ -209,6 +211,7 @@ interface VendorAssignForm {
   vendor_driver_phone:   string
   vendor_vehicle_plate:  string
   vendor_vehicle_type:   string
+  vendor_driver_email:   string
 }
 
 const emptyVendorForm: VendorAssignForm = {
@@ -219,9 +222,16 @@ const emptyVendorForm: VendorAssignForm = {
   vendor_driver_phone:   '',
   vendor_vehicle_plate:  '',
   vendor_vehicle_type:   '',
+  vendor_driver_email:   '',
 }
 
-const VENDOR_FIELDS: { key: keyof VendorAssignForm; label: string; required?: boolean }[] = [
+const VENDOR_FIELDS: {
+  key: keyof VendorAssignForm
+  label: string
+  required?: boolean
+  type?: string
+  hint?: string
+}[] = [
   { key: 'vendor_name',           label: 'Vendor / subcontractor' },
   { key: 'vendor_contact',        label: 'Vendor contact' },
   { key: 'vendor_driver_name',    label: 'Driver name', required: true },
@@ -229,7 +239,109 @@ const VENDOR_FIELDS: { key: keyof VendorAssignForm; label: string; required?: bo
   { key: 'vendor_driver_phone',   label: 'Driver phone' },
   { key: 'vendor_vehicle_plate',  label: 'Vehicle plate', required: true },
   { key: 'vendor_vehicle_type',   label: 'Vehicle type' },
+  {
+    key:   'vendor_driver_email',
+    label: 'Driver email',
+    type:  'email',
+    hint:  'Optional. Gives this driver app access for this booking — they get an email to set up sign-in on their phone.',
+  },
 ]
+
+/**
+ * App access for a vendor driver who was given an account.
+ *
+ * Two buttons, and they are not the same action. "Resend setup link" is for a
+ * driver who never enrolled or has a new phone — it leaves any working passkey
+ * alone. "Revoke access" is offboarding: every passkey dies, the session is
+ * killed, the account is deactivated. The vendor snapshot on the delivery is
+ * untouched by either, because that is the record of who drove.
+ */
+function ExternalDriverAccessRow({ userId }: { userId: string }) {
+  const [access, setAccess] = useState<ExternalDriverAccess | null>(null)
+  const [busy,   setBusy]   = useState(false)
+
+  const load = useCallback(() => {
+    externalDriverService.getAccess(userId)
+      .then(setAccess)
+      .catch(() => setAccess(null))
+  }, [userId])
+
+  useEffect(() => { load() }, [load])
+
+  const resend = async () => {
+    setBusy(true)
+    try {
+      await externalDriverService.reinvite(userId)
+      appToast.success('Setup link sent to the driver.')
+      load()
+    } catch (err) {
+      appToast.error(getApiErrorMessage(err, 'Could not send the setup link.'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const revoke = async () => {
+    // Deliberately a confirm: this signs the driver out mid-run if they are on
+    // the road, and the only way back is a fresh enrolment.
+    if (!window.confirm(
+      'Revoke this driver\'s app access?\n\n' +
+      'Their passkeys stop working immediately and they are signed out. ' +
+      'The delivery record is kept.'
+    )) return
+
+    setBusy(true)
+    try {
+      const res = await externalDriverService.revoke(userId)
+      appToast.success(`Access revoked (${res.credentialsRevoked} passkey(s)).`)
+      load()
+    } catch (err) {
+      appToast.error(getApiErrorMessage(err, 'Could not revoke access.'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const status = !access
+    ? 'Checking app access…'
+    : access.enrolled
+      ? `App access active · ${access.passkey_count} passkey${access.passkey_count === 1 ? '' : 's'}` +
+        (access.last_used_at ? ` · last used ${new Date(access.last_used_at).toLocaleString()}` : '')
+      : access.invite_pending
+        ? `Setup link sent — not yet used${access.invite_expires_at ? ` · expires ${new Date(access.invite_expires_at).toLocaleString()}` : ''}`
+        : 'No app access set up'
+
+  return (
+    <div className="mt-2 pt-2 border-t border-white/[0.06] space-y-1.5">
+      <div className="flex items-center gap-1.5 text-[11px] text-white/45">
+        <KeyRound size={11} className="text-white/30 shrink-0" />
+        <span>{status}</span>
+      </div>
+      <div className="flex gap-1.5">
+        <button
+          type="button"
+          onClick={resend}
+          disabled={busy}
+          className="text-[10px] font-bold px-2 py-1 rounded-md border border-white/10
+                     text-white/50 hover:text-white hover:border-white/25 transition-colors disabled:opacity-40"
+        >
+          Resend setup link
+        </button>
+        {access?.enrolled && (
+          <button
+            type="button"
+            onClick={revoke}
+            disabled={busy}
+            className="text-[10px] font-bold px-2 py-1 rounded-md border transition-colors disabled:opacity-40"
+            style={{ color: '#f87171', borderColor: 'rgba(248,113,113,0.3)' }}
+          >
+            Revoke access
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
 
 function AssignmentPanel({
   detail,
@@ -241,6 +353,7 @@ function AssignmentPanel({
   assignEditMode,
   vendorMode,
   vendorForm,
+  externalDriverUserId,
   selectClass,
   onDriverChange,
   onTruckChange,
@@ -259,6 +372,8 @@ function AssignmentPanel({
   assignEditMode:  boolean
   vendorMode:      boolean
   vendorForm:      VendorAssignForm
+  /** Set when this vendor driver was provisioned an app account, so access can be managed. */
+  externalDriverUserId: string | null
   selectClass:     string
   onDriverChange:  (id: string) => void
   onTruckChange:   (id: string) => void
@@ -332,6 +447,9 @@ function AssignmentPanel({
           {vendorMode && vendorForm.vendor_name && (
             <div className="text-[11px] text-white/45">Vendor: {vendorForm.vendor_name}</div>
           )}
+          {vendorMode && externalDriverUserId && (
+            <ExternalDriverAccessRow userId={externalDriverUserId} />
+          )}
         </div>
       ) : (
         <>
@@ -363,18 +481,22 @@ function AssignmentPanel({
 
           {vendorMode ? (
             <div className="space-y-2">
-              {VENDOR_FIELDS.map(({ key, label, required }) => (
+              {VENDOR_FIELDS.map(({ key, label, required, type, hint }) => (
                 <div key={key}>
                   <label className="text-[11px] text-white/40 block mb-1">
                     {label}{required && <span className="text-red-400"> *</span>}
                   </label>
                   <input
+                    type={type ?? 'text'}
                     value={vendorForm[key]}
                     disabled={assignBusy}
                     onChange={(e) => onVendorFieldChange(key, e.target.value)}
                     className={selectClass}
                     placeholder={label}
                   />
+                  {hint && (
+                    <p className="text-[10px] text-white/30 mt-1 leading-snug">{hint}</p>
+                  )}
                 </div>
               ))}
             </div>
@@ -894,6 +1016,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
       vendor_driver_phone:   record?.vendor_driver_phone   ?? '',
       vendor_vehicle_plate:  record?.vendor_vehicle_plate  ?? '',
       vendor_vehicle_type:   record?.vendor_vehicle_type   ?? '',
+      vendor_driver_email:   record?.vendor_driver_email   ?? '',
     } : emptyVendorForm)
 
     const fallback = getPrefillFromBookingDetail(detail, trucks)
@@ -1003,6 +1126,14 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     if (!selectedId) return
     if (assignVendorMode) {
       if (!vendorForm.vendor_driver_name.trim() || !vendorForm.vendor_vehicle_plate.trim()) return
+      // Catch a typo here rather than after it has provisioned an account against
+      // an address nobody reads — the invite is the driver's only way in, so a
+      // misspelt domain is a silently blocked delivery.
+      const email = vendorForm.vendor_driver_email.trim()
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        appToast.error('Enter a valid driver email, or leave it blank for no app access.')
+        return
+      }
     } else if (!assignDriverId || !assignTruckId) {
       return
     }
@@ -1631,6 +1762,10 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                           assignEditMode={assignEditMode}
                           vendorMode={assignVendorMode}
                           vendorForm={vendorForm}
+                          externalDriverUserId={
+                            allAssignments.find((a) => a.booking_id === detail.booking_id)
+                              ?.vendor_driver_user_id ?? null
+                          }
                           selectClass={selectClass}
                           onDriverChange={handleDriverChange}
                           onTruckChange={handleTruckChange}

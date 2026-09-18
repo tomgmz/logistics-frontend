@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Users, UserPlus, Search, RefreshCw, MoreVertical,
   Pencil, ShieldCheck, ShieldOff, Archive,
-  ChevronLeft, ChevronRight, AlertTriangle, KeyRound,
+  ChevronLeft, ChevronRight, AlertTriangle, KeyRound, ArrowLeftRight,
 } from 'lucide-react'
 import Select, { SelectChangeEvent } from '@mui/material/Select'
 import MenuItem from '@mui/material/MenuItem'
@@ -14,18 +14,20 @@ import FormControl from '@mui/material/FormControl'
 import { createTheme, ThemeProvider } from '@mui/material/styles'
 import type {
   UserTab, AnyUser, UserStatus,
-  ClientUser, DriverUser,
+  ClientUser, DriverUser, AdminUser,
 } from '@/app/types/admin/user-management.types'
 import {
   userService,
-  clientService, driverService,
+  clientService, driverService, itAdminService,
 } from '@/lib/services/admin/user-management.service'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import UserFormModal from './UserFormModal'
 import PasswordResetQueue from '@/components/admin/PasswordResetQueue'
+import ItAdminTransitionModal from '@/components/admin/ItAdminTransitionModal'
+import { useAuthStore } from '@/lib/store/auth.store'
 
-type UserMgmtTab = Extract<UserTab, 'clients' | 'drivers'>
+type UserMgmtTab = Extract<UserTab, 'clients' | 'drivers' | 'it-admins'>
 // 'password-resets' is a queue, not a user list, so it bypasses the fetch/search/
 // paginate machinery below and renders its own panel.
 const RESETS_TAB = 'password-resets'
@@ -35,6 +37,7 @@ const TABS: { key: TabValue; label: string }[] = [
   { key: 'all',        label: 'All Users'       },
   { key: 'clients',    label: 'Clients'         },
   { key: 'drivers',    label: 'Drivers'         },
+  { key: 'it-admins',  label: 'IT Admin'        },
   { key: RESETS_TAB,   label: 'Password Resets' },
 ]
 
@@ -50,13 +53,20 @@ const PAGE_SIZE = 10
 
 async function fetchByTab(tab: UserMgmtTab): Promise<AnyUser[]> {
   switch (tab) {
-    case 'clients': return clientService.getAll() as Promise<AnyUser[]>
-    case 'drivers': return driverService.getAll() as Promise<AnyUser[]>
+    case 'clients':   return clientService.getAll() as Promise<AnyUser[]>
+    case 'drivers':   return driverService.getAll() as Promise<AnyUser[]>
+    case 'it-admins': return itAdminService.getAll() as unknown as Promise<AnyUser[]>
   }
 }
 
+function serviceForTab(tab: UserMgmtTab) {
+  if (tab === 'clients')   return clientService
+  if (tab === 'it-admins') return itAdminService
+  return driverService
+}
+
 async function updateStatus(tab: UserMgmtTab, id: string, status: UserStatus): Promise<void> {
-  const svc = tab === 'clients' ? clientService : driverService
+  const svc = serviceForTab(tab)
 
   if (status === 'active')      return svc.activate(id).then()
   if (status === 'deactivated') return svc.deactivate(id).then()
@@ -291,14 +301,27 @@ function renderCells(user: AnyUser, tab: TabValue) {
         </>
       )
     }
+    case 'it-admins': {
+      const name = [user.first_name, user.middle_name, user.last_name, user.suffix].filter(Boolean).join(' ') || '—'
+      return (
+        <>
+          <td className="px-4 py-3.5"><p className="font-medium text-white">{name}</p></td>
+          <td className="px-4 py-3.5 text-sm text-[#818181]">{user.email}</td>
+          <td className="px-4 py-3.5 text-sm text-[#818181]">{user.phone ?? '—'}</td>
+          <td className="px-4 py-3.5"><StatusBadge status={user.status} /></td>
+          <td className="px-4 py-3.5 text-xs text-[#818181]">{formatDateTime(user.last_login_at ?? null)}</td>
+        </>
+      )
+    }
   }
 }
 
 // Only the user-list tabs have table headers; the resets tab brings its own table.
 const HEADERS: Record<Exclude<TabValue, typeof RESETS_TAB>, string[]> = {
-  all:     ['Name', 'Email', 'Phone', 'Role', 'Status'],
-  clients: ['Name', 'Email', 'Company', 'Status', 'Last Login'],
-  drivers: ['Name', 'License #', 'Expiry', 'Driver Status', 'Acct. Status'],
+  all:         ['Name', 'Email', 'Phone', 'Role', 'Status'],
+  clients:     ['Name', 'Email', 'Company', 'Status', 'Last Login'],
+  drivers:     ['Name', 'License #', 'Expiry', 'Driver Status', 'Acct. Status'],
+  'it-admins': ['Name', 'Email', 'Phone', 'Status', 'Last Login'],
 }
 
 export default function UserManagementClient() {
@@ -323,6 +346,18 @@ export default function UserManagementClient() {
   const [showForm,         setShowForm]         = useState(false)
   const [editUser,         setEditUser]         = useState<AnyUser | null>(null)
   const [formTab,          setFormTab]          = useState<UserMgmtTab>('clients')
+  const [showTransition,   setShowTransition]   = useState(false)
+
+  // Only the primary administrator may hand the IT Admin role over. The API
+  // enforces it; this just keeps a button that would 403 out of the way.
+  const isRootAdmin = useAuthStore((s) => s.user?.is_root_admin ?? false)
+
+  const isITAdminTab   = activeTab === 'it-admins'
+  // The system allows exactly one active IT Admin, so the row that matters on
+  // this tab is the active one — the rest are kept records of predecessors.
+  const activeITAdmin  = isITAdminTab
+    ? (allRows.find((u) => u.status === 'active') ?? null)
+    : null
 
   const isInitialAllFetch = useRef(true)
 
@@ -462,13 +497,29 @@ export default function UserManagementClient() {
           {/* Header */}
           <div className="flex items-start justify-between shrink-0">
             <h1 className="mt-1 text-2xl font-bold tracking-tight text-white">User Management</h1>
+            {/*
+              On the IT Admin tab "Add User" is the wrong verb: only one may be
+              active, so while the seat is filled the only move is to hand it over.
+              If it is somehow empty, creating one is exactly right.
+            */}
             {!isResetsTab && (
-              <button
-                onClick={openCreate}
-                className="flex items-center gap-2 rounded-xl bg-[#4df9ed] px-5 py-2.5 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5] active:scale-95"
-              >
-                <UserPlus size={15} /> Add User
-              </button>
+              isITAdminTab && activeITAdmin ? (
+                isRootAdmin && (
+                  <button
+                    onClick={() => setShowTransition(true)}
+                    className="flex items-center gap-2 rounded-xl bg-[#4df9ed] px-5 py-2.5 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5] active:scale-95"
+                  >
+                    <ArrowLeftRight size={15} /> Transition IT Admin
+                  </button>
+                )
+              ) : (
+                <button
+                  onClick={openCreate}
+                  className="flex items-center gap-2 rounded-xl bg-[#4df9ed] px-5 py-2.5 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5] active:scale-95"
+                >
+                  <UserPlus size={15} /> Add User
+                </button>
+              )
             )}
           </div>
 
@@ -698,6 +749,13 @@ export default function UserManagementClient() {
           }}
         />
       )}
+
+      <ItAdminTransitionModal
+        open={showTransition}
+        outgoing={activeITAdmin as AdminUser | null}
+        onClose={() => setShowTransition(false)}
+        onDone={refetchCurrentTab}
+      />
     </ThemeProvider>
   )
 }

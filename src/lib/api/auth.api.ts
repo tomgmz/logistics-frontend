@@ -169,6 +169,11 @@ export interface AuthUser {
   // True for an accountant the IT admin appointed to stand in for the general
   // manager on booking approvals — they get the GM's approve/reject controls.
   is_gm_proxy?: boolean
+  // True for the primary administrator account (the earliest-created admin),
+  // which is never permission-restricted and is the only one allowed to hand the
+  // IT Admin role to a successor. The API enforces that independently; this only
+  // keeps a button that would 403 out of everyone else's way.
+  is_root_admin?: boolean
   module_permissions?: ModulePermission[]
   clients?: {
     client_id:       string
@@ -250,6 +255,47 @@ export async function requestPasswordReset(email: string): Promise<string> {
     { email }
   )
   return data.message
+}
+
+/**
+ * The IT Admin's self-service reset: ask for a 6-digit code by email.
+ *
+ * Everyone else's reset goes through an admin queue. The IT Admin's cannot -
+ * the queue they would be waiting on is the one they staff - so they prove
+ * control of the registered mailbox with a code instead.
+ *
+ * Resolves the same way for an address that is not an IT Admin's as for one that
+ * is, by design. The UI must not read anything into it.
+ */
+export async function requestItAdminResetOtp(email: string): Promise<string> {
+  const { data } = await directApi.post<{ status: string; message: string }>(
+    '/auth/it-admin/forgot-password',
+    { email }
+  )
+  return data.message
+}
+
+export interface ResetOtpVerification {
+  token:      string
+  expires_at: string
+}
+
+/**
+ * Trade a correct code for a one-time reset token.
+ *
+ * The token is the same one an emailed link would have carried, so the caller
+ * carries on to /reset-password exactly as a link recipient does - the code never
+ * travels alongside the new password.
+ */
+export async function verifyItAdminResetOtp(
+  email: string,
+  code:  string,
+): Promise<ResetOtpVerification> {
+  const { data } = await directApi.post<{ status: string; data: ResetOtpVerification }>(
+    '/auth/it-admin/verify-otp',
+    { email, code }
+  )
+  return data.data
 }
 
 export interface ResetTokenStatus {

@@ -1,0 +1,13 @@
+[
+  {
+    "relation": ["delegate_permission/common.get_login_creds"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "ph.logistics8338.mobile",
+      "sha256_cert_fingerprints": [
+        "A0:24:24:DC:4B:E0:75:7B:76:F4:CA:3D:61:9E:70:5F:CE:B9:66:41:6B:82:F8:28:F5:1D:09:32:30:85:4A:73",
+        "A1:B6:19:73:12:25:46:32:53:EB:81:10:75:0B:7D:C1:9B:B1:96:70:D9:83:D2:4F:62:A2:97:44:45:C4:45:93"
+      ]
+    }
+  }
+]
