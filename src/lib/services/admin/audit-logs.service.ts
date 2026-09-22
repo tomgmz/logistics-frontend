@@ -1,11 +1,25 @@
 import proxyApi from '@/lib/api/auth.api'
 
 export type LogType =
-  | 'user_activity'
+  // A person acted on their own credentials or session.
+  | 'auth'
+  // An admin created, changed, or removed somebody else's account.
+  | 'user_management'
+  // Permissions granted or revoked, and attempts that were refused.
+  | 'access_control'
+  // A document or proof photo was attached or removed.
+  | 'document_activity'
+  // Records left the system in bulk.
+  | 'data_export'
   | 'admin_activity'
   | 'vehicle_activity'
   | 'booking'
   | 'payment'
+  | 'driver_activity'
+  | 'billing_activity'
+  /** @deprecated pre-split rows only — see the log split migration. */
+  | 'user_activity'
+  /** @deprecated technical failures now live in system_logs. */
   | 'system_error'
 
 export interface LogUser {
@@ -25,13 +39,20 @@ export interface AuditLog {
 }
 
 export interface LogStats {
-  total:          number
-  user_activity:  number
-  admin_activity: number
-  vehicle_activity: number
-  booking:        number
-  payment:        number
-  system_error:   number
+  total:             number
+  auth:              number
+  user_management:   number
+  access_control:    number
+  document_activity: number
+  data_export:       number
+  admin_activity:    number
+  vehicle_activity:  number
+  booking:           number
+  payment:           number
+  driver_activity:   number
+  billing_activity:  number
+  user_activity:     number
+  system_error:      number
 }
 
 export interface GetLogsParams {

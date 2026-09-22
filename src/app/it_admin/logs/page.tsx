@@ -8,38 +8,33 @@ import {
   type LogStats,
   type LogType,
 } from '@/lib/services/admin/audit-logs.service'
+import {
+  systemLogService,
+  type SystemLog as AppSystemLog,
+  type SystemLogLevel,
+  type SystemLogEventType,
+  type SystemLogStats,
+} from '@/lib/services/admin/system-logs.service'
 import { formatDate, formatTime, formatDateTime } from '@/app/utils/timeFormat'
 
-export type SystemLogLevel     = 'info' | 'warn' | 'error' | 'critical'
-export type SystemLogEventType = 'server_error' | 'auth_event' | 'email_event' | 'external_api' | 'cron_job' | 'db_event'
-
-export interface AppSystemLog {
-  log_id:     string
-  timestamp:  string
-  log_level:  SystemLogLevel
-  event_type: SystemLogEventType
-  source:     string
-  message:    string
-  metadata?:  Record<string, unknown>
-  resolved:   boolean
-}
-
-export interface SystemLogStats {
-  total:      number
-  info:       number
-  warn:       number
-  error:      number
-  critical:   number
-  unresolved: number
-}
+// Types now come from the service — see system-logs.service.ts. They used to be
+// declared here because there was no system-logs endpoint to type against.
+export type { SystemLogLevel, SystemLogEventType, SystemLogStats }
 
 const AUDIT_BADGE: Record<LogType, string> = {
-  user_activity:    'bg-[rgba(77,249,237,0.12)] text-[#4df9ed] border border-[rgba(77,249,237,0.25)]',
-  admin_activity:   'bg-[rgba(255,140,0,0.10)] text-[#ff9a3c] border border-[rgba(255,140,0,0.25)]',
-  vehicle_activity: 'bg-[rgba(58,246,38,0.10)] text-[#3af626] border border-[rgba(58,246,38,0.25)]',
-  booking:          'bg-[rgba(255,200,60,0.10)] text-[#ffc83c] border border-[rgba(255,200,60,0.25)]',
-  payment:          'bg-[rgba(160,120,255,0.12)] text-[#b08aff] border border-[rgba(160,120,255,0.25)]',
-  system_error:     'bg-[rgba(255,80,80,0.10)] text-[#ff6060] border border-[rgba(255,80,80,0.25)]',
+  auth:              'bg-[rgba(160,120,255,0.12)] text-[#b08aff] border border-[rgba(160,120,255,0.25)]',
+  user_management:   'bg-[rgba(77,249,237,0.12)] text-[#4df9ed] border border-[rgba(77,249,237,0.25)]',
+  access_control:    'bg-[rgba(255,80,80,0.10)] text-[#ff6060] border border-[rgba(255,80,80,0.25)]',
+  document_activity: 'bg-[rgba(120,180,255,0.12)] text-[#78b4ff] border border-[rgba(120,180,255,0.25)]',
+  data_export:       'bg-[rgba(255,120,200,0.12)] text-[#ff78c8] border border-[rgba(255,120,200,0.25)]',
+  admin_activity:    'bg-[rgba(255,140,0,0.10)] text-[#ff9a3c] border border-[rgba(255,140,0,0.25)]',
+  vehicle_activity:  'bg-[rgba(58,246,38,0.10)] text-[#3af626] border border-[rgba(58,246,38,0.25)]',
+  booking:           'bg-[rgba(255,200,60,0.10)] text-[#ffc83c] border border-[rgba(255,200,60,0.25)]',
+  payment:           'bg-[rgba(160,120,255,0.12)] text-[#b08aff] border border-[rgba(160,120,255,0.25)]',
+  driver_activity:   'bg-[rgba(58,246,38,0.10)] text-[#3af626] border border-[rgba(58,246,38,0.25)]',
+  billing_activity:  'bg-[rgba(255,200,60,0.10)] text-[#ffc83c] border border-[rgba(255,200,60,0.25)]',
+  user_activity:     'bg-[rgba(130,130,130,0.12)] text-[#9a9a9a] border border-[rgba(130,130,130,0.25)]',
+  system_error:      'bg-[rgba(255,80,80,0.10)] text-[#ff6060] border border-[rgba(255,80,80,0.25)]',
 }
 
 const LEVEL_BADGE: Record<SystemLogLevel, string> = {
@@ -105,7 +100,8 @@ function AuditLogsTab() {
 
   const totalPages    = Math.ceil(total / PAGE_SIZE)
   const safePage      = Math.min(page, Math.max(1, totalPages))
-  const displayedLogs = logs.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+  // Already the current page's rows — the server paginated them.
+  const displayedLogs = logs
 
   const displayName = (log: AuditLog) => {
     if (!log.users) return '—'
@@ -133,11 +129,18 @@ function AuditLogsTab() {
             className="bg-[#2a2a2a]/60 border border-[#424242] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-[#4df9ed] cursor-pointer ff-sc"
           >
             <option value="">All Types</option>
-            <option value="user_activity">User Activity</option>
+            <option value="auth">Sign-in &amp; Credentials</option>
+            <option value="user_management">User Management</option>
+            <option value="access_control">Access Control</option>
+            <option value="document_activity">Documents</option>
+            <option value="data_export">Data Exports</option>
             <option value="admin_activity">Admin Activity</option>
             <option value="vehicle_activity">Vehicle Activity</option>
+            <option value="driver_activity">Driver Activity</option>
             <option value="booking">Booking</option>
             <option value="payment">Payment</option>
+            <option value="billing_activity">Billing</option>
+            <option value="user_activity">User Activity (legacy)</option>
           </select>
           <select
             value={sort}
@@ -342,13 +345,20 @@ function SystemLogsTab() {
       setLoading(true)
       setError(null)
       try {
-        // const res = await systemLogsService.getAll({ sort, event_type: eventType, log_level: level, search: debouncedSearch })
-        // setLogs(res.data)
-        // setTotal(res.total)
-        await new Promise(r => setTimeout(r, 600))
+        // Paginated server-side, unlike the audit tab: system logs are written
+        // by machines and this table grows far faster than the audit one, so
+        // fetching everything to slice it locally stops working quickly.
+        const res = await systemLogService.getAll({
+          sort,
+          page,
+          limit: PAGE_SIZE,
+          ...(eventType      && { event_type: eventType }),
+          ...(level          && { log_level: level }),
+          ...(debouncedSearch && { search: debouncedSearch }),
+        })
         if (!cancelled) {
-          setLogs([])
-          setTotal(0)
+          setLogs(res.data)
+          setTotal(res.total)
         }
       } catch (e: unknown) {
         const err = e as { response?: { data?: { message?: string } }; message?: string }
@@ -359,7 +369,7 @@ function SystemLogsTab() {
     }
     run()
     return () => { cancelled = true }
-  }, [sort, eventType, level, debouncedSearch, refreshKey])
+  }, [sort, eventType, level, debouncedSearch, refreshKey, page])
 
   const totalPages    = Math.ceil(total / PAGE_SIZE)
   const safePage      = Math.min(page, Math.max(1, totalPages))
