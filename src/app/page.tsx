@@ -1,4 +1,5 @@
 import Navbar from '@/components/layout/Navbar';
+import SignedOutNotice from '@/components/layout/SignedOutNotice';
 import HeroSection from '@/components/sections/HeroSection';
 import AboutSection from '@/components/sections/AboutSection';
 import BrandsSection from '@/components/sections/BrandsSection';
@@ -10,6 +11,7 @@ import ContactSection from '@/components/sections/ContactSection';
 export default function HomePage() {
   return (
     <>
+      <SignedOutNotice />
       <Navbar />
       <main>
         <HeroSection />

@@ -12,7 +12,20 @@
  */
 export const SIGNED_OUT_PARAM = 'signedout'
 
-export function goHomeSignedOut(): void {
+/**
+ * Why the session ended, so the landing page can say something truthful.
+ *
+ * 'inactive' means the backend refused the request with ACCOUNT_INACTIVE: the
+ * account was deactivated or its role changed while the user was still signed
+ * in. That is not an expired session, and telling someone their session timed
+ * out when an admin has actually disabled their account sends them to retry
+ * their password over and over.
+ */
+export const SIGNED_OUT_REASON_PARAM = 'reason'
+export type SignedOutReason = 'inactive'
+
+export function goHomeSignedOut(reason?: SignedOutReason): void {
   if (typeof window === 'undefined') return
-  window.location.replace(`/?${SIGNED_OUT_PARAM}=1`)
+  const suffix = reason ? `&${SIGNED_OUT_REASON_PARAM}=${reason}` : ''
+  window.location.replace(`/?${SIGNED_OUT_PARAM}=1${suffix}`)
 }

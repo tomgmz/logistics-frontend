@@ -118,6 +118,17 @@ proxyApi.interceptors.response.use(
       url.includes('/auth/logout')      ||
       url.includes('/api/auth/me')
 
+    // The backend refused this because the account is no longer active, not
+    // because the token aged out. Refreshing cannot fix that — refreshAccessToken
+    // performs the same status check and would fail identically — so skip
+    // straight to signing out, and say why.
+    const errorCode = (error.response?.data as { code?: string } | undefined)?.code
+    if (error.response?.status === 401 && errorCode === 'ACCOUNT_INACTIVE') {
+      broadcastLogout()
+      goHomeSignedOut('inactive')
+      return Promise.reject(error)
+    }
+
     if (error.response?.status === 401 && !originalRequest?._retry && !isExcluded) {
       if (isRefreshing) {
         return new Promise<void>((resolve, reject) => {
