@@ -140,7 +140,6 @@ function AuditLogsTab() {
             <option value="booking">Booking</option>
             <option value="payment">Payment</option>
             <option value="billing_activity">Billing</option>
-            <option value="user_activity">User Activity (legacy)</option>
           </select>
           <select
             value={sort}
@@ -626,13 +625,13 @@ export default function LogsPage() {
               <>
                 {(
                   [
-                    ['Total',    auditStats.total,            '#ffffff'],
-                    ['User',     auditStats.user_activity,    '#4df9ed'],
-                    ['Admin',    auditStats.admin_activity,   '#ff9a3c'],
-                    ['Vehicles', auditStats.vehicle_activity, '#3af626'],
-                    ['Bookings', auditStats.booking,          '#ffc83c'],
-                    ['Payment',  auditStats.payment,          '#b08aff'],
-                    ['Errors',   auditStats.system_error,     '#ff6060'],
+                    ['Total',    auditStats.total,             '#ffffff'],
+                    ['Sign-ins', auditStats.auth,              '#b08aff'],
+                    ['Accounts', auditStats.user_management,   '#4df9ed'],
+                    ['Access',   auditStats.access_control,    '#ff6060'],
+                    ['Vehicles', auditStats.vehicle_activity,  '#3af626'],
+                    ['Bookings', auditStats.booking,           '#ffc83c'],
+                    ['Payment',  auditStats.payment,           '#b08aff'],
                   ] as [string, number, string][]
                 ).map(([label, val, color]) => (
                   <div key={label} className="rounded-lg border border-[#2a2a2a] bg-[#1b1b1b] px-3 py-1 text-center min-w-[52px]">

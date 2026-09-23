@@ -120,12 +120,12 @@ export default function AuditLogsPage() {
             <div className="flex flex-wrap gap-3">
               {(
                 [
-                  ['Total',    stats.total,             'total'],
-                  ['User',     stats.user_activity,     'user_activity'],
-                  ['Admin',    stats.admin_activity,    'admin_activity'],
-                  ['Vehicles', stats.vehicle_activity,  'vehicle_activity'],
-                  ['Bookings', stats.booking,           'booking'],
-                  ['Errors',   stats.system_error,      'system_error'],
+                  ['Total',    stats.total,              'total'],
+                  ['Sign-ins', stats.auth,               'auth'],
+                  ['Accounts', stats.user_management,    'user_management'],
+                  ['Access',   stats.access_control,     'access_control'],
+                  ['Vehicles', stats.vehicle_activity,   'vehicle_activity'],
+                  ['Bookings', stats.booking,            'booking'],
                 ] as [string, number, string][]
               ).map(([label, val, key]) => (
                 <div key={key} className="rounded-xl border border-[#2a2a2a] bg-[#1b1b1b] px-4 py-2 text-center min-w-[72px]">
@@ -164,8 +164,6 @@ export default function AuditLogsPage() {
               <option value="booking">Booking</option>
               <option value="payment">Payment</option>
               <option value="billing_activity">Billing</option>
-              {/* Pre-split rows. Kept so older history stays reachable. */}
-              <option value="user_activity">User Activity (legacy)</option>
             </select>
             <select
               value={sort}
