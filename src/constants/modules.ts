@@ -94,7 +94,11 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   'transit-tracking':     'Transit Tracking',
   'transaction-history':  'Transaction History',
   'system-maintenance':   'System Maintenance',
-  'audit-logs':           'Audit Logs',
+  // Scope named explicitly: the IT Admin's own Logs page (audit + system
+  // tabs) bypasses RBAC entirely, so this row only ever governs whether a
+  // company admin can open /admin/audit-logs. The key stays 'audit-logs'
+  // because module_permissions rows reference it by name.
+  'audit-logs':           'Audit Logs (Company Admin)',
 }
 
 // Assignable modules per managed role (matches the role's dashboard nav).
