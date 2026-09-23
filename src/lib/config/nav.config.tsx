@@ -38,7 +38,7 @@ export const NAV_ITEMS_BY_ROLE: Record<string, { href: string; label: string; ic
   it_admin: [
     { href: '/it_admin/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={17} /> },
     { href: '/it_admin/administrator-management', label: 'Admin Management', icon: <Users size={17} /> },
-    { href: '/it_admin/logs', label: 'Audit Logs', icon: <Activity size={17} /> },
+    { href: '/it_admin/logs', label: 'Logs', icon: <Activity size={17} /> },
   ],
   operations_manager: [
     { href: '/operations_admin/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={17} /> },
