@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Users, UserPlus, Search, RefreshCw, MoreVertical,
   Pencil, ShieldCheck, ShieldOff, Archive,
-  ChevronLeft, ChevronRight, AlertTriangle, KeyRound, ArrowLeftRight,
+  ChevronLeft, ChevronRight, AlertTriangle, ArrowLeftRight,
 } from 'lucide-react'
 import Select, { SelectChangeEvent } from '@mui/material/Select'
 import MenuItem from '@mui/material/MenuItem'
@@ -25,20 +25,24 @@ import { getApiErrorMessage } from '@/lib/api-error'
 import UserFormModal from './UserFormModal'
 import PasswordResetQueue from '@/components/admin/PasswordResetQueue'
 import ItAdminTransitionModal from '@/components/admin/ItAdminTransitionModal'
+import ModuleSectionTabs, { type ModuleSection } from '@/components/admin/ModuleSectionTabs'
+import { passwordResetService } from '@/lib/services/admin/password-reset.service'
 import { useAuthStore } from '@/lib/store/auth.store'
 
 type UserMgmtTab = Extract<UserTab, 'clients' | 'drivers' | 'it-admins'>
-// 'password-resets' is a queue, not a user list, so it bypasses the fetch/search/
-// paginate machinery below and renders its own panel.
-const RESETS_TAB = 'password-resets'
-type TabValue = UserMgmtTab | 'all' | typeof RESETS_TAB
+// The dropdown below filters the directory by role. Password resets are a queue
+// you act on, not a slice of the directory, so they are a top-level section
+// instead — see ModuleSectionTabs.
+type TabValue = UserMgmtTab | 'all'
+
+// Kept for the ?tab=password-resets deep-link a reset notification sends.
+const RESETS_DEEPLINK = 'password-resets'
 
 const TABS: { key: TabValue; label: string }[] = [
-  { key: 'all',        label: 'All Users'       },
-  { key: 'clients',    label: 'Clients'         },
-  { key: 'drivers',    label: 'Drivers'         },
-  { key: 'it-admins',  label: 'IT Admin'        },
-  { key: RESETS_TAB,   label: 'Password Resets' },
+  { key: 'all',        label: 'All Users' },
+  { key: 'clients',    label: 'Clients'   },
+  { key: 'drivers',    label: 'Drivers'   },
+  { key: 'it-admins',  label: 'IT Admin'  },
 ]
 
 const muiTheme = createTheme({
@@ -316,8 +320,8 @@ function renderCells(user: AnyUser, tab: TabValue) {
   }
 }
 
-// Only the user-list tabs have table headers; the resets tab brings its own table.
-const HEADERS: Record<Exclude<TabValue, typeof RESETS_TAB>, string[]> = {
+// The resets panel brings its own table, so only the directory tabs are here.
+const HEADERS: Record<TabValue, string[]> = {
   all:         ['Name', 'Email', 'Phone', 'Role', 'Status'],
   clients:     ['Name', 'Email', 'Company', 'Status', 'Last Login'],
   drivers:     ['Name', 'License #', 'Expiry', 'Driver Status', 'Acct. Status'],
@@ -330,9 +334,11 @@ export default function UserManagementClient() {
   const deepLinkTab     = searchParams.get('tab')
   const focusRequestId  = searchParams.get('request')
 
-  const [activeTab,        setActiveTab]        = useState<TabValue>(
-    deepLinkTab === RESETS_TAB ? RESETS_TAB : 'clients',
+  const [section,          setSection]          = useState<ModuleSection>(
+    deepLinkTab === RESETS_DEEPLINK ? 'password-resets' : 'directory',
   )
+  const [activeTab,        setActiveTab]        = useState<TabValue>('clients')
+  const [resetCount,       setResetCount]       = useState(0)
   const [allRows,          setAllRows]          = useState<AnyUser[]>([])
   const [loading,          setLoading]          = useState(true)
   const [fetching,         setFetching]         = useState(false)
@@ -352,6 +358,7 @@ export default function UserManagementClient() {
   // enforces it; this just keeps a button that would 403 out of the way.
   const isRootAdmin = useAuthStore((s) => s.user?.is_root_admin ?? false)
 
+  const isResetsTab    = section === 'password-resets'
   const isITAdminTab   = activeTab === 'it-admins'
   // The system allows exactly one active IT Admin, so the row that matters on
   // this tab is the active one — the rest are kept records of predecessors.
@@ -360,6 +367,21 @@ export default function UserManagementClient() {
     : null
 
   const isInitialAllFetch = useRef(true)
+
+  // Seeded once on mount so the tab can show a badge before anyone opens it —
+  // the panel itself only fetches when it is mounted, which is too late to tell
+  // someone there is work waiting. Best effort: a failure just means no badge.
+  useEffect(() => {
+    let cancelled = false
+    passwordResetService.list()
+      .then((rows) => {
+        if (!cancelled) {
+          setResetCount(rows.filter((r) => r.status === 'pending' || r.status === 'expired').length)
+        }
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
 
   // Debounce search
   useEffect(() => {
@@ -410,26 +432,24 @@ export default function UserManagementClient() {
     setPage(1)
     setSearch('')
     setSearchInput('')
-    // The resets tab loads its own data and has no user list to fetch.
-    if (activeTab === RESETS_TAB) { setLoading(false); return }
+    // The resets panel loads its own data and has no user list to fetch.
+    if (isResetsTab) { setLoading(false); return }
     if (activeTab === 'all') fetchAllUsers('', true)
     else fetchTabUsers(activeTab)
-  }, [activeTab]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeTab, isResetsTab]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (activeTab !== 'all') return
+    if (isResetsTab || activeTab !== 'all') return
     if (isInitialAllFetch.current) { isInitialAllFetch.current = false; return }
     fetchAllUsers(search, false)
-  }, [search, activeTab, fetchAllUsers])
+  }, [search, activeTab, isResetsTab, fetchAllUsers])
 
-  const isResetsTab = activeTab === RESETS_TAB
-
-  /** Reload whichever user list is showing. A no-op on the resets tab, which owns its own data. */
+  /** Reload whichever user list is showing. A no-op on the resets panel, which owns its own data. */
   const refetchCurrentTab = useCallback(async () => {
-    if (activeTab === RESETS_TAB) return
+    if (isResetsTab) return
     if (activeTab === 'all') await fetchAllUsers(search, false)
     else await fetchTabUsers(activeTab)
-  }, [activeTab, search, fetchAllUsers, fetchTabUsers])
+  }, [isResetsTab, activeTab, search, fetchAllUsers, fetchTabUsers])
 
   const filtered = activeTab === 'all' || isResetsTab
     ? allRows
@@ -540,7 +560,17 @@ export default function UserManagementClient() {
           {/* Table card */}
           <div className="flex flex-col flex-1 min-h-0 rounded-2xl border border-[#2a2a2a] bg-[#1b1b1b] overflow-hidden">
 
-            {/* Tab selector */}
+            {/* Directory vs. queue — two different jobs, so two top-level tabs. */}
+            <ModuleSectionTabs
+              value={section}
+              onChange={setSection}
+              directoryLabel="Users"
+              pendingCount={resetCount}
+            />
+
+            {/* Role filter. Belongs to the directory only — there is nothing to
+                filter by role in a queue. */}
+            {!isResetsTab && (
             <div className="px-4 pt-3 pb-3 border-b border-[#2a2a2a] shrink-0">
               <FormControl size="small" sx={{ minWidth: 200 }}>
                 <Select
@@ -568,7 +598,7 @@ export default function UserManagementClient() {
                     const tab = TABS.find((t) => t.key === value)!
                     return (
                       <span style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#4df9ed', fontSize: '13px', fontWeight: 500 }}>
-                        {value === RESETS_TAB ? <KeyRound size={14} /> : <Users size={14} />} {tab.label}
+                        <Users size={14} /> {tab.label}
                       </span>
                     )
                   }}
@@ -593,7 +623,7 @@ export default function UserManagementClient() {
                       }}
                     >
                       <span style={{ color: activeTab === t.key ? '#4df9ed' : '#818181', display: 'flex' }}>
-                        {t.key === RESETS_TAB ? <KeyRound size={14} /> : <Users size={14} />}
+                        <Users size={14} />
                       </span>
                       {t.label}
                       {activeTab === t.key && (
@@ -604,9 +634,13 @@ export default function UserManagementClient() {
                 </Select>
               </FormControl>
             </div>
+            )}
 
             {isResetsTab ? (
-              <PasswordResetQueue focusRequestId={focusRequestId} />
+              <PasswordResetQueue
+                focusRequestId={focusRequestId}
+                onPendingCountChange={setResetCount}
+              />
             ) : (
             <>
             {/* Search + refresh bar */}

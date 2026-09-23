@@ -76,10 +76,16 @@ type PendingAction =
 
 export default function PasswordResetQueue({
   focusRequestId,
+  onPendingCountChange,
 }: {
   // Set from ?request= on a notification deep-link, so the row the admin was
   // notified about is highlighted instead of lost in the list.
   focusRequestId?: string | null
+  // Reports how many requests still need action, so the tab this panel lives
+  // behind can carry the badge. The parent seeds its own count on mount (this
+  // panel only mounts when its tab is open); this keeps that number honest once
+  // the admin starts working through the queue.
+  onPendingCountChange?: (count: number) => void
 }) {
   const [rows,          setRows]          = useState<PasswordResetRequest[]>([])
   const [loading,       setLoading]       = useState(true)
@@ -133,6 +139,12 @@ export default function PasswordResetQueue({
 
   // Anything an admin still has to act on, not just untouched requests.
   const pendingCount = rows.filter((r) => SENDABLE.includes(r.status)).length
+
+  useEffect(() => {
+    // Only meaningful once a load has finished — reporting 0 from the empty
+    // initial state would blank the badge the parent just seeded.
+    if (!loading) onPendingCountChange?.(pendingCount)
+  }, [loading, pendingCount, onPendingCountChange])
 
   return (
     <>

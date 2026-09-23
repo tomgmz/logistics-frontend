@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   ShieldCheck as ShieldCheckIcon, UserPlus, Search, RefreshCw, MoreVertical,
   Pencil, ShieldCheck, ShieldOff, Archive, SlidersHorizontal, Gavel,
-  ChevronLeft, ChevronRight, AlertTriangle, KeyRound,
+  ChevronLeft, ChevronRight, AlertTriangle,
 } from 'lucide-react'
 import Select, { SelectChangeEvent } from '@mui/material/Select'
 import MenuItem from '@mui/material/MenuItem'
@@ -26,6 +26,8 @@ import { isManagedRole } from '@/constants/modules'
 import UserFormModal from '@/app/admin/user-management/UserFormModal'
 import PermissionsModal from './PermissionsModal'
 import PasswordResetQueue from '@/components/admin/PasswordResetQueue'
+import ModuleSectionTabs, { type ModuleSection } from '@/components/admin/ModuleSectionTabs'
+import { passwordResetService } from '@/lib/services/admin/password-reset.service'
 
 type AdminMgmtTab = Extract<
   UserTab,
@@ -33,8 +35,13 @@ type AdminMgmtTab = Extract<
 >
 // 'password-resets' is a queue, not a user list, so it renders its own panel and
 // skips the fetch/search/paginate machinery below.
-const RESETS_TAB = 'password-resets'
-type TabValue = AdminMgmtTab | 'all' | typeof RESETS_TAB
+// The dropdown below filters the directory by role. Password resets are a queue
+// you act on, not a slice of the directory, so they are a top-level section
+// instead - see ModuleSectionTabs.
+type TabValue = AdminMgmtTab | 'all'
+
+// Kept for the ?tab=password-resets deep-link a reset notification sends.
+const RESETS_DEEPLINK = 'password-resets'
 
 const TABS: { key: TabValue; label: string }[] = [
   { key: 'all',                label: 'All Administrators'  },
@@ -43,7 +50,6 @@ const TABS: { key: TabValue; label: string }[] = [
   { key: 'general-managers',   label: 'General Managers'    },
   { key: 'fleet-admins',       label: 'Fleet Managers'      },
   { key: 'operations-admins',  label: 'Operations Managers' },
-  { key: RESETS_TAB,           label: 'Password Resets'     },
 ]
 
 // Roles aggregated by the "All Administrators" view and the stats cards.
@@ -297,7 +303,7 @@ function EmptyState({ tab, onAdd }: { tab: TabValue; onAdd: () => void }) {
 const SHARED_HEADERS = ['Name', 'Email', 'Phone', 'Role', 'Status']
 
 // Only the user-list tabs have table headers; the resets tab brings its own table.
-const HEADERS: Record<Exclude<TabValue, typeof RESETS_TAB>, string[]> = {
+const HEADERS: Record<TabValue, string[]> = {
   all:                 SHARED_HEADERS,
   admins:              SHARED_HEADERS,
   accountants:         SHARED_HEADERS,
@@ -340,9 +346,11 @@ export default function AdminManagementClient() {
   const deepLinkTab    = searchParams.get('tab')
   const focusRequestId = searchParams.get('request')
 
-  const [activeTab,        setActiveTab]        = useState<TabValue>(
-    deepLinkTab === RESETS_TAB ? RESETS_TAB : 'accountants',
+  const [section,          setSection]          = useState<ModuleSection>(
+    deepLinkTab === RESETS_DEEPLINK ? 'password-resets' : 'directory',
   )
+  const [activeTab,        setActiveTab]        = useState<TabValue>('accountants')
+  const [resetCount,       setResetCount]       = useState(0)
   const [allRows,          setAllRows]          = useState<AnyUser[]>([])
   const [loading,          setLoading]          = useState(true)
   const [fetching,         setFetching]         = useState(false)
@@ -359,6 +367,23 @@ export default function AdminManagementClient() {
   const [permUser,         setPermUser]         = useState<AnyUser | null>(null)
 
   const isInitialAllFetch = useRef(true)
+
+  const isResetsTab = section === 'password-resets'
+
+  // Seeded once on mount so the tab can show a badge before anyone opens it -
+  // the panel itself only fetches when mounted, which is too late to tell someone
+  // there is work waiting. Best effort: a failure just means no badge.
+  useEffect(() => {
+    let cancelled = false
+    passwordResetService.list()
+      .then((rows) => {
+        if (!cancelled) {
+          setResetCount(rows.filter((r) => r.status === 'pending' || r.status === 'expired').length)
+        }
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
 
   useEffect(() => {
     const t = setTimeout(() => { setSearch(searchInput); setPage(1) }, 400)
@@ -408,26 +433,24 @@ export default function AdminManagementClient() {
     setPage(1)
     setSearch('')
     setSearchInput('')
-    // The resets tab loads its own data and has no user list to fetch.
-    if (activeTab === RESETS_TAB) { setLoading(false); return }
+    // The resets panel loads its own data and has no user list to fetch.
+    if (isResetsTab) { setLoading(false); return }
     if (activeTab === 'all') fetchAllUsers('', true)
     else fetchTabUsers(activeTab)
-  }, [activeTab]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeTab, isResetsTab]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (activeTab !== 'all') return
+    if (isResetsTab || activeTab !== 'all') return
     if (isInitialAllFetch.current) { isInitialAllFetch.current = false; return }
     fetchAllUsers(search, false)
-  }, [search, activeTab, fetchAllUsers])
+  }, [search, activeTab, isResetsTab, fetchAllUsers])
 
-  const isResetsTab = activeTab === RESETS_TAB
-
-  /** Reload whichever user list is showing. A no-op on the resets tab, which owns its own data. */
+  /** Reload whichever user list is showing. A no-op on the resets panel, which owns its own data. */
   const refetchCurrentTab = useCallback(async () => {
-    if (activeTab === RESETS_TAB) return
+    if (isResetsTab) return
     if (activeTab === 'all') await fetchAllUsers(search, false)
     else await fetchTabUsers(activeTab)
-  }, [activeTab, search, fetchAllUsers, fetchTabUsers])
+  }, [isResetsTab, activeTab, search, fetchAllUsers, fetchTabUsers])
 
   const filtered = activeTab === 'all' || isResetsTab
     ? allRows
@@ -449,7 +472,7 @@ export default function AdminManagementClient() {
     : filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
   async function handleStatusChange(user: AnyUser, status: UserStatus) {
-    const serviceTab = activeTab === 'all' || activeTab === RESETS_TAB
+    const serviceTab = activeTab === 'all'
       ? tabFromRole(user.role)
       : activeTab
     try {
@@ -490,7 +513,7 @@ export default function AdminManagementClient() {
   }
 
   function openEdit(user: AnyUser) {
-    const tab = activeTab === 'all' || activeTab === RESETS_TAB
+    const tab = activeTab === 'all'
       ? tabFromRole(user.role)
       : activeTab
     setFormTab(tab)
@@ -499,7 +522,7 @@ export default function AdminManagementClient() {
   }
 
   function openCreate() {
-    setFormTab(activeTab === 'all' || activeTab === RESETS_TAB ? 'accountants' : activeTab)
+    setFormTab(activeTab === 'all' ? 'accountants' : activeTab)
     setEditUser(null)
     setShowForm(true)
   }
@@ -547,7 +570,17 @@ export default function AdminManagementClient() {
           {/* Table card */}
           <div className="flex flex-col flex-1 min-h-0 rounded-2xl border border-[#2a2a2a] bg-[#1b1b1b] overflow-hidden">
 
-            {/* Tab selector */}
+            {/* Directory vs. queue - two different jobs, so two top-level tabs. */}
+            <ModuleSectionTabs
+              value={section}
+              onChange={setSection}
+              directoryLabel="Administrators"
+              pendingCount={resetCount}
+            />
+
+            {/* Role filter. Belongs to the directory only - there is nothing to
+                filter by role in a queue. */}
+            {!isResetsTab && (
             <div className="px-4 pt-3 pb-3 border-b border-[#2a2a2a] shrink-0">
               <FormControl size="small" sx={{ minWidth: 220 }}>
                 <Select
@@ -600,7 +633,7 @@ export default function AdminManagementClient() {
                       }}
                     >
                       <span style={{ color: activeTab === t.key ? '#4df9ed' : '#818181', display: 'flex' }}>
-                        {t.key === RESETS_TAB ? <KeyRound size={14} /> : <ShieldCheckIcon size={14} />}
+                        <ShieldCheckIcon size={14} />
                       </span>
                       {t.label}
                       {activeTab === t.key && (
@@ -611,9 +644,13 @@ export default function AdminManagementClient() {
                 </Select>
               </FormControl>
             </div>
+            )}
 
             {isResetsTab ? (
-              <PasswordResetQueue focusRequestId={focusRequestId} />
+              <PasswordResetQueue
+                focusRequestId={focusRequestId}
+                onPendingCountChange={setResetCount}
+              />
             ) : (
             <>
             {/* Search + refresh bar */}
