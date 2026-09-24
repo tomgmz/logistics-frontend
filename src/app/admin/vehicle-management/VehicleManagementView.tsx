@@ -31,6 +31,8 @@ import ReusableModal from '@/components/layout/ReusableModal'
 import { useModuleAccess } from '@/components/layout/ModuleAccess'
 import TruckModelFormModal from './TruckModelFormModal'
 import BlowbagetsInspectionModal from './BlowbagetsInspectionModal'
+import { useRecordLock, useRecordLocks } from '@/lib/hooks/useRecordLock'
+import RecordLockBanner, { RecordLockBadge } from '@/components/ui/RecordLockBanner'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 
@@ -374,6 +376,22 @@ export default function VehicleManagementView() {
     setModalMode('edit')
   }
 
+  // One person edits a vehicle at a time — see useRecordLock. If the vehicle
+  // changed while this screen was waiting for the lock, the form is out of date;
+  // close it rather than let it be saved over the newer record.
+  const truckLock = useRecordLock({
+    type:    'truck',
+    id:      modalMode === 'edit' ? editingId : null,
+    onStale: () => {
+      appToast.info('This vehicle was just changed by someone else. Reopen it to edit the latest.', {
+        action: 'truck-stale', entityId: editingId ?? undefined,
+      })
+      closeModal()
+      void loadTrucksPage()
+    },
+  })
+  const truckLocks = useRecordLocks('truck', canEdit || canDelete)
+
   const closeModal = () => {
     setModalMode(null)
     setEditingId(null)
@@ -662,6 +680,7 @@ export default function VehicleManagementView() {
                             <InspectionBadge inspection={t.latest_inspection ?? null} dueRecheck={needsReinspection(t)} />
                           </td>
                           <td className="px-3 py-2.5 text-right">
+                            <RecordLockBadge holder={truckLocks.get(t.truck_id)} />
                             {canEdit && (
                               <button
                                 type="button"
@@ -686,7 +705,8 @@ export default function VehicleManagementView() {
                               <button
                                 type="button"
                                 onClick={() => handleDeleteClick(t.truck_id)}
-                                className="p-1.5 rounded-md border border-red-500/25 text-red-400 hover:bg-red-500/10"
+                                disabled={truckLocks.has(t.truck_id)}
+                                className="p-1.5 rounded-md border border-red-500/25 text-red-400 hover:bg-red-500/10 disabled:opacity-30"
                                 title="Delete"
                               >
                                 <Trash2 size={14} />
@@ -797,7 +817,8 @@ export default function VehicleManagementView() {
                 </button>
               </div>
 
-              <div className="p-4 space-y-3">
+              <RecordLockBanner lock={truckLock} noun="vehicle" className="mx-4 mt-4" />
+              <fieldset disabled={truckLock.readOnly} className="p-4 space-y-3 min-w-0 border-0 m-0">
 
                 {/* Plate number */}
                 <label className="block">
@@ -966,14 +987,15 @@ export default function VehicleManagementView() {
                     {formError}
                   </p>
                 )}
-              </div>
+              </fieldset>
 
               <div className="flex items-center justify-between gap-2 px-4 py-3 border-t border-white/[0.07]">
                 {modalMode === 'edit' && editingId && canDelete && (
                   <button
                     type="button"
                     onClick={() => handleDeleteClick(editingId)}
-                    className="text-xs font-semibold text-red-400 hover:underline"
+                    disabled={truckLock.readOnly}
+                    className="text-xs font-semibold text-red-400 hover:underline disabled:opacity-40 disabled:no-underline"
                   >
                     Delete vehicle…
                   </button>
@@ -989,8 +1011,8 @@ export default function VehicleManagementView() {
                   <button
                     type="button"
                     onClick={handleSaveClick}
-                    disabled={isUnchanged}
-                    title={isUnchanged ? 'No changes to save' : undefined}
+                    disabled={isUnchanged || truckLock.readOnly}
+                    title={truckLock.readOnly ? 'Someone else is editing this vehicle' : isUnchanged ? 'No changes to save' : undefined}
                     className="px-4 py-2 rounded-lg text-sm font-bold text-black disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
                     style={{ background: 'var(--color-cyan)' }}
                   >

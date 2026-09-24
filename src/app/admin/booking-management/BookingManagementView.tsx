@@ -53,6 +53,8 @@ import { bookingRef, bookingRefFromRecord } from '@/lib/booking'
 import { externalDriverService, type ExternalDriverAccess } from '@/lib/services/admin/external-driver.service'
 import ReusableModal, { RemarksModal } from '@/components/layout/ReusableModal'
 import TripPlanner from './TripPlanner'
+import { useRecordLock, useRecordLocks } from '@/lib/hooks/useRecordLock'
+import RecordLockBanner, { RecordLockBadge } from '@/components/ui/RecordLockBanner'
 
 const PAGE_SIZE = 12
 
@@ -781,6 +783,8 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
   const [assignTruckId, setAssignTruckId]   = useState<string>('')
   const [assignBusy, setAssignBusy]         = useState(false)
   const [assignEditMode, setAssignEditMode] = useState(false)
+  // Bumped to remount TripPlanner when the booking changed under us.
+  const [plannerTick, setPlannerTick]       = useState(0)
 
   // Vendor-supplied crew: entered ad-hoc and snapshotted onto the delivery instead
   // of picking a registered driver/vehicle.
@@ -1060,6 +1064,24 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     }
   }, [restoreAssignment])
 
+  /**
+   * Re-read the open booking in place — for when someone else changed it. Unlike
+   * openDetail this keeps the panel up, so the edit lock is not dropped and
+   * re-taken around the reload.
+   */
+  const refreshDetail = useCallback(async (bookingId: string) => {
+    const [bookingResp, assignmentResp] = await Promise.allSettled([
+      bookingService.getBookingById(bookingId),
+      assignmentService.getByBookingId(bookingId),
+    ])
+    if (bookingResp.status !== 'fulfilled') return
+    const d = bookingResp.value as BookingDetail
+    setDetail(d)
+    setAssignEditMode(false)
+    restoreAssignment(d, assignmentResp.status === 'fulfilled' ? assignmentResp.value : undefined)
+    setPlannerTick((n) => n + 1)
+  }, [restoreAssignment])
+
   const closeDetail = useCallback(() => {
     setSelectedId(null)
     setDetail(null)
@@ -1283,6 +1305,36 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     (roleView === 'admin' || roleView === 'operations_manager') &&
     ['assigned', 'in_transit', 'completed'].includes(normalizeBookingStatus(detail.status))
 
+  /**
+   * One person edits a booking at a time. Operations and the Company Admin can
+   * both crew it, the GM and the admin can both decide it — whoever opens it
+   * first holds the lock, and everyone else sees it read-only with their name.
+   * The API refuses colliding writes (423) regardless; this is what keeps
+   * people from getting that far.
+   *
+   * Only for people who could change something here, and only while there is
+   * something left to change: a read-only viewer or a finished booking must not
+   * lock anybody out.
+   */
+  const bookingOpen = !!detail &&
+    !['completed', 'cancelled'].includes(String(detail.status ?? '').toLowerCase())
+  const mayEditBooking = roleView !== 'fleet_manager' && (canEdit || actsAsGm)
+  const bookingLock = useRecordLock({
+    type:    'booking',
+    id:      detail?.booking_id ?? null,
+    enabled: bookingOpen && mayEditBooking && !detailLoading,
+    onStale: () => {
+      if (!selectedId) return
+      void refreshDetail(selectedId)
+      appToast.info('This booking was just updated by someone else — showing the latest.', {
+        action: 'booking-stale', entityId: selectedId,
+      })
+    },
+  })
+  const bookingReadOnly = bookingLock.readOnly
+  // Badges are informational, so read-only viewers see them too.
+  const bookingLocks    = useRecordLocks('booking')
+
   return (
     <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-hidden ff-sc bg-[var(--color-bg)]">
 
@@ -1442,7 +1494,10 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                             className="border-b border-white/[0.05] cursor-pointer transition-colors hover:bg-white/[0.04]"
                             style={{ background: active ? 'rgba(77,249,237,0.06)' : undefined }}
                           >
-                            <td className="px-3 py-2.5 text-white/85 max-w-[160px] truncate">{r.display_id}</td>
+                            <td className="px-3 py-2.5 text-white/85 max-w-[200px]">
+                              <div className="truncate">{r.display_id}</div>
+                              <RecordLockBadge holder={bookingLocks.get(r.booking_id)} />
+                            </td>
                             <td className="px-3 py-2.5">
                               <span
                                 className="inline-flex text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border"
@@ -1522,6 +1577,8 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                   )}
                   {detail && !detailLoading && (
                     <>
+                      <RecordLockBanner lock={bookingLock} noun="booking" />
+
                       {/* Booking info */}
                       <div className="rounded-xl border border-white/[0.08] p-3 space-y-2 bg-black/20">
                         <p className="text-[10px] font-mono text-white/35 break-all">
@@ -1676,7 +1733,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                         </div>
 
                         {showStageActions && (
-                          <div className="flex gap-2">
+                          <fieldset disabled={bookingReadOnly} className="flex gap-2 min-w-0 border-0 p-0 m-0">
                             <button
                               type="button"
                               disabled={pendingStatus || pendingReject}
@@ -1695,7 +1752,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                             >
                               {pendingReject ? 'Rejecting…' : 'Reject'}
                             </button>
-                          </div>
+                          </fieldset>
                         )}
 
                         {/* Fleet sees where each vehicle went; readiness is managed
@@ -1727,6 +1784,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
 
                       {/* Driver / vehicle assignment */}
                       {showAssignment && (
+                        <fieldset disabled={bookingReadOnly} className="min-w-0 border-0 p-0 m-0">
                         <AssignmentPanel
                           detail={detail}
                           drivers={availableDrivers}
@@ -1760,13 +1818,18 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                             setPairFilled(null)
                           }}
                         />
+                        </fieldset>
                       )}
 
                       {/* How many runs the assigned vehicle makes. Only once a
                           vehicle actually exists: until then there is no body to
                           compare the load against, and nothing to plan around. */}
                       {showTripPlanner && (
-                        <TripPlanner detail={detail} canEdit={canEdit} />
+                        <TripPlanner
+                          key={`${detail.booking_id}:${plannerTick}`}
+                          detail={detail}
+                          canEdit={canEdit && !bookingReadOnly}
+                        />
                       )}
 
                       {/* Proof of pickup, photographed by the driver at the origin. */}

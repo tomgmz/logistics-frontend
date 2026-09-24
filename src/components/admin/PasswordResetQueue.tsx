@@ -7,6 +7,8 @@ import {
 import ReusableModal from '@/components/layout/ReusableModal'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
+import { useRecordLock, useRecordLocks } from '@/lib/hooks/useRecordLock'
+import { RecordLockBadge } from '@/components/ui/RecordLockBanner'
 import {
   passwordResetService,
   type PasswordResetRequest,
@@ -106,6 +108,23 @@ export default function PasswordResetQueue({
   }, [])
 
   useEffect(() => { void load(includeClosed) }, [includeClosed, load])
+
+  // Two admins working the queue must not both send a link for one request:
+  // the confirm dialog holds the request's lock, and a request someone else is
+  // acting on shows their name instead of its buttons.
+  const heldLocks = useRecordLocks('password_reset')
+  const actionLock = useRecordLock({
+    type:    'password_reset',
+    id:      pending?.request.request_id ?? null,
+    onStale: () => void load(includeClosed),
+  })
+  useEffect(() => {
+    if (actionLock.status !== 'locked' || !pending) return
+    appToast.info(`${actionLock.holderName ?? 'Another admin'} is already handling this request.`, {
+      action: 'password-reset-locked', entityId: pending.request.request_id,
+    })
+    setPending(null)
+  }, [actionLock.status, actionLock.holderName, pending])
 
   async function runAction(action: PendingAction) {
     const { kind, request } = action
@@ -229,7 +248,8 @@ export default function PasswordResetQueue({
                 rows.map((r) => {
                   const cfg     = STATUS_CFG[r.status]
                   const isFocus = focusRequestId === r.request_id
-                  const busy    = busyId === r.request_id
+                  const lockedBy = heldLocks.get(r.request_id)
+                  const busy    = busyId === r.request_id || !!lockedBy
                   const left    = r.status === 'sent' ? minutesLeft(r.token_expires_at) : null
 
                   return (
@@ -266,6 +286,7 @@ export default function PasswordResetQueue({
                       </td>
                       <td className="px-4 py-3.5">
                         <div className="flex items-center justify-end gap-2">
+                          <RecordLockBadge holder={lockedBy} />
                           {SENDABLE.includes(r.status) && (
                             <button
                               onClick={() => setPending({ kind: 'send', request: r })}

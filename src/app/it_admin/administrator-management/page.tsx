@@ -24,6 +24,8 @@ import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { isManagedRole } from '@/constants/modules'
 import UserFormModal from '@/app/admin/user-management/UserFormModal'
+import { useRecordLocks } from '@/lib/hooks/useRecordLock'
+import { RecordLockBadge } from '@/components/ui/RecordLockBanner'
 import PermissionsModal from './PermissionsModal'
 import PasswordResetQueue from '@/components/admin/PasswordResetQueue'
 import ModuleSectionTabs, { type ModuleSection } from '@/components/admin/ModuleSectionTabs'
@@ -151,9 +153,11 @@ interface RowMenuProps {
   onEdit: () => void
   onManageAccess: () => void
   onStatusChange: (s: UserStatus) => void
+  /** Someone else has this account open for editing: no actions until they finish. */
+  lockedBy?: string
 }
 
-function RowMenu({ user, tab, onEdit, onManageAccess, onStatusChange }: RowMenuProps) {
+function RowMenu({ user, tab, onEdit, onManageAccess, onStatusChange, lockedBy }: RowMenuProps) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -173,6 +177,8 @@ function RowMenu({ user, tab, onEdit, onManageAccess, onStatusChange }: RowMenuP
 
   const canEdit = tab !== 'all'
   const canManageAccess = isManagedRole(user.role)
+
+  if (lockedBy) return <RecordLockBadge holder={lockedBy} />
 
   return (
     <div ref={ref} className="relative">
@@ -332,6 +338,7 @@ export default function AdminManagementClient() {
   const [editUser,         setEditUser]         = useState<AnyUser | null>(null)
   const [formTab,          setFormTab]          = useState<AdminMgmtTab>('admins')
   const [permUser,         setPermUser]         = useState<AnyUser | null>(null)
+  const userLocks = useRecordLocks('user')
 
   const isInitialAllFetch = useRef(true)
 
@@ -668,6 +675,7 @@ export default function AdminManagementClient() {
                               onEdit={() => openEdit(user)}
                               onManageAccess={() => setPermUser(user)}
                               onStatusChange={(s) => handleStatusChange(user, s)}
+                              lockedBy={userLocks.get(user.user_id)}
                             />
                           </td>
                         </motion.tr>

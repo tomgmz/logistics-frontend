@@ -6,6 +6,8 @@ import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { systemMaintenanceService } from '@/lib/services/admin/system-maintenance.service'
 import { useModuleAccess } from '@/components/layout/ModuleAccess'
+import { useRecordLock, useRecordLocks } from '@/lib/hooks/useRecordLock'
+import RecordLockBanner, { RecordLockBadge } from '@/components/ui/RecordLockBanner'
 import type {
   Commodity,
   CreateCommodityPayload,
@@ -71,6 +73,19 @@ export default function SystemMaintenanceView() {
   const [lForm, setLForm] = useState<LandlineForm>(initLandline)
 
   const [editingPrefix, setEditingPrefix] = useState<LandlinePrefix | null>(null)
+
+  // One admin edits a prefix at a time; a form that waited on someone else's
+  // edit is stale, so it is dropped and the list re-read.
+  const prefixLock = useRecordLock({
+    type:    'landline_prefix',
+    id:      editingPrefix?.prefix_id ?? null,
+    onStale: () => {
+      appToast.info('This prefix was just changed by someone else. Reopen it to edit the latest.')
+      cancelEditLandline()
+      void load()
+    },
+  })
+  const prefixLocks = useRecordLocks('landline_prefix', tab === 'landline')
 
   async function load() {
     try {
@@ -376,6 +391,7 @@ export default function SystemMaintenanceView() {
     // landline tab
     return (
       <div className="space-y-4">
+        {editingPrefix && <RecordLockBanner lock={prefixLock} noun="prefix" />}
         {editingPrefix && (
           <div className="flex items-center justify-between rounded-lg border border-[#4DF9ED]/20 bg-[#4DF9ED]/5 px-3 py-2">
             <p className="text-xs font-bold text-[#4DF9ED]">
@@ -392,6 +408,7 @@ export default function SystemMaintenanceView() {
           </div>
         )}
 
+        <fieldset disabled={prefixLock.readOnly} className="space-y-4 min-w-0 border-0 p-0 m-0">
         <Field label="Prefix *">
           <input
             value={lForm.prefix}
@@ -425,6 +442,7 @@ export default function SystemMaintenanceView() {
           busy={saving}
           onClick={() => void submitLandline()}
         />
+        </fieldset>
       </div>
     )
   }
@@ -507,7 +525,8 @@ export default function SystemMaintenanceView() {
       <div className="space-y-2">
         {prefixes.map(pfx => {
           const isBeingEdited  = editingPrefix?.prefix_id === pfx.prefix_id
-          const isBeingDeleted = deleting === pfx.prefix_id
+          const lockedBy       = prefixLocks.get(pfx.prefix_id)
+          const isBeingDeleted = deleting === pfx.prefix_id || !!lockedBy
           return (
             <div
               key={pfx.prefix_id}
@@ -533,6 +552,7 @@ export default function SystemMaintenanceView() {
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
+                  <RecordLockBadge holder={lockedBy} />
                   {canEdit && (
                   <button
                     type="button"
@@ -552,7 +572,7 @@ export default function SystemMaintenanceView() {
                     className="rounded-md p-1.5 text-white/30 transition-colors hover:bg-red-500/10 hover:text-red-400 disabled:opacity-30"
                     aria-label={`Delete prefix ${pfx.prefix}`}
                   >
-                    {isBeingDeleted
+                    {deleting === pfx.prefix_id
                       ? <span className="inline-block h-3 w-3 animate-spin rounded-full border border-white/20 border-t-white/60" />
                       : <Trash2 size={13} />
                     }

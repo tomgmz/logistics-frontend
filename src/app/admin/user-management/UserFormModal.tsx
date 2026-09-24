@@ -38,6 +38,8 @@ import proxyApi from '@/lib/api/auth.api'
 import { EMPTY_FLAGS, MODULES_BY_ROLE, type ManagedRole, type ModuleFlags } from '@/constants/modules'
 import { permissionsService } from '@/lib/services/admin/permissions.service'
 import ModulePermissionMatrix from '@/app/it_admin/administrator-management/ModulePermissionMatrix'
+import { useRecordLock } from '@/lib/hooks/useRecordLock'
+import RecordLockBanner from '@/components/ui/RecordLockBanner'
 
 interface UserFormModalProps {
   tab: UserTab
@@ -292,6 +294,19 @@ export default function UserFormModal({ tab, user, onClose, onSaved, enablePermi
 
   const [perms, setPerms] = useState<Record<string, ModuleFlags>>({})
 
+  // One person edits an account at a time. If it changed while this form was
+  // waiting on someone else, the form is stale: close it rather than save over them.
+  const lock = useRecordLock({
+    type:    'user',
+    id:      isEdit ? user!.user_id : null,
+    onStale: () => {
+      appToast.info('This account was just changed by someone else. Reopen it to edit the latest.', {
+        action: 'user-stale', entityId: user?.user_id,
+      })
+      onClose()
+    },
+  })
+
   const [form, setForm]               = useState<FormState>(initialState)
   const [loading, setLoading]         = useState(false)
   const [globalError, setGlobalError] = useState<string | null>(null)
@@ -512,6 +527,11 @@ export default function UserFormModal({ tab, user, onClose, onSaved, enablePermi
           </div>
 
           <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5 px-6 py-6">
+            <RecordLockBanner lock={lock} noun="account" />
+            <fieldset
+              disabled={lock.readOnly}
+              className={`flex flex-col gap-5 min-w-0 border-0 p-0 m-0 ${lock.readOnly ? 'pointer-events-none opacity-70' : ''}`}
+            >
 
             {tab === 'drivers' && (
               <div className="rounded-xl border border-dashed border-[#424242] bg-[#2a2a2a]/30 px-4 py-4">
@@ -751,6 +771,8 @@ export default function UserFormModal({ tab, user, onClose, onSaved, enablePermi
               </motion.div>
             )}
 
+            </fieldset>
+
             <div className="flex justify-end gap-3 border-t border-[#2a2a2a] pt-5 mt-1">
               <button
                 type="button"
@@ -761,8 +783,8 @@ export default function UserFormModal({ tab, user, onClose, onSaved, enablePermi
               </button>
               <button
                 type="submit"
-                disabled={isSaveDisabled}
-                title={isEdit && !isDirty ? 'No changes to save' : undefined}
+                disabled={isSaveDisabled || lock.readOnly}
+                title={lock.readOnly ? 'Someone else is editing this account' : isEdit && !isDirty ? 'No changes to save' : undefined}
                 className="flex items-center gap-2 rounded-lg bg-[#4df9ed] px-5 py-2.5 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5] disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {loading && <Loader2 size={15} className="animate-spin" />}

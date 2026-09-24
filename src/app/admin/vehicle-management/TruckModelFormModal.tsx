@@ -16,6 +16,8 @@ import ReusableModal from '@/components/layout/ReusableModal'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { createTruckModelSchema } from '@/lib/validation/truck-model.validation'
+import { useRecordLock, useRecordLocks } from '@/lib/hooks/useRecordLock'
+import RecordLockBanner, { RecordLockBadge } from '@/components/ui/RecordLockBanner'
 
 export const VEHICLE_TYPES = [
   'Closed Van',
@@ -159,6 +161,21 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
     setFormMode('edit')
     initialForm.current = formState
   }
+
+  // One person edits a model at a time. A form that waited on someone else's
+  // edit is stale, so it is closed rather than saved over theirs.
+  const modelLock = useRecordLock({
+    type:    'truck_model',
+    id:      formMode === 'edit' ? editingId : null,
+    onStale: () => {
+      appToast.info('This model was just changed by someone else. Reopen it to edit the latest.', {
+        action: 'truck-model-stale', entityId: editingId ?? undefined,
+      })
+      closeForm()
+      void loadModels()
+    },
+  })
+  const modelLocks = useRecordLocks('truck_model', open)
 
   const closeForm = () => {
     setFormMode(null)
@@ -443,6 +460,7 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-semibold text-white truncate">{m.name}</p>
+                          <RecordLockBadge holder={modelLocks.get(m.model_id)} />
                           {m.vehicle_type && (
                             <span
                               className="inline-flex mt-1 text-[10px] font-bold px-2 py-0.5 rounded-md border"
@@ -485,7 +503,8 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
                           <button
                             type="button"
                             onClick={() => handleDeleteClick(m.model_id)}
-                            className="p-1.5 rounded-md border border-red-500/20 text-red-400/70 hover:bg-red-500/10"
+                            disabled={modelLocks.has(m.model_id)}
+                            className="p-1.5 rounded-md border border-red-500/20 text-red-400/70 hover:bg-red-500/10 disabled:opacity-30"
                             title="Delete"
                           >
                             <Trash2 size={13} />
@@ -529,7 +548,11 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
                 </button>
               </div>
 
-              <div className="p-4 space-y-4">
+              <RecordLockBanner lock={modelLock} noun="truck model" className="mx-4 mt-4" />
+              <fieldset
+                disabled={modelLock.readOnly}
+                className={`p-4 space-y-4 min-w-0 border-0 m-0 ${modelLock.readOnly ? 'pointer-events-none opacity-70' : ''}`}
+              >
 
                 {/* Image upload */}
                 <div className="flex flex-col gap-1">
@@ -737,7 +760,7 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
                   </p>
                 )}
 
-              </div>
+              </fieldset>
 
               {/* Footer */}
               <div className="flex items-center justify-between gap-2 px-4 py-3 border-t border-white/[0.07]">
@@ -745,7 +768,8 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
                   <button
                     type="button"
                     onClick={() => handleDeleteClick(editingId)}
-                    className="text-xs font-semibold text-red-400 hover:underline"
+                    disabled={modelLock.readOnly}
+                    className="text-xs font-semibold text-red-400 hover:underline disabled:opacity-40 disabled:no-underline"
                   >
                     Delete model…
                   </button>
@@ -761,7 +785,7 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
                   <button
                     type="button"
                     onClick={handleSaveClick}
-                    disabled={actionBusy || !hasChanges}
+                    disabled={actionBusy || !hasChanges || modelLock.readOnly}
                     className="px-4 py-2 rounded-lg text-sm font-bold text-black disabled:opacity-50"
                     style={{ background: 'var(--color-cyan)' }}
                   >

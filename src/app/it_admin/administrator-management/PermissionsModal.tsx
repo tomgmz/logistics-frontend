@@ -8,6 +8,8 @@ import { permissionsService } from '@/lib/services/admin/permissions.service'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import ModulePermissionMatrix from './ModulePermissionMatrix'
+import { useRecordLock } from '@/lib/hooks/useRecordLock'
+import RecordLockBanner from '@/components/ui/RecordLockBanner'
 
 interface PermissionsModalProps {
   userId:   string
@@ -17,6 +19,18 @@ interface PermissionsModalProps {
 }
 
 export default function PermissionsModal({ userId, userName, onClose, onSaved }: PermissionsModalProps) {
+  // Permissions are part of the account: the same lock as editing it, so two
+  // admins cannot each save a different access matrix over the other.
+  const lock = useRecordLock({
+    type:    'user',
+    id:      userId,
+    onStale: () => {
+      appToast.info("This account's access was just changed by someone else. Reopen to see the latest.", {
+        action: 'permissions-stale', entityId: userId,
+      })
+      onClose()
+    },
+  })
   const [loading,     setLoading]     = useState(true)
   const [saving,      setSaving]      = useState(false)
   const [error,       setError]       = useState<string | null>(null)
@@ -111,6 +125,7 @@ export default function PermissionsModal({ userId, userName, onClose, onSaved }:
 
         {/* Body */}
         <div className="flex-1 overflow-auto px-6 py-4">
+          <RecordLockBanner lock={lock} noun="account" className="mb-4" />
           {loading ? (
             <div className="flex items-center justify-center py-16 text-[#818181]">
               <Loader2 size={22} className="animate-spin" />
@@ -142,7 +157,7 @@ export default function PermissionsModal({ userId, userName, onClose, onSaved }:
                 modules={modules}
                 value={flags}
                 onChange={(m, next) => setFlags((prev) => ({ ...prev, [m]: next }))}
-                disabled={isProtected}
+                disabled={isProtected || lock.readOnly}
               />
             </>
           )}
@@ -160,7 +175,7 @@ export default function PermissionsModal({ userId, userName, onClose, onSaved }:
             </button>
             <button
               onClick={handleSave}
-              disabled={loading || saving || !!error || isProtected}
+              disabled={loading || saving || !!error || isProtected || lock.readOnly}
               className="flex items-center gap-2 rounded-lg bg-[#4df9ed] px-5 py-2 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5] disabled:opacity-40"
             >
               {saving && <Loader2 size={14} className="animate-spin" />} Save Access

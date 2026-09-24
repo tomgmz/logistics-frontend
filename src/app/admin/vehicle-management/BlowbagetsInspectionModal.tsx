@@ -12,6 +12,8 @@ import {
 import type { Truck, TruckInspection } from '@/app/types/truck.types'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
+import { useRecordLock } from '@/lib/hooks/useRecordLock'
+import RecordLockBanner from '@/components/ui/RecordLockBanner'
 
 /**
  * The fleet manager's BLOWBAGETS inspection of one vehicle.
@@ -47,6 +49,10 @@ export default function BlowbagetsInspectionModal({
   const [busy,    setBusy]    = useState(false)
   const [history, setHistory] = useState<TruckInspection[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
+
+  // Recording an inspection changes whether the vehicle can be assigned; two
+  // inspectors on one truck at once would each record over the other.
+  const lock = useRecordLock({ type: 'truck', id: truck?.truck_id ?? null })
 
   const doneCount = BLOWBAGETS_ITEMS.filter((it) => checked[it.key]).length
   const total     = BLOWBAGETS_ITEMS.length
@@ -140,6 +146,7 @@ export default function BlowbagetsInspectionModal({
             </div>
 
             <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
+              <RecordLockBanner lock={lock} noun="vehicle" />
               <div className="flex items-center justify-between">
                 <p className="text-[11px] text-white/45 leading-snug pr-3">
                   Tick every item you physically inspected and found sound. Anything left unticked
@@ -164,7 +171,7 @@ export default function BlowbagetsInspectionModal({
                     <li key={it.key}>
                       <button
                         type="button"
-                        disabled={busy}
+                        disabled={busy || lock.readOnly}
                         onClick={() => setChecked((prev) => ({ ...prev, [it.key]: !prev[it.key] }))}
                         aria-pressed={on}
                         className="w-full flex items-center gap-2.5 rounded-lg border px-2.5 py-2 text-left
@@ -210,7 +217,7 @@ export default function BlowbagetsInspectionModal({
                 <textarea
                   id="inspection-notes"
                   value={notes}
-                  disabled={busy}
+                  disabled={busy || lock.readOnly}
                   onChange={(e) => setNotes(e.target.value)}
                   rows={2}
                   maxLength={500}
@@ -281,7 +288,7 @@ export default function BlowbagetsInspectionModal({
               </button>
               <button
                 type="button"
-                disabled={busy}
+                disabled={busy || lock.readOnly}
                 onClick={() => void submit()}
                 className="flex-1 py-2 rounded-lg text-sm font-bold transition-colors disabled:opacity-40"
                 style={
