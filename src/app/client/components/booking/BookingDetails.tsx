@@ -19,7 +19,6 @@ import {
   setAllNonTiltable, setAllNonStackable,
   setAllStackable, setAllOversize,
   makeDefaultGroup,
-  setPaymentTerms,
 } from '@/lib/store/slice/booking.slice'
 import type { CargoMode, ItemGroup } from '@/lib/store/slice/booking.slice'
 import { selectCargoSummary, selectSections } from '@/lib/store/bookingSelectors'
@@ -547,7 +546,6 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
   const dropoffs     = useAppSelector((s) => s.booking.dropoffs)
   const mode         = useAppSelector((s) => s.booking.mode)
   const sections     = useAppSelector(selectSections)
-  const paymentTerms = useAppSelector((s) => s.booking.paymentTerms)
 
   const [touched,    setTouched]    = useState(false)
   const [mapTarget,  setMapTarget]  = useState<MapPickerTarget>(null)
@@ -591,8 +589,8 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
 
   const summary = useAppSelector(selectCargoSummary)
 
-  const rawErrors = validateBooking(date, time, pickup, dropoffs, sections, mode, paymentTerms, files.length)
-  const errors    = touched ? rawErrors : { schedule: {}, route: { dropoffs: {} }, sections: [], paymentTerms: undefined, documents: undefined }
+  const rawErrors = validateBooking(date, time, pickup, dropoffs, sections, mode, files.length)
+  const errors    = touched ? rawErrors : { schedule: {}, route: { dropoffs: {} }, sections: [], documents: undefined }
 
   const handleNext = () => {
     setTouched(true)
@@ -1210,29 +1208,6 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
               <Check size={11} className="text-[var(--color-cyan)]" />
               {files.length} file{files.length !== 1 ? 's' : ''} will be uploaded when you confirm your booking
             </p>
-          )}
-        </motion.div>
-
-        <motion.div variants={fadeUp} initial="hidden" animate="show"
-          className="bg-[#2A2828] rounded-md border border-white/[0.07] p-4 flex flex-col gap-4"
-        >
-          <SectionHeader icon={<CreditCard size={16} />} title="Payment Terms" />
-          <p className="ff-sc booking-text text-sm text-white/80">Select your payment terms</p>
-          <Select
-            value={paymentTerms}
-            onChange={(e: SelectChangeEvent) => dispatch(setPaymentTerms(e.target.value))}
-            displayEmpty
-            error={touched && !!rawErrors.paymentTerms}
-            sx={{ ...selectSx(INPUT_BG_PANEL, BORDER_PANEL, touched && !!rawErrors.paymentTerms), width: '100%' }}
-            MenuProps={MENU_PROPS}
-          >
-            <MenuItem value=""><em style={{ opacity: 0.4, fontStyle: 'normal' }}>Select payment terms</em></MenuItem>
-            <MenuItem value="30">30 days</MenuItem>
-            <MenuItem value="45">45 days</MenuItem>
-            <MenuItem value="60">60 days</MenuItem>
-          </Select>
-          {touched && rawErrors.paymentTerms && (
-            <FormHelperText sx={HELPER_SX}>{rawErrors.paymentTerms}</FormHelperText>
           )}
         </motion.div>
 

@@ -224,8 +224,7 @@ export const bookingService = {
   },
 
   // --- approval workflow ---------------------------------------------------
-  // The general manager's decision is the only approval gate. An accountant the
-  // IT admin appointed as GM proxy calls the same endpoint. A rejection must
+  // The general manager's decision is the only approval gate. A rejection must
   // carry remarks, which the client sees on the booking.
   gmReview: async (
     bookingId: string,

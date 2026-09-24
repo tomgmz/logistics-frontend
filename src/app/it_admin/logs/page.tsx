@@ -30,9 +30,7 @@ const AUDIT_BADGE: Record<LogType, string> = {
   admin_activity:    'bg-[rgba(255,140,0,0.10)] text-[#ff9a3c] border border-[rgba(255,140,0,0.25)]',
   vehicle_activity:  'bg-[rgba(58,246,38,0.10)] text-[#3af626] border border-[rgba(58,246,38,0.25)]',
   booking:           'bg-[rgba(255,200,60,0.10)] text-[#ffc83c] border border-[rgba(255,200,60,0.25)]',
-  payment:           'bg-[rgba(160,120,255,0.12)] text-[#b08aff] border border-[rgba(160,120,255,0.25)]',
   driver_activity:   'bg-[rgba(58,246,38,0.10)] text-[#3af626] border border-[rgba(58,246,38,0.25)]',
-  billing_activity:  'bg-[rgba(255,200,60,0.10)] text-[#ffc83c] border border-[rgba(255,200,60,0.25)]',
   user_activity:     'bg-[rgba(130,130,130,0.12)] text-[#9a9a9a] border border-[rgba(130,130,130,0.25)]',
   system_error:      'bg-[rgba(255,80,80,0.10)] text-[#ff6060] border border-[rgba(255,80,80,0.25)]',
 }
@@ -138,8 +136,6 @@ function AuditLogsTab() {
             <option value="vehicle_activity">Vehicle Activity</option>
             <option value="driver_activity">Driver Activity</option>
             <option value="booking">Booking</option>
-            <option value="payment">Payment</option>
-            <option value="billing_activity">Billing</option>
           </select>
           <select
             value={sort}
@@ -631,7 +627,6 @@ export default function LogsPage() {
                     ['Access',   auditStats.access_control,    '#ff6060'],
                     ['Vehicles', auditStats.vehicle_activity,  '#3af626'],
                     ['Bookings', auditStats.booking,           '#ffc83c'],
-                    ['Payment',  auditStats.payment,           '#b08aff'],
                   ] as [string, number, string][]
                 ).map(([label, val, color]) => (
                   <div key={label} className="rounded-lg border border-[#2a2a2a] bg-[#1b1b1b] px-3 py-1 text-center min-w-[52px]">

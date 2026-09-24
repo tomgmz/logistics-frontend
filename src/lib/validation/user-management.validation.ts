@@ -133,10 +133,6 @@ export const createClientSchema = z.object({
   billing_address: z
     .string({ error: 'Billing address is required' })
     .min(1, 'Billing address is required'),
-  // The reverse billing arrangement from the client's contract: which cycle
-  // their periods are cut on. The 30/45/60 payment term is not set here — it is
-  // chosen per booking, on the booking form.
-  billing_mode: z.enum(['weekly', 'monthly'], { error: 'Reverse billing mode is required' }),
 })
 
 export const updateClientSchema = z.object({
@@ -144,7 +140,6 @@ export const updateClientSchema = z.object({
   landline:        landlineOptional,
   company_name:    z.string().max(100, 'Company name is too long').optional(),
   billing_address: z.string().optional(),
-  billing_mode:    z.enum(['weekly', 'monthly']).optional(),
 })
 
 export const createDriverSchema = z
@@ -168,8 +163,6 @@ export const updateDriverSchema = z
 
 export const createAdminSchema           = z.object(baseCreateFields)
 export const updateAdminSchema           = z.object(baseUpdateFields)
-export const createAccountantSchema      = z.object(baseCreateFields)
-export const updateAccountantSchema      = z.object(baseUpdateFields)
 export const createGeneralManagerSchema  = z.object(baseCreateFields)
 export const updateGeneralManagerSchema  = z.object(baseUpdateFields)
 export const createFleetAdminSchema      = z.object(baseCreateFields)
@@ -187,7 +180,6 @@ export const FORM_SCHEMAS: Record<UserTab, SchemaPair> = {
   admins:              { create: createAdminSchema,           update: updateAdminSchema           },
   clients:             { create: createClientSchema,          update: updateClientSchema          },
   drivers:             { create: createDriverSchema,          update: updateDriverSchema          },
-  accountants:         { create: createAccountantSchema,      update: updateAccountantSchema      },
   'general-managers':  { create: createGeneralManagerSchema,  update: updateGeneralManagerSchema  },
   'fleet-admins':      { create: createFleetAdminSchema,      update: updateFleetAdminSchema      },
   'operations-admins': { create: createOperationsAdminSchema, update: updateOperationsAdminSchema },

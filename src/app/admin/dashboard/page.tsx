@@ -95,13 +95,6 @@ const statusColors: Record<StatusKey, string> = {
   "Cancelled":  T.red,
 };
 
-const billingRows = [
-  { label: "Total Billed (MTD)",  value: "₱278,400", accent: T.teal,     pct: 82 },
-  { label: "Collected",           value: "₱231,200", accent: T.greenAlt, pct: 68 },
-  { label: "Outstanding",         value: "₱47,200",  accent: T.amber,    pct: 14 },
-  { label: "Overdue (30+ days)",  value: "₱8,100",   accent: T.red,      pct: 3  },
-];
-
 const fadeUp: Variants = {
   hidden:  { opacity: 0, y: 20 },
   visible: (i: number = 0) => ({
@@ -348,44 +341,6 @@ const WeeklyChart = memo(function WeeklyChart() {
   );
 });
 
-const BillingCard = memo(function BillingCard() {
-  return (
-    <motion.div variants={fadeUp} custom={7} initial="hidden" animate="visible" style={{ height: "100%" }}>
-      <Card style={{ padding: "20px 18px", height: "100%", boxSizing: "border-box" }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: T.white, marginBottom: 2 }}>Billing Summary</div>
-        <div style={{ fontSize: 11, color: T.muted, marginBottom: 16 }}>Financial snapshot</div>
-        {billingRows.map((row, i) => (
-          <motion.div key={row.label} variants={fadeIn} custom={i} initial="hidden" animate="visible" style={{ marginBottom: 12 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
-              <span style={{ fontSize: 11, color: T.muted }}>{row.label}</span>
-              <span style={{ fontSize: 12, color: T.white, fontWeight: 600 }}>{row.value}</span>
-            </div>
-            <div style={{ height: 4, background: T.inner, borderRadius: 10, overflow: "hidden" }}>
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: `${row.pct}%` }}
-                transition={{ delay: 0.5 + i * 0.1, duration: 0.7, ease: "easeOut" }}
-                style={{ height: "100%", background: row.accent, borderRadius: 10 }}
-              />
-            </div>
-          </motion.div>
-        ))}
-        <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-          {[{ label: "Avg. Invoice", value: "₱5,860" }, { label: "Paid on Time", value: "91%" }].map(s => (
-            <div key={s.label} style={{
-              background: T.inner, borderRadius: 10, padding: "10px 12px",
-              border: `1px solid ${T.border}`,
-            }}>
-              <div style={{ fontSize: 10, color: T.muted, textTransform: "uppercase", letterSpacing: 0.8, fontWeight: 600 }}>{s.label}</div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: T.teal, marginTop: 3 }}>{s.value}</div>
-            </div>
-          ))}
-        </div>
-      </Card>
-    </motion.div>
-  );
-});
-
 const BookingsTable = memo(function BookingsTable() {
   return (
     <motion.div variants={fadeUp} custom={8} initial="hidden" animate="visible">
@@ -524,9 +479,8 @@ const AdminDashboard = memo(function AdminDashboard() {
       </div>
 
       {/* Row 2 */}
-      <div className="dash-row2" style={{ marginBottom: 16 }}>
+      <div style={{ marginBottom: 16 }}>
         <WeeklyChart />
-        <BillingCard />
       </div>
 
       {/* Table */}

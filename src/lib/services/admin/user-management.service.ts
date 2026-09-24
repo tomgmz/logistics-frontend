@@ -10,8 +10,6 @@ import type {
   UpdateClientPayload,
   CreateDriverPayload,
   UpdateDriverPayload,
-  CreateAccountantPayload,
-  UpdateAccountantPayload,
   CreateGeneralManagerPayload,
   UpdateGeneralManagerPayload,
   CreateFleetAdminPayload,
@@ -127,21 +125,6 @@ export const driverService = {
   remove: (id: string) => del(`${B}/drivers/${id}`),
   activate:   (id: string) => patch<DriverUser>(`${B}/drivers/${id}/activate`),
   deactivate: (id: string) => patch<DriverUser>(`${B}/drivers/${id}/deactivate`),
-}
-
-export const accountantService = {
-  getAll:      () => get<AdminUser[]>(`${B}/accountants`),
-  getOne:      (id: string) => get<AdminUser>(`${B}/accountants/${id}`),
-  create:      (p: CreateAccountantPayload) => post<AdminUser>(`${B}/accountants`, p),
-  update:      (id: string, p: UpdateAccountantPayload) => patch<AdminUser>(`${B}/accountants/${id}`, p),
-  remove:      (id: string) => del(`${B}/accountants/${id}`),
-  activate:    (id: string) => patch<AdminUser>(`${B}/accountants/${id}/activate`),
-  deactivate:  (id: string) => patch<AdminUser>(`${B}/accountants/${id}/deactivate`),
-  // Appoint (or stand down) this accountant as the general manager's stand-in for
-  // booking approvals. A proxy receives the GM's approval notifications and can
-  // approve or reject in their place.
-  setGmProxy:  (id: string, isProxy: boolean) =>
-    patch<AdminUser>(`${B}/accountants/${id}/gm-proxy`, { is_gm_proxy: isProxy }),
 }
 
 export const generalManagerService = {

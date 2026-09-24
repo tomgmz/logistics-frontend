@@ -75,18 +75,13 @@ const DEST_STATUSES: DestinationDeliveryStatus[] = ['pending', 'delivered', 'fai
 //                -> the driver is notified, and the fleet manager is told which
 //                   of their vehicles was taken.
 //
-// The accountant is no longer part of the chain — their view is read-only unless
-// the IT admin has appointed them as the GM's approval proxy. The fleet manager's
-// view is read-only too; their BLOWBAGETS inspections live in Vehicle Management.
 export type BookingRoleView =
   | 'admin'
-  | 'accountant'
   | 'general_manager'
   | 'operations_manager'
   | 'fleet_manager'
 
 const ROLE_FORCED_STATUS: Partial<Record<BookingRoleView, AdminBookingLifecycleStatus>> = {
-  accountant:         'pending',
   general_manager:    'pending',
   fleet_manager:      'assigned',
 }
@@ -99,7 +94,6 @@ const ROLE_HIDE_PENDING: Partial<Record<BookingRoleView, boolean>> = {
 
 const ROLE_TITLE: Record<BookingRoleView, string> = {
   admin:              'Booking management',
-  accountant:         'Bookings — awaiting GM approval',
   general_manager:    'Bookings — GM approval',
   operations_manager: 'Bookings — vehicle & driver assignment',
   fleet_manager:      'Bookings — assigned vehicles',
@@ -747,10 +741,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
   const forcedStatus = ROLE_FORCED_STATUS[roleView]
   const hidePending  = !!ROLE_HIDE_PENDING[roleView]
 
-  // An accountant is out of the approval chain unless the IT admin appointed
-  // them as the GM's proxy, in which case they act on the GM stage.
-  const isGmProxy   = useAuthStore((s) => s.user?.is_gm_proxy === true)
-  const actsAsGm    = roleView === 'general_manager' || (roleView === 'accountant' && isGmProxy)
+  const actsAsGm    = roleView === 'general_manager'
   const [rawBookings, setRawBookings] = useState<Record<string, unknown>[]>([])
   const [listLoading, setListLoading] = useState(true)
   const [listError, setListError]     = useState<string | null>(null)
@@ -1216,7 +1207,6 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
 
   // The GM decision — the single approval gate. Approving routes the booking to
   // operations; rejecting cancels it and sends the remarks to the client. The
-  // same call serves an accountant appointed as GM proxy.
   const handleGmReview = async (decision: 'approved' | 'rejected', remarks?: string) => {
     if (!selectedId) return
     if (decision === 'approved') setPendingStatus(true); else setPendingReject(true)
@@ -1565,12 +1555,6 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                               {detail.driver.truck?.plate_number ? ` · ${detail.driver.truck.plate_number}` : ''}
                             </div>
                           )}
-                          {detail.payment_terms && (
-                            <div className="flex items-center gap-2">
-                              <Clock size={14} className="text-white/35" />
-                              Payment terms: {detail.payment_terms} days
-                            </div>
-                          )}
                         </div>
                       </div>
 
@@ -1712,15 +1696,6 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                               {pendingReject ? 'Rejecting…' : 'Reject'}
                             </button>
                           </div>
-                        )}
-
-                        {/* The accountant is out of the approval chain unless the
-                            IT admin appointed them as the GM's stand-in. */}
-                        {roleView === 'accountant' && !isGmProxy && (
-                          <p className="text-[11px] text-white/40 leading-snug">
-                            Read-only. Bookings are approved by the general manager — ask the IT admin
-                            to appoint you as GM proxy if you need to approve in their place.
-                          </p>
                         )}
 
                         {/* Fleet sees where each vehicle went; readiness is managed

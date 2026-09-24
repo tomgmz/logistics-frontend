@@ -78,7 +78,6 @@ export interface BookingDetail {
   estimated_delivery?: string | null
 
   transaction_documents?:  string[] | null
-  payment_terms?:          string | null
 
   // Proof of pickup: photo the driver took at the origin when confirming it.
   pickup_proof_photo_url?: string | null

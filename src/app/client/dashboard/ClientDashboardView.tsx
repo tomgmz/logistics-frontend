@@ -10,14 +10,6 @@ import {
 } from 'lucide-react'
 
 import { bookingService } from '@/lib/services/client/booking.service'
-import {
-  clientBillingService,
-  actionFor,
-  statusExplanation,
-  periodLabel,
-  type BillingPeriod,
-  type PeriodAction,
-} from '@/lib/services/client/billing.service'
 import { notificationService, type AppNotification } from '@/lib/services/notification.service'
 import { useAuthStore } from '@/lib/store/auth.store'
 import type { BookingWithRelations, BookingDestination } from '@/lib/store/slice/routeMap.slice'
@@ -124,12 +116,6 @@ function timeAgo(iso: string): string {
 /** Today in the Philippines as YYYY-MM-DD — schedule_date is a PH calendar day. */
 function phToday(): string {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
-}
-
-const ACTION_LABEL: Record<Exclude<PeriodAction, 'none'>, string> = {
-  submit:   'File reverse billing',
-  resubmit: 'Correct & resubmit',
-  review:   'Review summary',
 }
 
 const fadeUp: Variants = {
@@ -293,38 +279,6 @@ function ActiveShipmentRow({ booking }: { booking: BookingWithRelations }) {
   )
 }
 
-function AttentionRow({ period }: { period: BillingPeriod }) {
-  const action   = actionFor(period)
-  const deadline = action === 'review' ? period.review_due_on : period.submission_end
-
-  return (
-    <div className="rounded-lg border p-3 flex flex-col gap-2" style={{ background: BG_PAGE, borderColor: BORDER }}>
-      <div className="flex items-center gap-2">
-        <CreditCard size={13} style={{ color: AMBER }} />
-        <span className="text-sm font-bold text-white">{periodLabel(period)}</span>
-        <span className="ml-auto text-[10px] uppercase tracking-widest" style={{ color: MUTED }}>
-          {period.mode}
-        </span>
-      </div>
-      {deadline && (
-        <span className="text-[11px] font-bold" style={{ color: AMBER }}>
-          Due {formatDate(deadline)}
-        </span>
-      )}
-      <p className="text-[11px] leading-snug" style={{ color: MUTED }}>
-        {statusExplanation(period)}
-      </p>
-      <Link
-        href="/client/reverse-billing"
-        className="flex items-center gap-0.5 text-[11px] font-bold hover:opacity-80 transition-opacity w-fit"
-        style={{ color: CYAN }}
-      >
-        {action !== 'none' ? ACTION_LABEL[action] : 'View details'} <ChevronRight size={11} />
-      </Link>
-    </div>
-  )
-}
-
 function RejectedRow({ booking }: { booking: BookingWithRelations }) {
   const reason = booking.rejection_reason as string | undefined
   return (
@@ -355,7 +309,6 @@ export default function ClientDashboardView() {
   const company  = useAuthStore((s) => s.user?.clients?.company_name)
 
   const [bookings, setBookings] = useState<BookingWithRelations[]>([])
-  const [periods,  setPeriods]  = useState<BillingPeriod[]>([])
   const [notes,    setNotes]    = useState<AppNotification[]>([])
   const [loading,  setLoading]  = useState(true)
   const [error,    setError]    = useState<string | null>(null)
@@ -365,13 +318,11 @@ export default function ClientDashboardView() {
     setLoading(true)
     setError(null)
     try {
-      const [bookingRows, periodRows, noteRows] = await Promise.all([
+      const [bookingRows, noteRows] = await Promise.all([
         bookingService.fetchBookingsByClient(clientId),
-        clientBillingService.listPeriods({ limit: 60 }),
         notificationService.list({ limit: 6 }),
       ])
       setBookings(bookingRows)
-      setPeriods(periodRows ?? [])
       setNotes(noteRows ?? [])
     } catch (err) {
       setError(getApiErrorMessage(err))
@@ -408,11 +359,6 @@ export default function ClientDashboardView() {
     ).length
   }, [bookings])
 
-  const actionablePeriods = useMemo(
-    () => periods.filter((p) => actionFor(p) !== 'none'),
-    [periods],
-  )
-
   const upcoming = useMemo(() => {
     const today = phToday()
     return bookings
@@ -425,8 +371,8 @@ export default function ClientDashboardView() {
       .slice(0, 5)
   }, [bookings])
 
-  // Turned-down bookings belong next to the billing deadlines: both are things
-  // the client has to act on, and a rejection is easy to miss otherwise.
+  // A rejection is easy to miss otherwise: it is the one thing on this screen
+  // the client has to act on rather than just watch.
   const rejected = useMemo(() => (
     bookings
       .filter((b) => asBookingStatus(b.status) === 'CANCELLED')
@@ -434,7 +380,7 @@ export default function ClientDashboardView() {
       .slice(0, 2)
   ), [bookings])
 
-  const attentionCount = actionablePeriods.length + rejected.length
+  const attentionCount = rejected.length
 
   if (!clientId) {
     return (
@@ -527,7 +473,7 @@ export default function ClientDashboardView() {
               <KpiTile label="Completed This Month" value={completedThisMonth}
                 sub="deliveries finished" color={GREEN} />
               <KpiTile label="Needs Your Attention" value={attentionCount}
-                sub="billing and rejections" color={CYAN} />
+                sub="rejected bookings" color={CYAN} />
             </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
@@ -575,7 +521,6 @@ export default function ClientDashboardView() {
                     <EmptyPanel icon={<CheckCircle2 size={26} />} message="Nothing needs you right now." />
                   ) : (
                     <div className="flex flex-col gap-2">
-                      {actionablePeriods.map((p) => <AttentionRow key={p.period_id} period={p} />)}
                       {rejected.map((b) => <RejectedRow key={b.booking_id} booking={b} />)}
                     </div>
                   )}

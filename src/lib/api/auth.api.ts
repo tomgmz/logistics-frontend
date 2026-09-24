@@ -177,9 +177,6 @@ export interface AuthUser {
   role:       string
   status:     string
   must_change_password: boolean
-  // True for an accountant the IT admin appointed to stand in for the general
-  // manager on booking approvals — they get the GM's approve/reject controls.
-  is_gm_proxy?: boolean
   // True for the primary administrator account (the earliest-created admin),
   // which is never permission-restricted and is the only one allowed to hand the
   // IT Admin role to a successor. The API enforces that independently; this only
@@ -190,7 +187,6 @@ export interface AuthUser {
     client_id:       string
     company_name:    string | null
     billing_address: string | null
-    billing_mode:    'weekly' | 'monthly' | null
   } | null
   drivers?: {
     driver_id:        string

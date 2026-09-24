@@ -11,7 +11,6 @@ export const NAV_ITEMS_BY_ROLE: Record<string, { href: string; label: string; ic
     { href: '/admin/booking-management', label: 'Booking Management', icon: <CalendarCheck size={17} /> },
     { href: '/admin/transit-tracking', label: 'Transit Tracking', icon: <MapPin size={17} /> },
     { href: '/admin/vehicle-management', label: 'Vehicle Management', icon: <Truck size={17} /> },
-    { href: '/admin/billing-management', label: 'Billing Management', icon: <CreditCard size={17} /> },
     { href: '/admin/transaction-history', label: 'Transaction History', icon: <History size={17} /> },
     { href: '/admin/document-management', label: 'Document Management', icon: <FileSearch size={17} /> },
     { href: '/admin/system-maintenance', label: 'System Maintenance', icon: <Layers size={17} /> },
@@ -21,7 +20,6 @@ export const NAV_ITEMS_BY_ROLE: Record<string, { href: string; label: string; ic
     { href: '/client/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={17} /> },
     { href: '/client/booking', label: 'Booking', icon: <CalendarCheck size={17} /> },
     { href: '/client/tracking', label: 'Delivery Tracking', icon: <MapPin size={17} /> },
-    { href: '/client/reverse-billing', label: 'Reverse Billing', icon: <CreditCard size={17} /> },
     { href: '/client/history', label: 'Transaction History', icon: <History size={17} /> },
   ],
   fleet_manager: [
@@ -45,14 +43,5 @@ export const NAV_ITEMS_BY_ROLE: Record<string, { href: string; label: string; ic
     { href: '/operations_admin/booking-management', label: 'Booking Management', icon: <CalendarCheck size={17} /> },
     { href: '/operations_admin/transit-tracking', label: 'Transit Tracking', icon: <MapPin size={17} /> },
     { href: '/operations_admin/document-management', label: 'Document Management', icon: <FileSearch size={17} /> },
-  ],
-  // Booking Management only appears for an accountant the IT admin has appointed
-  // as the GM's approval proxy — see NAV filtering in the accountant layout.
-  accountant: [
-    { href: '/accountant/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={17} /> },
-    { href: '/accountant/booking-management', label: 'Booking Management', icon: <CalendarCheck size={17} /> },
-    { href: '/accountant/billing-management', label: 'Billing Management', icon: <CreditCard size={17} /> },
-    { href: '/accountant/transaction-history', label: 'Transaction History', icon: <History size={17} /> },
-    { href: '/accountant/document-management', label: 'Document Management', icon: <FileSearch size={17} /> },
   ],
 }

@@ -44,11 +44,6 @@ const adminNavItems = [
     icon: <Truck size={17} />,
   },
   {
-    href: '/admin/billing-management',
-    label: 'Billing Management',
-    icon: <CreditCard size={17} />,
-  },
-  {
     href: '/admin/transaction-history',
     label: 'Transaction History',
     icon: <History size={17} />,

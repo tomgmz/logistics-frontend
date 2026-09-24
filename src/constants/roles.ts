@@ -1,7 +1,6 @@
 export const ROLE_ROUTES: Record<string, string> = {
   admin:      '/admin',
   general_manager:  '/general_manager',
-  accountant:       '/accountant',
   fleet_manager:      '/fleet_admin',
   operations_manager: '/operations_admin',
   it_admin:         '/it_admin',

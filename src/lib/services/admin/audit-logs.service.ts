@@ -14,9 +14,7 @@ export type LogType =
   | 'admin_activity'
   | 'vehicle_activity'
   | 'booking'
-  | 'payment'
   | 'driver_activity'
-  | 'billing_activity'
   /** @deprecated pre-split rows only — see the log split migration. */
   | 'user_activity'
   /** @deprecated technical failures now live in system_logs. */
@@ -48,9 +46,7 @@ export interface LogStats {
   admin_activity:    number
   vehicle_activity:  number
   booking:           number
-  payment:           number
   driver_activity:   number
-  billing_activity:  number
   user_activity:     number
   system_error:      number
 }

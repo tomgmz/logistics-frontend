@@ -41,7 +41,6 @@ export interface BookingErrors {
   schedule:      ScheduleErrors
   route:         RouteErrors
   sections:      SectionErrors[]
-  paymentTerms?: string
   documents?:    string
   touched:       boolean
 }
@@ -155,7 +154,6 @@ export function validateBooking(
   dropoffs:     string[],
   sections:     DropoffSection[],
   mode:         CargoMode,
-  paymentTerms: string,
   fileCount:    number,
 ): Omit<BookingErrors, 'touched'> {
   const errors: Omit<BookingErrors, 'touched'> = {
@@ -164,9 +162,6 @@ export function validateBooking(
     sections: validateSections(sections, mode),
   }
 
-  if (!paymentTerms) {
-    errors.paymentTerms = 'Payment terms are required'
-  }
   if (fileCount === 0) {
     errors.documents = 'At least one transaction document is required'
   }
@@ -191,7 +186,6 @@ export function hasAnyErrors(errors: Omit<BookingErrors, 'touched'>): boolean {
     hasScheduleErrors(errors.schedule) ||
     hasRouteErrors(errors.route)       ||
     hasSectionErrors(errors.sections)  ||
-    !!errors.paymentTerms              ||
     !!errors.documents
   )
 }

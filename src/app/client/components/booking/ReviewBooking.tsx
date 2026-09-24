@@ -98,7 +98,6 @@ export default function StepReview({ selectedService, pendingFiles, onBack, onNe
   const mode          = useAppSelector((s) => s.booking.mode)
   const sections      = useAppSelector((s) => s.booking.sections)
   const vehicle       = useAppSelector((s) => s.booking.vehicle)
-  const paymentTerms  = useAppSelector((s) => s.booking.paymentTerms)
 
   const allGroups = sections.flatMap((s) => s.groups)
 
@@ -188,7 +187,6 @@ export default function StepReview({ selectedService, pendingFiles, onBack, onNe
         truck_type_needed: vehicle.name,
         schedule_date:     date,
         call_time:         time,
-        ...(paymentTerms            && { payment_terms:       paymentTerms }),
         ...(cargo.grossWeightKg  > 0 && { required_weight_kg:     parseFloat(cargo.grossWeightKg.toFixed(2)) }),
         ...(cargo.volumeCbm      > 0 && { required_volume_cbm:    parseFloat(cargo.volumeCbm.toFixed(4)) }),
         ...(cargo.netWeightKg    > 0 && { required_net_weight_kg: parseFloat(cargo.netWeightKg.toFixed(2)) }),
@@ -319,13 +317,6 @@ export default function StepReview({ selectedService, pendingFiles, onBack, onNe
                     <SectionLabel>Service Type</SectionLabel>
                     <InfoBox value={serviceLabel} className="mt-2 w-full" />
                   </div>
-
-                  {paymentTerms && (
-                    <div>
-                      <SectionLabel>Payment Terms</SectionLabel>
-                      <InfoBox value={`${paymentTerms} days`} className="mt-2 w-full" />
-                    </div>
-                  )}
 
                   {pendingFiles.length > 0 && (
                     <div>

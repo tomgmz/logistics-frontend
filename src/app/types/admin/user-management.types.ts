@@ -4,7 +4,6 @@ export type AdminRole =
   | 'general_manager'
   | 'fleet_manager'
   | 'operations_manager'
-  | 'accountant'
 
 export type UserRole = AdminRole | 'driver' | 'client'
 
@@ -13,7 +12,6 @@ export type UserRole = AdminRole | 'driver' | 'client'
  * their contract and fixed at account creation. It is not a payment term: the
  * 30/45/60 day term is chosen per booking on the booking form.
  */
-export type BillingMode = 'weekly' | 'monthly'
 export type UserStatus = 'active' | 'inactive' | 'deactivated' | 'archived' | 'permanently_locked'
 /**
  * A driver's own availability for delivery work. A new driver starts
@@ -27,7 +25,6 @@ export type UserTab =
   | 'admins'
   | 'clients'
   | 'drivers'
-  | 'accountants'
   | 'general-managers'
   | 'fleet-admins'
   | 'operations-admins'
@@ -53,9 +50,6 @@ export interface BaseUser {
 
 export interface AdminUser extends BaseUser {
   role: AdminRole
-  // Only meaningful on accountants: appointed by the IT admin to stand in for
-  // the general manager on booking approvals.
-  is_gm_proxy?: boolean
 }
 
 export interface ClientUser extends BaseUser {
@@ -64,7 +58,6 @@ export interface ClientUser extends BaseUser {
     client_id: string
     company_name: string | null
     billing_address: string | null
-    billing_mode: BillingMode | null
     landline: string | null
   } | null
 }
@@ -101,7 +94,6 @@ export interface CreateClientPayload {
   last_name?: string
   company_name?: string
   billing_address?: string
-  billing_mode?: BillingMode
 }
 
 export interface CreateDriverPayload {
@@ -112,14 +104,6 @@ export interface CreateDriverPayload {
   last_name?: string
   license_number: string
   license_expiry: string
-}
-
-export interface CreateAccountantPayload {
-  email: string
-  password: string
-  phone?: string
-  first_name?: string
-  last_name?: string
 }
 
 export interface CreateGeneralManagerPayload {
@@ -163,7 +147,6 @@ export interface CreateITAdminPayload {
 export type UpdateAdminPayload           = Partial<Omit<CreateAdminPayload, 'password'>>
 export type UpdateClientPayload          = Partial<Omit<CreateClientPayload, 'password'>>
 export type UpdateDriverPayload          = Partial<Omit<CreateDriverPayload, 'password'>>
-export type UpdateAccountantPayload      = Partial<Omit<CreateAccountantPayload, 'password'>>
 export type UpdateGeneralManagerPayload  = Partial<Omit<CreateGeneralManagerPayload, 'password'>>
 export type UpdateFleetAdminPayload      = Partial<Omit<CreateFleetAdminPayload, 'password'>>
 export type UpdateOperationsAdminPayload = Partial<Omit<CreateOperationsAdminPayload, 'password'>>

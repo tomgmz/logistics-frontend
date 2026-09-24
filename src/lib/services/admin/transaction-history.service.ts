@@ -5,7 +5,7 @@ import type { BookingWithRelations } from '@/lib/store/slice/routeMap.slice'
  * Staff transaction history.
  *
  * Talks to /api/transaction-history, not /api/booking: the two are gated by
- * different modules, and an accountant can hold this one without the other.
+ * different modules, and a role can hold this one without the other.
  */
 
 export type DateBasis = 'scheduled' | 'booked' | 'completed'
@@ -63,7 +63,6 @@ export interface ExportRow {
   origin:           string | null
   destinations:     string | null
   truck_type:       string | null
-  payment_terms:    string | null
   total_cost:       number | null
 }
 
@@ -140,7 +139,6 @@ const CSV_COLUMNS: { key: keyof ExportRow; label: string; date?: true }[] = [
   { key: 'origin',           label: 'Pick Up' },
   { key: 'destinations',     label: 'Drop Offs' },
   { key: 'truck_type',       label: 'Truck Type' },
-  { key: 'payment_terms',    label: 'Payment Terms' },
   { key: 'total_cost',       label: 'Total Cost' },
 ]
 

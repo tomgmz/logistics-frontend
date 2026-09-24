@@ -69,7 +69,6 @@ export default function TransactionDetail({ booking, animated = true }: {
 
   const schedDate   = booking.schedule_date as string | undefined
   const callTime    = booking.call_time     as string | undefined
-  const payTerms    = booking.payment_terms as string | undefined
   const totalCost   = booking.total_cost    as number | null | undefined
   const createdAt   = booking.created_at    as string | undefined
 
@@ -117,10 +116,9 @@ export default function TransactionDetail({ booking, animated = true }: {
           <StatusBadge status={booking.status} />
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t" style={{ borderColor: BORDER }}>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2 border-t" style={{ borderColor: BORDER }}>
           <InfoTile label="Scheduled Date" value={formatDate(schedDate)} />
           <InfoTile label="Call Time"      value={callTime ?? '—'} />
-          <InfoTile label="Payment Terms"  value={payTerms ?? '—'} />
           <InfoTile label="Total Cost"     value={formatPeso(totalCost)} accent />
         </div>
       </div>

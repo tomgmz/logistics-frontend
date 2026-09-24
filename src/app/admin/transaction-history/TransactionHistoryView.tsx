@@ -38,7 +38,7 @@ import {
  * exactly the same filters as the rows.
  *
  * Rendered by both /admin/transaction-history and
- * /accountant/transaction-history. The dashboard shell resolves the
+ * The dashboard shell resolves the
  * transaction-history module from the URL segment, so there is no guard here —
  * only `canExport`, which decides whether the export control exists.
  */

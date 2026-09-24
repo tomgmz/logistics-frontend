@@ -21,7 +21,6 @@ import {
   adminService,
   clientService,
   driverService,
-  accountantService,
   generalManagerService,
   fleetAdminService,
   operationsAdminService,
@@ -54,7 +53,6 @@ const TAB_LABELS: Record<UserTab, string> = {
   admins:              'Admin',
   clients:             'Client',
   drivers:             'Driver',
-  accountants:         'Accountant',
   'general-managers':  'General Manager',
   'fleet-admins':      'Fleet Manager',
   'operations-admins': 'Operations Manager',
@@ -65,7 +63,6 @@ const TAB_LABELS: Record<UserTab, string> = {
 // the modules that role actually has pages for.
 const TAB_TO_ROLE: Partial<Record<UserTab, ManagedRole>> = {
   admins:              'admin',
-  accountants:         'accountant',
   'general-managers':  'general_manager',
   'fleet-admins':      'fleet_manager',
   'operations-admins': 'operations_manager',
@@ -121,7 +118,6 @@ function buildInitialState(tab: UserTab, user: AnyUser | null): FormState {
       landline:        c?.landline ? toLocalLandlineDigits(c.landline) : '',
       company_name:    c?.company_name    ?? '',
       billing_address: c?.billing_address ?? '',
-      billing_mode:    c?.billing_mode    ?? 'monthly',
     }
   }
 
@@ -170,7 +166,6 @@ async function submitForm(
     case 'admins':            return editId ? adminService.update(editId, clean as never).then(() => editId)            : adminService.create(clean as never).then(newId)
     case 'clients':           return editId ? clientService.update(editId, clean as never).then(() => editId)           : clientService.create(clean as never).then(newId)
     case 'drivers':           return editId ? driverService.update(editId, clean as never).then(() => editId)           : driverService.create(clean as never).then(newId)
-    case 'accountants':       return editId ? accountantService.update(editId, clean as never).then(() => editId)       : accountantService.create(clean as never).then(newId)
     case 'general-managers':  return editId ? generalManagerService.update(editId, clean as never).then(() => editId)   : generalManagerService.create(clean as never).then(newId)
     case 'fleet-admins':      return editId ? fleetAdminService.update(editId, clean as never).then(() => editId)       : fleetAdminService.create(clean as never).then(newId)
     case 'operations-admins': return editId ? operationsAdminService.update(editId, clean as never).then(() => editId)  : operationsAdminService.create(clean as never).then(newId)
@@ -693,21 +688,6 @@ export default function UserFormModal({ tab, user, onClose, onSaved, enablePermi
                     placeholder="Acme Corp"
                     error={fe.company_name}
                   />
-                </Field>
-                <Field
-                  label="Reverse Billing Mode"
-                  required
-                  hint="Billing cycle"
-                  error={fe.billing_mode}
-                >
-                  <Select
-                    value={String(form.billing_mode)}
-                    onChange={e => set('billing_mode', e.target.value)}
-                    error={fe.billing_mode}
-                  >
-                    <option value="monthly">Monthly</option>
-                    <option value="weekly">Weekly</option>
-                  </Select>
                 </Field>
               </div>
 
