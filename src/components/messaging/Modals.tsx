@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, Search, Loader2, Users, Check, MessageCirclePlus } from 'lucide-react'
 import { messagingService } from '@/lib/services/messaging.service'
 import type { MessagableUser } from '@/lib/services/messaging.service'
+import { roleLabel } from '@/lib/roles'
 
 function ModalShell({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
   return (
@@ -99,7 +100,7 @@ export function NewConversationModal({ onClose, onConversationReady }: NewConver
               </div>
               <div className="flex-1 min-w-0">
                 <p className="ff-body text-sm text-white truncate">{u.first_name} {u.last_name}</p>
-                <p className="ff-body text-[11px] text-white/35 capitalize truncate">{u.role.replace(/_/g, ' ')}</p>
+                <p className="ff-body text-[11px] text-white/35 capitalize truncate">{roleLabel(u.role)}</p>
               </div>
               {isStarting && <Loader2 size={14} className="animate-spin text-[var(--color-cyan)]/60 shrink-0" />}
             </motion.button>
@@ -211,7 +212,7 @@ export function NewGroupModal({ onClose, onGroupCreated }: NewGroupModalProps) {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="ff-body text-sm text-white truncate">{u.first_name} {u.last_name}</p>
-                  <p className="ff-body text-[11px] text-white/35 capitalize truncate">{u.role.replace(/_/g, ' ')}</p>
+                  <p className="ff-body text-[11px] text-white/35 capitalize truncate">{roleLabel(u.role)}</p>
                 </div>
                 <div className={`shrink-0 w-5 h-5 rounded-full border flex items-center justify-center transition-all ${isSel ? 'bg-[var(--color-cyan)] border-[var(--color-cyan)]' : 'border-white/20'}`}>
                   {isSel && <Check size={11} className="text-[var(--color-bg)]" />}

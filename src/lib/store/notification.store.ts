@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { AppNotification } from '@/lib/services/notification.service'
-import { notificationService } from '@/lib/services/notification.service'
+import { notificationService, normalizeNotification } from '@/lib/services/notification.service'
 
 interface NotificationStore {
   items:       AppNotification[]
@@ -26,7 +26,8 @@ export const useNotificationStore = create<NotificationStore>((set, get) => ({
   },
 
   // Called from the realtime subscription when a new notification arrives.
-  pushNew: (n) => {
+  pushNew: (raw) => {
+    const n = normalizeNotification(raw)
     const { items } = get()
     if (items.some((i) => i.notification_id === n.notification_id)) return
     set({ items: [n, ...items], unreadCount: get().unreadCount + (n.read_at ? 0 : 1) })

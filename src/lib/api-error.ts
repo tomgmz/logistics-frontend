@@ -11,11 +11,11 @@ const WRAPPER_PREFIXES = [
   /^Client creation failed:\s*/i,
   /^Driver creation failed:\s*/i,
   /^Accountant Creation Failed:\s*/i,
-  /^Operations Admin Creation Failed:\s*/i,
-  /^IT Admin Creation Failed:\s*/i,
+  /^Operations (?:Manager|Admin) Creation Failed:\s*/i,
+  /^IT Admin(?:istrator)? Creation Failed:\s*/i,
   /^General Manager Creation Failed:\s*/i,
-  /^Fleet Admin Creation Failed:\s*/i,
-  /^Admin creation failed:\s*/i,
+  /^Fleet (?:Manager|Admin) Creation Failed:\s*/i,
+  /^Admin(?:istrator)? creation failed:\s*/i,
 ]
 
 function unwrapServiceMessage(raw: string): string {

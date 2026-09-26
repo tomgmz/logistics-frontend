@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, Search, Loader2, Users, Check } from 'lucide-react'
 import { messagingService } from '@/lib/services/messaging.service'
 import type { MessagableUser } from '@/lib/services/messaging.service'
+import { roleLabel } from '@/lib/roles'
 
 interface NewGroupModalProps {
   onClose: () => void
@@ -155,7 +156,7 @@ export default function NewGroupModal({ onClose, onGroupCreated }: NewGroupModal
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="ff-body text-sm text-white truncate">{user.first_name} {user.last_name}</p>
-                      <p className="ff-body text-[11px] text-white/35 capitalize truncate">{user.role.replace(/_/g, ' ')}</p>
+                      <p className="ff-body text-[11px] text-white/35 capitalize truncate">{roleLabel(user.role)}</p>
                     </div>
                     <div className={`shrink-0 w-5 h-5 rounded-full border flex items-center justify-center transition-all ${isSelected ? 'bg-[var(--color-cyan)] border-[var(--color-cyan)]' : 'border-white/20'}`}>
                       {isSelected && <Check size={11} className="text-[var(--color-bg)]" />}

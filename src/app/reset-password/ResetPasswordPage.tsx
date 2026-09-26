@@ -499,7 +499,7 @@ function InvalidLinkView({ reason }: { reason?: string }) {
               : 'This reset link has already been used or has expired. Reset links work once and last for one hour.'}
           </p>
           <p className="font-spartan text-white/30 text-[0.76rem] leading-relaxed mt-1">
-            Request a new one from the sign-in screen and your administrator will send a fresh link.
+            Request a new one from the sign-in screen and your Administrator will send a fresh link.
           </p>
         </div>
 

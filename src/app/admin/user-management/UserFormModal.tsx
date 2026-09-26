@@ -52,13 +52,13 @@ interface UserFormModalProps {
 }
 
 const TAB_LABELS: Record<UserTab, string> = {
-  admins:              'Admin',
+  admins:              'Administrator',
   clients:             'Client',
   drivers:             'Driver',
   'general-managers':  'General Manager',
   'fleet-admins':      'Fleet Manager',
   'operations-admins': 'Operations Manager',
-  'it-admins':         'IT Admin',
+  'it-admins':         'IT Administrator',
 }
 
 // Maps an admin-management tab to its role so the create-time matrix only lists

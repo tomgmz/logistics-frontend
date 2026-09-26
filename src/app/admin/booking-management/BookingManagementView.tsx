@@ -96,7 +96,7 @@ const ROLE_HIDE_PENDING: Partial<Record<BookingRoleView, boolean>> = {
 
 const ROLE_TITLE: Record<BookingRoleView, string> = {
   admin:              'Booking management',
-  general_manager:    'Bookings — GM approval',
+  general_manager:    'Bookings — General Manager approval',
   operations_manager: 'Bookings — vehicle & driver assignment',
   fleet_manager:      'Bookings — assigned vehicles',
 }
@@ -1235,7 +1235,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     try {
       await bookingService.gmReview(selectedId, { gm_status: decision, rejection_reason: remarks })
       await refreshAfterAction()
-      appToast.success(decision === 'approved' ? 'Approved — sent to operations.' : 'Booking rejected.', { action: 'gm-review', entityId: selectedId })
+      appToast.success(decision === 'approved' ? 'Approved — sent to the Operations Manager.' : 'Booking rejected.', { action: 'gm-review', entityId: selectedId })
     } catch (e) {
       appToast.error(getApiErrorMessage(e, 'Request failed. Please try again.'), { action: 'gm-review', entityId: selectedId })
     } finally {
@@ -1351,7 +1351,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
             ? `Please confirm you have reviewed all ${docCount} transaction document${docCount > 1 ? 's' : ''} submitted by the client before proceeding.`
             : 'Please confirm you have reviewed all client-submitted documents and details before proceeding.')
           + (decidesGmStage
-            ? ' Operations will then be asked to select a vehicle and driver. This cannot be undone.'
+            ? ' The Operations Manager will then be asked to select a vehicle and driver. This cannot be undone.'
             : ' Approving cannot be undone.')
         }
         confirmLabel="Approve"
@@ -1771,7 +1771,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                             style={{ borderColor: 'rgba(248,113,113,0.30)', background: 'rgba(248,113,113,0.08)' }}
                           >
                             <p className="text-[10px] font-bold uppercase tracking-wider text-[#fca5a5]/80 mb-1">
-                              Rejected by the general manager
+                              Rejected by the General Manager
                             </p>
                             <p className="text-xs text-white/75 leading-snug">{d.rejection_reason}</p>
                           </div>

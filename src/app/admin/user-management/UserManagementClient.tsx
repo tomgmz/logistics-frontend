@@ -44,7 +44,7 @@ const TABS: { key: TabValue; label: string }[] = [
   { key: 'all',        label: 'All Users' },
   { key: 'clients',    label: 'Clients'   },
   { key: 'drivers',    label: 'Drivers'   },
-  { key: 'it-admins',  label: 'IT Admin'  },
+  { key: 'it-admins',  label: 'IT Administrator'  },
 ]
 
 const muiTheme = createTheme({
@@ -536,7 +536,7 @@ export default function UserManagementClient() {
                     onClick={() => setShowTransition(true)}
                     className="flex items-center gap-2 rounded-xl bg-[#4df9ed] px-5 py-2.5 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5] active:scale-95"
                   >
-                    <ArrowLeftRight size={15} /> Transition IT Admin
+                    <ArrowLeftRight size={15} /> Transition IT Administrator
                   </button>
                 )
               ) : (

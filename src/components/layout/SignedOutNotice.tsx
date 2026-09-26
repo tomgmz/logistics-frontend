@@ -18,7 +18,7 @@ import { SIGNED_OUT_PARAM, SIGNED_OUT_REASON_PARAM } from '@/lib/auth-redirect'
  */
 const MESSAGES: Record<string, string> = {
   inactive:
-    'Your account is no longer active. Signing in again will not restore access — please contact your administrator.',
+    'Your account is no longer active. Signing in again will not restore access — please contact your Administrator.',
 }
 
 const DEFAULT_MESSAGE = 'You have been signed out.'

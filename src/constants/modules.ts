@@ -95,7 +95,7 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   // tabs) bypasses RBAC entirely, so this row only ever governs whether a
   // company admin can open /admin/audit-logs. The key stays 'audit-logs'
   // because module_permissions rows reference it by name.
-  'audit-logs':           'Audit Logs (Company Admin)',
+  'audit-logs':           'Audit Logs (Company Administrator)',
 }
 
 // Assignable modules per managed role (matches the role's dashboard nav).

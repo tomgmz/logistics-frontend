@@ -87,7 +87,7 @@ export default function BlowbagetsInspectionModal({
       onRecorded(inspection)
       appToast.success(
         inspection.passed
-          ? `${truck.plate_number} passed — operations can now assign it.`
+          ? `${truck.plate_number} passed — the Operations Manager can now assign it.`
           : `${truck.plate_number} failed — it can't be assigned until it passes a re-check.`,
         { action: 'truck-inspection', entityId: truck.truck_id },
       )

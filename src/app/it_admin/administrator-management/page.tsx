@@ -47,7 +47,7 @@ const RESETS_DEEPLINK = 'password-resets'
 
 const TABS: { key: TabValue; label: string }[] = [
   { key: 'all',                label: 'All Administrators'  },
-  { key: 'admins',             label: 'Company Admins'      },
+  { key: 'admins',             label: 'Company Administrators'      },
   { key: 'general-managers',   label: 'General Managers'    },
   { key: 'fleet-admins',       label: 'Fleet Managers'      },
   { key: 'operations-admins',  label: 'Operations Managers' },
@@ -120,8 +120,8 @@ const ROLE_COLORS: Record<string, string> = {
 }
 
 const ROLE_LABELS: Record<string, string> = {
-  admin:            'Company Admin',
-  it_admin:         'IT Admin',
+  admin:            'Company Administrator',
+  it_admin:         'IT Administrator',
   general_manager:  'General Manager',
   fleet_manager:      'Fleet Manager',
   operations_manager: 'Operations Manager',

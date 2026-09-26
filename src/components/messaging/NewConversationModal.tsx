@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, Search, Loader2, MessageCirclePlus } from 'lucide-react'
 import { messagingService } from '@/lib/services/messaging.service'
 import type { MessagableUser } from '@/lib/services/messaging.service'
+import { roleLabel } from '@/lib/roles'
 
 interface NewConversationModalProps {
   onClose: () => void
@@ -164,7 +165,7 @@ export default function NewConversationModal({
                       {user.first_name} {user.last_name}
                     </p>
                     <p className="ff-body text-[11px] text-white/35 capitalize truncate">
-                      {user.role.replace(/_/g, ' ')}
+                      {roleLabel(user.role)}
                     </p>
                   </div>
 

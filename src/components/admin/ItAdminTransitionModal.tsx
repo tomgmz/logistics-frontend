@@ -115,7 +115,7 @@ export default function ItAdminTransitionModal({
       const result = await appToast.promise(
         itAdminService.transition({ ...payload(), reason }),
         {
-          loading: 'Transitioning the IT Admin role…',
+          loading: 'Transitioning the IT Administrator role…',
           success: 'Role transitioned. The outgoing account has been deactivated.',
           error:   (e) => extractApiError(e).message || 'Transition failed.',
         },
@@ -138,7 +138,7 @@ export default function ItAdminTransitionModal({
   }
 
   const outgoingName =
-    [outgoing?.first_name, outgoing?.last_name].filter(Boolean).join(' ') || outgoing?.email || 'the current IT Admin'
+    [outgoing?.first_name, outgoing?.last_name].filter(Boolean).join(' ') || outgoing?.email || 'the current IT Administrator'
 
   return (
     <>
@@ -160,7 +160,7 @@ export default function ItAdminTransitionModal({
               {/* Header */}
               <div className="flex items-start justify-between gap-4 border-b border-[#2a2a2a] px-6 py-4">
                 <div>
-                  <h2 className="text-lg font-bold text-white">Transition IT Admin</h2>
+                  <h2 className="text-lg font-bold text-white">Transition IT Administrator</h2>
                   <p className="mt-0.5 text-[13px] text-[#818181]">
                     Replace <span className="text-white">{outgoingName}</span> with a successor.
                   </p>
@@ -247,7 +247,7 @@ export default function ItAdminTransitionModal({
         open={confirming}
         title="Confirm the handover"
         description={
-          `${form.first_name} ${form.last_name} (${form.email.trim().toLowerCase()}) becomes the IT Admin, ` +
+          `${form.first_name} ${form.last_name} (${form.email.trim().toLowerCase()}) becomes the IT Administrator, ` +
           `and ${outgoingName} is deactivated and signed out immediately. Both happen together — ` +
           `there is no moment where the role is vacant.`
         }

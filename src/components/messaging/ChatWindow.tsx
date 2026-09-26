@@ -18,6 +18,7 @@ import type {
   ReactionTogglePayload,
 } from '@/app/types/messaging/messaging.types'
 import { toMessage } from '@/app/types/messaging/messaging.types'
+import { roleLabel } from '@/lib/roles'
 
 interface ReplyTo { messageId: string; content: string; senderName: string }
 
@@ -246,7 +247,7 @@ export default function ChatWindow({ conversation, draftUser, currentUserId, isP
               <motion.p key="status" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.15 }} className="ff-body text-[11px]">
                 {isOnline
                   ? <span className="text-[var(--color-green)]">Active now</span>
-                  : <span className="text-[var(--color-muted)] capitalize">{participant.role.replace(/_/g, ' ')}</span>}
+                  : <span className="text-[var(--color-muted)] capitalize">{roleLabel(participant.role)}</span>}
               </motion.p>
             )}
           </AnimatePresence>

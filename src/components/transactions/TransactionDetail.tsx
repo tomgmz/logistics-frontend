@@ -260,7 +260,7 @@ export default function TransactionDetail({ booking, animated = true }: {
           ? booking.rejection_reason.trim()
           : ''
         const headline = rejectedByGm
-          ? 'This booking was not approved by the general manager.'
+          ? 'This booking was not approved by the General Manager.'
           : remarks || booking.cancelled_by
             ? 'This booking was not approved.'
             : 'This booking was cancelled.'

@@ -9,6 +9,7 @@ import { logout } from '@/lib/api/auth.api'
 import { unregisterWebPush } from '@/lib/push/web-push'
 import { useAuthStore } from '@/lib/store/auth.store'
 import ReusableModal from '@/components/layout/ReusableModal'
+import { roleLabel } from '@/lib/roles'
 
 const SIDEBAR_COLLAPSED = 56
 const SIDEBAR_EXPANDED = 260
@@ -114,7 +115,7 @@ export default function ReusableSidebar({
                     : user?.email ?? 'User'}
                 </p>
                 <p className="ff-sc sm:!text-[0.8rem] md:!text-[0.9rem] lg:!text-[1.1rem] text-white/40 whitespace-nowrap capitalize">
-                  {user?.role?.replace(/_/g, ' ') ?? ''}
+                  {roleLabel(user?.role)}
                 </p>
               </motion.div>
             </div>

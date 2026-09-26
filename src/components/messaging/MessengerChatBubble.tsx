@@ -21,6 +21,7 @@ import { useIsMobile } from '@/lib/hooks/useIsMobile'
 import { QuickReactBar } from './EmojiPicker'
 import MessageInput from './MessageInput'
 import MessageBubble from './MessageBubble'
+import { roleLabel } from '@/lib/roles'
 
 const BUBBLE_W   = 338
 const BUBBLE_GAP = 10
@@ -205,7 +206,7 @@ export default function MessengerChatBubble({ conversationId, index }: Props) {
                   </motion.p>
                 ) : (
                   <motion.p key="s" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className={`ff-body text-[9px] ${isOnline ? 'text-[var(--color-green)]' : 'text-white/30'}`}>
-                    {isOnline ? 'Active now' : (participant?.role ?? '').replace(/_/g, ' ')}
+                    {isOnline ? 'Active now' : roleLabel(participant?.role)}
                   </motion.p>
                 )}
               </AnimatePresence>

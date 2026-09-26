@@ -13,6 +13,7 @@ import {
 import { formatDate, formatTime, formatDateTime } from '@/app/utils/timeFormat'
 import { useModuleAccess } from '@/components/layout/ModuleAccess'
 import ExportLogsButton from '@/components/admin/ExportLogsButton'
+import { expandCode, roleLabel } from '@/lib/roles'
 
 const BADGE_STYLES: Record<LogType, string> = {
   auth:              'bg-[rgba(160,120,255,0.12)] text-[#b08aff] border border-[rgba(160,120,255,0.25)]',
@@ -159,7 +160,7 @@ export default function AuditLogsPage() {
               <option value="access_control">Access Control</option>
               <option value="document_activity">Documents</option>
               <option value="data_export">Data Exports</option>
-              <option value="admin_activity">Admin Activity</option>
+              <option value="admin_activity">Administrator Activity</option>
               <option value="vehicle_activity">Vehicle Activity</option>
               <option value="driver_activity">Driver Activity</option>
               <option value="booking">Booking</option>
@@ -209,11 +210,11 @@ export default function AuditLogsPage() {
                 {([
                   ['Log ID',      selected.log_id],
                   ['Timestamp',   formatDateTime(selected.timestamp)],
-                  ['Type',        selected.log_type],
-                  ['Action',      selected.action],
+                  ['Type',        expandCode(selected.log_type).replace(/_/g, ' ')],
+                  ['Action',      expandCode(selected.action)],
                   ['Description', selected.description ?? '—'],
                   ['User',        displayName(selected)],
-                  ['Role',        selected.users?.role ?? '—'],
+                  ['Role',        roleLabel(selected.users?.role) || '—'],
 
                 ] as [string, string][]).map(([k, v]) => (
                   <div key={k} className="flex gap-3">
@@ -306,12 +307,12 @@ export default function AuditLogsPage() {
                       </td>
                       <td className="px-4 py-3.5">
                         <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-[0.1em] whitespace-nowrap ${BADGE_STYLES[log.log_type]}`}>
-                          {log.log_type.replace('_', ' ')}
+                          {expandCode(log.log_type).replace(/_/g, ' ')}
                         </span>
                       </td>
                       <td className="px-4 py-3.5">
                         <span className="font-mono text-[10px] text-[#b0b0b0] bg-[#2a2a2a] rounded px-1.5 py-0.5">
-                          {log.action}
+                          {expandCode(log.action)}
                         </span>
                       </td>
                       <td className="px-4 py-3.5 text-sm text-[#e0e0e0] max-w-xs truncate">

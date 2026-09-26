@@ -142,8 +142,8 @@ export default function PermissionsModal({ userId, userName, onClose, onSaved }:
                 <div className="mb-4 flex items-center gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
                   <Lock size={15} className="shrink-0" />
                   <span>
-                    This is the primary administrator account and cannot be restricted, so there is
-                    always one administrator with full access.
+                    This is the primary Administrator account and cannot be restricted, so there is
+                    always one Administrator with full access.
                   </span>
                 </div>
               )}

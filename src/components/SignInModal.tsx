@@ -218,9 +218,9 @@ function ErrorMessage({ message }: { message: string }) {
  * deal with it" and knowing who to chase.
  */
 function approverLabel(role?: string | null): string {
-  if (!role)                                  return 'administrator'
-  if (role === 'driver' || role === 'client') return 'Company Admin'
-  return 'IT Admin'
+  if (!role)                                  return 'Administrator'
+  if (role === 'driver' || role === 'client') return 'Company Administrator'
+  return 'IT Administrator'
 }
 
 /**
@@ -413,7 +413,7 @@ function ItAdminOtpResetStep({
           className="text-[0.72rem] font-semibold tracking-[0.18em] uppercase"
           style={{ fontFamily: "'League Spartan', sans-serif" }}
         >
-          {stage === 'intro' ? 'IT Admin Reset' : 'Enter Your Code'}
+          {stage === 'intro' ? 'IT Administrator Reset' : 'Enter Your Code'}
         </span>
       </div>
 
@@ -423,7 +423,7 @@ function ItAdminOtpResetStep({
             className="text-[0.82rem] leading-relaxed text-white/50"
             style={{ fontFamily: "'League Spartan', sans-serif" }}
           >
-            As IT Admin you reset your own password — there is no queue above you to
+            As IT Administrator you reset your own password — there is no queue above you to
             approve it. We will email a 6-digit code to{' '}
             <span className="text-[#4df9ed]/80">{email}</span>, and you set a new password
             once it checks out.
@@ -598,7 +598,7 @@ function ForgotPasswordStep({
             className="text-[0.82rem] leading-relaxed text-white/50"
             style={{ fontFamily: "'League Spartan', sans-serif" }}
           >
-            Password resets go through an administrator. We will let your{' '}
+            Password resets go through an Administrator. We will let your{' '}
             <span className="text-white/75">{approverLabel(role)}</span> know that{' '}
             <span className="text-[#4df9ed]/80">{email}</span> needs a reset, and they will send a
             one-time link to that address.

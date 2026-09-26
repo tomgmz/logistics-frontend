@@ -45,7 +45,7 @@ export function ModuleNoAccess() {
       </div>
       <p className="text-base font-semibold text-white">Access restricted</p>
       <p className="mt-1 max-w-sm text-sm text-[#818181]">
-        You don&apos;t have permission to view this module. Contact your IT administrator if you
+        You don&apos;t have permission to view this module. Contact your IT Administrator if you
         believe this is a mistake.
       </p>
     </div>

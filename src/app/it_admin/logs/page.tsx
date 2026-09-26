@@ -21,6 +21,7 @@ import {
   type SystemLogStats,
 } from '@/lib/services/admin/system-logs.service'
 import { formatDate, formatTime, formatDateTime } from '@/app/utils/timeFormat'
+import { expandCode, roleLabel } from '@/lib/roles'
 
 // Types now come from the service — see system-logs.service.ts. They used to be
 // declared here because there was no system-logs endpoint to type against.
@@ -137,7 +138,7 @@ function AuditLogsTab() {
             <option value="access_control">Access Control</option>
             <option value="document_activity">Documents</option>
             <option value="data_export">Data Exports</option>
-            <option value="admin_activity">Admin Activity</option>
+            <option value="admin_activity">Administrator Activity</option>
             <option value="vehicle_activity">Vehicle Activity</option>
             <option value="driver_activity">Driver Activity</option>
             <option value="booking">Booking</option>
@@ -183,11 +184,11 @@ function AuditLogsTab() {
               {([
                 ['Log ID',      selected.log_id],
                 ['Timestamp',   formatDateTime(selected.timestamp)],
-                ['Type',        selected.log_type],
-                ['Action',      selected.action],
+                ['Type',        expandCode(selected.log_type).replace(/_/g, ' ')],
+                ['Action',      expandCode(selected.action)],
                 ['Description', selected.description ?? '—'],
                 ['User',        displayName(selected)],
-                ['Role',        selected.users?.role ?? '—'],
+                ['Role',        roleLabel(selected.users?.role) || '—'],
               ] as [string, string][]).map(([k, v]) => (
                 <div key={k} className="flex gap-3">
                   <span className="text-[#818181] text-[10px] uppercase tracking-[0.1em] w-24 flex-shrink-0 pt-0.5">{k}</span>
@@ -263,12 +264,12 @@ function AuditLogsTab() {
                     </td>
                     <td className="px-4 py-3.5">
                       <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-[0.1em] whitespace-nowrap ${AUDIT_BADGE[log.log_type]}`}>
-                        {log.log_type.replace('_', ' ')}
+                        {expandCode(log.log_type).replace(/_/g, ' ')}
                       </span>
                     </td>
                     <td className="px-4 py-3.5">
                       <span className="font-mono text-[10px] text-[#b0b0b0] bg-[#2a2a2a] rounded px-1.5 py-0.5">
-                        {log.action}
+                        {expandCode(log.action)}
                       </span>
                     </td>
                     <td className="px-4 py-3.5 text-sm text-[#e0e0e0] max-w-xs truncate">{log.description ?? '—'}</td>

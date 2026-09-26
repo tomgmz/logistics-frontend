@@ -8,7 +8,7 @@ import { goHomeSignedOut } from '@/lib/auth-redirect'
 
 const NAV_ITEMS = [
   { href: '/it_admin/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={17} /> },
-  { href: '/it_admin/administrator-management', label: 'Admin Management', icon: <Users size={17} /> },
+  { href: '/it_admin/administrator-management', label: 'Administrator Management', icon: <Users size={17} /> },
   { href: '/it_admin/logs', label: 'Logs', icon: <Activity size={17} /> },
 ]
 

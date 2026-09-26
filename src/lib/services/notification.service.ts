@@ -1,4 +1,5 @@
 import proxyApi from '@/lib/api/auth.api'
+import { expandText } from '@/lib/roles'
 
 export interface AppNotification {
   notification_id: string
@@ -12,6 +13,13 @@ export interface AppNotification {
   created_at:      string
 }
 
+// Spell out abbreviations in text stored before the UI stopped using them.
+export const normalizeNotification = (n: AppNotification): AppNotification => ({
+  ...n,
+  title: expandText(n.title),
+  body:  expandText(n.body),
+})
+
 interface ApiResponse<T> {
   status: string
   data:   T
@@ -20,7 +28,7 @@ interface ApiResponse<T> {
 export const notificationService = {
   list: async (params?: { limit?: number; before?: string }): Promise<AppNotification[]> => {
     const { data } = await proxyApi.get<ApiResponse<AppNotification[]>>('/notifications', { params })
-    return data.data ?? []
+    return (data.data ?? []).map(normalizeNotification)
   },
 
   unreadCount: async (): Promise<number> => {

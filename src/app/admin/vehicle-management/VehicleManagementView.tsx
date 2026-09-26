@@ -219,7 +219,7 @@ function InspectionBadge({ inspection, dueRecheck }: { inspection: TruckInspecti
             : { color: '#fca5a5', borderColor: 'rgba(248,113,113,0.35)', background: 'rgba(248,113,113,0.10)' }
         }
         title={inspection.passed
-          ? 'Cleared — operations can assign this vehicle'
+          ? 'Cleared — the Operations Manager can assign this vehicle'
           : 'Failed — blocked from assignment until it passes a re-check'}
       >
         {inspection.passed ? 'Passed' : 'Failed'}
