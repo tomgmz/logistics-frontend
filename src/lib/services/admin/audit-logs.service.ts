@@ -1,4 +1,5 @@
 import proxyApi from '@/lib/api/auth.api'
+import { downloadXlsx, manilaCellDate, manilaDateStamp, type XlsxColumn } from '@/lib/xlsx-export'
 
 export type LogType =
   // A person acted on their own credentials or session.
@@ -95,4 +96,39 @@ export const auditLogService = {
 
   getById: (id: string): Promise<AuditLog> =>
     get<AuditLog>(`${B}/${id}`),
+}
+
+export type ExportLogsParams = Omit<GetLogsParams, 'page' | 'limit'>
+
+/** Same as the backend's AUDIT_EXPORT_ROW_CAP. */
+export const AUDIT_EXPORT_ROW_CAP = 10_000
+
+const AUDIT_XLSX_COLUMNS: XlsxColumn<AuditLog>[] = [
+  { label: 'Timestamp (PHT)', width: 20, value: (l) => manilaCellDate(l.timestamp) },
+  { label: 'Type',            width: 18, value: (l) => l.log_type },
+  { label: 'Action',          width: 28, value: (l) => l.action },
+  { label: 'Description',     width: 70, value: (l) => l.description },
+  { label: 'User',            width: 24, value: (l) =>
+      [l.users?.first_name, l.users?.last_name].filter(Boolean).join(' ') || null },
+  { label: 'Role',            width: 18, value: (l) => l.users?.role },
+  { label: 'User ID',         width: 38, value: (l) => l.user_id },
+  { label: 'Log ID',          width: 38, value: (l) => l.log_id },
+]
+
+/**
+ * Fetches every row matching the filters (up to the cap) and downloads them as
+ * an .xlsx. Shared by the Company Admin page and the IT Admin audit tab.
+ */
+export async function exportAuditLogsXlsx(
+  params: ExportLogsParams,
+): Promise<{ count: number; truncated: boolean }> {
+  const { data: body } = await proxyApi.get<
+    ApiResponse<AuditLog[]> & { meta: { truncated: boolean; count: number } }
+  >(`${B}/export`, { params })
+
+  const rows = body?.data ?? []
+  if (rows.length > 0) {
+    await downloadXlsx(`audit_logs_${manilaDateStamp()}.xlsx`, 'Audit Logs', rows, AUDIT_XLSX_COLUMNS)
+  }
+  return { count: rows.length, truncated: !!body?.meta?.truncated }
 }

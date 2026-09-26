@@ -2,14 +2,19 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { RefreshCw, ChevronLeft, ChevronRight, ScrollText, Server } from 'lucide-react'
+import ExportLogsButton from '@/components/admin/ExportLogsButton'
 import {
   auditLogService,
+  exportAuditLogsXlsx,
+  AUDIT_EXPORT_ROW_CAP,
   type AuditLog,
   type LogStats,
   type LogType,
 } from '@/lib/services/admin/audit-logs.service'
 import {
   systemLogService,
+  exportSystemLogsXlsx,
+  SYSTEM_EXPORT_ROW_CAP,
   type SystemLog as AppSystemLog,
   type SystemLogLevel,
   type SystemLogEventType,
@@ -152,6 +157,16 @@ function AuditLogsTab() {
           >
             <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
           </button>
+          <ExportLogsButton
+            noun="audit logs"
+            cap={AUDIT_EXPORT_ROW_CAP}
+            disabled={loading}
+            run={() => exportAuditLogsXlsx({
+              sort,
+              ...(logType         && { log_type: logType }),
+              ...(debouncedSearch && { search: debouncedSearch }),
+            })}
+          />
           <span className="ml-auto text-xs text-[#818181]">{total} records</span>
         </div>
 
@@ -422,6 +437,17 @@ function SystemLogsTab() {
           >
             <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
           </button>
+          <ExportLogsButton
+            noun="system logs"
+            cap={SYSTEM_EXPORT_ROW_CAP}
+            disabled={loading}
+            run={() => exportSystemLogsXlsx({
+              sort,
+              ...(eventType       && { event_type: eventType }),
+              ...(level           && { log_level: level }),
+              ...(debouncedSearch && { search: debouncedSearch }),
+            })}
+          />
           <span className="ml-auto text-xs text-[#818181]">{total} records</span>
         </div>
 

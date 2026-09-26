@@ -4,11 +4,15 @@ import { useEffect, useState, useCallback } from 'react'
 import { RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react'
 import {
   auditLogService as systemLogService,
+  exportAuditLogsXlsx,
+  AUDIT_EXPORT_ROW_CAP,
   type AuditLog as SystemLog,
   type LogStats,
   type LogType,
 } from '@/lib/services/admin/audit-logs.service'
 import { formatDate, formatTime, formatDateTime } from '@/app/utils/timeFormat'
+import { useModuleAccess } from '@/components/layout/ModuleAccess'
+import ExportLogsButton from '@/components/admin/ExportLogsButton'
 
 const BADGE_STYLES: Record<LogType, string> = {
   auth:              'bg-[rgba(160,120,255,0.12)] text-[#b08aff] border border-[rgba(160,120,255,0.25)]',
@@ -53,6 +57,7 @@ export default function AuditLogsPage() {
   const [logType, setLogType]                 = useState<LogType | ''>('')
   const [sort, setSort]                       = useState<'desc' | 'asc'>('desc')
   const [selected, setSelected]               = useState<SystemLog | null>(null)
+  const { canExport }                         = useModuleAccess()
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 400)
@@ -174,6 +179,19 @@ export default function AuditLogsPage() {
             >
               <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
             </button>
+            {/* Gated on can_export, the tier the IT Admin sets for this module. */}
+            {canExport && (
+              <ExportLogsButton
+                noun="audit logs"
+                cap={AUDIT_EXPORT_ROW_CAP}
+                disabled={loading}
+                run={() => exportAuditLogsXlsx({
+                  sort,
+                  ...(logType         && { log_type: logType }),
+                  ...(debouncedSearch && { search: debouncedSearch }),
+                })}
+              />
+            )}
             <span className="ml-auto text-xs text-[#818181]">
               {total} records
             </span>
