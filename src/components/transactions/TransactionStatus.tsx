@@ -1,7 +1,7 @@
 'use client'
 
 import {
-  MapPin, Truck, Clock, CheckCircle2, XCircle, AlertCircle, Loader2,
+  MapPin, Truck, Clock, CheckCircle2, XCircle, AlertCircle, Loader2, PackageCheck,
 } from 'lucide-react'
 
 import { type BookingStatus, asBookingStatus } from '@/app/types/maps/routemap.types'
@@ -25,6 +25,7 @@ export const STATUS_META: Record<
   ASSIGNED:   { label: 'Assigned',   color: CYAN,  bg: `${CYAN}18`,  icon: <CheckCircle2 size={12} /> },
   IN_TRANSIT: { label: 'In Transit', color: GREEN, bg: `${GREEN}18`, icon: <Truck        size={12} /> },
   ARRIVED:    { label: 'Arrived',    color: GREEN, bg: `${GREEN}18`, icon: <MapPin       size={12} /> },
+  DELIVERED:  { label: 'Delivered',  color: AMBER, bg: `${AMBER}18`, icon: <PackageCheck size={12} /> },
   COMPLETED:  { label: 'Completed',  color: CYAN,  bg: `${CYAN}18`,  icon: <CheckCircle2 size={12} /> },
   CANCELLED:  { label: 'Cancelled',  color: ERROR, bg: `${ERROR}18`, icon: <XCircle      size={12} /> },
 }
@@ -40,7 +41,7 @@ export function getStatusMeta(status: string) {
     : UNKNOWN_META
 }
 
-export const STATUS_ORDER: BookingStatus[] = ['PENDING', 'APPROVED', 'ASSIGNED', 'IN_TRANSIT', 'COMPLETED']
+export const STATUS_ORDER: BookingStatus[] = ['PENDING', 'APPROVED', 'ASSIGNED', 'IN_TRANSIT', 'DELIVERED', 'COMPLETED']
 
 export const TIMELINE_LABELS: Record<BookingStatus, string> = {
   BOOKED:     'Booking Created',
@@ -49,6 +50,7 @@ export const TIMELINE_LABELS: Record<BookingStatus, string> = {
   ASSIGNED:   'Driver Assigned',
   IN_TRANSIT: 'In Transit',
   ARRIVED:    'Arrived',
+  DELIVERED:  'Delivered — Awaiting Confirmation',
   COMPLETED:  'Completed',
   CANCELLED:  'Cancelled',
 }

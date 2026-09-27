@@ -16,6 +16,7 @@ const STATUS_MAP: Record<string, { label: string; color: string; bg: string; bor
   IN_TRANSIT:   { label: 'In Transit', color: 'var(--color-cyan)',   bg: 'rgba(77,249,237,0.12)',  border: 'rgba(77,249,237,0.3)'   },
   'IN TRANSIT': { label: 'In Transit', color: 'var(--color-cyan)',   bg: 'rgba(77,249,237,0.12)',  border: 'rgba(77,249,237,0.3)'   },
   BOOKED:       { label: 'Booked',     color: '#f69f26',             bg: 'rgba(246,159,38,0.12)',  border: 'rgba(246,159,38,0.3)'   },
+  DELIVERED:    { label: 'Delivered',  color: '#fbbf24',             bg: 'rgba(251,191,36,0.12)',  border: 'rgba(251,191,36,0.3)'   },
   COMPLETED:    { label: 'Completed',  color: 'var(--color-green)',  bg: 'rgba(58,246,38,0.12)',   border: 'rgba(58,246,38,0.3)'    },
   CANCELLED:    { label: 'Cancelled',  color: '#f62626',             bg: 'rgba(246,38,38,0.12)',   border: 'rgba(246,38,38,0.3)'    },
 }

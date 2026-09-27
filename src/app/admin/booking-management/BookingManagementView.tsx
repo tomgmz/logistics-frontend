@@ -53,6 +53,8 @@ import { bookingRef, bookingRefFromRecord } from '@/lib/booking'
 import { externalDriverService, type ExternalDriverAccess } from '@/lib/services/admin/external-driver.service'
 import ReusableModal, { RemarksModal } from '@/components/layout/ReusableModal'
 import TripPlanner from './TripPlanner'
+import CompletionPanel from '@/components/transactions/CompletionPanel'
+import type { BookingWithRelations } from '@/lib/store/slice/routeMap.slice'
 import { useRecordLock, useRecordLocks } from '@/lib/hooks/useRecordLock'
 import RecordLockBanner, { RecordLockBadge } from '@/components/ui/RecordLockBanner'
 
@@ -63,6 +65,7 @@ const BOOKING_STATUSES: AdminBookingLifecycleStatus[] = [
   'approved',
   'assigned',
   'in_transit',
+  'delivered',
   'completed',
   'cancelled',
 ]
@@ -938,7 +941,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
         // confirmed back in the 8338 lot — the cargo being off the truck does
         // not put the truck in the yard. The server refuses these assignments
         // either way; this keeps the dropdowns from offering them first.
-        if (bookingStatus === 'completed') return !a.bookings?.fleet_return_at
+        if (bookingStatus === 'delivered' || bookingStatus === 'completed') return !a.bookings?.fleet_return_at
         return true
       }),
     [allAssignments, selectedId],
@@ -1334,7 +1337,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
    */
   const showTripPlanner = !!detail &&
     (roleView === 'admin' || roleView === 'operations_manager') &&
-    ['assigned', 'in_transit', 'completed'].includes(normalizeBookingStatus(detail.status))
+    ['assigned', 'in_transit', 'delivered', 'completed'].includes(normalizeBookingStatus(detail.status))
 
   /**
    * One person edits a booking at a time. Operations and the Company Admin can
@@ -1348,7 +1351,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
    * lock anybody out.
    */
   const bookingOpen = !!detail &&
-    !['completed', 'cancelled'].includes(String(detail.status ?? '').toLowerCase())
+    !['delivered', 'completed', 'cancelled'].includes(String(detail.status ?? '').toLowerCase())
   const mayEditBooking = roleView !== 'fleet_manager' && (canEdit || actsAsGm)
   const bookingLock = useRecordLock({
     type:    'booking',
@@ -1855,6 +1858,12 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                       {/* How many runs the assigned vehicle makes. Only once a
                           vehicle actually exists: until then there is no body to
                           compare the load against, and nothing to plan around. */}
+                      {/* Delivered: the client confirms, or staff confirm for them. */}
+                      {(roleView === 'admin' || roleView === 'operations_manager') && (
+                        <CompletionPanel booking={detail as unknown as BookingWithRelations} mode="staff"
+                          onUpdated={() => { void refreshDetail(detail.booking_id); void loadPage() }} />
+                      )}
+
                       {showTripPlanner && (
                         <TripPlanner
                           key={`${detail.booking_id}:${plannerTick}`}

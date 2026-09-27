@@ -121,6 +121,7 @@ export type AdminBookingLifecycleStatus =
   | 'approved'
   | 'assigned'
   | 'in_transit'
+  | 'delivered'
   | 'completed'
   | 'cancelled'
 
@@ -232,6 +233,20 @@ export const bookingService = {
   ) => {
     await initCsrf()
     return patch<unknown>(`/booking/${bookingId}/gm-review`, payload)
+  },
+
+  // --- completion ----------------------------------------------------------
+  // The client confirms a delivered booking is complete; the Company
+  // Administrator or Operations Manager may confirm for them.
+  confirmCompletion: async (bookingId: string): Promise<BookingWithRelations> => {
+    await initCsrf()
+    return post<BookingWithRelations>(`/booking/${bookingId}/confirm-completion`)
+  },
+
+  // The client says the delivery is not right; holds auto-completion.
+  reportDeliveryIssue: async (bookingId: string, note: string): Promise<BookingWithRelations> => {
+    await initCsrf()
+    return post<BookingWithRelations>(`/booking/${bookingId}/report-issue`, { note })
   },
 
   getBookingById: (bookingId: string) =>

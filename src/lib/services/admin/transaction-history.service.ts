@@ -160,6 +160,10 @@ export interface TransactionApprovals {
   assignment: DecisionActor | null
   /** A cancellation or Company Administrator rejection. */
   cancelled:  DecisionActor | null
+  /** Who confirmed completion; `auto` when it completed on its own after 3 days. */
+  completion: (DecisionActor & { auto: boolean }) | null
+  /** A problem the client reported instead of confirming. */
+  issue:      { note: string; at: string | null } | null
 }
 
 export interface TransactionRecord {

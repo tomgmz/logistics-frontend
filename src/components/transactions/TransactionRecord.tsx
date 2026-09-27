@@ -469,6 +469,20 @@ function ApprovalsSection({ approvals, booking }: { approvals: TransactionApprov
         <DecisionCard stage="Rejected or Cancelled" verb="Cancelled"
           actor={approvals.cancelled} pendingLabel="Cancelled — by whom was not recorded." />
       )}
+      {(approvals.completion || String(booking.status ?? '').toLowerCase() === 'delivered') && (
+        <DecisionCard stage="Completion" verb="Confirmed complete"
+          actor={approvals.completion && !approvals.completion.auto ? approvals.completion : null}
+          pendingLabel={approvals.completion?.auto
+            ? `Completed automatically ${formatDateTime(approvals.completion.at)} — nobody confirmed within 3 days of delivery.`
+            : 'Delivered — awaiting the client’s confirmation.'} />
+      )}
+      {approvals.issue && (
+        <Card>
+          <span className="text-[10px] uppercase tracking-widest" style={{ color: ERROR }}>Problem Reported by the Client</span>
+          <span className="text-[12px] text-white/80 whitespace-pre-wrap">{approvals.issue.note}</span>
+          {approvals.issue.at && <span className="text-[11px]" style={{ color: MUTED }}>{formatDateTime(approvals.issue.at)}</span>}
+        </Card>
+      )}
       {eta && <InfoTile label="Estimated Delivery" value={formatDateTime(eta)} />}
     </Panel>
   )

@@ -25,6 +25,7 @@ import { type BookingStatus, asBookingStatus } from '@/app/types/maps/routemap.t
 import { bookingRef } from '@/lib/booking'
 
 import TransactionDetail from '@/components/transactions/TransactionDetail'
+import CompletionPanel from '@/components/transactions/CompletionPanel'
 import { StatusBadge } from '@/components/transactions/TransactionStatus'
 import {
   formatDate, formatPeso, buildCargoSummary, getDropoffs,
@@ -90,6 +91,7 @@ const TABS: { key: BookingStatus | 'all'; label: string }[] = [
   { key: 'APPROVED',   label: 'Approved' },
   { key: 'ASSIGNED',   label: 'Assigned' },
   { key: 'IN_TRANSIT', label: 'In Transit' },
+  { key: 'DELIVERED',  label: 'Delivered' },
   { key: 'COMPLETED',  label: 'Completed' },
   { key: 'CANCELLED',  label: 'Cancelled' },
 ]
@@ -565,7 +567,14 @@ export default function BookingHistoryModule() {
 
           {/* Detail */}
           {view === 'detail' && selected && (
-            <TransactionDetail key="detail" booking={selected} />
+            <div key="detail" className="flex flex-col gap-4">
+              {/* Completion is the client's call once the driver is done. */}
+              <CompletionPanel booking={selected} mode="client" onUpdated={(next) => {
+                setSelected(next)
+                setBookings((prev) => prev.map((b) => (b.booking_id === next.booking_id ? next : b)))
+              }} />
+              <TransactionDetail booking={selected} />
+            </div>
           )}
 
         </AnimatePresence>

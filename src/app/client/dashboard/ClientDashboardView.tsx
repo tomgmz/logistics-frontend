@@ -29,10 +29,11 @@ const AMBER    = '#FBBF24'
 const GREEN    = '#3af626'
 
 /** Statuses that mean a shipment is live: accepted, and not yet finished. */
-const ACTIVE_STATUSES: BookingStatus[] = ['APPROVED', 'ASSIGNED', 'IN_TRANSIT']
+const ACTIVE_STATUSES: BookingStatus[] = ['APPROVED', 'ASSIGNED', 'IN_TRANSIT', 'DELIVERED']
 
 /** In-transit first — that is what a client opens the dashboard to look at. */
-const ACTIVE_SORT: Record<string, number> = { IN_TRANSIT: 0, ASSIGNED: 1, APPROVED: 2 }
+// Delivered first: it is the one waiting on the client's confirmation.
+const ACTIVE_SORT: Record<string, number> = { DELIVERED: -1, IN_TRANSIT: 0, ASSIGNED: 1, APPROVED: 2 }
 
 const STATUS_META: Record<BookingStatus, { label: string; color: string; icon: React.ReactNode }> = {
   BOOKED:     { label: 'Booked',     color: CYAN,  icon: <CheckCircle2 size={11} /> },
@@ -41,6 +42,7 @@ const STATUS_META: Record<BookingStatus, { label: string; color: string; icon: R
   ASSIGNED:   { label: 'Assigned',   color: CYAN,  icon: <Truck        size={11} /> },
   IN_TRANSIT: { label: 'In Transit', color: GREEN, icon: <Truck        size={11} /> },
   ARRIVED:    { label: 'Arrived',    color: GREEN, icon: <MapPin       size={11} /> },
+  DELIVERED:  { label: 'Delivered — Please Confirm', color: AMBER, icon: <CheckCircle2 size={11} /> },
   COMPLETED:  { label: 'Completed',  color: CYAN,  icon: <CheckCircle2 size={11} /> },
   CANCELLED:  { label: 'Cancelled',  color: ERROR, icon: <XCircle      size={11} /> },
 }

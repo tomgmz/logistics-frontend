@@ -5,6 +5,8 @@ export type BookingStatus =
   | 'ASSIGNED'
   | 'IN_TRANSIT'
   | 'ARRIVED'
+  // Driver finished every drop-off; waiting on the client's confirmation.
+  | 'DELIVERED'
   | 'COMPLETED'
   | 'CANCELLED'
 
@@ -12,7 +14,7 @@ export function asBookingStatus(raw: string): BookingStatus | 'UNKNOWN' {
   const normalized = raw.replace(/\s+/g, '_').toUpperCase()
   const known: BookingStatus[] = [
     'BOOKED', 'PENDING', 'APPROVED', 'ASSIGNED',
-    'IN_TRANSIT', 'ARRIVED', 'COMPLETED', 'CANCELLED',
+    'IN_TRANSIT', 'ARRIVED', 'DELIVERED', 'COMPLETED', 'CANCELLED',
   ]
   return (known as string[]).includes(normalized)
     ? (normalized as BookingStatus)

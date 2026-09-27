@@ -57,6 +57,7 @@ const TABS: { key: string; label: string }[] = [
   { key: 'approved',   label: 'Approved' },
   { key: 'assigned',   label: 'Assigned' },
   { key: 'in_transit', label: 'In Transit' },
+  { key: 'delivered',  label: 'Delivered' },
   { key: 'completed',  label: 'Completed' },
   { key: 'cancelled',  label: 'Cancelled' },
 ]
