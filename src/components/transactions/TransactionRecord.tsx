@@ -7,11 +7,12 @@ import {
 } from 'lucide-react'
 
 import type { BookingWithRelations } from '@/lib/store/slice/routeMap.slice'
-import { BLOWBAGETS_ITEMS } from '@/lib/blowbagets'
 import { getApiErrorMessage } from '@/lib/api-error'
+import { roleLabel } from '@/lib/roles'
 import {
   transactionHistoryService,
-  type RecordInspection, type RecordReport, type RecordTrip, type TransactionRecord as RecordData,
+  type DecisionActor, type RecordInspection, type RecordReport, type RecordTrip,
+  type TransactionApprovals, type TransactionRecord as RecordData,
 } from '@/lib/services/admin/transaction-history.service'
 import { SectionHeader, InfoTile } from './TransactionDetail'
 import { formatDate, formatDateTime } from './transaction-format'
@@ -20,10 +21,10 @@ import { BG_PANEL, BG_CARD, BORDER, BORDER_C, CYAN, MUTED, ERROR, AMBER, GREEN }
 /**
  * The staff-only half of a transaction: everything attached to the booking that
  * the client-facing detail does not show — who drove it and in what, the proof
- * photos from every pickup and drop-off, the vehicle's inspections, the
+ * photos from every pickup and drop-off, the inspection the vehicle passed, the
  * driver's incident reports, the approval trail, and the full cargo lines.
  *
- * The crew, trips, reports and inspections are fetched per booking when the row
+ * The crew, trips, reports and inspection are fetched per booking when the row
  * is opened; the rest is already on the booking row.
  */
 
@@ -268,58 +269,18 @@ function TripsSection({ trips, booking }: { trips: RecordTrip[]; booking: Bookin
   )
 }
 
-function Checklist({ items }: { items: Record<string, boolean> | null | undefined }) {
-  if (!items) return null
-  return (
-    <div className="flex flex-wrap gap-1">
-      {BLOWBAGETS_ITEMS.map((it) => {
-        const ok = items[it.key] === true
-        return (
-          <span key={it.key} title={it.label}
-            className="text-[10px] font-bold px-1.5 py-0.5 rounded border"
-            style={ok
-              ? { color: GREEN, borderColor: `${GREEN}44`, background: `${GREEN}10` }
-              : { color: ERROR, borderColor: `${ERROR}44`, background: `${ERROR}10` }}>
-            {it.label}
-          </span>
-        )
-      })}
-    </div>
-  )
-}
-
-function InspectionsSection({ inspections, booking }: { inspections: RecordInspection[]; booking: Booking }) {
-  // Inspection recorded on the booking itself, before inspections moved to the vehicle.
-  const legacy = booking.blowbagets_check as { items?: Record<string, boolean>; checked_at?: string } | null | undefined
-  if (inspections.length === 0 && !legacy?.items) return null
-
+/**
+ * Only the pass the vehicle was assigned on — the latest passed BLOWBAGETS
+ * inspection before it went onto this booking. Later inspections belong to the
+ * vehicle's own history, not to this transaction.
+ */
+function InspectionSection({ inspection }: { inspection: RecordInspection | null }) {
   return (
     <Panel>
-      <SectionHeader icon={<ShieldCheck size={15} />} title="Vehicle Inspections (BLOWBAGETS)" />
-      {legacy?.items && (
-        <Card>
-          <span className="text-[11px] text-white/70">
-            Recorded on the booking{legacy.checked_at ? ` · ${formatDateTime(legacy.checked_at)}` : ''}
-          </span>
-          <Checklist items={legacy.items} />
-        </Card>
-      )}
-      {inspections.map((i) => (
-        <Card key={i.inspection_id}>
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] text-white/70">
-              {formatDateTime(i.inspected_at)}
-              {fullName(i.inspector) ? ` · ${fullName(i.inspector)}` : ''}
-            </span>
-            <span className="text-[10px] font-bold uppercase tracking-wider"
-              style={{ color: i.passed ? GREEN : ERROR }}>
-              {i.passed ? 'Passed' : 'Failed'}
-            </span>
-          </div>
-          <Checklist items={i.items} />
-          {i.notes && <p className="text-[11px] text-white/60">{i.notes}</p>}
-        </Card>
-      ))}
+      <SectionHeader icon={<ShieldCheck size={15} />} title="Vehicle Inspection (BLOWBAGETS)" />
+      {inspection
+        ? <InfoTile label="Passed Inspection" value={formatDateTime(inspection.inspected_at)} />
+        : <NoPhoto label="No passed inspection on file before this assignment." />}
     </Panel>
   )
 }
@@ -439,26 +400,76 @@ function CargoLinesSection({ booking }: { booking: Booking }) {
   )
 }
 
-function ApprovalsSection({ booking }: { booking: Booking }) {
-  const rows: [string, unknown][] = [
-    ['General Manager', booking.gm_status],
-    ['Operations',      booking.ops_status],
-    ['Fleet',           booking.fleet_status],
-  ]
-  const cancelledAt = booking.cancelled_at as string | null | undefined
-  const eta         = booking.estimated_delivery as string | null | undefined
+function DecisionCard({ stage, verb, actor, pendingLabel, note }: {
+  stage:        string
+  verb:         string
+  actor:        DecisionActor | null
+  pendingLabel: string
+  note?:        string | null
+}) {
+  return (
+    <Card>
+      <span className="text-[10px] uppercase tracking-widest" style={{ color: MUTED }}>{stage}</span>
+      {actor ? (
+        <>
+          <span className="text-sm font-bold text-white">
+            {verb} by {actor.name ?? 'an unknown user'}
+          </span>
+          <span className="text-[11px]" style={{ color: MUTED }}>
+            {actor.role ? roleLabel(actor.role) : 'Role not recorded'}
+            {actor.at ? ` · ${formatDateTime(actor.at)}` : ''}
+          </span>
+          {note && <span className="text-[11px]" style={{ color: AMBER }}>{note}</span>}
+        </>
+      ) : (
+        <span className="text-[12px]" style={{ color: 'rgba(255,255,255,0.45)' }}>{pendingLabel}</span>
+      )}
+    </Card>
+  )
+}
+
+function ApprovalsSection({ approvals, booking }: { approvals: TransactionApprovals; booking: Booking }) {
+  // No fleet stage: fleet_status stopped being written when that approval was
+  // retired (20260821000000_gm_first_approval_flow), so it reads 'pending' forever.
+  const gmStatus  = String(booking.gm_status ?? '').toLowerCase()
+  const opsStatus = String(booking.ops_status ?? '').toLowerCase()
+  const cancelled = String(booking.status ?? '').toLowerCase() === 'cancelled'
+  const eta       = booking.estimated_delivery as string | null | undefined
+
+  const review    = approvals.review
+  const rejected  = (review?.outcome ?? gmStatus) === 'rejected'
+  // The Company Administrator approves on their own authority when the General
+  // Manager isn't available; say so, so nobody reads it as the GM's decision.
+  const proxyNote = review?.role === 'admin' ? 'Decided by the Company Administrator in place of the General Manager.' : null
+
+  const reviewPending = gmStatus === 'approved' || gmStatus === 'rejected'
+    ? `${humanize(gmStatus)} — approver not recorded (decided before approvals were tracked).`
+    : 'Awaiting approval.'
+  const assignPending = opsStatus === 'assigned'
+    ? 'Assigned — assigner not recorded (assigned before assignments were tracked).'
+    : 'Driver and vehicle not yet assigned.'
+
+  // A Company Administrator rejection is recorded as a cancellation, not a
+  // General Manager decision.
+  const showCancel = cancelled && !rejected
+
   return (
     <Panel>
       <SectionHeader icon={<ClipboardCheck size={15} />} title="Approvals" />
-      <div className="grid grid-cols-3 gap-3">
-        {rows.map(([label, v]) => <InfoTile key={label} label={label} value={humanize(v as string | null)} />)}
-      </div>
-      {(eta || cancelledAt) && (
-        <div className="grid grid-cols-2 gap-3 pt-2 border-t" style={{ borderColor: BORDER }}>
-          {eta && <InfoTile label="Estimated Delivery" value={formatDateTime(eta)} />}
-          {cancelledAt && <InfoTile label="Cancelled" value={formatDateTime(cancelledAt)} />}
-        </div>
+      {/* Turned down before any approval: the cancellation card says it all. */}
+      {!(showCancel && !review && gmStatus !== 'approved') && (
+        <DecisionCard stage="Approval" verb={rejected ? 'Rejected' : 'Approved'}
+          actor={review} pendingLabel={reviewPending} note={proxyNote} />
       )}
+      {!rejected && !(showCancel && !approvals.assignment) && (
+        <DecisionCard stage="Operations Manager" verb="Driver and vehicle assigned"
+          actor={approvals.assignment} pendingLabel={assignPending} />
+      )}
+      {showCancel && (
+        <DecisionCard stage="Rejected or Cancelled" verb="Cancelled"
+          actor={approvals.cancelled} pendingLabel="Cancelled — by whom was not recorded." />
+      )}
+      {eta && <InfoTile label="Estimated Delivery" value={formatDateTime(eta)} />}
     </Panel>
   )
 }
@@ -498,13 +509,13 @@ export default function TransactionRecord({ booking }: { booking: Booking }) {
         <>
           <CrewSection record={record} booking={booking} />
           <TripsSection trips={record.trips} booking={booking} />
-          <InspectionsSection inspections={record.inspections} booking={booking} />
+          {record.delivery?.trucks && <InspectionSection inspection={record.inspection} />}
           <ReportsSection reports={record.reports} />
+          <ApprovalsSection approvals={record.approvals} booking={booking} />
         </>
       )}
       <CustomerSection booking={booking} />
       <CargoLinesSection booking={booking} />
-      <ApprovalsSection booking={booking} />
     </div>
   )
 }

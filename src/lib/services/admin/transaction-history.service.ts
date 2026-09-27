@@ -146,11 +146,29 @@ export interface RecordInspection {
   inspector?:    { first_name?: string; last_name?: string } | null
 }
 
+export interface DecisionActor {
+  name: string | null
+  /** users.role the person acted in, e.g. 'general_manager' or 'admin'. */
+  role: string | null
+  at:   string | null
+}
+
+export interface TransactionApprovals {
+  /** Approve/reject: the General Manager, or the Company Administrator in their place. */
+  review:     (DecisionActor & { outcome: string | null }) | null
+  /** Who assigned the driver and vehicle. */
+  assignment: DecisionActor | null
+  /** A cancellation or Company Administrator rejection. */
+  cancelled:  DecisionActor | null
+}
+
 export interface TransactionRecord {
   delivery:    RecordDelivery | null
   trips:       RecordTrip[]
   reports:     RecordReport[]
-  inspections: RecordInspection[]
+  /** The passed inspection the vehicle was assigned on, if any. */
+  inspection:  RecordInspection | null
+  approvals:   TransactionApprovals
 }
 
 interface ApiResponse<T> {
@@ -203,7 +221,7 @@ export const transactionHistoryService = {
     return data.data ?? []
   },
 
-  /** Crew, vehicle, trip proof, reports and inspections for one booking. */
+  /** Crew, vehicle, trip proof, reports and inspection for one booking. */
   record: async (bookingId: string): Promise<TransactionRecord> => {
     const { data } = await proxyApi.get<ApiResponse<TransactionRecord>>(
       `${B}/${encodeURIComponent(bookingId)}/record`,
