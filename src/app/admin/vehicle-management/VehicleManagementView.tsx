@@ -99,6 +99,8 @@ const ModelThumb = memo(function ModelThumb({
 
 const STATUSES: Truck['status'][] = [
   'available',
+  // Back from a job; set by the driver's return, lifted by the next passing BLOWBAGETS.
+  'recheck_due',
   'in_use',
   'under_maintenance',
   'inactive',
@@ -110,6 +112,7 @@ const STATUSES: Truck['status'][] = [
 const EDITABLE_STATUSES = STATUSES.filter((s) => s !== 'archived')
 
 function fmtLabel(s: string) {
+  if (s === 'recheck_due') return 'Re-check Due'
   return (s ?? '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
@@ -119,6 +122,8 @@ function statusStyle(status: string): { bg: string; color: string; border: strin
       return { bg: 'rgba(58,246,38,0.12)', color: '#86efac', border: 'rgba(58,246,38,0.35)' }
     case 'in_use':
       return { bg: 'rgba(77,249,237,0.12)', color: 'var(--color-cyan)', border: 'rgba(77,249,237,0.35)' }
+    case 'recheck_due':
+      return { bg: 'rgba(250,204,21,0.12)', color: '#fde047', border: 'rgba(250,204,21,0.35)' }
     case 'under_maintenance':
       return { bg: 'rgba(246,159,38,0.12)', color: '#fbbf24', border: 'rgba(246,159,38,0.35)' }
     case 'inactive':

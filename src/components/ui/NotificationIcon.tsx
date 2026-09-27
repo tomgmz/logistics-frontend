@@ -32,6 +32,7 @@ const ACTIONABLE_TYPES = new Set([
   "booking.ops_pending",
   "booking.assigned",
   "booking.fleet_recheck",
+  "booking.vehicle_returned",
   "driver.emergency",
   "driver.report",
   "auth.password_reset_requested",
@@ -67,6 +68,7 @@ const VALUE_LABELS: Record<string, Record<string, string>> = {
     assigned:         "Assigned to driver",
     vehicle_assigned: "Vehicle assigned",
     fleet_recheck:    "Vehicle re-check due",
+    vehicle_returned: "Vehicle back — re-check due",
   },
   window: {
     day_before: "Day before dispatch",

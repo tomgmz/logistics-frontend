@@ -34,7 +34,7 @@ export interface Truck {
   vehicle_type: string | null
   model_name:   string | null
   truck_model?: TruckModel | null
-  status:       'available' | 'in_use' | 'under_maintenance' | 'inactive' | 'archived'
+  status:       'available' | 'recheck_due' | 'in_use' | 'under_maintenance' | 'inactive' | 'archived'
   // Most recent inspection, or null when the vehicle has never been inspected
   // (which reads the same as a fail: it can't be assigned).
   latest_inspection?: TruckInspection | null
@@ -94,7 +94,7 @@ export interface CreateTruckInput {
 export interface UpdateTruckInput {
   plate_number?: string
   model_id?:     string | null
-  status?:       'available' | 'in_use' | 'under_maintenance' | 'inactive' | 'archived'
+  status?:       'available' | 'recheck_due' | 'in_use' | 'under_maintenance' | 'inactive' | 'archived'
   /** `null` unpairs the vehicle; absent leaves the pairing untouched. */
   assigned_driver_id?: string | null
 }
