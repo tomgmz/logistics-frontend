@@ -54,10 +54,12 @@ export function InfoTile({ label, value, accent, mono }: {
   )
 }
 
-export default function TransactionDetail({ booking, animated = true }: {
+export default function TransactionDetail({ booking, animated = true, showCrew = true }: {
   booking: BookingWithRelations
   /** Off when the container already animates, so the panel doesn't slide twice. */
   animated?: boolean
+  /** Off on the staff page, whose full record carries a fuller crew section. */
+  showCrew?: boolean
 }) {
   const dropoffs    = getDropoffs(booking)
   const driverName  = getDriverName(booking)
@@ -168,7 +170,7 @@ export default function TransactionDetail({ booking, animated = true }: {
       </div>
 
       {/* Driver & truck */}
-      {(driverName || plateNumber) && (
+      {showCrew && (driverName || plateNumber) && (
         <div className="rounded-xl border p-4 flex flex-col gap-3"
           style={{ background: BG_PANEL, borderColor: BORDER }}>
           <SectionHeader icon={<Truck size={15} />} title="Assigned Driver & Truck" />

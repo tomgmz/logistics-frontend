@@ -63,7 +63,94 @@ export interface ExportRow {
   origin:           string | null
   destinations:     string | null
   truck_type:       string | null
+  driver_name:      string | null
+  vehicle_plate:    string | null
+  vehicle_type:     string | null
+  vendor_name:      string | null
   total_cost:       number | null
+}
+
+/** One run's proof at a drop-off. */
+export interface RecordTripStop {
+  trip_stop_id:          string
+  sequence_order:        number
+  status:                string
+  delivered_at:          string | null
+  proof_photo_url:       string | null
+  proof_at:              string | null
+  proof_distance_m:      number | null
+  proof_override_reason: string | null
+  booking_destinations?: { address?: string | null } | null
+}
+
+export interface RecordTrip {
+  trip_id:                      string
+  trip_number:                  number
+  status:                       string
+  notes:                        string | null
+  pickup_proof_photo_url:       string | null
+  pickup_proof_at:              string | null
+  pickup_proof_distance_m:      number | null
+  pickup_proof_override_reason: string | null
+  booking_trip_stops:           RecordTripStop[]
+}
+
+export interface RecordDelivery {
+  status:                string
+  pickup_time:           string | null
+  delivery_time:         string | null
+  created_at:            string
+  is_vendor_supplied:    boolean
+  vendor_name:           string | null
+  vendor_contact:        string | null
+  vendor_driver_name:    string | null
+  vendor_driver_license: string | null
+  vendor_driver_phone:   string | null
+  vendor_driver_email:   string | null
+  vendor_vehicle_plate:  string | null
+  vendor_vehicle_type:   string | null
+  drivers?: {
+    license_number?: string | null
+    license_expiry?: string | null
+    users?: { first_name?: string; last_name?: string; phone?: string | null; email?: string | null } | null
+  } | null
+  trucks?: {
+    plate_number?: string | null
+    truck_models?: { name?: string | null; vehicle_type?: string | null } | null
+  } | null
+}
+
+export interface RecordReport {
+  report_id:         string
+  source:            'quick' | 'detailed'
+  incident_type:     string | null
+  sub_type:          string | null
+  description:       string | null
+  photo_urls:        string[]
+  video_urls:        string[]
+  address:           string | null
+  trip_can_continue: boolean | null
+  status:            string
+  resolution_note:   string | null
+  resolved_at:       string | null
+  created_at:        string
+  drivers?: { users?: { first_name?: string; last_name?: string } | null } | null
+}
+
+export interface RecordInspection {
+  inspection_id: string
+  items:         Record<string, boolean>
+  passed:        boolean
+  notes:         string | null
+  inspected_at:  string
+  inspector?:    { first_name?: string; last_name?: string } | null
+}
+
+export interface TransactionRecord {
+  delivery:    RecordDelivery | null
+  trips:       RecordTrip[]
+  reports:     RecordReport[]
+  inspections: RecordInspection[]
 }
 
 interface ApiResponse<T> {
@@ -116,6 +203,14 @@ export const transactionHistoryService = {
     return data.data ?? []
   },
 
+  /** Crew, vehicle, trip proof, reports and inspections for one booking. */
+  record: async (bookingId: string): Promise<TransactionRecord> => {
+    const { data } = await proxyApi.get<ApiResponse<TransactionRecord>>(
+      `${B}/${encodeURIComponent(bookingId)}/record`,
+    )
+    return data.data
+  },
+
   // Returns rows, not a file. The Next proxy re-serialises every response as
   // JSON, so the CSV itself is assembled in the browser.
   exportRows: async (
@@ -139,6 +234,10 @@ const CSV_COLUMNS: { key: keyof ExportRow; label: string; date?: true }[] = [
   { key: 'origin',           label: 'Pick Up' },
   { key: 'destinations',     label: 'Drop Offs' },
   { key: 'truck_type',       label: 'Truck Type' },
+  { key: 'driver_name',      label: 'Driver' },
+  { key: 'vehicle_plate',    label: 'Vehicle Plate' },
+  { key: 'vehicle_type',     label: 'Vehicle Type' },
+  { key: 'vendor_name',      label: 'Vendor' },
   { key: 'total_cost',       label: 'Total Cost' },
 ]
 

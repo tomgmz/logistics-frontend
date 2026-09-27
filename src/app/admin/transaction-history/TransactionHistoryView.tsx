@@ -15,6 +15,7 @@ import { appToast } from '@/lib/toast'
 
 import CompanyFilter from '@/components/transactions/CompanyFilter'
 import TransactionDetail from '@/components/transactions/TransactionDetail'
+import TransactionRecord from '@/components/transactions/TransactionRecord'
 import { StatusBadge, getStatusMeta } from '@/components/transactions/TransactionStatus'
 import {
   formatDate, formatPeso, formatPesoExact, getCompanyName, getDropoffs,
@@ -487,7 +488,8 @@ export default function TransactionHistoryView() {
           </div>
         </div>
 
-        {/* Detail panel — the same view the client sees for this transaction. */}
+        {/* Detail panel — the client's view of the transaction, then the full
+            staff record under it. */}
         <AnimatePresence>
           {selected && (
             <>
@@ -518,7 +520,9 @@ export default function TransactionHistoryView() {
                 </div>
                 <div className="min-h-0 flex-1 overflow-auto p-4">
                   {/* The drawer already slides, so the body must not slide too. */}
-                  <TransactionDetail booking={selected} animated={false} />
+                  <TransactionDetail booking={selected} animated={false} showCrew={false} />
+                  {/* Staff-only: crew, vehicle, proof photos, inspections, reports. */}
+                  <TransactionRecord key={selected.booking_id as string} booking={selected} />
                 </div>
               </motion.aside>
             </>
