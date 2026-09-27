@@ -59,9 +59,10 @@ export async function adminUpdateTruck(truckId: string, body: UpdateTruckInput):
   return data.data
 }
 
-export async function adminDeleteTruck(truckId: string): Promise<void> {
+/** Retire a vehicle. Refused (409) while it is out on a booking. */
+export async function adminArchiveTruck(truckId: string): Promise<void> {
   await initCsrf()
-  await authApi.delete(`${ADMIN}/trucks/${truckId}`)
+  await authApi.post(`${ADMIN}/trucks/${truckId}/archive`)
 }
 
 // --- BLOWBAGETS vehicle inspections ----------------------------------------
@@ -122,7 +123,8 @@ export async function adminUpdateTruckModel(modelId: string, body: UpdateTruckMo
   return data.data
 }
 
-export async function adminDeleteTruckModel(modelId: string): Promise<void> {
+/** Hide a model from the catalog. Refused (409) while active vehicles use it. */
+export async function adminArchiveTruckModel(modelId: string): Promise<void> {
   await initCsrf()
-  await authApi.delete(`${ADMIN}/truck-models/${modelId}`)
+  await authApi.post(`${ADMIN}/truck-models/${modelId}/archive`)
 }

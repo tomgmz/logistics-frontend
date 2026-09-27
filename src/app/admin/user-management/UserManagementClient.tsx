@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Users, UserPlus, Search, RefreshCw, MoreVertical,
-  Pencil, ShieldCheck, ShieldOff, Archive,
+  Pencil, Eye, ShieldCheck, ShieldOff, Archive,
   ChevronLeft, ChevronRight, AlertTriangle, ArrowLeftRight,
 } from 'lucide-react'
 import Select, { SelectChangeEvent } from '@mui/material/Select'
@@ -82,7 +82,8 @@ async function updateStatus(tab: UserMgmtTab, id: string, status: UserStatus): P
 }
 
 function tabFromRole(role: string): UserMgmtTab {
-  if (role === 'driver') return 'drivers'
+  if (role === 'driver')   return 'drivers'
+  if (role === 'it_admin') return 'it-admins'
   return 'clients'
 }
 
@@ -119,13 +120,14 @@ function StatusBadge({ status }: { status: UserStatus }) {
 interface RowMenuProps {
   user: AnyUser
   tab: TabValue
+  onView: () => void
   onEdit: () => void
   onStatusChange: (s: UserStatus) => void
   /** Someone else has this account open for editing: no actions until they finish. */
   lockedBy?: string
 }
 
-function RowMenu({ user, tab, onEdit, onStatusChange, lockedBy }: RowMenuProps) {
+function RowMenu({ user, tab, onView, onEdit, onStatusChange, lockedBy }: RowMenuProps) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -145,7 +147,21 @@ function RowMenu({ user, tab, onEdit, onStatusChange, lockedBy }: RowMenuProps) 
 
   const canEdit = tab !== 'all'
 
-  if (lockedBy) return <RecordLockBadge holder={lockedBy} />
+  // Viewing is read-only, so it stays available while someone else is editing.
+  if (lockedBy) {
+    return (
+      <div className="flex items-center justify-end gap-1.5">
+        <RecordLockBadge holder={lockedBy} />
+        <button
+          onClick={onView}
+          title="View Details"
+          className="rounded-md p-1.5 text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white"
+        >
+          <Eye size={15} />
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div ref={ref} className="relative">
@@ -165,6 +181,12 @@ function RowMenu({ user, tab, onEdit, onStatusChange, lockedBy }: RowMenuProps) 
             className="absolute right-0 top-8 z-50 w-48 rounded-xl border border-[#2a2a2a] bg-[#1b1b1b] py-1 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
+            <button
+              onClick={() => { setOpen(false); onView() }}
+              className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white"
+            >
+              <Eye size={13} /> View Details
+            </button>
             {canEdit && (
               <button
                 onClick={() => { setOpen(false); onEdit() }}
@@ -175,7 +197,7 @@ function RowMenu({ user, tab, onEdit, onStatusChange, lockedBy }: RowMenuProps) 
             )}
             {statusActions.length > 0 && (
               <>
-                {canEdit && <div className="my-1 border-t border-[#2a2a2a]" />}
+                <div className="my-1 border-t border-[#2a2a2a]" />
                 {statusActions.map((a) => (
                   <button
                     key={a.status}
@@ -357,6 +379,7 @@ export default function UserManagementClient() {
   const [serverTotalPages, setServerTotalPages] = useState(1)
   const [showForm,         setShowForm]         = useState(false)
   const [editUser,         setEditUser]         = useState<AnyUser | null>(null)
+  const [formViewOnly,     setFormViewOnly]     = useState(false)
   const userLocks = useRecordLocks('user')
   const [formTab,          setFormTab]          = useState<UserMgmtTab>('clients')
   const [showTransition,   setShowTransition]   = useState(false)
@@ -495,18 +518,20 @@ export default function UserManagementClient() {
     } catch { /* handled by toast */ }
   }
 
-  function openEdit(user: AnyUser) {
+  function openEdit(user: AnyUser, viewOnly = false) {
     const tab = activeTab === 'clients' || activeTab === 'drivers'
       ? activeTab
       : tabFromRole(user.role)
     setFormTab(tab)
     setEditUser(user)
+    setFormViewOnly(viewOnly)
     setShowForm(true)
   }
 
   function openCreate() {
     setFormTab(activeTab === 'clients' || activeTab === 'drivers' ? activeTab : 'clients')
     setEditUser(null)
+    setFormViewOnly(false)
     setShowForm(true)
   }
 
@@ -718,6 +743,7 @@ export default function UserManagementClient() {
                             <RowMenu
                               user={user}
                               tab={activeTab}
+                              onView={() => openEdit(user, true)}
                               onEdit={() => openEdit(user)}
                               onStatusChange={(s) => handleStatusChange(user, s)}
                               lockedBy={userLocks.get(user.user_id)}
@@ -784,6 +810,10 @@ export default function UserManagementClient() {
         <UserFormModal
           tab={formTab}
           user={editUser}
+          startInView={formViewOnly}
+          // Same rule as the row menu: the combined list can't open the edit form.
+          canEdit={activeTab !== 'all'}
+          lockedBy={editUser ? userLocks.get(editUser.user_id) : undefined}
           onClose={() => setShowForm(false)}
           onSaved={async () => {
             setShowForm(false)

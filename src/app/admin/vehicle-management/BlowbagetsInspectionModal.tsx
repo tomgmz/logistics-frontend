@@ -14,6 +14,7 @@ import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { useRecordLock } from '@/lib/hooks/useRecordLock'
 import RecordLockBanner from '@/components/ui/RecordLockBanner'
+import ReusableModal from '@/components/layout/ReusableModal'
 
 /**
  * The fleet manager's BLOWBAGETS inspection of one vehicle.
@@ -47,6 +48,9 @@ export default function BlowbagetsInspectionModal({
   const [checked, setChecked] = useState<Record<string, boolean>>({})
   const [notes,   setNotes]   = useState('')
   const [busy,    setBusy]    = useState(false)
+  // Recording decides whether operations can assign the vehicle, so it is
+  // confirmed like every other decision on this screen.
+  const [confirmOpen, setConfirmOpen] = useState(false)
   const [history, setHistory] = useState<TruckInspection[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
 
@@ -63,6 +67,7 @@ export default function BlowbagetsInspectionModal({
   useEffect(() => {
     setChecked({})
     setNotes('')
+    setConfirmOpen(false)
     if (!truck) return
 
     let cancelled = false
@@ -84,6 +89,7 @@ export default function BlowbagetsInspectionModal({
         notes: notes.trim() || null,
       })
       setHistory((prev) => [inspection, ...prev])
+      setConfirmOpen(false)
       onRecorded(inspection)
       appToast.success(
         inspection.passed
@@ -93,6 +99,7 @@ export default function BlowbagetsInspectionModal({
       )
       onClose()
     } catch (e) {
+      setConfirmOpen(false)
       appToast.error(getApiErrorMessage(e, 'Request failed. Please try again.'), {
         action: 'truck-inspection', entityId: truck.truck_id,
       })
@@ -102,6 +109,21 @@ export default function BlowbagetsInspectionModal({
   }
 
   return (
+    <>
+    <ReusableModal
+      open={!!truck && confirmOpen}
+      title={willPass ? 'Approve vehicle?' : 'Record failed inspection?'}
+      description={truck
+        ? willPass
+          ? `All ${total} BLOWBAGETS items passed. ${truck.plate_number} will be cleared for the Operations Manager to assign.`
+          : `${total - doneCount} of ${total} items were left unticked. ${truck.plate_number} will be recorded as failed, taken out of service, and blocked from assignment until it passes a re-check.`
+        : undefined}
+      confirmLabel={busy ? 'Recording…' : willPass ? 'Approve' : 'Record fail'}
+      cancelLabel="Cancel"
+      disableBackdropClose={busy}
+      onCancel={() => { if (!busy) setConfirmOpen(false) }}
+      onConfirm={() => { if (!busy) void submit() }}
+    />
     <AnimatePresence>
       {truck && (
         <>
@@ -289,7 +311,7 @@ export default function BlowbagetsInspectionModal({
               <button
                 type="button"
                 disabled={busy || lock.readOnly}
-                onClick={() => void submit()}
+                onClick={() => setConfirmOpen(true)}
                 className="flex-1 py-2 rounded-lg text-sm font-bold transition-colors disabled:opacity-40"
                 style={
                   willPass
@@ -304,5 +326,6 @@ export default function BlowbagetsInspectionModal({
         </>
       )}
     </AnimatePresence>
+    </>
   )
 }

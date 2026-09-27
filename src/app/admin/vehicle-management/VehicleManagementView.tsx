@@ -1,13 +1,14 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState, memo } from 'react'
+import { useCallback, useEffect, useMemo, useState, memo, type ReactNode } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Search,
   RefreshCw,
   Plus,
   Pencil,
-  Trash2,
+  Archive,
+  Eye,
   ChevronLeft,
   ChevronRight,
   X,
@@ -16,13 +17,13 @@ import {
   ClipboardCheck,
 } from 'lucide-react'
 
-import { assignedDriverName, needsReinspection, type Truck, type TruckInspection, type CreateTruckInput, type UpdateTruckInput } from '@/app/types/truck.types'
+import { assignedDriverName, isRoadworthy, needsReinspection, type Truck, type TruckInspection, type CreateTruckInput, type UpdateTruckInput } from '@/app/types/truck.types'
 import type { TruckModel } from '@/app/types/truck-model'
 import {
   adminFetchTrucksPaginated,
   adminCreateTruck,
   adminUpdateTruck,
-  adminDeleteTruck,
+  adminArchiveTruck,
   adminFetchTruckModels,
 } from '@/lib/services/admin/trucks.service'
 import { driverService } from '@/lib/services/admin/user-management.service'
@@ -33,6 +34,7 @@ import TruckModelFormModal from './TruckModelFormModal'
 import BlowbagetsInspectionModal from './BlowbagetsInspectionModal'
 import { useRecordLock, useRecordLocks } from '@/lib/hooks/useRecordLock'
 import RecordLockBanner, { RecordLockBadge } from '@/components/ui/RecordLockBanner'
+import RowActionMenu, { type RowAction } from '@/components/ui/RowActionMenu'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 
@@ -103,6 +105,10 @@ const STATUSES: Truck['status'][] = [
   'archived',
 ]
 
+// What the edit form may set. Archiving has its own action (it also releases the
+// driver pairing and is refused mid-booking), so it is not a status pick.
+const EDITABLE_STATUSES = STATUSES.filter((s) => s !== 'archived')
+
 function fmtLabel(s: string) {
   return (s ?? '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
@@ -131,7 +137,7 @@ function kgToTons(kg: number | null | undefined): string {
 }
 
 type FormMode    = 'create' | 'edit' | null
-type ConfirmKind = 'save' | 'delete' | null
+type ConfirmKind = 'save' | 'archive' | null
 
 interface TruckFormState {
   plate_number: string
@@ -229,6 +235,135 @@ function InspectionBadge({ inspection, dueRecheck }: { inspection: TruckInspecti
   )
 }
 
+function fmtDate(iso: string | null | undefined): string {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString()
+}
+
+function DetailRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex items-start justify-between gap-4 py-2 border-b border-white/[0.05] last:border-0">
+      <span className="text-[11px] font-bold uppercase tracking-wide text-white/40 shrink-0">{label}</span>
+      <span className="text-sm text-white/80 text-right min-w-0 break-words">{children}</span>
+    </div>
+  )
+}
+
+/** Read-only view of one vehicle — nothing here writes. */
+function VehicleDetailsModal({
+  truck,
+  onClose,
+  onUpdate,
+}: {
+  truck:    Truck | null
+  onClose:  () => void
+  /** Offered only when the viewer may edit and the vehicle is not archived. */
+  onUpdate?: (t: Truck) => void
+}) {
+  return (
+    <AnimatePresence>
+      {truck && (
+        <motion.div
+          className="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-black/65"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={onClose}
+        >
+          <motion.div
+            initial={{ y: 12, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 12, opacity: 0 }}
+            transition={{ type: 'spring', damping: 26, stiffness: 280 }}
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Details for ${truck.plate_number}`}
+            className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-white/10 bg-[var(--color-surface)] shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.07]">
+              <h2 className="text-sm font-bold text-white uppercase tracking-widest">Vehicle details</h2>
+              <button type="button" onClick={onClose} className="p-2 rounded-lg hover:bg-white/5 text-white/50" aria-label="Close">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-4">
+              <div className="flex gap-3 items-center">
+                <ModelThumb
+                  imageUrl={resolveModelImageUrl((truck.truck_model?.image_url as string | null | undefined) ?? null)}
+                  label={truck.truck_model?.name ?? 'Vehicle'}
+                  size={88}
+                />
+                <div className="min-w-0">
+                  <p className="text-lg font-mono font-bold text-white tracking-widest">{truck.plate_number}</p>
+                  <p className="text-xs text-white/50 truncate">
+                    {truck.truck_model?.name ?? 'No model'}
+                    {truck.truck_model?.vehicle_type ? ` · ${truck.truck_model.vehicle_type}` : ''}
+                  </p>
+                  <span
+                    className="inline-flex mt-1.5 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border"
+                    style={{ color: statusStyle(truck.status).color, borderColor: statusStyle(truck.status).border, background: statusStyle(truck.status).bg }}
+                  >
+                    {fmtLabel(truck.status)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-white/[0.08] bg-black/20 px-3">
+                <DetailRow label="Max weight">
+                  {truck.truck_model?.max_weight_kg != null
+                    ? `${truck.truck_model.max_weight_kg.toLocaleString()} kg · ${kgToTons(truck.truck_model.max_weight_kg)} t`
+                    : '—'}
+                </DetailRow>
+                <DetailRow label="Max volume">
+                  {truck.truck_model?.max_volume_cbm != null ? `${truck.truck_model.max_volume_cbm} cbm` : '—'}
+                </DetailRow>
+                <DetailRow label="Cargo bed (mm)">{truck.truck_model?.dimension_mm ?? '—'}</DetailRow>
+                <DetailRow label="Regular driver">
+                  {assignedDriverName(truck) ?? <span className="text-white/35">Unassigned</span>}
+                  {truck.assigned_driver?.license_number && (
+                    <span className="block text-[10px] text-white/35 font-mono">{truck.assigned_driver.license_number}</span>
+                  )}
+                </DetailRow>
+                <DetailRow label="BLOWBAGETS">
+                  <span className="inline-flex justify-end">
+                    <InspectionBadge inspection={truck.latest_inspection ?? null} dueRecheck={needsReinspection(truck)} />
+                  </span>
+                </DetailRow>
+                <DetailRow label="Last back in yard">{fmtDate(truck.last_fleet_return_at)}</DetailRow>
+                <DetailRow label="Added">{fmtDate(truck.created_at)}</DetailRow>
+                <DetailRow label="Last updated">{fmtDate(truck.updated_at)}</DetailRow>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 px-4 py-3 border-t border-white/[0.07]">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 rounded-lg border border-white/15 text-sm text-white/80 hover:bg-white/5"
+              >
+                Close
+              </button>
+              {onUpdate && truck.status !== 'archived' && (
+                <button
+                  type="button"
+                  onClick={() => onUpdate(truck)}
+                  className="px-4 py-2 rounded-lg text-sm font-bold text-black"
+                  style={{ background: 'var(--color-cyan)' }}
+                >
+                  Update Details
+                </button>
+              )}
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+}
+
 export default function VehicleManagementView() {
   const [trucks,  setTrucks]  = useState<Truck[]>([])
   const [models,  setModels]  = useState<TruckModel[]>([])
@@ -260,11 +395,13 @@ export default function VehicleManagementView() {
 
   const [confirmKind, setConfirmKind] = useState<ConfirmKind>(null)
   const [actionBusy,  setActionBusy]  = useState(false)
-  const [deleteId,    setDeleteId]    = useState<string | null>(null)
+  const [archiveTarget, setArchiveTarget] = useState<Truck | null>(null)
+  const [viewTruck,     setViewTruck]     = useState<Truck | null>(null)
 
   const [modelModalOpen, setModelModalOpen] = useState(false)
 
   const isUnchanged = modalMode === 'edit' && formsEqual(form, originalForm)
+  const editingTruck = useMemo(() => trucks.find((t) => t.truck_id === editingId) ?? null, [trucks, editingId])
 
   const loadModels = useCallback(async () => {
     try {
@@ -417,9 +554,9 @@ export default function VehicleManagementView() {
     setConfirmKind('save')
   }
 
-  const handleDeleteClick = (id: string) => {
-    setDeleteId(id)
-    setConfirmKind('delete')
+  const handleArchiveClick = (t: Truck) => {
+    setArchiveTarget(t)
+    setConfirmKind('archive')
   }
 
   const executeSave = async () => {
@@ -457,22 +594,62 @@ export default function VehicleManagementView() {
     }
   }
 
-  const executeDelete = async () => {
-    if (!deleteId) return
+  const executeArchive = async () => {
+    if (!archiveTarget) return
+    const id = archiveTarget.truck_id
     setActionBusy(true)
     try {
-      await adminDeleteTruck(deleteId)
-      appToast.success('Vehicle removed.', { action: 'truck-delete', entityId: deleteId })
-      if (editingId === deleteId) closeModal()
-      setDeleteId(null)
+      await adminArchiveTruck(id)
+      appToast.success(`${archiveTarget.plate_number} archived.`, { action: 'truck-archive', entityId: id })
+      if (editingId === id) closeModal()
+      if (viewTruck?.truck_id === id) setViewTruck(null)
+      setArchiveTarget(null)
       setConfirmKind(null)
       await refreshAll()
     } catch (e) {
-      appToast.error(getApiErrorMessage(e, 'Request failed. Please try again.'), { action: 'truck-delete', entityId: deleteId })
+      appToast.error(getApiErrorMessage(e, 'Request failed. Please try again.'), { action: 'truck-archive', entityId: id })
       setConfirmKind(null)
     } finally {
       setActionBusy(false)
     }
+  }
+
+  // The row's 3-dot menu. Viewing stays open while someone else is editing the
+  // vehicle; everything that writes waits for them.
+  function rowActions(t: Truck): RowAction[] {
+    const archived = t.status === 'archived'
+    const lockedBy = truckLocks.get(t.truck_id)
+    const lockedTitle = lockedBy ? `${lockedBy} is editing this vehicle` : undefined
+    const actions: RowAction[] = [
+      { label: 'View Details', icon: <Eye size={13} />, onSelect: () => setViewTruck(t) },
+    ]
+    if (archived) return actions
+
+    if (canEdit) {
+      actions.push({
+        label: 'Update Details', icon: <Pencil size={13} />, onSelect: () => openEdit(t),
+        disabled: !!lockedBy, title: lockedTitle,
+      })
+      // Only offered while the vehicle is actually blocked on BLOWBAGETS: never
+      // inspected, failed, or back from a booking since its last pass.
+      if (!isRoadworthy(t)) {
+        actions.push({
+          label: 'Approve Vehicle', icon: <ClipboardCheck size={13} />, tone: 'accent',
+          onSelect: () => setInspectTruck(t),
+          disabled: !!lockedBy, title: lockedTitle ?? 'Run the BLOWBAGETS inspection',
+        })
+      }
+    }
+    if (canDelete) {
+      const onBooking = t.status === 'in_use'
+      actions.push({
+        label: 'Archive', icon: <Archive size={13} />, tone: 'warning', separated: true,
+        onSelect: () => handleArchiveClick(t),
+        disabled: !!lockedBy || onBooking,
+        title: lockedTitle ?? (onBooking ? 'Out on a booking — archive it once it is back in the yard' : undefined),
+      })
+    }
+    return actions
   }
 
   const confirmModalProps = useMemo(() => {
@@ -487,17 +664,19 @@ export default function VehicleManagementView() {
         onConfirm:    () => { void executeSave() },
       }
     }
-    if (confirmKind === 'delete') {
+    if (confirmKind === 'archive' && archiveTarget) {
       return {
-        title:        'Delete vehicle?',
-        description:  'This cannot be undone. Active assignments may block deletion.',
-        confirmLabel: actionBusy ? '…' : 'Delete',
-        onConfirm:    () => { void executeDelete() },
+        title:        'Archive vehicle?',
+        description:  `${archiveTarget.plate_number} will be removed from the fleet list and can no longer be assigned to bookings.`
+          + (archiveTarget.assigned_driver_id ? ' Its regular driver will be unpaired.' : '')
+          + ' Its booking and inspection history is kept, and it stays under the Archived filter.',
+        confirmLabel: actionBusy ? 'Archiving…' : 'Archive',
+        onConfirm:    () => { void executeArchive() },
       }
     }
     return null
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [confirmKind, modalMode, form.plate_number, actionBusy])
+  }, [confirmKind, modalMode, form.plate_number, actionBusy, archiveTarget])
 
   return (
     <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-hidden ff-sc bg-[var(--color-bg)]">
@@ -622,7 +801,7 @@ export default function VehicleManagementView() {
                       <th className="px-3 py-2.5 font-bold hidden lg:table-cell">Driver</th>
                       <th className="px-3 py-2.5 font-bold">Status</th>
                       <th className="px-3 py-2.5 font-bold">BLOWBAGETS</th>
-                      <th className="px-3 py-2.5 font-bold text-right w-[140px]">Actions</th>
+                      <th className="px-3 py-2.5 font-bold text-right w-[90px]">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -679,39 +858,11 @@ export default function VehicleManagementView() {
                           <td className="px-3 py-2.5">
                             <InspectionBadge inspection={t.latest_inspection ?? null} dueRecheck={needsReinspection(t)} />
                           </td>
-                          <td className="px-3 py-2.5 text-right">
-                            <RecordLockBadge holder={truckLocks.get(t.truck_id)} />
-                            {canEdit && (
-                              <button
-                                type="button"
-                                onClick={() => setInspectTruck(t)}
-                                className="p-1.5 rounded-md border border-white/10 text-white/70 hover:bg-white/5 mr-1"
-                                title="Run BLOWBAGETS inspection"
-                              >
-                                <ClipboardCheck size={14} />
-                              </button>
-                            )}
-                            {canEdit && (
-                              <button
-                                type="button"
-                                onClick={() => openEdit(t)}
-                                className="p-1.5 rounded-md border border-white/10 text-white/70 hover:bg-white/5 mr-1"
-                                title="Edit"
-                              >
-                                <Pencil size={14} />
-                              </button>
-                            )}
-                            {canDelete && (
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteClick(t.truck_id)}
-                                disabled={truckLocks.has(t.truck_id)}
-                                className="p-1.5 rounded-md border border-red-500/25 text-red-400 hover:bg-red-500/10 disabled:opacity-30"
-                                title="Delete"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            )}
+                          <td className="px-3 py-2.5">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <RecordLockBadge holder={truckLocks.get(t.truck_id)} />
+                              <RowActionMenu label={`Actions for ${t.plate_number}`} actions={rowActions(t)} />
+                            </div>
                           </td>
                         </tr>
                       )
@@ -762,6 +913,21 @@ export default function VehicleManagementView() {
         }}
       />
 
+      <VehicleDetailsModal
+        truck={viewTruck}
+        onClose={() => setViewTruck(null)}
+        onUpdate={canEdit
+          ? (t) => {
+              if (truckLocks.has(t.truck_id)) {
+                appToast.info(`${truckLocks.get(t.truck_id)} is editing this vehicle.`, { action: 'truck-locked', entityId: t.truck_id })
+                return
+              }
+              setViewTruck(null)
+              openEdit(t)
+            }
+          : undefined}
+      />
+
       {/* Model catalog modal */}
       <TruckModelFormModal
         open={modelModalOpen}
@@ -780,7 +946,7 @@ export default function VehicleManagementView() {
         onCancel={() => {
           if (actionBusy) return
           setConfirmKind(null)
-          if (confirmKind === 'delete' && !editingId) setDeleteId(null)
+          if (confirmKind === 'archive') setArchiveTarget(null)
         }}
         onConfirm={confirmModalProps?.onConfirm}
       />
@@ -943,7 +1109,7 @@ export default function VehicleManagementView() {
                       onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as Truck['status'] }))}
                       className="mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-3 py-2.5 text-sm text-white outline-none"
                     >
-                      {STATUSES.map((s) => (
+                      {EDITABLE_STATUSES.map((s) => (
                         <option key={s} value={s}>{fmtLabel(s)}</option>
                       ))}
                     </select>
@@ -990,14 +1156,15 @@ export default function VehicleManagementView() {
               </fieldset>
 
               <div className="flex items-center justify-between gap-2 px-4 py-3 border-t border-white/[0.07]">
-                {modalMode === 'edit' && editingId && canDelete && (
+                {modalMode === 'edit' && editingTruck && canDelete && (
                   <button
                     type="button"
-                    onClick={() => handleDeleteClick(editingId)}
-                    disabled={truckLock.readOnly}
-                    className="text-xs font-semibold text-red-400 hover:underline disabled:opacity-40 disabled:no-underline"
+                    onClick={() => handleArchiveClick(editingTruck)}
+                    disabled={truckLock.readOnly || editingTruck.status === 'in_use'}
+                    title={editingTruck.status === 'in_use' ? 'Out on a booking — archive it once it is back in the yard' : undefined}
+                    className="text-xs font-semibold text-yellow-400 hover:underline disabled:opacity-40 disabled:no-underline"
                   >
-                    Delete vehicle…
+                    Archive vehicle…
                   </button>
                 )}
                 <div className="flex gap-2 ml-auto">

@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ShieldCheck as ShieldCheckIcon, UserPlus, Search, RefreshCw, MoreVertical,
-  Pencil, ShieldCheck, ShieldOff, Archive, SlidersHorizontal,
+  Pencil, Eye, ShieldCheck, ShieldOff, Archive, SlidersHorizontal,
   ChevronLeft, ChevronRight, AlertTriangle,
 } from 'lucide-react'
 import Select, { SelectChangeEvent } from '@mui/material/Select'
@@ -150,6 +150,7 @@ function RoleBadge({ role }: { role: string }) {
 interface RowMenuProps {
   user: AnyUser
   tab: TabValue
+  onView: () => void
   onEdit: () => void
   onManageAccess: () => void
   onStatusChange: (s: UserStatus) => void
@@ -157,7 +158,7 @@ interface RowMenuProps {
   lockedBy?: string
 }
 
-function RowMenu({ user, tab, onEdit, onManageAccess, onStatusChange, lockedBy }: RowMenuProps) {
+function RowMenu({ user, tab, onView, onEdit, onManageAccess, onStatusChange, lockedBy }: RowMenuProps) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -178,7 +179,21 @@ function RowMenu({ user, tab, onEdit, onManageAccess, onStatusChange, lockedBy }
   const canEdit = tab !== 'all'
   const canManageAccess = isManagedRole(user.role)
 
-  if (lockedBy) return <RecordLockBadge holder={lockedBy} />
+  // Viewing is read-only, so it stays available while someone else is editing.
+  if (lockedBy) {
+    return (
+      <div className="flex items-center justify-end gap-1.5">
+        <RecordLockBadge holder={lockedBy} />
+        <button
+          onClick={onView}
+          title="View Details"
+          className="rounded-md p-1.5 text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white"
+        >
+          <Eye size={15} />
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div ref={ref} className="relative">
@@ -198,6 +213,12 @@ function RowMenu({ user, tab, onEdit, onManageAccess, onStatusChange, lockedBy }
             className="absolute right-0 top-8 z-50 w-48 rounded-xl border border-[#2a2a2a] bg-[#1b1b1b] py-1 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
+            <button
+              onClick={() => { setOpen(false); onView() }}
+              className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white"
+            >
+              <Eye size={13} /> View Details
+            </button>
             {canEdit && (
               <button
                 onClick={() => { setOpen(false); onEdit() }}
@@ -216,7 +237,7 @@ function RowMenu({ user, tab, onEdit, onManageAccess, onStatusChange, lockedBy }
             )}
             {statusActions.length > 0 && (
               <>
-                {(canEdit || canManageAccess) && <div className="my-1 border-t border-[#2a2a2a]" />}
+                <div className="my-1 border-t border-[#2a2a2a]" />
                 {statusActions.map((a) => (
                   <button
                     key={a.status}
@@ -336,6 +357,7 @@ export default function AdminManagementClient() {
   const [serverTotalPages, setServerTotalPages] = useState(1)
   const [showForm,         setShowForm]         = useState(false)
   const [editUser,         setEditUser]         = useState<AnyUser | null>(null)
+  const [formViewOnly,     setFormViewOnly]     = useState(false)
   const [formTab,          setFormTab]          = useState<AdminMgmtTab>('admins')
   const [permUser,         setPermUser]         = useState<AnyUser | null>(null)
   const userLocks = useRecordLocks('user')
@@ -463,18 +485,20 @@ export default function AdminManagementClient() {
     } catch { /* handled by toast */ }
   }
 
-  function openEdit(user: AnyUser) {
+  function openEdit(user: AnyUser, viewOnly = false) {
     const tab = activeTab === 'all'
       ? tabFromRole(user.role)
       : activeTab
     setFormTab(tab)
     setEditUser(user)
+    setFormViewOnly(viewOnly)
     setShowForm(true)
   }
 
   function openCreate() {
     setFormTab(activeTab === 'all' ? 'admins' : activeTab)
     setEditUser(null)
+    setFormViewOnly(false)
     setShowForm(true)
   }
 
@@ -672,6 +696,7 @@ export default function AdminManagementClient() {
                             <RowMenu
                               user={user}
                               tab={activeTab}
+                              onView={() => openEdit(user, true)}
                               onEdit={() => openEdit(user)}
                               onManageAccess={() => setPermUser(user)}
                               onStatusChange={(s) => handleStatusChange(user, s)}
@@ -739,6 +764,10 @@ export default function AdminManagementClient() {
         <UserFormModal
           tab={formTab}
           user={editUser}
+          startInView={formViewOnly}
+          // Same rule as the row menu: the combined list can't open the edit form.
+          canEdit={activeTab !== 'all'}
+          lockedBy={editUser ? userLocks.get(editUser.user_id) : undefined}
           enablePermissions
           onClose={() => setShowForm(false)}
           onSaved={async () => {

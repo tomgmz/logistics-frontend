@@ -2,14 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Upload, Truck as TruckIcon, Pencil, Trash2, Plus, RefreshCw } from 'lucide-react'
+import { X, Upload, Truck as TruckIcon, Pencil, Archive, Eye, Plus, RefreshCw } from 'lucide-react'
 import type { CreateTruckModelInput, UpdateTruckModelInput } from '@/app/types/truck.types'
 import { TruckModel } from '@/app/types/truck-model'
 import {
   adminFetchTruckModels,
   adminCreateTruckModel,
   adminUpdateTruckModel,
-  adminDeleteTruckModel,
+  adminArchiveTruckModel,
   adminUploadTruckModelImage,
 } from '@/lib/services/admin/trucks.service'
 import ReusableModal from '@/components/layout/ReusableModal'
@@ -18,6 +18,7 @@ import { getApiErrorMessage } from '@/lib/api-error'
 import { createTruckModelSchema } from '@/lib/validation/truck-model.validation'
 import { useRecordLock, useRecordLocks } from '@/lib/hooks/useRecordLock'
 import RecordLockBanner, { RecordLockBadge } from '@/components/ui/RecordLockBanner'
+import RowActionMenu, { type RowAction } from '@/components/ui/RowActionMenu'
 
 export const VEHICLE_TYPES = [
   'Closed Van',
@@ -87,7 +88,7 @@ interface Props {
 }
 
 type FormMode    = 'create' | 'edit' | null
-type ConfirmKind = 'save' | 'delete' | null
+type ConfirmKind = 'save' | 'archive' | null
 
 type FieldErrors = Partial<Record<keyof ModelFormState | 'image', string>>
 
@@ -108,10 +109,12 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
   const [uploadBusy,   setUploadBusy]   = useState(false)
 
   const [confirmKind, setConfirmKind] = useState<ConfirmKind>(null)
-  const [deleteId,    setDeleteId]    = useState<string | null>(null)
+  const [archiveTarget, setArchiveTarget] = useState<TruckModel | null>(null)
+  const [viewModel,     setViewModel]     = useState<TruckModel | null>(null)
   const [actionBusy,  setActionBusy]  = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const editingModel = models.find((m) => m.model_id === editingId) ?? null
   const initialForm  = useRef<ModelFormState | null>(null)
 
   const hasChanges = formMode === 'create' || !!imageFile || (
@@ -263,9 +266,28 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
     setConfirmKind('save')
   }
 
-  const handleDeleteClick = (id: string) => {
-    setDeleteId(id)
-    setConfirmKind('delete')
+  const handleArchiveClick = (m: TruckModel) => {
+    setArchiveTarget(m)
+    setConfirmKind('archive')
+  }
+
+  // The card's 3-dot menu. Viewing stays open while someone else is editing
+  // the model; the writes wait for them.
+  function rowActions(m: TruckModel): RowAction[] {
+    const lockedBy = modelLocks.get(m.model_id)
+    const lockedTitle = lockedBy ? `${lockedBy} is editing this model` : undefined
+    return [
+      { label: 'View Details', icon: <Eye size={13} />, onSelect: () => setViewModel(m) },
+      {
+        label: 'Update Details', icon: <Pencil size={13} />, onSelect: () => openEdit(m),
+        disabled: !!lockedBy, title: lockedTitle,
+      },
+      {
+        label: 'Archive', icon: <Archive size={13} />, tone: 'warning', separated: true,
+        onSelect: () => handleArchiveClick(m),
+        disabled: !!lockedBy, title: lockedTitle,
+      },
+    ]
   }
 
   const executeSave = async () => {
@@ -314,39 +336,43 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
     }
   }
 
-  const executeDelete = async () => {
-    if (!deleteId) return
+  const executeArchive = async () => {
+    if (!archiveTarget) return
+    const id = archiveTarget.model_id
     setActionBusy(true)
     try {
-      await adminDeleteTruckModel(deleteId)
-      appToast.success('Truck model deleted.', { action: 'truck-model-delete', entityId: deleteId })
-      if (editingId === deleteId) closeForm()
-      setDeleteId(null)
+      await adminArchiveTruckModel(id)
+      appToast.success(`${archiveTarget.name} archived.`, { action: 'truck-model-archive', entityId: id })
+      if (editingId === id) closeForm()
+      if (viewModel?.model_id === id) setViewModel(null)
+      setArchiveTarget(null)
       setConfirmKind(null)
       await loadModels()
       onSaved?.()
     } catch (e) {
-      appToast.error(getApiErrorMessage(e, 'Request failed. Please try again.'), { action: 'truck-model-delete', entityId: deleteId })
+      // Most often: vehicles still use this model. The server names them.
+      appToast.error(getApiErrorMessage(e, 'Request failed. Please try again.'), { action: 'truck-model-archive', entityId: id })
       setConfirmKind(null)
     } finally {
       setActionBusy(false)
     }
   }
 
-  const confirmTitle = confirmKind === 'delete'
+  const confirmTitle = confirmKind === 'archive'
     ? 'Archive model?'
     : formMode === 'create' ? 'Create model?' : 'Save changes?'
 
-  const confirmDescription = confirmKind === 'delete'
-    ? 'This will remove the model. Trucks linked to it will lose their model reference.'
+  const confirmDescription = confirmKind === 'archive'
+    ? `"${archiveTarget?.name ?? 'This model'}" will be hidden from the catalog and can no longer be picked for vehicles. `
+      + 'Past bookings keep their details. A model still used by an active vehicle cannot be archived.'
     : formMode === 'create'
       ? `Add "${form.name.trim() || 'this model'}" to the catalog?`
       : `Save updates to "${form.name.trim() || 'this model'}"?`
 
   const confirmLabel = actionBusy
     ? (uploadBusy ? 'Uploading…' : 'Saving…')
-    : confirmKind === 'delete'
-      ? 'Delete'
+    : confirmKind === 'archive'
+      ? 'Archive'
       : formMode === 'create' ? 'Create' : 'Save'
 
   const inputCls = (hasErr: boolean) =>
@@ -491,24 +517,8 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
                             )}
                           </div>
                         </div>
-                        <div className="flex flex-col gap-1 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => openEdit(m)}
-                            className="p-1.5 rounded-md border border-white/10 text-white/60 hover:bg-white/5"
-                            title="Edit"
-                          >
-                            <Pencil size={13} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteClick(m.model_id)}
-                            disabled={modelLocks.has(m.model_id)}
-                            className="p-1.5 rounded-md border border-red-500/20 text-red-400/70 hover:bg-red-500/10 disabled:opacity-30"
-                            title="Delete"
-                          >
-                            <Trash2 size={13} />
-                          </button>
+                        <div className="shrink-0 self-start">
+                          <RowActionMenu label={`Actions for ${m.name}`} actions={rowActions(m)} />
                         </div>
                       </div>
                     ))}
@@ -764,14 +774,14 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
 
               {/* Footer */}
               <div className="flex items-center justify-between gap-2 px-4 py-3 border-t border-white/[0.07]">
-                {formMode === 'edit' && editingId && (
+                {formMode === 'edit' && editingModel && (
                   <button
                     type="button"
-                    onClick={() => handleDeleteClick(editingId)}
+                    onClick={() => handleArchiveClick(editingModel)}
                     disabled={modelLock.readOnly}
-                    className="text-xs font-semibold text-red-400 hover:underline disabled:opacity-40 disabled:no-underline"
+                    className="text-xs font-semibold text-yellow-400 hover:underline disabled:opacity-40 disabled:no-underline"
                   >
-                    Delete model…
+                    Archive model…
                   </button>
                 )}
                 <div className="flex gap-2 ml-auto">
@@ -798,6 +808,98 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
         )}
       </AnimatePresence>
 
+      {/* Read-only model details */}
+      <AnimatePresence>
+        {viewModel && (
+          <motion.div
+            className="fixed inset-0 z-[66] flex items-center justify-center p-4 bg-black/65"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setViewModel(null)}
+          >
+            <motion.div
+              initial={{ y: 12, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 12, opacity: 0 }}
+              transition={{ type: 'spring', damping: 26, stiffness: 280 }}
+              role="dialog"
+              aria-modal="true"
+              aria-label={`Details for ${viewModel.name}`}
+              className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-white/10 bg-[var(--color-surface)] shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.07]">
+                <h2 className="text-sm font-bold text-white uppercase tracking-widest">Truck model details</h2>
+                <button type="button" onClick={() => setViewModel(null)} className="p-2 rounded-lg hover:bg-white/5 text-white/50" aria-label="Close">
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="p-4 space-y-4">
+                {viewModel.image_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={viewModel.image_url} alt={viewModel.name} className="w-full h-44 object-cover rounded-xl border border-white/10 bg-black/30" />
+                ) : (
+                  <div className="w-full h-44 rounded-xl border border-white/10 bg-white/[0.04] flex items-center justify-center">
+                    <TruckIcon size={40} className="text-white/20" />
+                  </div>
+                )}
+
+                <div>
+                  <p className="text-base font-semibold text-white">{viewModel.name}</p>
+                  {viewModel.vehicle_type && (
+                    <span
+                      className="inline-flex mt-1 text-[10px] font-bold px-2 py-0.5 rounded-md border"
+                      style={{ background: 'rgba(77,249,237,0.08)', borderColor: 'rgba(77,249,237,0.25)', color: 'var(--color-cyan)' }}
+                    >
+                      {viewModel.vehicle_type}
+                    </span>
+                  )}
+                </div>
+
+                <div className="rounded-xl border border-white/[0.08] bg-black/20 px-3">
+                  {([
+                    ['Dimensions (mm)', viewModel.dimension_mm ?? '—'],
+                    ['Max weight',      viewModel.max_weight_kg  != null ? `${viewModel.max_weight_kg.toLocaleString()} kg` : '—'],
+                    ['Max volume',      viewModel.max_volume_cbm != null ? `${viewModel.max_volume_cbm} cbm` : '—'],
+                    ['Max length',      viewModel.max_length_cm  != null ? `${viewModel.max_length_cm} cm` : '—'],
+                    ['Suitable for',    viewModel.suitable_for || '—'],
+                    ['Stackable',       viewModel.stackable_friendly ? 'Yes' : 'No'],
+                    ['Added',           viewModel.created_at ? new Date(viewModel.created_at).toLocaleString() : '—'],
+                  ] as const).map(([label, value]) => (
+                    <div key={label} className="flex items-start justify-between gap-4 py-2 border-b border-white/[0.05] last:border-0">
+                      <span className="text-[11px] font-bold uppercase tracking-wide text-white/40 shrink-0">{label}</span>
+                      <span className="text-sm text-white/80 text-right min-w-0 break-words">{value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 px-4 py-3 border-t border-white/[0.07]">
+                <button
+                  type="button"
+                  onClick={() => setViewModel(null)}
+                  className="px-4 py-2 rounded-lg border border-white/15 text-sm text-white/80 hover:bg-white/5"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  disabled={modelLocks.has(viewModel.model_id)}
+                  title={modelLocks.has(viewModel.model_id) ? `${modelLocks.get(viewModel.model_id)} is editing this model` : undefined}
+                  onClick={() => { const m = viewModel; setViewModel(null); openEdit(m) }}
+                  className="px-4 py-2 rounded-lg text-sm font-bold text-black disabled:opacity-40"
+                  style={{ background: 'var(--color-cyan)' }}
+                >
+                  Update Details
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <ReusableModal
         open={!!confirmKind}
         title={confirmTitle}
@@ -808,10 +910,10 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
         onCancel={() => {
           if (actionBusy) return
           setConfirmKind(null)
-          if (confirmKind === 'delete') setDeleteId(null)
+          if (confirmKind === 'archive') setArchiveTarget(null)
         }}
         onConfirm={() => {
-          if (confirmKind === 'delete') void executeDelete()
+          if (confirmKind === 'archive') void executeArchive()
           else void executeSave()
         }}
       />

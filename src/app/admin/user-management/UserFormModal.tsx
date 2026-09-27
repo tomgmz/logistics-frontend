@@ -9,7 +9,7 @@ import {
   type SelectHTMLAttributes,
 } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Loader2 } from 'lucide-react'
+import { X, Loader2, Pencil, Eye, Upload } from 'lucide-react'
 import type {
   UserTab,
   ClientUser,
@@ -39,7 +39,7 @@ import { EMPTY_FLAGS, MODULES_BY_ROLE, type ManagedRole, type ModuleFlags } from
 import { permissionsService } from '@/lib/services/admin/permissions.service'
 import ModulePermissionMatrix from '@/app/it_admin/administrator-management/ModulePermissionMatrix'
 import { useRecordLock } from '@/lib/hooks/useRecordLock'
-import RecordLockBanner from '@/components/ui/RecordLockBanner'
+import RecordLockBanner, { RecordLockBadge } from '@/components/ui/RecordLockBanner'
 
 interface UserFormModalProps {
   tab: UserTab
@@ -49,6 +49,12 @@ interface UserFormModalProps {
   // When set, a module-access matrix is shown on creation so the IT Admin can
   // assign permissions up front (admin management).
   enablePermissions?: boolean
+  // Open an existing account read-only; "Edit Details" unlocks the same form.
+  startInView?: boolean
+  // Hide "Edit Details" where this view can't edit (e.g. the combined lists).
+  canEdit?: boolean
+  // Someone else is editing this account (from the list's lock state).
+  lockedBy?: string
 }
 
 const TAB_LABELS: Record<UserTab, string> = {
@@ -152,7 +158,8 @@ async function submitForm(
 
   if (tab === 'drivers' && (!editId || licenseFile)) {
     const fd = new FormData()
-    Object.entries(clean).forEach(([k, v]) => fd.append(k, String(v)))
+    // FormData stringifies null to "null"; send '' so a cleared suffix stays empty.
+    Object.entries(clean).forEach(([k, v]) => fd.append(k, v === null ? '' : String(v)))
     if (licenseFile) fd.append('image', licenseFile)
     const url    = editId ? `/admin/drivers/${editId}` : '/admin/drivers'
     const method = editId ? 'patch' : 'post'
@@ -284,8 +291,12 @@ function PhoneInputRow({
   )
 }
 
-export default function UserFormModal({ tab, user, onClose, onSaved, enablePermissions = false }: UserFormModalProps) {
+export default function UserFormModal({
+  tab, user, onClose, onSaved, enablePermissions = false,
+  startInView = false, canEdit = true, lockedBy,
+}: UserFormModalProps) {
   const isEdit = Boolean(user)
+  const [viewing, setViewing] = useState(isEdit && startInView)
   const formRole    = TAB_TO_ROLE[tab]
   const roleModules = formRole ? MODULES_BY_ROLE[formRole] : []
   const showPermissions = enablePermissions && !isEdit && roleModules.length > 0
@@ -299,6 +310,7 @@ export default function UserFormModal({ tab, user, onClose, onSaved, enablePermi
   const lock = useRecordLock({
     type:    'user',
     id:      isEdit ? user!.user_id : null,
+    enabled: !viewing,
     onStale: () => {
       appToast.info('This account was just changed by someone else. Reopen it to edit the latest.', {
         action: 'user-stale', entityId: user?.user_id,
@@ -317,6 +329,9 @@ export default function UserFormModal({ tab, user, onClose, onSaved, enablePermi
 
   const [licenseFile,    setLicenseFile]    = useState<File | null>(null)
   const [licensePreview, setLicensePreview] = useState<string | null>(null)
+  // Clicking the license photo reveals its actions; View License opens it full size.
+  const [licenseActions, setLicenseActions] = useState(false)
+  const [licenseFull,    setLicenseFull]    = useState(false)
 
   const [scanLoading, setScanLoading] = useState(false)
   const [scanDone,    setScanDone]    = useState(false)
@@ -371,6 +386,26 @@ export default function UserFormModal({ tab, user, onClose, onSaved, enablePermi
       e.target.value = ''
     }
   }
+
+  // Replacing the license on an existing driver only swaps the image. It is not
+  // re-scanned, so the saved name and license details are never overwritten.
+  function handleLicenseReplace(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setLicenseFile(file)
+    if (licensePreview) URL.revokeObjectURL(licensePreview)
+    setLicensePreview(URL.createObjectURL(file))
+    setLicenseActions(false)
+    setFieldErrors(prev => { const n = { ...prev }; delete n.license_image; return n })
+  }
+
+  useEffect(() => {
+    if (!licenseFull) return
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setLicenseFull(false) }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [licenseFull])
 
   const isDirty = useMemo(() => {
     const formDirty = Object.keys(initialState).some(key => form[key] !== initialState[key])
@@ -483,6 +518,27 @@ export default function UserFormModal({ tab, user, onClose, onSaved, enablePermi
     }
   }
 
+  // Opened from view mode, closing the edit returns to the read-only view
+  // (changes reverted) instead of closing the panel.
+  function leaveEdit() {
+    setForm(initialState)
+    setFieldErrors({})
+    setGlobalError(null)
+    setLicenseFile(null)
+    setLicensePreview(null)
+    setLicenseActions(false)
+    setViewing(true)
+  }
+
+  function requestCancel() {
+    if (startInView) {
+      if (isDirty) setConfirmClose(true)
+      else leaveEdit()
+    } else {
+      setConfirmClose(true)
+    }
+  }
+
   const isSaveDisabled = loading || (isEdit && !isDirty)
   const fe = fieldErrors
 
@@ -511,15 +567,17 @@ export default function UserFormModal({ tab, user, onClose, onSaved, enablePermi
           <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#2a2a2a] bg-[#1b1b1b] px-6 py-4">
             <div>
               <p className="text-[10px] font-bold tracking-[0.14em] uppercase text-[#4df9ed]">
-                {isEdit ? 'Edit' : 'Create'} {TAB_LABELS[tab]}
+                {viewing ? 'View' : isEdit ? 'Edit' : 'Create'} {TAB_LABELS[tab]}
               </p>
               <h2 className="mt-0.5 text-lg font-bold text-white">
-                {isEdit ? `Update ${TAB_LABELS[tab]}` : `New ${TAB_LABELS[tab]} Account`}
+                {viewing
+                  ? `${TAB_LABELS[tab]} Details`
+                  : isEdit ? `Update ${TAB_LABELS[tab]}` : `New ${TAB_LABELS[tab]} Account`}
               </h2>
             </div>
             <button
               type="button"
-              onClick={() => setConfirmClose(true)}
+              onClick={() => (viewing || !isDirty ? onClose() : setConfirmClose(true))}
               className="rounded-lg p-2 text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white"
             >
               <X size={18} />
@@ -528,11 +586,6 @@ export default function UserFormModal({ tab, user, onClose, onSaved, enablePermi
 
           <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5 px-6 py-6">
             <RecordLockBanner lock={lock} noun="account" />
-            <fieldset
-              disabled={lock.readOnly}
-              className={`flex flex-col gap-5 min-w-0 border-0 p-0 m-0 ${lock.readOnly ? 'pointer-events-none opacity-70' : ''}`}
-            >
-
             {tab === 'drivers' && (
               <div className="rounded-xl border border-dashed border-[#424242] bg-[#2a2a2a]/30 px-4 py-4">
 
@@ -554,15 +607,60 @@ export default function UserFormModal({ tab, user, onClose, onSaved, enablePermi
                   </p>
                 )}
 
-                {(licensePreview ?? storedLicenseUrl) && (
-                  <div className="mb-3 overflow-hidden rounded-lg border border-[#424242]">
+                {(licensePreview ?? storedLicenseUrl) ? (
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setLicenseActions(v => !v)}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setLicenseActions(v => !v) } }}
+                    className="relative mb-3 cursor-pointer overflow-hidden rounded-lg border border-[#424242] outline-none focus-visible:border-[#4df9ed]"
+                  >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={licensePreview ?? storedLicenseUrl!}
                       alt="License preview"
                       className="h-32 w-full object-cover"
                     />
+                    {licenseActions && (
+                      <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/70 backdrop-blur-[2px]">
+                        <button
+                          type="button"
+                          onClick={e => { e.stopPropagation(); setLicenseActions(false); setLicenseFull(true) }}
+                          className="flex items-center gap-2 rounded-lg border border-[#424242] bg-[#1b1b1b] px-4 py-2 text-sm font-medium text-white transition hover:border-[#4df9ed50]"
+                        >
+                          <Eye size={14} /> View License
+                        </button>
+                        {isEdit && !viewing && !lock.readOnly && (
+                          <label
+                            onClick={e => e.stopPropagation()}
+                            className="flex cursor-pointer items-center gap-2 rounded-lg bg-[#4df9ed] px-4 py-2 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5]"
+                          >
+                            <Upload size={14} /> Update License
+                            <input
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp"
+                              className="sr-only"
+                              onChange={handleLicenseReplace}
+                            />
+                          </label>
+                        )}
+                      </div>
+                    )}
                   </div>
+                ) : isEdit && (
+                  <p className="mb-3 text-[11px] text-[#818181]">No license image on file.</p>
+                )}
+
+                {isEdit && !viewing && !lock.readOnly && !(licensePreview ?? storedLicenseUrl) && (
+                  <label className="mb-3 flex w-fit cursor-pointer items-center gap-2 rounded-lg border border-[#424242] bg-[#1b1b1b] px-4 py-2 text-sm text-[#818181] transition hover:border-[#4df9ed50] hover:text-white">
+                    <Upload size={14} /> Upload License
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="sr-only"
+                      onChange={handleLicenseReplace}
+                    />
+                  </label>
                 )}
 
                 {/* Action buttons */}
@@ -599,6 +697,13 @@ export default function UserFormModal({ tab, user, onClose, onSaved, enablePermi
 
               </div>
             )}
+
+            <fieldset
+              disabled={viewing || lock.readOnly}
+              className={`flex flex-col gap-5 min-w-0 border-0 p-0 m-0 ${
+                lock.readOnly ? 'pointer-events-none opacity-70' : viewing ? 'pointer-events-none' : ''
+              }`}
+            >
 
             <div className="grid grid-cols-2 gap-4">
               <Field label="First Name" required error={fe.first_name}>
@@ -773,10 +878,32 @@ export default function UserFormModal({ tab, user, onClose, onSaved, enablePermi
 
             </fieldset>
 
+            {viewing ? (
+            <div className="flex items-center justify-end gap-3 border-t border-[#2a2a2a] pt-5 mt-1">
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-lg border border-[#424242] px-5 py-2.5 text-sm font-medium text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white"
+              >
+                Close
+              </button>
+              {canEdit && (lockedBy ? (
+                <RecordLockBadge holder={lockedBy} />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setViewing(false)}
+                  className="flex items-center gap-2 rounded-lg bg-[#4df9ed] px-5 py-2.5 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5]"
+                >
+                  <Pencil size={14} /> Edit Details
+                </button>
+              ))}
+            </div>
+            ) : (
             <div className="flex justify-end gap-3 border-t border-[#2a2a2a] pt-5 mt-1">
               <button
                 type="button"
-                onClick={() => setConfirmClose(true)}
+                onClick={requestCancel}
                 className="rounded-lg border border-[#424242] px-5 py-2.5 text-sm font-medium text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white"
               >
                 Cancel
@@ -791,9 +918,36 @@ export default function UserFormModal({ tab, user, onClose, onSaved, enablePermi
                 {loading ? 'Saving…' : isEdit ? 'Save Changes' : `Create ${TAB_LABELS[tab]}`}
               </button>
             </div>
+            )}
           </form>
         </motion.div>
       </div>
+
+      {licenseFull && (licensePreview ?? storedLicenseUrl) && (
+        <motion.div
+          key="license-full"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={() => setLicenseFull(false)}
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4 backdrop-blur-sm"
+        >
+          <button
+            type="button"
+            onClick={() => setLicenseFull(false)}
+            className="absolute right-4 top-4 rounded-lg p-2 text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white"
+          >
+            <X size={20} />
+          </button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={licensePreview ?? storedLicenseUrl!}
+            alt="Driver license"
+            onClick={e => e.stopPropagation()}
+            className="max-h-[90vh] max-w-full rounded-lg object-contain shadow-2xl"
+          />
+        </motion.div>
+      )}
 
       <ReusableModal
         key="confirm-close"
@@ -802,7 +956,11 @@ export default function UserFormModal({ tab, user, onClose, onSaved, enablePermi
         description="Any unsaved changes will be lost. Are you sure you want to close this form?"
         confirmLabel="Discard"
         cancelLabel="Keep editing"
-        onConfirm={onClose}
+        onConfirm={() => {
+          setConfirmClose(false)
+          if (startInView && isEdit) leaveEdit()
+          else onClose()
+        }}
         onCancel={() => setConfirmClose(false)}
       />
 
