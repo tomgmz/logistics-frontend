@@ -249,8 +249,10 @@ const VENDOR_FIELDS: {
  * Two buttons, and they are not the same action. "Resend setup link" is for a
  * driver who never enrolled or has a new phone — it leaves any working passkey
  * alone. "Revoke access" is offboarding: every passkey dies, the session is
- * killed, the account is deactivated. The vendor snapshot on the delivery is
- * untouched by either, because that is the record of who drove.
+ * killed, the account is deactivated. Once revoked, both give way to "Restore
+ * access", which reactivates the account and sends a new setup link — the old
+ * passkeys stay dead. The vendor snapshot on the delivery is untouched by all
+ * of them, because that is the record of who drove.
  */
 function ExternalDriverAccessRow({ userId }: { userId: string }) {
   const [access, setAccess] = useState<ExternalDriverAccess | null>(null)
@@ -298,8 +300,25 @@ function ExternalDriverAccessRow({ userId }: { userId: string }) {
     }
   }
 
+  const restore = async () => {
+    setBusy(true)
+    try {
+      await externalDriverService.restore(userId)
+      appToast.success('Access restored. A new setup link was sent to the driver.')
+      load()
+    } catch (err) {
+      appToast.error(getApiErrorMessage(err, 'Could not restore access.'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const revoked = access !== null && !access.account_active
+
   const status = !access
     ? 'Checking app access…'
+    : revoked
+      ? 'App access revoked'
     : access.enrolled
       ? `App access active · ${access.passkey_count} passkey${access.passkey_count === 1 ? '' : 's'}` +
         (access.last_used_at ? ` · last used ${new Date(access.last_used_at).toLocaleString()}` : '')
@@ -314,16 +333,28 @@ function ExternalDriverAccessRow({ userId }: { userId: string }) {
         <span>{status}</span>
       </div>
       <div className="flex gap-1.5">
-        <button
-          type="button"
-          onClick={resend}
-          disabled={busy}
-          className="text-[10px] font-bold px-2 py-1 rounded-md border border-white/10
-                     text-white/50 hover:text-white hover:border-white/25 transition-colors disabled:opacity-40"
-        >
-          Resend setup link
-        </button>
-        {access?.enrolled && (
+        {revoked ? (
+          <button
+            type="button"
+            onClick={restore}
+            disabled={busy}
+            className="text-[10px] font-bold px-2 py-1 rounded-md border border-white/10
+                       text-white/50 hover:text-white hover:border-white/25 transition-colors disabled:opacity-40"
+          >
+            Restore access
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={resend}
+            disabled={busy}
+            className="text-[10px] font-bold px-2 py-1 rounded-md border border-white/10
+                       text-white/50 hover:text-white hover:border-white/25 transition-colors disabled:opacity-40"
+          >
+            Resend setup link
+          </button>
+        )}
+        {access?.enrolled && !revoked && (
           <button
             type="button"
             onClick={revoke}

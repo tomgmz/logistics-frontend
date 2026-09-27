@@ -7,6 +7,7 @@ import {
   Users, UserPlus, Search, RefreshCw, MoreVertical,
   Pencil, Eye, ShieldCheck, ShieldOff, Archive,
   ChevronLeft, ChevronRight, AlertTriangle, ArrowLeftRight,
+  KeyRound, Send, RotateCcw,
 } from 'lucide-react'
 import Select, { SelectChangeEvent } from '@mui/material/Select'
 import MenuItem from '@mui/material/MenuItem'
@@ -29,13 +30,25 @@ import PasswordResetQueue from '@/components/admin/PasswordResetQueue'
 import ItAdminTransitionModal from '@/components/admin/ItAdminTransitionModal'
 import ModuleSectionTabs, { type ModuleSection } from '@/components/admin/ModuleSectionTabs'
 import { passwordResetService } from '@/lib/services/admin/password-reset.service'
+import { externalDriverService, type VendorDriverUser } from '@/lib/services/admin/external-driver.service'
 import { useAuthStore } from '@/lib/store/auth.store'
 
 type UserMgmtTab = Extract<UserTab, 'clients' | 'drivers' | 'it-admins'>
 // The dropdown below filters the directory by role. Password resets are a queue
 // you act on, not a slice of the directory, so they are a top-level section
 // instead — see ModuleSectionTabs.
-type TabValue = UserMgmtTab | 'all'
+//
+// Drivers split into two tabs under the one dropdown entry. Vendor drivers are
+// role='driver' too, but they are passkey-only subcontractors created from a
+// booking's assignment — no licence on file, no password, not company crew — so
+// they get their own list and their own actions instead of the driver form.
+type TabValue = UserMgmtTab | 'vendor-drivers' | 'all'
+type DirectoryTab = Exclude<TabValue, 'all'>
+
+const DRIVER_TABS: { key: 'drivers' | 'vendor-drivers'; label: string }[] = [
+  { key: 'drivers',        label: 'Company Drivers' },
+  { key: 'vendor-drivers', label: 'Vendor Drivers'  },
+]
 
 // Kept for the ?tab=password-resets deep-link a reset notification sends.
 const RESETS_DEEPLINK = 'password-resets'
@@ -57,10 +70,11 @@ const muiTheme = createTheme({
 
 const PAGE_SIZE = 10
 
-async function fetchByTab(tab: UserMgmtTab): Promise<AnyUser[]> {
+async function fetchByTab(tab: DirectoryTab): Promise<AnyUser[]> {
   switch (tab) {
     case 'clients':   return clientService.getAll() as Promise<AnyUser[]>
     case 'drivers':   return driverService.getAll() as Promise<AnyUser[]>
+    case 'vendor-drivers': return externalDriverService.list() as Promise<AnyUser[]>
     case 'it-admins': return itAdminService.getAll() as unknown as Promise<AnyUser[]>
   }
 }
@@ -222,6 +236,130 @@ function RowMenu({ user, tab, onView, onEdit, onStatusChange, lockedBy }: RowMen
   )
 }
 
+/** Where a vendor driver's passkey sign-in stands, in one badge. */
+function AccessBadge({ access }: { access: VendorDriverUser['access'] }) {
+  const cfg = !access.account_active
+    ? { label: 'Revoked',          cls: 'bg-red-500/15 text-red-400 border-red-500/30' }
+    : access.enrolled
+      ? { label: `Passkey set up${access.passkey_count > 1 ? ` (${access.passkey_count})` : ''}`,
+          cls: 'bg-[#4df9ed]/10 text-[#4df9ed] border-[#4df9ed]/30' }
+      : access.invite_pending
+        ? { label: 'Setup link sent', cls: 'bg-orange-500/15 text-orange-400 border-orange-500/30' }
+        : { label: 'Not set up',      cls: 'bg-[#818181]/10 text-[#818181] border-[#818181]/30' }
+  return (
+    <span
+      title={access.last_used_at ? `Last used ${formatDateTime(access.last_used_at)}` : undefined}
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold tracking-wide ${cfg.cls}`}
+    >
+      <KeyRound size={10} /> {cfg.label}
+    </span>
+  )
+}
+
+/**
+ * Actions for a vendor driver — the same three the booking's assignment card
+ * offers, since a passkey-only account has no password to reset or form to edit.
+ */
+function VendorRowMenu({ user, onDone, lockedBy }: {
+  user:      VendorDriverUser
+  onDone:    () => Promise<void> | void
+  lockedBy?: string
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handle(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handle)
+    return () => document.removeEventListener('mousedown', handle)
+  }, [])
+
+  if (lockedBy) {
+    return (
+      <div className="flex items-center justify-end">
+        <RecordLockBadge holder={lockedBy} />
+      </div>
+    )
+  }
+
+  const run = async (work: Promise<unknown>, loading: string, success: string, fallback: string) => {
+    setOpen(false)
+    try {
+      await appToast.promise(
+        work,
+        { loading, success, error: (e) => getApiErrorMessage(e, fallback) },
+        { action: 'vendor-driver-access', entityId: user.user_id },
+      )
+      await onDone()
+    } catch { /* handled by toast */ }
+  }
+
+  const resend = () => run(
+    externalDriverService.reinvite(user.user_id),
+    'Sending setup link…', 'Setup link sent to the driver.', 'Could not send the setup link.',
+  )
+
+  const revoke = () => {
+    if (!window.confirm(
+      `Revoke ${user.email}'s app access?\n\n` +
+      'Their passkeys stop working immediately and they are signed out. ' +
+      'You can restore access later; they will need to set up sign-in again.'
+    )) return
+    void run(
+      externalDriverService.revoke(user.user_id),
+      'Revoking access…', 'Access revoked.', 'Could not revoke access.',
+    )
+  }
+
+  const restore = () => run(
+    externalDriverService.restore(user.user_id),
+    'Restoring access…', 'Access restored. A new setup link was sent.', 'Could not restore access.',
+  )
+
+  const item = 'flex w-full items-center gap-2.5 px-3.5 py-2 text-sm transition'
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={(e) => { e.stopPropagation(); setOpen(!open) }}
+        className="rounded-md p-1.5 text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white"
+      >
+        <MoreVertical size={15} />
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: -4 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: -4 }}
+            transition={{ duration: 0.12 }}
+            className="absolute right-0 top-8 z-50 w-52 rounded-xl border border-[#2a2a2a] bg-[#1b1b1b] py-1 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {user.access.account_active ? (
+              <>
+                <button onClick={resend} className={`${item} text-[#818181] hover:bg-[#2a2a2a] hover:text-white`}>
+                  <Send size={13} /> Resend Setup Link
+                </button>
+                <div className="my-1 border-t border-[#2a2a2a]" />
+                <button onClick={revoke} className={`${item} text-red-400 hover:bg-red-500/10`}>
+                  <ShieldOff size={13} /> Revoke Access
+                </button>
+              </>
+            ) : (
+              <button onClick={restore} className={`${item} text-[#818181] hover:bg-[#2a2a2a] hover:text-white`}>
+                <RotateCcw size={13} /> Restore Access
+              </button>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
 function TableSkeleton({ cols }: { cols: number }) {
   return (
     <>
@@ -252,9 +390,11 @@ function EmptyState({ tab, onAdd }: { tab: TabValue; onAdd: () => void }) {
       </div>
       <p className="text-base font-semibold text-white">No records found</p>
       <p className="mt-1 text-sm text-[#818181]">
-        No {tab === 'all' ? 'users' : tab} match your current filters.
+        {tab === 'vendor-drivers'
+          ? 'No vendor drivers yet. They are added from a booking\'s assignment, with a driver email.'
+          : `No ${tab === 'all' ? 'users' : tab} match your current filters.`}
       </p>
-      {tab !== 'all' && (
+      {tab !== 'all' && tab !== 'vendor-drivers' && (
         <button
           onClick={onAdd}
           className="mt-6 flex items-center gap-2 rounded-lg bg-[#4df9ed] px-4 py-2 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5]"
@@ -333,6 +473,19 @@ function renderCells(user: AnyUser, tab: TabValue) {
         </>
       )
     }
+    case 'vendor-drivers': {
+      const u = user as VendorDriverUser
+      const name = [u.first_name, u.middle_name, u.last_name, u.suffix].filter(Boolean).join(' ') || '—'
+      return (
+        <>
+          <td className="px-4 py-3.5"><p className="font-medium text-white">{name}</p></td>
+          <td className="px-4 py-3.5 text-sm text-[#818181]">{u.email}</td>
+          <td className="px-4 py-3.5 text-sm text-[#818181]">{u.phone ?? '—'}</td>
+          <td className="px-4 py-3.5"><AccessBadge access={u.access} /></td>
+          <td className="px-4 py-3.5"><StatusBadge status={u.status} /></td>
+        </>
+      )
+    }
     case 'it-admins': {
       const name = [user.first_name, user.middle_name, user.last_name, user.suffix].filter(Boolean).join(' ') || '—'
       return (
@@ -353,6 +506,7 @@ const HEADERS: Record<TabValue, string[]> = {
   all:         ['Name', 'Email', 'Phone', 'Role', 'Status'],
   clients:     ['Name', 'Email', 'Company', 'Status', 'Last Login'],
   drivers:     ['Name', 'License #', 'Expiry', 'Driver Status', 'Acct. Status'],
+  'vendor-drivers': ['Name', 'Email', 'Phone', 'App Access', 'Acct. Status'],
   'it-admins': ['Name', 'Email', 'Phone', 'Status', 'Last Login'],
 }
 
@@ -389,6 +543,9 @@ export default function UserManagementClient() {
   const isRootAdmin = useAuthStore((s) => s.user?.is_root_admin ?? false)
 
   const isResetsTab    = section === 'password-resets'
+  // Both driver tabs sit under the one "Drivers" entry in the role dropdown.
+  const isDriverTab    = activeTab === 'drivers' || activeTab === 'vendor-drivers'
+  const dropdownTab: TabValue = isDriverTab ? 'drivers' : activeTab
   const isITAdminTab   = activeTab === 'it-admins'
   // The system allows exactly one active IT Admin, so the row that matters on
   // this tab is the active one — the rest are kept records of predecessors.
@@ -397,6 +554,17 @@ export default function UserManagementClient() {
     : null
 
   const isInitialAllFetch = useRef(true)
+
+  // Drop the old tab's rows in the same render that switches the tab. Leaving it
+  // to the fetch effect is one render too late: that render draws the previous
+  // tab's rows with the new tab's cells — company drivers through the vendor
+  // columns, which read an `access` field they don't have.
+  const switchTab = useCallback((tab: TabValue) => {
+    if (tab === activeTab) return
+    setAllRows([])
+    setLoading(true)
+    setActiveTab(tab)
+  }, [activeTab])
 
   // Seeded once on mount so the tab can show a badge before anyone opens it —
   // the panel itself only fetches when it is mounted, which is too late to tell
@@ -439,7 +607,7 @@ export default function UserManagementClient() {
     }
   }, [])
 
-  const fetchTabUsers = useCallback(async (tab: UserMgmtTab) => {
+  const fetchTabUsers = useCallback(async (tab: DirectoryTab) => {
     setLoading(true)
     setError(null)
     setAllRows([])
@@ -554,7 +722,7 @@ export default function UserManagementClient() {
               active, so while the seat is filled the only move is to hand it over.
               If it is somehow empty, creating one is exactly right.
             */}
-            {!isResetsTab && (
+            {!isResetsTab && activeTab !== 'vendor-drivers' && (
               isITAdminTab && activeITAdmin ? (
                 isRootAdmin && (
                   <button
@@ -606,8 +774,8 @@ export default function UserManagementClient() {
             <div className="px-4 pt-3 pb-3 border-b border-[#2a2a2a] shrink-0">
               <FormControl size="small" sx={{ minWidth: 200 }}>
                 <Select
-                  value={activeTab}
-                  onChange={(e: SelectChangeEvent) => setActiveTab(e.target.value as TabValue)}
+                  value={dropdownTab}
+                  onChange={(e: SelectChangeEvent) => switchTab(e.target.value as TabValue)}
                   MenuProps={{
                     PaperProps: {
                       sx: {
@@ -641,24 +809,24 @@ export default function UserManagementClient() {
                       sx={{
                         borderRadius: '8px', mb: '2px', fontSize: '13px',
                         fontWeight: t.key === 'all' ? 600 : 500,
-                        color: activeTab === t.key ? '#4df9ed' : '#818181',
-                        bgcolor: activeTab === t.key ? '#4df9ed0d' : 'transparent',
+                        color: dropdownTab === t.key ? '#4df9ed' : '#818181',
+                        bgcolor: dropdownTab === t.key ? '#4df9ed0d' : 'transparent',
                         display: 'flex', alignItems: 'center', gap: '10px',
                         borderTop: t.key === 'clients' ? '1px solid #2a2a2a' : 'none',
                         marginTop: t.key === 'clients' ? '4px' : '0',
                         paddingTop: t.key === 'clients' ? '8px' : undefined,
                         '&:hover': {
-                          bgcolor: activeTab === t.key ? '#4df9ed1a' : '#2a2a2a',
-                          color: activeTab === t.key ? '#4df9ed' : '#ffffff',
+                          bgcolor: dropdownTab === t.key ? '#4df9ed1a' : '#2a2a2a',
+                          color: dropdownTab === t.key ? '#4df9ed' : '#ffffff',
                         },
                         '&.Mui-selected': { bgcolor: '#4df9ed0d', '&:hover': { bgcolor: '#4df9ed1a' } },
                       }}
                     >
-                      <span style={{ color: activeTab === t.key ? '#4df9ed' : '#818181', display: 'flex' }}>
+                      <span style={{ color: dropdownTab === t.key ? '#4df9ed' : '#818181', display: 'flex' }}>
                         <Users size={14} />
                       </span>
                       {t.label}
-                      {activeTab === t.key && (
+                      {dropdownTab === t.key && (
                         <span style={{ marginLeft: 'auto', height: '6px', width: '6px', borderRadius: '50%', backgroundColor: '#4df9ed', flexShrink: 0 }} />
                       )}
                     </MenuItem>
@@ -666,6 +834,25 @@ export default function UserManagementClient() {
                 </Select>
               </FormControl>
             </div>
+            )}
+
+            {!isResetsTab && isDriverTab && (
+              <div className="flex gap-1 border-b border-[#2a2a2a] px-4 shrink-0">
+                {DRIVER_TABS.map((t) => (
+                  <button
+                    key={t.key}
+                    type="button"
+                    onClick={() => switchTab(t.key)}
+                    className={`-mb-px border-b-2 px-3 py-2.5 text-[13px] font-semibold transition ${
+                      activeTab === t.key
+                        ? 'border-[#4df9ed] text-[#4df9ed]'
+                        : 'border-transparent text-[#818181] hover:text-white'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
             )}
 
             {isResetsTab ? (
@@ -740,14 +927,22 @@ export default function UserManagementClient() {
                         >
                           {renderCells(user, activeTab)}
                           <td className="px-4 py-3.5 text-right">
-                            <RowMenu
-                              user={user}
-                              tab={activeTab}
-                              onView={() => openEdit(user, true)}
-                              onEdit={() => openEdit(user)}
-                              onStatusChange={(s) => handleStatusChange(user, s)}
-                              lockedBy={userLocks.get(user.user_id)}
-                            />
+                            {activeTab === 'vendor-drivers' ? (
+                              <VendorRowMenu
+                                user={user as VendorDriverUser}
+                                onDone={refetchCurrentTab}
+                                lockedBy={userLocks.get(user.user_id)}
+                              />
+                            ) : (
+                              <RowMenu
+                                user={user}
+                                tab={activeTab}
+                                onView={() => openEdit(user, true)}
+                                onEdit={() => openEdit(user)}
+                                onStatusChange={(s) => handleStatusChange(user, s)}
+                                lockedBy={userLocks.get(user.user_id)}
+                              />
+                            )}
                           </td>
                         </motion.tr>
                       ))}
