@@ -1,8 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Upload, Truck as TruckIcon, Pencil, Archive, Eye, Plus, RefreshCw } from 'lucide-react'
+import { X, Upload, Truck as TruckIcon, Pencil, Archive, Eye, Plus, RefreshCw, Search } from 'lucide-react'
 import type { CreateTruckModelInput, UpdateTruckModelInput } from '@/app/types/truck.types'
 import { TruckModel } from '@/app/types/truck-model'
 import {
@@ -19,6 +19,7 @@ import { createTruckModelSchema } from '@/lib/validation/truck-model.validation'
 import { useRecordLock, useRecordLocks } from '@/lib/hooks/useRecordLock'
 import RecordLockBanner, { RecordLockBadge } from '@/components/ui/RecordLockBanner'
 import RowActionMenu, { type RowAction } from '@/components/ui/RowActionMenu'
+import { ModelThumb, kgToTons } from './vehicle-ui'
 
 export const VEHICLE_TYPES = [
   'Closed Van',
@@ -81,10 +82,11 @@ function modelToForm(m: TruckModel): ModelFormState {
   }
 }
 
+/** Vehicle-management tier, passed down from the page. */
 interface Props {
-  open:     boolean
-  onClose:  () => void
-  onSaved?: () => void
+  canCreate: boolean
+  canEdit:   boolean
+  canDelete: boolean
 }
 
 type FormMode    = 'create' | 'edit' | null
@@ -92,10 +94,16 @@ type ConfirmKind = 'save' | 'archive' | null
 
 type FieldErrors = Partial<Record<keyof ModelFormState | 'image', string>>
 
-export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
+/**
+ * Vehicle Management → Models: the truck model catalog as a table. Vehicles
+ * pick their model (type, capacity, image) from here. Models are archived,
+ * never deleted, so past bookings keep their details.
+ */
+export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props) {
   const [models,      setModels]      = useState<TruckModel[]>([])
-  const [listLoading, setListLoading] = useState(false)
+  const [listLoading, setListLoading] = useState(true)
   const [listError,   setListError]   = useState<string | null>(null)
+  const [search,      setSearch]      = useState('')
 
   const [formMode,     setFormMode]    = useState<FormMode>(null)
   const [editingId,    setEditingId]   = useState<string | null>(null)
@@ -137,8 +145,16 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
   }, [])
 
   useEffect(() => {
-    if (open) void loadModels()
-  }, [open, loadModels])
+    void loadModels()
+  }, [loadModels])
+
+  const visibleModels = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return models
+    return models.filter((m) =>
+      [m.name, m.vehicle_type, m.suitable_for].some((v) => v?.toLowerCase().includes(q)),
+    )
+  }, [models, search])
 
   const openCreate = () => {
     setEditingId(null)
@@ -178,7 +194,7 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
       void loadModels()
     },
   })
-  const modelLocks = useRecordLocks('truck_model', open)
+  const modelLocks = useRecordLocks('truck_model', canEdit || canDelete)
 
   const closeForm = () => {
     setFormMode(null)
@@ -271,23 +287,28 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
     setConfirmKind('archive')
   }
 
-  // The card's 3-dot menu. Viewing stays open while someone else is editing
+  // The row's 3-dot menu. Viewing stays open while someone else is editing
   // the model; the writes wait for them.
   function rowActions(m: TruckModel): RowAction[] {
     const lockedBy = modelLocks.get(m.model_id)
     const lockedTitle = lockedBy ? `${lockedBy} is editing this model` : undefined
-    return [
+    const actions: RowAction[] = [
       { label: 'View Details', icon: <Eye size={13} />, onSelect: () => setViewModel(m) },
-      {
+    ]
+    if (canEdit) {
+      actions.push({
         label: 'Update Details', icon: <Pencil size={13} />, onSelect: () => openEdit(m),
         disabled: !!lockedBy, title: lockedTitle,
-      },
-      {
+      })
+    }
+    if (canDelete) {
+      actions.push({
         label: 'Archive', icon: <Archive size={13} />, tone: 'warning', separated: true,
         onSelect: () => handleArchiveClick(m),
         disabled: !!lockedBy, title: lockedTitle,
-      },
-    ]
+      })
+    }
+    return actions
   }
 
   const executeSave = async () => {
@@ -326,7 +347,6 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
       setConfirmKind(null)
       closeForm()
       await loadModels()
-      onSaved?.()
     } catch (e) {
       setConfirmKind(null)
       setUploadBusy(false)
@@ -348,7 +368,6 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
       setArchiveTarget(null)
       setConfirmKind(null)
       await loadModels()
-      onSaved?.()
     } catch (e) {
       // Most often: vehicles still use this model. The server names them.
       appToast.error(getApiErrorMessage(e, 'Request failed. Please try again.'), { action: 'truck-model-archive', entityId: id })
@@ -383,152 +402,122 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
 
   return (
     <>
-      {/* Catalog list modal */}
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
+      <div className="flex flex-1 min-h-0 flex-col p-3 lg:p-4 gap-3 overflow-hidden">
+        <div className="flex flex-col sm:flex-row gap-2 sm:items-center shrink-0">
+          <div
+            className="flex items-center gap-2 rounded-[10px] px-3 py-2 flex-1 max-w-md"
+            style={{ background: '#2a2828' }}
           >
-            <motion.div
-              initial={{ y: 14, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 14, opacity: 0 }}
-              transition={{ type: 'spring', damping: 26, stiffness: 280 }}
-              className="w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl border border-white/10 bg-[var(--color-surface)] shadow-2xl overflow-hidden"
-              onClick={(e) => e.stopPropagation()}
+            <Search size={16} className="text-white/40 shrink-0" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search model, type, use…"
+              className="bg-transparent border-none outline-none text-sm flex-1 text-white/80 placeholder:text-white/35"
+            />
+          </div>
+          <div className="flex items-center gap-2 sm:ml-auto">
+            <button
+              type="button"
+              onClick={() => void loadModels()}
+              className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/5 transition-colors"
             >
-              {/* Header */}
-              <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/[0.07] shrink-0">
-                <div>
-                  <h2 className="text-sm font-bold text-white uppercase tracking-widest">Truck model catalog</h2>
-                  <p className="text-[11px] text-white/40 mt-0.5">Manage models used in vehicle creation</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => void loadModels()}
-                    className="p-2 rounded-lg border border-white/10 text-white/50 hover:bg-white/5 transition-colors"
-                    title="Refresh"
-                  >
-                    <RefreshCw size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={openCreate}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-black"
-                    style={{ background: 'var(--color-cyan)' }}
-                  >
-                    <Plus size={13} />
-                    New model
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="p-2 rounded-lg hover:bg-white/5 text-white/50"
-                    aria-label="Close"
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
-              </div>
+              <RefreshCw size={14} />
+              Refresh
+            </button>
+            {canCreate && (
+              <button
+                type="button"
+                onClick={openCreate}
+                className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-wide text-black"
+                style={{ background: 'var(--color-cyan)' }}
+              >
+                <Plus size={16} />
+                Add model
+              </button>
+            )}
+          </div>
+        </div>
 
-              {/* Body */}
-              <div className="flex-1 min-h-0 overflow-y-auto">
-                {listLoading ? (
-                  <div className="flex items-center justify-center gap-3 py-16">
-                    <div
-                      className="w-7 h-7 border-2 border-t-transparent rounded-full animate-spin"
-                      style={{ borderColor: 'var(--color-cyan)' }}
-                    />
-                    <p className="text-sm text-white/45">Loading models…</p>
-                  </div>
-                ) : listError ? (
-                  <div className="flex flex-col items-center justify-center gap-3 py-12 px-6">
-                    <p className="text-red-400 text-sm text-center">{listError}</p>
-                    <button type="button" onClick={() => void loadModels()} className="text-[var(--color-cyan)] text-sm font-semibold">
-                      Try again
-                    </button>
-                  </div>
-                ) : models.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center gap-4 py-14 px-6 text-center">
-                    <TruckIcon size={38} className="text-white/15" />
-                    <p className="text-sm text-white/40">No truck models yet.</p>
-                    <button type="button" onClick={openCreate} className="text-[var(--color-cyan)] text-sm font-bold">
-                      Add the first model
-                    </button>
-                  </div>
-                ) : (
-                  <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {models.map((m) => (
-                      <div
-                        key={m.model_id}
-                        className="flex gap-3 p-3 rounded-xl border border-white/[0.08] bg-black/20 hover:bg-black/30 transition-colors"
-                      >
-                        <div className="shrink-0">
-                          {m.image_url ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={m.image_url}
-                              alt={m.name}
-                              width={64}
-                              height={64}
-                              className="w-16 h-16 rounded-lg object-cover border border-white/10 bg-black/30"
-                            />
-                          ) : (
-                            <div className="w-16 h-16 rounded-lg border border-white/10 bg-white/[0.04] flex items-center justify-center">
-                              <TruckIcon size={24} className="text-white/20" />
-                            </div>
-                          )}
+        <div className="flex-1 min-h-0 rounded-xl border border-white/[0.08] overflow-hidden flex flex-col bg-[#0f0f0f]">
+          {listLoading ? (
+            <div className="flex-1 flex flex-col items-center justify-center gap-3 py-16">
+              <div
+                className="w-9 h-9 border-2 border-t-transparent rounded-full animate-spin"
+                style={{ borderColor: 'var(--color-cyan)' }}
+              />
+              <p className="text-sm text-white/45">Loading models…</p>
+            </div>
+          ) : listError ? (
+            <div className="flex-1 flex flex-col items-center justify-center gap-3 p-6">
+              <p className="text-red-400 text-sm text-center">{listError}</p>
+              <button type="button" onClick={() => void loadModels()} className="text-[var(--color-cyan)] text-sm font-semibold">
+                Try again
+              </button>
+            </div>
+          ) : visibleModels.length === 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center gap-4 py-12 text-center px-4">
+              <TruckIcon size={40} className="text-white/20" />
+              <p className="text-sm text-white/45">
+                {models.length === 0 ? 'No truck models yet.' : 'No models match your search.'}
+              </p>
+              {models.length === 0 && canCreate && (
+                <button type="button" onClick={openCreate} className="text-[var(--color-cyan)] text-sm font-bold">
+                  Add the first model
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="overflow-auto flex-1 min-h-0">
+              <table className="w-full text-left text-sm border-collapse min-w-[700px]">
+                <thead className="sticky top-0 z-[1] bg-[#141414] border-b border-white/[0.07]">
+                  <tr className="text-[11px] uppercase tracking-wider text-white/40">
+                    <th className="px-2 py-2.5 font-bold w-14 text-center">Image</th>
+                    <th className="px-3 py-2.5 font-bold">Model</th>
+                    <th className="px-3 py-2.5 font-bold">Vehicle type</th>
+                    <th className="px-3 py-2.5 font-bold hidden md:table-cell">Cargo bed (mm)</th>
+                    <th className="px-3 py-2.5 font-bold">Max weight</th>
+                    <th className="px-3 py-2.5 font-bold hidden md:table-cell">Max volume</th>
+                    <th className="px-3 py-2.5 font-bold hidden lg:table-cell">Stackable</th>
+                    <th className="px-3 py-2.5 font-bold text-right w-[90px]">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleModels.map((m) => (
+                    <tr key={m.model_id} className="border-b border-white/[0.05] hover:bg-white/[0.03] transition-colors">
+                      <td className="px-2 py-2 align-middle">
+                        <div className="flex justify-center">
+                          <ModelThumb imageUrl={m.image_url ?? null} label={m.name} size={44} />
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-white truncate">{m.name}</p>
+                      </td>
+                      <td className="px-3 py-2.5 font-semibold text-white max-w-[240px] truncate">{m.name}</td>
+                      <td className="px-3 py-2.5 text-white/70">{m.vehicle_type ?? '—'}</td>
+                      <td className="px-3 py-2.5 text-white/60 text-xs hidden md:table-cell tabular-nums">{m.dimension_mm ?? '—'}</td>
+                      <td className="px-3 py-2.5 text-white/60 text-xs tabular-nums">
+                        {m.max_weight_kg != null ? `${m.max_weight_kg.toLocaleString()} kg · ${kgToTons(m.max_weight_kg)} t` : '—'}
+                      </td>
+                      <td className="px-3 py-2.5 text-white/60 text-xs hidden md:table-cell tabular-nums">
+                        {m.max_volume_cbm != null ? `${m.max_volume_cbm} cbm` : '—'}
+                      </td>
+                      <td className="px-3 py-2.5 text-xs hidden lg:table-cell">
+                        {m.stackable_friendly
+                          ? <span className="text-emerald-400/80">Yes</span>
+                          : <span className="text-white/35">No</span>}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <div className="flex items-center justify-end gap-1.5">
                           <RecordLockBadge holder={modelLocks.get(m.model_id)} />
-                          {m.vehicle_type && (
-                            <span
-                              className="inline-flex mt-1 text-[10px] font-bold px-2 py-0.5 rounded-md border"
-                              style={{
-                                background:  'rgba(77,249,237,0.08)',
-                                borderColor: 'rgba(77,249,237,0.25)',
-                                color:       'var(--color-cyan)',
-                              }}
-                            >
-                              {m.vehicle_type}
-                            </span>
-                          )}
-                          <div className="flex flex-wrap gap-2 mt-1.5">
-                            {m.max_weight_kg != null && (
-                              <span className="text-[10px] text-white/40 bg-white/[0.05] px-1.5 py-0.5 rounded">
-                                {m.max_weight_kg.toLocaleString()} kg
-                              </span>
-                            )}
-                            {m.max_volume_cbm != null && (
-                              <span className="text-[10px] text-white/40 bg-white/[0.05] px-1.5 py-0.5 rounded">
-                                {m.max_volume_cbm} cbm
-                              </span>
-                            )}
-                            {m.stackable_friendly && (
-                              <span className="text-[10px] text-emerald-400/70 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                                Stackable
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="shrink-0 self-start">
                           <RowActionMenu label={`Actions for ${m.name}`} actions={rowActions(m)} />
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Create / Edit form modal */}
       <AnimatePresence>
@@ -774,7 +763,7 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
 
               {/* Footer */}
               <div className="flex items-center justify-between gap-2 px-4 py-3 border-t border-white/[0.07]">
-                {formMode === 'edit' && editingModel && (
+                {formMode === 'edit' && editingModel && canDelete && (
                   <button
                     type="button"
                     onClick={() => handleArchiveClick(editingModel)}
@@ -884,6 +873,7 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
                 >
                   Close
                 </button>
+                {canEdit && (
                 <button
                   type="button"
                   disabled={modelLocks.has(viewModel.model_id)}
@@ -894,6 +884,7 @@ export default function TruckModelFormModal({ open, onClose, onSaved }: Props) {
                 >
                   Update Details
                 </button>
+                )}
               </div>
             </motion.div>
           </motion.div>

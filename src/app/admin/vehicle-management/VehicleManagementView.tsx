@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState, memo, type ReactNode } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Search,
@@ -13,10 +14,22 @@ import {
   ChevronRight,
   X,
   Truck as TruckIcon,
-  Settings2,
+  Layers,
+  Wrench,
+  Gauge,
   ClipboardCheck,
 } from 'lucide-react'
 
+import {
+  ModelThumb,
+  resolveModelImageUrl,
+  STATUSES,
+  EDITABLE_STATUSES,
+  fmtLabel,
+  statusStyle,
+  kgToTons,
+  InspectionBadge,
+} from './vehicle-ui'
 import { assignedDriverName, isRoadworthy, needsReinspection, type Truck, type TruckInspection, type CreateTruckInput, type UpdateTruckInput } from '@/app/types/truck.types'
 import type { TruckModel } from '@/app/types/truck-model'
 import {
@@ -25,12 +38,28 @@ import {
   adminUpdateTruck,
   adminArchiveTruck,
   adminFetchTruckModels,
+  adminFetchMaintenanceQueue,
+  adminUploadFleetPhoto,
 } from '@/lib/services/admin/trucks.service'
 import { driverService } from '@/lib/services/admin/user-management.service'
 import type { DriverUser } from '@/app/types/admin/user-management.types'
 import ReusableModal from '@/components/layout/ReusableModal'
 import { useModuleAccess } from '@/components/layout/ModuleAccess'
-import TruckModelFormModal from './TruckModelFormModal'
+import TruckModelsTab from './TruckModelsTab'
+import MaintenanceTab from './MaintenanceTab'
+import ReturnOdometerModal from './ReturnOdometerModal'
+import RecordServiceModal from './RecordServiceModal'
+import UpkeepHistory from './UpkeepHistory'
+import {
+  OdometerInput,
+  PhotoField,
+  ServiceStatusBadge,
+  parseKm,
+  fmtKm,
+  fmtDay,
+  phToday,
+  inputCls,
+} from './upkeep-ui'
 import BlowbagetsInspectionModal from './BlowbagetsInspectionModal'
 import { useRecordLock, useRecordLocks } from '@/lib/hooks/useRecordLock'
 import RecordLockBanner, { RecordLockBadge } from '@/components/ui/RecordLockBanner'
@@ -48,99 +77,6 @@ function formatPlateNumber(raw: string): string {
   return cleaned.slice(0, 7)
 }
 
-function resolveModelImageUrl(url: string | null | undefined): string | null {
-  if (!url?.trim()) return null
-  const u = url.trim()
-  if (u.startsWith('http://') || u.startsWith('https://')) return u
-  if (u.startsWith('/')) {
-    const base   = process.env.NEXT_PUBLIC_API_URL ?? ''
-    const origin = base.replace(/\/api\/?$/i, '')
-    return origin ? `${origin}${u}` : u
-  }
-  return u
-}
-
-const ModelThumb = memo(function ModelThumb({
-  imageUrl,
-  label,
-  size = 44,
-}: {
-  imageUrl: string | null
-  label: string
-  size?: number
-}) {
-  const [broken, setBroken] = useState(false)
-  const dim = `${size}px`
-  if (!imageUrl || broken) {
-    return (
-      <div
-        className="rounded-lg border border-white/10 bg-white/[0.04] flex items-center justify-center shrink-0"
-        style={{ width: dim, height: dim }}
-        title={label}
-      >
-        <TruckIcon size={Math.round(size * 0.42)} className="text-white/25" aria-hidden />
-      </div>
-    )
-  }
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={imageUrl}
-      alt={label}
-      width={size}
-      height={size}
-      className="rounded-lg object-cover border border-white/10 bg-black/30 shrink-0"
-      style={{ width: dim, height: dim }}
-      loading="lazy"
-      onError={() => setBroken(true)}
-    />
-  )
-})
-
-const STATUSES: Truck['status'][] = [
-  'available',
-  // Back from a job; set by the driver's return, lifted by the next passing BLOWBAGETS.
-  'recheck_due',
-  'in_use',
-  'under_maintenance',
-  'inactive',
-  'archived',
-]
-
-// What the edit form may set. Archiving has its own action (it also releases the
-// driver pairing and is refused mid-booking), so it is not a status pick.
-const EDITABLE_STATUSES = STATUSES.filter((s) => s !== 'archived')
-
-function fmtLabel(s: string) {
-  if (s === 'recheck_due') return 'Re-check Due'
-  return (s ?? '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
-}
-
-function statusStyle(status: string): { bg: string; color: string; border: string } {
-  switch (status) {
-    case 'available':
-      return { bg: 'rgba(58,246,38,0.12)', color: '#86efac', border: 'rgba(58,246,38,0.35)' }
-    case 'in_use':
-      return { bg: 'rgba(77,249,237,0.12)', color: 'var(--color-cyan)', border: 'rgba(77,249,237,0.35)' }
-    case 'recheck_due':
-      return { bg: 'rgba(250,204,21,0.12)', color: '#fde047', border: 'rgba(250,204,21,0.35)' }
-    case 'under_maintenance':
-      return { bg: 'rgba(246,159,38,0.12)', color: '#fbbf24', border: 'rgba(246,159,38,0.35)' }
-    case 'inactive':
-      return { bg: 'rgba(156,163,175,0.12)', color: '#d1d5db', border: 'rgba(156,163,175,0.3)' }
-    case 'archived':
-      return { bg: 'rgba(107,114,128,0.15)', color: '#9ca3af', border: 'rgba(107,114,128,0.35)' }
-    default:
-      return { bg: 'rgba(156,163,175,0.12)', color: '#9ca3af', border: 'rgba(156,163,175,0.3)' }
-  }
-}
-
-function kgToTons(kg: number | null | undefined): string {
-  if (kg == null) return ''
-  const tons = kg / 1000
-  return parseFloat(tons.toFixed(3)).toString()
-}
-
 type FormMode    = 'create' | 'edit' | null
 type ConfirmKind = 'save' | 'archive' | null
 
@@ -150,6 +86,12 @@ interface TruckFormState {
   status:       Truck['status']
   /** The vehicle's regular driver. '' means it has none. */
   assigned_driver_id: string
+  // Odometer + routine service schedule (strings while typing).
+  odometer_km:              string
+  service_interval_km:      string
+  service_interval_months:  string
+  last_service_at:          string
+  last_service_odometer_km: string
 }
 
 function emptyForm(): TruckFormState {
@@ -158,8 +100,15 @@ function emptyForm(): TruckFormState {
     model_id:     '',
     status:       'available',
     assigned_driver_id: '',
+    odometer_km:              '',
+    service_interval_km:      '',
+    service_interval_months:  '',
+    last_service_at:          '',
+    last_service_odometer_km: '',
   }
 }
+
+const numStr = (n: number | null | undefined) => (n == null ? '' : String(n))
 
 function truckToForm(t: Truck): TruckFormState {
   return {
@@ -167,77 +116,22 @@ function truckToForm(t: Truck): TruckFormState {
     model_id:     t.model_id ?? '',
     status:       t.status,
     assigned_driver_id: t.assigned_driver_id ?? '',
+    odometer_km:              numStr(t.odometer_km),
+    service_interval_km:      numStr(t.service_interval_km),
+    service_interval_months:  numStr(t.service_interval_months),
+    last_service_at:          t.last_service_at ?? '',
+    last_service_odometer_km: numStr(t.last_service_odometer_km),
   }
 }
 
 function formsEqual(a: TruckFormState, b: TruckFormState): boolean {
-  return (
-    a.plate_number === b.plate_number &&
-    a.model_id     === b.model_id     &&
-    a.status       === b.status       &&
-    a.assigned_driver_id === b.assigned_driver_id
-  )
+  return (Object.keys(a) as (keyof TruckFormState)[]).every((k) => a[k] === b[k])
 }
 
-/**
- * Whether this vehicle is cleared for operations to assign, from its most recent
- * BLOWBAGETS inspection. A vehicle that has never been inspected reads the same
- * as one that failed: it can't be picked.
- */
-function InspectionBadge({ inspection, dueRecheck }: { inspection: TruckInspection | null; dueRecheck?: boolean }) {
-  if (!inspection) {
-    return (
-      <span
-        className="inline-flex text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border"
-        style={{ color: 'rgba(255,255,255,0.45)', borderColor: 'rgba(255,255,255,0.15)' }}
-        title="Never inspected — cannot be assigned to a booking"
-      >
-        Not inspected
-      </span>
-    )
-  }
-
-  const when = new Date(inspection.inspected_at)
-  const whenLabel = Number.isNaN(when.getTime())
-    ? inspection.inspected_at
-    : when.toLocaleDateString()
-
-  // A pass that predates the vehicle's last homecoming is spent: it cleared the
-  // job the truck has already done. Saying "Passed" here would leave the fleet
-  // manager wondering why operations cannot pick it.
-  if (inspection.passed && dueRecheck) {
-    return (
-      <span className="flex flex-col gap-0.5 items-start">
-        <span
-          className="inline-flex text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border"
-          style={{ color: '#fbbf24', borderColor: 'rgba(246,159,38,0.35)', background: 'rgba(246,159,38,0.12)' }}
-          title="Back from a booking since its last check — inspect it again before it can be assigned"
-        >
-          Re-check due
-        </span>
-        <span className="text-[10px] text-white/30 tabular-nums">last {whenLabel}</span>
-      </span>
-    )
-  }
-
-  return (
-    <span className="flex flex-col gap-0.5 items-start">
-      <span
-        className="inline-flex text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border"
-        style={
-          inspection.passed
-            ? { color: 'var(--color-cyan)', borderColor: 'rgba(77,249,237,0.40)', background: 'rgba(77,249,237,0.12)' }
-            : { color: '#fca5a5', borderColor: 'rgba(248,113,113,0.35)', background: 'rgba(248,113,113,0.10)' }
-        }
-        title={inspection.passed
-          ? 'Cleared — the Operations Manager can assign this vehicle'
-          : 'Failed — blocked from assignment until it passes a re-check'}
-      >
-        {inspection.passed ? 'Passed' : 'Failed'}
-      </span>
-      <span className="text-[10px] text-white/30 tabular-nums">{whenLabel}</span>
-    </span>
-  )
+/** Whole months 1–60, or null. */
+function parseMonths(raw: string): number | null {
+  const n = parseKm(raw)
+  return n != null && n >= 1 && n <= 60 ? n : null
 }
 
 function fmtDate(iso: string | null | undefined): string {
@@ -338,9 +232,38 @@ function VehicleDetailsModal({
                   </span>
                 </DetailRow>
                 <DetailRow label="Last back in yard">{fmtDate(truck.last_fleet_return_at)}</DetailRow>
+                <DetailRow label="Odometer">
+                  {fmtKm(truck.odometer_km)}
+                  {truck.odometer_recorded_at && (
+                    <span className="block text-[10px] text-white/35">{fmtDate(truck.odometer_recorded_at)}</span>
+                  )}
+                  {truck.return_odometer_due && (
+                    <span className="block text-[10px] text-amber-300">Return reading due</span>
+                  )}
+                </DetailRow>
+                <DetailRow label="Service every">
+                  {truck.service_interval_km != null && truck.service_interval_months != null
+                    ? `${truck.service_interval_km.toLocaleString()} km or ${truck.service_interval_months} months`
+                    : <span className="text-white/35">Not set</span>}
+                </DetailRow>
+                <DetailRow label="Last service">
+                  {truck.last_service_at
+                    ? `${fmtDay(truck.last_service_at)} · ${fmtKm(truck.last_service_odometer_km)}`
+                    : <span className="text-white/35">Not set</span>}
+                </DetailRow>
+                <DetailRow label="Next service">
+                  <span className="inline-flex justify-end"><ServiceStatusBadge status={truck.service_status} /></span>
+                  {truck.service_status?.due_date && (
+                    <span className="block text-[10px] text-white/35">
+                      {fmtDay(truck.service_status.due_date)} or {fmtKm(truck.service_status.due_km)}
+                    </span>
+                  )}
+                </DetailRow>
                 <DetailRow label="Added">{fmtDate(truck.created_at)}</DetailRow>
                 <DetailRow label="Last updated">{fmtDate(truck.updated_at)}</DetailRow>
               </div>
+
+              <UpkeepHistory key={truck.truck_id} truckId={truck.truck_id} />
             </div>
 
             <div className="flex justify-end gap-2 px-4 py-3 border-t border-white/[0.07]">
@@ -369,7 +292,40 @@ function VehicleDetailsModal({
   )
 }
 
+type VehicleTab = 'vehicles' | 'models' | 'maintenance'
+
+const TABS: { key: VehicleTab; label: string; icon: ReactNode }[] = [
+  { key: 'vehicles',    label: 'Vehicles',    icon: <TruckIcon size={14} /> },
+  { key: 'models',      label: 'Models',      icon: <Layers size={14} /> },
+  { key: 'maintenance', label: 'Maintenance', icon: <Wrench size={14} /> },
+]
+
+function isVehicleTab(v: string | null): v is VehicleTab {
+  return v === 'vehicles' || v === 'models' || v === 'maintenance'
+}
+
+// Reads ?tab= (the fleet manager's report notification opens Maintenance) once.
+// Isolated so useSearchParams sits under its own Suspense boundary.
+function TabDeepLink({ onTab }: { onTab: (t: VehicleTab) => void }) {
+  const searchParams = useSearchParams()
+  const tab = searchParams.get('tab')
+  const appliedRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (isVehicleTab(tab) && appliedRef.current !== tab) {
+      appliedRef.current = tab
+      onTab(tab)
+    }
+  }, [tab, onTab])
+  return null
+}
+
 export default function VehicleManagementView() {
+  const [tab, setTab] = useState<VehicleTab>('vehicles')
+  // Shown on the Maintenance tab before anyone opens it.
+  const [maintenanceCount, setMaintenanceCount] = useState<number | null>(null)
+  // Bumped after a save so an open Maintenance tab re-reads its list.
+  const [maintenanceKey, setMaintenanceKey] = useState(0)
+
   const [trucks,  setTrucks]  = useState<Truck[]>([])
   const [models,  setModels]  = useState<TruckModel[]>([])
   // The full driver roster, for the "regular driver" picker. Deliberately NOT
@@ -394,6 +350,12 @@ export default function VehicleManagementView() {
 
   const [modalMode,     setModalMode]     = useState<FormMode>(null)
   const [editingId,     setEditingId]     = useState<string | null>(null)
+  // The vehicle as it was when opened — it may not be on the current page
+  // (e.g. opened from the Maintenance tab).
+  const [editingSnapshot, setEditingSnapshot] = useState<Truck | null>(null)
+  const [createOdoPhoto,  setCreateOdoPhoto]  = useState<File | null>(null)
+  const [returnTruck,     setReturnTruck]     = useState<Truck | null>(null)
+  const [serviceTruck,    setServiceTruck]    = useState<Truck | null>(null)
   const [form,          setForm]          = useState<TruckFormState>(emptyForm())
   const [originalForm,  setOriginalForm]  = useState<TruckFormState>(emptyForm())
   const [formError,     setFormError]     = useState<string | null>(null)
@@ -403,10 +365,12 @@ export default function VehicleManagementView() {
   const [archiveTarget, setArchiveTarget] = useState<Truck | null>(null)
   const [viewTruck,     setViewTruck]     = useState<Truck | null>(null)
 
-  const [modelModalOpen, setModelModalOpen] = useState(false)
 
   const isUnchanged = modalMode === 'edit' && formsEqual(form, originalForm)
-  const editingTruck = useMemo(() => trucks.find((t) => t.truck_id === editingId) ?? null, [trucks, editingId])
+  const editingTruck = useMemo(
+    () => trucks.find((t) => t.truck_id === editingId) ?? (editingSnapshot?.truck_id === editingId ? editingSnapshot : null),
+    [trucks, editingId, editingSnapshot],
+  )
 
   const loadModels = useCallback(async () => {
     try {
@@ -446,8 +410,27 @@ export default function VehicleManagementView() {
   }, [page, statusFilter, debouncedSearch])
 
   useEffect(() => {
-    void loadModels()
-  }, [loadModels])
+    if (tab === 'vehicles') void loadModels()
+  }, [tab, loadModels])
+
+  const loadMaintenanceCount = useCallback(() => {
+    void adminFetchMaintenanceQueue()
+      .then((list) => setMaintenanceCount(list.length))
+      .catch(() => setMaintenanceCount(null))
+  }, [])
+
+  useEffect(() => {
+    if (tab !== 'maintenance') loadMaintenanceCount()
+  }, [tab, loadMaintenanceCount])
+
+  const switchTab = useCallback((next: VehicleTab) => {
+    setTab(next)
+    // Keep the tab in the address so a refresh or a shared link lands on it.
+    const url = new URL(window.location.href)
+    if (next === 'vehicles') url.searchParams.delete('tab')
+    else url.searchParams.set('tab', next)
+    window.history.replaceState(window.history.state, '', url)
+  }, [])
 
   useEffect(() => {
     void driverService.getAll().then(setDrivers).catch(() => setDrivers([]))
@@ -503,6 +486,8 @@ export default function VehicleManagementView() {
 
   const openCreate = () => {
     setEditingId(null)
+    setEditingSnapshot(null)
+    setCreateOdoPhoto(null)
     setForm(emptyForm())
     setOriginalForm(emptyForm())
     setFormError(null)
@@ -511,6 +496,7 @@ export default function VehicleManagementView() {
 
   const openEdit = (t: Truck) => {
     setEditingId(t.truck_id)
+    setEditingSnapshot(t)
     const initial = truckToForm(t)
     setForm(initial)
     setOriginalForm(initial)
@@ -551,6 +537,37 @@ export default function VehicleManagementView() {
       setFormError('Invalid plate format (e.g. ABC 1234). Only letters, and numbers allowed.')
       return false
     }
+
+    // Odometer + service schedule. Required when creating; on an older vehicle
+    // the parts not yet set are entered here once.
+    const isCreate      = modalMode === 'create'
+    const needOdometer  = isCreate || editingTruck?.odometer_km == null
+    const needBaseline  = isCreate || !editingTruck?.last_service_at
+    const odo           = parseKm(form.odometer_km)
+    const everyKm       = parseKm(form.service_interval_km)
+    const everyMonths   = parseMonths(form.service_interval_months)
+    const lastKm        = parseKm(form.last_service_odometer_km)
+
+    if (needOdometer && (isCreate || form.odometer_km.trim()) && odo == null) {
+      setFormError('Enter the current odometer in whole kilometres.'); return false
+    }
+    const intervalTouched = isCreate || form.service_interval_km.trim() || form.service_interval_months.trim()
+    if (intervalTouched && (everyKm == null || everyKm < 100)) {
+      setFormError('Enter the service interval in kilometres (at least 100).'); return false
+    }
+    if (intervalTouched && everyMonths == null) {
+      setFormError('Enter the service interval in months (1 to 60).'); return false
+    }
+    const baselineTouched = needBaseline && (isCreate || form.last_service_at || form.last_service_odometer_km.trim())
+    if (baselineTouched) {
+      if (!form.last_service_at) { setFormError('Enter the last service date.'); return false }
+      if (form.last_service_at > phToday()) { setFormError('The last service date cannot be in the future.'); return false }
+      if (lastKm == null) { setFormError('Enter the odometer at the last service.'); return false }
+      const currentKm = odo ?? editingTruck?.odometer_km ?? null
+      if (currentKm != null && lastKm > currentKm) {
+        setFormError('The last service odometer cannot be higher than the current odometer.'); return false
+      }
+    }
     return true
   }
 
@@ -570,9 +587,16 @@ export default function VehicleManagementView() {
     setActionBusy(true)
     try {
       if (modalMode === 'create') {
+        const odometer_photo_url = createOdoPhoto ? await adminUploadFleetPhoto(createOdoPhoto) : null
         const body: CreateTruckInput = {
           plate_number: form.plate_number.trim().toUpperCase(),
           model_id,
+          odometer_km:              parseKm(form.odometer_km)!,
+          odometer_photo_url,
+          service_interval_km:      parseKm(form.service_interval_km)!,
+          service_interval_months:  parseMonths(form.service_interval_months)!,
+          last_service_at:          form.last_service_at,
+          last_service_odometer_km: parseKm(form.last_service_odometer_km)!,
         }
         await adminCreateTruck(body)
         appToast.success('Vehicle created.', { action: 'truck-save' })
@@ -585,12 +609,28 @@ export default function VehicleManagementView() {
           // rather than silently leave the old driver in place.
           assigned_driver_id: form.assigned_driver_id || null,
         }
+        // Schedule: intervals whenever given; the baseline and first odometer
+        // only while the vehicle has none (after that they move through Record
+        // Service and the delivery readings).
+        const everyKm     = parseKm(form.service_interval_km)
+        const everyMonths = parseMonths(form.service_interval_months)
+        if (everyKm != null)     body.service_interval_km     = everyKm
+        if (everyMonths != null) body.service_interval_months = everyMonths
+        if (!editingTruck?.last_service_at && form.last_service_at) {
+          body.last_service_at          = form.last_service_at
+          body.last_service_odometer_km = parseKm(form.last_service_odometer_km)!
+        }
+        if (editingTruck?.odometer_km == null && parseKm(form.odometer_km) != null) {
+          body.odometer_km = parseKm(form.odometer_km)!
+        }
         await adminUpdateTruck(editingId, body)
         appToast.success('Vehicle updated.', { action: 'truck-save', entityId: editingId })
       }
       setConfirmKind(null)
       closeModal()
       await refreshAll()
+      loadMaintenanceCount()
+      setMaintenanceKey((k) => k + 1)
     } catch (e) {
       setConfirmKind(null)
       setFormError(getApiErrorMessage(e, 'Request failed. Please try again.'))
@@ -635,15 +675,33 @@ export default function VehicleManagementView() {
         label: 'Update Details', icon: <Pencil size={13} />, onSelect: () => openEdit(t),
         disabled: !!lockedBy, title: lockedTitle,
       })
+      // Back from a delivery: the after-delivery odometer comes first.
+      if (t.return_odometer_due) {
+        actions.push({
+          label: 'Record Return Odometer', icon: <Gauge size={13} />, tone: 'accent',
+          onSelect: () => setReturnTruck(t),
+          disabled: !!lockedBy, title: lockedTitle,
+        })
+      }
       // Only offered while the vehicle is actually blocked on BLOWBAGETS: never
       // inspected, failed, or back from a booking since its last pass.
       if (!isRoadworthy(t)) {
         actions.push({
-          label: 'Approve Vehicle', icon: <ClipboardCheck size={13} />, tone: 'accent',
+          label: 'Approve Vehicle', icon: <ClipboardCheck size={13} />,
+          tone: t.return_odometer_due ? 'default' : 'accent',
           onSelect: () => setInspectTruck(t),
-          disabled: !!lockedBy, title: lockedTitle ?? 'Run the BLOWBAGETS inspection',
+          disabled: !!lockedBy || !!t.return_odometer_due,
+          title: lockedTitle ?? (t.return_odometer_due
+            ? 'Record the return odometer first'
+            : 'Run the BLOWBAGETS inspection and take the before-delivery odometer'),
         })
       }
+      actions.push({
+        label: 'Record Service', icon: <Wrench size={13} />,
+        tone: t.service_status?.state === 'overdue' ? 'accent' : 'default',
+        onSelect: () => setServiceTruck(t),
+        disabled: !!lockedBy, title: lockedTitle,
+      })
     }
     if (canDelete) {
       const onBooking = t.status === 'in_use'
@@ -686,43 +744,53 @@ export default function VehicleManagementView() {
   return (
     <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-hidden ff-sc bg-[var(--color-bg)]">
 
-      <header className="shrink-0 px-3 py-3 lg:px-4 border-b border-white/[0.07] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-bold text-white tracking-tight">Vehicle management</h1>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {canEdit && (
-            <button
-              type="button"
-              onClick={() => setModelModalOpen(true)}
-              className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/5 transition-colors"
-            >
-              <Settings2 size={14} />
-              Manage models
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => void refreshAll()}
-            className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/5 transition-colors"
-          >
-            <RefreshCw size={14} />
-            Refresh
-          </button>
-          {canCreate && (
-            <button
-              type="button"
-              onClick={openCreate}
-              className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-wide text-black"
-              style={{ background: 'var(--color-cyan)' }}
-            >
-              <Plus size={16} />
-              Add vehicle
-            </button>
-          )}
-        </div>
+      <Suspense fallback={null}>
+        <TabDeepLink onTab={setTab} />
+      </Suspense>
+
+      <header className="shrink-0 px-3 pt-3 lg:px-4 border-b border-white/[0.07] flex flex-col gap-2">
+        <h1 className="text-lg font-bold text-white tracking-tight">Vehicle management</h1>
+        <nav className="flex gap-1 -mb-px overflow-x-auto" role="tablist" aria-label="Vehicle management sections">
+          {TABS.map(({ key, label, icon }) => {
+            const active = tab === key
+            return (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => switchTab(key)}
+                className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold border-b-2 transition-colors whitespace-nowrap ${
+                  active ? 'text-[var(--color-cyan)] border-[var(--color-cyan)]' : 'text-white/50 border-transparent hover:text-white/80'
+                }`}
+              >
+                {icon}
+                {label}
+                {key === 'maintenance' && maintenanceCount != null && maintenanceCount > 0 && (
+                  <span className="ml-0.5 min-w-[18px] px-1 rounded-full text-[10px] leading-[18px] text-center bg-amber-400/15 text-amber-300 border border-amber-400/30">
+                    {maintenanceCount}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </nav>
       </header>
 
+      {tab === 'models' && (
+        <TruckModelsTab canCreate={canCreate} canEdit={canEdit} canDelete={canDelete} />
+      )}
+
+      {tab === 'maintenance' && (
+        <MaintenanceTab
+          key={maintenanceKey}
+          canEdit={canEdit}
+          onCount={setMaintenanceCount}
+          onSetUpSchedule={(t) => openEdit(t)}
+        />
+      )}
+
+      {tab === 'vehicles' && (
       <div className="flex flex-1 min-h-0 flex-col p-3 lg:p-4 gap-3 overflow-hidden">
 
         {/* Filters */}
@@ -763,6 +831,27 @@ export default function VehicleManagementView() {
             })}
           </div>
 
+          <div className="flex flex-wrap items-center gap-2 xl:ml-auto">
+            <button
+              type="button"
+              onClick={() => void refreshAll()}
+              className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/5 transition-colors"
+            >
+              <RefreshCw size={14} />
+              Refresh
+            </button>
+            {canCreate && (
+              <button
+                type="button"
+                onClick={openCreate}
+                className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-wide text-black"
+                style={{ background: 'var(--color-cyan)' }}
+              >
+                <Plus size={16} />
+                Add vehicle
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Table */}
@@ -785,8 +874,12 @@ export default function VehicleManagementView() {
           ) : trucks.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-4 py-12 text-center px-4">
               <TruckIcon size={40} className="text-white/20" />
-              <p className="text-sm text-white/45">No vehicles match your filters.</p>
-              {canCreate && (
+              {/* "Add your first vehicle" only when the fleet really is empty —
+                  not when a search or status filter just hides everything. */}
+              <p className="text-sm text-white/45">
+                {debouncedSearch || statusFilter !== 'all' ? 'No vehicles match your filters.' : 'No vehicles yet.'}
+              </p>
+              {canCreate && !debouncedSearch && statusFilter === 'all' && (
                 <button type="button" onClick={openCreate} className="text-[var(--color-cyan)] text-sm font-bold">
                   Add your first vehicle
                 </button>
@@ -795,7 +888,7 @@ export default function VehicleManagementView() {
           ) : (
             <>
               <div className="overflow-auto flex-1 min-h-0">
-                <table className="w-full text-left text-sm border-collapse min-w-[700px]">
+                <table className="w-full text-left text-sm border-collapse min-w-[760px]">
                   <thead className="sticky top-0 z-[1] bg-[#141414] border-b border-white/[0.07]">
                     <tr className="text-[11px] uppercase tracking-wider text-white/40">
                       <th className="px-2 py-2.5 font-bold w-14 text-center">Image</th>
@@ -806,6 +899,7 @@ export default function VehicleManagementView() {
                       <th className="px-3 py-2.5 font-bold hidden lg:table-cell">Driver</th>
                       <th className="px-3 py-2.5 font-bold">Status</th>
                       <th className="px-3 py-2.5 font-bold">BLOWBAGETS</th>
+                      <th className="px-3 py-2.5 font-bold hidden md:table-cell">Service</th>
                       <th className="px-3 py-2.5 font-bold text-right w-[90px]">Actions</th>
                     </tr>
                   </thead>
@@ -861,7 +955,21 @@ export default function VehicleManagementView() {
                           {/* Readiness for assignment: operations can only pick a
                               vehicle whose latest inspection passed. */}
                           <td className="px-3 py-2.5">
-                            <InspectionBadge inspection={t.latest_inspection ?? null} dueRecheck={needsReinspection(t)} />
+                            <div className="flex flex-col gap-1 items-start">
+                              {t.return_odometer_due && (
+                                <span
+                                  className="inline-flex text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border"
+                                  style={{ color: '#fbbf24', borderColor: 'rgba(246,159,38,0.35)', background: 'rgba(246,159,38,0.12)' }}
+                                  title="Back from a delivery — record the return odometer before the next inspection"
+                                >
+                                  Return odometer due
+                                </span>
+                              )}
+                              <InspectionBadge inspection={t.latest_inspection ?? null} dueRecheck={needsReinspection(t)} />
+                            </div>
+                          </td>
+                          <td className="px-3 py-2.5 hidden md:table-cell">
+                            <ServiceStatusBadge status={t.service_status} />
                           </td>
                           <td className="px-3 py-2.5">
                             <div className="flex items-center justify-end gap-1.5">
@@ -907,9 +1015,22 @@ export default function VehicleManagementView() {
           )}
         </div>
       </div>
+      )}
 
       {/* BLOWBAGETS inspection — the gate on whether operations can assign this
           vehicle to a booking. */}
+      <ReturnOdometerModal
+        truck={returnTruck}
+        onClose={() => setReturnTruck(null)}
+        onRecorded={() => { void loadTrucksPage() }}
+      />
+
+      <RecordServiceModal
+        truck={serviceTruck}
+        onClose={() => setServiceTruck(null)}
+        onRecorded={() => { void loadTrucksPage(); loadMaintenanceCount() }}
+      />
+
       <BlowbagetsInspectionModal
         truck={inspectTruck}
         onClose={() => setInspectTruck(null)}
@@ -931,13 +1052,6 @@ export default function VehicleManagementView() {
               openEdit(t)
             }
           : undefined}
-      />
-
-      {/* Model catalog modal */}
-      <TruckModelFormModal
-        open={modelModalOpen}
-        onClose={() => setModelModalOpen(false)}
-        onSaved={() => void refreshAll()}
       />
 
       {/* Confirm modal */}
@@ -1104,6 +1218,100 @@ export default function VehicleManagementView() {
                       </>
                     )}
                   </div>
+                </div>
+
+                {/* Odometer + routine service schedule. Required for a new vehicle;
+                    on an older one, whatever is still missing is entered here once. */}
+                <div className="rounded-xl border border-white/[0.08] bg-black/20 p-3 space-y-3">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-white/50">Odometer &amp; routine service</p>
+
+                  {(modalMode === 'create' || editingTruck?.odometer_km == null) ? (
+                    <>
+                      <OdometerInput
+                        value={form.odometer_km}
+                        onChange={(v) => setForm((f) => ({ ...f, odometer_km: v }))}
+                        label="Current odometer (km)"
+                      />
+                      {modalMode === 'create' && (
+                        <PhotoField file={createOdoPhoto} onFile={setCreateOdoPhoto} label="Odometer photo" />
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-[11px] text-white/45">
+                      Odometer: <span className="text-white/75 font-mono">{fmtKm(editingTruck.odometer_km)}</span>
+                      {' '}— it moves with the before and after delivery readings.
+                    </p>
+                  )}
+
+                  <div>
+                    <span className="text-[11px] font-bold uppercase text-white/40">
+                      Service every <span className="text-red-400">*</span>
+                    </span>
+                    <div className="mt-1 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                      <div className="relative">
+                        <input
+                          value={form.service_interval_km}
+                          onChange={(e) => setForm((f) => ({ ...f, service_interval_km: e.target.value }))}
+                          inputMode="numeric"
+                          placeholder="e.g. 5000"
+                          className={`${inputCls} mt-0 pr-10 font-mono tabular-nums`}
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-white/35">km</span>
+                      </div>
+                      <span className="text-[11px] text-white/40">or</span>
+                      <div className="relative">
+                        <input
+                          value={form.service_interval_months}
+                          onChange={(e) => setForm((f) => ({ ...f, service_interval_months: e.target.value }))}
+                          inputMode="numeric"
+                          placeholder="e.g. 3"
+                          className={`${inputCls} mt-0 pr-16 font-mono tabular-nums`}
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-white/35">months</span>
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-white/25 mt-1">
+                      Whichever comes first. An overdue vehicle cannot be assigned until its service is recorded.
+                    </p>
+                  </div>
+
+                  {(modalMode === 'create' || !editingTruck?.last_service_at) ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className="block">
+                        <span className="text-[11px] font-bold uppercase text-white/40">
+                          Last service <span className="text-red-400">*</span>
+                        </span>
+                        <input
+                          type="date"
+                          value={form.last_service_at}
+                          max={phToday()}
+                          onChange={(e) => setForm((f) => ({ ...f, last_service_at: e.target.value }))}
+                          className={inputCls}
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="text-[11px] font-bold uppercase text-white/40">
+                          Odometer then <span className="text-red-400">*</span>
+                        </span>
+                        <input
+                          value={form.last_service_odometer_km}
+                          onChange={(e) => setForm((f) => ({ ...f, last_service_odometer_km: e.target.value }))}
+                          inputMode="numeric"
+                          placeholder="km"
+                          className={`${inputCls} font-mono tabular-nums`}
+                        />
+                      </label>
+                      <p className="col-span-2 text-[10px] text-white/25 -mt-1">
+                        Never serviced? Use the day it was put into service and its odometer then.
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-white/45">
+                      Last service: <span className="text-white/75">{fmtDay(editingTruck.last_service_at)}</span>
+                      {' '}at <span className="text-white/75 font-mono">{fmtKm(editingTruck.last_service_odometer_km)}</span>
+                      {' '}— log new ones with Record Service.
+                    </p>
+                  )}
                 </div>
 
                 {modalMode === 'edit' && (

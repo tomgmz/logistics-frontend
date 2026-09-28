@@ -1,5 +1,5 @@
 import authApi, { initCsrf } from '../../api/auth.api'
-import type { Truck, TruckInspection, CreateTruckInput, UpdateTruckInput, CreateTruckModelInput,UpdateTruckModelInput } from '@/app/types/truck.types'
+import type { Truck, TruckInspection, CreateTruckInput, UpdateTruckInput, CreateTruckModelInput,UpdateTruckModelInput, MaintenanceTruck, OdometerReading, TruckService } from '@/app/types/truck.types'
 import type { BlowbagetsItems } from '@/lib/services/client/booking.service'
 import type { TruckModel } from '@/app/types/truck-model'
 
@@ -76,7 +76,7 @@ export async function adminFetchTruckInspections(truckId: string): Promise<Truck
 
 export async function adminRecordTruckInspection(
   truckId: string,
-  body: { items: BlowbagetsItems; notes?: string | null },
+  body: { items: BlowbagetsItems; notes?: string | null; odometer_km: number; odometer_photo_url: string },
 ): Promise<TruckInspection> {
   await initCsrf()
   const { data } = await authApi.post<{ data: TruckInspection }>(`${ADMIN}/trucks/${truckId}/inspections`, body)
@@ -127,4 +127,62 @@ export async function adminUpdateTruckModel(modelId: string, body: UpdateTruckMo
 export async function adminArchiveTruckModel(modelId: string): Promise<void> {
   await initCsrf()
   await authApi.post(`${ADMIN}/truck-models/${modelId}/archive`)
+}
+/**
+ * Vehicle Management → Maintenance: vehicles that need a mechanic (out of
+ * service, failed BLOWBAGETS, or an open breakdown/accident report from a
+ * driver), each with the reasons and the open reports that put it there.
+ */
+export async function adminFetchMaintenanceQueue(): Promise<MaintenanceTruck[]> {
+  const { data } = await authApi.get<{ data: MaintenanceTruck[] }>(`${ADMIN}/trucks/maintenance`)
+  return data?.data ?? []
+}
+
+// --- Odometer + routine service ---------------------------------------------
+
+/** Dashboard odometer photo or service receipt → hosted URL. */
+export async function adminUploadFleetPhoto(file: File): Promise<string> {
+  await initCsrf()
+  const formData = new FormData()
+  formData.append('image', file)
+  const { data } = await authApi.post<{ data: { url: string } }>(
+    `${ADMIN}/upload/fleet-photo`,
+    formData,
+    {
+      transformRequest: (data, headers) => {
+        delete headers['Content-Type']
+        return data
+      },
+    },
+  )
+  return data.data.url
+}
+
+/** The after-delivery odometer, once the driver has stamped the vehicle back. */
+export async function adminRecordReturnOdometer(
+  truckId: string,
+  body: { reading_km: number; photo_url: string },
+): Promise<OdometerReading> {
+  await initCsrf()
+  const { data } = await authApi.post<{ data: OdometerReading }>(`${ADMIN}/trucks/${truckId}/odometer`, body)
+  return data.data
+}
+
+/** A routine service — restarts the km and month counters. */
+export async function adminRecordTruckService(
+  truckId: string,
+  body: { serviced_at: string; odometer_km: number; work_done: string; workshop?: string | null; receipt_url?: string | null },
+): Promise<TruckService> {
+  await initCsrf()
+  const { data } = await authApi.post<{ data: TruckService }>(`${ADMIN}/trucks/${truckId}/services`, body)
+  return data.data
+}
+
+export async function adminFetchTruckUpkeep(
+  truckId: string,
+): Promise<{ services: TruckService[]; readings: OdometerReading[] }> {
+  const { data } = await authApi.get<{ data: { services: TruckService[]; readings: OdometerReading[] } }>(
+    `${ADMIN}/trucks/${truckId}/upkeep`,
+  )
+  return data?.data ?? { services: [], readings: [] }
 }

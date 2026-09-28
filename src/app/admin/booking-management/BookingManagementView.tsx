@@ -43,7 +43,7 @@ import {
 import { driverService } from '@/lib/services/admin/user-management.service'
 import { adminFetchTrucks } from '@/lib/services/admin/trucks.service'
 import type { DriverUser } from '@/app/types/admin/user-management.types'
-import { isRoadworthy, type Truck as TruckType } from '@/app/types/truck.types'
+import { isAssignable, type Truck as TruckType } from '@/app/types/truck.types'
 import { BLOWBAGETS_ITEMS } from '@/lib/blowbagets'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { nowDate } from '@/app/utils/serverTime'
@@ -977,7 +977,9 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
       trucks.filter((t) => {
         if (t.truck_id === assignTruckId) return true
         if (busyTruckIds.has(t.truck_id)) return false
-        return isRoadworthy(t)
+        // BLOWBAGETS current and routine service not overdue — the same two
+        // gates the server's assertTruckAssignable applies.
+        return isAssignable(t)
       }),
     [trucks, busyTruckIds, assignTruckId],
   )

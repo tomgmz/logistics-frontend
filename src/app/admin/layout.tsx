@@ -10,7 +10,8 @@ import {
   CreditCard,
   History,
   Layers,
-  LayoutDashboard
+  LayoutDashboard,
+  Siren,
 } from 'lucide-react'
 import ReusableDashboardShell from '@/components/layout/ReusableDashboardShell'
 import { ReactNode, useEffect } from 'react'
@@ -42,6 +43,11 @@ const adminNavItems = [
     href: '/admin/vehicle-management',
     label: 'Vehicle Management',
     icon: <Truck size={17} />,
+  },
+  {
+    href: '/admin/reports',
+    label: 'Reports',
+    icon: <Siren size={17} />,
   },
   {
     href: '/admin/transaction-history',

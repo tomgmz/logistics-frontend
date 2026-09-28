@@ -80,6 +80,7 @@ export const MODULE_KEYS = [
   'transaction-history',
   'system-maintenance',
   'audit-logs',
+  'reports',
 ] as const
 export type ModuleKey = (typeof MODULE_KEYS)[number]
 
@@ -96,6 +97,8 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   // company admin can open /admin/audit-logs. The key stays 'audit-logs'
   // because module_permissions rows reference it by name.
   'audit-logs':           'Audit Logs (Company Administrator)',
+  // Incidents drivers raise from the road (the driver app's Reports tab).
+  'reports':              'Reports',
 }
 
 // Assignable modules per managed role (matches the role's dashboard nav).
@@ -109,14 +112,15 @@ export const MODULES_BY_ROLE: Record<ManagedRole, ModuleKey[]> = {
     'document-management',
     'system-maintenance',
     'audit-logs',
+    'reports',
   ],
   general_manager: [
     'vehicle-management',
     'booking-management',
     'document-management',
   ],
-  fleet_manager: ['booking-management', 'vehicle-management', 'transit-tracking'],
-  operations_manager: ['booking-management', 'vehicle-management', 'document-management', 'transit-tracking'],
+  fleet_manager: ['booking-management', 'vehicle-management', 'transit-tracking', 'reports'],
+  operations_manager: ['booking-management', 'vehicle-management', 'document-management', 'transit-tracking', 'reports'],
 }
 
 // Default access tier per role per module — mirror of the backend
@@ -133,6 +137,7 @@ export const ROLE_MODULE_DEFAULTS: Record<ManagedRole, Partial<Record<ModuleKey,
     'transit-tracking':    'manage',
     'transaction-history': 'read',
     'audit-logs':          'read',
+    'reports':             'all',
   },
   general_manager: {
     'booking-management':  'manage',
@@ -145,12 +150,15 @@ export const ROLE_MODULE_DEFAULTS: Record<ManagedRole, Partial<Record<ModuleKey,
     'booking-management': 'read',
     'vehicle-management': 'all',
     'transit-tracking':   'manage',
+    // Vehicle-related reports only — scoped by the server, not this tier.
+    'reports':            'manage',
   },
   operations_manager: {
     'booking-management':  'all',
     'vehicle-management':  'read',
     'document-management': 'manage',
     'transit-tracking':    'manage',
+    'reports':             'manage',
   },
 }
 
