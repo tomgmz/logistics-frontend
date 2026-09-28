@@ -14,6 +14,7 @@ import { fmtDay, fmtKm } from './upkeep-ui'
 import DriverReportDetailModal from '@/components/reports/DriverReportDetailModal'
 import ReusableModal from '@/components/layout/ReusableModal'
 import { useRecordLocks } from '@/lib/hooks/useRecordLock'
+import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { RecordLockBadge } from '@/components/ui/RecordLockBanner'
 import RowActionMenu, { type RowAction } from '@/components/ui/RowActionMenu'
 import { appToast } from '@/lib/toast'
@@ -113,21 +114,25 @@ export default function MaintenanceTab({
 
   const truckLocks = useRecordLocks('truck', canEdit)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (quiet = false) => {
     try {
-      setLoading(true)
+      if (!quiet) setLoading(true)
       setError(null)
       const list = await adminFetchMaintenanceQueue()
       setRows(list)
       onCount?.(list.length)
     } catch (e) {
-      setError(getApiErrorMessage(e, 'Could not load the maintenance list. Please try again.'))
+      if (!quiet) setError(getApiErrorMessage(e, 'Could not load the maintenance list. Please try again.'))
     } finally {
-      setLoading(false)
+      if (!quiet) setLoading(false)
     }
   }, [onCount])
 
   useEffect(() => { void load() }, [load])
+
+  // Driver reports signal live:trucks too, so this one topic covers everything
+  // that puts a vehicle on (or takes it off) this list.
+  useLiveTable(['live:trucks'], () => { void load(true) })
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase()

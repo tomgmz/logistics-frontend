@@ -62,6 +62,7 @@ import {
 } from './upkeep-ui'
 import BlowbagetsInspectionModal from './BlowbagetsInspectionModal'
 import { useRecordLock, useRecordLocks } from '@/lib/hooks/useRecordLock'
+import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import RecordLockBanner, { RecordLockBadge } from '@/components/ui/RecordLockBanner'
 import RowActionMenu, { type RowAction } from '@/components/ui/RowActionMenu'
 import { appToast } from '@/lib/toast'
@@ -387,9 +388,11 @@ export default function VehicleManagementView() {
     return () => window.clearTimeout(t)
   }, [search])
 
-  const loadTrucksPage = useCallback(async () => {
+  // `quiet`: a live refresh re-reads in place — no spinner, and a transient
+  // failure leaves the rows on screen instead of replacing them with an error.
+  const loadTrucksPage = useCallback(async (quiet = false) => {
     try {
-      setListLoading(true)
+      if (!quiet) setListLoading(true)
       setListError(null)
       const res = await adminFetchTrucksPaginated({
         page:     page + 1,
@@ -403,9 +406,9 @@ export default function VehicleManagementView() {
         setPage(res.meta.totalPages - 1)
       }
     } catch (e) {
-      setListError(getApiErrorMessage(e, 'Request failed. Please try again.'))
+      if (!quiet) setListError(getApiErrorMessage(e, 'Request failed. Please try again.'))
     } finally {
-      setListLoading(false)
+      if (!quiet) setListLoading(false)
     }
   }, [page, statusFilter, debouncedSearch])
 
@@ -422,6 +425,16 @@ export default function VehicleManagementView() {
   useEffect(() => {
     if (tab !== 'maintenance') loadMaintenanceCount()
   }, [tab, loadMaintenanceCount])
+
+  // Live: someone else's edit, an inspection, a reading, a driver's return or
+  // report — the vehicle list and the Maintenance count follow on their own.
+  useLiveTable(['live:trucks', 'live:truck_models'], () => {
+    if (tab === 'vehicles') {
+      void loadTrucksPage(true)
+      void loadModels()
+    }
+    if (tab !== 'maintenance') loadMaintenanceCount()
+  })
 
   const switchTab = useCallback((next: VehicleTab) => {
     setTab(next)

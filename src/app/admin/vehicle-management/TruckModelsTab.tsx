@@ -17,6 +17,7 @@ import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { createTruckModelSchema } from '@/lib/validation/truck-model.validation'
 import { useRecordLock, useRecordLocks } from '@/lib/hooks/useRecordLock'
+import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import RecordLockBanner, { RecordLockBadge } from '@/components/ui/RecordLockBanner'
 import RowActionMenu, { type RowAction } from '@/components/ui/RowActionMenu'
 import { ModelThumb, kgToTons } from './vehicle-ui'
@@ -132,17 +133,19 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
     )
   )
 
-  const loadModels = useCallback(async () => {
+  const loadModels = useCallback(async (quiet = false) => {
     try {
-      setListLoading(true)
+      if (!quiet) setListLoading(true)
       setListError(null)
       setModels(await adminFetchTruckModels())
     } catch (e) {
-      setListError(getApiErrorMessage(e, 'Request failed. Please try again.'))
+      if (!quiet) setListError(getApiErrorMessage(e, 'Request failed. Please try again.'))
     } finally {
-      setListLoading(false)
+      if (!quiet) setListLoading(false)
     }
   }, [])
+
+  useLiveTable(['live:truck_models'], () => { void loadModels(true) })
 
   useEffect(() => {
     void loadModels()

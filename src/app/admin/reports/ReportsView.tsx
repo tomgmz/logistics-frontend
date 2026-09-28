@@ -27,6 +27,7 @@ import ClassifyReportModal from '@/components/reports/ClassifyReportModal'
 import ReusableModal, { RemarksModal } from '@/components/layout/ReusableModal'
 import { useModuleAccess } from '@/components/layout/ModuleAccess'
 import { useRecordLock, useRecordLocks } from '@/lib/hooks/useRecordLock'
+import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import RecordLockBanner, { RecordLockBadge } from '@/components/ui/RecordLockBanner'
 import RowActionMenu, { type RowAction } from '@/components/ui/RowActionMenu'
 import { appToast } from '@/lib/toast'
@@ -46,7 +47,9 @@ import { useAuthStore } from '@/lib/store/auth.store'
  * off their list until the desk Classifies it — which only the desk can do.
  */
 
-const POLL_MS = 30_000
+// Live updates come from useLiveTable; this slow poll is only a safety net for
+// a dropped realtime connection.
+const POLL_MS = 60_000
 
 type StatusFilter = 'open' | 'all' | ReportStatus
 
@@ -116,6 +119,8 @@ export default function ReportsView() {
   useEffect(() => { void load() }, [load])
 
   // A driver in trouble should not wait for someone to press Refresh.
+  useLiveTable(['live:driver_reports'], () => { void load(true) })
+
   useEffect(() => {
     const t = window.setInterval(() => {
       if (document.visibilityState === 'visible') void load(true)

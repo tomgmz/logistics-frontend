@@ -46,6 +46,7 @@ import type { DriverUser } from '@/app/types/admin/user-management.types'
 import { isAssignable, type Truck as TruckType } from '@/app/types/truck.types'
 import { BLOWBAGETS_ITEMS } from '@/lib/blowbagets'
 import { useAuthStore } from '@/lib/store/auth.store'
+import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { nowDate } from '@/app/utils/serverTime'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
@@ -890,9 +891,9 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     return () => window.clearTimeout(t)
   }, [search])
 
-  const loadPage = useCallback(async () => {
+  const loadPage = useCallback(async (quiet = false) => {
     try {
-      setListLoading(true)
+      if (!quiet) setListLoading(true)
       setListError(null)
       const res = await bookingService.fetchBookingsAdminPaginated({
         page:   page + 1,
@@ -910,13 +911,24 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
         setPage(res.meta.totalPages - 1)
       }
     } catch (e) {
-      setListError(getApiErrorMessage(e, 'Request failed. Please try again.'))
+      if (!quiet) setListError(getApiErrorMessage(e, 'Request failed. Please try again.'))
     } finally {
-      setListLoading(false)
+      if (!quiet) setListLoading(false)
     }
   }, [page, statusFilter, debouncedSearch])
 
   useEffect(() => { void loadPage() }, [loadPage])
+
+  // Live: the list and the crew pickers follow bookings and vehicles as they
+  // change. The OPEN booking is deliberately not reloaded here — someone may be
+  // mid-edit; its record lock's onStale already handles a change underneath.
+  useLiveTable(['live:bookings'], () => {
+    void loadPage(true)
+    assignmentService.getAll().then(setAllAssignments).catch(() => {})
+  })
+  useLiveTable(['live:trucks'], () => {
+    adminFetchTrucks().then(setTrucks).catch(() => {})
+  })
 
   const listRows  = useMemo(() => {
     const rows = toRows(rawBookings)
