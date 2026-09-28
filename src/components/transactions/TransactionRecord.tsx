@@ -16,6 +16,7 @@ import {
 } from '@/lib/services/admin/transaction-history.service'
 import { SectionHeader, InfoTile } from './TransactionDetail'
 import { formatDate, formatDateTime } from './transaction-format'
+import { formatArrivalWindow } from '@/lib/arrival-window'
 import { BG_PANEL, BG_CARD, BORDER, BORDER_C, CYAN, MUTED, ERROR, AMBER, GREEN } from './transaction-theme'
 
 /**
@@ -429,8 +430,8 @@ function DecisionCard({ stage, verb, actor, pendingLabel, note }: {
 }
 
 function ApprovalsSection({ approvals, booking }: { approvals: TransactionApprovals; booking: Booking }) {
-  // No fleet stage: fleet_status stopped being written when that approval was
-  // retired (20260821000000_gm_first_approval_flow), so it reads 'pending' forever.
+  // No fleet stage: that approval was retired (20260821000000_gm_first_approval_flow)
+  // and its fleet_status column dropped (20260929030000).
   const gmStatus  = String(booking.gm_status ?? '').toLowerCase()
   const opsStatus = String(booking.ops_status ?? '').toLowerCase()
   const cancelled = String(booking.status ?? '').toLowerCase() === 'cancelled'
@@ -483,7 +484,7 @@ function ApprovalsSection({ approvals, booking }: { approvals: TransactionApprov
           {approvals.issue.at && <span className="text-[11px]" style={{ color: MUTED }}>{formatDateTime(approvals.issue.at)}</span>}
         </Card>
       )}
-      {eta && <InfoTile label="Estimated Delivery" value={formatDateTime(eta)} />}
+      {eta && <InfoTile label="Planned Arrival" value={formatArrivalWindow(eta) ?? formatDateTime(eta)} />}
     </Panel>
   )
 }

@@ -28,6 +28,8 @@ export interface TripStop {
   sequence_order:  number
   status:          TripStopStatus
   delivered_at:    string | null
+  /** Planned arrival (drive time + unloading at earlier stops). */
+  planned_arrival_at?: string | null
   proof_photo_url: string | null
   proof_at:        string | null
   booking_destinations?: {
@@ -49,6 +51,10 @@ export interface Trip {
   /** Proof of loading for THIS run. One photo per run, never one per booking. */
   pickup_proof_photo_url: string | null
   pickup_proof_at:        string | null
+  /** The planned estimate, chained run to run — see backend planned-eta.service.ts. */
+  planned_departure_at?: string | null
+  planned_arrival_at?:   string | null
+  planned_return_at?:    string | null
   notes:       string | null
   booking_trip_stops: TripStop[]
 }

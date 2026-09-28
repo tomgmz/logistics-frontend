@@ -20,6 +20,7 @@ import {
 } from '@/lib/services/admin/trip.service'
 import type { BookingDetail } from '@/app/types/maps/routemap.types'
 import { appToast } from '@/lib/toast'
+import { formatArrivalClock, formatArrivalWindow } from '@/lib/arrival-window'
 import { getApiErrorMessage } from '@/lib/api-error'
 
 /**
@@ -395,6 +396,15 @@ export default function TripPlanner({ detail, canEdit }: Props) {
                     <TripStatusPill status={trip.status} />
                   </div>
 
+                  {/* Planned by the server from predicted traffic plus unloading and
+                      reloading allowances, chained run to run. */}
+                  {trip.planned_departure_at && (
+                    <p className="text-[11px] text-white/40">
+                      {trip.pickup_proof_at ? 'Left' : 'Leaves'} {formatArrivalClock(trip.planned_departure_at)}
+                      {trip.planned_return_at && <> · back ~{formatArrivalClock(trip.planned_return_at)}</>}
+                    </p>
+                  )}
+
                   <ul className="space-y-1">
                     {(trip.booking_trip_stops ?? [])
                       .slice()
@@ -403,6 +413,11 @@ export default function TripPlanner({ detail, canEdit }: Props) {
                         <li key={stop.trip_stop_id} className="flex items-start justify-between gap-2">
                           <span className="text-[12px] text-white/70 leading-snug min-w-0">
                             {stop.booking_destinations?.address ?? '—'}
+                            {stop.status === 'pending' && stop.planned_arrival_at && (
+                              <span className="block text-[11px] text-white/35">
+                                Planned {formatArrivalWindow(stop.planned_arrival_at)}
+                              </span>
+                            )}
                           </span>
                           <span
                             className="shrink-0 text-[10px] font-bold uppercase"

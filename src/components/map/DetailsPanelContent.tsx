@@ -13,6 +13,7 @@ import {
 import type { OptimizeRouteResponse, BookingDetail } from '@/app/types/maps/routemap.types'
 import { fetchTruckModels } from '@/lib/api/client/truck-model'
 import { formatEta, formatEtaClock, type StopEta } from '@/lib/hooks/useLiveDriverPosition'
+import { arrivalWindow, formatArrivalWindow, isPastWindow } from '@/lib/arrival-window'
 
 const SC = { fontFamily: "var(--font-alegreya-sc), 'Alegreya Sans SC', sans-serif" } as const
 
@@ -124,12 +125,24 @@ export function DetailsPanelContent({
   const truckType   = bookingDetail?.truck_type_needed          ?? 'L300'
   const plateNumber = bookingDetail?.driver?.truck?.plate_number ?? '—'
   const totalCost   = bookingDetail?.total_cost != null ? `₱${bookingDetail.total_cost}` : '—'
-  const estDelivery = bookingDetail?.estimated_delivery ?? scheduleDate
+  // The planned arrival at the last stop of the last run, as a window. Before
+  // it's planned (no truck yet) this falls back to the scheduled day.
+  const plannedAt   = bookingDetail?.estimated_delivery ?? null
+  const estDelivery = formatArrivalWindow(plannedAt) ?? scheduleDate
 
   // The final stop's live ETA, which is what "estimate arrival" has always meant
   // on this panel and never actually showed — `estimated_arrival` was a declared
   // field the backend never populated, so this rendered an em dash for everyone.
   const destEta = destStop ? etaByStop?.get(destStop.destination_id) : undefined
+
+  // Behind plan: the live ETA to the final stop lands after the planned window,
+  // or the window has closed with the delivery still open. Without a plan there
+  // is nothing to be late against.
+  const plannedEnd = arrivalWindow(plannedAt)?.end ?? null
+  const done       = ['DELIVERED', 'COMPLETED', 'CANCELLED'].includes(status.toUpperCase())
+  const isLate     = !done && !!plannedEnd && (
+    destEta ? Date.parse(destEta.eta_at) > plannedEnd.getTime() : isPastWindow(plannedAt)
+  )
 
   const arrivalLabel = destEta
     ? `${formatEtaClock(destEta.eta_at)} · ${formatEta(destEta.eta_seconds)}`
@@ -408,11 +421,11 @@ export function DetailsPanelContent({
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-muted)" strokeWidth="1.5">
               <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
             </svg>
-            {!isLoading && status.toUpperCase() !== 'COMPLETED' && (
+            {!isLoading && isLate && (
               <span className="text-[10px] font-bold" style={{ color: '#fd2cbe' }}>Late</span>
             )}
           </div>
-          <p className="text-[10px] mb-0.5" style={{ color: 'var(--color-muted)' }}>Estimated Delivery</p>
+          <p className="text-[10px] mb-0.5" style={{ color: 'var(--color-muted)' }}>Planned Arrival</p>
           <p className="text-white text-[13px]" style={SC}>
             {isLoading ? <Skeleton style={{ width: '5rem' }} /> : estDelivery || '—'}
           </p>
