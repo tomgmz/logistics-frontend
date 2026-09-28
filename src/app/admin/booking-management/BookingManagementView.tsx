@@ -114,7 +114,6 @@ type DetailWithExtra = BookingDetail & {
   non_stackable_cargo?: boolean | null
   cargo_density_kg_cbm?: number | null
   required_net_weight_kg?: number | null
-  accounting_status?: 'pending' | 'approved' | 'rejected' | 'forwarded' | null
   gm_status?:         'pending' | 'approved' | 'rejected' | null
   ops_status?:        'pending' | 'assigned' | null
   // The GM's remarks when a booking was not approved.
