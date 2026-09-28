@@ -3,14 +3,14 @@
 import { useState, useEffect, memo } from "react";
 import { motion, Variants } from "framer-motion";
 import {
-  AreaChart, Area, BarChart, Bar,
+  BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell,
 } from "recharts";
 import { ValueType } from "recharts/types/component/DefaultTooltipContent";
 import { ReactNode } from "react";
 import {
-  Package, Truck, CreditCard, CheckCircle,
+  Package, Truck, CheckCircle,
   TrendingUp, TrendingDown,
 } from "lucide-react";
 
@@ -50,17 +50,6 @@ interface KpiTileProps {
   delta: number; icon: ReactNode;
   accent: string; delay: number;
 }
-
-const revenueData = [
-  { month: "Jan", revenue: 142000, bookings: 312 },
-  { month: "Feb", revenue: 168000, bookings: 378 },
-  { month: "Mar", revenue: 153000, bookings: 344 },
-  { month: "Apr", revenue: 197000, bookings: 421 },
-  { month: "May", revenue: 221000, bookings: 489 },
-  { month: "Jun", revenue: 209000, bookings: 465 },
-  { month: "Jul", revenue: 243000, bookings: 532 },
-  { month: "Aug", revenue: 278000, bookings: 601 },
-];
 
 const serviceData = [
   { name: "Beverages",     value: 32, color: T.teal    },
@@ -216,8 +205,7 @@ const CustomTooltip = memo(function CustomTooltip({ active, payload, label }: {
       {payload.map((p, i) => (
         <p key={i} style={{ color: p.color as string, margin: "2px 0" }}>
           {p.name}: <strong>
-            {typeof p.value === "number" && p.value > 1000
-              ? `₱${p.value.toLocaleString()}` : p.value}
+            {typeof p.value === "number" ? p.value.toLocaleString() : p.value}
           </strong>
         </p>
       ))}
@@ -230,53 +218,6 @@ const Card = memo(function Card({ children, style }: { children: ReactNode; styl
     <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 16, ...style }}>
       {children}
     </div>
-  );
-});
-
-const RevenueChart = memo(function RevenueChart() {
-  return (
-    <motion.div variants={fadeUp} custom={4} initial="hidden" animate="visible" style={{ height: "100%" }}>
-      <Card style={{ padding: "20px 18px", height: "100%", boxSizing: "border-box" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: T.white }}>Revenue Overview</div>
-            <div style={{ fontSize: 11, color: T.muted, marginTop: 2 }}>Monthly performance trend</div>
-          </div>
-          <div style={{ display: "flex", gap: 14, fontSize: 11, color: T.muted }}>
-            {[{ label: "Revenue", color: T.teal }, { label: "Bookings", color: T.purple }].map(l => (
-              <span key={l.label} style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                <span style={{ width: 7, height: 7, borderRadius: 2, background: l.color, display: "inline-block" }} />
-                {l.label}
-              </span>
-            ))}
-          </div>
-        </div>
-        {/* chartShell isolates the ResizeObserver subtree */}
-        <div style={chartShell}>
-          <ResponsiveContainer width="100%" height={200}>
-            <AreaChart data={revenueData}>
-              <defs>
-                <linearGradient id="gradRev" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%"  stopColor={T.teal}   stopOpacity={0.25} />
-                  <stop offset="95%" stopColor={T.teal}   stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="gradBook" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%"  stopColor={T.purple} stopOpacity={0.25} />
-                  <stop offset="95%" stopColor={T.purple} stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke={T.border} />
-              <XAxis dataKey="month" tick={{ fill: T.muted, fontSize: 10 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: T.muted, fontSize: 10 }} axisLine={false} tickLine={false}
-                tickFormatter={(v: number) => v >= 1000 ? `₱${v / 1000}k` : String(v)} />
-              <Tooltip content={<CustomTooltip />} />
-              <Area type="monotone" dataKey="revenue"  stroke={T.teal}   strokeWidth={2} fill="url(#gradRev)"  name="Revenue"  dot={false} />
-              <Area type="monotone" dataKey="bookings" stroke={T.purple} strokeWidth={2} fill="url(#gradBook)" name="Bookings" dot={false} />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      </Card>
-    </motion.div>
   );
 });
 
@@ -425,7 +366,7 @@ const AdminDashboard = memo(function AdminDashboard() {
       <style>{`
         .dash-kpi-grid {
           display: grid;
-          grid-template-columns: repeat(4, 1fr);
+          grid-template-columns: repeat(3, 1fr);
           gap: 12px;
         }
         .dash-row1 {
@@ -468,19 +409,13 @@ const AdminDashboard = memo(function AdminDashboard() {
       <div className="dash-kpi-grid" style={{ marginBottom: 16 }}>
         <KpiTile label="New Bookings Today"  value={47}     icon={<Package size={15} />}      accent={T.teal}     delta={12.4} delay={0} />
         <KpiTile label="Active Bookings"     value={134}    icon={<Truck size={15} />}         accent={T.purple}   delta={8.1}  delay={1} />
-        <KpiTile label="Monthly Revenue"     value={278000} prefix="₱" icon={<CreditCard size={15} />} accent={T.amber} delta={15.7} delay={2} />
-        <KpiTile label="On-Time Delivery"    value={94}     suffix="%" icon={<CheckCircle size={15} />} accent={T.greenAlt} delta={2.3} delay={3} />
+        <KpiTile label="On-Time Delivery"    value={94}     suffix="%" icon={<CheckCircle size={15} />} accent={T.greenAlt} delta={2.3} delay={2} />
       </div>
 
       {/* Row 1 */}
       <div className="dash-row1" style={{ marginBottom: 16 }}>
-        <RevenueChart />
-        <DonutChart />
-      </div>
-
-      {/* Row 2 */}
-      <div style={{ marginBottom: 16 }}>
         <WeeklyChart />
+        <DonutChart />
       </div>
 
       {/* Table */}
