@@ -117,7 +117,6 @@ type DetailWithExtra = BookingDetail & {
   accounting_status?: 'pending' | 'approved' | 'rejected' | 'forwarded' | null
   gm_status?:         'pending' | 'approved' | 'rejected' | null
   ops_status?:        'pending' | 'assigned' | null
-  fleet_status?:      'pending' | 'approved' | 'rejected' | null
   // The GM's remarks when a booking was not approved.
   rejection_reason?:  string | null
   blowbagets_check?:  BlowbagetsCheck | null

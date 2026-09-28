@@ -11,7 +11,7 @@ import { bookingRef } from '@/lib/booking'
 import { StatusBadge, StatusTimeline } from './TransactionStatus'
 import {
   formatDate, formatDateTime, formatPeso, fileNameFromUrl,
-  parseCargoDetails, buildCargoSummary, getDropoffs,
+  buildCargoSummary, getDropoffs,
   getDriverName, getPlateNumber, getTruckModel,
 } from './transaction-format'
 import { BG_PANEL, BG_CARD, BORDER, BORDER_C, CYAN, MUTED, ERROR } from './transaction-theme'
@@ -66,7 +66,6 @@ export default function TransactionDetail({ booking, animated = true, showCrew =
   const plateNumber = getPlateNumber(booking)
   const truckModel  = getTruckModel(booking)
   const summary     = buildCargoSummary(booking)
-  const parsed      = parseCargoDetails(booking.cargo_details as string | null | undefined)
   const docs        = (booking.transaction_documents as string[] | null | undefined) ?? []
 
   const schedDate   = booking.schedule_date as string | undefined
@@ -156,7 +155,7 @@ export default function TransactionDetail({ booking, animated = true, showCrew =
         <div className="border-t pt-4" style={{ borderColor: BORDER }}>
           <SectionHeader icon={<Package size={15} />} title="Cargo" />
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
-            <InfoTile label="Mode"         value={parsed?.mode ?? truckType ?? '—'} />
+            <InfoTile label="Mode"         value={truckType ?? '—'} />
             <InfoTile label="Summary"      value={summary} />
             <InfoTile label="Truck Needed" value={truckType ?? '—'} />
             {weightKg  != null && <InfoTile label="Weight"    value={`${weightKg} KG`} />}

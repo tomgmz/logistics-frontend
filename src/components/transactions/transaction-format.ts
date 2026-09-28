@@ -2,7 +2,6 @@ import type {
   BookingWithRelations,
   BookingDestination,
 } from '@/lib/store/slice/routeMap.slice'
-import type { ParsedCargoDetails } from '@/app/types/maps/routemap.types'
 
 /**
  * Formatters and field readers shared by the client and staff transaction
@@ -52,22 +51,8 @@ export function fileNameFromUrl(url: string): string {
   } catch { return url }
 }
 
-export function parseCargoDetails(raw: string | null | undefined): ParsedCargoDetails | null {
-  if (!raw) return null
-  try { return JSON.parse(raw) as ParsedCargoDetails } catch { return null }
-}
-
 export function buildCargoSummary(booking: BookingWithRelations): string {
-  const parsed = parseCargoDetails(booking.cargo_details as string | null | undefined)
-  const pieces = parsed?.sections
-    ?.flatMap((s) => s.groups)
-    .reduce((sum, g) => sum + (parseInt(g.pieces || '0', 10)), 0) ?? 0
-
   const parts: string[] = []
-  if (pieces > 0) {
-    const mode = parsed?.mode ?? 'loose'
-    parts.push(`${pieces} ${mode === 'palletized' ? 'pallet' : 'piece'}${pieces !== 1 ? 's' : ''}`)
-  }
   const weight = booking.required_weight_kg as number | null | undefined
   const volume = booking.required_volume_cbm as number | null | undefined
   if (weight)  parts.push(`${weight} KG`)

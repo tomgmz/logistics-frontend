@@ -61,7 +61,6 @@ export interface BookingDetail {
   origin_longitude?:  number | null
 
   truck_type_needed:  string
-  cargo_details?:     string | null
   parsed_cargo?:      ParsedCargoDetails | null
 
   schedule_date:  string
