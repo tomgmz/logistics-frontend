@@ -160,21 +160,21 @@ export function DetailsPanelContent({
 
   const { imageUrl: truckImageUrl, loading: truckImageLoading } = useTruckImage(truckType)
 
-  const parsedCargo     = bookingDetail?.parsed_cargo ?? null
-  const allGroups       = parsedCargo?.sections.flatMap(s => s.groups) ?? []
-  const totalPieces     = allGroups.reduce((sum, g) => sum + (parseInt(g.pieces) || 0), 0)
+  // From the booking's cargo lines. The first line stands in for the product
+  // and handling codes, the way the panel has always shown a single product.
+  const cargoItems      = bookingDetail?.booking_cargo_items ?? []
+  const totalPieces     = cargoItems.reduce((sum, i) => sum + (i.quantity ?? 0), 0)
   const totalWeight     = bookingDetail?.required_weight_kg  ?? null
   const volume          = bookingDetail?.required_volume_cbm ?? null
-  const firstGroup      = allGroups[0] ?? null
-  const product         = firstGroup?.product       ?? null
-  const shc             = firstGroup?.shc           ?? null
-  const additionalShc   = firstGroup?.additionalShc ?? null
-  const hasNonTiltable  = allGroups.some(g => g.nonTiltable)
-  const hasNonStackable = allGroups.some(g => g.nonStackable)
+  const firstItem       = cargoItems[0] ?? null
+  const product         = firstItem?.products?.name ?? firstItem?.product_text ?? null
+  const shc             = firstItem?.shc?.code      ?? firstItem?.shc_text     ?? null
+  const additionalShc   = firstItem?.ashc?.code     ?? firstItem?.ashc_text    ?? null
+  const hasNonStackable = !!bookingDetail?.non_stackable_cargo
   const density         = totalWeight && volume && volume > 0
     ? (totalWeight / volume).toFixed(1)
     : null
-  const hasCargo = !!(parsedCargo || totalWeight || volume)
+  const hasCargo = !!(cargoItems.length || totalWeight || volume)
 
   return (
     <div className="flex flex-col min-h-full" style={SC}>
@@ -506,10 +506,9 @@ export function DetailsPanelContent({
                 ) : null)}
               </div>
 
-              {(hasNonTiltable || hasNonStackable) && (
+              {hasNonStackable && (
                 <ul className="list-disc pl-5 space-y-0.5 mt-1">
-                  {hasNonTiltable  && <li className="text-white text-[12px]" style={SC}>Non-tiltable items present</li>}
-                  {hasNonStackable && <li className="text-white text-[12px]" style={SC}>Non-stackable items present</li>}
+                  <li className="text-white text-[12px]" style={SC}>Non-stackable items present</li>
                 </ul>
               )}
             </>

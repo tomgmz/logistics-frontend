@@ -21,36 +21,6 @@ export function asBookingStatus(raw: string): BookingStatus | 'UNKNOWN' {
     : 'UNKNOWN'
 }
 
-export interface CargoGroup {
-  id:            string
-  pieces:        string
-  looseLength:   string
-  looseWidth:    string
-  looseHeight:   string
-  weight:        string
-  weightUnit:    string
-  perItem:       string
-  nonTiltable:   boolean
-  nonStackable:  boolean
-  commodity:     string
-  product:       string
-  shc:           string
-  additionalShc: string
-  stackable:     boolean
-  oversize:      boolean
-}
-
-export interface CargoSection {
-  dropoffIndex: number
-  groups:       CargoGroup[]
-}
-
-export interface ParsedCargoDetails {
-  service:  string
-  mode:     string
-  sections: CargoSection[]
-}
-
 export interface BookingDetail {
   booking_id:       string
   reference_number?: string | null
@@ -61,7 +31,6 @@ export interface BookingDetail {
   origin_longitude?:  number | null
 
   truck_type_needed:  string
-  parsed_cargo?:      ParsedCargoDetails | null
 
   schedule_date:  string
   call_time:      string
@@ -71,6 +40,7 @@ export interface BookingDetail {
   required_weight_kg?:   number | null
   required_length_cm?:   number | null
   stackable_required?:   boolean | null
+  non_stackable_cargo?:  boolean | null
 
   created_at?:         string
   updated_at?:         string
