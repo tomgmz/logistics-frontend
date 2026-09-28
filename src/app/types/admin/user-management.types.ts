@@ -7,11 +7,6 @@ export type AdminRole =
 
 export type UserRole = AdminRole | 'driver' | 'client'
 
-/**
- * Which reverse billing cycle a client's billing periods are cut on, taken from
- * their contract and fixed at account creation. It is not a payment term: the
- * 30/45/60 day term is chosen per booking on the booking form.
- */
 export type UserStatus = 'active' | 'inactive' | 'deactivated' | 'archived' | 'permanently_locked'
 /**
  * A driver's own availability for delivery work. A new driver starts

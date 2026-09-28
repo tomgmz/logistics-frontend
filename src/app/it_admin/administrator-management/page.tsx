@@ -33,7 +33,7 @@ import { passwordResetService } from '@/lib/services/admin/password-reset.servic
 
 type AdminMgmtTab = Extract<
   UserTab,
-  'admins' | 'accountants' | 'general-managers' | 'fleet-admins' | 'operations-admins'
+  'admins' | 'general-managers' | 'fleet-admins' | 'operations-admins'
 >
 // 'password-resets' is a queue, not a user list, so it renders its own panel and
 // skips the fetch/search/paginate machinery below.
@@ -54,7 +54,7 @@ const TABS: { key: TabValue; label: string }[] = [
 ]
 
 // Roles aggregated by the "All Administrators" view and the stats cards.
-const ADMIN_ROLE_FILTER = 'admin,accountant,general_manager,fleet_manager,operations_manager'
+const ADMIN_ROLE_FILTER = 'admin,general_manager,fleet_manager,operations_manager'
 
 const muiTheme = createTheme({
   palette: {
@@ -116,7 +116,6 @@ const ROLE_COLORS: Record<string, string> = {
   general_manager:  'bg-cyan-500/15 text-cyan-400 border-cyan-500/30',
   fleet_manager:      'bg-orange-500/15 text-orange-400 border-orange-500/30',
   operations_manager: 'bg-violet-500/15 text-violet-400 border-violet-500/30',
-  accountant:       'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
 }
 
 const ROLE_LABELS: Record<string, string> = {
@@ -125,7 +124,6 @@ const ROLE_LABELS: Record<string, string> = {
   general_manager:  'General Manager',
   fleet_manager:      'Fleet Manager',
   operations_manager: 'Operations Manager',
-  accountant:       'Accountant',
 }
 
 function StatusBadge({ status }: { status: UserStatus }) {

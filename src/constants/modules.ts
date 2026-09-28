@@ -174,7 +174,7 @@ export function defaultFlagsForRole(role: string | undefined | null): Record<str
 }
 
 // Map a dashboard route href to its module key (used to gate nav items).
-// Matches the trailing segment, e.g. "/accountant/booking-management" -> "booking-management".
+// Matches the trailing segment, e.g. "/fleet_admin/booking-management" -> "booking-management".
 export function moduleFromHref(href: string): ModuleKey | null {
   const seg = href.split('/').filter(Boolean).pop() ?? ''
   return (MODULE_KEYS as readonly string[]).includes(seg) ? (seg as ModuleKey) : null

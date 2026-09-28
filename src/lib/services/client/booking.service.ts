@@ -81,7 +81,6 @@ export interface CreateBookingPayload {
   required_length_cm?:    number
   required_net_weight_kg?: number
   non_stackable_cargo?:   boolean
-  payment_terms?:         string
   transaction_documents?: string[]
   cargo_items?:           CargoItemPayload[]
   destinations: {
@@ -110,7 +109,6 @@ export interface UpdateBookingPayload {
   required_weight_kg?:    number | null
   required_length_cm?:    number | null
   stackable_required?:    boolean | null
-  payment_terms?:         string | null
   transaction_documents?: string[] | null
 }
 

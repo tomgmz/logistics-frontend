@@ -65,6 +65,6 @@ export const FAQS = [
   },
   {
     q: 'Where is my transaction history?',
-    a: 'Access your account to view all past and current deliveries and payments',
+    a: 'Access your account to view all past and current deliveries',
   },
 ];

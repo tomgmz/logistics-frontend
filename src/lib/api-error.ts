@@ -10,7 +10,6 @@ const WRAPPER_PREFIXES = [
   /^Auth update failed:\s*/i,
   /^Client creation failed:\s*/i,
   /^Driver creation failed:\s*/i,
-  /^Accountant Creation Failed:\s*/i,
   /^Operations (?:Manager|Admin) Creation Failed:\s*/i,
   /^IT Admin(?:istrator)? Creation Failed:\s*/i,
   /^General Manager Creation Failed:\s*/i,
