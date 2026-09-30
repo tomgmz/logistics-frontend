@@ -8,11 +8,12 @@ import { supabase } from '@/lib/supabase'
  * Database triggers broadcast on public topics (see the backend migration
  * 20260928050000_live_table_signals):
  *   live:trucks  live:truck_models  live:driver_reports  live:bookings
+ *   live:documents (20260930010000_document_management)
  * The payload is only { table, id } — anon-key channels are public, so the
  * signal never carries data. The screen re-reads from the API, which applies
  * every permission and scoping rule as usual.
  */
-export type LiveTopic = 'live:trucks' | 'live:truck_models' | 'live:driver_reports' | 'live:bookings'
+export type LiveTopic = 'live:trucks' | 'live:truck_models' | 'live:driver_reports' | 'live:bookings' | 'live:documents'
 
 type Listener = () => void
 

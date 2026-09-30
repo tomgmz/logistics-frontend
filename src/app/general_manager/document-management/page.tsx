@@ -1,8 +1,5 @@
-export default function GeneralManagerDocuments() {
-  return (
-    <div className="flex items-center justify-center h-full">
-      <span className="ff-sc text-[var(--color-muted)] text-3xl">Document Management</span>
-    </div>
-  )
-}
+import DocumentManagementView from '@/app/admin/document-management/DocumentManagementView'
 
+export default function GeneralManagerDocuments() {
+  return <DocumentManagementView />
+}
