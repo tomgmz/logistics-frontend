@@ -17,6 +17,18 @@ function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'))
 }
 
+// Every route outside PUBLIC_PATHS lives under one of the role portals. A path
+// that is neither cannot match a page, so it goes straight through to Next's
+// not-found page instead of being redirected — sending a mistyped link to the
+// landing page (or a signed-in user to their portal) hid the fact that the
+// link was wrong. Unknown paths *inside* a portal stay behind the portal guard
+// below, so a signed-out visitor learns nothing about what the portals hold.
+const PORTAL_PREFIXES = Array.from(new Set(Object.values(ROLE_ROUTES)))
+
+function isPortalPath(pathname: string): boolean {
+  return PORTAL_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + '/'))
+}
+
 function getRoleFromToken(token: string): string | null {
   try {
     const [, payloadB64] = token.split('.')
@@ -93,7 +105,7 @@ async function route(req: NextRequest): Promise<NextResponse> {
     return NextResponse.next()
   }
 
-  if (isPublicPath(pathname)) {
+  if (isPublicPath(pathname) || !isPortalPath(pathname)) {
     return NextResponse.next()
   }
 
