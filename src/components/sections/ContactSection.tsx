@@ -1,13 +1,138 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 import { motion, useInView } from 'framer-motion';
+import { z } from 'zod';
+import { getApiUrl } from '@/lib/api/api-url';
+import {
+  emailField,
+  fieldErrors,
+  firstNameField,
+  lastNameField,
+  normalizePhMobile,
+  optionalMobileField,
+} from '@/lib/validation/fields';
+
+const ROLES = ['fmcg', 'shipper', 'other'] as const;
+type Role = (typeof ROLES)[number];
+
+// Same name / email / phone rules as every account in the system; the backend
+// (POST /api/public/contact) checks them again before emailing the company.
+const contactSchema = z.object({
+  first_name: firstNameField,
+  last_name:  lastNameField,
+  email:      emailField,
+  phone:      optionalMobileField,
+  role:       z.enum(ROLES),
+  message:    z
+    .string()
+    .trim()
+    .min(10, 'Message must be at least 10 characters')
+    .max(2000, 'Message is too long (2000 characters at most)'),
+});
+
+type ContactForm = {
+  first_name: string;
+  last_name:  string;
+  email:      string;
+  phone:      string;
+  message:    string;
+  // Honeypot: hidden from people, so only a bot fills it in.
+  website:    string;
+};
+
+const emptyForm: ContactForm = { first_name: '', last_name: '', email: '', phone: '', message: '', website: '' };
+
+const labelClass = "font-'Alegreysa Sans SC, sans-serif' text-white/60 text-[0.65rem] tracking-widest uppercase mb-1.5 block";
+
+const inputClass = `w-full bg-[#1a1a1a] border rounded-[8px]
+  px-3 py-2.5 text-white text-sm font-'Alegreysa Sans SC, sans-serif'
+  focus:outline-none focus:border-[#4df9ed]/40 transition-colors`;
+
+const TEXT_FIELDS: {
+  key:          'first_name' | 'last_name' | 'email' | 'phone';
+  label:        string;
+  type:         string;
+  autoComplete: string;
+  placeholder?: string;
+  optional?:    boolean;
+}[] = [
+  { key: 'first_name', label: 'First Name', type: 'text',  autoComplete: 'given-name' },
+  { key: 'last_name',  label: 'Last Name',  type: 'text',  autoComplete: 'family-name' },
+  { key: 'email',      label: 'Email',      type: 'email', autoComplete: 'email' },
+  { key: 'phone',      label: 'Phone',      type: 'tel',   autoComplete: 'tel', placeholder: '0917 123 4567', optional: true },
+];
+
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null;
+  return <p className="text-red-400 text-[0.7rem] mt-1">{message}</p>;
+}
 
 export default function ContactSection() {
   const ref    = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, margin: '-80px' });
 
-  const [role, setRole] = useState('fmcg');
+  const [role, setRole]       = useState<Role>('fmcg');
+  const [form, setForm]       = useState<ContactForm>(emptyForm);
+  const [errors, setErrors]   = useState<Record<string, string>>({});
+  const [sending, setSending] = useState(false);
+  const [status, setStatus]   = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
+
+  const set = (key: keyof ContactForm, value: string) => {
+    setForm((f) => ({ ...f, [key]: value }));
+    setErrors((e) => (e[key] ? { ...e, [key]: '' } : e));
+    setStatus(null);
+  };
+
+  const borderFor = (key: string) => (errors[key] ? 'border-red-400/60' : 'border-white/[0.10]');
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (sending) return;
+
+    const checked = contactSchema.safeParse({
+      first_name: form.first_name,
+      last_name:  form.last_name,
+      email:      form.email,
+      phone:      normalizePhMobile(form.phone),
+      role,
+      message:    form.message,
+    });
+    if (!checked.success) {
+      setErrors(fieldErrors(checked.error));
+      return;
+    }
+
+    setSending(true);
+    setStatus(null);
+    try {
+      // No cookies on purpose: a public form has nothing to do with a signed-in
+      // visitor's session, and leaving them off keeps CSRF out of the picture.
+      const res = await fetch(`${getApiUrl()}/public/contact`, {
+        method:      'POST',
+        headers:     { 'Content-Type': 'application/json' },
+        credentials: 'omit',
+        body:        JSON.stringify({ ...checked.data, website: form.website }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        const serverErrors: Array<{ field: string; message: string }> = data?.errors ?? [];
+        if (serverErrors.length) {
+          setErrors(Object.fromEntries(serverErrors.map((x) => [x.field, x.message])));
+        }
+        setStatus({ kind: 'error', text: data?.message ?? 'We could not send your message. Please try again.' });
+        return;
+      }
+      setForm(emptyForm);
+      setRole('fmcg');
+      setErrors({});
+      setStatus({ kind: 'success', text: 'Thank you. Your message has been sent, and our team will get back to you soon.' });
+    } catch {
+      setStatus({ kind: 'error', text: 'We could not reach our server. Please check your connection and try again.' });
+    } finally {
+      setSending(false);
+    }
+  };
 
   return (
     <>
@@ -55,63 +180,58 @@ export default function ContactSection() {
               grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-0 overflow-hidden"
           >
 
-            <div className="p-6 sm:p-8 md:p-10">
+            <form className="relative p-6 sm:p-8 md:p-10" onSubmit={handleSubmit} noValidate>
+              <div aria-hidden="true" className="absolute -left-[9999px] top-0 w-px h-px overflow-hidden">
+                <label>
+                  Website
+                  <input
+                    type="text"
+                    tabIndex={-1}
+                    autoComplete="off"
+                    value={form.website}
+                    onChange={(e) => set('website', e.target.value)}
+                  />
+                </label>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="font-'Alegreysa Sans SC, sans-serif' text-white/60 text-[0.65rem] tracking-widest uppercase mb-1.5 block">
-                    First Name
-                  </label>
-                  <input
-                    type="text"
-                    className="w-full bg-[#1a1a1a] border border-white/[0.10] rounded-[8px]
-                      px-3 py-2.5 text-white text-sm font-'Alegreysa Sans SC, sans-serif'
-                      focus:outline-none focus:border-[#4df9ed]/40 transition-colors"
-                  />
-                </div>
-                <div>
-                  <label className="font-'Alegreysa Sans SC, sans-serif' text-white/60 text-[0.65rem] tracking-widest uppercase mb-1.5 block">
-                    Last Name
-                  </label>
-                  <input
-                    type="text"
-                    className="w-full bg-[#1a1a1a] border border-white/[0.10] rounded-[8px]
-                      px-3 py-2.5 text-white text-sm font-'Alegreysa Sans SC, sans-serif'
-                      focus:outline-none focus:border-[#4df9ed]/40 transition-colors"
-                  />
-                </div>
-                <div>
-                  <label className="font-'Alegreysa Sans SC, sans-serif' text-white/60 text-[0.65rem] tracking-widest uppercase mb-1.5 block">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    className="w-full bg-[#1a1a1a] border border-white/[0.10] rounded-[8px]
-                      px-3 py-2.5 text-white text-sm font-'Alegreysa Sans SC, sans-serif'
-                      focus:outline-none focus:border-[#4df9ed]/40 transition-colors"
-                  />
-                </div>
-                <div>
-                  <label className="font-'Alegreysa Sans SC, sans-serif' text-white/60 text-[0.65rem] tracking-widest uppercase mb-1.5 block">
-                    Phone
-                  </label>
-                  <input
-                    type="tel"
-                    className="w-full bg-[#1a1a1a] border border-white/[0.10] rounded-[8px]
-                      px-3 py-2.5 text-white text-sm font-'Alegreysa Sans SC, sans-serif'
-                      focus:outline-none focus:border-[#4df9ed]/40 transition-colors"
-                  />
-                </div>
+                {TEXT_FIELDS.map(({ key, label, type, autoComplete, placeholder, optional }) => (
+                  <div key={key}>
+                    <label htmlFor={`contact-${key}`} className={labelClass}>
+                      {label}
+                      {optional && <span className="text-white/30 normal-case tracking-normal"> (optional)</span>}
+                    </label>
+                    <input
+                      id={`contact-${key}`}
+                      type={type}
+                      autoComplete={autoComplete}
+                      placeholder={placeholder}
+                      value={form[key]}
+                      onChange={(e) => set(key, e.target.value)}
+                      aria-invalid={!!errors[key]}
+                      className={`${inputClass} ${borderFor(key)}`}
+                    />
+                    <FieldError message={errors[key]} />
+                  </div>
+                ))}
               </div>
 
               <div className="mb-4">
-                <label className="font-'Alegreysa Sans SC, sans-serif' text-white/60 text-[0.65rem] tracking-widest uppercase mb-2 block">
+                <span className="font-'Alegreysa Sans SC, sans-serif' text-white/60 text-[0.65rem] tracking-widest uppercase mb-2 block">
                   Your Role or Company
-                </label>
-                <div className="flex flex-wrap gap-x-5 gap-y-2">
-                  {['fmcg', 'shipper', 'other'].map((r) => (
+                </span>
+                <div className="flex flex-wrap gap-x-5 gap-y-2" role="radiogroup">
+                  {ROLES.map((r) => (
                     <label key={r} className="flex items-center gap-2 cursor-pointer group">
+                      <input
+                        type="radio"
+                        name="contact-role"
+                        value={r}
+                        checked={role === r}
+                        onChange={() => setRole(r)}
+                        className="sr-only"
+                      />
                       <div
-                        onClick={() => setRole(r)}
                         className={`w-3.5 h-3.5 rounded-full border-2 transition-all duration-200 cursor-pointer
                           ${role === r
                             ? 'border-[#4df9ed] bg-[#4df9ed]'
@@ -127,25 +247,41 @@ export default function ContactSection() {
               </div>
 
               <div className="mb-6">
-                <label className="font-'Alegreysa Sans SC, sans-serif' text-white/60 text-[0.65rem] tracking-widest uppercase mb-1.5 block">
+                <label htmlFor="contact-message" className={labelClass}>
                   Message
                 </label>
                 <textarea
+                  id="contact-message"
                   rows={4}
-                  className="w-full bg-[#1a1a1a] border border-white/[0.10] rounded-[8px]
-                    px-3 py-2.5 text-white text-sm font-'Alegreysa Sans SC, sans-serif' resize-none
-                    focus:outline-none focus:border-[#4df9ed]/40 transition-colors"
+                  maxLength={2000}
+                  value={form.message}
+                  onChange={(e) => set('message', e.target.value)}
+                  aria-invalid={!!errors.message}
+                  className={`${inputClass} ${borderFor('message')} resize-none`}
                 />
+                <FieldError message={errors.message} />
               </div>
 
               <button
+                type="submit"
+                disabled={sending}
                 className="font-'Alegreysa Sans SC, sans-serif' bg-white text-[#0a0a0a] px-7 py-2.5 rounded-[8px]
                   text-sm tracking-wider font-semibold
-                  hover:bg-white/90 transition-all duration-300 cursor-pointer w-full sm:w-auto"
+                  hover:bg-white/90 transition-all duration-300 cursor-pointer w-full sm:w-auto
+                  disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Submit
+                {sending ? 'Sending…' : 'Submit'}
               </button>
-            </div>
+
+              {status && (
+                <p
+                  role="status"
+                  className={`mt-4 text-sm ${status.kind === 'success' ? 'text-[#4df9ed]' : 'text-red-400'}`}
+                >
+                  {status.text}
+                </p>
+              )}
+            </form>
 
             <div className="border-t lg:border-t-0 lg:border-l border-white/[0.08]
               p-6 sm:p-8 md:p-10 bg-[#0f0f0f]">

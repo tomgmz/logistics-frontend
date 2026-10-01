@@ -27,6 +27,13 @@ import {
 
 import { supabase } from '@/lib/supabase'
 import { pickDriver, pickTruck, type CrewSelection, type PairFilled } from '@/lib/crew-pairing'
+import { z } from 'zod'
+import {
+  fullNameField,
+  normalizePhMobile,
+  optionalEmailField,
+  optionalMobileField,
+} from '@/lib/validation/fields'
 import { statusColor } from '@/components/map/status.colors'
 import { useModuleAccess } from '@/components/layout/ModuleAccess'
 import type { BookingDetail } from '@/app/types/maps/routemap.types'
@@ -223,6 +230,12 @@ const emptyVendorForm: VendorAssignForm = {
   vendor_driver_email:   '',
 }
 
+const vendorDriverSchema = z.object({
+  vendor_driver_name:  fullNameField('Driver name'),
+  vendor_driver_phone: optionalMobileField,
+  vendor_driver_email: optionalEmailField,
+})
+
 const VENDOR_FIELDS: {
   key: keyof VendorAssignForm
   label: string
@@ -234,7 +247,7 @@ const VENDOR_FIELDS: {
   { key: 'vendor_contact',        label: 'Vendor contact' },
   { key: 'vendor_driver_name',    label: 'Driver name', required: true },
   { key: 'vendor_driver_license', label: 'Driver license #' },
-  { key: 'vendor_driver_phone',   label: 'Driver phone' },
+  { key: 'vendor_driver_phone',   label: 'Driver phone', type: 'tel', hint: 'PH mobile, e.g. 0917 123 4567.' },
   { key: 'vendor_vehicle_plate',  label: 'Vehicle plate', required: true },
   { key: 'vendor_vehicle_type',   label: 'Vehicle type' },
   {
@@ -1185,12 +1198,16 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     if (!selectedId) return
     if (assignVendorMode) {
       if (!vendorForm.vendor_driver_name.trim() || !vendorForm.vendor_vehicle_plate.trim()) return
-      // Catch a typo here rather than after it has provisioned an account against
-      // an address nobody reads — the invite is the driver's only way in, so a
-      // misspelt domain is a silently blocked delivery.
-      const email = vendorForm.vendor_driver_email.trim()
-      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        appToast.error('Enter a valid driver email, or leave it blank for no app access.')
+      // Same name / phone / email rules as every user in the system. Catching a
+      // bad email here matters most: the invite is the driver's only way in, so
+      // a misspelt domain is a silently blocked delivery.
+      const checked = vendorDriverSchema.safeParse({
+        vendor_driver_name:  vendorForm.vendor_driver_name,
+        vendor_driver_phone: normalizePhMobile(vendorForm.vendor_driver_phone),
+        vendor_driver_email: vendorForm.vendor_driver_email,
+      })
+      if (!checked.success) {
+        appToast.error(checked.error.issues[0].message)
         return
       }
     } else if (!assignDriverId || !assignTruckId) {
@@ -1204,6 +1221,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
             ...Object.fromEntries(
               Object.entries(vendorForm).map(([k, v]) => [k, v.trim() || undefined]),
             ),
+            vendor_driver_phone: normalizePhMobile(vendorForm.vendor_driver_phone) || undefined,
           })
         : await assignmentService.assignBooking(selectedId, {
             driver_id: assignDriverId,

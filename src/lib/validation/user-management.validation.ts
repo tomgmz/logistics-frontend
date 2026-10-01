@@ -1,99 +1,32 @@
 import { z } from 'zod'
+import {
+  emailField,
+  fieldErrors,
+  firstNameField,
+  lastNameField,
+  middleNameField,
+  mobileField,
+  optionalLandlineField,
+  suffixField,
+} from './fields'
 
 export const USER_SUFFIXES = ['Jr.', 'Sr.', 'II', 'III', 'IV', 'V'] as const
 
-const PH_MOBILE_REGEX   = /^\+639[0-9]{9}$/
-const PH_LANDLINE_REGEX = /^\+63[0-9]{9}$/
-
-const emailRegex =
-  /^[a-zA-Z0-9](?:[a-zA-Z0-9]|[._%+-](?=[a-zA-Z0-9]))*@(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,63}$/
-
-const firstName = z
-  .string({ error: 'First name is required' })
-  .min(2, 'First name must be at least 2 characters')
-  .max(50, 'First name is too long')
-  .regex(
-    /^[\p{L}]+\.?(?:[ '-][\p{L}]+\.?)*$/u,
-    'First name may only contain letters, spaces, hyphens, or apostrophes',
-  )
-
-const lastName = z
-  .string({ error: 'Last name is required' })
-  .min(2, 'Last name must be at least 2 characters')
-  .max(50, 'Last name is too long')
-  .regex(
-    /^[\p{L}](?:[\p{L}'-]*[\p{L}])?(?: [\p{L}'-]+[\p{L}])*$/u,
-    'Last name may only contain letters, spaces, hyphens, or apostrophes',
-  )
-
-const middleName = z
-  .string()
-  .optional()
-  .nullable()
-  .transform(v => (v === '' ? null : v))
-  .refine(
-    v => v == null || v.length >= 2,
-    'Middle name must be at least 2 characters',
-  )
-  .refine(
-    v => v == null || v.length <= 50,
-    'Middle name is too long',
-  )
-  .refine(
-    v => v == null || /^[\p{L}]+(?:[ '-][\p{L}]+)*$/u.test(v),
-    'Middle name may only contain letters, spaces, hyphens, or apostrophes',
-  )
-
-const suffix = z.preprocess(
-  v => (v === '' ? null : v),
-  z.string()
-    .max(20, 'Suffix is too long')
-    .regex(/^[\p{L}0-9 .,'-]*$/u, 'Suffix may only contain letters, numbers, spaces, periods, commas, apostrophes, or hyphens')
-    .optional()
-    .nullable(),
-)
+// Name, email and phone rules come from ./fields, the one copy every form in
+// the app shares.
+const firstName        = firstNameField
+const lastName         = lastNameField
+const middleName       = middleNameField
+const suffix           = suffixField
+const email            = emailField
+const phone            = mobileField
+const phoneOptional    = mobileField.optional()
+const landlineOptional = optionalLandlineField
 
 const suffixWithOthersCheck = suffix.refine(
   v => v == null || v !== 'others',
   'Please type a suffix when Others is selected',
 )
-
-const email = z
-  .string({ error: 'Email is required' })
-  .min(5, 'Email is too short')
-  .max(254, 'Email is too long')
-  .regex(emailRegex, 'Please enter a valid email address')
-  .refine(
-    v => v.split('@')[0].length <= 64,
-    'Email local part is too long',
-  )
-  .refine(v => {
-    const domain = v.split('@')[1]
-    if (!domain) return true
-    const parts  = domain.split('.')
-    for (let i = 0; i < parts.length - 1; i++) {
-      if (parts[i] === parts[i + 1]) return false
-    }
-    return true
-  }, 'Please enter a valid email address')
-  .transform(v => v.trim().toLowerCase())
-
-const phone = z
-  .string({ error: 'Phone is required' })
-  .regex(PH_MOBILE_REGEX, 'Enter a valid PH mobile number (+639XXXXXXXXX)')
-
-const phoneOptional = z
-  .string()
-  .regex(PH_MOBILE_REGEX, 'Enter a valid PH mobile number (+639XXXXXXXXX)')
-  .optional()
-  .transform(v => (v === '' ? null : v))
-
-const landlineOptional = z
-  .string()
-  .regex(PH_LANDLINE_REGEX, 'Enter a valid PH landline')
-  .optional()
-  .nullable()
-  .transform(v => (v === '' ? null : v))
 
 const licenseNumber = z
   .string({ error: 'License number is required' })
@@ -193,11 +126,5 @@ export function validateForm(
 ): Record<string, string> {
   const schema = isEdit ? FORM_SCHEMAS[tab].update : FORM_SCHEMAS[tab].create
   const result = schema.safeParse(data)
-  if (result.success) return {}
-  const errors: Record<string, string> = {}
-  for (const issue of result.error.issues) {
-    const key = issue.path[issue.path.length - 1] as string
-    if (key && !errors[key]) errors[key] = issue.message
-  }
-  return errors
+  return result.success ? {} : fieldErrors(result.error)
 }
