@@ -24,8 +24,18 @@ export const SIGNED_OUT_PARAM = 'signedout'
 export const SIGNED_OUT_REASON_PARAM = 'reason'
 export type SignedOutReason = 'inactive'
 
+/**
+ * The first sign-out navigation wins. Whatever ends the session also clears the
+ * user from the store, and every portal layout answers a missing user with its
+ * own goHomeSignedOut() a render later. location.replace() honours the last
+ * call, so without this latch that reason-less bounce overrode
+ * goHomeSignedOut('inactive') and the explanation never showed.
+ */
+let leaving = false
+
 export function goHomeSignedOut(reason?: SignedOutReason): void {
-  if (typeof window === 'undefined') return
+  if (typeof window === 'undefined' || leaving) return
+  leaving = true
   const suffix = reason ? `&${SIGNED_OUT_REASON_PARAM}=${reason}` : ''
   window.location.replace(`/?${SIGNED_OUT_PARAM}=1${suffix}`)
 }
