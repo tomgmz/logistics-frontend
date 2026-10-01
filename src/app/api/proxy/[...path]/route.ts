@@ -1,8 +1,11 @@
 import axios, { type AxiosResponse } from 'axios'
 import { NextRequest, NextResponse } from 'next/server'
 import { backendCookieHeader, TOKEN_COOKIES } from '@/lib/server/token-cookies'
+import { forwardedGeoHeaders } from '@/lib/server/geo-forward'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL!
+
+const GEO_FORWARD_PATHS = new Set(['auth/change-password'])
 
 function forwardSetCookieHeaders(nextRes: NextResponse, axiosRes: AxiosResponse) {
   const raw = axiosRes.headers['set-cookie']
@@ -53,6 +56,9 @@ async function handler(
         ...(req.headers.get('x-csrf-token')
           ? { 'X-CSRF-Token': req.headers.get('x-csrf-token')! }
           : {}),
+        // The password-changed emails say roughly where the change came from;
+        // only the proxy knows the visitor's location. See lib/server/geo-forward.
+        ...(GEO_FORWARD_PATHS.has(path) ? forwardedGeoHeaders(req) : {}),
       },
       data: body,
     })
