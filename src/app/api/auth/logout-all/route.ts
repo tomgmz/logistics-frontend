@@ -5,7 +5,7 @@ import { API_URL, cookieClearOptions, getForwardHeaders, handleError } from '../
 export async function POST(req: NextRequest) {
   try {
     await axios.post(`${API_URL}/auth/logout-all`, {}, {
-      headers: getForwardHeaders(req),
+      headers: await getForwardHeaders(req),
     })
   } catch (error: unknown) {
     if (axios.isAxiosError(error) && error.response?.status !== 401) {

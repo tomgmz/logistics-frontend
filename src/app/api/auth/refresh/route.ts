@@ -7,15 +7,16 @@ import {
   getForwardHeaders,
   handleError,
 } from '../_proxy'
+import { setTokenCookie, withoutTokens } from '@/lib/server/token-cookies'
 
 export async function POST(req: NextRequest) {
   try {
     const { data } = await axios.post(`${API_URL}/auth/refresh`, {}, {
-      headers: getForwardHeaders(req),
+      headers: await getForwardHeaders(req),
     })
 
-    const res = NextResponse.json(data)
-    res.cookies.set('access_token', data.data.accessToken, accessTokenCookieOptions)
+    const res = NextResponse.json(withoutTokens(data))
+    await setTokenCookie(res, 'access_token', data.data.accessToken, accessTokenCookieOptions)
     return res
 
   } catch (error: unknown) {

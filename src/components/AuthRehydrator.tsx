@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { getMe, type AuthUser } from '@/lib/api/auth.api'
 import { useAuthStore } from '@/lib/store/auth.store'
+import { readPersisted } from '@/lib/secure-storage'
 import { syncServerTime } from '@/app/utils/serverTime'
 import { ROLE_ROUTES } from '@/constants/roles'
 import axios from 'axios'
@@ -60,14 +61,16 @@ export default function AuthRehydrator() {
   }, [hasHydrated, user, pathname, router])
 
   useEffect(() => {
-    const handleStorage = (e: StorageEvent) => {
+    type Persisted = { state?: { user?: { user_id?: string } | null } }
+    const handleStorage = async (e: StorageEvent) => {
       if (e.key !== 'auth-user') return
-      const oldUserId = e.oldValue
-        ? (JSON.parse(e.oldValue)?.state?.user?.user_id ?? null)
-        : null
-      const newUserId = e.newValue
-        ? (JSON.parse(e.newValue)?.state?.user?.user_id ?? null)
-        : null
+      // The stored value is encrypted (lib/secure-storage).
+      const [oldVal, newVal] = await Promise.all([
+        readPersisted<Persisted>(e.oldValue, 'auth-user'),
+        readPersisted<Persisted>(e.newValue, 'auth-user'),
+      ])
+      const oldUserId = oldVal?.state?.user?.user_id ?? null
+      const newUserId = newVal?.state?.user?.user_id ?? null
       if (oldUserId && newUserId && oldUserId !== newUserId) {
         router.replace('/')
         return
@@ -79,8 +82,9 @@ export default function AuthRehydrator() {
         if (!isPublic) router.replace('/')
       }
     }
-    window.addEventListener('storage', handleStorage)
-    return () => window.removeEventListener('storage', handleStorage)
+    const onStorage = (e: StorageEvent) => { void handleStorage(e) }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
   }, [router, pathname])
 
   useEffect(() => {
@@ -143,8 +147,8 @@ export default function AuthRehydrator() {
 
     async function rehydrate() {
       try {
-        const persisted    = localStorage.getItem('auth-user')
-        const hasLocalUser = !!JSON.parse(persisted ?? '{}')?.state?.user
+        const persisted    = await readPersisted<{ state?: { user?: unknown } }>(localStorage.getItem('auth-user'), 'auth-user')
+        const hasLocalUser = !!persisted?.state?.user
         if (!hasLocalUser) {
           if (!cancelled) clearUser()
           return

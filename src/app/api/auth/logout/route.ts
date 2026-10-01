@@ -5,7 +5,7 @@ import { API_URL, cookieClearOptions, getForwardHeaders } from '../_proxy'
 export async function POST(req: NextRequest) {
   try {
     await axios.post(`${API_URL}/auth/logout`, {}, {
-      headers: getForwardHeaders(req),
+      headers: await getForwardHeaders(req),
     })
   } catch {
     // Whatever the backend said — or failed to say — the cookies still go. An

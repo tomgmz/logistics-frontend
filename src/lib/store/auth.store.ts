@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { persist, createJSONStorage } from 'zustand/middleware'
+import { encryptedLocalStorage } from '@/lib/secure-storage'
 import type { AuthUser } from '@/lib/api/auth.api'
 
 interface AuthStore {
@@ -21,6 +22,9 @@ export const useAuthStore = create<AuthStore>()(
     }),
     {
       name: 'auth-user',
+      // Encrypted at rest (lib/secure-storage); hydration is therefore async,
+      // which `hasHydrated` already gates every portal on.
+      storage: createJSONStorage(() => encryptedLocalStorage),
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true)
       },

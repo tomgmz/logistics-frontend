@@ -8,18 +8,19 @@ import {
   getForwardHeaders,
   handleError,
 } from '../_proxy'
+import { setTokenCookie, withoutTokens } from '@/lib/server/token-cookies'
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
 
     const { data } = await axios.post(`${API_URL}/auth/verify-otp`, body, {
-      headers: getForwardHeaders(req),
+      headers: await getForwardHeaders(req),
     })
 
-    const res = NextResponse.json(data)
-    res.cookies.set('access_token',  data.data.accessToken,  accessTokenCookieOptions)
-    res.cookies.set('refresh_token', data.data.refreshToken, refreshTokenCookieOptions)
+    const res = NextResponse.json(withoutTokens(data))
+    await setTokenCookie(res, 'access_token',  data.data.accessToken,  accessTokenCookieOptions)
+    await setTokenCookie(res, 'refresh_token', data.data.refreshToken, refreshTokenCookieOptions)
 
     if (data.data.user?.must_change_password) {
       res.cookies.set('must_change_pw', '1', mustChangePwCookieOptions)

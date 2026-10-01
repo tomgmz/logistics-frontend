@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ROLE_ROUTES } from './constants/roles'
 import { SIGNED_OUT_PARAM } from './lib/auth-redirect'
+import { openToken } from './lib/server/token-cookies'
 
 // '/reset-password' has to be public: whoever opens a reset link has no session
 // (and may be permanently locked), so the guard would otherwise bounce them to
@@ -33,7 +34,7 @@ function getRoleFromToken(token: string): string | null {
   }
 }
 
-export function proxy(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
 
   // A client that has given up on its session arrives here. Take it at its word:
@@ -48,9 +49,13 @@ export function proxy(req: NextRequest) {
     return res
   }
 
+  // Session cookies are encrypted (lib/server/token-cookies). One that does not
+  // decrypt — tampered, or issued before encryption — counts as no cookie.
+  const accessToken  = await openToken('access_token',  req.cookies.get('access_token')?.value)
+  const refreshToken = await openToken('refresh_token', req.cookies.get('refresh_token')?.value)
+
   const mustChangePw = req.cookies.get('must_change_pw')?.value === '1'
   if (mustChangePw && !isPublicPath(pathname)) {
-    const accessToken = req.cookies.get('access_token')?.value
     const role        = accessToken ? getRoleFromToken(accessToken) : null
     const portal      = role ? (ROLE_ROUTES[role] ?? '/') : '/'
     const dest        = req.nextUrl.clone()
@@ -61,8 +66,6 @@ export function proxy(req: NextRequest) {
 
   // Redirect authenticated users away from landing page
   if (pathname === '/') {
-    const accessToken  = req.cookies.get('access_token')?.value
-    const refreshToken = req.cookies.get('refresh_token')?.value
     const sessionToken = accessToken ?? refreshToken
     if (sessionToken) {
       const role          = getRoleFromToken(sessionToken)
@@ -79,9 +82,6 @@ export function proxy(req: NextRequest) {
   if (isPublicPath(pathname)) {
     return NextResponse.next()
   }
-
-  const accessToken  = req.cookies.get('access_token')?.value
-  const refreshToken = req.cookies.get('refresh_token')?.value
 
   // No tokens — redirect to landing page
   if (!accessToken && !refreshToken) {

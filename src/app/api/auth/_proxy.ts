@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { NextRequest, NextResponse } from 'next/server'
+import { backendCookieHeader } from '@/lib/server/token-cookies'
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL!
 export const isProd  = process.env.NODE_ENV === 'production'
@@ -36,10 +37,12 @@ export const mustChangePwCookieOptions = {
   maxAge:   60 * 60,
 }
 
-export function getForwardHeaders(req: NextRequest) {
+// The session cookies are encrypted in the browser; the backend gets them
+// decrypted (see lib/server/token-cookies).
+export async function getForwardHeaders(req: NextRequest) {
   return {
     'Content-Type':  'application/json',
-    cookie:          req.headers.get('cookie') ?? '',
+    cookie:          await backendCookieHeader(req),
     // Forward CSRF token to backend on all auth routes
     ...(req.headers.get('x-csrf-token')
       ? { 'X-CSRF-Token': req.headers.get('x-csrf-token')! }
@@ -51,6 +54,9 @@ export function handleError(error: unknown) {
   if (axios.isAxiosError(error) && error.response) {
     return NextResponse.json(error.response.data, { status: error.response.status })
   }
+  // Not the backend answering — e.g. a missing COOKIE_ENCRYPTION_KEY. Say so in
+  // the server log; the browser only needs to know it failed.
+  console.error('[auth proxy] error:', error)
   return NextResponse.json(
     { status: 'error', message: 'Internal server error' },
     { status: 500 },

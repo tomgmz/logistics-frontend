@@ -1,5 +1,6 @@
 import axios, { type AxiosResponse } from 'axios'
 import { NextRequest, NextResponse } from 'next/server'
+import { backendCookieHeader, TOKEN_COOKIES } from '@/lib/server/token-cookies'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL!
 
@@ -8,7 +9,10 @@ function forwardSetCookieHeaders(nextRes: NextResponse, axiosRes: AxiosResponse)
   if (!raw) return
   const cookies = Array.isArray(raw) ? raw : [raw]
   for (const cookie of cookies) {
-    if (cookie) nextRes.headers.append('Set-Cookie', cookie)
+    // Session cookies are only ever set, encrypted, by the /api/auth routes. A
+    // raw token cookie from the backend must never reach the browser.
+    if (!cookie || TOKEN_COOKIES.some((n) => cookie.startsWith(`${n}=`))) continue
+    nextRes.headers.append('Set-Cookie', cookie)
   }
 }
 
@@ -45,7 +49,7 @@ async function handler(
       url,
       headers: {
         ...(forwardedContentType ? { 'Content-Type': forwardedContentType } : {}),
-        cookie: req.headers.get('cookie') ?? '',
+        cookie: await backendCookieHeader(req),
         ...(req.headers.get('x-csrf-token')
           ? { 'X-CSRF-Token': req.headers.get('x-csrf-token')! }
           : {}),
