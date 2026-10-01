@@ -35,6 +35,20 @@ function getRoleFromToken(token: string): string | null {
 }
 
 export async function proxy(req: NextRequest) {
+  const res = await route(req)
+
+  // A token cookie that is present but does not decrypt — left over from before
+  // the cookies were encrypted, or tampered with — is already ignored above.
+  // Delete it as well, so no readable token lingers in the browser until it
+  // expires on its own.
+  for (const name of ['access_token', 'refresh_token'] as const) {
+    const raw = req.cookies.get(name)?.value
+    if (raw && !(await openToken(name, raw))) res.cookies.delete(name)
+  }
+  return res
+}
+
+async function route(req: NextRequest): Promise<NextResponse> {
   const { pathname } = req.nextUrl
 
   // A client that has given up on its session arrives here. Take it at its word:

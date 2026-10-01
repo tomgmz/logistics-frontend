@@ -125,7 +125,12 @@ export async function readPersisted<T = unknown>(stored: string | null, name: st
 export const encryptedLocalStorage: StateStorage = {
   getItem: async (name) => {
     if (typeof window === 'undefined') return null
-    return decryptString(window.localStorage.getItem(name), name)
+    const stored = window.localStorage.getItem(name)
+    const plain  = await decryptString(stored, name)
+    // Not ours or no longer opens (a pre-encryption plaintext value, or a key
+    // that was lost): drop it rather than leave readable data lying around.
+    if (stored && plain === null) window.localStorage.removeItem(name)
+    return plain
   },
   setItem: async (name, value) => {
     if (typeof window === 'undefined') return
