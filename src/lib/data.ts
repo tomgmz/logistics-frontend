@@ -32,6 +32,12 @@ export const BRANDS = [
   { src: ASSETS.temu,     alt: 'Temu',     className: 'h-20 w-20' },
 ];
 
+export const CONTACT = {
+  phone:   '+63 9685 536 8975',
+  email:   '8338LogisticsServices@gmail.com',
+  address: ['Blk. 6 Lot 8 Lynville Enclave,', 'Mamatid, City of Cabuyao, Laguna'],
+};
+
 export const SERVICES = [
   { img: ASSETS.svcContainers, label: 'Nationwide cargo movement' },
   { img: ASSETS.svcDelivery,   label: 'Smart delivery scheduling' },
@@ -39,14 +45,6 @@ export const SERVICES = [
   { img: ASSETS.svcTracking,   label: 'Complete delivery records' },
 ];
 
-export const METRICS = [
-  { value: '90%',   label: 'On-time delivery rate' },
-  { value: '24/7',  label: 'Live tracking available' },
-  { value: '500K+', label: 'Shipments managed' },
-  { value: '4.9/5', label: 'Client rating' },
-  { value: '15 min',label: 'Avg. support response' },
-  { value: '99.5%', label: 'Transaction success rate' },
-];
 
 export const CYCLING_WORDS = ['MOVING', 'PERFORMANCE', 'EFFICIENCY', 'TRACKING', 'PRECISION', 'YOU'];
 

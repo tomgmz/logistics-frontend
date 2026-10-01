@@ -182,18 +182,6 @@ export default function ContactSection() {
           </motion.div>
         </div>
       </section>
-
-      <footer className="w-full bg-[#0a0a0a] border-t border-white/[0.07]">
-        <div className="max-w-[1100px] mx-auto px-5 sm:px-8 md:px-12 py-5
-          flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span className="font-'Alegreysa Sans SC, sans-serif' text-white/30 text-xs tracking-widest uppercase">
-            8338 Logistic Services
-          </span>
-          <span className="font-'Alegreysa Sans SC, sans-serif' text-white/30 text-xs tracking-widest uppercase text-center">
-            © 2026 Logistics Services. All Rights Reserved.
-          </span>
-        </div>
-      </footer>
     </>
   );
 }

@@ -8,6 +8,7 @@ import { changePassword } from '@/lib/api/auth.api'
 import { ROLE_ROUTES } from '@/constants/roles'
 import Image from 'next/image'
 import { ASSETS } from '@/lib/data'
+import SiteFooter from '@/components/layout/SiteFooter'
 import {
   IconEye,
   IconLock,
@@ -332,6 +333,8 @@ export default function ChangePasswordPage() {
           )}
         </AnimatePresence>
       </main>
+
+      <SiteFooter variant="compact" />
     </div>
   )
 }

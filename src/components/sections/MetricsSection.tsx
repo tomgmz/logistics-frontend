@@ -2,7 +2,8 @@
 
 import { useRef, useEffect, useState } from 'react';
 import { motion, useInView, animate } from 'framer-motion';
-import { METRICS, ASSETS } from '@/lib/data';
+import { ASSETS } from '@/lib/data';
+import type { PublicMetrics } from '@/lib/server/public-metrics';
 import Image from 'next/image';
 
 function AnimatedValue({ raw }: { raw: string }) {
@@ -59,7 +60,35 @@ function StatCard({ value, label, index }: { value: string; label: string; index
   );
 }
 
-export default function MetricsSection() {
+// Shown when a figure has nothing behind it yet (or the backend is down) —
+// honest, where a '0%' would read as a failure.
+const NONE = '—';
+
+const rate = (v: number | null | undefined) => (v == null ? NONE : `${v}%`);
+
+// Plain digits so AnimatedValue can count up to them: '1,234' would stop the
+// match at the comma, so large counts are abbreviated instead.
+function count(v: number | undefined): string {
+  if (v == null) return NONE;
+  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M+`;
+  if (v >= 10_000)    return `${Math.floor(v / 1_000)}K+`;
+  if (v >= 1_000)     return `${(v / 1_000).toFixed(1)}K+`;
+  return String(v);
+}
+
+function buildCards(m: PublicMetrics | null) {
+  return [
+    { value: rate(m?.onTimeRate),          label: 'On-time delivery rate' },
+    { value: '24/7',                       label: 'Live tracking available' },
+    { value: count(m?.shipmentsManaged),   label: 'Shipments managed' },
+    { value: rate(m?.deliverySuccessRate), label: 'Successful delivery rate' },
+    { value: count(m?.dropOffsDelivered),  label: 'Drop-offs delivered' },
+    { value: count(m?.clientsServed),      label: 'Clients served' },
+  ];
+}
+
+export default function MetricsSection({ metrics }: { metrics: PublicMetrics | null }) {
+  const cards = buildCards(metrics);
   const ref    = useRef<HTMLDivElement>(null);
   const inView = useInView(ref as React.RefObject<Element>, { once: true, margin: '-80px' });
 
@@ -122,7 +151,7 @@ export default function MetricsSection() {
             <div className="absolute inset-0 bg-[#0a0a0a]/50" />
           </motion.div>
 
-          {METRICS.map((m, i) => (
+          {cards.map((m, i) => (
             <StatCard key={m.label} value={m.value} label={m.label} index={i + 1} />
           ))}
 

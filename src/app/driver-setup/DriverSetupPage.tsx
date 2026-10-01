@@ -5,6 +5,7 @@ import { motion } from 'framer-motion'
 import { useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import { ASSETS } from '@/lib/data'
+import SiteFooter from '@/components/layout/SiteFooter'
 
 /**
  * Where a vendor driver's passkey setup link lands.
@@ -58,7 +59,8 @@ export default function DriverSetupPage() {
   }, [token, attempted])
 
   return (
-    <div className="bg-[#0a0a0a] flex flex-col items-center justify-center px-5 py-10" style={{ minHeight: '100dvh' }}>
+    <div className="bg-[#0a0a0a] flex flex-col" style={{ minHeight: '100dvh' }}>
+    <div className="flex-1 flex flex-col items-center justify-center px-5 py-10">
       <div className="mb-8">
         <Image src={ASSETS.logo} alt="8338 Logistics" width={140} height={40} priority />
       </div>
@@ -119,6 +121,9 @@ export default function DriverSetupPage() {
           </div>
         </div>
       </motion.div>
+    </div>
+
+    <SiteFooter variant="compact" />
     </div>
   )
 }

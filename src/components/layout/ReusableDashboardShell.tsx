@@ -4,6 +4,7 @@ import { ReactNode, useMemo, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import ReusableHeader  from './ReusableHeader'
 import ReusableSidebar from './ReusableSidebar'
+import SiteFooter      from './SiteFooter'
 import PushProvider                  from '@/components/push/PushProvider'
 import { ModuleAccessProvider, ModuleNoAccess } from './ModuleAccess'
 import { useAuthStore } from '@/lib/store/auth.store'
@@ -52,11 +53,14 @@ export default function ReusableDashboardShell({ children, navItems }: ReusableD
         <ReusableSidebar navItems={visibleNavItems} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
         <main className="min-w-0 flex-1 overflow-hidden flex flex-col bg-[var(--color-surface)]">
-          {blocked ? (
-            <ModuleNoAccess />
-          ) : (
-            <ModuleAccessProvider flags={currentFlags}>{children}</ModuleAccessProvider>
-          )}
+          <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+            {blocked ? (
+              <ModuleNoAccess />
+            ) : (
+              <ModuleAccessProvider flags={currentFlags}>{children}</ModuleAccessProvider>
+            )}
+          </div>
+          <SiteFooter variant="compact" />
         </main>
       </div>
 

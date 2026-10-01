@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import { ASSETS } from '@/lib/data'
+import SiteFooter from '@/components/layout/SiteFooter'
 import { completePasswordReset, verifyResetToken } from '@/lib/api/auth.api'
 import {
   IconEye,
@@ -389,6 +390,8 @@ export default function ResetPasswordPage() {
           )}
         </AnimatePresence>
       </main>
+
+      <SiteFooter variant="compact" />
     </div>
   )
 }

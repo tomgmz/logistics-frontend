@@ -4,6 +4,7 @@ import { ReactNode, useEffect } from 'react'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { goHomeSignedOut } from '@/lib/auth-redirect'
 import ReusableHeader from '@/components/layout/ReusableHeader'
+import SiteFooter from '@/components/layout/SiteFooter'
 import { useState } from 'react'
 
 export default function MessagingLayout({ children }: { children: ReactNode }) {
@@ -32,6 +33,7 @@ export default function MessagingLayout({ children }: { children: ReactNode }) {
       <main className="flex flex-1 min-h-0 overflow-hidden">
         {children}
       </main>
+      <SiteFooter variant="compact" />
     </div>
   )
 }
