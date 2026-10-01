@@ -11,6 +11,7 @@ import { useAuthStore } from '@/lib/store/auth.store'
 import { useAppDispatch, useAppSelector } from '@/lib/hooks/hooks'
 import { setSidebarOpen } from '@/lib/store/slice/booking.slice'
 import ReusableModal from '@/components/layout/ReusableModal'
+import SigningOutOverlay from '@/components/layout/SigningOutOverlay'
 import { History, CalendarCheck, MapPin, CreditCard } from 'lucide-react'
 
 const SIDEBAR_COLLAPSED = 56
@@ -41,10 +42,15 @@ export default function Sidebar() {
   const user            = useAuthStore((state) => state.user)
   const clearUser       = useAuthStore((state) => state.clearUser)
   const [logoutModalOpen, setLogoutModalOpen] = useState(false)
+  const [signingOut,      setSigningOut]      = useState(false)
 
   const open = (val: boolean) => dispatch(setSidebarOpen(val))
 
   const handleLogout = async () => {
+    // Swap the confirm modal for the full-screen loader; it stays up until the
+    // navigation below replaces the page.
+    setLogoutModalOpen(false)
+    setSigningOut(true)
     try {
       await logout()
     } catch {
@@ -175,6 +181,8 @@ export default function Sidebar() {
         onConfirm={handleLogout}
         onCancel={() => setLogoutModalOpen(false)}
       />
+
+      <SigningOutOverlay open={signingOut} />
     </>
   )
 }

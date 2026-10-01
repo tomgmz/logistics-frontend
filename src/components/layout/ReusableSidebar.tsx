@@ -9,6 +9,7 @@ import { logout } from '@/lib/api/auth.api'
 import { unregisterWebPush } from '@/lib/push/web-push'
 import { useAuthStore } from '@/lib/store/auth.store'
 import ReusableModal from '@/components/layout/ReusableModal'
+import SigningOutOverlay from '@/components/layout/SigningOutOverlay'
 import { roleLabel } from '@/lib/roles'
 
 const SIDEBAR_COLLAPSED = 56
@@ -49,8 +50,13 @@ export default function ReusableSidebar({
   const user = useAuthStore((state) => state.user)
   const clearUser = useAuthStore((state) => state.clearUser)
   const [logoutModalOpen, setLogoutModalOpen] = useState(false)
+  const [signingOut,      setSigningOut]      = useState(false)
 
   const handleLogout = async () => {
+    // Swap the confirm modal for the full-screen loader; it stays up until the
+    // navigation below replaces the page.
+    setLogoutModalOpen(false)
+    setSigningOut(true)
     try {
       await unregisterWebPush()
       await logout()
@@ -197,6 +203,8 @@ export default function ReusableSidebar({
         onConfirm={handleLogout}
         onCancel={() => setLogoutModalOpen(false)}
       />
+
+      <SigningOutOverlay open={signingOut} />
     </>
   )
 }
