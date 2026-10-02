@@ -1,7 +1,8 @@
 'use client'
 
-import { useLiveTable } from '@/lib/hooks/useLiveTable'
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useLiveTable, useLivePending } from '@/lib/hooks/useLiveTable'
+import NewEntriesBar from '@/components/ui/NewEntriesBar'
+import { useEffect, useState, useCallback } from 'react'
 import { RefreshCw, ChevronLeft, ChevronRight, ScrollText, Server } from 'lucide-react'
 import ExportLogsButton from '@/components/admin/ExportLogsButton'
 import {
@@ -82,9 +83,14 @@ function AuditLogsTab() {
 
   useEffect(() => { setPage(1) }, [debouncedSearch, logType, sort])
 
-  // `quiet` re-reads in place (a live signal): no spinner, and a failed re-read
-  // keeps the rows already on screen instead of replacing them with an error.
+  // New audit rows are counted, not loaded: the list never shifts while it is
+  // being read, and the busiest live topic costs no re-reads.
+  const { pending, clear: clearPending } = useLivePending(['live:audit_logs'])
+
+  // `quiet` re-reads in place: no spinner, and a failed re-read keeps the rows
+  // already on screen instead of replacing them with an error.
   const fetchLogs = useCallback(async (quiet = false) => {
+    clearPending()
     if (!quiet) {
       setLoading(true)
       setError(null)
@@ -104,11 +110,9 @@ function AuditLogsTab() {
     } finally {
       if (!quiet) setLoading(false)
     }
-  }, [sort, logType, debouncedSearch])
+  }, [sort, logType, debouncedSearch, clearPending])
 
   useEffect(() => { fetchLogs() }, [fetchLogs, refreshKey])
-
-  useLiveTable(['live:audit_logs'], () => { void fetchLogs(true) })
 
   const totalPages    = Math.ceil(total / PAGE_SIZE)
   const safePage      = Math.min(page, Math.max(1, totalPages))
@@ -210,6 +214,8 @@ function AuditLogsTab() {
         {error && !loading && (
           <div className="shrink-0 border-b border-red-500/20 bg-red-500/10 px-5 py-3 text-sm text-red-400">{error}</div>
         )}
+
+        <NewEntriesBar count={pending} onRefresh={() => setRefreshKey(k => k + 1)} />
 
         {/* Table */}
         <div className="flex-1 overflow-auto min-h-0">
@@ -350,19 +356,9 @@ function SystemLogsTab() {
   const [sort, setSort]                       = useState<'desc' | 'asc'>('desc')
   const [selected, setSelected]               = useState<AppSystemLog | null>(null)
   const [refreshKey, setRefreshKey]           = useState(0)
-  // Bumped by a live signal: re-reads like refreshKey, but without the spinner.
-  const [liveKey, setLiveKey]                 = useState(0)
-  const quietRef                              = useRef(false)
-  // A failed re-read can itself write a system log (a tripped rate limit),
-  // which would signal another re-read. Back off for a minute after a failure
-  // so the tab can never feed itself.
-  const liveFailedAtRef                       = useRef(0)
-
-  useLiveTable(['live:system_logs'], () => {
-    if (Date.now() - liveFailedAtRef.current < 60_000) return
-    quietRef.current = true
-    setLiveKey(k => k + 1)
-  }, { debounceMs: 2000 })
+  // New system rows are counted, not loaded. Nothing re-reads on its own, so a
+  // failed read that writes a system log can no longer feed itself.
+  const { pending, clear: clearPending }      = useLivePending(['live:system_logs'])
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 400)
@@ -373,13 +369,10 @@ function SystemLogsTab() {
 
   useEffect(() => {
     let cancelled = false
-    const quiet = quietRef.current
-    quietRef.current = false
+    clearPending()
     const run = async () => {
-      if (!quiet) {
-        setLoading(true)
-        setError(null)
-      }
+      setLoading(true)
+      setError(null)
       try {
         // Paginated server-side, unlike the audit tab: system logs are written
         // by machines and this table grows far faster than the audit one, so
@@ -398,15 +391,14 @@ function SystemLogsTab() {
         }
       } catch (e: unknown) {
         const err = e as { response?: { data?: { message?: string } }; message?: string }
-        if (quiet) liveFailedAtRef.current = Date.now()
-        if (!cancelled && !quiet) setError(err.response?.data?.message ?? err.message ?? 'Failed to fetch system logs')
+        if (!cancelled) setError(err.response?.data?.message ?? err.message ?? 'Failed to fetch system logs')
       } finally {
-        if (!cancelled && !quiet) setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
     run()
     return () => { cancelled = true }
-  }, [sort, eventType, level, debouncedSearch, refreshKey, liveKey, page])
+  }, [sort, eventType, level, debouncedSearch, refreshKey, page, clearPending])
 
   const totalPages    = Math.ceil(total / PAGE_SIZE)
   const safePage      = Math.min(page, Math.max(1, totalPages))
@@ -517,6 +509,8 @@ function SystemLogsTab() {
         {error && !loading && (
           <div className="shrink-0 border-b border-red-500/20 bg-red-500/10 px-5 py-3 text-sm text-red-400">{error}</div>
         )}
+
+        <NewEntriesBar count={pending} onRefresh={() => setRefreshKey(k => k + 1)} />
 
         {/* Table */}
         <div className="flex-1 overflow-auto min-h-0">

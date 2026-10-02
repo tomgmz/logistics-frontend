@@ -1,6 +1,7 @@
 'use client'
 
-import { useLiveTable } from '@/lib/hooks/useLiveTable'
+import { useLiveTable, useLivePending } from '@/lib/hooks/useLiveTable'
+import NewEntriesBar from '@/components/ui/NewEntriesBar'
 import { useEffect, useState, useCallback } from 'react'
 import { RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react'
 import {
@@ -68,9 +69,14 @@ export default function AuditLogsPage() {
 
   useEffect(() => { setPage(1) }, [debouncedSearch, logType, sort])
 
-  // `quiet` re-reads in place (a live signal): no spinner, and a failed re-read
-  // keeps the rows already on screen instead of replacing them with an error.
+  // New audit rows are counted, not loaded: the list never shifts while it is
+  // being read, and the busiest live topic costs no re-reads.
+  const { pending, clear: clearPending } = useLivePending(['live:audit_logs'])
+
+  // `quiet` re-reads in place: no spinner, and a failed re-read keeps the rows
+  // already on screen instead of replacing them with an error.
   const fetchLogs = useCallback(async (quiet = false) => {
+    clearPending()
     if (!quiet) {
       setLoading(true)
       setError(null)
@@ -90,7 +96,7 @@ export default function AuditLogsPage() {
     } finally {
       if (!quiet) setLoading(false)
     }
-  }, [sort, logType, debouncedSearch])
+  }, [sort, logType, debouncedSearch, clearPending])
 
   const fetchStats = useCallback(async () => {
     try {
@@ -104,7 +110,8 @@ export default function AuditLogsPage() {
   useEffect(() => { fetchLogs() }, [fetchLogs])
   useEffect(() => { fetchStats() }, [fetchStats])
 
-  useLiveTable(['live:audit_logs'], () => { void fetchLogs(true); void fetchStats() })
+  // The stat cards stay live; only the list waits for the bar.
+  useLiveTable(['live:audit_logs'], () => { void fetchStats() })
 
   const totalPages = Math.ceil(total / PAGE_SIZE)
   const safePage = Math.min(page, totalPages)
@@ -239,6 +246,8 @@ export default function AuditLogsPage() {
               {error}
             </div>
           )}
+
+          <NewEntriesBar count={pending} onRefresh={() => void fetchLogs()} />
 
           <div className="flex-1 overflow-auto min-h-0">
             {loading && (

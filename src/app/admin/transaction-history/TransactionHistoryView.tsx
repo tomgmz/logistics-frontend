@@ -1,6 +1,7 @@
 'use client'
 
-import { useLiveTable } from '@/lib/hooks/useLiveTable'
+import { useLivePending } from '@/lib/hooks/useLiveTable'
+import NewEntriesBar from '@/components/ui/NewEntriesBar'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
@@ -142,9 +143,14 @@ export default function TransactionHistoryView() {
     sort,
   }), [statusFilter, debouncedSearch, clientIds, dateBasis, dateFrom, dateTo, sort])
 
-  // `quiet` re-reads in place (a live signal): no spinner, and a failed re-read
-  // keeps the rows already on screen instead of replacing them with an error.
+  // Booking changes are counted, not loaded: every stop and status change on
+  // any active booking would otherwise reload this whole history.
+  const { pending, clear: clearPending } = useLivePending(['live:bookings'])
+
+  // `quiet` re-reads in place: no spinner, and a failed re-read keeps the rows
+  // already on screen instead of replacing them with an error.
   const load = useCallback(async (quiet = false) => {
+    clearPending()
     if (!quiet) {
       setLoading(true)
       setError(null)
@@ -167,11 +173,9 @@ export default function TransactionHistoryView() {
     } finally {
       if (!quiet) setLoading(false)
     }
-  }, [filters, page])
+  }, [filters, page, clearPending])
 
   useEffect(() => { void load() }, [load])
-
-  useLiveTable(['live:bookings'], () => { void load(true) })
 
   useEffect(() => {
     let cancelled = false
@@ -367,6 +371,8 @@ export default function TransactionHistoryView() {
           {/* Table */}
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border
                           border-white/[0.08] bg-[#0f0f0f]">
+            <NewEntriesBar count={pending} singular="new update" plural="new updates"
+              onRefresh={() => void load(true)} />
             {loading ? (
               <div className="flex flex-1 flex-col items-center justify-center gap-3 py-16">
                 <div className="h-9 w-9 animate-spin rounded-full border-2 border-t-transparent"

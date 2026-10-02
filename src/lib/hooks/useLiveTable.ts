@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 
 /**
@@ -89,4 +89,29 @@ export function useLiveTable(
       unsubs.forEach((u) => u())
     }
   }, [key, enabled, debounceMs])
+}
+
+/**
+ * For history screens (logs, transactions, the document library): count changes
+ * instead of re-reading, so rows never shift under someone reading the list and
+ * a busy topic costs no API calls. The screen shows <NewEntriesBar count={pending}>
+ * and calls `clear()` whenever it loads, for whatever reason (the bar, a filter,
+ * a page change), since the list is current again at that point.
+ */
+export function useLivePending(
+  topics: LiveTopic[],
+  { enabled = true }: { enabled?: boolean } = {},
+): { pending: number; clear: () => void } {
+  const [pending, setPending] = useState(0)
+  const key = topics.join('|')
+
+  useEffect(() => {
+    if (!enabled) return
+    const bump = () => setPending((n) => n + 1)
+    const unsubs = (key.split('|') as LiveTopic[]).map((t) => subscribe(t, bump))
+    return () => unsubs.forEach((u) => u())
+  }, [key, enabled])
+
+  const clear = useCallback(() => setPending(0), [])
+  return { pending, clear }
 }

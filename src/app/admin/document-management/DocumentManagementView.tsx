@@ -35,7 +35,8 @@ import { DocumentThumb, DocumentTypeBadge, ReviewStatusBadge } from '@/component
 import ReusableModal, { RemarksModal } from '@/components/layout/ReusableModal'
 import RowActionMenu, { type RowAction } from '@/components/ui/RowActionMenu'
 import { useModuleAccess } from '@/components/layout/ModuleAccess'
-import { useLiveTable } from '@/lib/hooks/useLiveTable'
+import { useLiveTable, useLivePending } from '@/lib/hooks/useLiveTable'
+import NewEntriesBar from '@/components/ui/NewEntriesBar'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { formatDate, formatTime } from '@/app/utils/timeFormat'
 import { appToast } from '@/lib/toast'
@@ -172,9 +173,14 @@ export default function DocumentManagementView() {
   const filterKey = JSON.stringify(filters)
   useEffect(() => { setPage(1) }, [filterKey])
 
+  // Booking and truck changes are only counted: most of them touch no file, and
+  // reloading the whole library on each one was the widest re-read in the app.
+  const { pending, clear: clearPending } = useLivePending(['live:bookings', 'live:trucks'])
+
   const reqId = useRef(0)
   const load = useCallback(async (quiet = false) => {
     const id = ++reqId.current
+    clearPending()
     try {
       if (!quiet) setLoading(true)
       setError(null)
@@ -189,12 +195,12 @@ export default function DocumentManagementView() {
     } finally {
       if (id === reqId.current && !quiet) setLoading(false)
     }
-  }, [filters, page])
+  }, [filters, page, clearPending])
 
   useEffect(() => { void load() }, [load])
 
-  // Proof photos arrive from the driver app, receipts from the fleet side.
-  useLiveTable(['live:documents', 'live:bookings', 'live:trucks'], () => { void load(true) })
+  // Files themselves stay live: a new upload or proof photo shows at once.
+  useLiveTable(['live:documents'], () => { void load(true) })
 
   useEffect(() => {
     const t = window.setInterval(() => {
@@ -531,6 +537,8 @@ export default function DocumentManagementView() {
 
         {/* Results */}
         <div className="flex-1 min-h-0 rounded-xl border border-white/[0.08] overflow-hidden flex flex-col bg-[#0f0f0f]">
+          <NewEntriesBar count={pending} singular="new update" plural="new updates"
+            onRefresh={() => void load(true)} />
           {loading ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-3 py-16">
               <div className="w-9 h-9 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--color-cyan)' }} />
