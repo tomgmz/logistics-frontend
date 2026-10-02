@@ -11,6 +11,7 @@ import { supabase } from '@/lib/supabase'
  *   live:documents (20260930010000_document_management)
  *   live:users  live:password_resets  live:audit_logs  live:system_logs
  *   live:catalog (20261002000000_live_table_signals_more)
+ *   live:tracking (sent by the backend's position ingest, not a trigger)
  * The payload is only { table, id } — anon-key channels are public, so the
  * signal never carries data. The screen re-reads from the API, which applies
  * every permission and scoping rule as usual.
@@ -18,12 +19,22 @@ import { supabase } from '@/lib/supabase'
 export type LiveTopic =
   | 'live:trucks' | 'live:truck_models' | 'live:driver_reports' | 'live:bookings' | 'live:documents'
   | 'live:users' | 'live:password_resets' | 'live:audit_logs' | 'live:system_logs' | 'live:catalog'
+  | 'live:tracking'
 
 type Listener = () => void
 
 // supabase.channel() hands back the same channel for the same topic, so every
 // hook on a topic shares one subscription (same reason as useRecordLock).
 const channels = new Map<string, { ch: ReturnType<typeof supabase.channel>; listeners: Set<Listener> }>()
+
+/**
+ * Raw subscription, for a screen that needs its own pacing instead of the
+ * debounce below — the fleet map, whose topic fires on every truck's every
+ * ping, so a debounce could be held off indefinitely by a busy fleet.
+ */
+export function subscribeLive(topic: LiveTopic, listener: Listener): () => void {
+  return subscribe(topic, listener)
+}
 
 function subscribe(topic: LiveTopic, listener: Listener): () => void {
   let entry = channels.get(topic)

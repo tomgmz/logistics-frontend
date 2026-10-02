@@ -22,12 +22,17 @@ export function LiveTruckMarker({
   isStale,
   ageMs,
   nextEta,
+  caption,
+  onClick,
 }: {
   position: { lat: number; lng: number } | null
   latest:   DriverPosition | null
   isStale:  boolean
   ageMs:    number | null
   nextEta?: StopEta | null
+  /** Which truck this is — the fleet map shows several, the booking map one. */
+  caption?: string | null
+  onClick?: () => void
 }) {
   if (!position || !latest) return null
 
@@ -42,8 +47,9 @@ export function LiveTruckMarker({
   return (
     <AdvancedMarker
       position={position}
-      title={`Driver position — ${formatAge(ageMs)}`}
+      title={`${caption ? `${caption} — ` : ''}Driver position — ${formatAge(ageMs)}`}
       zIndex={10}
+      onClick={onClick}
     >
       <div className="flex flex-col items-center gap-1">
         <div
@@ -54,6 +60,7 @@ export function LiveTruckMarker({
             color,
           }}
         >
+          {caption && <span className="text-white/80">{caption} · </span>}
           {isStale
             ? `NO SIGNAL · ${formatAge(ageMs)}`
             : etaLabel

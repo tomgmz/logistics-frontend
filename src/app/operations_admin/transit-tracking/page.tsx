@@ -1,8 +1,9 @@
+import TransitTrackingView from '@/app/admin/transit-tracking/TransitTrackingView'
+
 export default function OpsManagerTransitTracking() {
   return (
-    <div className="flex items-center justify-center h-full">
-      <span className="ff-sc text-[var(--color-muted)] text-3xl">Transit Tracking</span>
+    <div className="flex flex-1 min-h-0 flex-col bg-[var(--color-bg)]">
+      <TransitTrackingView />
     </div>
   )
 }
-

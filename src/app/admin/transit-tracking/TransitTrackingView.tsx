@@ -1,8 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { APIProvider, Map, AdvancedMarker } from '@vis.gl/react-google-maps'
+import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps'
 import SearchIcon from '@mui/icons-material/Search'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import CloseIcon from '@mui/icons-material/Close'
@@ -25,9 +25,16 @@ import type { OptimizedStop, OptimizeRouteResponse } from '@/app/types/maps/rout
 import { bookingRef } from '@/lib/booking'
 import { useLiveDriverPosition } from '@/lib/hooks/useLiveDriverPosition'
 import { LiveTruckMarker } from '@/components/map/LiveTruckMarker'
+import { useFleetPositions } from '@/lib/hooks/useFleetPositions'
 
 const GOOGLE_MAPS_KEY    = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
 const GOOGLE_MAPS_MAP_ID = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID
+
+/** Metro Manila — where the map sits before there is anything to fit it to. */
+const DEFAULT_CENTER = { lat: 14.5995, lng: 120.9842 }
+
+/** What the map shows: every truck on the road, or one booking's route and truck. */
+type MapMode = 'all' | 'single'
 
 const SC = { fontFamily: "var(--font-alegreya-sc), 'Alegreya Sans SC', sans-serif" } as const
 
@@ -208,6 +215,31 @@ function RouteMarkers({
   )
 }
 
+/**
+ * Frame the given points once per `fitKey`, not on every update — refitting on
+ * each position would yank the map out from under someone who has panned or
+ * zoomed in on one truck.
+ */
+function FitBounds({ fitKey, points }: { fitKey: string | null; points: { lat: number; lng: number }[] }) {
+  const map    = useMap()
+  const fitted = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (!map || !fitKey || points.length === 0 || fitted.current === fitKey) return
+    fitted.current = fitKey
+    if (points.length === 1) {
+      map.panTo(points[0])
+      map.setZoom(14)
+      return
+    }
+    const bounds = new google.maps.LatLngBounds()
+    points.forEach((p) => bounds.extend(p))
+    map.fitBounds(bounds, 64)
+  }, [map, fitKey, points])
+
+  return null
+}
+
 export default function TransitTrackingView() {
   const dispatch = useAppDispatch()
   const user     = useAuthStore((s) => s.user)
@@ -227,6 +259,9 @@ export default function TransitTrackingView() {
   const [activeFilter,  setActiveFilter]  = useState<FilterKey>('Active')
   const [detailOpen,    setDetailOpen]    = useState(true)
   const [totalDuration, setTotalDuration] = useState(0)
+  const [mapMode,       setMapMode]       = useState<MapMode>('all')
+
+  const fleet = useFleetPositions()
 
   const loadBookings = useCallback(() => {
     dispatch(fetchBookings(user))
@@ -254,7 +289,14 @@ export default function TransitTrackingView() {
     dispatch(fetchRouteAndDetail(bookingId))
     setTotalDuration(0)
     setDetailOpen(true)
+    setMapMode('single')
   }, [dispatch, selectedId])
+
+  const clearSelected = useCallback(() => {
+    dispatch(clearSelection())
+    setDetailOpen(true)
+    setMapMode('all')
+  }, [dispatch])
 
   const encoded          = routeData ? getEncodedPolyline(routeData) : null
   const resolvedDuration = encoded ? (routeData?.total_duration ?? 0) * 60 : totalDuration
@@ -302,37 +344,74 @@ export default function TransitTrackingView() {
     <p className="text-sm text-white/45 text-center py-8">Select a booking to view route and delivery details.</p>
   )
 
-  const mapInner = routeData ? (
+  const showSingle = mapMode === 'single' && !!selectedId
+
+  // Framing: every truck when showing the fleet, the route when showing one
+  // booking. Recomputed every render on purpose — FitBounds only acts when the
+  // key changes, so a moving truck never refits the map.
+  const fleetPoints  = fleet.trucks.map((t) => t.position)
+  const singlePoints = routeData
+    ? [
+        { lat: routeData.origin.latitude, lng: routeData.origin.longitude },
+        ...stops.map((st) => ({ lat: st.latitude, lng: st.longitude })),
+      ]
+    : []
+  const fitKey = showSingle
+    ? (routeData ? `single:${selectedId}` : null)
+    : (fleetPoints.length > 0 ? 'all' : null)
+
+  const mapInner = (
     <Map
       mapId={GOOGLE_MAPS_MAP_ID}
-      defaultCenter={{ lat: routeData.origin.latitude, lng: routeData.origin.longitude }}
+      defaultCenter={DEFAULT_CENTER}
       defaultZoom={11}
       gestureHandling="greedy"
       className="w-full h-full min-h-[240px]"
     >
-      <RouteMarkers routeData={routeData} stops={stops} />
-      {isInTransit && (
-        <LiveTruckMarker
-          position={live.position}
-          latest={live.latest}
-          isStale={live.isStale}
-          ageMs={live.ageMs}
-          nextEta={live.nextEta}
-        />
+      <FitBounds fitKey={fitKey} points={showSingle ? singlePoints : fleetPoints} />
+
+      {showSingle ? (
+        routeData && (
+          <>
+            <RouteMarkers routeData={routeData} stops={stops} />
+            {isInTransit && (
+              <LiveTruckMarker
+                position={live.position}
+                latest={live.latest}
+                isStale={live.isStale}
+                ageMs={live.ageMs}
+                nextEta={live.nextEta}
+              />
+            )}
+            <DirectionsRenderer
+              encodedPolyline={encodedPolyline}
+              origin={routeData.origin}
+              stops={stops}
+              onDurations={(total) => { if (!encodedPolyline) setTotalDuration(total) }}
+            />
+          </>
+        )
+      ) : (
+        fleet.trucks.map((t) => (
+          <LiveTruckMarker
+            key={t.latest.booking_id}
+            position={t.position}
+            latest={t.latest}
+            isStale={t.isStale}
+            ageMs={t.ageMs}
+            nextEta={t.nextEta}
+            caption={t.latest.plate_number ?? bookingRef({
+              booking_id:       t.latest.booking_id,
+              reference_number: t.latest.reference_number,
+            })}
+            onClick={() => selectBooking(t.latest.booking_id)}
+          />
+        ))
       )}
-      <DirectionsRenderer
-        encodedPolyline={encodedPolyline}
-        origin={routeData.origin}
-        stops={stops}
-        onDurations={(total) => { if (!encodedPolyline) setTotalDuration(total) }}
-      />
     </Map>
-  ) : (
-    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[#0a0a0a]">
-      <LocalShippingIcon sx={{ fontSize: 48, color: '#333' }} />
-      <p className="text-white/50 text-sm font-medium">Select a booking to open the map</p>
-    </div>
   )
+
+  const fleetEmpty = !showSingle && !fleet.loading && fleet.trucks.length === 0
 
   if (!GOOGLE_MAPS_KEY || !GOOGLE_MAPS_MAP_ID) {
     return (
@@ -450,7 +529,7 @@ export default function TransitTrackingView() {
             {selectedId && (
               <button
                 type="button"
-                onClick={() => { dispatch(clearSelection()); setDetailOpen(true) }}
+                onClick={clearSelected}
                 className="shrink-0 w-full py-2.5 text-[11px] font-bold uppercase tracking-wider border-t border-white/[0.07] text-[var(--color-cyan)] hover:bg-white/[0.03]"
               >
                 Clear selection
@@ -461,6 +540,48 @@ export default function TransitTrackingView() {
           <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-hidden relative">
             <div className="flex-1 min-h-[280px] lg:min-h-0 relative bg-black">
               {mapInner}
+
+              <div
+                className="absolute top-3 left-3 z-10 flex rounded-lg border border-white/10 overflow-hidden shadow-lg"
+                style={{ background: 'var(--color-bg)' }}
+                role="group"
+                aria-label="What the map shows"
+              >
+                {([
+                  { mode: 'all',    label: `All vehicles (${fleet.trucks.length})`, disabled: false },
+                  { mode: 'single', label: 'Selected booking',                       disabled: !selectedId },
+                ] as const).map(({ mode, label, disabled }) => {
+                  const active = (mode === 'single') === showSingle
+                  return (
+                    <button
+                      key={mode}
+                      type="button"
+                      disabled={disabled}
+                      aria-pressed={active}
+                      onClick={() => setMapMode(mode)}
+                      title={disabled ? 'Select a booking from the list or a truck on the map' : undefined}
+                      className="px-3 py-2 text-[11px] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                      style={{
+                        background: active ? 'rgba(77,249,237,0.12)' : 'transparent',
+                        color:      active ? 'var(--color-cyan)' : 'rgba(255,255,255,0.6)',
+                      }}
+                    >
+                      {label}
+                    </button>
+                  )
+                })}
+              </div>
+
+              {fleetEmpty && (
+                <div className="absolute inset-x-0 top-16 z-10 flex justify-center pointer-events-none">
+                  <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/80 px-4 py-2">
+                    <LocalShippingIcon sx={{ fontSize: 16, color: '#666' }} />
+                    <span className="text-white/60 text-xs">
+                      {fleet.error ?? 'No vehicles are on the road right now'}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
 
             <AnimatePresence>
