@@ -1,5 +1,6 @@
 'use client'
 
+import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { useEffect, useMemo, useState } from 'react'
 import { Plus, RefreshCw, Tag, Layers, Package, Phone, Pencil, Trash2, X } from 'lucide-react'
 import { appToast } from '@/lib/toast'
@@ -87,9 +88,10 @@ export default function SystemMaintenanceView() {
   })
   const prefixLocks = useRecordLocks('landline_prefix', tab === 'landline')
 
-  async function load() {
+  // `quiet` re-reads in place (a live signal): no spinner and no error toast.
+  async function load(quiet = false) {
     try {
-      setLoading(true)
+      if (!quiet) setLoading(true)
       const [codes, comms, prods, pfxs] = await Promise.all([
         systemMaintenanceService.getHandlingCodes(),
         systemMaintenanceService.getCommodities(),
@@ -101,13 +103,15 @@ export default function SystemMaintenanceView() {
       setProducts(prods)
       setPrefixes(pfxs)
     } catch (e: unknown) {
-      appToast.error(getApiErrorMessage(e) || 'Failed to load data')
+      if (!quiet) appToast.error(getApiErrorMessage(e) || 'Failed to load data')
     } finally {
-      setLoading(false)
+      if (!quiet) setLoading(false)
     }
   }
 
   useEffect(() => { void load() }, [])
+
+  useLiveTable(['live:catalog'], () => { void load(true) })
 
   const filteredProducts = useMemo(() => {
     if (!pForm.commodity_id) return products

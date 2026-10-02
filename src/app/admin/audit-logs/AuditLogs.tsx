@@ -1,5 +1,6 @@
 'use client'
 
+import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { useEffect, useState, useCallback } from 'react'
 import { RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react'
 import {
@@ -67,9 +68,13 @@ export default function AuditLogsPage() {
 
   useEffect(() => { setPage(1) }, [debouncedSearch, logType, sort])
 
-  const fetchLogs = useCallback(async () => {
-    setLoading(true)
-    setError(null)
+  // `quiet` re-reads in place (a live signal): no spinner, and a failed re-read
+  // keeps the rows already on screen instead of replacing them with an error.
+  const fetchLogs = useCallback(async (quiet = false) => {
+    if (!quiet) {
+      setLoading(true)
+      setError(null)
+    }
     try {
       const res = await systemLogService.getAll({
         sort,
@@ -79,10 +84,11 @@ export default function AuditLogsPage() {
       setLogs(res.data)
       setTotal(res.total)
     } catch (e: unknown) {
+      if (quiet) return
       const err = e as { response?: { data?: { message?: string } }; message?: string }
       setError(err.response?.data?.message ?? err.message ?? 'Failed to fetch logs')
     } finally {
-      setLoading(false)
+      if (!quiet) setLoading(false)
     }
   }, [sort, logType, debouncedSearch])
 
@@ -97,6 +103,8 @@ export default function AuditLogsPage() {
 
   useEffect(() => { fetchLogs() }, [fetchLogs])
   useEffect(() => { fetchStats() }, [fetchStats])
+
+  useLiveTable(['live:audit_logs'], () => { void fetchLogs(true); void fetchStats() })
 
   const totalPages = Math.ceil(total / PAGE_SIZE)
   const safePage = Math.min(page, totalPages)

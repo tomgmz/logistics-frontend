@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useLiveTable } from '@/lib/hooks/useLiveTable'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { RefreshCw, ChevronLeft, ChevronRight, ScrollText, Server } from 'lucide-react'
 import ExportLogsButton from '@/components/admin/ExportLogsButton'
 import {
@@ -81,9 +82,13 @@ function AuditLogsTab() {
 
   useEffect(() => { setPage(1) }, [debouncedSearch, logType, sort])
 
-  const fetchLogs = useCallback(async () => {
-    setLoading(true)
-    setError(null)
+  // `quiet` re-reads in place (a live signal): no spinner, and a failed re-read
+  // keeps the rows already on screen instead of replacing them with an error.
+  const fetchLogs = useCallback(async (quiet = false) => {
+    if (!quiet) {
+      setLoading(true)
+      setError(null)
+    }
     try {
       const res = await auditLogService.getAll({
         sort,
@@ -93,14 +98,17 @@ function AuditLogsTab() {
       setLogs(res.data)
       setTotal(res.total)
     } catch (e: unknown) {
+      if (quiet) return
       const err = e as { response?: { data?: { message?: string } }; message?: string }
       setError(err.response?.data?.message ?? err.message ?? 'Failed to fetch logs')
     } finally {
-      setLoading(false)
+      if (!quiet) setLoading(false)
     }
   }, [sort, logType, debouncedSearch])
 
   useEffect(() => { fetchLogs() }, [fetchLogs, refreshKey])
+
+  useLiveTable(['live:audit_logs'], () => { void fetchLogs(true) })
 
   const totalPages    = Math.ceil(total / PAGE_SIZE)
   const safePage      = Math.min(page, Math.max(1, totalPages))
@@ -342,6 +350,19 @@ function SystemLogsTab() {
   const [sort, setSort]                       = useState<'desc' | 'asc'>('desc')
   const [selected, setSelected]               = useState<AppSystemLog | null>(null)
   const [refreshKey, setRefreshKey]           = useState(0)
+  // Bumped by a live signal: re-reads like refreshKey, but without the spinner.
+  const [liveKey, setLiveKey]                 = useState(0)
+  const quietRef                              = useRef(false)
+  // A failed re-read can itself write a system log (a tripped rate limit),
+  // which would signal another re-read. Back off for a minute after a failure
+  // so the tab can never feed itself.
+  const liveFailedAtRef                       = useRef(0)
+
+  useLiveTable(['live:system_logs'], () => {
+    if (Date.now() - liveFailedAtRef.current < 60_000) return
+    quietRef.current = true
+    setLiveKey(k => k + 1)
+  }, { debounceMs: 2000 })
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 400)
@@ -352,9 +373,13 @@ function SystemLogsTab() {
 
   useEffect(() => {
     let cancelled = false
+    const quiet = quietRef.current
+    quietRef.current = false
     const run = async () => {
-      setLoading(true)
-      setError(null)
+      if (!quiet) {
+        setLoading(true)
+        setError(null)
+      }
       try {
         // Paginated server-side, unlike the audit tab: system logs are written
         // by machines and this table grows far faster than the audit one, so
@@ -373,14 +398,15 @@ function SystemLogsTab() {
         }
       } catch (e: unknown) {
         const err = e as { response?: { data?: { message?: string } }; message?: string }
-        if (!cancelled) setError(err.response?.data?.message ?? err.message ?? 'Failed to fetch system logs')
+        if (quiet) liveFailedAtRef.current = Date.now()
+        if (!cancelled && !quiet) setError(err.response?.data?.message ?? err.message ?? 'Failed to fetch system logs')
       } finally {
-        if (!cancelled) setLoading(false)
+        if (!cancelled && !quiet) setLoading(false)
       }
     }
     run()
     return () => { cancelled = true }
-  }, [sort, eventType, level, debouncedSearch, refreshKey, page])
+  }, [sort, eventType, level, debouncedSearch, refreshKey, liveKey, page])
 
   const totalPages    = Math.ceil(total / PAGE_SIZE)
   const safePage      = Math.min(page, Math.max(1, totalPages))
@@ -627,11 +653,15 @@ export default function LogsPage() {
   const [auditStats, setAuditStats] = useState<LogStats | null>(null)
   const [systemStats]               = useState<SystemLogStats | null>(null)
 
-  useEffect(() => {
+  const loadAuditStats = useCallback(() => {
     auditLogService.getStats()
       .then(setAuditStats)
       .catch(() => {})
   }, [])
+
+  useEffect(() => { loadAuditStats() }, [loadAuditStats])
+
+  useLiveTable(['live:audit_logs'], loadAuditStats)
 
   return (
     <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-hidden bg-[#0a0a0a] text-white">

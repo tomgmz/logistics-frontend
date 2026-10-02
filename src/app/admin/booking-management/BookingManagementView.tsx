@@ -23,10 +23,13 @@ import {
   Check,
   ClipboardCheck,
   KeyRound,
+  AlertTriangle,
 } from 'lucide-react'
 
 import { supabase } from '@/lib/supabase'
 import { pickDriver, pickTruck, type CrewSelection, type PairFilled } from '@/lib/crew-pairing'
+import { codingFlagFor, type CodingFlag } from '@/lib/number-coding'
+import { formatPhDateTime, submittedAfterCloseToday } from '@/lib/office-hours'
 import { z } from 'zod'
 import {
   fullNameField,
@@ -163,6 +166,34 @@ function getPrefillFromBookingDetail(detail: BookingDetail, trucks: TruckType[])
   }
 }
 
+/**
+ * Marks a pending booking the client sent after 5 PM today. Clients may book at
+ * any time; this tells staff still on shift that it came in after closing. It
+ * clears itself at midnight, when the booking becomes the next day's ordinary
+ * work.
+ */
+function AfterHoursBadge() {
+  return (
+    <span
+      title="Submitted after 5:00 PM today — due for review when the office opens"
+      className="inline-flex text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border mt-0.5"
+      style={{ color: '#facc15', borderColor: '#facc1555', background: '#facc1514' }}
+    >
+      After hours
+    </span>
+  )
+}
+
+/** Server-corrected "now", re-read each minute so the badge drops at midnight. */
+function useMinuteClock(): Date {
+  const [now, setNow] = useState(() => nowDate())
+  useEffect(() => {
+    const id = setInterval(() => setNow(nowDate()), 60_000)
+    return () => clearInterval(id)
+  }, [])
+  return now
+}
+
 interface ListRow {
   booking_id: string
   display_id: string
@@ -172,6 +203,7 @@ interface ListRow {
   truck_type_needed?: string
   company?: string | null
   stops: number
+  created_at: string | null
 }
 
 function toRows(raw: Record<string, unknown>[]): ListRow[] {
@@ -188,6 +220,7 @@ function toRows(raw: Record<string, unknown>[]): ListRow[] {
       truck_type_needed: typeof b.truck_type_needed === 'string' ? b.truck_type_needed : undefined,
       company:           clients?.company_name ?? null,
       stops:             Array.isArray(dests) ? dests.length : 0,
+      created_at:        typeof b.created_at === 'string' ? b.created_at : null,
     }
   })
 }
@@ -449,6 +482,18 @@ function AssignmentPanel({
     ? !!vendorForm.vendor_driver_name.trim() && !!vendorForm.vendor_vehicle_plate.trim()
     : !!assignDriverId && !!assignTruckId
 
+  // Number coding is a flag, never a block — see lib/number-coding.
+  const codingOf  = (plate: string | null | undefined) => codingFlagFor(plate, detail)
+  const pairedPlateOf = (driverId: string) =>
+    trucks.find((t) => t.assigned_driver_id === driverId)?.plate_number ?? null
+  const selectedPlate = vendorMode
+    ? vendorForm.vendor_vehicle_plate
+    : trucks.find((t) => t.truck_id === assignTruckId)?.plate_number
+      ?? detail.vehicle?.plate_number
+      ?? detail.driver?.truck?.plate_number
+      ?? null
+  const selectedCoding = selectedPlate ? codingOf(selectedPlate) : null
+
   return (
     <div className="rounded-xl border border-white/[0.08] p-3 space-y-3 bg-black/20">
       <div className="flex items-center justify-between">
@@ -492,6 +537,7 @@ function AssignmentPanel({
           {vendorMode && externalDriverUserId && (
             <ExternalDriverAccessRow userId={externalDriverUserId} />
           )}
+          {selectedCoding && <CodingNotice flag={selectedCoding} plate={selectedPlate!} />}
         </div>
       ) : (
         <>
@@ -553,12 +599,19 @@ function AssignmentPanel({
                   className={selectClass}
                 >
                   <option value="">Select driver</option>
-                  {drivers.map((dr) => (
-                    <option key={dr.user_id} value={dr.drivers?.driver_id ?? dr.user_id}>
-                      {dr.first_name} {dr.last_name}
-                      {dr.drivers?.license_number ? ` · ${dr.drivers.license_number}` : ''}
-                    </option>
-                  ))}
+                  {drivers.map((dr) => {
+                    const driverId = dr.drivers?.driver_id ?? dr.user_id
+                    // Picking a driver fills in their usual vehicle, so its
+                    // coding day is worth seeing at this step too.
+                    const coded = codingOf(pairedPlateOf(driverId))
+                    return (
+                      <option key={dr.user_id} value={driverId}>
+                        {dr.first_name} {dr.last_name}
+                        {dr.drivers?.license_number ? ` · ${dr.drivers.license_number}` : ''}
+                        {coded ? ' — ⚠ usual vehicle coded' : ''}
+                      </option>
+                    )
+                  })}
                 </select>
                 {/* The list is only ever the drivers who ticked THIS booking's day
                     on their own calendar, so an empty one means nobody offered to
@@ -582,6 +635,7 @@ function AssignmentPanel({
                     <option key={t.truck_id} value={t.truck_id}>
                       {t.plate_number}
                       {t.vehicle_type ? ` · ${t.vehicle_type}` : ''}
+                      {codingOf(t.plate_number) ? ' — ⚠ coding day' : ''}
                     </option>
                   ))}
                 </select>
@@ -595,6 +649,8 @@ function AssignmentPanel({
               </div>
             </div>
           )}
+
+          {selectedCoding && <CodingNotice flag={selectedCoding} plate={selectedPlate!} />}
 
           <div className="flex gap-2">
             {assignEditMode && (
@@ -624,6 +680,36 @@ function AssignmentPanel({
           </div>
         </>
       )}
+    </div>
+  )
+}
+
+/**
+ * The vehicle on (or about to go on) this booking is coded that day somewhere
+ * the route goes. Informational: the operator may still assign it — a run
+ * planned between the coding windows is fine, holidays suspend coding, and
+ * some vehicles are exempt.
+ */
+function CodingNotice({ flag, plate }: { flag: CodingFlag; plate: string }) {
+  return (
+    <div
+      className="rounded-lg border px-2.5 py-2 flex items-start gap-2"
+      style={{ borderColor: 'rgba(246,159,38,0.35)', background: 'rgba(246,159,38,0.10)' }}
+    >
+      <AlertTriangle size={14} className="mt-0.5 shrink-0 text-amber-400" />
+      <div className="min-w-0 space-y-0.5">
+        <p className="text-xs font-semibold text-amber-300">
+          Number coding: {plate} is coded on {flag.day}
+        </p>
+        <p className="text-[11px] text-white/65 leading-snug">
+          Plate ends in {flag.digit}, and the route goes through {flag.cities.join(', ')}.
+          Coding hours: {flag.hours}.
+          {flag.callTimeCoded && ' The call time falls inside the coding hours.'}
+        </p>
+        <p className="text-[10px] text-white/35 leading-snug">
+          Not enforced on public holidays. Some cities set their own hours.
+        </p>
+      </div>
     </div>
   )
 }
@@ -1398,6 +1484,9 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
   const bookingReadOnly = bookingLock.readOnly
   // Badges are informational, so read-only viewers see them too.
   const bookingLocks    = useRecordLocks('booking')
+  const clockNow        = useMinuteClock()
+  const showAfterHours  = (status: string | null | undefined, createdAt: string | null | undefined) =>
+    normalizeBookingStatus(status ?? '') === 'pending' && submittedAfterCloseToday(createdAt, clockNow)
 
   return (
     <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-hidden ff-sc bg-[var(--color-bg)]">
@@ -1560,6 +1649,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                           >
                             <td className="px-3 py-2.5 text-white/85 max-w-[200px]">
                               <div className="truncate">{r.display_id}</div>
+                              {showAfterHours(r.status, r.created_at) && <AfterHoursBadge />}
                               <RecordLockBadge holder={bookingLocks.get(r.booking_id)} />
                             </td>
                             <td className="px-3 py-2.5">
@@ -1648,6 +1738,12 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                         <p className="text-[10px] font-mono text-white/35 break-all">
                           {bookingRef(detail)}
                         </p>
+                        {detail.created_at && (
+                          <div className="flex flex-wrap items-center gap-2 text-[11px] text-white/45">
+                            <span>Submitted {formatPhDateTime(detail.created_at)}</span>
+                            {showAfterHours(detail.status, detail.created_at) && <AfterHoursBadge />}
+                          </div>
+                        )}
                         <div className="flex items-start gap-2 text-white/90 text-sm">
                           <MapPin size={16} className="text-[var(--color-cyan)] shrink-0 mt-0.5" />
                           <span>{detail.origin}</span>

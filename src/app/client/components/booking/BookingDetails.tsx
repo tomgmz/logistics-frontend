@@ -43,6 +43,8 @@ import {
 } from '@/lib/validation/bookingValidation'
 
 import type { ResolvedPlace } from '@/lib/hooks/usePlacesAutoComplete'
+import { nowDate } from '@/app/utils/serverTime'
+import { OFFICE_HOURS_LABEL, isWithinOfficeHours } from '@/lib/office-hours'
 
 interface Props {
   onNext: () => void
@@ -80,24 +82,15 @@ const ERROR_COLOR    = '#f87171'
 const ERROR_BORDER   = `${ERROR_COLOR}99`
 const RADIUS         = '8px'
 
-const TIME_SLOTS: string[] = []
-for (let h = 0; h < 24; h++) {
-  TIME_SLOTS.push(`${String(h).padStart(2, '0')}:00`)
-  TIME_SLOTS.push(`${String(h).padStart(2, '0')}:30`)
-}
+/** Call time is picked as hour + minute, the minute in 5-minute steps. */
+const HOURS   = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0'))
+const MINUTES = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0'))
 
 const MONTHS = [
   'January','February','March','April','May','June',
   'July','August','September','October','November','December',
 ]
 const DOW = ['Su','Mo','Tu','We','Th','Fr','Sa']
-
-/**
- * Sunday. The fleet does not run, no driver can tick it on the availability
- * calendar, and the API rejects a Sunday `schedule_date` outright — so the
- * picker must not offer one in the first place.
- */
-const REST_WEEKDAY = 0
 
 function calDays(year: number, month: number) {
   const first = new Date(year, month, 1).getDay()
@@ -262,21 +255,15 @@ function DatePickerPopup({
   const todayD = today.getDate()
 
   // Tomorrow is the earliest bookable day, so today greys out with the past.
-  // Sundays grey out on every page of the calendar: the fleet rests, so one
-  // would sit in the queue uncrewable.
+  // Every weekday is open for transit, Sundays included — only the office (the
+  // acceptance of bookings) keeps Monday-to-Saturday hours.
   const isDisabled = (d: number) => {
     const dt = new Date(viewYear, viewMonth, d)
-    if (dt.getDay() === REST_WEEKDAY) return true
     const td = new Date(todayY, todayM, todayD)
     return dt <= td
   }
 
-  // The first day that actually is selectable: tomorrow, pushed past a Sunday.
-  const nextAvailable = (() => {
-    const dt = new Date(todayY, todayM, todayD + 1)
-    while (dt.getDay() === REST_WEEKDAY) dt.setDate(dt.getDate() + 1)
-    return dt
-  })()
+  const nextAvailable = new Date(todayY, todayM, todayD + 1)
 
   const idleBorder   = hasError ? ERROR_BORDER : BORDER_PANEL
   const activeBorder = hasError ? ERROR_COLOR   : `${CYAN}66`
@@ -332,13 +319,8 @@ function DatePickerPopup({
             </div>
 
             <div className="grid grid-cols-7 mb-1">
-              {DOW.map((d, i) => (
-                <div
-                  key={d}
-                  className={`text-center ff-sc text-[10px] py-0.5 ${
-                    i === REST_WEEKDAY ? 'text-white/15' : 'text-white/30'
-                  }`}
-                >
+              {DOW.map((d) => (
+                <div key={d} className="text-center ff-sc text-[10px] py-0.5 text-white/30">
                   {d}
                 </div>
               ))}
@@ -375,7 +357,7 @@ function DatePickerPopup({
               })}
             </div>
 
-            <div className="mt-3 pt-2 border-t border-white/[0.07] flex flex-col items-center gap-1">
+            <div className="mt-3 pt-2 border-t border-white/[0.07] flex justify-center">
               <button
                 type="button"
                 onClick={() => {
@@ -391,7 +373,6 @@ function DatePickerPopup({
               >
                 Next available
               </button>
-              <span className="ff-sc text-[10px] text-white/30">No deliveries on Sundays</span>
             </div>
           </motion.div>
         )}
@@ -409,8 +390,11 @@ function TimePickerPopup({
   errorMsg?: string
 }) {
   const [open, setOpen] = useState(false)
-  const ref      = useRef<HTMLDivElement>(null)
-  const listRef  = useRef<HTMLDivElement>(null)
+  const ref       = useRef<HTMLDivElement>(null)
+  const hourRef   = useRef<HTMLDivElement>(null)
+  const minuteRef = useRef<HTMLDivElement>(null)
+
+  const [selHour, selMinute] = value ? value.split(':') : ['', '']
 
   useEffect(() => {
     if (!open) return
@@ -421,13 +405,28 @@ function TimePickerPopup({
     return () => document.removeEventListener('mousedown', handler)
   }, [open])
 
+  // Bring the current pick into view in both columns when the popup opens.
   useEffect(() => {
     if (!open || !value) return
-    const idx = TIME_SLOTS.indexOf(value)
-    if (idx === -1 || !listRef.current) return
-    const btn = listRef.current.children[idx] as HTMLElement | undefined
-    btn?.scrollIntoView({ block: 'center' })
-  }, [open, value])
+    const scrollTo = (list: HTMLDivElement | null, idx: number) => {
+      if (idx === -1 || !list) return
+      const btn = list.children[idx] as HTMLElement | undefined
+      btn?.scrollIntoView({ block: 'center' })
+    }
+    scrollTo(hourRef.current,   HOURS.indexOf(selHour))
+    scrollTo(minuteRef.current, MINUTES.indexOf(selMinute))
+  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Picking the hour keeps the popup open for the minute; picking the minute
+  // completes the time and closes it.
+  const pickHour   = (h: string) => onChange(`${h}:${MINUTES.includes(selMinute) ? selMinute : '00'}`)
+  const pickMinute = (m: string) => { onChange(`${selHour || '08'}:${m}`); setOpen(false) }
+
+  const columnBtn = (selected: boolean) => ({
+    background: selected ? `${CYAN}1A` : 'transparent',
+    color:      selected ? CYAN : '#fff',
+    fontWeight: selected ? 700 : 400,
+  })
 
   const idleBorder   = hasError ? ERROR_BORDER : BORDER_PANEL
   const activeBorder = hasError ? ERROR_COLOR   : `${CYAN}66`
@@ -462,42 +461,97 @@ function TimePickerPopup({
             animate={{ opacity: 1, y: 0,  scale: 1 }}
             exit={{   opacity: 0, y: -6,  scale: 0.97 }}
             transition={{ duration: 0.15 }}
-            className="absolute top-[42px] left-0 z-50 rounded-xl shadow-2xl w-[160px] overflow-hidden"
+            className="absolute top-[42px] left-0 z-50 rounded-xl shadow-2xl w-[200px] overflow-hidden"
             style={{
               background: '#1E1C1C',
               border: `1px solid ${BORDER_PANEL}`,
             }}
           >
-            <div className="px-3 py-2 border-b border-white/[0.07]">
-              <span className="ff-sc text-[10px] text-white/40 uppercase tracking-widest">
-                Select Time
+            <div className="grid grid-cols-2 border-b border-white/[0.07]">
+              <span className="px-3 py-2 ff-sc text-[10px] text-white/40 uppercase tracking-widest">Hour</span>
+              <span className="px-3 py-2 ff-sc text-[10px] text-white/40 uppercase tracking-widest border-l border-white/[0.07]">
+                Minute
               </span>
             </div>
-            <div ref={listRef} className="overflow-y-auto flex flex-col" style={{ maxHeight: 220 }}>
-              {TIME_SLOTS.map(slot => {
-                const selected = slot === value
-                return (
-                  <button
-                    key={slot}
-                    type="button"
-                    onClick={() => { onChange(slot); setOpen(false) }}
-                    className="flex items-center justify-between px-4 py-2 text-sm ff-sc
-                               transition-colors cursor-pointer text-left"
-                    style={{
-                      background: selected ? `${CYAN}1A` : 'transparent',
-                      color: selected ? CYAN : '#fff',
-                      fontWeight: selected ? 700 : 400,
-                    }}
-                  >
-                    <span>{formatDisplayTime(slot)}</span>
-                    {selected && <Check size={11} style={{ color: CYAN }} />}
-                  </button>
-                )
-              })}
+            <div className="grid grid-cols-2">
+              <div ref={hourRef} className="overflow-y-auto flex flex-col" style={{ maxHeight: 220 }}>
+                {HOURS.map(h => {
+                  const selected = h === selHour
+                  const h12 = Number(h) % 12 === 0 ? 12 : Number(h) % 12
+                  return (
+                    <button
+                      key={h}
+                      type="button"
+                      onClick={() => pickHour(h)}
+                      className="flex items-center justify-between px-3 py-2 text-sm ff-sc
+                                 transition-colors cursor-pointer text-left"
+                      style={columnBtn(selected)}
+                    >
+                      <span>{h12} {Number(h) < 12 ? 'AM' : 'PM'}</span>
+                      {selected && <Check size={11} style={{ color: CYAN }} />}
+                    </button>
+                  )
+                })}
+              </div>
+              <div ref={minuteRef} className="overflow-y-auto flex flex-col border-l border-white/[0.07]" style={{ maxHeight: 220 }}>
+                {MINUTES.map(m => {
+                  const selected = m === selMinute
+                  return (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => pickMinute(m)}
+                      className="flex items-center justify-between px-3 py-2 text-sm ff-sc
+                                 transition-colors cursor-pointer text-left"
+                      style={columnBtn(selected)}
+                    >
+                      <span>:{m}</span>
+                      {selected && <Check size={11} style={{ color: CYAN }} />}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
+  )
+}
+
+/**
+ * Office hours notice. Bookings are accepted Monday to Saturday, 8 AM – 5 PM,
+ * but the form never refuses one sent outside them — it says when the office
+ * will pick it up instead. Transit itself runs any day, Sundays included.
+ */
+function OfficeHoursNotice() {
+  const [open, setOpen] = useState(() => isWithinOfficeHours(nowDate()))
+
+  // Re-checked each minute, so a form left open across 5 PM changes its tone.
+  useEffect(() => {
+    const id = setInterval(() => setOpen(isWithinOfficeHours(nowDate())), 60_000)
+    return () => clearInterval(id)
+  }, [])
+
+  const accent = open ? CYAN : '#facc15'
+
+  return (
+    <div
+      role="note"
+      className="flex items-start gap-2 rounded-md px-3 py-2.5 border"
+      style={{ background: `${accent}10`, borderColor: `${accent}55` }}
+    >
+      <Info size={15} style={{ color: accent, flexShrink: 0, marginTop: 1 }} />
+      <div className="flex flex-col gap-0.5">
+        <span className="ff-sc booking-text text-xs" style={{ color: accent }}>
+          Operation hours and booking acceptance: {OFFICE_HOURS_LABEL}
+        </span>
+        <span className="ff-sc booking-text text-xs text-white/60">
+          {open
+            ? 'Transit can be scheduled any day, including Sundays.'
+            : 'You can still book now — your request will be reviewed when the office opens. Transit can be scheduled any day, including Sundays.'}
+        </span>
+      </div>
     </div>
   )
 }
@@ -690,6 +744,8 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
       </AnimatePresence>
 
       <div className="flex-1 overflow-auto p-4 lg:p-6 flex flex-col gap-3 sm:gap-6">
+
+        <OfficeHoursNotice />
 
         {/* Transit Schedule + Pick Up + Drop Off */}
         <motion.div variants={stagger} initial="hidden" animate="show"

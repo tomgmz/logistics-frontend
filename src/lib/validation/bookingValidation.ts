@@ -1,6 +1,6 @@
 import type { CargoMode, ItemGroup, DropoffSection } from '@/lib/store/slice/booking.slice'
 import { nowDate } from '@/app/utils/serverTime'
-import { phDayPlus, phDayPlusYear, dayOfWeek } from '@/lib/ph-date'
+import { phDayPlus, phDayPlusYear } from '@/lib/ph-date'
 
 export interface ScheduleErrors {
   date?: string
@@ -45,9 +45,6 @@ export interface BookingErrors {
   touched:       boolean
 }
 
-/** Sunday — the fleet's rest day. The API rejects a Sunday `schedule_date`. */
-const REST_WEEKDAY = 0
-
 function isPositiveNumber(val: string): boolean {
   const n = Number(val)
   return val.trim() !== '' && Number.isFinite(n) && n > 0
@@ -67,18 +64,14 @@ export function validateSchedule(date: string, time: string): ScheduleErrors {
     // Compared as Philippine calendar days — plain YYYY-MM-DD strings, which
     // sort correctly — exactly as the API does. Doing this in browser-local time
     // meant a device in another zone disagreed with the server about which day
-    // "tomorrow" is, and about which dates are Sundays.
+    // "tomorrow" is. Every weekday is open for transit, Sundays included.
     const selected = date.slice(0, 10)
     const serverNow = nowDate()
 
     const earliest = phDayPlus(serverNow, 1)
     const latest   = phDayPlusYear(serverNow)
 
-    // The picker cannot offer a Sunday, but a date restored from a stale draft
-    // still can be — catch it here rather than losing the wizard to a 400.
-    if (dayOfWeek(selected) === REST_WEEKDAY) {
-      errors.date = 'Deliveries are not scheduled on Sundays — please pick another day'
-    } else if (selected < earliest) {
+    if (selected < earliest) {
       errors.date = `Booking must be at least a day ahead (earliest: ${earliest})`
     } else if (selected > latest) {
       errors.date = 'Date cannot be more than 1 year in the future'

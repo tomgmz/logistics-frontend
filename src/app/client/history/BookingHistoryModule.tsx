@@ -1,5 +1,6 @@
 'use client'
 
+import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { motion, Variants, AnimatePresence } from 'framer-motion'
 import { Suspense, useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -215,21 +216,29 @@ export default function BookingHistoryModule() {
   const dateFromRef = useRef<HTMLInputElement>(null)
   const dateToRef   = useRef<HTMLInputElement>(null)
 
-  const loadBookings = useCallback(async () => {
+  // `quiet` re-reads in place (a live signal): no spinner, and a failed re-read
+  // keeps the bookings already on screen instead of replacing them with an error.
+  const loadBookings = useCallback(async (quiet = false) => {
     if (!clientId) { setLoading(false); return }
-    setLoading(true)
-    setError(null)
+    if (!quiet) {
+      setLoading(true)
+      setError(null)
+    }
     try {
       const data = await bookingService.fetchBookingsByClient(clientId)
       setBookings(data)
     } catch {
-      setError('Failed to load bookings. Please try again.')
+      if (!quiet) setError('Failed to load bookings. Please try again.')
     } finally {
-      setLoading(false)
+      if (!quiet) setLoading(false)
     }
   }, [clientId])
 
   useEffect(() => { loadBookings() }, [loadBookings])
+
+  // The signal is id-only and covers every client's bookings; the re-read goes
+  // through the API, which only ever returns this client's own.
+  useLiveTable(['live:bookings'], () => { void loadBookings(true) }, { enabled: !!clientId })
 
   // Notification deep-link: once bookings load, open the one named in ?booking=.
   const [deepLinkId, setDeepLinkId] = useState<string | null>(null)
@@ -317,7 +326,7 @@ export default function BookingHistoryModule() {
         </div>
         {view === 'list' && !loading && (
           <>
-            <button onClick={loadBookings} title="Refresh"
+            <button onClick={() => void loadBookings()} title="Refresh"
               className="ml-2 flex items-center justify-center w-7 h-7 rounded-lg border transition-colors
                          hover:border-white/30 hover:text-white cursor-pointer"
               style={{ borderColor: BORDER_C, color: MUTED }}>
@@ -526,7 +535,7 @@ export default function BookingHistoryModule() {
                 <div className="flex flex-col items-center gap-3 py-16">
                   <AlertCircle size={32} style={{ color: ERROR }} />
                   <p className="text-sm" style={{ color: ERROR }}>{error}</p>
-                  <button onClick={loadBookings}
+                  <button onClick={() => void loadBookings()}
                     className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider
                                transition-opacity hover:opacity-70 cursor-pointer"
                     style={{ color: CYAN }}>

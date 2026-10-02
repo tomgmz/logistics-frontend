@@ -1,5 +1,6 @@
 'use client'
 
+import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { useCallback, useEffect, useState } from 'react'
 import {
   AlertTriangle, KeyRound, MailCheck, RefreshCw, Send, X,
@@ -95,19 +96,25 @@ export default function PasswordResetQueue({
   const [includeClosed, setIncludeClosed] = useState(false)
   const [pending,       setPending]       = useState<PendingAction | null>(null)
 
-  const load = useCallback(async (closed: boolean) => {
-    setLoading(true)
-    setError(null)
+  // `quiet` re-reads in place (a live signal): no spinner, and a failed re-read
+  // keeps the rows already on screen instead of replacing them with an error.
+  const load = useCallback(async (closed: boolean, quiet = false) => {
+    if (!quiet) {
+      setLoading(true)
+      setError(null)
+    }
     try {
       setRows(await passwordResetService.list(closed))
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Failed to load reset requests.'))
+      if (!quiet) setError(getApiErrorMessage(err, 'Failed to load reset requests.'))
     } finally {
-      setLoading(false)
+      if (!quiet) setLoading(false)
     }
   }, [])
 
   useEffect(() => { void load(includeClosed) }, [includeClosed, load])
+
+  useLiveTable(['live:password_resets'], () => { void load(includeClosed, true) })
 
   // Two admins working the queue must not both send a link for one request:
   // the confirm dialog holds the request's lock, and a request someone else is

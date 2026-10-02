@@ -1,5 +1,6 @@
 'use client'
 
+import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -367,26 +368,28 @@ export default function AdminManagementClient() {
   // Seeded once on mount so the tab can show a badge before anyone opens it -
   // the panel itself only fetches when mounted, which is too late to tell someone
   // there is work waiting. Best effort: a failure just means no badge.
-  useEffect(() => {
-    let cancelled = false
+  const loadResetCount = useCallback(() => {
     passwordResetService.list()
-      .then((rows) => {
-        if (!cancelled) {
-          setResetCount(rows.filter((r) => r.status === 'pending' || r.status === 'expired').length)
-        }
-      })
+      .then((rows) => setResetCount(rows.filter((r) => r.status === 'pending' || r.status === 'expired').length))
       .catch(() => {})
-    return () => { cancelled = true }
   }, [])
+
+  useEffect(() => { loadResetCount() }, [loadResetCount])
+
+  useLiveTable(['live:password_resets'], loadResetCount)
 
   useEffect(() => {
     const t = setTimeout(() => { setSearch(searchInput); setPage(1) }, 400)
     return () => clearTimeout(t)
   }, [searchInput])
 
-  const fetchAllUsers = useCallback(async (searchQuery: string, hard = false) => {
-    if (hard) setLoading(true); else setFetching(true)
-    setError(null)
+  // `quiet` re-reads in place (a live signal): no spinner, and a failed re-read
+  // keeps the rows already on screen instead of replacing them with an error.
+  const fetchAllUsers = useCallback(async (searchQuery: string, hard = false, quiet = false) => {
+    if (!quiet) {
+      if (hard) setLoading(true); else setFetching(true)
+      setError(null)
+    }
     try {
       const [result, statsResult] = await Promise.all([
         userService.getAll({ search: searchQuery || undefined, role: ADMIN_ROLE_FILTER }),
@@ -397,17 +400,21 @@ export default function AdminManagementClient() {
       setServerTotalPages(Math.ceil(result.total / PAGE_SIZE))
       setStats({ total: statsResult.total, active: statsResult.active, archived: statsResult.archived })
     } catch {
-      setError('Failed to load accounts. Check your connection or permissions.')
+      if (!quiet) setError('Failed to load accounts. Check your connection or permissions.')
     } finally {
-      setLoading(false)
-      setFetching(false)
+      if (!quiet) {
+        setLoading(false)
+        setFetching(false)
+      }
     }
   }, [])
 
-  const fetchTabUsers = useCallback(async (tab: AdminMgmtTab) => {
-    setLoading(true)
-    setError(null)
-    setAllRows([])
+  const fetchTabUsers = useCallback(async (tab: AdminMgmtTab, quiet = false) => {
+    if (!quiet) {
+      setLoading(true)
+      setError(null)
+      setAllRows([])
+    }
     try {
       const [rows, statsResult] = await Promise.all([
         fetchByTab(tab),
@@ -416,11 +423,18 @@ export default function AdminManagementClient() {
       setAllRows(rows)
       setStats({ total: statsResult.total, active: statsResult.active, archived: statsResult.archived })
     } catch {
-      setError('Failed to load accounts. Check your connection or permissions.')
+      if (!quiet) setError('Failed to load accounts. Check your connection or permissions.')
     } finally {
-      setLoading(false)
+      if (!quiet) setLoading(false)
     }
   }, [])
+
+  // Someone else (or the driver app) changed an account: re-read the open tab.
+  useLiveTable(['live:users'], () => {
+    if (isResetsTab) return
+    if (activeTab === 'all') void fetchAllUsers(search, false, true)
+    else void fetchTabUsers(activeTab, true)
+  })
 
   useEffect(() => {
     isInitialAllFetch.current = true

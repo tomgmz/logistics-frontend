@@ -1,5 +1,6 @@
 'use client'
 
+import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
@@ -141,9 +142,13 @@ export default function TransactionHistoryView() {
     sort,
   }), [statusFilter, debouncedSearch, clientIds, dateBasis, dateFrom, dateTo, sort])
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    setError(null)
+  // `quiet` re-reads in place (a live signal): no spinner, and a failed re-read
+  // keeps the rows already on screen instead of replacing them with an error.
+  const load = useCallback(async (quiet = false) => {
+    if (!quiet) {
+      setLoading(true)
+      setError(null)
+    }
     try {
       // Rows and totals go out together under one filter object, so the strip
       // above the table can never describe a different query than the table.
@@ -158,13 +163,15 @@ export default function TransactionHistoryView() {
         setPage(list.meta.totalPages - 1)
       }
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Failed to load transactions. Please try again.'))
+      if (!quiet) setError(getApiErrorMessage(err, 'Failed to load transactions. Please try again.'))
     } finally {
-      setLoading(false)
+      if (!quiet) setLoading(false)
     }
   }, [filters, page])
 
   useEffect(() => { void load() }, [load])
+
+  useLiveTable(['live:bookings'], () => { void load(true) })
 
   useEffect(() => {
     let cancelled = false
