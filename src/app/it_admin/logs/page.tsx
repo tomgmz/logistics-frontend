@@ -343,16 +343,40 @@ function AuditLogsTab() {
   )
 }
 
+const EVENT_TYPES: SystemLogEventType[] = ['server_error', 'auth_event', 'email_event', 'external_api', 'cron_job', 'db_event']
+const LEVELS: SystemLogLevel[]          = ['info', 'warn', 'error', 'critical']
+
+type ResolvedFilter = '' | 'false' | 'true'
+
+/**
+ * Filters the dashboard deep-links with, e.g. ?tab=system&level=critical&resolved=false.
+ * Read once when the tab mounts, which is always on the client (see LogsPage).
+ */
+function systemFiltersFromUrl() {
+  const p = typeof window === 'undefined' ? new URLSearchParams() : new URLSearchParams(window.location.search)
+  const eventType = p.get('event_type') as SystemLogEventType | null
+  const level     = p.get('level') as SystemLogLevel | null
+  const resolved  = p.get('resolved')
+  return {
+    search:    p.get('search') ?? '',
+    eventType: eventType && EVENT_TYPES.includes(eventType) ? eventType : '',
+    level:     level && LEVELS.includes(level) ? level : '',
+    resolved:  (resolved === 'true' || resolved === 'false' ? resolved : '') as ResolvedFilter,
+  } as const
+}
+
 function SystemLogsTab() {
+  const [initial]                             = useState(systemFiltersFromUrl)
   const [logs, setLogs]                       = useState<AppSystemLog[]>([])
   const [total, setTotal]                     = useState(0)
   const [page, setPage]                       = useState(1)
   const [loading, setLoading]                 = useState(true)
   const [error, setError]                     = useState<string | null>(null)
-  const [search, setSearch]                   = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
-  const [eventType, setEventType]             = useState<SystemLogEventType | ''>('')
-  const [level, setLevel]                     = useState<SystemLogLevel | ''>('')
+  const [search, setSearch]                   = useState(initial.search)
+  const [debouncedSearch, setDebouncedSearch] = useState(initial.search)
+  const [eventType, setEventType]             = useState<SystemLogEventType | ''>(initial.eventType)
+  const [level, setLevel]                     = useState<SystemLogLevel | ''>(initial.level)
+  const [resolved, setResolved]               = useState<ResolvedFilter>(initial.resolved)
   const [sort, setSort]                       = useState<'desc' | 'asc'>('desc')
   const [selected, setSelected]               = useState<AppSystemLog | null>(null)
   const [refreshKey, setRefreshKey]           = useState(0)
@@ -365,7 +389,13 @@ function SystemLogsTab() {
     return () => clearTimeout(t)
   }, [search])
 
-  useEffect(() => { setPage(1) }, [debouncedSearch, eventType, level, sort])
+  // The deep-link filters are applied; drop them from the URL so switching tabs
+  // and back starts clean instead of re-applying them.
+  useEffect(() => {
+    if (window.location.search) window.history.replaceState(null, '', window.location.pathname)
+  }, [])
+
+  useEffect(() => { setPage(1) }, [debouncedSearch, eventType, level, resolved, sort])
 
   useEffect(() => {
     let cancelled = false
@@ -383,6 +413,7 @@ function SystemLogsTab() {
           limit: PAGE_SIZE,
           ...(eventType      && { event_type: eventType }),
           ...(level          && { log_level: level }),
+          ...(resolved       && { resolved: resolved === 'true' }),
           ...(debouncedSearch && { search: debouncedSearch }),
         })
         if (!cancelled) {
@@ -398,7 +429,7 @@ function SystemLogsTab() {
     }
     run()
     return () => { cancelled = true }
-  }, [sort, eventType, level, debouncedSearch, refreshKey, page, clearPending])
+  }, [sort, eventType, level, resolved, debouncedSearch, refreshKey, page, clearPending])
 
   const totalPages    = Math.ceil(total / PAGE_SIZE)
   const safePage      = Math.min(page, Math.max(1, totalPages))
@@ -442,6 +473,15 @@ function SystemLogsTab() {
             <option value="critical">Critical</option>
           </select>
           <select
+            value={resolved}
+            onChange={e => setResolved(e.target.value as ResolvedFilter)}
+            className="bg-[#2a2a2a]/60 border border-[#424242] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-[#4df9ed] cursor-pointer ff-sc"
+          >
+            <option value="">Resolved and Unresolved</option>
+            <option value="false">Unresolved</option>
+            <option value="true">Resolved</option>
+          </select>
+          <select
             value={sort}
             onChange={e => setSort(e.target.value as 'asc' | 'desc')}
             className="bg-[#2a2a2a]/60 border border-[#424242] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-[#4df9ed] cursor-pointer ff-sc"
@@ -464,6 +504,7 @@ function SystemLogsTab() {
               sort,
               ...(eventType       && { event_type: eventType }),
               ...(level           && { log_level: level }),
+              ...(resolved        && { resolved: resolved === 'true' }),
               ...(debouncedSearch && { search: debouncedSearch }),
             })}
           />
@@ -643,7 +684,13 @@ function SystemLogsTab() {
 }
 
 export default function LogsPage() {
-  const [activeTab, setActiveTab]   = useState<ActiveTab>('audit')
+  // Dashboard deep links land on ?tab=system. Safe to read in the initialiser:
+  // the it_admin layout renders nothing until the auth store has hydrated, so
+  // this page never renders on the server.
+  const [activeTab, setActiveTab]   = useState<ActiveTab>(() =>
+    typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tab') === 'system'
+      ? 'system'
+      : 'audit')
   const [auditStats, setAuditStats] = useState<LogStats | null>(null)
   const [systemStats]               = useState<SystemLogStats | null>(null)
 
