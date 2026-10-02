@@ -30,7 +30,8 @@ export interface BookingDetail {
   origin_latitude?:   number | null
   origin_longitude?:  number | null
 
-  truck_type_needed:  string
+  // Null until operations assigns a vehicle.
+  truck_type_needed:  string | null
 
   schedule_date:  string
   call_time:      string

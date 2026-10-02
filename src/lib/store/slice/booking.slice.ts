@@ -39,19 +39,6 @@ export interface DropoffSection {
   groups: ItemGroup[]
 }
 
-export interface VehicleData {
-  id: string
-  name: string
-  imageUrl: string
-  maxWeightKG: number
-  maxVolumeCBM: number
-  maxLengthCM: number
-  bodyType: string
-  dimension: string
-  suitableFor: string
-  stackableFriendly: boolean
-}
-
 interface BookingState {
   sidebarOpen: boolean
   step: number
@@ -69,7 +56,6 @@ interface BookingState {
   allNonStackable: boolean
   allStackable: boolean
   allOversize: boolean
-  vehicle: VehicleData | null
 }
 
 export function makeDefaultGroup(): ItemGroup {
@@ -132,7 +118,6 @@ const initialState: BookingState = {
   allNonStackable: false,
   allStackable: false,
   allOversize: false,
-  vehicle: null,
 }
 
 const bookingSlice = createSlice({
@@ -143,7 +128,7 @@ const bookingSlice = createSlice({
       state.sidebarOpen = action.payload
     },
     setStep(state, action: PayloadAction<number>) {
-      state.step = Math.min(Math.max(action.payload, 1), 3)
+      state.step = Math.min(Math.max(action.payload, 1), 2)
     },
     setService(state, action: PayloadAction<ServiceType>) {
       state.service = action.payload
@@ -227,9 +212,6 @@ const bookingSlice = createSlice({
       state.allOversize = action.payload
       state.sections.forEach((sec) => sec.groups.forEach((g) => { g.oversize = action.payload }))
     },
-    setVehicle(state, action: PayloadAction<VehicleData | null>) {
-      state.vehicle = action.payload
-    },
     resetBooking() {
       return {
         ...initialState,
@@ -261,7 +243,6 @@ export const {
   setAllNonStackable,
   setAllStackable,
   setAllOversize,
-  setVehicle,
   resetBooking,
 } = bookingSlice.actions
 

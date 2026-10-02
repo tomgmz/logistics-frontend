@@ -73,7 +73,7 @@ export interface CreateBookingPayload {
   origin:                 string
   origin_latitude?:       number
   origin_longitude?:      number
-  truck_type_needed:      string
+  truck_type_needed?:     string
   schedule_date:          string
   call_time:              string
   required_volume_cbm?:   number

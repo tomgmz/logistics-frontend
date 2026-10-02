@@ -4,7 +4,6 @@ import { useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Check } from 'lucide-react'
 import StepBookingDetails from './BookingDetails'
-import StepVehicle from './ChooseVehicle'
 import StepReview from './ReviewBooking'
 import { useAppDispatch, useAppSelector } from '@/lib/hooks/hooks'
 import { setStep, resetBooking } from '@/lib/store/slice/booking.slice'
@@ -12,8 +11,7 @@ import './BookingDetails.css'
 
 const STEPS = [
   { id: 1, label: 'Booking Details' },
-  { id: 2, label: 'Vehicle'         },
-  { id: 3, label: 'Review'          },
+  { id: 2, label: 'Review'          },
 ]
 
 const slideVariants = {
@@ -113,8 +111,7 @@ export default function BookingWizard() {
                 onFilesChange={setPendingFiles}
               />
             )}
-            {step === 2 && <StepVehicle onNext={goNext} onBack={goBack} />}
-            {step === 3 && (
+            {step === 2 && (
               <StepReview
                 selectedService={service}
                 onBack={goBack}

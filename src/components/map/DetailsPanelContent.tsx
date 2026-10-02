@@ -122,7 +122,7 @@ export function DetailsPanelContent({
   const destCity   = destStop?.address?.split(',')[0] ?? '—'
   const destFull   = destStop?.address ?? '—'
 
-  const truckType   = bookingDetail?.truck_type_needed          ?? 'L300'
+  const truckType   = bookingDetail?.truck_type_needed          ?? 'To be assigned'
   const plateNumber = bookingDetail?.driver?.truck?.plate_number ?? '—'
   const totalCost   = bookingDetail?.total_cost != null ? `₱${bookingDetail.total_cost}` : '—'
   // The planned arrival at the last stop of the last run, as a window. Before

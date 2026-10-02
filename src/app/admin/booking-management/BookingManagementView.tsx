@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -64,6 +64,7 @@ import { bookingRef, bookingRefFromRecord } from '@/lib/booking'
 import { externalDriverService, type ExternalDriverAccess } from '@/lib/services/admin/external-driver.service'
 import ReusableModal, { RemarksModal } from '@/components/layout/ReusableModal'
 import TripPlanner from './TripPlanner'
+import VehiclePicker, { cargoSummaryFromBooking } from './VehiclePicker'
 import CompletionPanel from '@/components/transactions/CompletionPanel'
 import type { BookingWithRelations } from '@/lib/store/slice/routeMap.slice'
 import { useRecordLock, useRecordLocks } from '@/lib/hooks/useRecordLock'
@@ -425,7 +426,7 @@ function AssignmentPanel({
   assignDriverId,
   assignTruckId,
   assignBusy,
-  assignEditMode,
+  pickerOpen,
   vendorMode,
   vendorForm,
   externalDriverUserId,
@@ -435,8 +436,8 @@ function AssignmentPanel({
   onVendorModeChange,
   onVendorFieldChange,
   onAssign,
-  onEditClick,
-  onCancelEdit,
+  onOpenPicker,
+  onClosePicker,
 }: {
   detail:          BookingDetail
   drivers:         DriverUser[]
@@ -444,7 +445,8 @@ function AssignmentPanel({
   assignDriverId:  string
   assignTruckId:   string
   assignBusy:      boolean
-  assignEditMode:  boolean
+  /** The "Choose vehicle and driver" pop-up is up. */
+  pickerOpen:      boolean
   vendorMode:      boolean
   vendorForm:      VendorAssignForm
   /** Set when this vendor driver was provisioned an app account, so access can be managed. */
@@ -455,11 +457,11 @@ function AssignmentPanel({
   onVendorModeChange:  (on: boolean) => void
   onVendorFieldChange: (key: keyof VendorAssignForm, value: string) => void
   onAssign:        () => void
-  onEditClick:     () => void
-  onCancelEdit:    () => void
+  onOpenPicker:    () => void
+  /** Closes without saving and puts back what is on the booking. */
+  onClosePicker:   () => void
 }) {
   const isAssigned = normalizeBookingStatus(detail.status) === 'assigned'
-  const locked     = isAssigned && !assignEditMode
 
   const driverLabel = (() => {
     if (vendorMode) return vendorForm.vendor_driver_name || '—'
@@ -494,28 +496,22 @@ function AssignmentPanel({
       ?? null
   const selectedCoding = selectedPlate ? codingOf(selectedPlate) : null
 
+  // The load the client recorded — what the vehicle is chosen against, now that
+  // the client no longer picks one when booking.
+  const cargo = useMemo(() => cargoSummaryFromBooking(detail), [detail])
+
+  const title = isAssigned ? 'Change vehicle and driver' : 'Choose vehicle and driver'
+
   return (
     <div className="rounded-xl border border-white/[0.08] p-3 space-y-3 bg-black/20">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <UserCheck size={14} className="text-[var(--color-cyan)]" />
-          <h3 className="text-[11px] font-bold uppercase tracking-wider text-white/40">
-            Driver and vehicle assignment
-          </h3>
-        </div>
-        {locked && (
-          <button
-            type="button"
-            onClick={onEditClick}
-            className="text-[11px] font-bold px-2.5 py-1 rounded-lg border border-white/10
-                       text-white/50 hover:text-white hover:border-white/25 transition-colors"
-          >
-            Edit
-          </button>
-        )}
+      <div className="flex items-center gap-2">
+        <UserCheck size={14} className="text-[var(--color-cyan)]" />
+        <h3 className="text-[11px] font-bold uppercase tracking-wider text-white/40">
+          Driver and vehicle assignment
+        </h3>
       </div>
 
-      {locked ? (
+      {isAssigned ? (
         <div className="space-y-2 text-sm text-white/70">
           {vendorMode && (
             <span className="inline-flex text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border"
@@ -537,133 +533,44 @@ function AssignmentPanel({
           {vendorMode && externalDriverUserId && (
             <ExternalDriverAccessRow userId={externalDriverUserId} />
           )}
-          {selectedCoding && <CodingNotice flag={selectedCoding} plate={selectedPlate!} />}
+          {selectedCoding && !pickerOpen && <CodingNotice flag={selectedCoding} plate={selectedPlate!} />}
         </div>
       ) : (
-        <>
-          {/* Company vs vendor-supplied crew toggle */}
-          <div className="flex rounded-lg border border-white/10 p-0.5 text-[11px] font-bold">
-            <button
-              type="button"
-              disabled={assignBusy}
-              onClick={() => onVendorModeChange(false)}
-              className="flex-1 py-1.5 rounded-md transition-colors disabled:opacity-40"
-              style={!vendorMode
-                ? { background: 'rgba(77,249,237,0.14)', color: 'var(--color-cyan)' }
-                : { color: '#888' }}
-            >
-              Company fleet
-            </button>
-            <button
-              type="button"
-              disabled={assignBusy}
-              onClick={() => onVendorModeChange(true)}
-              className="flex-1 py-1.5 rounded-md transition-colors disabled:opacity-40"
-              style={vendorMode
-                ? { background: 'rgba(246,159,38,0.14)', color: '#fbbf24' }
-                : { color: '#888' }}
-            >
-              Vendor-supplied
-            </button>
-          </div>
+        <p className="text-xs text-white/45">No vehicle or driver assigned yet.</p>
+      )}
 
-          {vendorMode ? (
-            <div className="space-y-2">
-              {VENDOR_FIELDS.map(({ key, label, required, type, hint }) => (
-                <div key={key}>
-                  <label className="text-[11px] text-white/40 block mb-1">
-                    {label}{required && <span className="text-red-400"> *</span>}
-                  </label>
-                  <input
-                    type={type ?? 'text'}
-                    value={vendorForm[key]}
-                    disabled={assignBusy}
-                    onChange={(e) => onVendorFieldChange(key, e.target.value)}
-                    className={selectClass}
-                    placeholder={label}
-                  />
-                  {hint && (
-                    <p className="text-[10px] text-white/30 mt-1 leading-snug">{hint}</p>
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <div>
-                <label className="text-[11px] text-white/40 block mb-1">Driver</label>
-                <select
-                  value={assignDriverId}
-                  disabled={assignBusy}
-                  onChange={(e) => onDriverChange(e.target.value)}
-                  className={selectClass}
-                >
-                  <option value="">Select driver</option>
-                  {drivers.map((dr) => {
-                    const driverId = dr.drivers?.driver_id ?? dr.user_id
-                    // Picking a driver fills in their usual vehicle, so its
-                    // coding day is worth seeing at this step too.
-                    const coded = codingOf(pairedPlateOf(driverId))
-                    return (
-                      <option key={dr.user_id} value={driverId}>
-                        {dr.first_name} {dr.last_name}
-                        {dr.drivers?.license_number ? ` · ${dr.drivers.license_number}` : ''}
-                        {coded ? ' — ⚠ usual vehicle coded' : ''}
-                      </option>
-                    )
-                  })}
-                </select>
-                {/* The list is only ever the drivers who ticked THIS booking's day
-                    on their own calendar, so an empty one means nobody offered to
-                    work that day — not a bug, and not something to override here. */}
-                <p className="text-[10px] text-white/35 mt-1">
-                  {drivers.length === 0
-                    ? `No driver marked ${detail.schedule_date ?? 'this day'} as a day they can work.`
-                    : `${drivers.length} driver${drivers.length === 1 ? '' : 's'} available on ${detail.schedule_date}.`}
-                </p>
-              </div>
-              <div>
-                <label className="text-[11px] text-white/40 block mb-1">Vehicle</label>
-                <select
-                  value={assignTruckId}
-                  disabled={assignBusy}
-                  onChange={(e) => onTruckChange(e.target.value)}
-                  className={selectClass}
-                >
-                  <option value="">Select vehicle</option>
-                  {trucks.map((t) => (
-                    <option key={t.truck_id} value={t.truck_id}>
-                      {t.plate_number}
-                      {t.vehicle_type ? ` · ${t.vehicle_type}` : ''}
-                      {codingOf(t.plate_number) ? ' — ⚠ coding day' : ''}
-                    </option>
-                  ))}
-                </select>
-                {/* Vehicles are gated on the fleet manager's inspection: only a
-                    vehicle whose latest BLOWBAGETS check passed is selectable. */}
-                <p className="text-[10px] text-white/35 mt-1">
-                  {trucks.length === 0
-                    ? 'No vehicle has a passing BLOWBAGETS inspection on file.'
-                    : `${trucks.length} vehicle${trucks.length === 1 ? '' : 's'} cleared by BLOWBAGETS.`}
-                </p>
-              </div>
-            </div>
-          )}
+      <button
+        type="button"
+        disabled={assignBusy}
+        onClick={onOpenPicker}
+        className="w-full py-2 rounded-lg text-sm font-bold transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
+        style={{
+          background: 'rgba(77,249,237,0.12)',
+          border:     '1px solid rgba(77,249,237,0.30)',
+          color:      'var(--color-cyan)',
+        }}
+      >
+        <Truck size={14} />
+        {title}
+      </button>
 
-          {selectedCoding && <CodingNotice flag={selectedCoding} plate={selectedPlate!} />}
-
+      <CrewPickerDialog
+        open={pickerOpen}
+        busy={assignBusy}
+        title={title}
+        subtitle={[detail.reference_number, detail.clients?.company_name, detail.schedule_date].filter(Boolean).join(' · ')}
+        onClose={onClosePicker}
+        footer={
           <div className="flex gap-2">
-            {assignEditMode && (
-              <button
-                type="button"
-                disabled={assignBusy}
-                onClick={onCancelEdit}
-                className="flex-1 py-2 rounded-lg text-sm font-bold border border-white/10
-                           text-white/50 hover:text-white transition-colors disabled:opacity-40"
-              >
-                Cancel
-              </button>
-            )}
+            <button
+              type="button"
+              disabled={assignBusy}
+              onClick={onClosePicker}
+              className="flex-1 py-2 rounded-lg text-sm font-bold border border-white/10
+                         text-white/50 hover:text-white transition-colors disabled:opacity-40"
+            >
+              Cancel
+            </button>
             <button
               type="button"
               disabled={assignBusy || !canSubmit}
@@ -675,12 +582,217 @@ function AssignmentPanel({
                 color:      'var(--color-cyan)',
               }}
             >
-              {assignBusy ? 'Assigning…' : assignEditMode ? 'Update' : 'Assign'}
+              {assignBusy ? 'Assigning…' : isAssigned ? 'Update' : 'Assign'}
             </button>
           </div>
-        </>
-      )}
+        }
+      >
+        {/* Company vs vendor-supplied crew toggle */}
+        <div className="flex rounded-lg border border-white/10 p-0.5 text-[11px] font-bold">
+          <button
+            type="button"
+            disabled={assignBusy}
+            onClick={() => onVendorModeChange(false)}
+            className="flex-1 py-1.5 rounded-md transition-colors disabled:opacity-40"
+            style={!vendorMode
+              ? { background: 'rgba(77,249,237,0.14)', color: 'var(--color-cyan)' }
+              : { color: '#888' }}
+          >
+            Company fleet
+          </button>
+          <button
+            type="button"
+            disabled={assignBusy}
+            onClick={() => onVendorModeChange(true)}
+            className="flex-1 py-1.5 rounded-md transition-colors disabled:opacity-40"
+            style={vendorMode
+              ? { background: 'rgba(246,159,38,0.14)', color: '#fbbf24' }
+              : { color: '#888' }}
+          >
+            Vendor-supplied
+          </button>
+        </div>
+
+        {/* What the vehicle has to carry. */}
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-white/55">
+          <span className="flex items-center gap-1">
+            <Package size={12} className="text-white/35" />
+            {cargo.totalPieces > 0 ? `${cargo.totalPieces} pieces` : '— pieces'}
+          </span>
+          <span className="flex items-center gap-1">
+            <Weight size={12} className="text-white/35" />
+            {cargo.grossWeightKg > 0 ? `${cargo.grossWeightKg.toLocaleString()} KG` : '— KG'}
+          </span>
+          <span className="flex items-center gap-1">
+            <Layers size={12} className="text-white/35" />
+            {cargo.volumeCbm > 0 ? `${cargo.volumeCbm.toFixed(2)} CBM` : '— CBM'}
+          </span>
+          {cargo.maxDimensionCm > 0 && (
+            <span className="flex items-center gap-1">
+              <Ruler size={12} className="text-white/35" />
+              Longest item {cargo.maxDimensionCm} CM
+            </span>
+          )}
+          {cargo.hasNonStackable && <span>· Non-stackable items</span>}
+        </div>
+
+        {vendorMode ? (
+          <div className="space-y-2">
+            {VENDOR_FIELDS.map(({ key, label, required, type, hint }) => (
+              <div key={key}>
+                <label className="text-[11px] text-white/40 block mb-1">
+                  {label}{required && <span className="text-red-400"> *</span>}
+                </label>
+                <input
+                  type={type ?? 'text'}
+                  value={vendorForm[key]}
+                  disabled={assignBusy}
+                  onChange={(e) => onVendorFieldChange(key, e.target.value)}
+                  className={selectClass}
+                  placeholder={label}
+                />
+                {hint && (
+                  <p className="text-[10px] text-white/30 mt-1 leading-snug">{hint}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div>
+              <label className="text-[11px] text-white/40 block mb-1">Vehicle</label>
+              <VehiclePicker
+                trucks={trucks}
+                selectedId={assignTruckId}
+                cargo={cargo}
+                disabled={assignBusy}
+                codingOf={codingOf}
+                onSelect={onTruckChange}
+              />
+              {trucks.length > 0 && (
+                <p className="text-[10px] text-white/35 mt-1">
+                  {`${trucks.length} vehicle${trucks.length === 1 ? '' : 's'} cleared by BLOWBAGETS. Picking one fills in its usual driver.`}
+                </p>
+              )}
+            </div>
+            <div>
+              <label className="text-[11px] text-white/40 block mb-1">Driver</label>
+              <select
+                value={assignDriverId}
+                disabled={assignBusy}
+                onChange={(e) => onDriverChange(e.target.value)}
+                className={selectClass}
+              >
+                <option value="">Select driver</option>
+                {drivers.map((dr) => {
+                  const driverId = dr.drivers?.driver_id ?? dr.user_id
+                  // Picking a driver fills in their usual vehicle, so its
+                  // coding day is worth seeing at this step too.
+                  const coded = codingOf(pairedPlateOf(driverId))
+                  return (
+                    <option key={dr.user_id} value={driverId}>
+                      {dr.first_name} {dr.last_name}
+                      {dr.drivers?.license_number ? ` · ${dr.drivers.license_number}` : ''}
+                      {coded ? ' — ⚠ usual vehicle coded' : ''}
+                    </option>
+                  )
+                })}
+              </select>
+              {/* The list is only ever the drivers who ticked THIS booking's day
+                  on their own calendar, so an empty one means nobody offered to
+                  work that day — not a bug, and not something to override here. */}
+              <p className="text-[10px] text-white/35 mt-1">
+                {drivers.length === 0
+                  ? `No driver marked ${detail.schedule_date ?? 'this day'} as a day they can work.`
+                  : `${drivers.length} driver${drivers.length === 1 ? '' : 's'} available on ${detail.schedule_date}.`}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {selectedCoding && <CodingNotice flag={selectedCoding} plate={selectedPlate!} />}
+      </CrewPickerDialog>
     </div>
+  )
+}
+
+/**
+ * The pop-up the crew is chosen in. Wider than ReusableModal, which is sized for
+ * a yes/no question, because it holds the vehicle cards.
+ */
+function CrewPickerDialog({
+  open, busy, title, subtitle, onClose, footer, children,
+}: {
+  open:     boolean
+  busy:     boolean
+  title:    string
+  subtitle: string
+  onClose:  () => void
+  footer:   ReactNode
+  children: ReactNode
+}) {
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !busy) onClose() }
+    window.addEventListener('keydown', onKey)
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      document.body.style.overflow = prevOverflow
+    }
+  }, [open, busy, onClose])
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          key="crew-picker-backdrop"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          onClick={busy ? undefined : onClose}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="crew-picker-title"
+          className="fixed inset-0 z-[70] flex items-end justify-center sm:items-center sm:p-4"
+          style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
+        >
+          <motion.div
+            initial={{ opacity: 0, y: 24, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 12, scale: 0.98 }}
+            transition={{ type: 'spring', stiffness: 320, damping: 30 }}
+            onClick={(e) => e.stopPropagation()}
+            className="relative flex flex-col w-full sm:max-w-2xl max-h-[92vh] rounded-t-[18px] sm:rounded-[18px]
+                       border border-white/[0.08] bg-[#232323]"
+          >
+            <div className="flex items-start justify-between gap-3 px-4 sm:px-5 pt-4 pb-3 border-b border-white/[0.06]">
+              <div className="min-w-0">
+                <h2 id="crew-picker-title" className="text-base font-bold text-white">{title}</h2>
+                {subtitle && <p className="text-[11px] text-white/40 mt-0.5 truncate">{subtitle}</p>}
+              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={busy}
+                aria-label="Close"
+                className="shrink-0 p-1 rounded-md text-white/45 hover:text-white transition-colors disabled:opacity-40"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-5 py-4 space-y-3">
+              {children}
+            </div>
+            <div className="px-4 sm:px-5 py-3 border-t border-white/[0.06]">
+              {footer}
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   )
 }
 
@@ -914,6 +1026,8 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
   const [assignDriverId, setAssignDriverId] = useState<string>('')
   const [assignTruckId, setAssignTruckId]   = useState<string>('')
   const [assignBusy, setAssignBusy]         = useState(false)
+  // The "Choose vehicle and driver" pop-up is open. Closed on a successful
+  // assign; cancelling it puts back what is on the booking.
   const [assignEditMode, setAssignEditMode] = useState(false)
   // Bumped to remount TripPlanner when the booking changed under us.
   const [plannerTick, setPlannerTick]       = useState(0)
@@ -1763,7 +1877,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                           </div>
                           <div className="flex items-center gap-2">
                             <Truck size={14} className="text-white/35" />
-                            {detail.truck_type_needed}
+                            {detail.truck_type_needed ?? 'Vehicle not assigned yet'}
                           </div>
                           {detail.driver?.name && (
                             <div className="flex items-center gap-2">
@@ -1952,7 +2066,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                           assignDriverId={assignDriverId}
                           assignTruckId={assignTruckId}
                           assignBusy={assignBusy}
-                          assignEditMode={assignEditMode}
+                          pickerOpen={assignEditMode}
                           vendorMode={assignVendorMode}
                           vendorForm={vendorForm}
                           externalDriverUserId={
@@ -1967,8 +2081,8 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                             setVendorForm((prev) => ({ ...prev, [key]: value }))
                           }
                           onAssign={() => void handleAssign()}
-                          onEditClick={() => setAssignEditMode(true)}
-                          onCancelEdit={() => {
+                          onOpenPicker={() => setAssignEditMode(true)}
+                          onClosePicker={() => {
                             setAssignEditMode(false)
                             const restore = committedAssignment.driverId || committedAssignment.truckId
                               ? committedAssignment

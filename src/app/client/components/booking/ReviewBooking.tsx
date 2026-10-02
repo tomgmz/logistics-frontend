@@ -97,7 +97,6 @@ export default function StepReview({ selectedService, pendingFiles, onBack, onNe
   const dropoffs      = useAppSelector((s) => s.booking.dropoffs)
   const mode          = useAppSelector((s) => s.booking.mode)
   const sections      = useAppSelector((s) => s.booking.sections)
-  const vehicle       = useAppSelector((s) => s.booking.vehicle)
 
   const allGroups = sections.flatMap((s) => s.groups)
 
@@ -123,7 +122,6 @@ export default function StepReview({ selectedService, pendingFiles, onBack, onNe
   const attemptKey = useRef<string | null>(null)
 
   const confirm = async () => {
-    if (!vehicle) return
     if (pendingFiles.length === 0) {
       setError('At least one transaction document is required.')
       return
@@ -184,7 +182,6 @@ export default function StepReview({ selectedService, pendingFiles, onBack, onNe
         origin:            pickup,
         ...(pickupLat != null && { origin_latitude:  pickupLat }),
         ...(pickupLng != null && { origin_longitude: pickupLng }),
-        truck_type_needed: vehicle.name,
         schedule_date:     date,
         call_time:         time,
         ...(cargo.grossWeightKg  > 0 && { required_weight_kg:     parseFloat(cargo.grossWeightKg.toFixed(2)) }),
@@ -346,23 +343,20 @@ export default function StepReview({ selectedService, pendingFiles, onBack, onNe
 
                 <div className="flex flex-col items-center gap-3 w-full lg:w-1/2">
                   <SectionLabel className="self-center">Transit Vehicle</SectionLabel>
-                  {vehicle ? (
-                    <>
-                      <div className="relative w-full h-[180px] lg:h-[220px]">
-                        <Image
-                          src={vehicle.imageUrl || '/images/vehicles/default-truck.png'}
-                          alt={vehicle.name}
-                          fill
-                          className="object-contain drop-shadow-2xl"
-                        />
-                      </div>
-                      <p className="ff-sc booking-text text-white text-2xl lg:text-3xl tracking-widest text-center">
-                        {vehicle.name}
-                      </p>
-                    </>
-                  ) : (
-                    <p className="ff-sc booking-text text-white/40 text-sm">No vehicle selected</p>
-                  )}
+                  {/* The client no longer picks a vehicle: the Operations Manager
+                      chooses the vehicle and driver for this load once the
+                      booking is approved. */}
+                  <div className="relative w-full h-[180px] lg:h-[220px] opacity-60">
+                    <Image
+                      src="/landingpage/aboutSection/wingvan.png"
+                      alt="Vehicle to be assigned"
+                      fill
+                      className="object-contain drop-shadow-2xl"
+                    />
+                  </div>
+                  <p className="ff-sc booking-text text-white/70 text-sm lg:text-base text-center max-w-sm">
+                    Assigned by our Operations Manager after approval, based on your cargo.
+                  </p>
                 </div>
 
               </div>
