@@ -114,11 +114,15 @@ export const driverService = {
   // decides that, so it is a per-booking question and cannot be answered from
   // the full roster — hence a fetch rather than a filter over getAll(). Pass the
   // driver already on the booking so editing an assignment never drops them.
-  getAssignable: (date: string, currentDriverId?: string | null) =>
-    get<DriverUser[]>(
+  // Pass the main and second driver already on the booking, so editing it never
+  // drops either of them.
+  getAssignable: (date: string, currentDriverIds: (string | null | undefined)[] = []) => {
+    const current = currentDriverIds.filter(Boolean).join(',')
+    return get<DriverUser[]>(
       `${B}/drivers/assignable?date=${encodeURIComponent(date)}` +
-      (currentDriverId ? `&current_driver_id=${encodeURIComponent(currentDriverId)}` : ''),
-    ),
+      (current ? `&current_driver_id=${encodeURIComponent(current)}` : ''),
+    )
+  },
   getOne: (id: string) => get<DriverUser>(`${B}/drivers/${id}`),
   create: (p: CreateDriverPayload) => post<DriverUser>(`${B}/drivers`, p),
   update: (id: string, p: UpdateDriverPayload) => patch<DriverUser>(`${B}/drivers/${id}`, p),

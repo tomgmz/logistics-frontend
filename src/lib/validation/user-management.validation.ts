@@ -75,16 +75,34 @@ export const updateClientSchema = z.object({
   billing_address: z.string().optional(),
 })
 
+// A vendor driver also names the vendor they come from; Booking Management
+// copies it onto the delivery. Mirrors the backend createDriverSchema.
+const vendorName    = z.string().trim().max(120, 'Vendor name is too long')
+const vendorContact = z.string().trim().max(120, 'Vendor contact is too long')
+
+function requireVendorName(data: { is_external?: unknown; vendor_name?: unknown }, ctx: z.RefinementCtx) {
+  if (data.is_external === true && !String(data.vendor_name ?? '').trim()) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['vendor_name'], message: 'Vendor name is required' })
+  }
+}
+
 export const createDriverSchema = z
   .object({
     ...baseCreateFields,
     license_number:   licenseNumber,
     license_expiry:   licenseExpiry,
+    is_external:      z.boolean().optional(),
+    vendor_name:      vendorName.optional(),
+    vendor_contact:   vendorContact.optional(),
   })
+  .superRefine(requireVendorName)
 
 export const updateDriverSchema = z
   .object({
     ...baseUpdateFields,
+    is_external:    z.boolean().optional(),
+    vendor_name:    vendorName.optional(),
+    vendor_contact: vendorContact.optional(),
     license_number: licenseNumber.optional(),
     license_expiry: z
       .string()
@@ -93,6 +111,7 @@ export const updateDriverSchema = z
       .refine(val => !val || new Date(val) > new Date(), 'License is already expired')
       .optional(),
   })
+  .superRefine(requireVendorName)
 
 export const createAdminSchema           = z.object(baseCreateFields)
 export const updateAdminSchema           = z.object(baseUpdateFields)

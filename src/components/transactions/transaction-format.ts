@@ -73,12 +73,16 @@ export function getDropoffs(booking: BookingWithRelations): string[] {
 }
 
 export function getDriverName(booking: BookingWithRelations): string | null {
-  const assignments = booking.driver_assignments as Array<{
+  // Main driver first, then the optional second driver ("Juan Cruz & Pedro Reyes").
+  const assignments = (booking.driver_assignments as Array<{
+    crew_role?: 'lead' | 'second'
     drivers?: { users?: { first_name?: string; last_name?: string } }
-  }> | undefined
-  const u = assignments?.[0]?.drivers?.users
-  if (!u) return null
-  return `${u.first_name ?? ''} ${u.last_name ?? ''}`.trim() || null
+  }> | undefined) ?? []
+  const names = [...assignments]
+    .sort((a, b) => (a.crew_role === 'second' ? 1 : 0) - (b.crew_role === 'second' ? 1 : 0))
+    .map((a) => `${a.drivers?.users?.first_name ?? ''} ${a.drivers?.users?.last_name ?? ''}`.trim())
+    .filter(Boolean)
+  return names.length ? names.join(' & ') : null
 }
 
 export function getPlateNumber(booking: BookingWithRelations): string | null {

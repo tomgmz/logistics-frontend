@@ -30,13 +30,7 @@ import { supabase } from '@/lib/supabase'
 import { pickDriver, pickTruck, type CrewSelection, type PairFilled } from '@/lib/crew-pairing'
 import { codingFlagFor, type CodingFlag } from '@/lib/number-coding'
 import { formatPhDateTime, submittedAfterCloseToday } from '@/lib/office-hours'
-import { z } from 'zod'
-import {
-  fullNameField,
-  normalizePhMobile,
-  optionalEmailField,
-  optionalMobileField,
-} from '@/lib/validation/fields'
+import { licenseExpiryState } from '@/lib/license-expiry'
 import { statusColor } from '@/components/map/status.colors'
 import { useModuleAccess } from '@/components/layout/ModuleAccess'
 import type { BookingDetail } from '@/app/types/maps/routemap.types'
@@ -61,7 +55,12 @@ import { nowDate } from '@/app/utils/serverTime'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { bookingRef, bookingRefFromRecord } from '@/lib/booking'
-import { externalDriverService, type ExternalDriverAccess } from '@/lib/services/admin/external-driver.service'
+import {
+  externalDriverService,
+  type ExternalDriverAccess,
+  type VendorDriverUser,
+} from '@/lib/services/admin/external-driver.service'
+import type { SecondDriverRecord } from '@/lib/services/admin/assignment.service'
 import ReusableModal, { RemarksModal } from '@/components/layout/ReusableModal'
 import TripPlanner from './TripPlanner'
 import VehiclePicker, { cargoSummaryFromBooking } from './VehiclePicker'
@@ -242,55 +241,48 @@ function fmtNum(n: number | null | undefined, unit: string, decimals = 2): strin
   return `${n.toFixed(decimals)} ${unit}`
 }
 
+// Vendor-supplied crew. The driver is picked from the vendor drivers registered
+// in Driver Management, and the server copies their details and their vendor
+// onto the delivery. Only the vehicle is typed here, because vendor vehicles are
+// never registered.
 interface VendorAssignForm {
-  vendor_name:           string
-  vendor_contact:        string
-  vendor_driver_name:    string
-  vendor_driver_license: string
-  vendor_driver_phone:   string
+  vendor_driver_user_id: string
+  /** Optional second vendor driver (user_id); '' for none. */
+  second_vendor_driver_user_id: string
   vendor_vehicle_plate:  string
   vendor_vehicle_type:   string
-  vendor_driver_email:   string
+  // Display only, off the delivery already on the booking: the name for a vendor
+  // driver who was typed in before vendor drivers were registered.
+  vendor_driver_name:    string
+  vendor_name:           string
 }
 
 const emptyVendorForm: VendorAssignForm = {
-  vendor_name:           '',
-  vendor_contact:        '',
-  vendor_driver_name:    '',
-  vendor_driver_license: '',
-  vendor_driver_phone:   '',
+  vendor_driver_user_id: '',
+  second_vendor_driver_user_id: '',
   vendor_vehicle_plate:  '',
   vendor_vehicle_type:   '',
-  vendor_driver_email:   '',
+  vendor_driver_name:    '',
+  vendor_name:           '',
 }
 
-const vendorDriverSchema = z.object({
-  vendor_driver_name:  fullNameField('Driver name'),
-  vendor_driver_phone: optionalMobileField,
-  vendor_driver_email: optionalEmailField,
-})
+// Same words under both second-driver pickers.
+const SECOND_DRIVER_HINT =
+  'They see this booking and its stops in the app. The main driver confirms pickup, stops and proof photos.'
 
-const VENDOR_FIELDS: {
-  key: keyof VendorAssignForm
-  label: string
-  required?: boolean
-  type?: string
-  hint?: string
-}[] = [
-  { key: 'vendor_name',           label: 'Vendor / subcontractor' },
-  { key: 'vendor_contact',        label: 'Vendor contact' },
-  { key: 'vendor_driver_name',    label: 'Driver name', required: true },
-  { key: 'vendor_driver_license', label: 'Driver license #' },
-  { key: 'vendor_driver_phone',   label: 'Driver phone', type: 'tel', hint: 'PH mobile, e.g. 0917 123 4567.' },
-  { key: 'vendor_vehicle_plate',  label: 'Vehicle plate', required: true },
-  { key: 'vendor_vehicle_type',   label: 'Vehicle type' },
-  {
-    key:   'vendor_driver_email',
-    label: 'Driver email',
-    type:  'email',
-    hint:  'Optional. Gives this driver app access for this booking — they get an email to set up sign-in on their phone.',
-  },
-]
+function vendorDriverName(u: VendorDriverUser): string {
+  return [u.first_name, u.middle_name, u.last_name, u.suffix].filter(Boolean).join(' ') || u.email
+}
+
+/** "Expired" / "expires in 12 days" for the dropdown, or nothing when in date. */
+function licenseNote(expiry: string | null | undefined): string {
+  const state = licenseExpiryState(expiry)
+  if (state.kind === 'expired') return ' — ⚠ license expired'
+  if (state.kind === 'expiring') {
+    return state.daysLeft === 0 ? ' — ⚠ license expires today' : ` — ⚠ license expires in ${state.daysLeft} day${state.daysLeft === 1 ? '' : 's'}`
+  }
+  return ''
+}
 
 /**
  * App access for a vendor driver who was given an account.
@@ -424,14 +416,19 @@ function AssignmentPanel({
   drivers,
   trucks,
   assignDriverId,
+  assignSecondDriverId,
   assignTruckId,
   assignBusy,
   pickerOpen,
   vendorMode,
   vendorForm,
+  vendorDrivers,
+  vendorDriversLoading,
   externalDriverUserId,
   selectClass,
   onDriverChange,
+  onSecondDriverChange,
+  secondDriver,
   onTruckChange,
   onVendorModeChange,
   onVendorFieldChange,
@@ -443,16 +440,24 @@ function AssignmentPanel({
   drivers:         DriverUser[]
   trucks:          TruckType[]
   assignDriverId:  string
+  /** Optional second company driver ('' for none). */
+  assignSecondDriverId: string
+  /** The second driver already on the booking, for the summary. */
+  secondDriver:    SecondDriverRecord | null
   assignTruckId:   string
   assignBusy:      boolean
   /** The "Choose vehicle and driver" pop-up is up. */
   pickerOpen:      boolean
   vendorMode:      boolean
   vendorForm:      VendorAssignForm
+  /** Vendor drivers registered in Driver Management, with their access state. */
+  vendorDrivers:   VendorDriverUser[]
+  vendorDriversLoading: boolean
   /** Set when this vendor driver was provisioned an app account, so access can be managed. */
   externalDriverUserId: string | null
   selectClass:     string
   onDriverChange:  (id: string) => void
+  onSecondDriverChange: (id: string) => void
   onTruckChange:   (id: string) => void
   onVendorModeChange:  (on: boolean) => void
   onVendorFieldChange: (key: keyof VendorAssignForm, value: string) => void
@@ -464,10 +469,30 @@ function AssignmentPanel({
   const isAssigned = normalizeBookingStatus(detail.status) === 'assigned'
 
   const driverLabel = (() => {
-    if (vendorMode) return vendorForm.vendor_driver_name || '—'
+    if (vendorMode) {
+      const picked = vendorDrivers.find((v) => v.user_id === vendorForm.vendor_driver_user_id)
+      return picked ? vendorDriverName(picked) : vendorForm.vendor_driver_name || '—'
+    }
     const dr = drivers.find((d) => (d.drivers?.driver_id ?? d.user_id) === assignDriverId)
     if (!dr) return assignDriverId || '—'
     return `${dr.first_name} ${dr.last_name}${dr.drivers?.license_number ? ` · ${dr.drivers.license_number}` : ''}`
+  })()
+
+  // The second driver, from the picker's current choice, falling back to the one
+  // already on the booking.
+  const secondDriverLabel = (() => {
+    if (vendorMode) {
+      const id = vendorForm.second_vendor_driver_user_id
+      if (!id) return null
+      const picked = vendorDrivers.find((v) => v.user_id === id)
+      if (picked) return vendorDriverName(picked)
+    } else {
+      if (!assignSecondDriverId) return null
+      const dr = drivers.find((d) => (d.drivers?.driver_id ?? d.user_id) === assignSecondDriverId)
+      if (dr) return `${dr.first_name} ${dr.last_name}`
+    }
+    const u = secondDriver?.users
+    return u ? [u.first_name, u.last_name].filter(Boolean).join(' ') || null : null
   })()
 
   const truckLabel = (() => {
@@ -480,8 +505,16 @@ function AssignmentPanel({
     return `${t.plate_number}${t.vehicle_type ? ` · ${t.vehicle_type}` : ''}`
   })()
 
+  const vendorLabel = vendorDrivers.find((v) => v.user_id === vendorForm.vendor_driver_user_id)?.drivers?.vendor_name
+    || vendorForm.vendor_name
+
+  // Only accounts that can sign in are offered; a revoked one would be refused.
+  const pickableVendorDrivers = vendorDrivers.filter(
+    (v) => v.access.account_active || v.user_id === vendorForm.vendor_driver_user_id,
+  )
+
   const canSubmit = vendorMode
-    ? !!vendorForm.vendor_driver_name.trim() && !!vendorForm.vendor_vehicle_plate.trim()
+    ? !!vendorForm.vendor_driver_user_id && !!vendorForm.vendor_vehicle_plate.trim()
     : !!assignDriverId && !!assignTruckId
 
   // Number coding is a flag, never a block — see lib/number-coding.
@@ -523,12 +556,18 @@ function AssignmentPanel({
             <User size={13} className="text-white/35 shrink-0" />
             <span>{driverLabel}</span>
           </div>
+          {secondDriverLabel && (
+            <div className="flex items-center gap-2">
+              <User size={13} className="text-white/35 shrink-0" />
+              <span>{secondDriverLabel} <span className="text-[11px] text-white/40">· second driver</span></span>
+            </div>
+          )}
           <div className="flex items-center gap-2">
             <Truck size={13} className="text-white/35 shrink-0" />
             <span>{truckLabel}</span>
           </div>
-          {vendorMode && vendorForm.vendor_name && (
-            <div className="text-[11px] text-white/45">Vendor: {vendorForm.vendor_name}</div>
+          {vendorMode && vendorLabel && (
+            <div className="text-[11px] text-white/45">Vendor: {vendorLabel}</div>
           )}
           {vendorMode && externalDriverUserId && (
             <ExternalDriverAccessRow userId={externalDriverUserId} />
@@ -637,25 +676,88 @@ function AssignmentPanel({
         </div>
 
         {vendorMode ? (
-          <div className="space-y-2">
-            {VENDOR_FIELDS.map(({ key, label, required, type, hint }) => (
-              <div key={key}>
+          <div className="space-y-3">
+            <div>
+              <label className="text-[11px] text-white/40 block mb-1">
+                Vendor driver<span className="text-red-400"> *</span>
+              </label>
+              <select
+                value={vendorForm.vendor_driver_user_id}
+                disabled={assignBusy || vendorDriversLoading}
+                onChange={(e) => onVendorFieldChange('vendor_driver_user_id', e.target.value)}
+                className={selectClass}
+              >
+                <option value="">
+                  {vendorDriversLoading ? 'Loading vendor drivers…' : 'Select vendor driver'}
+                </option>
+                {pickableVendorDrivers.map((v) => (
+                  <option key={v.user_id} value={v.user_id}>
+                    {vendorDriverName(v)}
+                    {v.drivers?.vendor_name ? ` · ${v.drivers.vendor_name}` : ''}
+                    {licenseNote(v.drivers?.license_expiry)}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[10px] text-white/35 mt-1 leading-snug">
+                {!vendorDriversLoading && pickableVendorDrivers.length === 0
+                  ? 'No vendor drivers yet. Add them in User Management → Drivers → Vendor Drivers.'
+                  : 'Their details and vendor are copied onto this delivery. Add or edit vendor drivers in User Management.'}
+              </p>
+              {/* Typed in before vendor drivers were registered: there is no
+                  record to pick, so a registered driver has to be chosen to update. */}
+              {!vendorForm.vendor_driver_user_id && vendorForm.vendor_driver_name && (
+                <p className="text-[10px] text-amber-300/80 mt-1 leading-snug">
+                  On this booking now: {vendorForm.vendor_driver_name} (typed in, not registered).
+                </p>
+              )}
+            </div>
+            <div>
+              <label className="text-[11px] text-white/40 block mb-1">Second driver (optional)</label>
+              <select
+                value={vendorForm.second_vendor_driver_user_id}
+                disabled={assignBusy || vendorDriversLoading}
+                onChange={(e) => onVendorFieldChange('second_vendor_driver_user_id', e.target.value)}
+                className={selectClass}
+              >
+                <option value="">No second driver</option>
+                {pickableVendorDrivers
+                  .filter((v) => v.user_id !== vendorForm.vendor_driver_user_id)
+                  .map((v) => (
+                    <option key={v.user_id} value={v.user_id}>
+                      {vendorDriverName(v)}
+                      {v.drivers?.vendor_name ? ` · ${v.drivers.vendor_name}` : ''}
+                      {licenseNote(v.drivers?.license_expiry)}
+                    </option>
+                  ))}
+              </select>
+              <p className="text-[10px] text-white/35 mt-1 leading-snug">{SECOND_DRIVER_HINT}</p>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
                 <label className="text-[11px] text-white/40 block mb-1">
-                  {label}{required && <span className="text-red-400"> *</span>}
+                  Vehicle plate<span className="text-red-400"> *</span>
                 </label>
                 <input
-                  type={type ?? 'text'}
-                  value={vendorForm[key]}
+                  value={vendorForm.vendor_vehicle_plate}
                   disabled={assignBusy}
-                  onChange={(e) => onVendorFieldChange(key, e.target.value)}
+                  onChange={(e) => onVendorFieldChange('vendor_vehicle_plate', e.target.value)}
                   className={selectClass}
-                  placeholder={label}
+                  placeholder="ABC 1234"
+                  maxLength={30}
                 />
-                {hint && (
-                  <p className="text-[10px] text-white/30 mt-1 leading-snug">{hint}</p>
-                )}
               </div>
-            ))}
+              <div>
+                <label className="text-[11px] text-white/40 block mb-1">Vehicle type</label>
+                <input
+                  value={vendorForm.vendor_vehicle_type}
+                  disabled={assignBusy}
+                  onChange={(e) => onVendorFieldChange('vendor_vehicle_type', e.target.value)}
+                  className={selectClass}
+                  placeholder="6-wheeler closed van"
+                  maxLength={60}
+                />
+              </div>
+            </div>
           </div>
         ) : (
           <div className="space-y-3">
@@ -706,6 +808,26 @@ function AssignmentPanel({
                   ? `No driver marked ${detail.schedule_date ?? 'this day'} as a day they can work.`
                   : `${drivers.length} driver${drivers.length === 1 ? '' : 's'} available on ${detail.schedule_date}.`}
               </p>
+            </div>
+            <div>
+              <label className="text-[11px] text-white/40 block mb-1">Second driver (optional)</label>
+              <select
+                value={assignSecondDriverId}
+                disabled={assignBusy}
+                onChange={(e) => onSecondDriverChange(e.target.value)}
+                className={selectClass}
+              >
+                <option value="">No second driver</option>
+                {drivers
+                  .filter((dr) => (dr.drivers?.driver_id ?? dr.user_id) !== assignDriverId)
+                  .map((dr) => (
+                    <option key={dr.user_id} value={dr.drivers?.driver_id ?? dr.user_id}>
+                      {dr.first_name} {dr.last_name}
+                      {dr.drivers?.license_number ? ` · ${dr.drivers.license_number}` : ''}
+                    </option>
+                  ))}
+              </select>
+              <p className="text-[10px] text-white/35 mt-1 leading-snug">{SECOND_DRIVER_HINT}</p>
             </div>
           </div>
         )}
@@ -1024,6 +1146,14 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
   const [trucks, setTrucks]               = useState<TruckType[]>([])
   const [allAssignments, setAllAssignments] = useState<AssignmentRecord[]>([])
   const [assignDriverId, setAssignDriverId] = useState<string>('')
+  // Optional second company driver ('' for none).
+  const [assignSecondDriverId, setAssignSecondDriverId] = useState<string>('')
+
+  // Picking the second driver as the main one (directly, or through a vehicle's
+  // usual driver) leaves no second driver rather than the same person twice.
+  useEffect(() => {
+    if (assignSecondDriverId && assignSecondDriverId === assignDriverId) setAssignSecondDriverId('')
+  }, [assignDriverId, assignSecondDriverId])
   const [assignTruckId, setAssignTruckId]   = useState<string>('')
   const [assignBusy, setAssignBusy]         = useState(false)
   // The "Choose vehicle and driver" pop-up is open. Closed on a successful
@@ -1032,14 +1162,32 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
   // Bumped to remount TripPlanner when the booking changed under us.
   const [plannerTick, setPlannerTick]       = useState(0)
 
-  // Vendor-supplied crew: entered ad-hoc and snapshotted onto the delivery instead
-  // of picking a registered driver/vehicle.
+  // Vendor-supplied crew: a registered vendor driver plus a typed vehicle,
+  // snapshotted onto the delivery.
   const [assignVendorMode, setAssignVendorMode] = useState(false)
   const [vendorForm, setVendorForm]             = useState<VendorAssignForm>(emptyVendorForm)
+  const [vendorDrivers, setVendorDrivers]       = useState<VendorDriverUser[]>([])
+  const [vendorDriversLoading, setVendorDriversLoading] = useState(false)
+
+  // Read fresh each time the vendor picker is opened, so a driver just added in
+  // User Management (or one whose access was just revoked) is reflected.
+  useEffect(() => {
+    if (!assignEditMode || !assignVendorMode) return
+    let cancelled = false
+    setVendorDriversLoading(true)
+    externalDriverService.list()
+      .then((rows) => { if (!cancelled) setVendorDrivers(rows) })
+      .catch((e) => {
+        if (!cancelled) appToast.error(getApiErrorMessage(e, 'Could not load vendor drivers.'), { action: 'vendor-drivers' })
+      })
+      .finally(() => { if (!cancelled) setVendorDriversLoading(false) })
+    return () => { cancelled = true }
+  }, [assignEditMode, assignVendorMode])
 
   const [committedAssignment, setCommittedAssignment] = useState<{
     driverId: string
     truckId: string
+    secondDriverId?: string
   }>({ driverId: '', truckId: '' })
 
   useEffect(() => {
@@ -1059,13 +1207,16 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     async (signal?: { cancelled: boolean }) => {
       if (!scheduleDay) { setDrivers([]); return }
       try {
-        const rows = await driverService.getAssignable(scheduleDay, committedAssignment.driverId || null)
+        const rows = await driverService.getAssignable(
+          scheduleDay,
+          [committedAssignment.driverId, committedAssignment.secondDriverId],
+        )
         if (!signal?.cancelled) setDrivers(rows)
       } catch {
         if (!signal?.cancelled) setDrivers([])
       }
     },
-    [scheduleDay, committedAssignment.driverId],
+    [scheduleDay, committedAssignment.driverId, committedAssignment.secondDriverId],
   )
 
   useEffect(() => {
@@ -1171,7 +1322,9 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
   )
 
   const busyDriverIds = useMemo(
-    () => new Set(busyElsewhere.map((a) => a.driver_id).filter(Boolean) as string[]),
+    () => new Set(
+      busyElsewhere.flatMap((a) => [a.driver_id, a.second_driver?.driver_id]).filter(Boolean) as string[],
+    ),
     [busyElsewhere],
   )
 
@@ -1187,10 +1340,10 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     () =>
       drivers.filter((dr) => {
         const id = dr.drivers?.driver_id ?? dr.user_id
-        if (id === assignDriverId) return true
+        if (id === assignDriverId || id === assignSecondDriverId) return true
         return !busyDriverIds.has(id)
       }),
-    [drivers, busyDriverIds, assignDriverId],
+    [drivers, busyDriverIds, assignDriverId, assignSecondDriverId],
   )
 
   // Only vehicles whose most recent BLOWBAGETS inspection passed can be picked.
@@ -1263,22 +1416,22 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     const isVendor = record?.is_vendor_supplied === true
     setAssignVendorMode(isVendor)
     setVendorForm(isVendor ? {
-      vendor_name:           record?.vendor_name           ?? '',
-      vendor_contact:        record?.vendor_contact        ?? '',
-      vendor_driver_name:    record?.vendor_driver_name    ?? '',
-      vendor_driver_license: record?.vendor_driver_license ?? '',
-      vendor_driver_phone:   record?.vendor_driver_phone   ?? '',
+      vendor_driver_user_id: record?.vendor_driver_user_id ?? '',
+      second_vendor_driver_user_id: record?.second_driver?.users?.user_id ?? '',
       vendor_vehicle_plate:  record?.vendor_vehicle_plate  ?? '',
       vendor_vehicle_type:   record?.vendor_vehicle_type   ?? '',
-      vendor_driver_email:   record?.vendor_driver_email   ?? '',
+      vendor_driver_name:    record?.vendor_driver_name    ?? '',
+      vendor_name:           record?.vendor_name           ?? '',
     } : emptyVendorForm)
 
     const fallback = getPrefillFromBookingDetail(detail, trucks)
     const ids = {
       driverId: (isVendor ? '' : assignment?.driver_id) ?? fallback.driverId,
       truckId:  (isVendor ? '' : assignment?.truck_id)  ?? fallback.truckId,
+      secondDriverId: isVendor ? '' : record?.second_driver?.driver_id ?? '',
     }
     setAssignDriverId(ids.driverId)
+    setAssignSecondDriverId(ids.secondDriverId)
     setAssignTruckId(ids.truckId)
     // These came off the booking, not out of the pairing, so nothing here may be
     // moved or cleared by a later change to the other field.
@@ -1294,6 +1447,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     setApproveModalOpen(false)
     setRejectModalOpen(false)
     setAssignDriverId('')
+    setAssignSecondDriverId('')
     setAssignTruckId('')
     setPairFilled(null)
     setAssignVendorMode(false)
@@ -1349,6 +1503,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     setApproveModalOpen(false)
     setRejectModalOpen(false)
     setAssignDriverId('')
+    setAssignSecondDriverId('')
     setAssignTruckId('')
     setPairFilled(null)
     setAssignVendorMode(false)
@@ -1397,19 +1552,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
   const handleAssign = async () => {
     if (!selectedId) return
     if (assignVendorMode) {
-      if (!vendorForm.vendor_driver_name.trim() || !vendorForm.vendor_vehicle_plate.trim()) return
-      // Same name / phone / email rules as every user in the system. Catching a
-      // bad email here matters most: the invite is the driver's only way in, so
-      // a misspelt domain is a silently blocked delivery.
-      const checked = vendorDriverSchema.safeParse({
-        vendor_driver_name:  vendorForm.vendor_driver_name,
-        vendor_driver_phone: normalizePhMobile(vendorForm.vendor_driver_phone),
-        vendor_driver_email: vendorForm.vendor_driver_email,
-      })
-      if (!checked.success) {
-        appToast.error(checked.error.issues[0].message)
-        return
-      }
+      if (!vendorForm.vendor_driver_user_id || !vendorForm.vendor_vehicle_plate.trim()) return
     } else if (!assignDriverId || !assignTruckId) {
       return
     }
@@ -1417,17 +1560,18 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     try {
       const result = assignVendorMode
         ? await assignmentService.assignBooking(selectedId, {
-            is_vendor_supplied: true,
-            ...Object.fromEntries(
-              Object.entries(vendorForm).map(([k, v]) => [k, v.trim() || undefined]),
-            ),
-            vendor_driver_phone: normalizePhMobile(vendorForm.vendor_driver_phone) || undefined,
+            is_vendor_supplied:    true,
+            vendor_driver_user_id: vendorForm.vendor_driver_user_id,
+            vendor_vehicle_plate:  vendorForm.vendor_vehicle_plate.trim(),
+            vendor_vehicle_type:   vendorForm.vendor_vehicle_type.trim() || undefined,
+            second_vendor_driver_user_id: vendorForm.second_vendor_driver_user_id || null,
           })
         : await assignmentService.assignBooking(selectedId, {
             driver_id: assignDriverId,
             truck_id:  assignTruckId,
+            second_driver_id: assignSecondDriverId || null,
           })
-      setCommittedAssignment({ driverId: assignDriverId, truckId: assignTruckId })
+      setCommittedAssignment({ driverId: assignDriverId, truckId: assignTruckId, secondDriverId: assignSecondDriverId })
       setAssignEditMode(false)
       await openDetail(selectedId)
       await loadPage()
@@ -2064,11 +2208,18 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                           drivers={availableDrivers}
                           trucks={availableTrucks}
                           assignDriverId={assignDriverId}
+                          assignSecondDriverId={assignSecondDriverId}
+                          secondDriver={
+                            allAssignments.find((a) => a.booking_id === detail.booking_id)?.second_driver ?? null
+                          }
+                          onSecondDriverChange={setAssignSecondDriverId}
                           assignTruckId={assignTruckId}
                           assignBusy={assignBusy}
                           pickerOpen={assignEditMode}
                           vendorMode={assignVendorMode}
                           vendorForm={vendorForm}
+                          vendorDrivers={vendorDrivers}
+                          vendorDriversLoading={vendorDriversLoading}
                           externalDriverUserId={
                             allAssignments.find((a) => a.booking_id === detail.booking_id)
                               ?.vendor_driver_user_id ?? null
@@ -2078,7 +2229,14 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                           onTruckChange={handleTruckChange}
                           onVendorModeChange={setAssignVendorMode}
                           onVendorFieldChange={(key, value) =>
-                            setVendorForm((prev) => ({ ...prev, [key]: value }))
+                            setVendorForm((prev) => {
+                              const next = { ...prev, [key]: value }
+                              // Never the same person as both drivers.
+                              if (key === 'vendor_driver_user_id' && value && value === prev.second_vendor_driver_user_id) {
+                                next.second_vendor_driver_user_id = ''
+                              }
+                              return next
+                            })
                           }
                           onAssign={() => void handleAssign()}
                           onOpenPicker={() => setAssignEditMode(true)}
@@ -2089,6 +2247,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                               : getPrefillFromBookingDetail(detail, trucks)
                             setAssignDriverId(restore.driverId)
                             setAssignTruckId(restore.truckId)
+                            setAssignSecondDriverId(committedAssignment.secondDriverId ?? '')
                             setPairFilled(null)
                           }}
                         />

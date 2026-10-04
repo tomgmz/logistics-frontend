@@ -11,15 +11,35 @@ export interface AssignBookingPayload {
   truck_id?: string
 
   is_vendor_supplied?: boolean
-  vendor_name?: string
-  vendor_contact?: string
-  vendor_driver_name?: string
-  vendor_driver_license?: string
-  vendor_driver_phone?: string
+  /**
+   * The registered vendor driver (User Management → Vendor Drivers). The server
+   * copies their details and vendor onto the delivery; only the vehicle is typed.
+   */
+  vendor_driver_user_id?: string
   vendor_vehicle_plate?: string
   vendor_vehicle_type?: string
-  /** Optional. Supplying it provisions a passkey-only app account for this driver. */
-  vendor_driver_email?: string
+  /**
+   * Optional second driver. Company: a drivers.driver_id from the assignable
+   * pool. Vendor: a registered vendor driver's user_id. null removes them.
+   */
+  second_driver_id?: string | null
+  second_vendor_driver_user_id?: string | null
+}
+
+/** The optional second driver on a booking. They see it in the app; the main driver runs it. */
+export interface SecondDriverRecord {
+  driver_id:      string
+  license_number: string | null
+  license_expiry: string | null
+  is_external:    boolean
+  vendor_name:    string | null
+  users: {
+    user_id:    string
+    first_name: string | null
+    last_name:  string | null
+    phone:      string | null
+    email:      string | null
+  } | null
 }
 
 export interface AssignmentRecord {
@@ -44,6 +64,7 @@ export interface AssignmentRecord {
   vendor_driver_email: string | null
   /** The provisioned account, when this driver was given app access. */
   vendor_driver_user_id: string | null
+  second_driver?: SecondDriverRecord | null
 
   // The booking this delivery belongs to. Its status — not the delivery's — is
   // what says whether the crew is still tied up, and a completed booking keeps

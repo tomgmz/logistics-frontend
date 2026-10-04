@@ -24,10 +24,11 @@ import {
 } from '@/lib/services/admin/user-management.service'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
-import UserFormModal from './UserFormModal'
+import UserFormModal, { type DriverSource } from './UserFormModal'
 import { useRecordLocks } from '@/lib/hooks/useRecordLock'
 import { RecordLockBadge } from '@/components/ui/RecordLockBanner'
 import PasswordResetQueue from '@/components/admin/PasswordResetQueue'
+import { licenseExpiryState, needsLicenseUpdate } from '@/lib/license-expiry'
 import ItAdminTransitionModal from '@/components/admin/ItAdminTransitionModal'
 import ModuleSectionTabs, { type ModuleSection } from '@/components/admin/ModuleSectionTabs'
 import { passwordResetService } from '@/lib/services/admin/password-reset.service'
@@ -40,9 +41,9 @@ type UserMgmtTab = Extract<UserTab, 'clients' | 'drivers' | 'it-admins'>
 // instead — see ModuleSectionTabs.
 //
 // Drivers split into two tabs under the one dropdown entry. Vendor drivers are
-// role='driver' too, but they are passkey-only subcontractors created from a
-// booking's assignment — no licence on file, no password, not company crew — so
-// they get their own list and their own actions instead of the driver form.
+// role='driver' too, but they are passkey-only subcontractors — no password, not
+// company crew — so they get their own list and their own access actions. Both
+// kinds are added and edited through the same driver form.
 type TabValue = UserMgmtTab | 'vendor-drivers' | 'all'
 type DirectoryTab = Exclude<TabValue, 'all'>
 
@@ -258,12 +259,14 @@ function AccessBadge({ access }: { access: VendorDriverUser['access'] }) {
 }
 
 /**
- * Actions for a vendor driver — the same three the booking's assignment card
- * offers, since a passkey-only account has no password to reset or form to edit.
+ * Actions for a vendor driver: the shared view/edit form, plus the access actions
+ * a passkey-only account needs instead of a password reset.
  */
-function VendorRowMenu({ user, onDone, lockedBy }: {
+function VendorRowMenu({ user, onDone, onView, onEdit, lockedBy }: {
   user:      VendorDriverUser
   onDone:    () => Promise<void> | void
+  onView:    () => void
+  onEdit:    () => void
   lockedBy?: string
 }) {
   const [open, setOpen] = useState(false)
@@ -339,6 +342,13 @@ function VendorRowMenu({ user, onDone, lockedBy }: {
             className="absolute right-0 top-8 z-50 w-52 rounded-xl border border-[#2a2a2a] bg-[#1b1b1b] py-1 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
+            <button onClick={() => { setOpen(false); onView() }} className={`${item} text-[#818181] hover:bg-[#2a2a2a] hover:text-white`}>
+              <Eye size={13} /> View Details
+            </button>
+            <button onClick={() => { setOpen(false); onEdit() }} className={`${item} text-[#818181] hover:bg-[#2a2a2a] hover:text-white`}>
+              <Pencil size={13} /> Edit Details
+            </button>
+            <div className="my-1 border-t border-[#2a2a2a]" />
             {user.access.account_active ? (
               <>
                 <button onClick={resend} className={`${item} text-[#818181] hover:bg-[#2a2a2a] hover:text-white`}>
@@ -392,10 +402,10 @@ function EmptyState({ tab, onAdd }: { tab: TabValue; onAdd: () => void }) {
       <p className="text-base font-semibold text-white">No records found</p>
       <p className="mt-1 text-sm text-[#818181]">
         {tab === 'vendor-drivers'
-          ? 'No vendor drivers yet. They are added from a booking\'s assignment, with a driver email.'
+          ? 'No vendor drivers yet. Add one here, then pick them in Booking Management for a vendor-supplied delivery.'
           : `No ${tab === 'all' ? 'users' : tab} match your current filters.`}
       </p>
-      {tab !== 'all' && tab !== 'vendor-drivers' && (
+      {tab !== 'all' && (
         <button
           onClick={onAdd}
           className="mt-6 flex items-center gap-2 rounded-lg bg-[#4df9ed] px-4 py-2 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5]"
@@ -422,6 +432,35 @@ function RoleBadge({ role }: { role: string }) {
   return (
     <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold tracking-wide ${cls}`}>
       {label}
+    </span>
+  )
+}
+
+/**
+ * Flags a license that expires within a month (amber) or has already expired
+ * (red), so the Company Administrator knows to update the driver's details.
+ * Renders nothing while the license is comfortably in date.
+ */
+function LicenseExpiryBadge({ expiry }: { expiry: string | null }) {
+  const state = licenseExpiryState(expiry)
+  if (state.kind === 'ok') return null
+
+  const expired = state.kind === 'expired'
+  const label = expired
+    ? 'Expired'
+    : state.daysLeft === 0 ? 'Expires today'
+    : state.daysLeft === 1 ? 'Expires tomorrow'
+    : `Expires in ${state.daysLeft} days`
+  const cls = expired
+    ? 'bg-red-500/15 text-red-400 border-red-500/30'
+    : 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+
+  return (
+    <span
+      title="Update this driver's license details once it is renewed."
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold tracking-wide whitespace-nowrap ${cls}`}
+    >
+      <AlertTriangle size={11} /> {label}
     </span>
   )
 }
@@ -462,7 +501,12 @@ function renderCells(user: AnyUser, tab: TabValue) {
         <>
           <td className="px-4 py-3.5"><p className="font-medium text-white">{name}</p></td>
           <td className="px-4 py-3.5 text-sm font-mono text-[#818181]">{u.drivers?.license_number ?? '—'}</td>
-          <td className="px-4 py-3.5 text-sm text-[#818181]">{formatDate(u.drivers?.license_expiry ?? null)}</td>
+          <td className="px-4 py-3.5 text-sm text-[#818181]">
+            <div className="flex flex-col items-start gap-1">
+              <span>{formatDate(u.drivers?.license_expiry ?? null)}</span>
+              <LicenseExpiryBadge expiry={u.drivers?.license_expiry ?? null} />
+            </div>
+          </td>
           <td className="px-4 py-3.5">
             {drvStatus && (
               <span className="inline-flex items-center rounded-full border border-[#4df9ed]/30 bg-[#4df9ed]/10 px-2 py-0.5 text-[11px] font-semibold text-[#4df9ed]">
@@ -480,8 +524,14 @@ function renderCells(user: AnyUser, tab: TabValue) {
       return (
         <>
           <td className="px-4 py-3.5"><p className="font-medium text-white">{name}</p></td>
+          <td className="px-4 py-3.5 text-sm text-[#818181]">{u.drivers?.vendor_name || '—'}</td>
           <td className="px-4 py-3.5 text-sm text-[#818181]">{u.email}</td>
-          <td className="px-4 py-3.5 text-sm text-[#818181]">{u.phone ?? '—'}</td>
+          <td className="px-4 py-3.5 text-sm text-[#818181]">
+            <div className="flex flex-col items-start gap-1">
+              <span>{formatDate(u.drivers?.license_expiry ?? null)}</span>
+              <LicenseExpiryBadge expiry={u.drivers?.license_expiry ?? null} />
+            </div>
+          </td>
           <td className="px-4 py-3.5"><AccessBadge access={u.access} /></td>
           <td className="px-4 py-3.5"><StatusBadge status={u.status} /></td>
         </>
@@ -507,7 +557,7 @@ const HEADERS: Record<TabValue, string[]> = {
   all:         ['Name', 'Email', 'Phone', 'Role', 'Status'],
   clients:     ['Name', 'Email', 'Company', 'Status', 'Last Login'],
   drivers:     ['Name', 'License #', 'Expiry', 'Driver Status', 'Acct. Status'],
-  'vendor-drivers': ['Name', 'Email', 'Phone', 'App Access', 'Acct. Status'],
+  'vendor-drivers': ['Name', 'Vendor', 'Email', 'Expiry', 'App Access', 'Acct. Status'],
   'it-admins': ['Name', 'Email', 'Phone', 'Status', 'Last Login'],
 }
 
@@ -529,6 +579,8 @@ export default function UserManagementClient() {
   const [searchInput,      setSearchInput]      = useState('')
   const [search,           setSearch]           = useState('')
   const [page,             setPage]             = useState(1)
+  // Drivers tab: narrow the list to licenses that are expiring or expired.
+  const [licenseOnly,      setLicenseOnly]      = useState(false)
   const [stats,            setStats]            = useState({ total: 0, active: 0, archived: 0 })
   const [serverTotal,      setServerTotal]      = useState(0)
   const [serverTotalPages, setServerTotalPages] = useState(1)
@@ -537,6 +589,7 @@ export default function UserManagementClient() {
   const [formViewOnly,     setFormViewOnly]     = useState(false)
   const userLocks = useRecordLocks('user')
   const [formTab,          setFormTab]          = useState<UserMgmtTab>('clients')
+  const [formDriverSource, setFormDriverSource] = useState<DriverSource>('company')
   const [showTransition,   setShowTransition]   = useState(false)
 
   // Only the primary administrator may hand the IT Admin role over. The API
@@ -642,6 +695,7 @@ export default function UserManagementClient() {
   useEffect(() => {
     isInitialAllFetch.current = true
     setPage(1)
+    setLicenseOnly(false)
     setSearch('')
     setSearchInput('')
     // The resets panel loads its own data and has no user list to fetch.
@@ -663,9 +717,18 @@ export default function UserManagementClient() {
     else await fetchTabUsers(activeTab)
   }, [isResetsTab, activeTab, search, fetchAllUsers, fetchTabUsers])
 
+  // Counted over the whole roster, not the current page or search, so the notice
+  // never undercounts.
+  const licenseFlagCount = isDriverTab
+    ? allRows.filter((u) => needsLicenseUpdate((u as DriverUser).drivers?.license_expiry)).length
+    : 0
+
   const filtered = activeTab === 'all' || isResetsTab
     ? allRows
     : allRows.filter((u) => {
+        // Ignored once nothing is flagged, so updating the last driver can't strand
+        // the admin on an empty list with the notice (and its toggle) gone.
+        if (licenseOnly && licenseFlagCount > 0 && isDriverTab && !needsLicenseUpdate((u as DriverUser).drivers?.license_expiry)) return false
         if (!search) return true
         const q = search.toLowerCase()
         return (
@@ -675,7 +738,7 @@ export default function UserManagementClient() {
         )
       })
 
-  const total      = activeTab === 'all' ? serverTotal      : filtered.length
+  const total      = activeTab === 'all' ? serverTotal     : filtered.length
   const totalPages = activeTab === 'all' ? serverTotalPages : Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const safePage   = Math.min(page, totalPages)
   const users      = activeTab === 'all'
@@ -711,7 +774,9 @@ export default function UserManagementClient() {
   }
 
   function openCreate() {
-    setFormTab(activeTab === 'clients' || activeTab === 'drivers' ? activeTab : 'clients')
+    setFormTab(isDriverTab ? 'drivers' : 'clients')
+    // The driver form starts on whichever tab it was opened from.
+    setFormDriverSource(activeTab === 'vendor-drivers' ? 'vendor' : 'company')
     setEditUser(null)
     setFormViewOnly(false)
     setShowForm(true)
@@ -736,7 +801,7 @@ export default function UserManagementClient() {
               active, so while the seat is filled the only move is to hand it over.
               If it is somehow empty, creating one is exactly right.
             */}
-            {!isResetsTab && activeTab !== 'vendor-drivers' && (
+            {!isResetsTab && (
               isITAdminTab && activeITAdmin ? (
                 isRootAdmin && (
                   <button
@@ -751,7 +816,7 @@ export default function UserManagementClient() {
                   onClick={openCreate}
                   className="flex items-center gap-2 rounded-xl bg-[#4df9ed] px-5 py-2.5 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5] active:scale-95"
                 >
-                  <UserPlus size={15} /> Add User
+                  <UserPlus size={15} /> {activeTab === 'vendor-drivers' ? 'Add Vendor Driver' : activeTab === 'drivers' ? 'Add Driver' : 'Add User'}
                 </button>
               )
             )}
@@ -899,6 +964,22 @@ export default function UserManagementClient() {
               </span>
             </div>
 
+            {isDriverTab && licenseFlagCount > 0 && (
+              <div className="flex items-center gap-3 border-b border-amber-500/20 bg-amber-500/10 px-5 py-3 text-sm text-amber-400 shrink-0">
+                <AlertTriangle size={14} className="shrink-0" />
+                <span>
+                  {licenseFlagCount === 1 ? '1 driver has' : `${licenseFlagCount} drivers have`} a license that expires
+                  within a month or has expired. Update their license details once it is renewed.
+                </span>
+                <button
+                  onClick={() => { setLicenseOnly((v) => !v); setPage(1) }}
+                  className="ml-auto shrink-0 rounded-lg border border-amber-500/40 px-3 py-1.5 text-xs font-semibold text-amber-300 transition hover:bg-amber-500/15"
+                >
+                  {licenseOnly ? 'Show all drivers' : 'Show only these'}
+                </button>
+              </div>
+            )}
+
             {error && (
               <div className="flex items-center gap-3 border-b border-red-500/20 bg-red-500/10 px-5 py-3 text-sm text-red-400 shrink-0">
                 <AlertTriangle size={14} /> {error}
@@ -945,6 +1026,8 @@ export default function UserManagementClient() {
                               <VendorRowMenu
                                 user={user as VendorDriverUser}
                                 onDone={refetchCurrentTab}
+                                onView={() => openEdit(user, true)}
+                                onEdit={() => openEdit(user)}
                                 lockedBy={userLocks.get(user.user_id)}
                               />
                             ) : (
@@ -1019,6 +1102,7 @@ export default function UserManagementClient() {
         <UserFormModal
           tab={formTab}
           user={editUser}
+          driverSource={formDriverSource}
           startInView={formViewOnly}
           // Same rule as the row menu: the combined list can't open the edit form.
           canEdit={activeTab !== 'all'}

@@ -97,9 +97,12 @@ function CrewSection({ record, booking }: { record: RecordData; booking: Booking
 
   // Older bookings predate the deliveries join below; fall back to the
   // assignment rows that come with the booking itself.
-  const fallbackDriver = fullName((booking.driver_assignments as Array<{
+  const crew = (booking.driver_assignments as Array<{
+    crew_role?: 'lead' | 'second'
     drivers?: { users?: { first_name?: string; last_name?: string } }
-  }> | undefined)?.[0]?.drivers?.users)
+  }> | undefined) ?? []
+  const fallbackDriver = fullName((crew.find((a) => a.crew_role !== 'second') ?? crew[0])?.drivers?.users)
+  const secondDriver   = fullName(crew.find((a) => a.crew_role === 'second')?.drivers?.users)
   const fallbackPlate = (booking.truck_assignments as Array<{
     trucks?: { plate_number?: string }
   }> | undefined)?.[0]?.trucks?.plate_number ?? null
@@ -145,6 +148,7 @@ function CrewSection({ record, booking }: { record: RecordData; booking: Booking
         )}
         <InfoTile label="Phone" value={phone || '—'} />
         {email && <InfoTile label="Email" value={email} />}
+        {secondDriver && <InfoTile label="Second Driver" value={secondDriver} />}
       </div>
 
       <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest pt-2 border-t"

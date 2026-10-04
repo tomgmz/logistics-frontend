@@ -55,7 +55,12 @@ interface UserFormModalProps {
   canEdit?: boolean
   // Someone else is editing this account (from the list's lock state).
   lockedBy?: string
+  // Drivers only, on create: which kind of driver the form starts on. Opened
+  // from the Vendor Drivers tab it starts on Vendor; the admin can still switch.
+  driverSource?: DriverSource
 }
+
+export type DriverSource = 'company' | 'vendor'
 
 const TAB_LABELS: Record<UserTab, string> = {
   admins:              'Administrator',
@@ -109,7 +114,7 @@ function toNameCase(value: string): string {
   return value.replace(/(^|[\s'-])(\p{L})/gu, (_, sep, ch) => sep + ch.toUpperCase())
 }
 
-function buildInitialState(tab: UserTab, user: AnyUser | null): FormState {
+function buildInitialState(tab: UserTab, user: AnyUser | null, driverSource: DriverSource = 'company'): FormState {
   const base: FormState = {
     first_name:  user?.first_name  ?? '',
     last_name:   user?.last_name   ?? '',
@@ -135,6 +140,10 @@ function buildInitialState(tab: UserTab, user: AnyUser | null): FormState {
       ...base,
       license_number:   d?.license_number                ?? '',
       license_expiry:   d?.license_expiry?.split('T')[0] ?? '',
+      // Fixed once the driver exists: a driver never moves between 8338 and a vendor.
+      is_external:      user ? d?.is_external === true : driverSource === 'vendor',
+      vendor_name:      d?.vendor_name    ?? '',
+      vendor_contact:   d?.vendor_contact ?? '',
     }
   }
 
@@ -155,6 +164,18 @@ async function submitForm(
   )
   if (clean.phone)    clean.phone    = attachCountryCode(String(clean.phone))
   if (clean.landline) clean.landline = attachCountryCode(String(clean.landline))
+
+  if (tab === 'drivers') {
+    if (form.is_external === true) {
+      // Sent even when blank on an edit, so clearing the contact actually clears it.
+      if (editId) clean.vendor_contact = String(form.vendor_contact ?? '')
+    } else {
+      delete clean.vendor_name
+      delete clean.vendor_contact
+    }
+    // Chosen on create only; the server refuses to move a driver between kinds.
+    if (editId) delete clean.is_external
+  }
 
   if (tab === 'drivers' && (!editId || licenseFile)) {
     const fd = new FormData()
@@ -293,7 +314,7 @@ function PhoneInputRow({
 
 export default function UserFormModal({
   tab, user, onClose, onSaved, enablePermissions = false,
-  startInView = false, canEdit = true, lockedBy,
+  startInView = false, canEdit = true, lockedBy, driverSource = 'company',
 }: UserFormModalProps) {
   const isEdit = Boolean(user)
   const [viewing, setViewing] = useState(isEdit && startInView)
@@ -301,7 +322,7 @@ export default function UserFormModal({
   const roleModules = formRole ? MODULES_BY_ROLE[formRole] : []
   const showPermissions = enablePermissions && !isEdit && roleModules.length > 0
 
-  const initialState = useMemo(() => buildInitialState(tab, user), [tab, user])
+  const initialState = useMemo(() => buildInitialState(tab, user, driverSource), [tab, user, driverSource])
 
   const [perms, setPerms] = useState<Record<string, ModuleFlags>>({})
 
@@ -499,8 +520,10 @@ export default function UserFormModal({
 
       appToast.success(
         isEdit
-          ? `${TAB_LABELS[tab]} updated successfully.`
-          : `New ${TAB_LABELS[tab]} account created.`,
+          ? `${formLabel} updated successfully.`
+          : isVendorDriver
+            ? `New ${formLabel} added. A setup link for the app was emailed to them.`
+            : `New ${formLabel} account created.`,
         { action: isEdit ? 'edit-user' : 'create-user', entityId: user?.user_id ?? 'new' },
       )
       onSaved()
@@ -542,6 +565,20 @@ export default function UserFormModal({
   const isSaveDisabled = loading || (isEdit && !isDirty)
   const fe = fieldErrors
 
+  const isVendorDriver = tab === 'drivers' && form.is_external === true
+  const formLabel      = isVendorDriver ? 'Vendor Driver' : TAB_LABELS[tab]
+
+  // Switching kind on create: drop the other kind's errors, and the vendor fields
+  // when going back to 8338, so a stale vendor name is never sent.
+  function setDriverSource(source: DriverSource) {
+    setForm(prev => ({
+      ...prev,
+      is_external: source === 'vendor',
+      ...(source === 'company' && { vendor_name: '', vendor_contact: '' }),
+    }))
+    setFieldErrors(prev => { const n = { ...prev }; delete n.vendor_name; delete n.vendor_contact; return n })
+  }
+
   const isKnownSuffix = USER_SUFFIXES.includes(form.suffix as never)
   const suffixSelectValue = showCustomSuffix ? 'others' : ((form.suffix ?? '') as string)
 
@@ -567,12 +604,12 @@ export default function UserFormModal({
           <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#2a2a2a] bg-[#1b1b1b] px-6 py-4">
             <div>
               <p className="text-[10px] font-bold tracking-[0.14em] uppercase text-[#4df9ed]">
-                {viewing ? 'View' : isEdit ? 'Edit' : 'Create'} {TAB_LABELS[tab]}
+                {viewing ? 'View' : isEdit ? 'Edit' : 'Create'} {formLabel}
               </p>
               <h2 className="mt-0.5 text-lg font-bold text-white">
                 {viewing
-                  ? `${TAB_LABELS[tab]} Details`
-                  : isEdit ? `Update ${TAB_LABELS[tab]}` : `New ${TAB_LABELS[tab]} Account`}
+                  ? `${formLabel} Details`
+                  : isEdit ? `Update ${formLabel}` : `New ${formLabel} Account`}
               </h2>
             </div>
             <button
@@ -586,6 +623,40 @@ export default function UserFormModal({
 
           <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5 px-6 py-6">
             <RecordLockBanner lock={lock} noun="account" />
+            {tab === 'drivers' && (
+              <div>
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-[#818181]">Driver from</p>
+                {isEdit ? (
+                  <p className="text-sm text-white">
+                    {isVendorDriver ? 'Vendor' : '8338 Logistics (company driver)'}
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    {([
+                      { key: 'company', label: '8338 Logistics', hint: 'Company driver. Signs in with a password.' },
+                      { key: 'vendor',  label: 'Vendor',         hint: 'Supplied by a vendor. Signs in with a passkey.' },
+                    ] as const).map(opt => {
+                      const active = (opt.key === 'vendor') === isVendorDriver
+                      return (
+                        <button
+                          key={opt.key}
+                          type="button"
+                          onClick={() => setDriverSource(opt.key)}
+                          className={`rounded-xl border px-4 py-3 text-left transition ${
+                            active
+                              ? 'border-[#4df9ed] bg-[#4df9ed]/10'
+                              : 'border-[#424242] hover:border-[#818181]'
+                          }`}
+                        >
+                          <p className={`text-sm font-semibold ${active ? 'text-[#4df9ed]' : 'text-white'}`}>{opt.label}</p>
+                          <p className="mt-0.5 text-[11px] leading-snug text-[#818181]">{opt.hint}</p>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
             {tab === 'drivers' && (
               <div className="rounded-xl border border-dashed border-[#424242] bg-[#2a2a2a]/30 px-4 py-4">
 
@@ -829,6 +900,29 @@ export default function UserFormModal({
 
             {tab === 'drivers' && (<>
 
+              {isVendorDriver && (
+                <div className="grid grid-cols-2 gap-4">
+                  <Field label="Vendor Name" required error={fe.vendor_name}>
+                    <Input
+                      value={form.vendor_name as string}
+                      onChange={e => set('vendor_name', e.target.value)}
+                      placeholder="ABC Trucking Services"
+                      maxLength={120}
+                      error={fe.vendor_name}
+                    />
+                  </Field>
+                  <Field label="Vendor Contact" hint="Optional" error={fe.vendor_contact}>
+                    <Input
+                      value={form.vendor_contact as string}
+                      onChange={e => set('vendor_contact', e.target.value)}
+                      placeholder="Contact person or number"
+                      maxLength={120}
+                      error={fe.vendor_contact}
+                    />
+                  </Field>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <Field label="License Number" required error={fe.license_number}>
                   <Input
@@ -915,7 +1009,7 @@ export default function UserFormModal({
                 className="flex items-center gap-2 rounded-lg bg-[#4df9ed] px-5 py-2.5 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5] disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {loading && <Loader2 size={15} className="animate-spin" />}
-                {loading ? 'Saving…' : isEdit ? 'Save Changes' : `Create ${TAB_LABELS[tab]}`}
+                {loading ? 'Saving…' : isEdit ? 'Save Changes' : `Create ${formLabel}`}
               </button>
             </div>
             )}
@@ -967,7 +1061,7 @@ export default function UserFormModal({
       <ReusableModal
         key="confirm-save"
         open={confirmSave}
-        title={isEdit ? `Save changes to this ${TAB_LABELS[tab]}?` : `Create new ${TAB_LABELS[tab]}?`}
+        title={isEdit ? `Save changes to this ${formLabel}?` : `Create new ${formLabel}?`}
         description={
           isEdit
             ? 'This will update the account with the new information.'
