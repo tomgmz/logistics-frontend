@@ -196,7 +196,9 @@ export interface UpdateTruckInput extends TruckScheduleInput {
 export interface CreateTruckModelInput {
   name:               string
   vehicle_type:       string
-  dimension_mm?:      string | null
+  length_mm:          number
+  width_mm:           number
+  height_mm:          number
   suitable_for?:      string | null
   stackable_friendly?: boolean
   max_volume_cbm?:    number | null
@@ -208,7 +210,9 @@ export interface CreateTruckModelInput {
 export interface UpdateTruckModelInput {
   name?:               string
   vehicle_type?:       string
-  dimension_mm?:       string | null
+  length_mm?:          number
+  width_mm?:           number
+  height_mm?:          number
   suitable_for?:       string | null
   stackable_friendly?: boolean
   max_volume_cbm?:     number | null

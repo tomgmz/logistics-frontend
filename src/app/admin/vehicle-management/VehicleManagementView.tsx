@@ -28,6 +28,7 @@ import {
   fmtLabel,
   statusStyle,
   kgToTons,
+  fmtDimensions,
   InspectionBadge,
 } from './vehicle-ui'
 import { assignedDriverName, isRoadworthy, needsReinspection, type Truck, type TruckInspection, type CreateTruckInput, type UpdateTruckInput } from '@/app/types/truck.types'
@@ -220,7 +221,7 @@ function VehicleDetailsModal({
                 <DetailRow label="Max volume">
                   {truck.truck_model?.max_volume_cbm != null ? `${truck.truck_model.max_volume_cbm} cbm` : '—'}
                 </DetailRow>
-                <DetailRow label="Cargo bed (mm)">{truck.truck_model?.dimension_mm ?? '—'}</DetailRow>
+                <DetailRow label="Cargo bed (mm)">{fmtDimensions(truck.truck_model)}</DetailRow>
                 <DetailRow label="Regular driver">
                   {assignedDriverName(truck) ?? <span className="text-white/35">Unassigned</span>}
                   {truck.assigned_driver?.license_number && (

@@ -20,7 +20,7 @@ import { useRecordLock, useRecordLocks } from '@/lib/hooks/useRecordLock'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import RecordLockBanner, { RecordLockBadge } from '@/components/ui/RecordLockBanner'
 import RowActionMenu, { type RowAction } from '@/components/ui/RowActionMenu'
-import { ModelThumb, kgToTons } from './vehicle-ui'
+import { ModelThumb, fmtDimensions, kgToTons } from './vehicle-ui'
 
 export const VEHICLE_TYPES = [
   'Closed Van',
@@ -67,13 +67,12 @@ function emptyModelForm(): ModelFormState {
 }
 
 function modelToForm(m: TruckModel): ModelFormState {
-  const dimParts = m.dimension_mm?.split(/\s*[x×]\s*/i) ?? []
   return {
     name:               m.name               ?? '',
     vehicle_type:       m.vehicle_type        ?? '',
-    length_mm:          dimParts[0]           ?? '',
-    width_mm:           dimParts[1]           ?? '',
-    height_mm:          dimParts[2]           ?? '',
+    length_mm:          m.length_mm != null ? String(m.length_mm) : '',
+    width_mm:           m.width_mm  != null ? String(m.width_mm)  : '',
+    height_mm:          m.height_mm != null ? String(m.height_mm) : '',
     suitable_for:       m.suitable_for        ?? '',
     stackable_friendly: m.stackable_friendly  ?? false,
     max_volume_cbm:     m.max_volume_cbm != null ? String(m.max_volume_cbm) : '',
@@ -325,12 +324,12 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
         setUploadBusy(false)
       }
 
-      const dimension_mm = `${form.length_mm} x ${form.width_mm} x ${form.height_mm}`
-
       const payload = {
         name:               form.name.trim(),
         vehicle_type:       form.vehicle_type,
-        dimension_mm,
+        length_mm:          parseInt(form.length_mm, 10),
+        width_mm:           parseInt(form.width_mm, 10),
+        height_mm:          parseInt(form.height_mm, 10),
         suitable_for:       form.suitable_for.trim(),
         stackable_friendly: form.stackable_friendly,
         max_volume_cbm:     parseFloat(form.max_volume_cbm),
@@ -495,7 +494,7 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
                       </td>
                       <td className="px-3 py-2.5 font-semibold text-white max-w-[240px] truncate">{m.name}</td>
                       <td className="px-3 py-2.5 text-white/70">{m.vehicle_type ?? '—'}</td>
-                      <td className="px-3 py-2.5 text-white/60 text-xs hidden md:table-cell tabular-nums">{m.dimension_mm ?? '—'}</td>
+                      <td className="px-3 py-2.5 text-white/60 text-xs hidden md:table-cell tabular-nums">{fmtDimensions(m)}</td>
                       <td className="px-3 py-2.5 text-white/60 text-xs tabular-nums">
                         {m.max_weight_kg != null ? `${m.max_weight_kg.toLocaleString()} kg · ${kgToTons(m.max_weight_kg)} t` : '—'}
                       </td>
@@ -852,7 +851,7 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
 
                 <div className="rounded-xl border border-white/[0.08] bg-black/20 px-3">
                   {([
-                    ['Dimensions (mm)', viewModel.dimension_mm ?? '—'],
+                    ['Dimensions (mm)', fmtDimensions(viewModel)],
                     ['Max weight',      viewModel.max_weight_kg  != null ? `${viewModel.max_weight_kg.toLocaleString()} kg` : '—'],
                     ['Max volume',      viewModel.max_volume_cbm != null ? `${viewModel.max_volume_cbm} cbm` : '—'],
                     ['Max length',      viewModel.max_length_cm  != null ? `${viewModel.max_length_cm} cm` : '—'],

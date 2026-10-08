@@ -93,6 +93,12 @@ export function statusStyle(status: string): { bg: string; color: string; border
   }
 }
 
+/** Cargo bed as "L x W x H" in mm, or '—' when any side is missing. */
+export function fmtDimensions(m: { length_mm?: number | null; width_mm?: number | null; height_mm?: number | null } | null | undefined): string {
+  if (!m?.length_mm || !m.width_mm || !m.height_mm) return '—'
+  return `${m.length_mm} x ${m.width_mm} x ${m.height_mm}`
+}
+
 export function kgToTons(kg: number | null | undefined): string {
   if (kg == null) return ''
   const tons = kg / 1000
