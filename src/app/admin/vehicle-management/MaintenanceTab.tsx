@@ -6,7 +6,7 @@ import { Search, RefreshCw, Wrench, ClipboardCheck, FileWarning, Ban, Settings2 
 import type { MaintenanceReason, MaintenanceTruck, TruckInspection } from '@/app/types/truck.types'
 import { assignedDriverName } from '@/app/types/truck.types'
 import { incidentLabel, type DriverReport } from '@/app/types/driver-report.types'
-import { adminFetchMaintenanceQueue, adminUpdateTruck } from '@/lib/services/admin/trucks.service'
+import { adminFetchMaintenanceQueue, adminUpdateTruck, flaggedBookingNotice } from '@/lib/services/admin/trucks.service'
 import { BLOWBAGETS_ITEMS } from '@/lib/blowbagets'
 import BlowbagetsInspectionModal from './BlowbagetsInspectionModal'
 import RecordServiceModal from './RecordServiceModal'
@@ -149,8 +149,10 @@ export default function MaintenanceTab({
     const id = holdTarget.truck_id
     setBusy(true)
     try {
-      await adminUpdateTruck(id, { status: 'under_maintenance' })
-      appToast.success(`${holdTarget.plate_number} is out of service.`, { action: 'truck-maintenance', entityId: id })
+      const saved   = await adminUpdateTruck(id, { status: 'under_maintenance' })
+      const flagged = flaggedBookingNotice(holdTarget.plate_number, saved?.flagged_booking)
+      if (flagged) appToast.warn(flagged, { action: 'truck-maintenance', entityId: id })
+      else appToast.success(`${holdTarget.plate_number} is out of service.`, { action: 'truck-maintenance', entityId: id })
       setHoldTarget(null)
       await load()
     } catch (e) {

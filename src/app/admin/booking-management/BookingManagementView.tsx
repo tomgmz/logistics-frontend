@@ -42,6 +42,8 @@ import {
 } from '@/lib/services/client/booking.service'
 import {
   assignmentService,
+  isOutOfServiceStatus,
+  outOfServiceVehicle,
   type AssignmentRecord,
 } from '@/lib/services/admin/assignment.service'
 import { driverService } from '@/lib/services/admin/user-management.service'
@@ -181,6 +183,49 @@ function AfterHoursBadge() {
     >
       After hours
     </span>
+  )
+}
+
+const OUT_OF_SERVICE_WORDS: Record<string, string> = {
+  under_maintenance: 'Under Maintenance',
+  inactive:          'Inactive',
+  archived:          'Archived',
+}
+
+/** List badge: the vehicle on this booking was taken out of service. */
+function VehiclePulledBadge({ plate, status }: { plate: string; status: string }) {
+  return (
+    <span
+      title={`${plate} is ${OUT_OF_SERVICE_WORDS[status] ?? status}. Choose another vehicle.`}
+      className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border mt-0.5"
+      style={{ color: '#f87171', borderColor: '#f8717155', background: '#f8717114' }}
+    >
+      <AlertTriangle size={9} />
+      Vehicle out of service
+    </span>
+  )
+}
+
+/**
+ * Detail banner for the same. Before departure the fix is another vehicle; on
+ * the road the cargo is already on it, so it is Operations' call.
+ */
+function VehiclePulledBanner({
+  plate, status, onTheRoad,
+}: { plate: string; status: string; onTheRoad: boolean }) {
+  return (
+    <div
+      className="flex gap-2 rounded-lg border px-3 py-2 text-xs leading-snug"
+      style={{ color: '#fca5a5', borderColor: 'rgba(248,113,113,0.35)', background: 'rgba(248,113,113,0.08)' }}
+    >
+      <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+      <span>
+        <b>{plate}</b> was marked <b>{OUT_OF_SERVICE_WORDS[status] ?? status}</b> by the Fleet Manager.{' '}
+        {onTheRoad
+          ? 'It is already on the road — decide whether to send a replacement vehicle.'
+          : 'Choose another vehicle. The driver cannot load it until you do.'}
+      </span>
+    </div>
   )
 }
 
@@ -1387,6 +1432,8 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
   })
   useLiveTable(['live:trucks'], () => {
     adminFetchTrucks().then(setTrucks).catch(() => {})
+    // A vehicle's status is what flags a booking whose vehicle was pulled.
+    assignmentService.getAll().then(setAllAssignments).catch(() => {})
   })
 
   const listRows  = useMemo(() => {
@@ -1425,6 +1472,16 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     [busyElsewhere],
   )
 
+  // Bookings whose vehicle was taken out of service after it was assigned.
+  const pulledByBooking = useMemo(() => {
+    const byId = new Map<string, { plate: string; status: string }>()
+    for (const a of allAssignments) {
+      const pulled = outOfServiceVehicle(a)
+      if (pulled) byId.set(a.booking_id, pulled)
+    }
+    return byId
+  }, [allAssignments])
+
   const busyTruckIds = useMemo(
     () => new Set(busyElsewhere.map((a) => a.truck_id).filter(Boolean) as string[]),
     [busyElsewhere],
@@ -1448,6 +1505,11 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
   const availableTrucks = useMemo(
     () =>
       trucks.filter((t) => {
+        // Taken out of service: gone from the choices, even the one already on
+        // this booking — the server refuses it, and keeping its card would
+        // invite a save that cannot succeed. Live: the Fleet Manager's change
+        // arrives on live:trucks and drops it from an open pop-up.
+        if (isOutOfServiceStatus(t.status)) return false
         if (t.truck_id === assignTruckId) return true
         if (busyTruckIds.has(t.truck_id)) return false
         // BLOWBAGETS current and routine service not overdue — the same two
@@ -1466,6 +1528,17 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
    * for why that distinction is the whole point.
    */
   const [pairFilled, setPairFilled] = useState<PairFilled>(null)
+
+  // The selected vehicle was just pulled: clear the pick, so the pop-up asks for
+  // another one instead of holding a choice it no longer shows.
+  useEffect(() => {
+    if (!assignTruckId) return
+    const picked = trucks.find((t) => t.truck_id === assignTruckId)
+    if (picked && isOutOfServiceStatus(picked.status)) {
+      setAssignTruckId('')
+      setPairFilled(null)
+    }
+  }, [trucks, assignTruckId])
 
   const pairedDriverOf = useCallback(
     (truckId: string) => trucks.find((t) => t.truck_id === truckId)?.assigned_driver_id ?? null,
@@ -2021,6 +2094,9 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                             <td className="px-3 py-2.5 text-white/85 max-w-[200px]">
                               <div className="truncate">{r.display_id}</div>
                               {showAfterHours(r.status, r.created_at) && <AfterHoursBadge />}
+                              {pulledByBooking.get(r.booking_id) && (
+                                <VehiclePulledBadge {...pulledByBooking.get(r.booking_id)!} />
+                              )}
                               <RecordLockBadge holder={bookingLocks.get(r.booking_id)} />
                             </td>
                             <td className="px-3 py-2.5">
@@ -2312,6 +2388,15 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                       {/* Inspection recorded against the booking itself, on records
                           predating the move to per-vehicle inspections. */}
                       {d?.blowbagets_check && <BlowbagetsRecord check={d.blowbagets_check} />}
+
+                      {/* The vehicle was pulled after it was assigned. Shown at every
+                          stage and to every role, not only inside the crew panel. */}
+                      {pulledByBooking.get(detail.booking_id) && (
+                        <VehiclePulledBanner
+                          {...pulledByBooking.get(detail.booking_id)!}
+                          onTheRoad={normalizeBookingStatus(detail.status) !== 'assigned'}
+                        />
+                      )}
 
                       {/* Driver / vehicle assignment */}
                       {showAssignment && (

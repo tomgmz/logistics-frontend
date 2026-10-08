@@ -36,7 +36,7 @@ import type { TruckModel } from '@/app/types/truck-model'
 import {
   adminFetchTrucksPaginated,
   adminCreateTruck,
-  adminUpdateTruck,
+  adminUpdateTruck, flaggedBookingNotice,
   adminArchiveTruck,
   adminFetchTruckModels,
   adminFetchMaintenanceQueue,
@@ -637,8 +637,10 @@ export default function VehicleManagementView() {
         if (editingTruck?.odometer_km == null && parseKm(form.odometer_km) != null) {
           body.odometer_km = parseKm(form.odometer_km)!
         }
-        await adminUpdateTruck(editingId, body)
-        appToast.success('Vehicle updated.', { action: 'truck-save', entityId: editingId })
+        const saved   = await adminUpdateTruck(editingId, body)
+        const flagged = flaggedBookingNotice(saved?.plate_number ?? 'The vehicle', saved?.flagged_booking)
+        if (flagged) appToast.warn(flagged, { action: 'truck-save', entityId: editingId })
+        else appToast.success('Vehicle updated.', { action: 'truck-save', entityId: editingId })
       }
       setConfirmKind(null)
       closeModal()
@@ -1336,7 +1338,9 @@ export default function VehicleManagementView() {
                       onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as Truck['status'] }))}
                       className="mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-3 py-2.5 text-sm text-white outline-none"
                     >
-                      {EDITABLE_STATUSES.map((s) => (
+                      {/* In use is set by assignment, so it is only shown when it is
+                          already the vehicle's status. */}
+                      {EDITABLE_STATUSES.filter((s) => s !== 'in_use' || editingTruck?.status === 'in_use').map((s) => (
                         <option key={s} value={s}>{fmtLabel(s)}</option>
                       ))}
                     </select>

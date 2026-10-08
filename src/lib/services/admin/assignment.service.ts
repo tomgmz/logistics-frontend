@@ -80,6 +80,12 @@ export interface AssignmentRecord {
   second_driver?: SecondDriverRecord | null
   /** Optional helper on a short route, by name only. */
   helper_name?: string | null
+  /** The fleet vehicle, when there is one. Its status flags a pulled vehicle. */
+  trucks?: {
+    truck_id:     string
+    plate_number: string
+    status:       string
+  } | null
 
   // The booking this delivery belongs to. Its status — not the delivery's — is
   // what says whether the crew is still tied up, and a completed booking keeps
@@ -90,6 +96,29 @@ export interface AssignmentRecord {
     schedule_date?:   string | null
     fleet_return_at?: string | null
   } | null
+}
+
+/**
+ * Statuses a person sets to take a vehicle off the road. A booking whose vehicle
+ * has one of these needs another vehicle (or, on the road, a decision).
+ */
+export const OUT_OF_SERVICE_STATUSES = ['under_maintenance', 'inactive', 'archived'] as const
+
+export function isOutOfServiceStatus(status: string | null | undefined): boolean {
+  return !!status && (OUT_OF_SERVICE_STATUSES as readonly string[]).includes(status)
+}
+
+/** The pulled vehicle on a booking that is still running, or null. */
+export function outOfServiceVehicle(
+  record: AssignmentRecord | null | undefined,
+): { plate: string; status: string } | null {
+  const truck = record?.trucks
+  if (!truck || !isOutOfServiceStatus(truck.status)) return null
+  const booking = record?.bookings
+  // Done and the truck is home: nothing left to act on.
+  if (booking?.status === 'cancelled') return null
+  if ((booking?.status === 'delivered' || booking?.status === 'completed') && booking.fleet_return_at) return null
+  return { plate: truck.plate_number, status: truck.status }
 }
 
 // The four values the database permits. 'completed'/'cancelled' were accepted

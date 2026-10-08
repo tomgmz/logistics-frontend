@@ -84,8 +84,10 @@ export interface ServiceStatus {
 
 /** Cleared for the Operations Manager to pick: BLOWBAGETS current and service not overdue. */
 export function isAssignable(
-  truck: Pick<Truck, 'latest_inspection' | 'last_fleet_return_at' | 'service_status'>,
+  truck: Pick<Truck, 'latest_inspection' | 'last_fleet_return_at' | 'service_status'> & { status?: Truck['status'] },
 ): boolean {
+  // Taken out of service by a person — the server refuses these too.
+  if (truck.status === 'under_maintenance' || truck.status === 'inactive' || truck.status === 'archived') return false
   return isRoadworthy(truck) && truck.service_status?.state !== 'overdue'
 }
 

@@ -30,7 +30,7 @@ export function fmtDay(day: string | null | undefined): string {
 
 export const inputCls =
   'mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-3 py-2.5 text-sm text-white outline-none ' +
-  'focus:border-[var(--color-cyan)]/40 disabled:opacity-50'
+  'focus:border-[var(--color-cyan)]/40 disabled:opacity-50 date-input-cyan'
 
 /**
  * Odometer entry. Shows the distance since the last reading as the Fleet

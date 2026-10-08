@@ -53,10 +53,32 @@ export async function adminCreateTruck(body: CreateTruckInput): Promise<Truck> {
   return data.data
 }
 
-export async function adminUpdateTruck(truckId: string, body: UpdateTruckInput): Promise<Truck> {
+/**
+ * Set when the change took a vehicle off a live booking: that booking is now
+ * flagged and Operations has been told.
+ */
+export interface FlaggedBooking {
+  booking_id:       string
+  reference_number: string | null
+  status:           string
+}
+
+export async function adminUpdateTruck(
+  truckId: string,
+  body: UpdateTruckInput,
+): Promise<Truck & { flagged_booking?: FlaggedBooking | null }> {
   await initCsrf()
-  const { data } = await authApi.patch<{ data: Truck }>(`${ADMIN}/trucks/${truckId}`, body)
+  const { data } = await authApi.patch<{ data: Truck & { flagged_booking?: FlaggedBooking | null } }>(`${ADMIN}/trucks/${truckId}`, body)
   return data.data
+}
+
+/** Toast copy for a status change that flagged a booking, or null. */
+export function flaggedBookingNotice(plate: string, flagged: FlaggedBooking | null | undefined): string | null {
+  if (!flagged) return null
+  const ref = flagged.reference_number ?? 'its booking'
+  return flagged.status === 'assigned'
+    ? `${plate} is out of service. Booking ${ref} was flagged and Operations was told to choose another vehicle.`
+    : `${plate} is out of service while on the road for booking ${ref}. Operations was told.`
 }
 
 /** Retire a vehicle. Refused (409) while it is out on a booking. */
