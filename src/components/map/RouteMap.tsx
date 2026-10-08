@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { APIProvider, Map, AdvancedMarker }  from '@vis.gl/react-google-maps'
 import { OptimizedStop, OptimizeRouteResponse } from '@/app/types/maps/routemap.types'
 import { motion, AnimatePresence }           from 'framer-motion'
@@ -24,6 +24,7 @@ import { statusColor } from './status.colors'
 import { bookingRef } from '@/lib/booking'
 import { useLiveDriverPosition, formatAge } from '@/lib/hooks/useLiveDriverPosition'
 import { LiveTruckMarker } from './LiveTruckMarker'
+import { useLiveRoute, LiveRoutePolyline, FollowTruck, remainingStops } from './LiveRoute'
 
 const GOOGLE_MAPS_KEY    = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!
 const GOOGLE_MAPS_MAP_ID = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID!
@@ -311,6 +312,18 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
   const isInTransit = bookingDetail?.status === 'in_transit'
   const live = useLiveDriverPosition(selectedId, isInTransit)
 
+  // While the truck is on the road the map draws the route Google gives from
+  // where it actually is, not the line planned before it left — see LiveRoute.
+  const etaIdsKey = [...live.etaByStop.keys()].join(',')
+  const remaining = useMemo(
+    () => remainingStops(stops, new Set(etaIdsKey ? etaIdsKey.split(',') : [])),
+    [stops, etaIdsKey],
+  )
+  const liveRoute = useLiveRoute({ enabled: isInTransit, latest: live.latest, stops: remaining })
+  const showLiveRoute = isInTransit && !!live.latest
+  const [following, setFollowing] = useState(true)
+  const latestPoint = live.latest ? { lat: live.latest.latitude, lng: live.latest.longitude } : null
+
   const loadBookings = useCallback(() => {
     dispatch(fetchBookings(user))
   }, [dispatch, user])
@@ -334,6 +347,7 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
       dispatch(fetchRouteAndDetail(bookingId))
       setTotalDuration(0)
       setDetailPanelOpen(true)
+      setFollowing(true)
       if (typeof window !== 'undefined' && window.innerWidth < 1024) {
         setMobileView('map')
       }
@@ -405,14 +419,21 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
           nextEta={live.nextEta}
         />
       )}
-      <DirectionsRenderer
-        encodedPolyline={encodedPolyline}
-        origin={routeData.origin}
-        stops={stops}
-        onDurations={(total, _legs) => {
-          if (!encodedPolyline) setTotalDuration(total)
-        }}
-      />
+      {showLiveRoute ? (
+        <>
+          <LiveRoutePolyline path={liveRoute} truck={live.position} />
+          <FollowTruck position={latestPoint} following={following} onFollowingChange={setFollowing} />
+        </>
+      ) : (
+        <DirectionsRenderer
+          encodedPolyline={encodedPolyline}
+          origin={routeData.origin}
+          stops={stops}
+          onDurations={(total, _legs) => {
+            if (!encodedPolyline) setTotalDuration(total)
+          }}
+        />
+      )}
     </Map>
   ) : (
     <EmptyMapState />

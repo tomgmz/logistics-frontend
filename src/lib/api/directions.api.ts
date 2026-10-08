@@ -2,7 +2,7 @@ import authApi, { initCsrf } from './auth.api'
 
 export interface DirectionsRequest {
   origin: {
-    location: { latLng: { latitude: number; longitude: number } }
+    location: { latLng: { latitude: number; longitude: number }; heading?: number }
   }
   destination: {
     location: { latLng: { latitude: number; longitude: number } }
@@ -18,6 +18,10 @@ export interface DirectionsRequest {
     avoidHighways?: boolean
     avoidFerries?:  boolean
   }
+  /** Google's raw polyline only — no Roads snap, no traffic intervals. */
+  fast?: boolean
+  /** HIGH_QUALITY: Google's full-resolution, road-aligned line. */
+  polylineQuality?: 'HIGH_QUALITY' | 'OVERVIEW'
 }
 
 export interface DirectionsResponse {

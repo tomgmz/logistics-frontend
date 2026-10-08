@@ -106,6 +106,10 @@ export function DirectionsRenderer({
           }),
           travelMode:        'DRIVE',
           routingPreference: 'TRAFFIC_AWARE',
+          // Google's own full-resolution line, drawn as-is. The Roads snap the
+          // non-fast path adds was never drawn here and sat visibly off the road.
+          fast:              true,
+          polylineQuality:   'HIGH_QUALITY',
           routeModifiers: {
             avoidTolls:    false,
             avoidHighways: false,

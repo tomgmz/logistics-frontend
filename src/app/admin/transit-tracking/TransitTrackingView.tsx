@@ -26,6 +26,7 @@ import { bookingRef } from '@/lib/booking'
 import { useLiveDriverPosition } from '@/lib/hooks/useLiveDriverPosition'
 import { LiveTruckMarker } from '@/components/map/LiveTruckMarker'
 import { useFleetPositions } from '@/lib/hooks/useFleetPositions'
+import { useLiveRoute, LiveRoutePolyline, FollowTruck, remainingStops } from '@/components/map/LiveRoute'
 
 const GOOGLE_MAPS_KEY    = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
 const GOOGLE_MAPS_MAP_ID = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID
@@ -260,6 +261,7 @@ export default function TransitTrackingView() {
   const [detailOpen,    setDetailOpen]    = useState(true)
   const [totalDuration, setTotalDuration] = useState(0)
   const [mapMode,       setMapMode]       = useState<MapMode>('all')
+  const [following,     setFollowing]     = useState(true)
 
   const fleet = useFleetPositions()
 
@@ -290,6 +292,7 @@ export default function TransitTrackingView() {
     setTotalDuration(0)
     setDetailOpen(true)
     setMapMode('single')
+    setFollowing(true)
   }, [dispatch, selectedId])
 
   const clearSelected = useCallback(() => {
@@ -309,6 +312,22 @@ export default function TransitTrackingView() {
   // open a channel and poll an endpoint that can only answer null.
   const isInTransit = bookingDetail?.status === 'in_transit'
   const live = useLiveDriverPosition(selectedId, isInTransit)
+
+  // While the truck is on the road the map draws the route Google gives from
+  // where it actually is, not the line planned before it left — see LiveRoute.
+  const showSingleMode = mapMode === 'single' && !!selectedId
+  const etaIdsKey = [...live.etaByStop.keys()].join(',')
+  const remaining = useMemo(
+    () => remainingStops(stops, new Set(etaIdsKey ? etaIdsKey.split(',') : [])),
+    [stops, etaIdsKey],
+  )
+  const liveRoute = useLiveRoute({
+    enabled: isInTransit && showSingleMode,
+    latest:  live.latest,
+    stops:   remaining,
+  })
+  const showLiveRoute = isInTransit && !!live.latest
+  const latestPoint = live.latest ? { lat: live.latest.latitude, lng: live.latest.longitude } : null
 
   const detailPanel = routeData && bookingDetail ? (
     <DetailsPanelContent
@@ -344,7 +363,7 @@ export default function TransitTrackingView() {
     <p className="text-sm text-white/45 text-center py-8">Select a booking to view route and delivery details.</p>
   )
 
-  const showSingle = mapMode === 'single' && !!selectedId
+  const showSingle = showSingleMode
 
   // Framing: every truck when showing the fleet, the route when showing one
   // booking. Recomputed every render on purpose — FitBounds only acts when the
@@ -383,12 +402,19 @@ export default function TransitTrackingView() {
                 nextEta={live.nextEta}
               />
             )}
-            <DirectionsRenderer
-              encodedPolyline={encodedPolyline}
-              origin={routeData.origin}
-              stops={stops}
-              onDurations={(total) => { if (!encodedPolyline) setTotalDuration(total) }}
-            />
+            {showLiveRoute ? (
+              <>
+                <LiveRoutePolyline path={liveRoute} truck={live.position} />
+                <FollowTruck position={latestPoint} following={following} onFollowingChange={setFollowing} />
+              </>
+            ) : (
+              <DirectionsRenderer
+                encodedPolyline={encodedPolyline}
+                origin={routeData.origin}
+                stops={stops}
+                onDurations={(total) => { if (!encodedPolyline) setTotalDuration(total) }}
+              />
+            )}
           </>
         )
       ) : (
