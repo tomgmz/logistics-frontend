@@ -82,9 +82,18 @@ const ERROR_COLOR    = '#f87171'
 const ERROR_BORDER   = `${ERROR_COLOR}99`
 const RADIUS         = '8px'
 
-/** Call time is picked as hour + minute, the minute in 5-minute steps. */
-const HOURS   = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0'))
+/**
+ * Call time is picked as 12-hour hour + minute + AM/PM, the minute in 5-minute
+ * steps. The stored value stays 24-hour "HH:MM".
+ */
+const HOURS   = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
 const MINUTES = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0'))
+const PERIODS = ['AM', 'PM'] as const
+type Period = typeof PERIODS[number]
+
+function to24(h12: number, period: Period) {
+  return String((h12 % 12) + (period === 'PM' ? 12 : 0)).padStart(2, '0')
+}
 
 const MONTHS = [
   'January','February','March','April','May','June',
@@ -395,6 +404,9 @@ function TimePickerPopup({
   const minuteRef = useRef<HTMLDivElement>(null)
 
   const [selHour, selMinute] = value ? value.split(':') : ['', '']
+  const sel24     = selHour ? Number(selHour) : null
+  const selH12    = sel24 === null ? null : (sel24 % 12 === 0 ? 12 : sel24 % 12)
+  const selPeriod: Period | null = sel24 === null ? null : (sel24 < 12 ? 'AM' : 'PM')
 
   useEffect(() => {
     if (!open) return
@@ -413,14 +425,23 @@ function TimePickerPopup({
       const btn = list.children[idx] as HTMLElement | undefined
       btn?.scrollIntoView({ block: 'center' })
     }
-    scrollTo(hourRef.current,   HOURS.indexOf(selHour))
+    scrollTo(hourRef.current,   selH12 === null ? -1 : HOURS.indexOf(selH12))
     scrollTo(minuteRef.current, MINUTES.indexOf(selMinute))
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Picking the hour keeps the popup open for the minute; picking the minute
-  // completes the time and closes it.
-  const pickHour   = (h: string) => onChange(`${h}:${MINUTES.includes(selMinute) ? selMinute : '00'}`)
-  const pickMinute = (m: string) => { onChange(`${selHour || '08'}:${m}`); setOpen(false) }
+  // Hour and minute keep the popup open; AM/PM is the last column, so picking
+  // it completes the time and closes it. Until AM/PM is chosen the hour leans
+  // to office hours (7–11 → AM, 12 and 1–6 → PM).
+  const minuteOr00 = MINUTES.includes(selMinute) ? selMinute : '00'
+  const pickHour   = (h: number) => {
+    const period = selPeriod ?? (h >= 7 && h <= 11 ? 'AM' : 'PM')
+    onChange(`${to24(h, period)}:${minuteOr00}`)
+  }
+  const pickMinute = (m: string) => onChange(`${selHour || '08'}:${m}`)
+  const pickPeriod = (p: Period) => {
+    onChange(`${to24(selH12 ?? 8, p)}:${minuteOr00}`)
+    setOpen(false)
+  }
 
   const columnBtn = (selected: boolean) => ({
     background: selected ? `${CYAN}1A` : 'transparent',
@@ -461,23 +482,25 @@ function TimePickerPopup({
             animate={{ opacity: 1, y: 0,  scale: 1 }}
             exit={{   opacity: 0, y: -6,  scale: 0.97 }}
             transition={{ duration: 0.15 }}
-            className="absolute top-[42px] left-0 z-50 rounded-xl shadow-2xl w-[200px] overflow-hidden"
+            className="absolute top-[42px] left-0 z-50 rounded-xl shadow-2xl w-[240px] overflow-hidden"
             style={{
               background: '#1E1C1C',
               border: `1px solid ${BORDER_PANEL}`,
             }}
           >
-            <div className="grid grid-cols-2 border-b border-white/[0.07]">
+            <div className="grid grid-cols-3 border-b border-white/[0.07]">
               <span className="px-3 py-2 ff-sc text-[10px] text-white/40 uppercase tracking-widest">Hour</span>
               <span className="px-3 py-2 ff-sc text-[10px] text-white/40 uppercase tracking-widest border-l border-white/[0.07]">
                 Minute
               </span>
+              <span className="px-3 py-2 ff-sc text-[10px] text-white/40 uppercase tracking-widest border-l border-white/[0.07]">
+                AM/PM
+              </span>
             </div>
-            <div className="grid grid-cols-2">
+            <div className="grid grid-cols-3">
               <div ref={hourRef} className="overflow-y-auto flex flex-col" style={{ maxHeight: 220 }}>
                 {HOURS.map(h => {
-                  const selected = h === selHour
-                  const h12 = Number(h) % 12 === 0 ? 12 : Number(h) % 12
+                  const selected = h === selH12
                   return (
                     <button
                       key={h}
@@ -487,7 +510,7 @@ function TimePickerPopup({
                                  transition-colors cursor-pointer text-left"
                       style={columnBtn(selected)}
                     >
-                      <span>{h12} {Number(h) < 12 ? 'AM' : 'PM'}</span>
+                      <span>{h}</span>
                       {selected && <Check size={11} style={{ color: CYAN }} />}
                     </button>
                   )
@@ -506,6 +529,24 @@ function TimePickerPopup({
                       style={columnBtn(selected)}
                     >
                       <span>:{m}</span>
+                      {selected && <Check size={11} style={{ color: CYAN }} />}
+                    </button>
+                  )
+                })}
+              </div>
+              <div className="flex flex-col border-l border-white/[0.07]">
+                {PERIODS.map(p => {
+                  const selected = p === selPeriod
+                  return (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => pickPeriod(p)}
+                      className="flex items-center justify-between px-3 py-2 text-sm ff-sc
+                                 transition-colors cursor-pointer text-left"
+                      style={columnBtn(selected)}
+                    >
+                      <span>{p}</span>
                       {selected && <Check size={11} style={{ color: CYAN }} />}
                     </button>
                   )
