@@ -24,6 +24,19 @@ export interface AssignBookingPayload {
    */
   second_driver_id?: string | null
   second_vendor_driver_user_id?: string | null
+  /** Helper's name on a route of 30 km or less. Information only. */
+  helper_name?: string | null
+}
+
+/**
+ * The route's road distance (pickup to every drop-off, one way) and the crew rule
+ * it sets: over threshold_km a second driver is required, otherwise an optional
+ * helper. distance_km null means it could not be measured, and neither is enforced.
+ */
+export interface RouteDistance {
+  distance_km:            number | null
+  threshold_km:           number
+  requires_second_driver: boolean | null
 }
 
 /** The optional second driver on a booking. They see it in the app; the main driver runs it. */
@@ -65,6 +78,8 @@ export interface AssignmentRecord {
   /** The provisioned account, when this driver was given app access. */
   vendor_driver_user_id: string | null
   second_driver?: SecondDriverRecord | null
+  /** Optional helper on a short route, by name only. */
+  helper_name?: string | null
 
   // The booking this delivery belongs to. Its status — not the delivery's — is
   // what says whether the crew is still tied up, and a completed booking keeps
@@ -126,6 +141,8 @@ export const assignmentService = {
   getByBookingId: (bookingId: string) => get<AssignmentRecord>(`${B}/${bookingId}`),
 
   getHistoryByBookingId: (bookingId: string) => get<AssignmentRecord[]>(`${B}/${bookingId}/history`),
+
+  getRouteDistance: (bookingId: string) => get<RouteDistance>(`${B}/${bookingId}/route-distance`),
 
   /**
    * Crew a booking. The reply carries `capacity_warning` when the chosen vehicle

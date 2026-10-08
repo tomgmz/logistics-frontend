@@ -60,7 +60,7 @@ import {
   type ExternalDriverAccess,
   type VendorDriverUser,
 } from '@/lib/services/admin/external-driver.service'
-import type { SecondDriverRecord } from '@/lib/services/admin/assignment.service'
+import type { RouteDistance, SecondDriverRecord } from '@/lib/services/admin/assignment.service'
 import ReusableModal, { RemarksModal } from '@/components/layout/ReusableModal'
 import TripPlanner from './TripPlanner'
 import VehiclePicker, { cargoSummaryFromBooking } from './VehiclePicker'
@@ -270,6 +270,35 @@ const emptyVendorForm: VendorAssignForm = {
 const SECOND_DRIVER_HINT =
   'They see this booking and its stops in the app. The main driver confirms pickup, stops and proof photos.'
 
+const HELPER_HINT = 'For information only. The helper has no app access and is not notified.'
+
+/**
+ * Which crew fields the route calls for. Over the threshold: a required second
+ * driver and no helper. At or under it: an optional helper and no second
+ * driver. Still measuring, or unmeasurable: both optional, nothing enforced.
+ */
+function crewRule(route: RouteDistance | null): { second: 'required' | 'hidden' | 'optional'; helper: boolean } {
+  if (route?.requires_second_driver === true)  return { second: 'required', helper: false }
+  if (route?.requires_second_driver === false) return { second: 'hidden',   helper: true }
+  return { second: 'optional', helper: true }
+}
+
+function RouteDistanceNote({ route, loading }: { route: RouteDistance | null; loading: boolean }) {
+  const text = loading
+    ? 'Measuring the route…'
+    : route?.distance_km == null
+      ? 'Route distance unavailable, so neither a second driver nor a helper is required.'
+      : route.requires_second_driver
+        ? `Route: ${route.distance_km} km by road. Over ${route.threshold_km} km, so a second driver is required.`
+        : `Route: ${route.distance_km} km by road. ${route.threshold_km} km or less, so no second driver. A helper can be added.`
+  return (
+    <div className="flex items-center gap-1.5 text-[11px] text-white/55">
+      <Ruler size={12} className="text-white/35 shrink-0" />
+      <span>{text}</span>
+    </div>
+  )
+}
+
 function vendorDriverName(u: VendorDriverUser): string {
   return [u.first_name, u.middle_name, u.last_name, u.suffix].filter(Boolean).join(' ') || u.email
 }
@@ -429,6 +458,11 @@ function AssignmentPanel({
   onDriverChange,
   onSecondDriverChange,
   secondDriver,
+  helperName,
+  savedHelperName,
+  onHelperNameChange,
+  route,
+  routeLoading,
   onTruckChange,
   onVendorModeChange,
   onVendorFieldChange,
@@ -444,6 +478,14 @@ function AssignmentPanel({
   assignSecondDriverId: string
   /** The second driver already on the booking, for the summary. */
   secondDriver:    SecondDriverRecord | null
+  /** The helper's name in the picker ('' for none). */
+  helperName:      string
+  /** The helper already on the booking, for the summary. */
+  savedHelperName: string | null
+  onHelperNameChange: (name: string) => void
+  /** Road distance of the route; decides second driver vs helper. */
+  route:           RouteDistance | null
+  routeLoading:    boolean
   assignTruckId:   string
   assignBusy:      boolean
   /** The "Choose vehicle and driver" pop-up is up. */
@@ -513,9 +555,30 @@ function AssignmentPanel({
     (v) => v.access.account_active || v.user_id === vendorForm.vendor_driver_user_id,
   )
 
-  const canSubmit = vendorMode
+  const rule = crewRule(route)
+  const hasSecond = vendorMode ? !!vendorForm.second_vendor_driver_user_id : !!assignSecondDriverId
+  const canSubmit = !routeLoading && (rule.second !== 'required' || hasSecond) && (vendorMode
     ? !!vendorForm.vendor_driver_user_id && !!vendorForm.vendor_vehicle_plate.trim()
-    : !!assignDriverId && !!assignTruckId
+    : !!assignDriverId && !!assignTruckId)
+
+  const secondDriverLabelText = rule.second === 'required'
+    ? <>Second driver<span className="text-red-400"> *</span></>
+    : 'Second driver (optional)'
+
+  const helperField = rule.helper && (
+    <div>
+      <label className="text-[11px] text-white/40 block mb-1">Helper (optional)</label>
+      <input
+        value={helperName}
+        disabled={assignBusy}
+        onChange={(e) => onHelperNameChange(e.target.value)}
+        className={selectClass}
+        placeholder="Helper's full name"
+        maxLength={120}
+      />
+      <p className="text-[10px] text-white/35 mt-1 leading-snug">{HELPER_HINT}</p>
+    </div>
+  )
 
   // Number coding is a flag, never a block — see lib/number-coding.
   const codingOf  = (plate: string | null | undefined) => codingFlagFor(plate, detail)
@@ -560,6 +623,12 @@ function AssignmentPanel({
             <div className="flex items-center gap-2">
               <User size={13} className="text-white/35 shrink-0" />
               <span>{secondDriverLabel} <span className="text-[11px] text-white/40">· second driver</span></span>
+            </div>
+          )}
+          {savedHelperName && (
+            <div className="flex items-center gap-2">
+              <User size={13} className="text-white/35 shrink-0" />
+              <span>{savedHelperName} <span className="text-[11px] text-white/40">· helper</span></span>
             </div>
           )}
           <div className="flex items-center gap-2">
@@ -675,6 +744,8 @@ function AssignmentPanel({
           {cargo.hasNonStackable && <span>· Non-stackable items</span>}
         </div>
 
+        <RouteDistanceNote route={route} loading={routeLoading} />
+
         {vendorMode ? (
           <div className="space-y-3">
             <div>
@@ -711,15 +782,16 @@ function AssignmentPanel({
                 </p>
               )}
             </div>
+            {rule.second !== 'hidden' && (
             <div>
-              <label className="text-[11px] text-white/40 block mb-1">Second driver (optional)</label>
+              <label className="text-[11px] text-white/40 block mb-1">{secondDriverLabelText}</label>
               <select
                 value={vendorForm.second_vendor_driver_user_id}
                 disabled={assignBusy || vendorDriversLoading}
                 onChange={(e) => onVendorFieldChange('second_vendor_driver_user_id', e.target.value)}
                 className={selectClass}
               >
-                <option value="">No second driver</option>
+                <option value="">{rule.second === 'required' ? 'Select second driver' : 'No second driver'}</option>
                 {pickableVendorDrivers
                   .filter((v) => v.user_id !== vendorForm.vendor_driver_user_id)
                   .map((v) => (
@@ -732,6 +804,8 @@ function AssignmentPanel({
               </select>
               <p className="text-[10px] text-white/35 mt-1 leading-snug">{SECOND_DRIVER_HINT}</p>
             </div>
+            )}
+            {helperField}
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="text-[11px] text-white/40 block mb-1">
@@ -809,15 +883,16 @@ function AssignmentPanel({
                   : `${drivers.length} driver${drivers.length === 1 ? '' : 's'} available on ${detail.schedule_date}.`}
               </p>
             </div>
+            {rule.second !== 'hidden' && (
             <div>
-              <label className="text-[11px] text-white/40 block mb-1">Second driver (optional)</label>
+              <label className="text-[11px] text-white/40 block mb-1">{secondDriverLabelText}</label>
               <select
                 value={assignSecondDriverId}
                 disabled={assignBusy}
                 onChange={(e) => onSecondDriverChange(e.target.value)}
                 className={selectClass}
               >
-                <option value="">No second driver</option>
+                <option value="">{rule.second === 'required' ? 'Select second driver' : 'No second driver'}</option>
                 {drivers
                   .filter((dr) => (dr.drivers?.driver_id ?? dr.user_id) !== assignDriverId)
                   .map((dr) => (
@@ -829,6 +904,8 @@ function AssignmentPanel({
               </select>
               <p className="text-[10px] text-white/35 mt-1 leading-snug">{SECOND_DRIVER_HINT}</p>
             </div>
+            )}
+            {helperField}
           </div>
         )}
 
@@ -1155,6 +1232,12 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     if (assignSecondDriverId && assignSecondDriverId === assignDriverId) setAssignSecondDriverId('')
   }, [assignDriverId, assignSecondDriverId])
   const [assignTruckId, setAssignTruckId]   = useState<string>('')
+  // Optional helper on a short route, by name ('' for none).
+  const [assignHelperName, setAssignHelperName] = useState<string>('')
+  // The open booking's road distance. Read when the crew pop-up opens (cached
+  // server-side), since it decides second driver vs helper.
+  const [routeDistance, setRouteDistance]   = useState<RouteDistance | null>(null)
+  const [routeLoading, setRouteLoading]     = useState(false)
   const [assignBusy, setAssignBusy]         = useState(false)
   // The "Choose vehicle and driver" pop-up is open. Closed on a successful
   // assign; cancelling it puts back what is on the booking.
@@ -1188,7 +1271,21 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     driverId: string
     truckId: string
     secondDriverId?: string
+    helperName?: string
   }>({ driverId: '', truckId: '' })
+
+  // Measured each time the pop-up opens: a stop may have moved since.
+  useEffect(() => {
+    if (!assignEditMode || !selectedId) return
+    let cancelled = false
+    setRouteLoading(true)
+    setRouteDistance(null)
+    assignmentService.getRouteDistance(selectedId)
+      .then((r) => { if (!cancelled) setRouteDistance(r) })
+      .catch(() => { if (!cancelled) setRouteDistance(null) })
+      .finally(() => { if (!cancelled) setRouteLoading(false) })
+    return () => { cancelled = true }
+  }, [assignEditMode, selectedId])
 
   useEffect(() => {
     void Promise.all([
@@ -1429,9 +1526,11 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
       driverId: (isVendor ? '' : assignment?.driver_id) ?? fallback.driverId,
       truckId:  (isVendor ? '' : assignment?.truck_id)  ?? fallback.truckId,
       secondDriverId: isVendor ? '' : record?.second_driver?.driver_id ?? '',
+      helperName: record?.helper_name ?? '',
     }
     setAssignDriverId(ids.driverId)
     setAssignSecondDriverId(ids.secondDriverId)
+    setAssignHelperName(ids.helperName)
     setAssignTruckId(ids.truckId)
     // These came off the booking, not out of the pairing, so nothing here may be
     // moved or cleared by a later change to the other field.
@@ -1448,6 +1547,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     setRejectModalOpen(false)
     setAssignDriverId('')
     setAssignSecondDriverId('')
+    setAssignHelperName('')
     setAssignTruckId('')
     setPairFilled(null)
     setAssignVendorMode(false)
@@ -1504,6 +1604,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     setRejectModalOpen(false)
     setAssignDriverId('')
     setAssignSecondDriverId('')
+    setAssignHelperName('')
     setAssignTruckId('')
     setPairFilled(null)
     setAssignVendorMode(false)
@@ -1556,6 +1657,11 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     } else if (!assignDriverId || !assignTruckId) {
       return
     }
+    // Only what the route allows goes out: a short route sends no second driver,
+    // a long one no helper, so a value left in a hidden field is never saved.
+    const rule       = crewRule(routeDistance)
+    const keepSecond = rule.second !== 'hidden'
+    const helperName = rule.helper ? assignHelperName.trim() || null : null
     setAssignBusy(true)
     try {
       const result = assignVendorMode
@@ -1564,14 +1670,21 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
             vendor_driver_user_id: vendorForm.vendor_driver_user_id,
             vendor_vehicle_plate:  vendorForm.vendor_vehicle_plate.trim(),
             vendor_vehicle_type:   vendorForm.vendor_vehicle_type.trim() || undefined,
-            second_vendor_driver_user_id: vendorForm.second_vendor_driver_user_id || null,
+            second_vendor_driver_user_id: keepSecond ? vendorForm.second_vendor_driver_user_id || null : null,
+            helper_name:           helperName,
           })
         : await assignmentService.assignBooking(selectedId, {
             driver_id: assignDriverId,
             truck_id:  assignTruckId,
-            second_driver_id: assignSecondDriverId || null,
+            second_driver_id: keepSecond ? assignSecondDriverId || null : null,
+            helper_name:      helperName,
           })
-      setCommittedAssignment({ driverId: assignDriverId, truckId: assignTruckId, secondDriverId: assignSecondDriverId })
+      setCommittedAssignment({
+        driverId:       assignDriverId,
+        truckId:        assignTruckId,
+        secondDriverId: keepSecond ? assignSecondDriverId : '',
+        helperName:     helperName ?? '',
+      })
       setAssignEditMode(false)
       await openDetail(selectedId)
       await loadPage()
@@ -2213,6 +2326,13 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                             allAssignments.find((a) => a.booking_id === detail.booking_id)?.second_driver ?? null
                           }
                           onSecondDriverChange={setAssignSecondDriverId}
+                          helperName={assignHelperName}
+                          savedHelperName={
+                            allAssignments.find((a) => a.booking_id === detail.booking_id)?.helper_name ?? null
+                          }
+                          onHelperNameChange={setAssignHelperName}
+                          route={routeDistance}
+                          routeLoading={routeLoading}
                           assignTruckId={assignTruckId}
                           assignBusy={assignBusy}
                           pickerOpen={assignEditMode}
@@ -2248,6 +2368,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                             setAssignDriverId(restore.driverId)
                             setAssignTruckId(restore.truckId)
                             setAssignSecondDriverId(committedAssignment.secondDriverId ?? '')
+                            setAssignHelperName(committedAssignment.helperName ?? '')
                             setPairFilled(null)
                           }}
                         />
