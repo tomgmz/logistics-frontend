@@ -234,11 +234,17 @@ export const bookingService = {
   },
 
   // --- completion ----------------------------------------------------------
-  // The client confirms a delivered booking is complete; the Company
-  // Administrator or Operations Manager may confirm for them.
+  // Only the client confirms a delivered booking is complete.
   confirmCompletion: async (bookingId: string): Promise<BookingWithRelations> => {
     await initCsrf()
     return post<BookingWithRelations>(`/booking/${bookingId}/confirm-completion`)
+  },
+
+  // Company Administrator / Operations Manager: the client's reported problem is
+  // dealt with. The booking stays delivered and the client gets a fresh 3 days.
+  resolveDeliveryIssue: async (bookingId: string): Promise<BookingWithRelations> => {
+    await initCsrf()
+    return post<BookingWithRelations>(`/booking/${bookingId}/resolve-issue`)
   },
 
   // The client says the delivery is not right; holds auto-completion.

@@ -37,6 +37,7 @@ const ACTIONABLE_TYPES = new Set([
   "booking.delivery_confirm",
   "booking.delivery_confirm_reminder",
   "booking.delivery_issue",
+  "booking.delivery_issue_resolved",
   "driver.emergency",
   "driver.report",
   "auth.password_reset_requested",
@@ -77,6 +78,7 @@ const VALUE_LABELS: Record<string, Record<string, string>> = {
     delivery_confirm: "Delivered — awaiting your confirmation",
     delivery_confirm_reminder: "Completes automatically tomorrow",
     delivery_issue:   "Client reported a problem",
+    delivery_issue_resolved: "Problem resolved — awaiting your confirmation",
   },
   window: {
     day_before: "Day before dispatch",

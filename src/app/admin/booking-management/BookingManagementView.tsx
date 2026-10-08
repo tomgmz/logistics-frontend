@@ -2463,7 +2463,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                       {/* How many runs the assigned vehicle makes. Only once a
                           vehicle actually exists: until then there is no body to
                           compare the load against, and nothing to plan around. */}
-                      {/* Delivered: the client confirms, or staff confirm for them. */}
+                      {/* Delivered: waiting on the client. Staff can only resolve a reported problem. */}
                       {(roleView === 'admin' || roleView === 'operations_manager') && (
                         <CompletionPanel booking={detail as unknown as BookingWithRelations} mode="staff"
                           onUpdated={() => { void refreshDetail(detail.booking_id); void loadPage() }} />
