@@ -23,7 +23,10 @@ export function thumbnailUrl(url: string, size = 96): string | null {
   return url.replace('/image/upload/', `/image/upload/${t},f_auto/`)
 }
 
-function FallbackIcon({ doc, size }: { doc: LibraryDocument; size: number }) {
+/** All a thumbnail needs, so the client's history can use it with its slimmer rows. */
+type ThumbDoc = Pick<LibraryDocument, 'file_url' | 'file_name'>
+
+function FallbackIcon({ doc, size }: { doc: ThumbDoc; size: number }) {
   const name = doc.file_name.toLowerCase()
   if (name.endsWith('.xlsx') || name.endsWith('.xls') || name.endsWith('.csv')) {
     return <FileSpreadsheet size={size} className="text-emerald-300/80" />
@@ -35,7 +38,7 @@ function FallbackIcon({ doc, size }: { doc: LibraryDocument; size: number }) {
   return <FileIcon size={size} className="text-white/40" />
 }
 
-export function DocumentThumb({ doc, size = 40, big = false }: { doc: LibraryDocument; size?: number; big?: boolean }) {
+export function DocumentThumb({ doc, size = 40, big = false }: { doc: ThumbDoc; size?: number; big?: boolean }) {
   const thumb = thumbnailUrl(doc.file_url, big ? 360 : 96)
   return (
     <div

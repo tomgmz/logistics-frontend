@@ -112,7 +112,21 @@ export interface UpdateBookingPayload {
   transaction_documents?: string[] | null
 }
 
-export type DestinationDeliveryStatus = 'pending' | 'delivered' | 'failed'
+export type ClientDocumentType =
+  | 'transaction_document' | 'pickup_proof' | 'delivery_proof'
+  | 'delivery_receipt' | 'proof_of_delivery' | 'trip_ticket' | 'purchase_order' | 'other'
+
+export interface ClientBookingDocument {
+  doc_key:     string
+  doc_type:    ClientDocumentType
+  source:      'client' | 'driver' | 'staff'
+  file_url:    string
+  file_name:   string
+  uploaded_at: string | null
+  detail:      string | null
+}
+
+export type DestinationDeliveryStatus ='pending' | 'delivered' | 'failed'
 
 export type AdminBookingLifecycleStatus =
   | 'pending'
@@ -255,6 +269,11 @@ export const bookingService = {
 
   getBookingById: (bookingId: string) =>
     get<unknown>(`/booking/${bookingId}`),
+
+  // Every file the client may see on their booking: their attachments, the
+  // pickup and drop-off proof photos, and approved staff paperwork.
+  fetchBookingDocuments: (bookingId: string) =>
+    get<ClientBookingDocument[]>(`/booking/${bookingId}/documents`),
 
   fetchBookingsByClient: async (clientId: string): Promise<BookingWithRelations[]> => {
     const { data } = await proxyApi.get<{ status: string; data: BookingWithRelations[] }>(

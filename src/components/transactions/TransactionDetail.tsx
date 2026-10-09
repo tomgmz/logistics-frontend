@@ -54,12 +54,17 @@ export function InfoTile({ label, value, accent, mono }: {
   )
 }
 
-export default function TransactionDetail({ booking, animated = true, showCrew = true }: {
+export default function TransactionDetail({ booking, animated = true, showCrew = true, showDocuments = true }: {
   booking: BookingWithRelations
   /** Off when the container already animates, so the panel doesn't slide twice. */
   animated?: boolean
   /** Off on the staff page, whose full record carries a fuller crew section. */
   showCrew?: boolean
+  /**
+   * Off on the client's page, where BookingDocuments lists these attachments
+   * alongside the proof photos and staff paperwork.
+   */
+  showDocuments?: boolean
 }) {
   const dropoffs    = getDropoffs(booking)
   const driverName  = getDriverName(booking)
@@ -225,7 +230,7 @@ export default function TransactionDetail({ booking, animated = true, showCrew =
       </div>
 
       {/* Transaction documents (Cloudinary URLs) */}
-      {docs.length > 0 && (
+      {showDocuments && docs.length > 0 && (
         <div className="rounded-xl border p-4 flex flex-col gap-3"
           style={{ background: BG_PANEL, borderColor: BORDER }}>
           <SectionHeader icon={<FileText size={15} />} title="Transaction Documents" />

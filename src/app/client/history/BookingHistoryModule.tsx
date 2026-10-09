@@ -27,6 +27,7 @@ import { bookingRef } from '@/lib/booking'
 
 import TransactionDetail from '@/components/transactions/TransactionDetail'
 import CompletionPanel from '@/components/transactions/CompletionPanel'
+import BookingDocuments from '@/components/transactions/BookingDocuments'
 import { StatusBadge } from '@/components/transactions/TransactionStatus'
 import {
   formatDate, formatPeso, buildCargoSummary, getDropoffs,
@@ -582,7 +583,8 @@ export default function BookingHistoryModule() {
                 setSelected(next)
                 setBookings((prev) => prev.map((b) => (b.booking_id === next.booking_id ? next : b)))
               }} />
-              <TransactionDetail booking={selected} />
+              <TransactionDetail booking={selected} showDocuments={false} />
+              <BookingDocuments key={selected.booking_id as string} bookingId={selected.booking_id as string} />
             </div>
           )}
 
