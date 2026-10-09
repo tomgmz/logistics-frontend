@@ -348,6 +348,18 @@ function vendorDriverName(u: VendorDriverUser): string {
   return [u.first_name, u.middle_name, u.last_name, u.suffix].filter(Boolean).join(' ') || u.email
 }
 
+/**
+ * Why a vendor driver can't be picked for this booking, or null when they can.
+ * A driver takes one booking at a time, as main or second driver, until the
+ * vehicle is confirmed back at the parking. The server refuses it either way.
+ */
+function vendorDriverBusyNote(u: VendorDriverUser, bookingId: string): string | null {
+  const b = u.current_booking
+  if (!b || b.booking_id === bookingId) return null
+  const ref = b.reference_number ?? 'another booking'
+  return b.awaiting_return ? ` — not back at the parking from ${ref}` : ` — on ${ref}`
+}
+
 /** "Expired" / "expires in 12 days" for the dropdown, or nothing when in date. */
 function licenseNote(expiry: string | null | undefined): string {
   const state = licenseExpiryState(expiry)
@@ -806,13 +818,17 @@ function AssignmentPanel({
                 <option value="">
                   {vendorDriversLoading ? 'Loading vendor drivers…' : 'Select vendor driver'}
                 </option>
-                {pickableVendorDrivers.map((v) => (
-                  <option key={v.user_id} value={v.user_id}>
-                    {vendorDriverName(v)}
-                    {v.drivers?.vendor_name ? ` · ${v.drivers.vendor_name}` : ''}
-                    {licenseNote(v.drivers?.license_expiry)}
-                  </option>
-                ))}
+                {pickableVendorDrivers.map((v) => {
+                  const busy = vendorDriverBusyNote(v, detail.booking_id)
+                  return (
+                    <option key={v.user_id} value={v.user_id} disabled={!!busy}>
+                      {vendorDriverName(v)}
+                      {v.drivers?.vendor_name ? ` · ${v.drivers.vendor_name}` : ''}
+                      {licenseNote(v.drivers?.license_expiry)}
+                      {busy ?? ''}
+                    </option>
+                  )
+                })}
               </select>
               <p className="text-[10px] text-white/35 mt-1 leading-snug">
                 {!vendorDriversLoading && pickableVendorDrivers.length === 0
@@ -839,13 +855,17 @@ function AssignmentPanel({
                 <option value="">{rule.second === 'required' ? 'Select second driver' : 'No second driver'}</option>
                 {pickableVendorDrivers
                   .filter((v) => v.user_id !== vendorForm.vendor_driver_user_id)
-                  .map((v) => (
-                    <option key={v.user_id} value={v.user_id}>
-                      {vendorDriverName(v)}
-                      {v.drivers?.vendor_name ? ` · ${v.drivers.vendor_name}` : ''}
-                      {licenseNote(v.drivers?.license_expiry)}
-                    </option>
-                  ))}
+                  .map((v) => {
+                    const busy = vendorDriverBusyNote(v, detail.booking_id)
+                    return (
+                      <option key={v.user_id} value={v.user_id} disabled={!!busy}>
+                        {vendorDriverName(v)}
+                        {v.drivers?.vendor_name ? ` · ${v.drivers.vendor_name}` : ''}
+                        {licenseNote(v.drivers?.license_expiry)}
+                        {busy ?? ''}
+                      </option>
+                    )
+                  })}
               </select>
               <p className="text-[10px] text-white/35 mt-1 leading-snug">{SECOND_DRIVER_HINT}</p>
             </div>

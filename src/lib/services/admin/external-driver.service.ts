@@ -25,8 +25,23 @@ export interface ExternalDriverAccess {
   account_active:    boolean
 }
 
+/**
+ * The booking a driver is still tied to, as main or second driver: from being
+ * crewed until the vehicle is confirmed back at the parking. One at a time.
+ */
+export interface DriverCurrentBooking {
+  booking_id:       string
+  reference_number: string | null
+  crew_role:        'lead' | 'second'
+  /** Done delivering, but the return to the parking is not confirmed yet. */
+  awaiting_return:  boolean
+}
+
 /** A vendor driver as User Management lists them: the account plus its access state. */
-export type VendorDriverUser = DriverUser & { access: ExternalDriverAccess }
+export type VendorDriverUser = DriverUser & {
+  access:          ExternalDriverAccess
+  current_booking: DriverCurrentBooking | null
+}
 
 export const externalDriverService = {
   async list(): Promise<VendorDriverUser[]> {
