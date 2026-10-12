@@ -15,9 +15,10 @@ import type { DashboardTicket } from '@/lib/services/admin/staff-dashboard.servi
  * assistant feeds. Answered by email, in Gmail on the web (a `mailto:` link only
  * works where a desktop mail program is set up, which is why the old "Reply by
  * email" did nothing for staff who use Gmail in the browser):
- *   Open in Gmail  the ticket's thread in the support inbox — press Reply there
- *                  and it goes to the client (the client is the reply-to),
- *                  keeping the whole exchange in one thread
+ *   Open in Gmail  the ticket's thread in the support inbox — press REPLY ALL
+ *                  there. The ticket email went to the client with the inbox
+ *                  CC'd, so Reply all reaches the client inside the thread they
+ *                  already have (plain Reply would only address the inbox)
  *   New email      a Gmail compose window to the client, ticket ref in the subject
  * Then marked resolved here, which emails the client the note.
  */
@@ -95,10 +96,10 @@ export default function SupportTicketsPanel({
                     href={gmailThreadUrl(inbox, t.reference)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    title={`Open the ${t.reference} email in ${inbox} and press Reply`}
+                    title={`Opens the ${t.reference} thread in ${inbox}. Use Reply all so your answer reaches the client in the same thread.`}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-2.5 py-1.5 text-[11px] font-semibold text-white/80 hover:bg-white/5"
                   >
-                    <ExternalLink size={12} /> Open in Gmail
+                    <ExternalLink size={12} /> Reply all in Gmail
                   </a>
                   {compose && (
                     <a
@@ -129,7 +130,7 @@ export default function SupportTicketsPanel({
       <RemarksModal
         open={!!resolving}
         title={resolving ? `Resolve ${resolving.reference}?` : 'Resolve ticket?'}
-        description="The client is emailed that the ticket is resolved, with this note. Reply to them by email first if you haven't."
+        description="The client is emailed that the ticket is resolved, with this note. Answer them first in Gmail (Reply all on the ticket email) if you haven't."
         remarksLabel="Note to the client"
         remarksPlaceholder="e.g. We corrected the drop-off address on your booking."
         confirmLabel={busy ? 'Saving…' : 'Mark resolved'}
