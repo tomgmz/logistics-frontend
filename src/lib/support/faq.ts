@@ -127,9 +127,9 @@ export const FAQ: FaqEntry[] = [
     id: 'track',
     question: 'How do I track my delivery?',
     answer:
-      'Open Delivery Tracking and pick the booking. Once the truck is on the road you see it move live on the ' +
-      'map, the estimated arrival at each drop-off, and a stepper showing which drop-offs are done and which ' +
-      'one the driver is heading to.',
+      'Every delivery can be followed live. Once the truck is on the road, clients see it move on the map under ' +
+      'Delivery Tracking, with the estimated arrival at each drop-off, which drop-offs are done, and which one ' +
+      'the driver is heading to. A photo is taken at every drop-off as proof.',
     keywords: ['track', 'tracking', 'where is', 'location', 'live', 'map', 'eta', 'arrival', 'when will', 'truck now'],
     link: { href: '/client/tracking', label: 'Open Delivery Tracking' },
     category: 'tracking',
@@ -230,8 +230,9 @@ export const FAQ: FaqEntry[] = [
     id: 'pricing',
     question: 'How much does a delivery cost? How do I pay?',
     answer:
-      'Rates and billing are handled directly by our team rather than in the portal. Open a ticket with your ' +
-      'route and cargo, or the booking reference, and we will reply by email with the details.',
+      'Rates depend on the route, the cargo and the vehicle, so our team quotes them directly rather than ' +
+      'online. Send us your pickup and drop-off points and what you are moving (through the contact form, or a ' +
+      'ticket in the help assistant if you are already a client) and we will reply by email with a quote.',
     keywords: ['how much', 'price', 'pricing', 'cost', 'rate', 'quote', 'pay', 'payment', 'invoice', 'billing', 'charge', 'fee'],
     category: 'other',
   },

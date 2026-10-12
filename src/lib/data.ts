@@ -1,3 +1,4 @@
+import { FAQ as HELP_FAQ } from '@/lib/support/faq'
 export const ASSETS = {
 
   //logo
@@ -48,21 +49,15 @@ export const SERVICES = [
 
 export const CYCLING_WORDS = ['MOVING', 'PERFORMANCE', 'EFFICIENCY', 'TRACKING', 'PRECISION', 'YOU'];
 
-export const FAQS = [
-  {
-    q: 'How can I book as shipment?',
-    a: 'Booking online or in our app. Enter the transit details, choose a service, and confirm to schedule your delivery.',
-  },
-  {
-    q: 'Is real-time tracking available?',
-    a: 'Track every shipment live using your tracking number for instant updates.',
-  },
-  {
-    q: 'Which cargo types are supported?',
-    a: 'FCL and LCL. Special handling available on request.',
-  },
-  {
-    q: 'Where is my transaction history?',
-    a: 'Access your account to view all past and current deliveries',
-  },
-];
+/**
+ * The landing page FAQ: the four questions a company that isn't a client yet
+ * asks first. Taken from the help assistant's own answers (lib/support/faq),
+ * so the page and the chatbot always say the same thing.
+ */
+const LANDING_FAQ_IDS = ['become-client', 'what-we-deliver', 'track', 'pricing']
+
+export const FAQS = LANDING_FAQ_IDS.map((id) => {
+  const entry = HELP_FAQ.find((f) => f.id === id)
+  if (!entry) throw new Error(`Landing FAQ "${id}" is missing from lib/support/faq`)
+  return { q: entry.question, a: entry.answer }
+})
