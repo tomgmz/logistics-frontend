@@ -318,6 +318,7 @@ export function DetailsPanelContent({
                   key: st.destination_id, address: st.address, status: st.status,
                   loads_total: st.loads_total, loads_done: st.loads_done,
                 })),
+                routeData.heading_to_destination_id,
               )}
               live={status === 'in_transit'}
             />
@@ -370,7 +371,12 @@ export function DetailsPanelContent({
                         {!isLast && <div className="w-px flex-1 min-h-[16px] mt-1" style={{ background: 'var(--color-border)' }} />}
                       </div>
                       <div>
-                        <p className="text-white text-[12px]" style={SC}>{stop.address.split(',')[0]}</p>
+                        <p className="text-white text-[12px]" style={SC}>
+                          {stop.address.split(',')[0]}
+                          {stop.destination_id === routeData.heading_to_destination_id && stop.status === 'pending' && (
+                            <span className="ml-1.5 text-[10px]" style={{ color: 'var(--color-cyan)' }}>· heading here</span>
+                          )}
+                        </p>
                         <p className="text-[10px]" style={{ color: 'var(--color-muted)' }}>
                           {stop.address.split(',').slice(1).join(',').trim()}
                         </p>

@@ -33,6 +33,17 @@ export type BookingQueueKey =
 export type VehicleQueueKey =
   | 'return_odometer_due' | 'recheck_due' | 'failed_inspection' | 'service_overdue' | 'service_due_soon'
 
+export interface DashboardTicket {
+  ticket_id:  string
+  reference:  string
+  subject:    string
+  category:   string
+  client:     string | null
+  email:      string | null
+  booking:    string | null
+  created_at: string
+}
+
 export interface StaffDashboard {
   generated_at: string
   queues:       Record<BookingQueueKey, Queue<DashboardBooking>>
@@ -41,6 +52,7 @@ export interface StaffDashboard {
     status: Record<string, number>
   }
   open_driver_reports:    number
+  support_tickets:        Queue<DashboardTicket>
   flagged_vendor_drivers: number
   analytics: {
     series:      { day: string; created: number; delivered: number }[]

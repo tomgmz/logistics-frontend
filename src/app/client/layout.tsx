@@ -4,6 +4,7 @@ import { ReactNode, useEffect } from 'react'
 import ReusableDashboardShell from '@/components/layout/ReusableDashboardShell'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { goHomeSignedOut } from '@/lib/auth-redirect'
+import HelpAssistant from '@/components/support/HelpAssistant'
 import { History, CalendarCheck, MapPin, CreditCard, LayoutDashboard } from 'lucide-react'
 
 const NAV_ITEMS = [
@@ -28,5 +29,11 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
     return <div className="min-h-screen bg-[#0a0a0a]" />
   }
 
-  return <ReusableDashboardShell navItems={NAV_ITEMS}>{children}</ReusableDashboardShell>
+  return (
+    <>
+      <ReusableDashboardShell navItems={NAV_ITEMS}>{children}</ReusableDashboardShell>
+      {/* FAQ assistant + support tickets, clients only. */}
+      <HelpAssistant />
+    </>
+  )
 }

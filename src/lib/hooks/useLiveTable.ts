@@ -19,7 +19,7 @@ import { supabase } from '@/lib/supabase'
 export type LiveTopic =
   | 'live:trucks' | 'live:truck_models' | 'live:driver_reports' | 'live:bookings' | 'live:documents'
   | 'live:users' | 'live:password_resets' | 'live:audit_logs' | 'live:system_logs' | 'live:catalog'
-  | 'live:tracking'
+  | 'live:tracking' | 'live:support_tickets'
 
 type Listener = () => void
 

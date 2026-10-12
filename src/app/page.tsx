@@ -9,6 +9,7 @@ import MetricsSection from '@/components/sections/MetricsSection';
 import FaqSection from '@/components/sections/FaqSection';
 import ContactSection from '@/components/sections/ContactSection';
 import { getPublicMetrics } from '@/lib/server/public-metrics';
+import HelpAssistant from '@/components/support/HelpAssistant';
 
 export default async function HomePage() {
   const metrics = await getPublicMetrics();
@@ -27,6 +28,8 @@ export default async function HomePage() {
         <ContactSection />
       </main>
       <SiteFooter />
+      {/* FAQ assistant for visitors; points to the contact form when it can't help. */}
+      <HelpAssistant audience="public" />
     </>
   );
 }

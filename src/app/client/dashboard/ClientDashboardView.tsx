@@ -6,7 +6,7 @@ import Link from 'next/link'
 import {
   LayoutDashboard, RefreshCw, AlertCircle, Truck, Clock,
   CheckCircle2, MapPin, Package, Plus, ChevronRight, Bell,
-  CalendarDays, CreditCard, XCircle, Inbox,
+  CalendarDays, CreditCard, XCircle, Inbox, LifeBuoy,
 } from 'lucide-react'
 
 import { bookingService } from '@/lib/services/client/booking.service'
@@ -17,6 +17,8 @@ import { type BookingStatus, asBookingStatus } from '@/app/types/maps/routemap.t
 import { bookingRef } from '@/lib/booking'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { RouteStepper, countSteps } from '@/components/map/RouteStepper'
+import { supportService, openHelpAssistant, type SupportTicket } from '@/lib/services/support.service'
+import { useLiveTable } from '@/lib/hooks/useLiveTable'
 
 const BG_PAGE  = '#0a0a0a'
 const BG_PANEL = '#2A2828'
@@ -157,6 +159,59 @@ function StatusBadge({ status }: { status: string }) {
     >
       {m.icon}{m.label}
     </span>
+  )
+}
+
+/**
+ * Help & support: the assistant answers common questions straight away, and
+ * opens a ticket to our team (answered by email) when it can't.
+ */
+function HelpPanel() {
+  const [tickets, setTickets] = useState<SupportTicket[] | null>(null)
+  const load = useCallback(() => {
+    supportService.mine().then(setTickets).catch(() => setTickets([]))
+  }, [])
+  useEffect(() => { load() }, [load])
+  useLiveTable(['live:support_tickets'], load)
+
+  const open   = (tickets ?? []).filter((t) => t.status === 'open')
+  const latest = (tickets ?? [])[0]
+
+  return (
+    <Panel>
+      <SectionHeader icon={<LifeBuoy size={16} />} title="Help & Support" />
+      <p className="text-xs leading-snug" style={{ color: MUTED }}>
+        {open.length > 0
+          ? `${open.length} ticket${open.length === 1 ? '' : 's'} waiting for a reply by email.`
+          : 'Questions about a booking or delivery? The assistant answers right away.'}
+      </p>
+      {latest && (
+        <p className="text-[11px]" style={{ color: MUTED }}>
+          Latest: <span className="font-mono text-white/70">{latest.reference}</span> · {latest.subject}
+          {' · '}<span style={{ color: latest.status === 'open' ? AMBER : CYAN }}>
+            {latest.status === 'open' ? 'Waiting for reply' : 'Resolved'}
+          </span>
+        </p>
+      )}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => openHelpAssistant('chat')}
+          className="flex-1 rounded-lg px-3 py-2 text-xs font-bold cursor-pointer"
+          style={{ background: CYAN, color: '#000' }}
+        >
+          Ask the assistant
+        </button>
+        <button
+          type="button"
+          onClick={() => openHelpAssistant('tickets')}
+          className="rounded-lg border px-3 py-2 text-xs font-semibold text-white/80 cursor-pointer hover:bg-white/5"
+          style={{ borderColor: BORDER }}
+        >
+          My tickets
+        </button>
+      </div>
+    </Panel>
   )
 }
 
@@ -407,11 +462,6 @@ export default function ClientDashboardView() {
           <h1 className="font-bold text-white text-base tracking-wide truncate">
             {company ? `Welcome back, ${company}` : 'Dashboard'}
           </h1>
-          <p className="text-[11px]" style={{ color: MUTED }}>
-            {new Date().toLocaleDateString('en-PH', {
-              weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
-            })}
-          </p>
         </div>
 
         {!loading && (
@@ -528,6 +578,8 @@ export default function ClientDashboardView() {
                     </div>
                   )}
                 </Panel>
+
+                <HelpPanel />
 
                 <Panel>
                   <SectionHeader icon={<CalendarDays size={16} />} title="Upcoming Pickups" />

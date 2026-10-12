@@ -25,6 +25,7 @@ import { statusColor } from './status.colors'
 import { bookingRef } from '@/lib/booking'
 import { useLiveDriverPosition, formatAge } from '@/lib/hooks/useLiveDriverPosition'
 import { LiveTruckMarker } from './LiveTruckMarker'
+import { useRouteChanged } from '@/hooks/useRouteChanged'
 import { useLiveRoute, LiveRoutePolyline, FollowTruck, remainingStops } from './LiveRoute'
 
 const GOOGLE_MAPS_KEY    = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!
@@ -306,6 +307,10 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
     dispatch(setSelectedId(initialBookingId))
     dispatch(fetchRouteAndDetail(initialBookingId))
   }, [initialBookingId, dispatch])
+
+  // The driver loaded a run, confirmed a drop-off or chose which one to do
+  // next: re-read the route so the stepper shows where the truck is heading.
+  useRouteChanged(selectedId, () => { if (selectedId) dispatch(fetchRouteAndDetail(selectedId)) })
 
   const selectBooking = useCallback(
     (bookingId: string) => {

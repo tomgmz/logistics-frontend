@@ -1,6 +1,6 @@
 import type { CargoMode, ItemGroup, DropoffSection } from '@/lib/store/slice/booking.slice'
 import { nowDate } from '@/app/utils/serverTime'
-import { phDayPlus, phDayPlusYear } from '@/lib/ph-date'
+import { phDayPlus, phDayPlusMonth } from '@/lib/ph-date'
 
 export interface ScheduleErrors {
   date?: string
@@ -69,12 +69,12 @@ export function validateSchedule(date: string, time: string): ScheduleErrors {
     const serverNow = nowDate()
 
     const earliest = phDayPlus(serverNow, 1)
-    const latest   = phDayPlusYear(serverNow)
+    const latest   = phDayPlusMonth(serverNow)
 
     if (selected < earliest) {
       errors.date = `Booking must be at least a day ahead (earliest: ${earliest})`
     } else if (selected > latest) {
-      errors.date = 'Date cannot be more than 1 year in the future'
+      errors.date = `Bookings can be made up to 1 month ahead (latest: ${latest})`
     }
   }
 

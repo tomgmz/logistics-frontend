@@ -8,8 +8,9 @@ import {
 } from 'recharts'
 import {
   AlertTriangle, CalendarCheck, CheckCircle2, ClipboardCheck, Gauge, Flag,
-  MapPin, PackageCheck, RefreshCw, ShieldAlert, Truck, Wrench, ChevronRight, Clock,
+  MapPin, PackageCheck, RefreshCw, ShieldAlert, Truck, Wrench, ChevronRight, Clock, Ticket,
 } from 'lucide-react'
+import SupportTicketsPanel from './SupportTicketsPanel'
 
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { getApiErrorMessage } from '@/lib/api-error'
@@ -38,13 +39,6 @@ const BASE: Record<StaffRole, string> = {
   general_manager:    '/general_manager',
   operations_manager: '/operations_admin',
   fleet_manager:      '/fleet_admin',
-}
-
-const TITLE: Record<StaffRole, string> = {
-  admin:              'Company Administrator',
-  general_manager:    'General Manager',
-  operations_manager: 'Operations Manager',
-  fleet_manager:      'Fleet Manager',
 }
 
 // Validated (dataviz validate_palette, dark, surface #1b1b1b): both inside the
@@ -108,6 +102,12 @@ function cardsFor(role: StaffRole, d: Data): CardSpec[] {
     count: d.open_driver_reports, href: `${base}/reports`, icon: <ShieldAlert size={16} />, tone: 'red',
   }
 
+  // Client support tickets from the help assistant; the panel is on this page.
+  const ticketsCard: CardSpec = {
+    label: 'Client support tickets', hint: 'Reply by email, then mark resolved',
+    count: d.support_tickets.count, href: '#support-tickets', icon: <Ticket size={16} />, tone: 'amber',
+  }
+
   switch (role) {
     case 'general_manager':
       return [
@@ -126,6 +126,7 @@ function cardsFor(role: StaffRole, d: Data): CardSpec[] {
         { label: 'In transit', hint: 'Follow them on the map', count: q.in_transit.count,
           href: `${base}/transit-tracking`, icon: <MapPin size={16} />, tone: 'cyan' },
         issuesCard,
+        ticketsCard,
         reportsCard,
       ]
     case 'fleet_manager':
@@ -149,6 +150,7 @@ function cardsFor(role: StaffRole, d: Data): CardSpec[] {
             v.return_odometer_due.count + notReady + v.service_overdue.count,
           href: `${base}/vehicle-management`, icon: <Truck size={16} />, tone: 'amber' },
         reportsCard,
+        ticketsCard,
         { label: 'Flagged vendor drivers', hint: 'Access revoked; restore before reuse', count: d.flagged_vendor_drivers,
           href: `${base}/user-management`, icon: <Flag size={16} />, tone: 'muted' },
       ]
@@ -378,18 +380,15 @@ export default function StaffDashboard({ role }: { role: StaffRole }) {
   useEffect(() => { void load() }, [load])
   // Every queue here is a projection of bookings, vehicles and reports, so a
   // change to any of them re-reads.
-  useLiveTable(['live:bookings', 'live:trucks', 'live:driver_reports'], () => { void load() }, { debounceMs: 2_000 })
+  useLiveTable(['live:bookings', 'live:trucks', 'live:driver_reports', 'live:support_tickets'], () => { void load() }, { debounceMs: 2_000 })
 
   const base = BASE[role]
 
   return (
     <div className="flex-1 overflow-y-auto bg-[var(--color-bg)] ff-sc">
-      <div className="mx-auto max-w-[1280px] space-y-5 px-4 py-4 lg:px-6">
+      <div className="w-full space-y-5 px-4 py-4 lg:px-5">
         <header className="flex items-center justify-between gap-3">
-          <div>
-            <h1 className="text-lg font-bold tracking-tight text-white">Dashboard</h1>
-            <p className="text-[11px] text-white/40">{TITLE[role]} · what needs you now</p>
-          </div>
+          <h1 className="text-lg font-bold tracking-tight text-white">Dashboard</h1>
           <button
             type="button"
             onClick={() => { setLoading(true); void load() }}
@@ -423,8 +422,16 @@ export default function StaffDashboard({ role }: { role: StaffRole }) {
               {listsFor(role, data).map((l) => <ListPanel key={l.title} list={l} base={base} />)}
             </div>
 
-            <p className="flex items-center gap-1.5 text-[10px] text-white/30">
-              <PackageCheck size={11} /> Updates live as bookings, vehicles and reports change.
+            {(role === 'admin' || role === 'operations_manager') && (
+              <SupportTicketsPanel
+                count={data.support_tickets.count}
+                items={data.support_tickets.items}
+                onChanged={() => { void load() }}
+              />
+            )}
+
+            <p className="flex items-center gap-2 text-xs text-white/45">
+              <PackageCheck size={15} className="shrink-0" /> Updates live as bookings, vehicles and reports change.
             </p>
           </>
         )}

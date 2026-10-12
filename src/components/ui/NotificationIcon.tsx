@@ -4,15 +4,16 @@ import { useEffect, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { Bell, X, Check, CheckCheck, ChevronRight } from "lucide-react";
+import { Bell, X, Check, CheckCheck, ChevronRight, RefreshCw } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import ReusableModal from "../layout/ReusableModal";
 import { now } from "@/app/utils/serverTime";
 import { useIsMobile } from "@/lib/hooks/useIsMobile";
 import { expandCode, roleLabel } from "@/lib/roles";
-import { useNotificationStore } from "@/lib/store/notification.store";
+import { useNotificationStore, NOTIFICATIONS_PAGE_SIZE } from "@/lib/store/notification.store";
 import { useNotificationsRealtime } from "@/hooks/useNotificationsRealtime";
 import { useSessionRevokedRealtime } from "@/hooks/useSessionRevokedRealtime";
+import Pagination from "@/components/ui/Pagination";
 import type { AppNotification } from "@/lib/services/notification.service";
 
 const timeAgo = (iso: string): string => {
@@ -285,6 +286,11 @@ export default function NotificationIcon() {
   const hydrate = useNotificationStore((s) => s.hydrate);
   const markRead = useNotificationStore((s) => s.markRead);
   const markAllRead = useNotificationStore((s) => s.markAllRead);
+  const page        = useNotificationStore((s) => s.page);
+  const total       = useNotificationStore((s) => s.total);
+  const totalPages  = useNotificationStore((s) => s.totalPages);
+  const pageLoading = useNotificationStore((s) => s.pageLoading);
+  const goToPage    = useNotificationStore((s) => s.goToPage);
 
   const [open, setOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -453,18 +459,28 @@ export default function NotificationIcon() {
       {header}
       <div className="h-px bg-white/[0.06] shrink-0" />
 
-      <div className={`${scrollClass} ${isMobile ? "flex-1 min-h-0" : "max-h-[68vh]"}`}>
+      <div className={`${scrollClass} ${isMobile ? "flex-1 min-h-0" : "max-h-[60vh]"} ${pageLoading ? "opacity-50" : ""} transition-opacity`}>
         {list}
       </div>
 
       <div className="h-px bg-white/[0.06] shrink-0" />
-      <div className="flex justify-end px-[18px] py-2.5 shrink-0">
+      <div className="flex items-center justify-between gap-3 px-[18px] py-2.5 shrink-0">
+        <Pagination
+          className="flex-1"
+          page={page}
+          totalPages={totalPages}
+          total={total}
+          pageSize={NOTIFICATIONS_PAGE_SIZE}
+          disabled={pageLoading}
+          onPageChange={(p) => { void goToPage(p) }}
+        />
         <button
-          className="flex items-center gap-1 text-[10px] tracking-widest text-white/40 bg-transparent border border-white/[0.08] rounded-lg px-2.5 py-1 cursor-pointer transition-all hover:text-white hover:border-white/20 hover:bg-white/5"
-          style={{ fontFamily: "'Aboreto', sans-serif" }}
+          title="Refresh"
+          aria-label="Refresh notifications"
+          className="flex h-7 w-7 shrink-0 items-center justify-center text-white/40 bg-transparent border border-white/[0.08] rounded-md cursor-pointer transition-all hover:text-white hover:border-white/20 hover:bg-white/5"
           onClick={() => hydrate()}
         >
-          Refresh
+          <RefreshCw size={12} />
         </button>
       </div>
     </>

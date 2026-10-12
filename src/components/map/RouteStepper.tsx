@@ -25,6 +25,10 @@ export interface RouteStep {
   state:  StepState
   /** Loads for this drop-off across trips; shown when there is more than one. */
   loads?: { done: number; total: number }
+  /** The driver is driving to this one now (they may have chosen it out of order). */
+  heading?: boolean
+  /** The step being worked now: the heading, or the first one still owed anything. */
+  active?:  boolean
 }
 
 interface StopLike {
@@ -39,22 +43,31 @@ interface StopLike {
 const PAST_PICKUP = new Set(['in_transit', 'delivered', 'completed'])
 
 /**
- * Turn a booking's pickup and drop-offs into steps. The first drop-off still
- * owed anything is the current one while the booking is on the road; before
- * departure the pickup is.
+ * Turn a booking's pickup and drop-offs into steps.
+ *
+ * The current step is the drop-off the driver is actually heading to when the
+ * server says so (`headingTo`, which follows the driver's own choice of order).
+ * Without it — before loading, between runs, or on a list row — it falls back
+ * to the first drop-off still owed anything, or the pickup before departure.
  */
 export function routeSteps(
   bookingStatus: string | null | undefined,
   origin:        string,
   stops:         StopLike[],
+  headingTo?:    string | null,
 ): RouteStep[] {
   const status     = (bookingStatus ?? '').toLowerCase()
   const cancelled  = status === 'cancelled'
   const leftPickup = PAST_PICKUP.has(status) ||
     stops.some((s) => s.status === 'delivered' || s.status === 'failed' || (s.loads_done ?? 0) > 0)
 
-  // Only one step is ever current; a cancelled booking has none.
-  let currentTaken = cancelled
+  const heading = headingTo && stops.some((s) => s.key === headingTo && s.status !== 'delivered' && s.status !== 'failed')
+    ? headingTo
+    : null
+
+  // Only one step is ever current; a cancelled booking has none, and a known
+  // heading claims it for that drop-off.
+  let currentTaken = cancelled || !!heading
   let pickupState: StepState = 'upcoming'
   if (leftPickup) pickupState = 'done'
   else if (!cancelled) { pickupState = 'current'; currentTaken = true }
@@ -63,18 +76,22 @@ export function routeSteps(
     const total = Math.max(1, s.loads_total ?? 1)
     const done  = Math.min(total, s.loads_done ?? (s.status === 'delivered' ? total : 0))
     let state: StepState
+    let active = false
     if (s.status === 'delivered')    state = 'done'
     else if (s.status === 'failed')  state = 'failed'
-    else if (!currentTaken)          { state = done > 0 ? 'partial' : 'current'; currentTaken = true }
+    else if (s.key === heading)      { state = done > 0 ? 'partial' : 'current'; active = true }
+    else if (!currentTaken)          { state = done > 0 ? 'partial' : 'current'; currentTaken = true; active = true }
     else                             state = done > 0 ? 'partial' : 'upcoming'
     return {
       key: s.key, label: placeName(s.address), title: s.address, state,
       loads: total > 1 ? { done, total } : undefined,
+      heading: s.key === heading,
+      active,
     }
   })
 
   return [
-    { key: 'pickup', label: placeName(origin) || 'Pick up', title: origin, state: pickupState },
+    { key: 'pickup', label: placeName(origin) || 'Pick up', title: origin, state: pickupState, active: pickupState === 'current' },
     ...dropSteps,
   ]
 }
@@ -137,6 +154,15 @@ function lineInto(step: RouteStep): string {
   return CYAN
 }
 
+/**
+ * The step being worked now: the drop-off the driver is heading to when known,
+ * otherwise the 'current' step. A partially delivered drop-off further down the
+ * route is not "now" just because some of its loads are in.
+ */
+function isActive(step: RouteStep): boolean {
+  return step.active ?? step.state === 'current'
+}
+
 function Dot({ step, size, live, showContent }: {
   step: RouteStep; size: number; live: boolean; showContent: boolean
 }) {
@@ -148,7 +174,7 @@ function Dot({ step, size, live, showContent }: {
     step.state === 'failed'  ? RED :
     step.state === 'partial' ? `linear-gradient(90deg, ${CYAN} 50%, transparent 50%)` :
     'var(--color-bg, #0a0a0a)'
-  const pulse = live && (step.state === 'current' || step.state === 'partial')
+  const pulse = live && isActive(step)
 
   return (
     <span
@@ -190,7 +216,7 @@ export function RouteStepper({
             {i > 0 && (
               <span className="mx-1 h-[2px] flex-1 rounded-full" style={{ background: lineInto(step) }} />
             )}
-            <Dot step={step} size={step.state === 'current' || step.state === 'partial' ? 10 : 8} live={live} showContent={false} />
+            <Dot step={step} size={isActive(step) ? 10 : 8} live={live} showContent={false} />
           </div>
         ))}
       </div>
@@ -214,7 +240,7 @@ export function RouteStepper({
               key={step.key}
               className="relative flex flex-col items-center px-1"
               title={step.title ?? step.label}
-              aria-current={step.state === 'current' || step.state === 'partial' ? 'step' : undefined}
+              aria-current={isActive(step) ? 'step' : undefined}
             >
               {next && (
                 <span
@@ -229,7 +255,7 @@ export function RouteStepper({
                 />
               )}
 
-              {live && (step.state === 'current' || step.state === 'partial') && (
+              {live && isActive(step) && (
                 <Truck size={14} strokeWidth={1.75} className="absolute -top-5" style={{ color: CYAN }} aria-hidden />
               )}
 
@@ -244,6 +270,9 @@ export function RouteStepper({
               <span className="w-full truncate text-center text-[10px] leading-tight text-white/45">
                 {step.label}
               </span>
+              {step.heading && (
+                <span className="mt-0.5 text-[10px] font-semibold" style={{ color: CYAN }}>Heading here</span>
+              )}
               {step.loads && (
                 <span
                   className="mt-0.5 text-[10px] font-semibold tabular-nums"

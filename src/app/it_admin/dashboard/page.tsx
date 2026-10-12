@@ -626,12 +626,11 @@ export default function ItAdminDashboard() {
     // owns its scroll: fill that area and scroll inside it.
     <div className="flex-1 min-h-0 overflow-y-auto bg-[#0a0a0a] text-white px-3 py-3 lg:px-4">
 
-      <div className="mx-auto flex max-w-[1600px] flex-col gap-3">
+      <div className="flex w-full flex-col gap-3">
 
         <div className="flex flex-wrap items-center justify-between gap-3 mt-1">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-            <p className="text-xs text-[#818181]">System health, sign-in security and accounts</p>
           </div>
           <div className="flex items-center gap-3">
             {summary && (

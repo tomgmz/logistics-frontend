@@ -26,6 +26,7 @@ import { bookingRef } from '@/lib/booking'
 import { useLiveDriverPosition } from '@/lib/hooks/useLiveDriverPosition'
 import { LiveTruckMarker } from '@/components/map/LiveTruckMarker'
 import { useFleetPositions } from '@/lib/hooks/useFleetPositions'
+import { useRouteChanged } from '@/hooks/useRouteChanged'
 import { useLiveRoute, LiveRoutePolyline, FollowTruck, remainingStops } from '@/components/map/LiveRoute'
 import { RouteStepper, bookingRouteSteps, dropoffSummary } from '@/components/map/RouteStepper'
 
@@ -249,6 +250,10 @@ export default function TransitTrackingView() {
   }, [bookings, search])
 
   const filteredList = useMemo(() => filterBookings(searchFiltered, activeFilter), [searchFiltered, activeFilter])
+
+  // The driver loaded a run, confirmed a drop-off or chose which one to do
+  // next: re-read the route so the stepper shows where the truck is heading.
+  useRouteChanged(selectedId, () => { if (selectedId) dispatch(fetchRouteAndDetail(selectedId)) })
 
   const selectBooking = useCallback((bookingId: string) => {
     if (selectedId === bookingId) return

@@ -1,7 +1,22 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+
+/**
+ * Render into <body>, not where the modal is declared. A modal declared inside
+ * the header (the notification bell's "Mark all as read") was trapped in the
+ * header's stacking context, so its z-index lost to the full-screen
+ * notifications sheet on mobile, which is itself portaled to <body>.
+ */
+const noopSubscribe = () => () => {};
+
+function BodyPortal({ children }: { children: ReactNode }) {
+  // false on the server, true in the browser — without a setState-in-effect.
+  const mounted = useSyncExternalStore(noopSubscribe, () => true, () => false);
+  return mounted ? createPortal(children, document.body) : null;
+}
 
 export interface ReusableModalProps {
   open: boolean;
@@ -98,6 +113,7 @@ export default function ReusableModal({
     typeof window !== "undefined" && window.innerWidth < 640;
 
   return (
+    <BodyPortal>
     <AnimatePresence>
       {open && (
         <motion.div
@@ -208,6 +224,7 @@ export default function ReusableModal({
         </motion.div>
       )}
     </AnimatePresence>
+    </BodyPortal>
   );
 }
 
@@ -282,6 +299,7 @@ export function RemarksModal({
   const trimmed = remarks.trim();
 
   return (
+    <BodyPortal>
     <AnimatePresence>
       {open && (
         <motion.div
@@ -424,5 +442,6 @@ export function RemarksModal({
         </motion.div>
       )}
     </AnimatePresence>
+    </BodyPortal>
   );
 }

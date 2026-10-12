@@ -37,10 +37,18 @@ export function dayOfWeek(isoDay: string): number {
   return new Date(`${isoDay.slice(0, 10)}T00:00:00Z`).getUTCDay()
 }
 
-/** `YYYY-MM-DD` a year on from the given moment, in Philippine time. */
-export function phDayPlusYear(at: Date | number): string {
-  const ms = typeof at === 'number' ? at : at.getTime()
-  const d = new Date(ms + PH_OFFSET_MS)
-  d.setUTCFullYear(d.getUTCFullYear() + 1)
+/**
+ * The same calendar day one month on, in Philippine time — the latest day a
+ * booking can be scheduled for (mirrors the API's phDayPlusMonth). A day next
+ * month doesn't have (Jan 31) becomes that month's last day.
+ */
+export function phDayPlusMonth(at: Date | number): string {
+  const ms   = typeof at === 'number' ? at : at.getTime()
+  const d    = new Date(ms + PH_OFFSET_MS)
+  const day  = d.getUTCDate()
+  d.setUTCDate(1)
+  d.setUTCMonth(d.getUTCMonth() + 1)
+  const last = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate()
+  d.setUTCDate(Math.min(day, last))
   return d.toISOString().slice(0, 10)
 }

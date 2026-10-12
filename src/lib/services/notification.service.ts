@@ -31,6 +31,18 @@ export const notificationService = {
     return (data.data ?? []).map(normalizeNotification)
   },
 
+  /** One numbered page, newest first, with the total for the pager. */
+  page: async (page: number, limit: number): Promise<{ items: AppNotification[]; total: number; totalPages: number }> => {
+    const { data } = await proxyApi.get<ApiResponse<AppNotification[]> & {
+      meta?: { total: number; totalPages: number }
+    }>('/notifications', { params: { page, limit } })
+    return {
+      items:      (data.data ?? []).map(normalizeNotification),
+      total:      data.meta?.total ?? 0,
+      totalPages: data.meta?.totalPages ?? 1,
+    }
+  },
+
   unreadCount: async (): Promise<number> => {
     const { data } = await proxyApi.get<ApiResponse<{ count: number }>>('/notifications/unread-count')
     return data.data?.count ?? 0

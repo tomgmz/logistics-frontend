@@ -266,11 +266,17 @@ function DatePickerPopup({
   // Tomorrow is the earliest bookable day, so today greys out with the past.
   // Every weekday is open for transit, Sundays included — only the office (the
   // acceptance of bookings) keeps Monday-to-Saturday hours.
+  // And no further out than one month: the same day next month is the last
+  // bookable one (the API refuses anything later).
+  const lastDay = new Date(todayY, todayM + 1, Math.min(todayD, new Date(todayY, todayM + 2, 0).getDate()))
   const isDisabled = (d: number) => {
     const dt = new Date(viewYear, viewMonth, d)
     const td = new Date(todayY, todayM, todayD)
-    return dt <= td
+    return dt <= td || dt > lastDay
   }
+  // Nothing to show past the month that holds the last bookable day.
+  const atLastMonth = viewYear > lastDay.getFullYear() ||
+    (viewYear === lastDay.getFullYear() && viewMonth >= lastDay.getMonth())
 
   const nextAvailable = new Date(todayY, todayM, todayD + 1)
 
@@ -321,8 +327,9 @@ function DatePickerPopup({
               <span className="ff-sc text-xs font-bold text-white tracking-wider">
                 {MONTHS[viewMonth]} {viewYear}
               </span>
-              <button type="button" onClick={nextMonth}
-                className="p-1 rounded hover:bg-white/10 transition-colors cursor-pointer text-white/60 hover:text-white">
+              <button type="button" onClick={nextMonth} disabled={atLastMonth}
+                aria-label="Next month"
+                className="p-1 rounded hover:bg-white/10 transition-colors cursor-pointer text-white/60 hover:text-white disabled:opacity-20 disabled:cursor-not-allowed">
                 <ChevronRight size={15} />
               </button>
             </div>
