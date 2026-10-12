@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { CheckCircle2, Mail, Ticket } from 'lucide-react'
+import { CheckCircle2, ExternalLink, Mail, Ticket } from 'lucide-react'
 
 import { RemarksModal } from '@/components/layout/ReusableModal'
 import { appToast } from '@/lib/toast'
@@ -12,15 +12,31 @@ import type { DashboardTicket } from '@/lib/services/admin/staff-dashboard.servi
 
 /**
  * Client support tickets waiting on a reply, oldest first: the queue the help
- * assistant feeds. Answered by email — "Reply by email" opens a message to the
- * client with the ticket reference in the subject — then marked resolved here,
- * which emails the client the note.
+ * assistant feeds. Answered by email, in Gmail on the web (a `mailto:` link only
+ * works where a desktop mail program is set up, which is why the old "Reply by
+ * email" did nothing for staff who use Gmail in the browser):
+ *   Open in Gmail  the ticket's thread in the support inbox — press Reply there
+ *                  and it goes to the client (the client is the reply-to),
+ *                  keeping the whole exchange in one thread
+ *   New email      a Gmail compose window to the client, ticket ref in the subject
+ * Then marked resolved here, which emails the client the note.
  */
+
+/** Gmail URLs, opened in the support inbox's account (`authuser`). */
+function gmailThreadUrl(inbox: string, reference: string): string {
+  return `https://mail.google.com/mail/?authuser=${encodeURIComponent(inbox)}#search/${encodeURIComponent(`"${reference}"`)}`
+}
+function gmailComposeUrl(inbox: string, to: string, subject: string): string {
+  const q = new URLSearchParams({ authuser: inbox, view: 'cm', fs: '1', to, su: subject })
+  return `https://mail.google.com/mail/?${q.toString()}`
+}
 export default function SupportTicketsPanel({
-  count, items, onChanged,
+  count, items, inbox, onChanged,
 }: {
   count:     number
   items:     DashboardTicket[]
+  /** The support inbox (a Gmail address) the tickets were sent to. */
+  inbox:     string
   onChanged: () => void
 }) {
   const [resolving, setResolving] = useState<DashboardTicket | null>(null)
@@ -61,9 +77,7 @@ export default function SupportTicketsPanel({
       ) : (
         <ul className="divide-y divide-white/[0.05]">
           {items.map((t) => {
-            const mail = t.email
-              ? `mailto:${t.email}?subject=${encodeURIComponent(`[${t.reference}] ${t.subject}`)}`
-              : null
+            const compose = t.email ? gmailComposeUrl(inbox, t.email, `[${t.reference}] ${t.subject}`) : null
             return (
               <li key={t.ticket_id} className="flex flex-col gap-2 px-3.5 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
@@ -77,12 +91,24 @@ export default function SupportTicketsPanel({
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
-                  {mail && (
+                  <a
+                    href={gmailThreadUrl(inbox, t.reference)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={`Open the ${t.reference} email in ${inbox} and press Reply`}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-2.5 py-1.5 text-[11px] font-semibold text-white/80 hover:bg-white/5"
+                  >
+                    <ExternalLink size={12} /> Open in Gmail
+                  </a>
+                  {compose && (
                     <a
-                      href={mail}
+                      href={compose}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={`New email to ${t.email}`}
                       className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-2.5 py-1.5 text-[11px] font-semibold text-white/80 hover:bg-white/5"
                     >
-                      <Mail size={12} /> Reply by email
+                      <Mail size={12} /> New email
                     </a>
                   )}
                   <button

@@ -426,6 +426,7 @@ export default function StaffDashboard({ role }: { role: StaffRole }) {
               <SupportTicketsPanel
                 count={data.support_tickets.count}
                 items={data.support_tickets.items}
+                inbox={data.support_tickets.inbox}
                 onChanged={() => { void load() }}
               />
             )}

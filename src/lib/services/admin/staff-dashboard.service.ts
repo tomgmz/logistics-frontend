@@ -52,7 +52,7 @@ export interface StaffDashboard {
     status: Record<string, number>
   }
   open_driver_reports:    number
-  support_tickets:        Queue<DashboardTicket>
+  support_tickets:        Queue<DashboardTicket> & { inbox: string }
   flagged_vendor_drivers: number
   analytics: {
     series:      { day: string; created: number; delivered: number }[]
