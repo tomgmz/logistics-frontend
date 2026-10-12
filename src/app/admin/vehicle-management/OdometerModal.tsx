@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Gauge, X } from 'lucide-react'
 
 import type { Truck } from '@/app/types/truck.types'
-import { adminRecordReturnOdometer, adminUploadFleetPhoto } from '@/lib/services/admin/trucks.service'
+import { adminRecordOdometer, adminUploadFleetPhoto } from '@/lib/services/admin/trucks.service'
 import { useRecordLock } from '@/lib/hooks/useRecordLock'
 import RecordLockBanner from '@/components/ui/RecordLockBanner'
 import ReusableModal from '@/components/layout/ReusableModal'
@@ -14,11 +14,15 @@ import { getApiErrorMessage } from '@/lib/api-error'
 import { OdometerInput, PhotoField, parseKm, fmtKm } from './upkeep-ui'
 
 /**
- * The after-delivery odometer. The driver stamps the vehicle back in the lot;
- * the Fleet Manager then types the reading off the dash with a photo. The next
- * BLOWBAGETS (and so the next job) waits for it.
+ * Update a vehicle's odometer, typed off the dash with a photo. Kept apart from
+ * the BLOWBAGETS inspection.
+ *
+ * When the vehicle is back from a delivery this is the after-delivery reading,
+ * and the vehicle can't be assigned again until it is in. Otherwise it is an
+ * ad-hoc update, for example a multi-trip run paused for weather with the
+ * vehicle back in the parking lot.
  */
-export default function ReturnOdometerModal({
+export default function OdometerModal({
   truck,
   onClose,
   onRecorded,
@@ -34,6 +38,7 @@ export default function ReturnOdometerModal({
   const [confirmOpen, setConfirmOpen] = useState(false)
 
   const lock = useRecordLock({ type: 'truck', id: truck?.truck_id ?? null })
+  const isReturn = !!truck?.return_odometer_due
 
   useEffect(() => {
     setKm(''); setPhoto(null); setError(null); setConfirmOpen(false)
@@ -56,8 +61,8 @@ export default function ReturnOdometerModal({
     setBusy(true)
     try {
       const photo_url = await adminUploadFleetPhoto(photo)
-      await adminRecordReturnOdometer(truck.truck_id, { reading_km: reading, photo_url })
-      appToast.success(`Return odometer recorded for ${truck.plate_number}.`, { action: 'truck-odometer', entityId: truck.truck_id })
+      await adminRecordOdometer(truck.truck_id, { reading_km: reading, photo_url })
+      appToast.success(`${isReturn ? 'Return odometer recorded' : 'Odometer updated'} for ${truck.plate_number}.`, { action: 'truck-odometer', entityId: truck.truck_id })
       setConfirmOpen(false)
       onRecorded()
       onClose()
@@ -89,7 +94,7 @@ export default function ReturnOdometerModal({
               transition={{ type: 'spring', damping: 26, stiffness: 280 }}
               role="dialog"
               aria-modal="true"
-              aria-label={`Return odometer for ${truck.plate_number}`}
+              aria-label={`${isReturn ? 'Return odometer' : 'Update odometer'} for ${truck.plate_number}`}
               className="w-full max-w-md rounded-2xl border border-white/10 bg-[var(--color-surface)] shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >
@@ -97,7 +102,7 @@ export default function ReturnOdometerModal({
                 <div className="flex items-center gap-2.5 min-w-0">
                   <Gauge size={18} className="text-[var(--color-cyan)] shrink-0" />
                   <div className="min-w-0">
-                    <h2 className="text-sm font-bold text-white">Return odometer</h2>
+                    <h2 className="text-sm font-bold text-white">{isReturn ? 'Return odometer' : 'Update odometer'}</h2>
                     <p className="text-[11px] text-white/45 font-mono truncate">{truck.plate_number}</p>
                   </div>
                 </div>
@@ -109,8 +114,11 @@ export default function ReturnOdometerModal({
               <RecordLockBanner lock={lock} noun="vehicle" className="mx-4 mt-4" />
               <fieldset disabled={lock.readOnly || busy} className="p-4 space-y-3 min-w-0 border-0 m-0">
                 <p className="text-[11px] text-white/45 leading-snug">
-                  The vehicle is back from a delivery. Type the reading on the dash and attach a photo of it —
-                  the next BLOWBAGETS inspection waits for this.
+                  {isReturn
+                    ? 'The vehicle is back from a delivery. Type the reading on the dash and attach a photo of it. ' +
+                      'It cannot be assigned again until this is recorded.'
+                    : 'Type the reading on the dash and attach a photo of it. Use this whenever the vehicle is back ' +
+                      'in the parking lot, for example when a trip is paused.'}
                 </p>
                 <OdometerInput value={km} onChange={setKm} lastKm={truck.odometer_km ?? null} />
                 <PhotoField file={photo} onFile={setPhoto} label="Odometer photo" required />
@@ -140,10 +148,10 @@ export default function ReturnOdometerModal({
 
       <ReusableModal
         open={!!truck && confirmOpen}
-        title="Record return odometer?"
+        title={isReturn ? 'Record return odometer?' : 'Update odometer?'}
         description={truck && reading != null
-          ? `${truck.plate_number} came back at ${fmtKm(reading)}` +
-            (truck.odometer_km != null ? ` (+${(reading - truck.odometer_km).toLocaleString()} km since it went out).` : '.')
+          ? `${truck.plate_number} ${isReturn ? 'came back at' : 'now reads'} ${fmtKm(reading)}` +
+            (truck.odometer_km != null ? ` (+${(reading - truck.odometer_km).toLocaleString()} km since the last reading).` : '.')
           : undefined}
         confirmLabel={busy ? 'Saving…' : 'Record'}
         cancelLabel="Cancel"

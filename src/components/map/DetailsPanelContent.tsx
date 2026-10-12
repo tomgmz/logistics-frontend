@@ -14,6 +14,7 @@ import type { OptimizeRouteResponse, BookingDetail } from '@/app/types/maps/rout
 import { fetchTruckModels } from '@/lib/api/client/truck-model'
 import { formatEta, formatEtaClock, type StopEta } from '@/lib/hooks/useLiveDriverPosition'
 import { arrivalWindow, formatArrivalWindow, isPastWindow } from '@/lib/arrival-window'
+import { RouteStepper, routeSteps } from './RouteStepper'
 
 const SC = { fontFamily: "var(--font-alegreya-sc), 'Alegreya Sans SC', sans-serif" } as const
 
@@ -90,7 +91,6 @@ interface Props {
   bookingDetail:      BookingDetail | null
   completedStops:     number
   totalStops:         number
-  progressPercentage: number
   /**
    * Server-computed arrival times per remaining stop, from the driver's live
    * position. Empty when the booking isn't in transit or the truck hasn't
@@ -104,7 +104,6 @@ interface Props {
 export function DetailsPanelContent({
   routeData,
   bookingDetail,
-  progressPercentage,
   etaByStop,
   nextEta,
 }: Props) {
@@ -306,53 +305,23 @@ export function DetailsPanelContent({
           </span>
         </div>
 
-        <div className="flex justify-between px-3 mb-1">
-          <span className="text-[10px]">
-            <span style={{ color: 'var(--color-cyan)' }}>FROM</span>
-            <span style={{ color: 'var(--color-muted)' }}> [1st Drop Off Point]</span>
-          </span>
-          <span className="text-[10px] text-right">
-            <span style={{ color: 'var(--color-cyan)' }}>TO</span>
-            <span style={{ color: 'var(--color-muted)' }}> [2nd Drop Off Point]</span>
-          </span>
-        </div>
-
-        <div className="px-3 pb-1.5">
-          <div className="relative h-[8px] flex items-center">
-            <div className="absolute inset-0 rounded-full" style={{ background: 'var(--color-border)' }} />
-            {!isLoading && (
-              <>
-                <motion.div
-                  className="absolute left-0 h-full rounded-full"
-                  style={{ background: 'var(--color-cyan)' }}
-                  initial={{ width: 0 }}
-                  animate={{ width: `${progressPercentage}%` }}
-                  transition={{ duration: 1, ease: 'easeOut' }}
-                />
-                <motion.div
-                  className="absolute flex items-center justify-center"
-                  initial={{ left: '0%' }}
-                  animate={{ left: `${Math.max(0, progressPercentage - 3)}%` }}
-                  transition={{ duration: 1, ease: 'easeOut' }}
-                  style={{ top: '50%', transform: 'translateY(-60%)' }}
-                >
-                  <Truck size={20} strokeWidth={1.75} style={{ color: 'var(--color-cyan, #4df9ed)' }} />
-                </motion.div>
-              </>
-            )}
-          </div>
-        </div>
-
-        <div className="flex justify-between px-3 pb-2">
-          {[
-            { city: originCity, full: originFull },
-            { city: destCity,   full: destFull   },
-          ].map(({ city, full }, i) => (
-            <div key={i} className={i === 1 ? 'text-right' : ''}>
-              <p className="text-white text-[11px]" style={SC}>{city}</p>
-              <p className="text-[10px]" style={{ color: 'var(--color-muted)' }}>{subCity(full)}</p>
-            </div>
-          ))}
+        {/* Pick up, then each drop-off in route order, stop by stop. */}
+        <div className="px-3 pt-4 pb-2">
+          {isLoading ? (
+            <BlockSkeleton style={{ width: '100%', height: 40 }} />
+          ) : (
+            <RouteStepper
+              steps={routeSteps(
+                status,
+                originFull,
+                stops.map((st) => ({
+                  key: st.destination_id, address: st.address, status: st.status,
+                  loads_total: st.loads_total, loads_done: st.loads_done,
+                })),
+              )}
+              live={status === 'in_transit'}
+            />
+          )}
         </div>
       </div>
 

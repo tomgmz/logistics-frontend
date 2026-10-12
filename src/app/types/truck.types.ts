@@ -84,10 +84,12 @@ export interface ServiceStatus {
 
 /** Cleared for the Operations Manager to pick: BLOWBAGETS current and service not overdue. */
 export function isAssignable(
-  truck: Pick<Truck, 'latest_inspection' | 'last_fleet_return_at' | 'service_status'> & { status?: Truck['status'] },
+  truck: Pick<Truck, 'latest_inspection' | 'last_fleet_return_at' | 'service_status' | 'return_odometer_due'> & { status?: Truck['status'] },
 ): boolean {
   // Taken out of service by a person — the server refuses these too.
   if (truck.status === 'under_maintenance' || truck.status === 'inactive' || truck.status === 'archived') return false
+  // Back from a job without its return odometer: every job is metered.
+  if (truck.return_odometer_due) return false
   return isRoadworthy(truck) && truck.service_status?.state !== 'overdue'
 }
 
@@ -95,7 +97,7 @@ export interface OdometerReading {
   reading_id:       string
   truck_id:         string
   reading_km:       number
-  kind:             'initial' | 'pre_trip' | 'post_trip' | 'service'
+  kind:             'initial' | 'pre_trip' | 'post_trip' | 'service' | 'manual'
   photo_url:        string | null
   booking_id:       string | null
   reference_number: string | null
@@ -183,6 +185,8 @@ export interface CreateTruckInput extends TruckScheduleInput {
   odometer_km:  number
   odometer_photo_url?: string | null
   created_by?:  string | null
+  /** The vehicle's regular driver, when paired at creation. */
+  assigned_driver_id?: string | null
 }
 
 export interface UpdateTruckInput extends TruckScheduleInput {

@@ -27,6 +27,7 @@ import { useLiveDriverPosition } from '@/lib/hooks/useLiveDriverPosition'
 import { LiveTruckMarker } from '@/components/map/LiveTruckMarker'
 import { useFleetPositions } from '@/lib/hooks/useFleetPositions'
 import { useLiveRoute, LiveRoutePolyline, FollowTruck, remainingStops } from '@/components/map/LiveRoute'
+import { RouteStepper, bookingRouteSteps, dropoffSummary } from '@/components/map/RouteStepper'
 
 const GOOGLE_MAPS_KEY    = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
 const GOOGLE_MAPS_MAP_ID = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID
@@ -55,28 +56,12 @@ function fmtStatus(s: string) {
   return s.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
-function addressAbbr(address: string | undefined, fallback: string): string {
-  if (!address) return fallback
-  return address.match(/\b[A-Z]{2,4}\b/)?.[0] ?? address.split(',')[0].slice(0, 3).toUpperCase()
-}
-
 function getEncodedPolyline(routeData: OptimizeRouteResponse | null): string | null {
   if (!routeData) return null
   const ext = routeData as OptimizeRouteResponse & { encoded_polyline?: string; encodedPolyline?: string }
   return ext.encoded_polyline ?? ext.encodedPolyline ?? null
 }
 
-/**
- * How far along a booking is, from its stops. Replaces a hard-coded 35% that
- * made every in-transit truck look a third of the way through its route.
- */
-function progressOf(booking: BookingWithRelations): number {
-  if (booking.status === 'completed') return 100
-  const stops = booking.booking_destinations ?? []
-  if (stops.length === 0) return 0
-  const done = stops.filter((d) => (d as { status?: string }).status === 'delivered').length
-  return Math.round((done / stops.length) * 100)
-}
 
 function TransitBookingRow({
   booking,
@@ -94,7 +79,7 @@ function TransitBookingRow({
   const origin          = booking.origin?.split(',')[0] ?? '—'
   const lastDestAddress = booking.booking_destinations?.[booking.booking_destinations.length - 1]?.address
   const dest            = lastDestAddress?.split(',')[0] ?? '—'
-  const destAbbr        = addressAbbr(lastDestAddress, 'DST')
+  const steps = bookingRouteSteps(booking as Parameters<typeof bookingRouteSteps>[0])
 
   return (
     <motion.button
@@ -122,31 +107,11 @@ function TransitBookingRow({
         <span className="text-[11px] font-bold shrink-0" style={{ ...SC, color }}>{label}</span>
       </div>
 
-      <div className="flex items-center gap-1.5 mb-2">
-        <span className="text-white text-[10px] font-bold min-w-[24px]">{addressAbbr(booking.origin, 'ORG')}</span>
-        <div className="flex-1 relative h-3 flex items-center">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full h-[2px] rounded-full bg-[#333]" />
-          </div>
-          <div
-            className="absolute left-0 h-[2px] rounded-full transition-all duration-1000"
-            style={{
-              width:      `${progressOf(booking)}%`,
-              background: color,
-            }}
-          />
-          {booking.status === 'in_transit' && (
-            <div
-              className="absolute w-2.5 h-2.5 rounded-full border border-white transition-all duration-1000"
-              style={{
-                left: `calc(${progressOf(booking)}% - 5px)`,
-                background: color,
-                boxShadow: `0 0 6px ${color}`,
-              }}
-            />
-          )}
+      <div className="flex items-center gap-2.5 mb-2 px-0.5">
+        <div className="flex-1 min-w-0">
+          <RouteStepper steps={steps} compact live={booking.status === 'in_transit'} />
         </div>
-        <span className="text-white text-[10px] font-bold min-w-[20px] text-right">{destAbbr}</span>
+        <span className="shrink-0 text-[10px] tabular-nums text-white/45">{dropoffSummary(steps)}</span>
       </div>
 
       <div className="flex justify-between items-end gap-2">
@@ -306,7 +271,6 @@ export default function TransitTrackingView() {
 
   const completedStops     = stops.filter((s) => s.status === 'delivered').length
   const totalStops         = stops.length
-  const progressPercentage = totalStops > 0 ? (completedStops / totalStops) * 100 : 0
 
   // Only a booking on the road can have a live position; anything else would
   // open a channel and poll an endpoint that can only answer null.
@@ -338,7 +302,6 @@ export default function TransitTrackingView() {
       bookingDetail={bookingDetail}
       completedStops={completedStops}
       totalStops={totalStops}
-      progressPercentage={progressPercentage}
       etaByStop={live.etaByStop}
       nextEta={live.nextEta}
     />

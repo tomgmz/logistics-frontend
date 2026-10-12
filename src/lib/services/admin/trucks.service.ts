@@ -98,7 +98,7 @@ export async function adminFetchTruckInspections(truckId: string): Promise<Truck
 
 export async function adminRecordTruckInspection(
   truckId: string,
-  body: { items: BlowbagetsItems; notes?: string | null; odometer_km: number; odometer_photo_url: string },
+  body: { items: BlowbagetsItems; notes?: string | null },
 ): Promise<TruckInspection> {
   await initCsrf()
   const { data } = await authApi.post<{ data: TruckInspection }>(`${ADMIN}/trucks/${truckId}/inspections`, body)
@@ -180,8 +180,11 @@ export async function adminUploadFleetPhoto(file: File): Promise<string> {
   return data.data.url
 }
 
-/** The after-delivery odometer, once the driver has stamped the vehicle back. */
-export async function adminRecordReturnOdometer(
+/**
+ * An odometer reading. The server files it as the after-delivery reading when
+ * the vehicle is back from a job and still owes one, otherwise as an update.
+ */
+export async function adminRecordOdometer(
   truckId: string,
   body: { reading_km: number; photo_url: string },
 ): Promise<OdometerReading> {

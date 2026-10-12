@@ -11,6 +11,7 @@ const READING_LABEL: Record<OdometerReading['kind'], string> = {
   initial:   'Initial reading',
   pre_trip:  'Before delivery',
   post_trip: 'After delivery',
+  manual:    'Odometer update',
   service:   'At service',
 }
 

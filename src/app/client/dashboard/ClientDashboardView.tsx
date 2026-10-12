@@ -16,6 +16,7 @@ import type { BookingWithRelations, BookingDestination } from '@/lib/store/slice
 import { type BookingStatus, asBookingStatus } from '@/app/types/maps/routemap.types'
 import { bookingRef } from '@/lib/booking'
 import { getApiErrorMessage } from '@/lib/api-error'
+import { RouteStepper, countSteps } from '@/components/map/RouteStepper'
 
 const BG_PAGE  = '#0a0a0a'
 const BG_PANEL = '#2A2828'
@@ -187,16 +188,12 @@ function KpiTile({ label, value, sub, color }: {
   )
 }
 
-/** Stops confirmed out of total, as a bar. */
+/** Stops confirmed out of total, as a stepper. */
 function StopProgressBar({ done, total }: { done: number; total: number }) {
-  const pct = total > 0 ? Math.round((done / total) * 100) : 0
   return (
     <div className="flex items-center gap-2">
-      <div className="h-1.5 flex-1 rounded-full overflow-hidden" style={{ background: BG_CARD }}>
-        <div
-          className="h-full rounded-full transition-all"
-          style={{ width: `${pct}%`, background: done === total && total > 0 ? GREEN : CYAN }}
-        />
+      <div className="flex-1 min-w-0">
+        <RouteStepper steps={countSteps(done, total)} compact />
       </div>
       <span className="text-[10px] font-bold tabular-nums shrink-0" style={{ color: MUTED }}>
         {done}/{total} stops

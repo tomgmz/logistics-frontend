@@ -48,7 +48,7 @@ import ReusableModal from '@/components/layout/ReusableModal'
 import { useModuleAccess } from '@/components/layout/ModuleAccess'
 import TruckModelsTab from './TruckModelsTab'
 import MaintenanceTab from './MaintenanceTab'
-import ReturnOdometerModal from './ReturnOdometerModal'
+import OdometerModal from './OdometerModal'
 import RecordServiceModal from './RecordServiceModal'
 import UpkeepHistory from './UpkeepHistory'
 import {
@@ -356,7 +356,9 @@ export default function VehicleManagementView() {
   // (e.g. opened from the Maintenance tab).
   const [editingSnapshot, setEditingSnapshot] = useState<Truck | null>(null)
   const [createOdoPhoto,  setCreateOdoPhoto]  = useState<File | null>(null)
-  const [returnTruck,     setReturnTruck]     = useState<Truck | null>(null)
+  const [odometerTruck,   setOdometerTruck]   = useState<Truck | null>(null)
+  // Create only: pair the new vehicle with a regular driver straight away.
+  const [pairOnCreate,    setPairOnCreate]    = useState(false)
   const [serviceTruck,    setServiceTruck]    = useState<Truck | null>(null)
   const [form,          setForm]          = useState<TruckFormState>(emptyForm())
   const [originalForm,  setOriginalForm]  = useState<TruckFormState>(emptyForm())
@@ -502,6 +504,7 @@ export default function VehicleManagementView() {
     setEditingId(null)
     setEditingSnapshot(null)
     setCreateOdoPhoto(null)
+    setPairOnCreate(false)
     setForm(emptyForm())
     setOriginalForm(emptyForm())
     setFormError(null)
@@ -562,6 +565,9 @@ export default function VehicleManagementView() {
     const everyMonths   = parseMonths(form.service_interval_months)
     const lastKm        = parseKm(form.last_service_odometer_km)
 
+    if (isCreate && pairOnCreate && !form.assigned_driver_id) {
+      setFormError('Choose the regular driver, or turn off "Assign a regular driver".'); return false
+    }
     if (needOdometer && (isCreate || form.odometer_km.trim()) && odo == null) {
       setFormError('Enter the current odometer in whole kilometres.'); return false
     }
@@ -611,6 +617,7 @@ export default function VehicleManagementView() {
           service_interval_months:  parseMonths(form.service_interval_months)!,
           last_service_at:          form.last_service_at,
           last_service_odometer_km: parseKm(form.last_service_odometer_km)!,
+          assigned_driver_id:       pairOnCreate ? form.assigned_driver_id || null : null,
         }
         await adminCreateTruck(body)
         appToast.success('Vehicle created.', { action: 'truck-save' })
@@ -691,25 +698,22 @@ export default function VehicleManagementView() {
         label: 'Update Details', icon: <Pencil size={13} />, onSelect: () => openEdit(t),
         disabled: !!lockedBy, title: lockedTitle,
       })
-      // Back from a delivery: the after-delivery odometer comes first.
-      if (t.return_odometer_due) {
-        actions.push({
-          label: 'Record Return Odometer', icon: <Gauge size={13} />, tone: 'accent',
-          onSelect: () => setReturnTruck(t),
-          disabled: !!lockedBy, title: lockedTitle,
-        })
-      }
+      // Its own record, apart from BLOWBAGETS: the after-delivery reading when
+      // the vehicle is back from a job, otherwise an update at any time.
+      actions.push({
+        label: t.return_odometer_due ? 'Record Return Odometer' : 'Update Odometer', icon: <Gauge size={13} />,
+        tone: t.return_odometer_due ? 'accent' : 'default',
+        onSelect: () => setOdometerTruck(t),
+        disabled: !!lockedBy, title: lockedTitle,
+      })
       // Only offered while the vehicle is actually blocked on BLOWBAGETS: never
       // inspected, failed, or back from a booking since its last pass.
       if (!isRoadworthy(t)) {
         actions.push({
-          label: 'Approve Vehicle', icon: <ClipboardCheck size={13} />,
-          tone: t.return_odometer_due ? 'default' : 'accent',
+          label: 'Approve Vehicle', icon: <ClipboardCheck size={13} />, tone: 'accent',
           onSelect: () => setInspectTruck(t),
-          disabled: !!lockedBy || !!t.return_odometer_due,
-          title: lockedTitle ?? (t.return_odometer_due
-            ? 'Record the return odometer first'
-            : 'Run the BLOWBAGETS inspection and take the before-delivery odometer'),
+          disabled: !!lockedBy,
+          title: lockedTitle ?? 'Run the BLOWBAGETS inspection',
         })
       }
       actions.push({
@@ -976,7 +980,7 @@ export default function VehicleManagementView() {
                                 <span
                                   className="inline-flex text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border"
                                   style={{ color: '#fbbf24', borderColor: 'rgba(246,159,38,0.35)', background: 'rgba(246,159,38,0.12)' }}
-                                  title="Back from a delivery — record the return odometer before the next inspection"
+                                  title="Back from a delivery — record the return odometer before it can be assigned again"
                                 >
                                   Return odometer due
                                 </span>
@@ -1035,9 +1039,9 @@ export default function VehicleManagementView() {
 
       {/* BLOWBAGETS inspection — the gate on whether operations can assign this
           vehicle to a booking. */}
-      <ReturnOdometerModal
-        truck={returnTruck}
-        onClose={() => setReturnTruck(null)}
+      <OdometerModal
+        truck={odometerTruck}
+        onClose={() => setOdometerTruck(null)}
         onRecorded={() => { void loadTrucksPage() }}
       />
 
@@ -1255,7 +1259,7 @@ export default function VehicleManagementView() {
                   ) : (
                     <p className="text-[11px] text-white/45">
                       Odometer: <span className="text-white/75 font-mono">{fmtKm(editingTruck.odometer_km)}</span>
-                      {' '}— it moves with the before and after delivery readings.
+                      {' '}— change it with Update Odometer on the vehicle&apos;s menu.
                     </p>
                   )}
 
@@ -1347,18 +1351,45 @@ export default function VehicleManagementView() {
                   </label>
                 )}
 
-                {/* The vehicle's regular driver. Edit only: a truck is paired
-                    once it exists, and pairing at creation would mean picking a
-                    driver before anyone has seen the vehicle on the list. */}
-                {modalMode === 'edit' && (
+                {/* The vehicle's regular driver. On create it sits behind a toggle,
+                    since most new vehicles are paired later (or never). */}
+                {modalMode === 'create' && (
+                  <label className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.08] bg-black/20 px-3 py-2.5 cursor-pointer">
+                    <span className="min-w-0">
+                      <span className="block text-[11px] font-bold uppercase text-white/50">Assign a regular driver</span>
+                      <span className="block text-[10px] text-white/30 mt-0.5">Pair this vehicle with the driver who normally drives it.</span>
+                    </span>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={pairOnCreate}
+                      onClick={() => {
+                        setPairOnCreate((on) => !on)
+                        if (pairOnCreate) setForm((f) => ({ ...f, assigned_driver_id: '' }))
+                      }}
+                      className="relative shrink-0 w-10 h-[22px] rounded-full border transition-colors"
+                      style={pairOnCreate
+                        ? { background: 'rgba(77,249,237,0.25)', borderColor: 'rgba(77,249,237,0.55)' }
+                        : { background: 'rgba(255,255,255,0.06)', borderColor: 'rgba(255,255,255,0.15)' }}
+                    >
+                      <span
+                        className="absolute top-[2px] w-4 h-4 rounded-full transition-all"
+                        style={{ left: pairOnCreate ? 20 : 3, background: pairOnCreate ? 'var(--color-cyan)' : 'rgba(255,255,255,0.45)' }}
+                      />
+                    </button>
+                  </label>
+                )}
+                {(modalMode === 'edit' || pairOnCreate) && (
                   <label className="block">
-                    <span className="text-[11px] font-bold uppercase text-white/40">Assigned driver</span>
+                    <span className="text-[11px] font-bold uppercase text-white/40">
+                      Assigned driver{modalMode === 'create' && <span className="text-red-400"> *</span>}
+                    </span>
                     <select
                       value={form.assigned_driver_id}
                       onChange={(e) => setForm((f) => ({ ...f, assigned_driver_id: e.target.value }))}
                       className="mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-3 py-2.5 text-sm text-white outline-none"
                     >
-                      <option value="">No regular driver</option>
+                      <option value="">{modalMode === 'create' ? 'Select driver' : 'No regular driver'}</option>
                       {drivers.map((d) => {
                         const id    = d.drivers?.driver_id
                         const taken = id ? pairedElsewhere.get(id) : undefined

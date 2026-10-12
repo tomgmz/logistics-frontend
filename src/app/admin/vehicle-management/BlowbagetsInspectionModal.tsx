@@ -8,9 +8,7 @@ import { BLOWBAGETS_ITEMS, toBlowbagetsItems } from '@/lib/blowbagets'
 import {
   adminFetchTruckInspections,
   adminRecordTruckInspection,
-  adminUploadFleetPhoto,
 } from '@/lib/services/admin/trucks.service'
-import { OdometerInput, PhotoField, parseKm, fmtKm } from './upkeep-ui'
 import type { Truck, TruckInspection } from '@/app/types/truck.types'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
@@ -27,9 +25,8 @@ import ReusableModal from '@/components/layout/ReusableModal'
  * unticked records a failure and takes the vehicle out of the selectable pool
  * until it passes a re-check.
  *
- * It is also where the before-delivery odometer is taken: the Fleet Manager
- * types the reading with a photo of the dash. A vehicle back from a delivery
- * must have its return odometer recorded first.
+ * The odometer is not taken here. It has its own Update Odometer action, so a
+ * re-check (for example before a paused multi-trip run resumes) needs no reading.
  */
 
 function fmtWhen(iso: string): string {
@@ -53,9 +50,6 @@ export default function BlowbagetsInspectionModal({
 }) {
   const [checked, setChecked] = useState<Record<string, boolean>>({})
   const [notes,   setNotes]   = useState('')
-  const [odometer, setOdometer] = useState('')
-  const [odoPhoto, setOdoPhoto] = useState<File | null>(null)
-  const [odoError, setOdoError] = useState<string | null>(null)
   const [busy,    setBusy]    = useState(false)
   // Recording decides whether operations can assign the vehicle, so it is
   // confirmed like every other decision on this screen.
@@ -76,9 +70,6 @@ export default function BlowbagetsInspectionModal({
   useEffect(() => {
     setChecked({})
     setNotes('')
-    setOdometer('')
-    setOdoPhoto(null)
-    setOdoError(null)
     setConfirmOpen(false)
     if (!truck) return
 
@@ -96,12 +87,9 @@ export default function BlowbagetsInspectionModal({
     if (!truck) return
     setBusy(true)
     try {
-      const odometer_photo_url = await adminUploadFleetPhoto(odoPhoto!)
       const inspection = await adminRecordTruckInspection(truck.truck_id, {
         items: toBlowbagetsItems(checked),
         notes: notes.trim() || null,
-        odometer_km: parseKm(odometer)!,
-        odometer_photo_url,
       })
       setHistory((prev) => [inspection, ...prev])
       setConfirmOpen(false)
@@ -123,17 +111,7 @@ export default function BlowbagetsInspectionModal({
     }
   }
 
-  const returnDue = !!truck?.return_odometer_due
-
-  // The odometer and its photo are required before the decision is confirmed.
   function review() {
-    const km = parseKm(odometer)
-    if (km == null) { setOdoError('Enter the odometer in whole kilometres.'); return }
-    if (truck?.odometer_km != null && km < truck.odometer_km) {
-      setOdoError(`The odometer can't go below the last reading (${fmtKm(truck.odometer_km)}).`); return
-    }
-    if (!odoPhoto) { setOdoError('Add a photo of the odometer.'); return }
-    setOdoError(null)
     setConfirmOpen(true)
   }
 
@@ -198,12 +176,6 @@ export default function BlowbagetsInspectionModal({
 
             <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
               <RecordLockBanner lock={lock} noun="vehicle" />
-              {returnDue && (
-                <p className="text-xs text-amber-200 border border-amber-400/30 rounded-lg px-3 py-2 bg-amber-400/10">
-                  {truck.plate_number} is back from a delivery. Record its return odometer first — use
-                  &ldquo;Record Return Odometer&rdquo; on the vehicle&apos;s menu.
-                </p>
-              )}
               <div className="flex items-center justify-between">
                 <p className="text-[11px] text-white/45 leading-snug pr-3">
                   Tick every item you physically inspected and found sound. Anything left unticked
@@ -284,24 +256,6 @@ export default function BlowbagetsInspectionModal({
                 />
               </div>
 
-              {/* The before-delivery odometer, typed off the dash with a photo. */}
-              <div className="rounded-xl border border-white/[0.08] bg-black/20 p-3 space-y-3">
-                <OdometerInput
-                  value={odometer}
-                  onChange={setOdometer}
-                  lastKm={truck.odometer_km ?? null}
-                  disabled={busy || lock.readOnly || returnDue}
-                />
-                <PhotoField
-                  file={odoPhoto}
-                  onFile={setOdoPhoto}
-                  label="Odometer photo"
-                  required
-                  disabled={busy || lock.readOnly || returnDue}
-                />
-                {odoError && <p className="text-[11px] text-red-400">{odoError}</p>}
-              </div>
-
               {/* Past inspections, so the fleet manager can see what changed. */}
               <div>
                 <h3 className="text-[11px] font-bold uppercase tracking-wider text-white/40 mb-2">
@@ -363,7 +317,7 @@ export default function BlowbagetsInspectionModal({
               </button>
               <button
                 type="button"
-                disabled={busy || lock.readOnly || returnDue}
+                disabled={busy || lock.readOnly}
                 onClick={review}
                 className="flex-1 py-2 rounded-lg text-sm font-bold transition-colors disabled:opacity-40"
                 style={

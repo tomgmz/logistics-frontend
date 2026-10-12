@@ -71,6 +71,11 @@ export interface DriverUser extends BaseUser {
     /** The vendor a vendor driver comes from; null for company drivers. */
     vendor_name?:      string | null
     vendor_contact?:   string | null
+    /** Set when a vendor driver's app access was revoked (automatically once
+     *  their booking completed, or by hand); cleared on restore. */
+    access_revoked_at?:         string | null
+    access_revoked_reason?:     string | null
+    access_revoked_booking_id?: string | null
   } | null
 }
 

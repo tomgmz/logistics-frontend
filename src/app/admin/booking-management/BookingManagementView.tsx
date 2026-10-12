@@ -1532,8 +1532,8 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
         if (isOutOfServiceStatus(t.status)) return false
         if (t.truck_id === assignTruckId) return true
         if (busyTruckIds.has(t.truck_id)) return false
-        // BLOWBAGETS current and routine service not overdue — the same two
-        // gates the server's assertTruckAssignable applies.
+        // BLOWBAGETS current, routine service not overdue and no return odometer
+        // owed — the same gates the server's assertTruckAssignable applies.
         return isAssignable(t)
       }),
     [trucks, busyTruckIds, assignTruckId],

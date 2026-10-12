@@ -11,6 +11,7 @@ import RefreshIcon        from '@mui/icons-material/Refresh'
 import type { BookingWithRelations }         from '@/lib/store/slice/routeMap.slice'
 import { StatusBadge }                       from './RouteMapComponents'
 import { DetailsPanelContent }               from './DetailsPanelContent'
+import { RouteStepper, bookingRouteSteps, dropoffSummary }   from './RouteStepper'
 import { DirectionsRenderer }                from './DirectionsRenderer'
 import { useAppDispatch, useAppSelector }    from '@/lib/hooks/hooks'
 import { useAuthStore }                      from '@/lib/store/auth.store'
@@ -45,11 +46,6 @@ function fmtStatus(s: string) {
   return s.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase())
 }
 
-function addressAbbr(address: string | undefined, fallback: string): string {
-  if (!address) return fallback
-  return address.match(/\b[A-Z]{2,4}\b/)?.[0] ?? address.split(',')[0].slice(0, 3).toUpperCase()
-}
-
 /**
  * How far along a booking is, from its stops.
  *
@@ -57,14 +53,6 @@ function addressAbbr(address: string | undefined, fallback: string): string {
  * on the list look a third of the way through its route regardless of how many
  * drop-offs it had actually made.
  */
-function progressOf(booking: BookingWithRelations): number {
-  if (booking.status === 'completed') return 100
-  const stops = booking.booking_destinations ?? []
-  if (stops.length === 0) return booking.status === 'in_transit' ? 0 : 0
-  const done = stops.filter((d) => (d as { status?: string }).status === 'delivered').length
-  return Math.round((done / stops.length) * 100)
-}
-
 function BookingListItem({
   booking,
   selected,
@@ -79,13 +67,12 @@ function BookingListItem({
   const color  = statusColor(booking.status)
   const label  = fmtStatus(booking.status)
   const origin = booking.origin?.split(',')[0] ?? '—'
-  const pct    = progressOf(booking)
 
   const lastDestAddress =
     booking.booking_destinations?.[booking.booking_destinations.length - 1]?.address
 
   const dest     = lastDestAddress?.split(',')[0] ?? '—'
-  const destAbbr = addressAbbr(lastDestAddress, 'DST')
+  const steps = bookingRouteSteps(booking as Parameters<typeof bookingRouteSteps>[0])
 
   return (
     <motion.button
@@ -113,30 +100,11 @@ function BookingListItem({
         <span className="text-[11px] font-bold shrink-0" style={{ fontFamily: "var(--font-alegreya-sc), 'Alegreya Sans SC', sans-serif", color }}>{label}</span>
       </div>
 
-      <div className="flex items-center gap-1.5 mb-2">
-        <span className="text-white text-[10px] font-bold min-w-[24px]">
-          {addressAbbr(booking.origin, 'ORG')}
-        </span>
-        <div className="flex-1 relative h-3 flex items-center">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full h-[2px] rounded-full bg-[#333]" />
-          </div>
-          <div
-            className="absolute left-0 h-[2px] rounded-full transition-all duration-1000"
-            style={{ width: `${pct}%`, background: color }}
-          />
-          {booking.status === 'in_transit' && (
-            <div
-              className="absolute w-2.5 h-2.5 rounded-full border border-white transition-all duration-1000"
-              style={{
-                left: `calc(${pct}% - 5px)`,
-                background: color,
-                boxShadow: `0 0 6px ${color}`,
-              }}
-            />
-          )}
+      <div className="flex items-center gap-2.5 mb-2 px-0.5">
+        <div className="flex-1 min-w-0">
+          <RouteStepper steps={steps} compact live={booking.status === 'in_transit'} />
         </div>
-        <span className="text-white text-[10px] font-bold min-w-[20px] text-right">{destAbbr}</span>
+        <span className="shrink-0 text-[10px] tabular-nums text-white/45">{dropoffSummary(steps)}</span>
       </div>
 
       <div className="flex justify-between items-end">
@@ -304,7 +272,6 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
 
   const completedStops     = stops.filter((s) => s.status === 'delivered').length
   const totalStops         = stops.length
-  const progressPercentage = totalStops > 0 ? (completedStops / totalStops) * 100 : 0
 
   // Only a booking that is actually on the road can have a live position. Asking
   // for one on a pending or completed booking would open a channel and poll an
@@ -376,7 +343,6 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
       bookingDetail={bookingDetail}
       completedStops={completedStops}
       totalStops={totalStops}
-      progressPercentage={progressPercentage}
       etaByStop={live.etaByStop}
       nextEta={live.nextEta}
     />

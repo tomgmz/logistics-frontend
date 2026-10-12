@@ -8,7 +8,7 @@ import {
   Users, UserPlus, Search, RefreshCw, MoreVertical,
   Pencil, Eye, ShieldCheck, ShieldOff, Archive,
   ChevronLeft, ChevronRight, AlertTriangle, ArrowLeftRight,
-  KeyRound, Send, RotateCcw,
+  KeyRound, Send, RotateCcw, Flag,
 } from 'lucide-react'
 import Select, { SelectChangeEvent } from '@mui/material/Select'
 import MenuItem from '@mui/material/MenuItem'
@@ -254,6 +254,28 @@ function AccessBadge({ access }: { access: VendorDriverUser['access'] }) {
       className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold tracking-wide ${cfg.cls}`}
     >
       <KeyRound size={10} /> {cfg.label}
+    </span>
+  )
+}
+
+/**
+ * The flag on a vendor account whose access was revoked: automatically once the
+ * booking they drove was completed, or by hand. Says when and why, so whoever
+ * picks a vendor crew next knows to restore access first.
+ */
+function RevokedFlag({ user }: { user: VendorDriverUser }) {
+  if (user.access.account_active) return null
+  const at     = user.drivers?.access_revoked_at ?? null
+  const reason = user.drivers?.access_revoked_reason ?? null
+  return (
+    <span
+      title={at ? `Revoked ${formatDateTime(at)}` : undefined}
+      className="mt-1 inline-flex max-w-[260px] items-center gap-1 rounded-md border border-red-500/30 bg-red-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-red-300"
+    >
+      <Flag size={10} className="shrink-0" />
+      <span className="truncate">
+        Flagged: access revoked{reason ? ` (${reason})` : ''}{at ? ` · ${formatDate(at)}` : ''}
+      </span>
     </span>
   )
 }
@@ -523,7 +545,10 @@ function renderCells(user: AnyUser, tab: TabValue) {
       const name = [u.first_name, u.middle_name, u.last_name, u.suffix].filter(Boolean).join(' ') || '—'
       return (
         <>
-          <td className="px-4 py-3.5"><p className="font-medium text-white">{name}</p></td>
+          <td className="px-4 py-3.5">
+            <p className="font-medium text-white">{name}</p>
+            <RevokedFlag user={u} />
+          </td>
           <td className="px-4 py-3.5 text-sm text-[#818181]">{u.drivers?.vendor_name || '—'}</td>
           <td className="px-4 py-3.5 text-sm text-[#818181]">{u.email}</td>
           <td className="px-4 py-3.5 text-sm text-[#818181]">

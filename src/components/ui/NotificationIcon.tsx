@@ -12,6 +12,7 @@ import { useIsMobile } from "@/lib/hooks/useIsMobile";
 import { expandCode, roleLabel } from "@/lib/roles";
 import { useNotificationStore } from "@/lib/store/notification.store";
 import { useNotificationsRealtime } from "@/hooks/useNotificationsRealtime";
+import { useSessionRevokedRealtime } from "@/hooks/useSessionRevokedRealtime";
 import type { AppNotification } from "@/lib/services/notification.service";
 
 const timeAgo = (iso: string): string => {
@@ -69,6 +70,8 @@ const VALUE_LABELS: Record<string, Record<string, string>> = {
     gm_pending:       "Awaiting General Manager approval",
     rejected_gm:      "Rejected by the General Manager",
     rejected_admin:   "Rejected by the Company Administrator",
+    approved_gm:      "Approved by the General Manager",
+    approved_admin:   "Approved by the Company Administrator",
     ops_pending:      "Awaiting vehicle and driver assignment",
     assigned:         "Assigned to driver",
     vehicle_assigned: "Vehicle assigned",
@@ -274,6 +277,8 @@ export default function NotificationIcon() {
   const router = useRouter();
   const isMobile = useIsMobile();
   useNotificationsRealtime();
+  // Mounted with the header in every signed-in portal, like the bell itself.
+  useSessionRevokedRealtime();
 
   const notifications = useNotificationStore((s) => s.items);
   const unreadCount = useNotificationStore((s) => s.unreadCount);

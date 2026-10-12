@@ -1,8 +1,5 @@
-export default function OperationsAdminDashboard() {
-  return (
-    <div className="flex items-center justify-center h-full">
-      <span className="ff-sc text-[var(--color-muted)] text-3xl">Operations Manager — Dashboard</span>
-    </div>
-  )
-}
+import StaffDashboard from '@/components/dashboard/StaffDashboard'
 
+export default function OperationsAdminDashboard() {
+  return <StaffDashboard role="operations_manager" />
+}

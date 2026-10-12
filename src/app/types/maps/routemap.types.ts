@@ -123,6 +123,9 @@ export interface OptimizedStop {
   optimized_sequence_order: number
   status:                   'pending' | 'delivered' | 'failed'
   notes?:                   string | null
+  /** Loads bound for this drop-off across the trips, and how many have unloaded. */
+  loads_total?:             number
+  loads_done?:              number
   estimated_arrival?:       string
   total_duration?:          number
 }
