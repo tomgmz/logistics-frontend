@@ -253,7 +253,7 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 16, scale: 0.98 }}
           transition={{ duration: 0.18 }}
-          className="fixed inset-0 z-[59] flex flex-col overflow-hidden bg-[#0d0d0d] sm:inset-auto sm:bottom-24 sm:right-5 sm:h-[min(620px,calc(100dvh-120px))] sm:w-[400px] sm:rounded-2xl sm:border sm:border-white/[0.08] sm:shadow-2xl"
+          className="ff-chat fixed inset-0 z-[59] flex flex-col overflow-hidden bg-[#0d0d0d] sm:inset-auto sm:bottom-24 sm:right-5 sm:h-[min(620px,calc(100dvh-120px))] sm:w-[400px] sm:rounded-2xl sm:border sm:border-white/[0.08] sm:shadow-2xl"
         >
           {/* Header */}
           <div className="flex items-center justify-between gap-3 border-b border-white/[0.07] px-4 py-3">

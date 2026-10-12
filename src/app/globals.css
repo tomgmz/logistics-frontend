@@ -130,6 +130,13 @@
     font-size: 0.875rem;
   }
 
+  /* Conversation: messaging and the help assistant (chatbot) use the regular,
+     not small caps, Alegreya Sans; everything else in the app stays Alegreya
+     Sans SC. Font family only — sizes are the components' own. */
+  .ff-chat {
+    font-family: var(--font-alegreya), 'Alegreya Sans', sans-serif;
+  }
+
   @media (min-width: 640px) {
     .ff-body {
       font-size: 0.875rem;
