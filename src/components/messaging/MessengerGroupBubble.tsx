@@ -328,7 +328,8 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
                 const showAvatar   = !isMine && (msgs[i + 1]?.sender_id !== msg.sender_id || msgs[i + 1]?.kind === 'system' || i === msgs.length - 1)
 
                 return (
-                  <div key={msg.id}
+                  <div key={msg.id}>
+                  <div
                     className={`flex gap-1.5 ${isMine ? 'justify-end' : 'justify-start'}`}
                     onMouseEnter={() => { if (hoverTimeout.current) clearTimeout(hoverTimeout.current); hoverTimeout.current = setTimeout(() => setHovered(msg.id), 60) }}
                     onMouseLeave={() => { if (hoverTimeout.current) clearTimeout(hoverTimeout.current); setHovered(null) }}
@@ -403,8 +404,10 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
                         </div>
                       )}
 
-                      <SeenByAvatars seenBy={seenAt[msg.id] ?? []} />
                     </div>
+                  </div>
+                  {/* Seen avatars always sit at the right edge, whoever sent the message. */}
+                  <SeenByAvatars seenBy={seenAt[msg.id] ?? []} />
                   </div>
                 )
               })}

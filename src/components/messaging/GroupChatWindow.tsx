@@ -417,7 +417,8 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
                   const replyName     = msg.reply_to ? (msg.reply_to.sender_id === currentUserId ? 'You' : memberMap[msg.reply_to.sender_id]?.first_name ?? 'Someone') : undefined
 
                   return (
-                    <div key={msg.id}
+                    <div key={msg.id}>
+                    <div
                       className={`flex gap-2 ${isMine ? 'justify-end' : 'justify-start'}`}
                       onMouseEnter={() => { if (hoverTimeout.current) clearTimeout(hoverTimeout.current); hoverTimeout.current = setTimeout(() => setHoveredId(msg.id), 60) }}
                       onMouseLeave={() => { if (hoverTimeout.current) clearTimeout(hoverTimeout.current); setHoveredId(null) }}
@@ -492,8 +493,10 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
                           </div>
                         )}
 
-                        <SeenByAvatars seenBy={seenAt[msg.id] ?? []} />
                       </div>
+                    </div>
+                    {/* Seen avatars always sit at the right edge, whoever sent the message. */}
+                    <SeenByAvatars seenBy={seenAt[msg.id] ?? []} />
                     </div>
                   )
                 })}
