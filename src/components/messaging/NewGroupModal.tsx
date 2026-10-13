@@ -98,9 +98,9 @@ export default function NewGroupModal({ onClose, onGroupCreated }: NewGroupModal
             />
           </div>
 
-          {/* Selected chips */}
+          {/* Selected chips: at most two rows; more scroll here, so the list below keeps its room. */}
           {selectedUsers.length > 0 && (
-            <div className="px-3 pb-2 flex flex-wrap gap-1.5 shrink-0">
+            <div className="px-3 pb-2 flex flex-wrap content-start gap-1.5 shrink-0 max-h-[66px] overflow-y-auto [&::-webkit-scrollbar]:w-[3px] [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full">
               {selectedUsers.map(u => (
                 <button
                   key={u.user_id}

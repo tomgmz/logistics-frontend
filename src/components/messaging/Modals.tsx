@@ -170,9 +170,9 @@ export function NewGroupModal({ onClose, onGroupCreated }: NewGroupModalProps) {
           className="w-full bg-white/[0.04] border border-white/[0.07] rounded-xl px-3 py-2.5 ff-body text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[var(--color-cyan)]/30 transition-all" />
       </div>
 
-      {/* Selected chips */}
+      {/* Selected chips: at most two rows; more scroll here, so the list below keeps its room. */}
       {selectedUsers.length > 0 && (
-        <div className="px-3 pb-2 flex flex-wrap gap-1.5 shrink-0">
+        <div className="px-3 pb-2 flex flex-wrap content-start gap-1.5 shrink-0 max-h-[66px] overflow-y-auto [&::-webkit-scrollbar]:w-[3px] [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full">
           {selectedUsers.map(u => (
             <button key={u.user_id} type="button" onClick={() => toggle(u.user_id)}
               className="flex items-center gap-1 px-2 py-1 rounded-full bg-[var(--color-cyan)]/10 border border-[var(--color-cyan)]/20 text-[var(--color-cyan)] ff-body text-[11px]">
