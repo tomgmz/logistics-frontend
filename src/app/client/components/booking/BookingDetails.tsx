@@ -19,8 +19,14 @@ import {
   setAllNonTiltable, setAllNonStackable,
   setAllStackable, setAllOversize,
   makeDefaultGroup,
+  removeExistingDocument,
 } from '@/lib/store/slice/booking.slice'
 import type { CargoMode, ItemGroup } from '@/lib/store/slice/booking.slice'
+import { documentName } from '@/lib/booking-resubmit'
+
+// Stable empty list, so the selector below does not hand back a new array
+// (and re-render) on every store change.
+const NO_DOCS: string[] = []
 import { selectCargoSummary, selectSections } from '@/lib/store/bookingSelectors'
 import MapLocationPicker from './MapLocationPicker'
 import './BookingDetails.css'
@@ -648,6 +654,10 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
   const dropoffs     = useAppSelector((s) => s.booking.dropoffs)
   const mode         = useAppSelector((s) => s.booking.mode)
   const sections     = useAppSelector(selectSections)
+  // Documents already on a rejected booking being corrected. They count toward
+  // the required document and the three-file limit, like newly chosen ones.
+  const keptDocs     = useAppSelector((s) => s.booking.resubmit?.existingDocuments) ?? NO_DOCS
+  const docCount     = files.length + keptDocs.length
 
   const [touched,    setTouched]    = useState(false)
   const [mapTarget,  setMapTarget]  = useState<MapPickerTarget>(null)
@@ -691,7 +701,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
 
   const summary = useAppSelector(selectCargoSummary)
 
-  const rawErrors = validateBooking(date, time, pickup, dropoffs, sections, mode, files.length)
+  const rawErrors = validateBooking(date, time, pickup, dropoffs, sections, mode, docCount)
   const errors    = touched ? rawErrors : { schedule: {}, route: { dropoffs: {} }, sections: [], documents: undefined }
 
   const handleNext = () => {
@@ -744,7 +754,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
 
   const validateAndAddFiles = (incoming: File[]) => {
     setDocError(null)
-    const slots    = MAX_DOC_COUNT - files.length
+    const slots    = MAX_DOC_COUNT - docCount
     const accepted = incoming.slice(0, slots)
     if (accepted.length === 0) return
 
@@ -1235,18 +1245,18 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
             onDrop={(e) => {
               e.preventDefault()
               setIsDragging(false)
-              if (files.length >= MAX_DOC_COUNT) return
+              if (docCount >= MAX_DOC_COUNT) return
               validateAndAddFiles(Array.from(e.dataTransfer.files))
             }}
-            onClick={() => { if (files.length < MAX_DOC_COUNT) fileInputRef.current?.click() }}
+            onClick={() => { if (docCount < MAX_DOC_COUNT) fileInputRef.current?.click() }}
             className="flex flex-col items-center gap-2 rounded-md px-4 py-6 border border-dashed transition-colors cursor-pointer"
             style={{
               background:    INPUT_BG_CARD,
               borderColor:   isDragging ? CYAN
                            : (touched && !!rawErrors.documents && !docError) ? ERROR_BORDER
                            : '#818181',
-              opacity:       files.length >= MAX_DOC_COUNT ? 0.5 : 1,
-              pointerEvents: files.length >= MAX_DOC_COUNT ? 'none' : 'auto',
+              opacity:       docCount >= MAX_DOC_COUNT ? 0.5 : 1,
+              pointerEvents: docCount >= MAX_DOC_COUNT ? 'none' : 'auto',
             }}
           >
             <Upload size={24} style={{ color: isDragging ? CYAN : 'rgba(255,255,255,0.4)' }} />
@@ -1276,10 +1286,36 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
           {touched && rawErrors.documents && !docError && (
             <p className="ff-sc booking-text text-xs text-red-400">{rawErrors.documents}</p>
           )}
-          {files.length >= MAX_DOC_COUNT && (
+          {docCount >= MAX_DOC_COUNT && (
             <p className="ff-sc booking-text text-xs text-white/40 text-center">
               Maximum of {MAX_DOC_COUNT} files reached
             </p>
+          )}
+
+          {keptDocs.length > 0 && (
+            <div className="flex flex-col gap-1.5">
+              {keptDocs.map((url) => (
+                <div key={url}
+                  className="flex items-center justify-between rounded-md px-3 py-2 border border-white/10"
+                  style={{ background: INPUT_BG_CARD }}
+                >
+                  <div className="flex items-center gap-2 flex-1 min-w-0 mr-2">
+                    <File size={13} className="text-white/40 shrink-0" />
+                    <div className="flex flex-col flex-1 min-w-0">
+                      <a href={url} target="_blank" rel="noopener noreferrer"
+                        className="ff-sc booking-text text-xs text-white/80 truncate hover:underline">
+                        {documentName(url)}
+                      </a>
+                      <span className="ff-sc booking-text text-[10px] text-white/40">already attached</span>
+                    </div>
+                  </div>
+                  <button type="button" onClick={() => dispatch(removeExistingDocument(url))}
+                    className="hover:text-red-400 transition-colors cursor-pointer shrink-0">
+                    <X size={13} />
+                  </button>
+                </div>
+              ))}
+            </div>
           )}
 
           {files.length > 0 && (

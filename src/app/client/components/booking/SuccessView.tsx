@@ -4,9 +4,12 @@ import { CheckCircle2 } from 'lucide-react'
 export default function SuccessView({
   bookingReference,
   onNewBooking,
+  resubmitted = false,
 }: {
   bookingReference: string | null
   onNewBooking: () => void
+  /** A rejected booking the client corrected and sent back for review. */
+  resubmitted?: boolean
 }) {
   return (
     <motion.div
@@ -29,10 +32,12 @@ export default function SuccessView({
         transition={{ delay: 0.35 }}
       >
         <h2 className="ff-sc booking-text text-white text-3xl lg:text-5xl font-bold mb-3 uppercase tracking-widest">
-          Booking Confirmed!
+          {resubmitted ? 'Booking Resubmitted!' : 'Booking Confirmed!'}
         </h2>
         <p className="ff-sc booking-text text-[var(--color-muted)] text-base lg:text-xl">
-          Your shipment has been scheduled successfully.
+          {resubmitted
+            ? 'Your corrected booking was sent back to 8338 for review.'
+            : 'Your shipment has been scheduled successfully.'}
         </p>
         {bookingReference && (
           <p className="ff-sc booking-text text-[var(--color-cyan)] text-sm lg:text-lg mt-2">

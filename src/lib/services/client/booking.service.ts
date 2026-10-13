@@ -150,6 +150,19 @@ export const bookingService = {
     return post<CreateBookingResult>('/booking', input)
   },
 
+  // A booking 8338 rejected, corrected by the client and sent back for review.
+  // The full booking is restated, like a new one, but keeps its id and number.
+  resubmitBooking: async (bookingId: string, input: Omit<CreateBookingPayload, 'idempotency_key'>) => {
+    await initCsrf()
+    return post<CreateBookingResult>(`/booking/${bookingId}/resubmit`, input)
+  },
+
+  // The client lets a rejected booking go instead of resubmitting it.
+  closeRejectedBooking: async (bookingId: string): Promise<BookingWithRelations> => {
+    await initCsrf()
+    return post<BookingWithRelations>(`/booking/${bookingId}/close`)
+  },
+
   updateBooking: (bookingId: string, payload: UpdateBookingPayload) =>
     patch<unknown>(`/booking/${bookingId}`, payload),
 

@@ -12,6 +12,7 @@ import { calcCargoSummary, palletizedGroup, looseGroup } from '@/lib/cargo/summa
 import type { CargoItemPayload } from '@/lib/services/client/booking.service'
 import { uploadService } from '@/lib/services/admin/documentUpload.service'
 import { appToast } from '@/lib/toast'
+import { documentName } from '@/lib/booking-resubmit'
 import './BookingDetails.css'
 import SuccessView from './SuccessView'
 
@@ -87,6 +88,12 @@ export default function StepReview({ selectedService, pendingFiles, onBack, onNe
   const [bookingId,      setBookingId]      = useState<string | null>(null)
   const [error,          setError]          = useState<string | null>(null)
   const [docUploadState, setDocUploadState] = useState<'idle' | 'uploading' | 'done' | 'failed'>('idle')
+  const [wasResubmit,    setWasResubmit]    = useState(false)
+
+  // Set when correcting a rejected booking: it is resubmitted in place instead
+  // of booked anew, and keeps whichever of its documents the client left on it.
+  const resubmit      = useAppSelector((s) => s.booking.resubmit)
+  const keptDocuments = resubmit?.existingDocuments ?? []
 
   const pickupLat     = useAppSelector((s) => s.booking.pickupLat)
   const pickupLng     = useAppSelector((s) => s.booking.pickupLng)
@@ -122,7 +129,7 @@ export default function StepReview({ selectedService, pendingFiles, onBack, onNe
   const attemptKey = useRef<string | null>(null)
 
   const confirm = async () => {
-    if (pendingFiles.length === 0) {
+    if (pendingFiles.length + keptDocuments.length === 0) {
       setError('At least one transaction document is required.')
       return
     }
@@ -132,7 +139,10 @@ export default function StepReview({ selectedService, pendingFiles, onBack, onNe
     try {
       // Upload once per attempt, then reuse.
       let transactionUrls = uploadedUrls
-      if (!transactionUrls) {
+      if (!transactionUrls && pendingFiles.length === 0) {
+        // Resubmitting with only the documents already on the booking.
+        transactionUrls = []
+      } else if (!transactionUrls) {
         setDocUploadState('uploading')
         try {
           const uploadResult = await uploadService.uploadBookingDocuments(pendingFiles)
@@ -153,7 +163,8 @@ export default function StepReview({ selectedService, pendingFiles, onBack, onNe
         }
       }
 
-      if (transactionUrls.length === 0) {
+      const allDocuments = [...keptDocuments, ...transactionUrls]
+      if (allDocuments.length === 0) {
         setError('At least one transaction document is required.')
         return
       }
@@ -175,10 +186,7 @@ export default function StepReview({ selectedService, pendingFiles, onBack, onNe
 
       const cargoItems = buildCargoItems(sections, mode, sequenceByDropoff)
 
-      if (!attemptKey.current) attemptKey.current = crypto.randomUUID()
-
-      const payload = {
-        idempotency_key:   attemptKey.current,
+      const details = {
         origin:            pickup,
         ...(pickupLat != null && { origin_latitude:  pickupLat }),
         ...(pickupLng != null && { origin_longitude: pickupLng }),
@@ -190,7 +198,7 @@ export default function StepReview({ selectedService, pendingFiles, onBack, onNe
         // The longest edge of any single item, whichever axis it was entered on.
         ...(cargo.maxDimensionCm > 0 && { required_length_cm:     cargo.maxDimensionCm }),
         non_stackable_cargo: cargo.hasNonStackable,
-        transaction_documents: transactionUrls,
+        transaction_documents: allDocuments,
         ...(cargoItems.length > 0      && { cargo_items:           cargoItems }),
         destinations: activeDropoffs.map(({ address, dropoffIndex }, i) => ({
           address,
@@ -204,7 +212,13 @@ export default function StepReview({ selectedService, pendingFiles, onBack, onNe
         })),
       }
 
-      const result = await bookingService.createBooking(payload)
+      let result
+      if (resubmit) {
+        result = await bookingService.resubmitBooking(resubmit.bookingId, details)
+      } else {
+        if (!attemptKey.current) attemptKey.current = crypto.randomUUID()
+        result = await bookingService.createBooking({ idempotency_key: attemptKey.current, ...details })
+      }
       const bookingReference = result?.reference_number ?? result?.booking_id ?? null
 
       // Booked. Release the attempt key and the cached uploads so "New booking"
@@ -213,11 +227,12 @@ export default function StepReview({ selectedService, pendingFiles, onBack, onNe
       setUploadedUrls(null)
 
       setBookingId(bookingReference)
+      setWasResubmit(!!resubmit)
       dispatch(resetBooking())
       onClearFiles()
       setSubmitted(true)
 
-      appToast.success('Booking submitted successfully.', {
+      appToast.success(resubmit ? 'Booking resubmitted for review.' : 'Booking submitted successfully.', {
         action: 'booking-create',
         ...(result?.booking_id != null ? { entityId: result.booking_id } : {}),
       })
@@ -243,7 +258,7 @@ export default function StepReview({ selectedService, pendingFiles, onBack, onNe
       : 'Not selected'
 
   const buttonLabel = (() => {
-    if (!loading) return 'Book Transit'
+    if (!loading) return resubmit ? 'Resubmit Booking' : 'Book Transit'
     if (docUploadState === 'uploading') return 'Uploading documents…'
     return 'Processing…'
   })()
@@ -257,6 +272,7 @@ export default function StepReview({ selectedService, pendingFiles, onBack, onNe
             key="success"
             bookingReference={bookingId}
             onNewBooking={onNewBooking}
+            resubmitted={wasResubmit}
           />
         ) : (
 
@@ -315,10 +331,24 @@ export default function StepReview({ selectedService, pendingFiles, onBack, onNe
                     <InfoBox value={serviceLabel} className="mt-2 w-full" />
                   </div>
 
-                  {pendingFiles.length > 0 && (
+                  {pendingFiles.length + keptDocuments.length > 0 && (
                     <div>
                       <SectionLabel>Transaction Documents</SectionLabel>
                       <div className="flex flex-col gap-1 mt-2">
+                        {keptDocuments.map((url) => (
+                          <div
+                            key={url}
+                            className="flex items-center gap-2 rounded-lg border border-white/[0.10]
+                                       bg-white/[0.03] px-3 py-2"
+                          >
+                            <span className="ff-sc booking-text text-white/60 text-xs truncate flex-1">
+                              {documentName(url)}
+                            </span>
+                            <span className="ff-sc booking-text text-white/30 text-[10px] shrink-0">
+                              Already attached
+                            </span>
+                          </div>
+                        ))}
                         {pendingFiles.map((f, i) => (
                           <div
                             key={i}
@@ -333,9 +363,11 @@ export default function StepReview({ selectedService, pendingFiles, onBack, onNe
                             </span>
                           </div>
                         ))}
-                        <p className="ff-sc booking-text text-[10px] text-white/30 mt-1">
-                          Will be uploaded on confirmation
-                        </p>
+                        {pendingFiles.length > 0 && (
+                          <p className="ff-sc booking-text text-[10px] text-white/30 mt-1">
+                            Will be uploaded on confirmation
+                          </p>
+                        )}
                       </div>
                     </div>
                   )}
@@ -524,7 +556,7 @@ export default function StepReview({ selectedService, pendingFiles, onBack, onNe
                            disabled:opacity-50 disabled:cursor-not-allowed
                            transition-colors duration-300 text-sm lg:text-base"
               >
-                {loading ? <><Spinner /> {buttonLabel}</> : 'Book Transit'}
+                {loading ? <><Spinner /> {buttonLabel}</> : buttonLabel}
               </motion.button>
             </motion.div>
 

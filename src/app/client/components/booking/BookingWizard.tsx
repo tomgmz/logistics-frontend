@@ -1,12 +1,18 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Check } from 'lucide-react'
+import { Check, XCircle } from 'lucide-react'
 import StepBookingDetails from './BookingDetails'
 import StepReview from './ReviewBooking'
 import { useAppDispatch, useAppSelector } from '@/lib/hooks/hooks'
-import { setStep, resetBooking } from '@/lib/store/slice/booking.slice'
+import { setStep, resetBooking, loadResubmitDraft } from '@/lib/store/slice/booking.slice'
+import { bookingService } from '@/lib/services/client/booking.service'
+import type { BookingWithRelations } from '@/lib/store/slice/routeMap.slice'
+import { bookingToResubmitDraft, isAwaitingResubmit } from '@/lib/booking-resubmit'
+import { getApiErrorMessage } from '@/lib/api-error'
+import { appToast } from '@/lib/toast'
 import './BookingDetails.css'
 
 const STEPS = [
@@ -20,10 +26,68 @@ const slideVariants = {
   exit:   (dir: number) => ({ x: dir > 0 ? -56 :  56, opacity: 0 }),
 }
 
+/**
+ * Reads `?resubmit=<bookingId>` (the Edit & Resubmit button on a rejected
+ * booking) and loads that booking into the wizard for the client to correct.
+ * Leaving the parameter off while a correction is loaded drops back to a blank
+ * new booking. Isolated so useSearchParams sits under its own Suspense boundary.
+ */
+function ResubmitLoader({ onLoaded, onLoading }: {
+  onLoaded:  () => void
+  onLoading: (loading: boolean) => void
+}) {
+  const dispatch     = useAppDispatch()
+  const router       = useRouter()
+  const id           = useSearchParams().get('resubmit')
+  const loadedId     = useAppSelector((s) => s.booking.resubmit?.bookingId ?? null)
+  const loadedIdRef  = useRef(loadedId)
+  loadedIdRef.current = loadedId
+
+  useEffect(() => {
+    if (!id) {
+      if (loadedIdRef.current) {
+        dispatch(resetBooking())
+        onLoaded()
+      }
+      return
+    }
+    // Already loaded — keep the client's edits (e.g. coming back to this page).
+    if (loadedIdRef.current === id) return
+
+    let cancelled = false
+    onLoading(true)
+    ;(async () => {
+      try {
+        const booking = await bookingService.getBookingById(id) as BookingWithRelations
+        if (cancelled) return
+        if (!booking || !isAwaitingResubmit(booking)) {
+          appToast.error('This booking can no longer be edited and resubmitted.')
+          router.replace('/client/booking')
+          return
+        }
+        dispatch(loadResubmitDraft(bookingToResubmitDraft(booking)))
+        onLoaded()
+      } catch (err) {
+        if (cancelled) return
+        appToast.error(getApiErrorMessage(err, 'Could not load the booking.'))
+        router.replace('/client/booking')
+      } finally {
+        if (!cancelled) onLoading(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [id, dispatch, router, onLoaded, onLoading])
+
+  return null
+}
+
 export default function BookingWizard() {
   const dispatch = useAppDispatch()
+  const router   = useRouter()
   const step     = useAppSelector((s) => s.booking.step)
   const service  = useAppSelector((s) => s.booking.service)
+  const resubmit = useAppSelector((s) => s.booking.resubmit)
+  const [loadingDraft, setLoadingDraft] = useState(false)
 
   const [dir,          setDir]          = useState(1)
   const [wizardKey,    setWizardKey]    = useState(0)
@@ -42,7 +106,17 @@ export default function BookingWizard() {
     setPendingFiles([])
     dispatch(resetBooking())
     setWizardKey(k => k + 1)
-  }, [dispatch])
+    // Drop a ?resubmit= left over from correcting a rejected booking.
+    router.replace('/client/booking')
+  }, [dispatch, router])
+
+  // A booking loaded for correction starts the wizard over, without any files
+  // queued for the previous one.
+  const handleDraftLoaded = useCallback(() => {
+    setPendingFiles([])
+    setDir(1)
+    setWizardKey(k => k + 1)
+  }, [])
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
@@ -52,8 +126,13 @@ export default function BookingWizard() {
                       grid grid-cols-[1fr_auto_1fr] items-center gap-4">
 
         <h1 className="ff-sc booking-text text-white text-base lg:text-xl tracking-wider whitespace-nowrap">
-          New Booking
-          {service && (
+          {resubmit ? 'Edit & Resubmit' : 'New Booking'}
+          {resubmit?.reference ? (
+            <>
+              <span className="text-white/30 mx-1.5">/</span>
+              <span>{resubmit.reference}</span>
+            </>
+          ) : service && (
             <>
               <span className="text-white/30 mx-1.5">/</span>
               <span className="uppercase">{service}</span>
@@ -91,8 +170,29 @@ export default function BookingWizard() {
         <div className="hidden sm:block" />
       </div>
 
+      <Suspense fallback={null}>
+        <ResubmitLoader onLoaded={handleDraftLoaded} onLoading={setLoadingDraft} />
+      </Suspense>
+
+      {/* Why the booking being corrected was turned down, kept in view while editing. */}
+      {resubmit && (
+        <div className="shrink-0 flex items-start gap-2 px-4 lg:px-6 py-2.5 border-b border-white/[0.07]"
+          style={{ background: 'rgba(248,113,113,0.08)' }}>
+          <XCircle size={15} className="shrink-0 mt-0.5" style={{ color: '#f87171' }} />
+          <p className="ff-sc booking-text text-xs lg:text-sm text-white/85">
+            This booking was not approved{resubmit.rejectionReason ? <>: <span className="text-white">{resubmit.rejectionReason}</span></> : '.'}
+            {' '}Correct the details below and resubmit it for another review.
+          </p>
+        </div>
+      )}
+
       {/* Step content — key forces full remount on new booking */}
       <div key={wizardKey} className="flex-1 min-h-0 relative overflow-hidden">
+        {loadingDraft && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-[var(--color-bg)]/80">
+            <span className="ff-sc booking-text text-sm text-white/70">Loading booking…</span>
+          </div>
+        )}
         <AnimatePresence mode="wait" custom={dir}>
           <motion.div
             key={step}

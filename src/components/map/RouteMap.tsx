@@ -38,7 +38,7 @@ function filterBookings(bookings: BookingWithRelations[], filter: FilterKey) {
   switch (filter) {
     case 'Active':    return bookings.filter((b) => b.status === 'in_transit' || b.status === 'assigned')
     case 'Pending':   return bookings.filter((b) => b.status === 'pending')
-    case 'Completed': return bookings.filter((b) => b.status === 'completed'  || b.status === 'cancelled')
+    case 'Completed': return bookings.filter((b) => b.status === 'completed')
     default:          return bookings
   }
 }
@@ -240,7 +240,13 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
 
   const user = useAuthStore((s) => s.user)
 
-  const bookings        = useAppSelector((s) => s.routeMap.bookings)
+  const allBookings     = useAppSelector((s) => s.routeMap.bookings)
+  // A cancelled booking (rejected, or withdrawn) never moves, so there is
+  // nothing to track. It stays visible in Transaction History.
+  const bookings        = useMemo(
+    () => allBookings.filter((b) => String(b.status).toLowerCase() !== 'cancelled'),
+    [allBookings],
+  )
   const listLoading     = useAppSelector((s) => s.routeMap.listLoading)
   const listError       = useAppSelector((s) => s.routeMap.listError)
   const selectedId      = useAppSelector((s) => s.routeMap.selectedId)

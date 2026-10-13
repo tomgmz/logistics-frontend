@@ -15,6 +15,8 @@ import { useAuthStore } from '@/lib/store/auth.store'
 import type { BookingWithRelations, BookingDestination } from '@/lib/store/slice/routeMap.slice'
 import { type BookingStatus, asBookingStatus } from '@/app/types/maps/routemap.types'
 import { bookingRef } from '@/lib/booking'
+import { isAwaitingResubmit } from '@/lib/booking-resubmit'
+import RejectionPanel from '@/components/transactions/RejectionPanel'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { RouteStepper, countSteps } from '@/components/map/RouteStepper'
 import { supportService, openHelpAssistant, type SupportTicket } from '@/lib/services/support.service'
@@ -337,7 +339,10 @@ function ActiveShipmentRow({ booking }: { booking: BookingWithRelations }) {
   )
 }
 
-function RejectedRow({ booking }: { booking: BookingWithRelations }) {
+function RejectedRow({ booking, onUpdated }: {
+  booking:   BookingWithRelations
+  onUpdated: (next: BookingWithRelations) => void
+}) {
   const reason = booking.rejection_reason as string | undefined
   return (
     <div className="rounded-lg border p-3 flex flex-col gap-1.5" style={{ background: BG_PAGE, borderColor: `${ERROR}40` }}>
@@ -350,12 +355,13 @@ function RejectedRow({ booking }: { booking: BookingWithRelations }) {
           {bookingRef(booking)}
         </Link>
         <span className="ml-auto text-[10px] uppercase tracking-widest" style={{ color: ERROR }}>
-          Cancelled
+          Rejected
         </span>
       </div>
       <p className="text-[11px] leading-snug" style={{ color: MUTED }}>
         {reason ? `Reason: ${reason}` : 'This booking was turned down.'}
       </p>
+      <RejectionPanel booking={booking} onUpdated={onUpdated} compact />
     </div>
   )
 }
@@ -430,10 +436,11 @@ export default function ClientDashboardView() {
   }, [bookings])
 
   // A rejection is easy to miss otherwise: it is the one thing on this screen
-  // the client has to act on rather than just watch.
+  // the client has to act on rather than just watch. It leaves the list once
+  // the client resubmits it or cancels it.
   const rejected = useMemo(() => (
     bookings
-      .filter((b) => asBookingStatus(b.status) === 'CANCELLED')
+      .filter(isAwaitingResubmit)
       .sort((a, b) => String(b.updated_at ?? '').localeCompare(String(a.updated_at ?? '')))
       .slice(0, 2)
   ), [bookings])
@@ -574,7 +581,11 @@ export default function ClientDashboardView() {
                     <EmptyPanel icon={<CheckCircle2 size={26} />} message="Nothing needs you right now." />
                   ) : (
                     <div className="flex flex-col gap-2">
-                      {rejected.map((b) => <RejectedRow key={b.booking_id} booking={b} />)}
+                      {rejected.map((b) => (
+                        <RejectedRow key={b.booking_id} booking={b} onUpdated={(next) => {
+                          setBookings((prev) => prev.map((x) => (x.booking_id === next.booking_id ? next : x)))
+                        }} />
+                      ))}
                     </div>
                   )}
                 </Panel>

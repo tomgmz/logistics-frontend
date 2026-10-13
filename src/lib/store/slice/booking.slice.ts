@@ -1,4 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
+import type { ResubmitDraft } from '@/lib/booking-resubmit'
 
 export type CargoMode   = 'loose' | 'palletized'
 export type ServiceType = 'fmcg' | null
@@ -39,7 +40,20 @@ export interface DropoffSection {
   groups: ItemGroup[]
 }
 
+/**
+ * Set while the wizard is correcting a booking 8338 rejected, rather than
+ * creating a new one. `existingDocuments` are the transaction documents already
+ * on that booking; the client keeps or removes them and may add more.
+ */
+export interface ResubmitContext {
+  bookingId:         string
+  reference:         string | null
+  rejectionReason:   string | null
+  existingDocuments: string[]
+}
+
 interface BookingState {
+  resubmit: ResubmitContext | null
   sidebarOpen: boolean
   step: number
   service: ServiceType
@@ -102,6 +116,7 @@ function ensureSection(state: BookingState, dropoffIndex: number): DropoffSectio
 }
 
 const initialState: BookingState = {
+  resubmit: null,
   sidebarOpen: true,
   step: 1,
   service: 'fmcg',
@@ -212,6 +227,33 @@ const bookingSlice = createSlice({
       state.allOversize = action.payload
       state.sections.forEach((sec) => sec.groups.forEach((g) => { g.oversize = action.payload }))
     },
+    loadResubmitDraft(state, action: PayloadAction<ResubmitDraft>) {
+      const d = action.payload
+      return {
+        ...initialState,
+        sidebarOpen:     state.sidebarOpen,
+        resubmit: {
+          bookingId:         d.bookingId,
+          reference:         d.reference,
+          rejectionReason:   d.rejectionReason,
+          existingDocuments: d.existingDocuments,
+        },
+        date:            d.date,
+        time:            d.time,
+        pickup:          d.pickup,
+        pickupLat:       d.pickupLat,
+        pickupLng:       d.pickupLng,
+        dropoffs:        d.dropoffs,
+        dropoffCoords:   d.dropoffCoords,
+        mode:            'loose' as CargoMode,
+        sections:        d.sections,
+        allNonStackable: d.allNonStackable,
+      }
+    },
+    removeExistingDocument(state, action: PayloadAction<string>) {
+      if (!state.resubmit) return
+      state.resubmit.existingDocuments = state.resubmit.existingDocuments.filter((u) => u !== action.payload)
+    },
     resetBooking() {
       return {
         ...initialState,
@@ -244,6 +286,8 @@ export const {
   setAllStackable,
   setAllOversize,
   resetBooking,
+  loadResubmitDraft,
+  removeExistingDocument,
 } = bookingSlice.actions
 
 export default bookingSlice.reducer

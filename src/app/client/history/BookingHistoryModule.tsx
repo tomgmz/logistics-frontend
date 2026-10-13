@@ -26,6 +26,7 @@ import { type BookingStatus, asBookingStatus } from '@/app/types/maps/routemap.t
 import { bookingRef } from '@/lib/booking'
 
 import TransactionDetail from '@/components/transactions/TransactionDetail'
+import RejectionPanel from '@/components/transactions/RejectionPanel'
 import CompletionPanel from '@/components/transactions/CompletionPanel'
 import BookingDocuments from '@/components/transactions/BookingDocuments'
 import { StatusBadge } from '@/components/transactions/TransactionStatus'
@@ -580,6 +581,11 @@ export default function BookingHistoryModule() {
             <div key="detail" className="flex flex-col gap-4">
               {/* Completion is the client's call once the driver is done. */}
               <CompletionPanel booking={selected} mode="client" onUpdated={(next) => {
+                setSelected(next)
+                setBookings((prev) => prev.map((b) => (b.booking_id === next.booking_id ? next : b)))
+              }} />
+              {/* A rejection is the client's to answer: resubmit or cancel. */}
+              <RejectionPanel booking={selected} onUpdated={(next) => {
                 setSelected(next)
                 setBookings((prev) => prev.map((b) => (b.booking_id === next.booking_id ? next : b)))
               }} />
