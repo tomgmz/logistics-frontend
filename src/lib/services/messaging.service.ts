@@ -82,6 +82,10 @@ export const messagingService = {
   addGroupMembers: (groupId: string, memberIds: string[]) =>
     post<{ added: number }>(`${B}/groups/${groupId}/members`, { member_ids: memberIds }),
 
+  // Only the group's creator may remove someone.
+  removeGroupMember: (groupId: string, userId: string) =>
+    del<void>(`${B}/groups/${groupId}/members/${userId}`),
+
   respondToGroupInvite: (groupId: string, accept: boolean) =>
     patch<void>(`${B}/groups/${groupId}/invite/respond`, { accept }),
 

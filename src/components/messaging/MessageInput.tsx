@@ -142,7 +142,10 @@ export default function MessageInput({
             placeholder="Type a message…"
             rows={1}
             maxLength={5000}
-            disabled={disabled}
+            // Never disabled: `disabled` only means a message is still being
+            // sent, and disabling the box would drop its focus, so the user had
+            // to click back into it after every message. Sending is blocked in
+            // handleSend instead, and the next message can be typed meanwhile.
             className="w-full bg-transparent px-3 py-2.5 ff-body text-sm text-white placeholder:text-white/25 resize-none focus:outline-none overflow-y-auto [&::-webkit-scrollbar]:w-[3px] [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full"
             style={{ minHeight: compact ? '36px' : '44px', maxHeight: compact ? '80px' : '120px' }}
           />

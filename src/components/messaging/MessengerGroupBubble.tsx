@@ -7,7 +7,7 @@ import { useMessengerStore } from '@/lib/store/messenger.store'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { messagingService } from '@/lib/services/messaging.service'
 import { useIsMobile } from '@/lib/hooks/useIsMobile'
-import { groupMessagesByDate, formatMessageTime } from '@/app/utils/messaging.utils'
+import { groupMessagesByDate, formatMessageTime, groupEventText } from '@/app/utils/messaging.utils'
 import { toGroup, toGroupMessage } from '@/app/types/messaging/messaging.types'
 import type {
   Group,
@@ -150,6 +150,7 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
   useEffect(() => { setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50) }, [messages, typingUsers])
 
   const memberMap = Object.fromEntries(members.map(m => [m.user_id, m]))
+  const nameOf    = (id: string) => memberMap[id] ? `${memberMap[id].first_name} ${memberMap[id].last_name}`.trim() : undefined
 
   const { broadcastTyping } = useMessagingRealtime({
     currentUserId,
@@ -190,6 +191,7 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
       id: oid, group_id: groupId, sender_id: currentUserId, body,
       created_at: new Date().toISOString(),
       reply_to: replyTo ? { message_id: replyTo.messageId, content: replyTo.content, sender_id: currentUserId } : null,
+      kind: 'text' as const, meta: null,
       reactions: [],
     }])
     setReplyTo(null)
@@ -303,16 +305,23 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
             <div key={date} className="space-y-1.5">
               <p className="ff-body text-[9px] text-white/20 text-center uppercase tracking-widest">{date}</p>
               {msgs.map((msg, i) => {
+                if (msg.kind === 'system') {
+                  return (
+                    <p key={msg.id} className="text-center ff-body text-[10px] text-white/45 py-1.5 px-6 leading-snug">
+                      {groupEventText(msg, currentUserId, nameOf)}
+                    </p>
+                  )
+                }
                 const isMine       = msg.sender_id === currentUserId
                 const sender       = memberMap[msg.sender_id]
                 const prev         = msgs[i - 1]
-                const showName     = !isMine && prev?.sender_id !== msg.sender_id
+                const showName     = !isMine && (prev?.sender_id !== msg.sender_id || prev?.kind === 'system')
                 const isOptimistic = msg.id.startsWith('optimistic-')
                 const grouped      = groupReactions(msg.reactions, currentUserId)
                 const seenBy       = (!isOptimistic && isMine) ? getSeenBy(members, msg.created_at, msg.sender_id, currentUserId) : []
                 const replyName    = msg.reply_to ? (msg.reply_to.sender_id === currentUserId ? 'You' : memberMap[msg.reply_to.sender_id]?.first_name ?? 'Someone') : undefined
                 const senderInitials = sender ? `${sender.first_name?.[0] ?? '?'}${sender.last_name?.[0] ?? '?'}`.toUpperCase() : '?'
-                const showAvatar   = !isMine && (msgs[i + 1]?.sender_id !== msg.sender_id || i === msgs.length - 1)
+                const showAvatar   = !isMine && (msgs[i + 1]?.sender_id !== msg.sender_id || msgs[i + 1]?.kind === 'system' || i === msgs.length - 1)
 
                 return (
                   <div key={msg.id}

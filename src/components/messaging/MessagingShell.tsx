@@ -53,7 +53,7 @@ export default function MessagingShell() {
       const mapped = rawGroups.map(toGroup)
       setGroups(mapped)
       // Keep the open group in step with the list (new name, new members).
-      setSelectedGroup(prev => (prev ? mapped.find(g => g.id === prev.id) ?? prev : prev))
+      setSelectedGroup(prev => (prev ? mapped.find(g => g.id === prev.id) ?? null : prev))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load conversations')
     } finally {
@@ -96,7 +96,7 @@ export default function MessagingShell() {
             last_message: { message_id: raw.message_id, body: raw.content, created_at: raw.sent_at, sender_id: raw.sender_id },
             unread_count: raw.sender_id === currentUserId
               ? 0
-              : selectedGroup?.id !== g.id ? g.unread_count + 1 : g.unread_count,
+              : raw.message_type === 'system' || selectedGroup?.id === g.id ? g.unread_count : g.unread_count + 1,
           }
         })
       })

@@ -142,7 +142,15 @@ export interface GroupMessageRaw {
   reply_to_message_id: string | null
   reply_to: MessageReplyTo | null
   reactions: MessageReaction[]
+  message_type?: 'text' | 'system'
+  meta?: GroupSystemEvent | null
 }
+
+/** A group event shown as a centered line in the chat, not a speech bubble. */
+export type GroupSystemEvent =
+  | { event: 'renamed'; name: string; previous_name?: string | null }
+  | { event: 'added'; user_ids: string[]; names: string[] }
+  | { event: 'removed'; user_id: string; name: string }
 
 export interface GroupMemberRaw {
   status: 'pending' | 'accepted' | 'declined'
@@ -176,6 +184,8 @@ export interface GroupMessage {
   created_at: string
   reply_to: MessageReplyTo | null
   reactions: MessageReaction[]
+  kind: 'text' | 'system'
+  meta: GroupSystemEvent | null
 }
 
 export interface GroupMember {
@@ -236,6 +246,8 @@ export function toGroupMessage(raw: GroupMessageRaw): GroupMessage {
     created_at: raw.sent_at,
     reply_to:   raw.reply_to?.message_id ? raw.reply_to : null,
     reactions:  raw.reactions  ?? [],
+    kind:       raw.message_type === 'system' ? 'system' : 'text',
+    meta:       raw.meta ?? null,
   }
 }
 

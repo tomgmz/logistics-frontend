@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { X, Search, Loader2, Users, Check, UserPlus, Pencil } from 'lucide-react'
+import { X, Search, Loader2, Users, Check, UserPlus, Pencil, UserMinus } from 'lucide-react'
 import { messagingService, type MessagableUser } from '@/lib/services/messaging.service'
 import { roleLabel, matchesPersonSearch } from '@/lib/roles'
 import { getApiErrorMessage } from '@/lib/api-error'
@@ -72,10 +72,57 @@ const LIST_CLASS = 'flex-1 overflow-y-auto px-2 pb-2 min-h-0 [&::-webkit-scrollb
 const INPUT_CLASS = 'w-full bg-white/[0.04] border border-white/[0.07] rounded-xl px-3 py-2.5 ff-body text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[var(--color-cyan)]/30 transition-all'
 const PRIMARY_CLASS = 'w-full py-2.5 rounded-xl ff-body text-sm font-medium transition-all bg-[var(--color-cyan)] text-[var(--color-bg)] disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2'
 
-/** Everyone in the group: who has joined, and who has been invited but not yet. */
-function MembersModal({ group, currentUserId, onClose }: {
-  group: Group; currentUserId: string; onClose: () => void
+/**
+ * Everyone in the group: who has joined, and who has been invited but not yet.
+ * The group's creator can remove anyone else from here.
+ */
+function MembersModal({ group, currentUserId, onClose, onChanged }: {
+  group: Group; currentUserId: string; onClose: () => void; onChanged: () => void
 }) {
+  const [confirmId, setConfirmId] = useState<string | null>(null)
+  const [removing,  setRemoving]  = useState(false)
+  const [error,     setError]     = useState<string | null>(null)
+  const canRemove = group.created_by === currentUserId
+
+  const remove = async (userId: string) => {
+    setRemoving(true)
+    setError(null)
+    try {
+      await messagingService.removeGroupMember(group.id, userId)
+      setConfirmId(null)
+      onChanged()
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Could not remove this person'))
+    } finally {
+      setRemoving(false)
+    }
+  }
+
+  const removeControl = (m: GroupMember) => {
+    if (!canRemove || m.user_id === currentUserId) return null
+    if (confirmId === m.user_id) {
+      return (
+        <div className="shrink-0 flex items-center gap-1">
+          <button type="button" disabled={removing} onClick={() => void remove(m.user_id)}
+            className="px-2 py-1 rounded-lg bg-red-500/80 hover:bg-red-500 ff-body text-[11px] text-white disabled:opacity-50">
+            {removing ? <Loader2 size={11} className="animate-spin" /> : 'Remove'}
+          </button>
+          <button type="button" disabled={removing} onClick={() => setConfirmId(null)}
+            className="px-2 py-1 rounded-lg border border-white/10 ff-body text-[11px] text-white/60 hover:text-white">
+            Keep
+          </button>
+        </div>
+      )
+    }
+    return (
+      <button type="button" title="Remove from group" aria-label={`Remove ${m.first_name} ${m.last_name} from group`}
+        onClick={() => setConfirmId(m.user_id)}
+        className="shrink-0 p-1.5 rounded-lg text-white/30 hover:text-red-400 hover:bg-white/5 transition-colors">
+        <UserMinus size={14} />
+      </button>
+    )
+  }
+
   const joined  = group.members.filter(m => m.status === 'accepted')
   const invited = group.members.filter(m => m.status === 'pending')
   const sortByName = (a: GroupMember, b: GroupMember) =>
@@ -94,7 +141,8 @@ function MembersModal({ group, currentUserId, onClose }: {
           In the group · {joined.length}
         </p>
         {[...joined].sort(sortByName).map(m => (
-          <PersonRow key={m.user_id} first={m.first_name} last={m.last_name} role={m.role} right={tag(m)} />
+          <PersonRow key={m.user_id} first={m.first_name} last={m.last_name} role={m.role}
+            right={<>{tag(m)}{removeControl(m)}</>} />
         ))}
         {invited.length > 0 && (
           <>
@@ -103,11 +151,12 @@ function MembersModal({ group, currentUserId, onClose }: {
             </p>
             {[...invited].sort(sortByName).map(m => (
               <PersonRow key={m.user_id} first={m.first_name} last={m.last_name} role={m.role}
-                right={<span className="shrink-0 ff-body text-[10px] text-amber-400/80">Invite pending</span>} />
+                right={<><span className="shrink-0 ff-body text-[10px] text-amber-400/80">Invite pending</span>{removeControl(m)}</>} />
             ))}
           </>
         )}
       </div>
+      {error && <p className="px-4 pb-3 ff-body text-xs text-red-400">{error}</p>}
     </ModalFrame>
   )
 }
@@ -250,7 +299,8 @@ export default function GroupOptionsModals({ view, group, currentUserId, onClose
   onChanged:     () => void
 }) {
   const done = () => { onChanged(); onClose() }
-  if (view === 'members') return <MembersModal group={group} currentUserId={currentUserId} onClose={onClose} />
+  // Stays open after a removal, so several people can be removed in a row.
+  if (view === 'members') return <MembersModal group={group} currentUserId={currentUserId} onClose={onClose} onChanged={onChanged} />
   if (view === 'add')     return <AddMembersModal group={group} onClose={onClose} onDone={done} />
   if (view === 'rename')  return <RenameModal group={group} onClose={onClose} onDone={done} />
   return null

@@ -36,3 +36,33 @@ export function groupMessagesByDate<T extends { created_at: string }>(
   }
   return Object.entries(map).map(([date, msgs]) => ({ date, messages: msgs }))
 }
+/** "A and B", "A, B and C". */
+function joinNames(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? ''
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
+}
+
+/**
+ * The sentence for a group event line, from the reader's point of view:
+ * "You named the group Dispatch." / "Ana Cruz added Ben Lee and you."
+ * Falls back to the stored sentence when the event cannot be read.
+ */
+export function groupEventText(
+  msg: { sender_id: string; body: string; meta: import('@/app/types/messaging/messaging.types').GroupSystemEvent | null },
+  currentUserId: string,
+  nameOf: (userId: string) => string | undefined,
+): string {
+  const meta = msg.meta
+  if (!meta) return msg.body
+  const actor = msg.sender_id === currentUserId ? 'You' : nameOf(msg.sender_id) ?? 'Someone'
+  if (meta.event === 'renamed') return `${actor} named the group ${meta.name}.`
+  if (meta.event === 'added') {
+    const names = meta.user_ids.map((id, i) => (id === currentUserId ? 'you' : meta.names[i] ?? nameOf(id) ?? 'someone'))
+    return `${actor} added ${joinNames(names)} to the group.`
+  }
+  if (meta.event === 'removed') {
+    const who = meta.user_id === currentUserId ? 'you' : meta.name || nameOf(meta.user_id) || 'someone'
+    return `${actor} removed ${who} from the group.`
+  }
+  return msg.body
+}

@@ -8,7 +8,7 @@ import { useMessagingRealtime } from '@/lib/hooks/useMessagingRealtime'
 import MessageInput from './MessageInput'
 import GroupOptionsModals, { type GroupOptionsView } from './GroupOptionsModals'
 import { QuickReactBar } from './EmojiPicker'
-import { groupMessagesByDate, formatMessageTime } from '@/app/utils/messaging.utils'
+import { groupMessagesByDate, formatMessageTime, groupEventText } from '@/app/utils/messaging.utils'
 import { Reply as ReplyIcon } from 'lucide-react'
 import type {
   Group,
@@ -134,6 +134,10 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
   const memberMap       = Object.fromEntries(members.map(m => [m.user_id, m]))
   const invitedBy       = memberMap[members.find(m => m.user_id === currentUserId)?.invited_by ?? '']
   const invitedByName   = invitedBy ? `${invitedBy.first_name} ${invitedBy.last_name}` : 'Someone'
+  const nameOf          = (id: string) => memberMap[id] ? `${memberMap[id].first_name} ${memberMap[id].last_name}`.trim() : undefined
+  const creatorLine     = group.created_by === currentUserId
+    ? 'You created this group'
+    : `${nameOf(group.created_by) ?? 'Someone'} created this group`
 
   const coerce = useCallback((r: GroupMessageRaw): GroupMessage => toGroupMessage(r), [])
 
@@ -206,6 +210,7 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
       created_at: new Date().toISOString(),
       reply_to: replyTo ? { message_id: replyTo.messageId, content: replyTo.content, sender_id: currentUserId } : null,
       reactions: [],
+      kind: 'text', meta: null,
     }
     pendingIds.current.add(oid)
     setMessages(p => [...p, opt])
@@ -346,10 +351,36 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
                 <button type="button" onClick={fetchMessages} className="ff-body text-xs text-[var(--color-cyan)]/60 hover:text-[var(--color-cyan)] transition-colors">Retry</button>
               </div>
             )}
-            {!loading && !error && dateGroups.length === 0 && (
-              <div className="flex flex-col items-center justify-center h-full gap-2 text-center">
-                <Users size={24} className="text-white/20" />
-                <p className="ff-body text-white/20 text-xs">No messages yet. Start the conversation.</p>
+            {!loading && !error && (
+              <div className="flex flex-col items-center text-center gap-2 pt-6 pb-8">
+                <div className="w-16 h-16 rounded-full bg-[var(--color-surface-dark)] border border-white/10 flex items-center justify-center">
+                  <Users size={26} className="text-white/60" />
+                </div>
+                <p className="ff-body text-base text-white font-semibold mt-1 break-words max-w-full">{group.name}</p>
+                <p className="ff-body text-xs text-white/45">{creatorLine}</p>
+                <div className="flex items-start gap-6 mt-3">
+                  <button type="button" onClick={() => setOptionsView('add')} className="flex flex-col items-center gap-1.5 group">
+                    <span className="w-10 h-10 rounded-full bg-white/[0.07] group-hover:bg-white/[0.12] flex items-center justify-center transition-colors">
+                      <UserPlus size={16} className="text-white/80" />
+                    </span>
+                    <span className="ff-body text-xs text-white/70">Add</span>
+                  </button>
+                  <button type="button" onClick={() => setOptionsView('rename')} className="flex flex-col items-center gap-1.5 group">
+                    <span className="w-10 h-10 rounded-full bg-white/[0.07] group-hover:bg-white/[0.12] flex items-center justify-center transition-colors">
+                      <Pencil size={16} className="text-white/80" />
+                    </span>
+                    <span className="ff-body text-xs text-white/70">Name</span>
+                  </button>
+                  <button type="button" onClick={() => setOptionsView('members')} className="flex flex-col items-center gap-1.5 group">
+                    <span className="w-10 h-10 rounded-full bg-white/[0.07] group-hover:bg-white/[0.12] flex items-center justify-center transition-colors">
+                      <Users size={16} className="text-white/80" />
+                    </span>
+                    <span className="ff-body text-xs text-white/70">Members</span>
+                  </button>
+                </div>
+                {dateGroups.length === 0 && (
+                  <p className="ff-body text-white/25 text-xs mt-6">No messages yet. Start the conversation.</p>
+                )}
               </div>
             )}
             {!loading && !error && dateGroups.map(({ date, messages: msgs }) => (
@@ -360,11 +391,20 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
                   <div className="flex-1 h-px bg-white/[0.04]" />
                 </div>
                 {msgs.map((msg, i) => {
+                  if (msg.kind === 'system') {
+                    return (
+                      <p key={msg.id} className="text-center ff-body text-[12px] text-white/45 py-1.5 px-6 leading-snug">
+                        {groupEventText(msg, currentUserId, nameOf)}
+                      </p>
+                    )
+                  }
                   const isMine        = msg.sender_id === currentUserId
                   const sender        = memberMap[msg.sender_id]
                   const prev          = msgs[i - 1]
-                  const showName      = !isMine && prev?.sender_id !== msg.sender_id
-                  const showAvatar    = !isMine && (msgs[i + 1]?.sender_id !== msg.sender_id || i === msgs.length - 1)
+                  const next          = msgs[i + 1]
+                  // An event line breaks a run of messages, like a change of sender.
+                  const showName      = !isMine && (prev?.sender_id !== msg.sender_id || prev?.kind === 'system')
+                  const showAvatar    = !isMine && (next?.sender_id !== msg.sender_id || next?.kind === 'system' || i === msgs.length - 1)
                   const senderInitials= sender ? `${sender.first_name?.[0] ?? '?'}${sender.last_name?.[0] ?? '?'}`.toUpperCase() : '?'
                   const isSenderOnline= sender ? onlineIds.includes(sender.user_id) : false
                   const isOptimistic  = msg.id.startsWith('optimistic-')
