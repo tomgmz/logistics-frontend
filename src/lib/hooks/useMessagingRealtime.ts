@@ -23,6 +23,8 @@ export interface UseMessagingRealtimeOptions {
   onGroupInvite?:       (payload: GroupInvitePayload)      => void
   /** A group was renamed or gained members. */
   onGroupUpdated?:      (payload: { group_id: string; name?: string }) => void
+  /** A message was unsent for everyone: drop it. */
+  onMessageUnsent?:     (payload: { message_id: string; conversation_id?: string; group_id?: string }) => void
   onReactionToggle?:    (payload: ReactionTogglePayload)   => void
   onTyping?:            (userId: string, isTyping: boolean) => void
   onPresenceChange?:    (onlineUserIds: string[])          => void
@@ -67,6 +69,9 @@ export function useMessagingRealtime(opts: UseMessagingRealtimeOptions) {
       })
       .on('broadcast', { event: 'group_invite' }, ({ payload }: { payload: GroupInvitePayload }) => {
         optsRef.current.onGroupInvite?.(payload)
+      })
+      .on('broadcast', { event: 'message_unsent' }, ({ payload }: { payload: { message_id: string; conversation_id?: string; group_id?: string } }) => {
+        optsRef.current.onMessageUnsent?.(payload)
       })
       .on('broadcast', { event: 'group_updated' }, ({ payload }: { payload: { group_id: string; name?: string } }) => {
         optsRef.current.onGroupUpdated?.(payload)

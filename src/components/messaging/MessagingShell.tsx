@@ -104,6 +104,7 @@ export default function MessagingShell() {
     },
     onGroupInvite: () => fetchAll(),
     onGroupUpdated: () => fetchAll(),
+    onMessageUnsent: () => fetchAll(),
   })
 
   const unified: UnifiedListItem[] = [

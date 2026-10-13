@@ -11,7 +11,7 @@ import GroupOptionsModals, { type GroupOptionsView } from './GroupOptionsModals'
 import { QuickReactBar } from './EmojiPicker'
 import { groupMessagesByDate, formatMessageTime, groupEventText, isReadBy, latestSeenPositions } from '@/app/utils/messaging.utils'
 import { Reply as ReplyIcon, Trash2 } from 'lucide-react'
-import ConfirmDeleteDialog from './ConfirmDeleteDialog'
+import ConfirmDeleteDialog, { type DeleteScope } from './ConfirmDeleteDialog'
 import type {
   Group,
   GroupMessage,
@@ -188,6 +188,7 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
 
   const { broadcastTyping } = useMessagingRealtime({
     currentUserId,
+    onMessageUnsent: ({ message_id }) => setMessages(prev => prev.filter(m => m.id !== message_id)),
     conversationId: `group:${group.id}`,
     onGroupMessage: (raw) => {
       if (raw.group_id !== group.id) return
@@ -242,12 +243,12 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
     finally { setSending(false) }
   }
 
-  const confirmDelete = async () => {
+  const confirmDelete = async (scope: DeleteScope) => {
     const id = deleteId
     setDeleteId(null)
     if (!id) return
     setMessages(prev => prev.filter(m => m.id !== id))
-    try { await messagingService.hideGroupMessage(group.id, id) }
+    try { await messagingService.hideGroupMessage(group.id, id, scope) }
     catch { fetchMessages() }
   }
 
@@ -273,7 +274,7 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
 
   return (
     <>
-    <ConfirmDeleteDialog open={deleteId !== null} onCancel={() => setDeleteId(null)} onConfirm={() => void confirmDelete()} />
+    <ConfirmDeleteDialog open={deleteId !== null} canUnsend={messages.some(m => m.id === deleteId && m.sender_id === currentUserId)} onCancel={() => setDeleteId(null)} onConfirm={(scope) => void confirmDelete(scope)} />
     <div className="flex flex-col h-full min-h-0">
       {/* Header */}
       <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-white/[0.07] bg-[var(--color-bg)]">
@@ -517,7 +518,7 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
                               onClick={() => setReplyTo({ messageId: msg.id, content: msg.body, senderName: 'You' })}
                               className="p-1.5 rounded-lg hover:bg-white/5 text-white/25 hover:text-white/60 transition-colors"
                             ><ReplyIcon size={13} /></motion.button>
-                            {!isOptimistic && <motion.button initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} type="button" title="Delete for me"
+                            {!isOptimistic && <motion.button initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} type="button" title="Remove message"
                               onClick={() => setDeleteId(msg.id)}
                               className="p-1.5 rounded-lg hover:bg-white/5 text-white/25 hover:text-red-400 transition-colors"
                             ><Trash2 size={13} /></motion.button>}
@@ -530,7 +531,7 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
                               onClick={() => setReplyTo({ messageId: msg.id, content: msg.body, senderName: sender?.first_name ?? 'Someone' })}
                               className="p-1.5 rounded-lg hover:bg-white/5 text-white/25 hover:text-white/60 transition-colors"
                             ><ReplyIcon size={13} /></motion.button>
-                            {!isOptimistic && <motion.button initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} type="button" title="Delete for me"
+                            {!isOptimistic && <motion.button initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} type="button" title="Remove message"
                               onClick={() => setDeleteId(msg.id)}
                               className="p-1.5 rounded-lg hover:bg-white/5 text-white/25 hover:text-red-400 transition-colors"
                             ><Trash2 size={13} /></motion.button>}

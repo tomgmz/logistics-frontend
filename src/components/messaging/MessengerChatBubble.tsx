@@ -105,6 +105,7 @@ export default function MessengerChatBubble({ conversationId, index }: Props) {
 
   const { broadcastTyping } = useMessagingRealtime({
     currentUserId,
+    onMessageUnsent: ({ message_id }) => setMessages(prev => prev.filter(m => m.id !== message_id)),
     conversationId,
     onNewMessage: (raw: MessageRow) => {
       const inc = toMessage(raw)
@@ -149,10 +150,10 @@ export default function MessengerChatBubble({ conversationId, index }: Props) {
   }
 
   // Delete for me: the other person keeps the message.
-  const handleDelete = async (messageId: string) => {
+  const handleDelete = async (messageId: string, scope: 'me' | 'everyone' = 'me') => {
     if (messageId.startsWith('optimistic-')) return
     setMessages(prev => prev.filter(m => m.id !== messageId))
-    try { await messagingService.deleteMessage(messageId) }
+    try { await messagingService.deleteMessage(messageId, scope) }
     catch { fetchMessages() }
   }
 

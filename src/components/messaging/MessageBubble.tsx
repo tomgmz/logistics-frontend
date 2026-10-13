@@ -1,7 +1,7 @@
 'use client'
 
 import ReadTicks from './ReadTicks'
-import ConfirmDeleteDialog from './ConfirmDeleteDialog'
+import ConfirmDeleteDialog, { type DeleteScope } from './ConfirmDeleteDialog'
 
 import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -31,7 +31,8 @@ interface MessageBubbleProps {
   showSeen?:        boolean
   onReply?:         (msg: Message) => void
   onReact?:         (messageId: string, emoji: string) => void
-  onDelete?:        (messageId: string) => void
+  /** 'me' deletes it for you; 'everyone' unsends it (your own messages only). */
+  onDelete?:        (messageId: string, scope: DeleteScope) => void
   replyToSenderName?: string
 }
 
@@ -69,7 +70,7 @@ export default function MessageBubble({
         </button>
       )}
       {onDelete && (
-        <button type="button" onClick={() => setConfirmingDelete(true)} title="Delete for me"
+        <button type="button" onClick={() => setConfirmingDelete(true)} title="Remove message"
           className="p-1.5 rounded-lg hover:bg-white/5 text-white/25 hover:text-[var(--color-red,#f87171)] transition-colors">
           <Trash2 size={13} />
         </button>
@@ -87,8 +88,9 @@ export default function MessageBubble({
       {/* Rendered into a portal, so its place in the tree does not matter. */}
       <ConfirmDeleteDialog
         open={confirmingDelete}
+        canUnsend={isMine}
         onCancel={() => setConfirmingDelete(false)}
-        onConfirm={() => { setConfirmingDelete(false); onDelete?.(message.id) }}
+        onConfirm={(scope) => { setConfirmingDelete(false); onDelete?.(message.id, scope) }}
       />
       {/* Avatar */}
       {!isMine && (

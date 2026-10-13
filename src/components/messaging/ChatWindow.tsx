@@ -122,6 +122,7 @@ export default function ChatWindow({ conversation, draftUser, currentUserId, isP
 
   const { broadcastTyping } = useMessagingRealtime({
     currentUserId,
+    onMessageUnsent: ({ message_id }) => setMessages(prev => prev.filter(m => m.id !== message_id)),
     conversationId: realtimeConvId,
     onNewMessage: (raw) => {
       const incoming = toMessage2(raw)
@@ -202,10 +203,10 @@ export default function ChatWindow({ conversation, draftUser, currentUserId, isP
     catch { fetchMessages() }
   }
 
-  const handleDelete = async (messageId: string) => {
+  const handleDelete = async (messageId: string, scope: 'me' | 'everyone' = 'me') => {
     if (messageId.startsWith('optimistic-')) return
     setMessages(prev => prev.filter(m => m.id !== messageId))
-    try { await messagingService.deleteMessage(messageId) }
+    try { await messagingService.deleteMessage(messageId, scope) }
     catch { fetchMessages() }
   }
 

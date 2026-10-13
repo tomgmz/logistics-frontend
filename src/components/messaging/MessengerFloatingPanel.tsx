@@ -94,6 +94,9 @@ export default function MessengerFloatingPanel() {
     },
     // A fresh group invite (no message yet) — refresh so it shows in the list.
     onGroupInvite: () => fetchAll(),
+    // Previews follow a rename, member change or unsent message.
+    onGroupUpdated: () => fetchAll(),
+    onMessageUnsent: () => fetchAll(),
   })
 
   // Close on outside click
