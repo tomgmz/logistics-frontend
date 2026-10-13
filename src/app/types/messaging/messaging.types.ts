@@ -11,6 +11,7 @@ export type UserRole =
 
 export interface MessageReaction  { emoji: string; user_id: string }
 export interface MessageReplyTo   { message_id: string; content: string; sender_id: string }
+export interface BookingRefRow    { booking_id: string; reference_number: string | null }
 
 export interface ConversationWithDetails {
   conversation_id: string
@@ -30,6 +31,8 @@ export interface ConversationWithDetails {
     role: UserRole
     email: string
   }
+  /** The booking the conversation was started for, if any. */
+  booking?: BookingRefRow | null
   last_message: { message_id: string; content: string; sent_at: string; sender_id: string } | null
   unread_count: number
 }
@@ -55,6 +58,8 @@ export interface MessagableUser {
   role: UserRole
   email: string
   booking_id?: string
+  /** Client <-> driver only: the open bookings that link the two. */
+  bookings?: BookingRefRow[]
 }
 
 export interface MessageParticipant {

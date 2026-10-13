@@ -8,6 +8,7 @@ import { useMessagingRealtime } from '@/lib/hooks/useMessagingRealtime'
 import { useMessengerStore } from '@/lib/store/messenger.store'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { roleLabel } from '@/lib/roles'
+import { bookingRef } from '@/lib/booking'
 import { formatConversationTime, formatMessageTime } from '@/app/utils/messaging.utils'
 import type { ConversationWithDetails, MessageRow, MessagableUser } from '@/app/types/messaging/messaging.types'
 
@@ -29,6 +30,33 @@ type Thread =
 
 const fullName = (u: { first_name: string | null; last_name: string | null }) =>
   `${u.first_name ?? ''} ${u.last_name ?? ''}`.trim() || 'Unknown'
+
+/**
+ * The booking numbers to show beside a name: a driver's current deliveries for
+ * this client when they have any, else the booking the chat was started for.
+ */
+function bookingRefsFor(
+  userId: string,
+  drivers: MessagableUser[],
+  conv?: ConversationWithDetails | null,
+): string[] {
+  const live = drivers.find((d) => d.user_id === userId)?.bookings ?? []
+  const rows = live.length > 0 ? live : conv?.booking ? [conv.booking] : []
+  return [...new Set(rows.map((b) => bookingRef(b)).filter(Boolean))]
+}
+
+function BookingRefs({ refs }: { refs: string[] }) {
+  if (refs.length === 0) return null
+  return (
+    <>
+      {refs.map((r) => (
+        <span key={r} className="shrink-0 rounded-md border border-white/10 bg-white/[0.04] px-1.5 py-px font-mono text-[10px] text-white/60">
+          {r}
+        </span>
+      ))}
+    </>
+  )
+}
 
 export function useClientMessages(userId: string | undefined, visible: boolean) {
   const [conversations, setConversations] = useState<ConversationWithDetails[]>([])
@@ -181,7 +209,10 @@ export function ClientMessagesPanel({ state, userId, onAskAssistant }: {
               >
                 <Avatar role="driver" />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13px] font-semibold text-white">{fullName(d)}</span>
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    <span className="truncate text-[13px] font-semibold text-white">{fullName(d)}</span>
+                    <BookingRefs refs={bookingRefsFor(d.user_id, drivers)} />
+                  </span>
                   <span className="block text-[11px] text-white/45">Driver on your active delivery</span>
                 </span>
                 <span className="text-[11px] font-semibold text-[var(--color-cyan)]">
@@ -219,8 +250,11 @@ export function ClientMessagesPanel({ state, userId, onAskAssistant }: {
                     >
                       <Avatar role={other.role} />
                       <span className="min-w-0 flex-1">
-                        <span className="flex items-baseline justify-between gap-2">
-                          <span className="truncate text-[13px] font-semibold text-white">{fullName(other)}</span>
+                        <span className="flex items-center justify-between gap-2">
+                          <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+                            <span className="truncate text-[13px] font-semibold text-white">{fullName(other)}</span>
+                            <BookingRefs refs={bookingRefsFor(other.user_id, drivers, c)} />
+                          </span>
                           {last && <span className="shrink-0 text-[10px] text-white/35">{formatConversationTime(last.sent_at)}</span>}
                         </span>
                         <span className="block text-[11px] text-white/40">{roleLabel(other.role)}</span>
@@ -268,7 +302,10 @@ export function ClientMessagesPanel({ state, userId, onAskAssistant }: {
         </button>
         {other && <Avatar role={other.role} />}
         <div className="min-w-0">
-          <p className="truncate text-[13px] font-semibold text-white">{other ? fullName(other) : 'Conversation'}</p>
+          <p className="flex flex-wrap items-center gap-1.5">
+            <span className="truncate text-[13px] font-semibold text-white">{other ? fullName(other) : 'Conversation'}</span>
+            {other && <BookingRefs refs={bookingRefsFor(other.user_id, drivers, conv)} />}
+          </p>
           {other && <p className="text-[11px] text-white/40">{roleLabel(other.role)}</p>}
         </div>
       </div>
