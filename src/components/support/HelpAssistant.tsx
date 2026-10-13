@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
-  Bot, CheckCircle2, ChevronDown, ChevronRight, LifeBuoy, Loader2, MessageCircleQuestion, Pin, Send, Ticket, X,
+  Bot, CheckCircle2, ChevronRight, LifeBuoy, Loader2, MessageCircleQuestion, Send, Ticket, X,
 } from 'lucide-react'
 import { useClientMessages, ClientMessagesPanel } from './ClientMessages'
 
@@ -102,11 +102,6 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
   const [ticketsLoading, setTicketsLoading] = useState(false)
 
   const scroller = useRef<HTMLDivElement>(null)
-  // The question the client last CLICKED, pinned in a bar above the chat
-  // (Messenger-style). It stays there while they type other things and the
-  // conversation moves on; tapping the bar jumps back to it.
-  const [pinned, setPinned] = useState<{ id: number; text: string } | null>(null)
-  const pinnedRef = useRef<HTMLDivElement>(null)
 
   const push = useCallback((m: Omit<Msg, 'id'>) => {
     setMessages((prev) => [...prev, { ...m, id: nextId.current++ }])
@@ -142,14 +137,6 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
   useEffect(() => {
     scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: 'smooth' })
   }, [messages, ticketOpen])
-
-  // Jump back to the pinned question, a little below the top of the chat.
-  const goToPinned = useCallback(() => {
-    const box = scroller.current
-    const q   = pinnedRef.current
-    if (!box || !q) return
-    box.scrollTo({ top: Math.max(0, q.offsetTop - 12), behavior: 'smooth' })
-  }, [])
 
   const loadTickets = useCallback(async () => {
     setTicketsLoading(true)
@@ -209,8 +196,6 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
   }, [answer, push, canTicket])
 
   const pick = useCallback((entry: FaqEntry) => {
-    // A clicked question becomes the pinned one.
-    setPinned({ id: nextId.current, text: entry.question })
     push({ from: 'client', text: entry.question })
     answer(entry)
   }, [answer, push])
@@ -346,27 +331,9 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
             <ClientMessagesPanel state={inbox} userId={user.user_id} onAskAssistant={() => setTab('chat')} />
           ) : tab === 'chat' || !canTicket ? (
             <>
-              {/* The last clicked question, pinned above the chat; it does not scroll away. */}
-              {pinned && (
-                <button
-                  type="button"
-                  onClick={goToPinned}
-                  className="flex shrink-0 items-center gap-3 border-b border-white/[0.08] bg-white/[0.03] px-4 py-2.5 text-left transition-colors hover:bg-white/[0.06]"
-                  aria-label={`Pinned question: ${pinned.text}. Go to it`}
-                >
-                  <Pin size={15} className="shrink-0 -rotate-45 text-[var(--color-cyan)]" />
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-[11px] text-white/45">You</span>
-                    <span className="block truncate text-[13px] font-semibold text-white/90">{pinned.text}</span>
-                  </span>
-                  <ChevronDown size={16} className="shrink-0 text-white/45" />
-                </button>
-              )}
-              <div ref={scroller} className="relative flex-1 space-y-3 overflow-y-auto px-4 py-4">
+              <div ref={scroller} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
                 {messages.map((m) => (
-                  <div key={m.id}
-                    ref={pinned && m.id === pinned.id ? pinnedRef : undefined}
-                    className={`flex ${m.from === 'client' ? 'justify-end' : 'justify-start'} gap-2`}>
+                  <div key={m.id} className={`flex ${m.from === 'client' ? 'justify-end' : 'justify-start'} gap-2`}>
                     {m.from === 'bot' && (
                       <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-[var(--color-cyan)]">
                         <Bot size={13} />
@@ -410,7 +377,8 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
                         </div>
                       )}
 
-                      {m.suggestions && m.suggestions.length > 0 && (
+                      {/* The greeting's common questions move to the bottom once the chat has moved on. */}
+                      {m.suggestions && m.suggestions.length > 0 && !(m.id === 0 && messages.length > 1) && (
                         <div className="flex flex-wrap gap-1.5">
                           {m.suggestions.map((s) => (
                             <button
@@ -437,6 +405,31 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
                     </div>
                   </div>
                 ))}
+
+                {/* After any answer, the common questions sit at the very bottom of the
+                    chat, so another can be picked without scrolling back up. */}
+                {messages.length > 1 && !ticketOpen && (
+                  <div className="flex gap-2 pt-1">
+                    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-[var(--color-cyan)]">
+                      <MessageCircleQuestion size={13} />
+                    </span>
+                    <div className="max-w-[85%] space-y-1.5">
+                      <p className="text-[11px] text-white/45">Have another question?</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {(isPublic && !canTicket ? PUBLIC_STARTER_QUESTIONS : STARTER_QUESTIONS).map((s) => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => pick(s)}
+                            className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-left text-[11px] text-white/75 hover:border-[var(--color-cyan)]/40 hover:text-white"
+                          >
+                            {s.question}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {ticketOpen && (
                   <div className="space-y-2.5 rounded-xl border border-white/[0.08] bg-white/[0.02] p-3">
