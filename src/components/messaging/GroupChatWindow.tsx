@@ -9,7 +9,7 @@ import MessageInput from './MessageInput'
 import ReadTicks from './ReadTicks'
 import GroupOptionsModals, { type GroupOptionsView } from './GroupOptionsModals'
 import { QuickReactBar } from './EmojiPicker'
-import { groupMessagesByDate, formatMessageTime, groupEventText } from '@/app/utils/messaging.utils'
+import { groupMessagesByDate, formatMessageTime, groupEventText, isReadBy, latestSeenPositions } from '@/app/utils/messaging.utils'
 import { Reply as ReplyIcon } from 'lucide-react'
 import type {
   Group,
@@ -37,8 +37,7 @@ function getSeenBy(members: GroupMember[], msgCreatedAt: string, senderId: strin
     m.status === 'accepted' &&
     m.user_id !== senderId &&
     m.user_id !== currentUserId &&
-    m.last_read_at !== null &&
-    m.last_read_at >= msgCreatedAt
+    isReadBy(m.last_read_at, msgCreatedAt)
   )
 }
 
@@ -244,6 +243,8 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
     : typingNames.length > 2   ? 'Several people are typing' : null
 
   const dateGroups = groupMessagesByDate(messages)
+  // Each member's avatar appears once, under the newest message they have seen.
+  const seenAt     = latestSeenPositions(messages, members, currentUserId)
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -491,7 +492,7 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
                           </div>
                         )}
 
-                        {isMine && <SeenByAvatars seenBy={seenBy} />}
+                        <SeenByAvatars seenBy={seenAt[msg.id] ?? []} />
                       </div>
                     </div>
                   )

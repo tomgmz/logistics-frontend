@@ -75,3 +75,27 @@ export function isReadBy(readAt: string | null | undefined, createdAt: string): 
   if (!readAt) return false
   return parseDate(createdAt).getTime() <= parseDate(readAt).getTime()
 }
+
+/**
+ * Where each member's "seen" avatar goes in a group chat: once per member,
+ * under the newest message they have read (one they did not write
+ * themselves), like Messenger. Returns message id -> the members to show there.
+ */
+export function latestSeenPositions<
+  M extends { id: string; sender_id: string; created_at: string; kind?: string },
+  P extends { user_id: string; status: string; last_read_at: string | null },
+>(messages: M[], members: P[], currentUserId: string): Record<string, P[]> {
+  const out: Record<string, P[]> = {}
+  for (const member of members) {
+    if (member.status !== 'accepted' || member.user_id === currentUserId || !member.last_read_at) continue
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i]
+      if (msg.kind === 'system' || msg.id.startsWith('optimistic-') || msg.sender_id === member.user_id) continue
+      if (isReadBy(member.last_read_at, msg.created_at)) {
+        ;(out[msg.id] ??= []).push(member)
+        break
+      }
+    }
+  }
+  return out
+}

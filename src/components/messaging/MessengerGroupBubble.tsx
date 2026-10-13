@@ -7,7 +7,7 @@ import { useMessengerStore } from '@/lib/store/messenger.store'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { messagingService } from '@/lib/services/messaging.service'
 import { useIsMobile } from '@/lib/hooks/useIsMobile'
-import { groupMessagesByDate, formatMessageTime, groupEventText } from '@/app/utils/messaging.utils'
+import { groupMessagesByDate, formatMessageTime, groupEventText, isReadBy, latestSeenPositions } from '@/app/utils/messaging.utils'
 import { toGroup, toGroupMessage } from '@/app/types/messaging/messaging.types'
 import type {
   Group,
@@ -34,8 +34,7 @@ function getSeenBy(members: GroupMember[], msgCreatedAt: string, senderId: strin
     m.status === 'accepted' &&
     m.user_id !== senderId &&
     m.user_id !== currentUserId &&
-    m.last_read_at !== null &&
-    m.last_read_at >= msgCreatedAt
+    isReadBy(m.last_read_at, msgCreatedAt)
   )
 }
 
@@ -221,6 +220,8 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
     : typingNames.length > 1 ? 'Several typing…' : null
 
   const dateGroups = groupMessagesByDate(messages)
+  // Each member's avatar appears once, under the newest message they have seen.
+  const seenAt     = latestSeenPositions(messages, members, currentUserId)
   const acceptedCount = members.filter(m => m.status === 'accepted').length
   // Your message counts as seen once every other member has read it.
   const othersInGroup = members.filter(m => m.status === 'accepted' && m.user_id !== currentUserId).length
@@ -402,7 +403,7 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
                         </div>
                       )}
 
-                      {isMine && <SeenByAvatars seenBy={seenBy} />}
+                      <SeenByAvatars seenBy={seenAt[msg.id] ?? []} />
                     </div>
                   </div>
                 )
