@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, Search, Loader2, Users, Check, MessageCirclePlus } from 'lucide-react'
 import { messagingService } from '@/lib/services/messaging.service'
 import type { MessagableUser } from '@/lib/services/messaging.service'
-import { roleLabel } from '@/lib/roles'
+import { roleLabel, matchesPersonSearch } from '@/lib/roles'
 
 function ModalShell({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
   return (
@@ -49,10 +49,7 @@ export function NewConversationModal({ onClose, onConversationReady }: NewConver
     setTimeout(() => searchRef.current?.focus(), 80)
   }, [])
 
-  const filtered = users.filter(u => {
-    const q = search.toLowerCase()
-    return `${u.first_name ?? ''} ${u.last_name ?? ''}`.toLowerCase().includes(q) || u.role.toLowerCase().includes(q)
-  })
+  const filtered = users.filter(u => matchesPersonSearch(search, u))
 
   const handleSelect = async (u: MessagableUser) => {
     if (starting) return

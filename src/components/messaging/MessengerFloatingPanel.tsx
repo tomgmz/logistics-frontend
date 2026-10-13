@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Search, Loader2, Users, Expand } from 'lucide-react'
+import { matchesPersonSearch } from '@/lib/roles'
 import { useRouter } from 'next/navigation'
 import { useMessengerStore } from '@/lib/store/messenger.store'
 import { useAuthStore } from '@/lib/store/auth.store'
@@ -110,11 +111,10 @@ export default function MessengerFloatingPanel() {
   ].sort((a, b) => b.lastAt.localeCompare(a.lastAt))
 
   const filtered = unified.filter(item => {
-    const q    = search.toLowerCase()
-    const name = item.kind === 'dm'
-      ? `${item.data.participants[0].first_name} ${item.data.participants[0].last_name}`.toLowerCase()
-      : item.data.name.toLowerCase()
-    return name.includes(q) && (tab === 'All' || item.data.unread_count > 0)
+    const matches = item.kind === 'dm'
+      ? matchesPersonSearch(search, item.data.participants[0])
+      : item.data.name.toLowerCase().includes(search.trim().toLowerCase())
+    return matches && (tab === 'All' || item.data.unread_count > 0)
   })
 
   return (

@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, Search, Loader2, Users, Check } from 'lucide-react'
 import { messagingService } from '@/lib/services/messaging.service'
 import type { MessagableUser } from '@/lib/services/messaging.service'
-import { roleLabel } from '@/lib/roles'
+import { roleLabel, matchesPersonSearch } from '@/lib/roles'
 
 interface NewGroupModalProps {
   onClose: () => void
@@ -31,10 +31,7 @@ export default function NewGroupModal({ onClose, onGroupCreated }: NewGroupModal
     setTimeout(() => searchRef.current?.focus(), 80)
   }, [])
 
-  const filtered = users.filter(u => {
-    const name = `${u.first_name ?? ''} ${u.last_name ?? ''}`.toLowerCase()
-    return name.includes(search.toLowerCase()) || u.role.toLowerCase().includes(search.toLowerCase())
-  })
+  const filtered = users.filter(u => matchesPersonSearch(search, u))
 
   const toggleSelect = (userId: string) => {
     setSelected(prev => {

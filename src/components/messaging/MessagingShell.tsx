@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { MessageCircle, Loader2 } from 'lucide-react'
+import { matchesPersonSearch } from '@/lib/roles'
 import { messagingService } from '@/lib/services/messaging.service'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { useMessagingRealtime } from '@/lib/hooks/useMessagingRealtime'
@@ -110,12 +111,11 @@ export default function MessagingShell() {
     return bT.localeCompare(aT)
   })
 
-  const filtered = unified.filter(item => {
-    const q = search.toLowerCase()
-    return item.kind === 'dm'
-      ? `${item.data.participants[0].first_name} ${item.data.participants[0].last_name}`.toLowerCase().includes(q)
-      : item.data.name.toLowerCase().includes(q)
-  })
+  const filtered = unified.filter(item => (
+    item.kind === 'dm'
+      ? matchesPersonSearch(search, item.data.participants[0])
+      : item.data.name.toLowerCase().includes(search.trim().toLowerCase())
+  ))
 
   const selectDm = (conv: Conversation) => {
     setSelectedConvId(conv.id)

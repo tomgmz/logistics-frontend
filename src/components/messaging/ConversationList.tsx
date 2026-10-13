@@ -42,7 +42,7 @@ export default function ConversationList({
           <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/25 pointer-events-none" />
           <input
             type="text" value={search} onChange={e => onSearchChange(e.target.value)}
-            placeholder="Search conversations…"
+            placeholder="Search by name or role…"
             className="w-full bg-white/[0.04] border border-white/[0.07] rounded-xl pl-9 pr-3 py-2.5 ff-body text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[var(--color-cyan)]/30 focus:bg-white/[0.06] transition-all"
           />
         </div>
