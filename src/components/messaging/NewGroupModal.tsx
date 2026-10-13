@@ -24,7 +24,8 @@ export default function NewGroupModal({ onClose, onGroupCreated }: NewGroupModal
 
   useEffect(() => {
     messagingService.getMessagableUsers()
-      .then(setUsers)
+      // Clients talk one-to-one only; the API refuses them in groups.
+      .then(us => setUsers(us.filter(u => u.role !== 'client')))
       .catch(() => setError('Could not load contacts'))
       .finally(() => setLoading(false))
     setTimeout(() => searchRef.current?.focus(), 80)

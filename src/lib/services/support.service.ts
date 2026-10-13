@@ -66,8 +66,18 @@ export const supportService = {
   },
 }
 
-/** Ask the help assistant to open, from anywhere in the client portal. */
+/**
+ * Ask the help assistant to open, from anywhere in the client portal. The
+ * client's messages live in it too: tab 'messages', optionally on one
+ * conversation.
+ */
+export type HelpTab = 'chat' | 'messages' | 'tickets'
 export const OPEN_HELP_EVENT = 'open-help-assistant'
-export function openHelpAssistant(tab: 'chat' | 'tickets' = 'chat'): void {
-  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(OPEN_HELP_EVENT, { detail: { tab } }))
+export function openHelpAssistant(tab: HelpTab = 'chat', conversationId?: string): void {
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(OPEN_HELP_EVENT, { detail: { tab, conversationId } }))
+}
+
+/** Where the client's messages open from outside the portal (e.g. /messages, a push tap). */
+export function clientMessagesHref(conversationId?: string): string {
+  return `/client/dashboard?chat=messages${conversationId ? `&conversation=${encodeURIComponent(conversationId)}` : ''}`
 }

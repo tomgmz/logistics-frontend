@@ -8,6 +8,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import {
   Bot, CheckCircle2, ChevronRight, LifeBuoy, Loader2, MessageCircleQuestion, Send, Ticket, X,
 } from 'lucide-react'
+import { useClientMessages, ClientMessagesPanel } from './ClientMessages'
 
 import authApi from '@/lib/api/auth.api'
 import { useAuthStore } from '@/lib/store/auth.store'
@@ -18,7 +19,7 @@ import { bookingRef } from '@/lib/booking'
 import { matchFaq, CONFIDENT_SCORE, STARTER_QUESTIONS, PUBLIC_STARTER_QUESTIONS, type FaqEntry } from '@/lib/support/faq'
 import {
   supportService, TICKET_CATEGORY_LABEL, OPEN_HELP_EVENT,
-  type ChatLine, type SupportTicket, type TicketCategory,
+  type ChatLine, type HelpTab, type SupportTicket, type TicketCategory,
 } from '@/lib/services/support.service'
 
 /**
@@ -35,6 +36,10 @@ import {
  * or the client says the answer didn't help, it offers a ticket. The ticket
  * carries the conversation so staff see what was already suggested, and is
  * answered by email.
+ *
+ * In the portal it is also the client's inbox (the "Messages" tab, see
+ * ClientMessages): their driver and our team write to them here, and the
+ * header's message icon opens it instead of the staff messenger.
  */
 
 interface Msg {
@@ -70,7 +75,9 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
   const isPublic  = audience === 'public'
 
   const [open, setOpen] = useState(false)
-  const [tab,  setTab]  = useState<'chat' | 'tickets'>('chat')
+  const [tab,  setTab]  = useState<HelpTab>('chat')
+  const inbox = useClientMessages(!isPublic && canTicket ? user?.user_id : undefined, open && tab === 'messages')
+  const { openConversation } = inbox
 
   const nextId = useRef(1)
   const [messages, setMessages] = useState<Msg[]>(() => [
@@ -103,12 +110,29 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
   // Opened from elsewhere in the portal (the dashboard's help card).
   useEffect(() => {
     const onOpen = (e: Event) => {
+      const detail = (e as CustomEvent<{ tab?: HelpTab; conversationId?: string }>).detail
       setOpen(true)
-      setTab((e as CustomEvent<{ tab?: 'chat' | 'tickets' }>).detail?.tab ?? 'chat')
+      setTab(detail?.tab ?? 'chat')
+      if (detail?.conversationId) void openConversation(detail.conversationId)
     }
     window.addEventListener(OPEN_HELP_EVENT, onOpen)
     return () => window.removeEventListener(OPEN_HELP_EVENT, onOpen)
-  }, [])
+  }, [openConversation])
+
+  // Arrived from /messages or a push tap (clientMessagesHref): open the inbox.
+  useEffect(() => {
+    if (isPublic) return
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('chat') !== 'messages') return
+    setOpen(true)
+    setTab('messages')
+    const conversationId = params.get('conversation')
+    if (conversationId) void openConversation(conversationId)
+    params.delete('chat')
+    params.delete('conversation')
+    const rest = params.toString()
+    window.history.replaceState(null, '', `${window.location.pathname}${rest ? `?${rest}` : ''}`)
+  }, [isPublic, openConversation])
 
   useEffect(() => {
     scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: 'smooth' })
@@ -226,7 +250,7 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
   if (!mounted) return null
   if (!isPublic && !canTicket) return null
 
-  // On Delivery Tracking the map has its own button bottom-right on phones.
+  // On Transit Tracking the map has its own button bottom-right on phones.
   const lift = pathname?.startsWith('/client/tracking') ? 'bottom-20 lg:bottom-5' : 'bottom-5'
 
   const launcher = (
@@ -235,11 +259,16 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
       onClick={() => setOpen((o) => !o)}
       whileHover={{ scale: 1.05 }}
       whileTap={{ scale: 0.95 }}
-      aria-label={open ? 'Close help' : 'Help and support'}
+      aria-label={open ? 'Close help' : inbox.totalUnread > 0 ? `Help and messages, ${inbox.totalUnread} unread` : 'Help and messages'}
       className={`fixed right-5 ${lift} z-[58] flex items-center justify-center rounded-full shadow-xl`}
       style={{ width: 52, height: 52, background: 'var(--color-cyan)', color: '#0a0a0a', boxShadow: '0 10px 30px rgba(77,249,237,0.25)' }}
     >
       {open ? <X size={22} /> : <MessageCircleQuestion size={24} />}
+      {!open && inbox.totalUnread > 0 && (
+        <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-[20px] items-center justify-center rounded-full border-2 border-[#0d0d0d] bg-red-500 px-1 text-[10px] font-bold text-white">
+          {inbox.totalUnread > 9 ? '9+' : inbox.totalUnread}
+        </span>
+      )}
     </motion.button>
   )
 
@@ -263,7 +292,9 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
               </span>
               <div>
                 <p className="text-sm font-bold text-white">Help &amp; support</p>
-                <p className="text-[11px] text-white/40">Answers right away · our team replies by email</p>
+                <p className="text-[11px] text-white/40">
+                  {tab === 'messages' && canTicket ? 'Your driver and our team' : 'Answers right away · our team replies by email'}
+                </p>
               </div>
             </div>
             <button type="button" onClick={() => setOpen(false)} aria-label="Close" className="rounded-lg p-1.5 text-white/50 hover:bg-white/5 hover:text-white">
@@ -274,7 +305,7 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
           {/* Tabs — "My tickets" only for a signed-in client */}
           {canTicket && (
           <div className="flex border-b border-white/[0.07] px-2" role="tablist">
-            {([['chat', 'Assistant'], ['tickets', 'My tickets']] as const).map(([key, label]) => (
+            {([['chat', 'Assistant'], ['messages', 'Messages'], ['tickets', 'My tickets']] as const).map(([key, label]) => (
               <button
                 key={key}
                 type="button"
@@ -284,6 +315,9 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
                 className={`relative px-3 py-2.5 text-xs font-bold transition-colors ${tab === key ? 'text-[var(--color-cyan)]' : 'text-white/50 hover:text-white/80'}`}
               >
                 {label}
+                {key === 'messages' && inbox.totalUnread > 0 && (
+                  <span className="ml-1.5 rounded-full bg-[var(--color-cyan)] px-1.5 text-[10px] font-bold tabular-nums text-[#0a0a0a]">{inbox.totalUnread}</span>
+                )}
                 {key === 'tickets' && openCount > 0 && (
                   <span className="ml-1.5 rounded-full bg-white/10 px-1.5 text-[10px] tabular-nums text-white/70">{openCount}</span>
                 )}
@@ -293,7 +327,9 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
           </div>
           )}
 
-          {tab === 'chat' || !canTicket ? (
+          {tab === 'messages' && canTicket && user ? (
+            <ClientMessagesPanel state={inbox} userId={user.user_id} onAskAssistant={() => setTab('chat')} />
+          ) : tab === 'chat' || !canTicket ? (
             <>
               <div ref={scroller} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
                 {messages.map((m) => (

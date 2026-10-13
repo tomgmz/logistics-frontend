@@ -9,6 +9,7 @@ import NotificationIcon from '@/components/ui/NotificationIcon'
 import { useMessengerStore } from '@/lib/store/messenger.store'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { ROLE_ROUTES } from '@/constants/roles'
+import { openHelpAssistant } from '@/lib/services/support.service'
 
 interface ReusableHeaderProps {
   sidebarOpen: boolean
@@ -56,7 +57,9 @@ export default function ReusableHeader({ sidebarOpen, onToggleSidebar }: Reusabl
           <motion.button
             whileHover={{ scale: 1.08 }}
             whileTap={{ scale: 0.94 }}
-            onClick={() => router.push('/messages')}
+            // A client's messages live in the help assistant, not the staff messenger.
+            onClick={() => (user?.role === 'client' ? openHelpAssistant('messages') : router.push('/messages'))}
+            aria-label="Messages"
             className="
               relative w-9 h-9 lg:w-10 lg:h-10 rounded-full glass
               flex items-center justify-center transition-colors
