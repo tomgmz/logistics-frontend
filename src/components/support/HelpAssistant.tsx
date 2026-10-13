@@ -87,10 +87,10 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
   ])
   const [input, setInput] = useState('')
   const [helped, setHelped] = useState<Record<number, boolean>>({})
-  // Where the common questions are offered: under the greeting (null) until a
-  // question is wrapped up — the client says the answer helped, or sends a
-  // ticket after saying it did not. Then they move to just below that message,
-  // the bottom of the chat at that moment, ready for the next question.
+  // Where the common questions are offered: under the greeting (null) until the
+  // client answers "Did this answer it?" (Yes or No), and again once a ticket is
+  // sent. Each time they move to just below that message, the bottom of the
+  // chat at that moment, ready for the next question.
   const [questionsAfter, setQuestionsAfter] = useState<number | null>(null)
 
   // Ticket form, shown inside the chat when the client asks for a person.
@@ -377,6 +377,7 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
                             className="rounded-md border border-white/10 px-2 py-0.5 text-white/70 hover:bg-white/5">Yes</button>
                           <button type="button" onClick={() => {
                             setHelped((h) => ({ ...h, [m.id]: false }))
+                            setQuestionsAfter(nextId.current)
                             push({
                               from: 'bot',
                               text: canTicket
