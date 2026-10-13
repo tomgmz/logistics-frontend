@@ -21,7 +21,7 @@ import { useIsMobile } from '@/lib/hooks/useIsMobile'
 import { QuickReactBar } from './EmojiPicker'
 import MessageInput from './MessageInput'
 import MessageBubble from './MessageBubble'
-import { roleLabel } from '@/lib/roles'
+import { roleLabel, nameWithRole } from '@/lib/roles'
 
 const BUBBLE_W   = 338
 const BUBBLE_GAP = 10
@@ -201,7 +201,7 @@ export default function MessengerChatBubble({ conversationId, index }: Props) {
             <p className="ff-body text-xs text-white/30">Loading…</p>
           ) : (
             <>
-              <p className="ff-body text-xs text-white truncate">{participant?.first_name} {participant?.last_name}</p>
+              <p className="ff-body text-xs text-white truncate">{participant ? nameWithRole(participant.first_name, participant.last_name, participant.role) : ''}</p>
               <AnimatePresence mode="wait">
                 {isTyping ? (
                   <motion.p key="t" initial={{ opacity: 0, y: 2 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="ff-body text-[9px] text-[var(--color-cyan)] flex items-center gap-0.5">

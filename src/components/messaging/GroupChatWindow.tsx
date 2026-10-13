@@ -1,5 +1,7 @@
 'use client'
 
+import { nameWithRole } from '@/lib/roles'
+
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { ArrowLeft, MoreVertical, Users, Loader2, Check, X, CornerUpLeft, UserPlus, Pencil, Inbox } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -500,7 +502,7 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
                           )}
                         </AnimatePresence>
 
-                        {showName && sender && <span className="ff-body text-[10px] text-white/30 px-1">{sender.first_name} {sender.last_name}</span>}
+                        {showName && sender && <span className="ff-body text-[10px] text-white/30 px-1">{nameWithRole(sender.first_name, sender.last_name, sender.role)}</span>}
 
                         {msg.reply_to && (
                           <div className={`flex items-start gap-1.5 px-2.5 py-1.5 rounded-xl mb-0.5 max-w-full border-l-2 ${isMine ? 'bg-white/[0.06] border-white/20' : 'bg-white/[0.04] border-[var(--color-cyan)]/40'}`}>

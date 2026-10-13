@@ -1,5 +1,7 @@
 'use client'
 
+import { nameWithRole } from '@/lib/roles'
+
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Loader2, Minus, Users, CornerUpLeft, Check } from 'lucide-react'
@@ -372,7 +374,7 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
                         )}
                       </AnimatePresence>
 
-                      {showName && sender && <span className="ff-body text-[9px] text-white/30 px-0.5">{sender.first_name} {sender.last_name}</span>}
+                      {showName && sender && <span className="ff-body text-[9px] text-white/30 px-0.5">{nameWithRole(sender.first_name, sender.last_name, sender.role)}</span>}
 
                       {msg.reply_to && (
                         <div className={`flex items-start gap-1 px-2 py-1 rounded-lg mb-0.5 max-w-full border-l-2 ${isMine ? 'bg-white/[0.06] border-white/20' : 'bg-white/[0.04] border-[var(--color-cyan)]/40'}`}>

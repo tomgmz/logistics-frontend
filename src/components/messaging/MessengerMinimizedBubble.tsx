@@ -1,5 +1,7 @@
 'use client'
 
+import { nameWithRole } from '@/lib/roles'
+
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Users } from 'lucide-react'
@@ -75,7 +77,7 @@ function MinimizedBubbleItem({ chat, stackIndex }: MinimizedBubbleItemProps) {
   const name = isGroup
     ? (group?.name ?? '...')
     : participant
-      ? `${participant.first_name} ${participant.last_name}`
+      ? nameWithRole(participant.first_name, participant.last_name, participant.role)
       : '...'
 
   const isMyLastMsg = latestMsg?.sender_id === currentUserId

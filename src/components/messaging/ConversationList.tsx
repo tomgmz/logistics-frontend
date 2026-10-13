@@ -1,5 +1,7 @@
 'use client'
 
+import { nameWithRole } from '@/lib/roles'
+
 import { motion } from 'framer-motion'
 import { Search, SquarePen, Users } from 'lucide-react'
 import type { Conversation, Group, UnifiedListItem } from '@/app/types/messaging/messaging.types'
@@ -114,7 +116,7 @@ function DmItem({ conv, index, isSelected, currentUserId, onSelect, isOnline }: 
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2 mb-0.5">
-          <span className={`ff-body text-[13px] truncate ${hasUnread ? 'text-white' : 'text-white/75'}`}>{p.first_name} {p.last_name}</span>
+          <span className={`ff-body text-[13px] truncate ${hasUnread ? 'text-white' : 'text-white/75'}`}>{nameWithRole(p.first_name, p.last_name, p.role)}</span>
           {last && <span className="ff-body text-[10px] text-white/25 shrink-0">{formatConversationTime(last.created_at)}</span>}
         </div>
         <div className="flex items-center gap-1.5">

@@ -1,5 +1,7 @@
 'use client'
 
+import { nameWithRole } from '@/lib/roles'
+
 import ReadTicks from './ReadTicks'
 import ConfirmDeleteDialog, { type DeleteScope } from './ConfirmDeleteDialog'
 
@@ -116,7 +118,7 @@ export default function MessageBubble({
         onMouseLeave={onLeave}
       >
         {!isMine && showSenderName && sender && (
-          <span className="ff-body text-[10px] text-white/40 px-1">{sender.first_name} {sender.last_name}</span>
+          <span className="ff-body text-[10px] text-white/40 px-1">{nameWithRole(sender.first_name, sender.last_name, sender.role)}</span>
         )}
 
         {/* Quick react bar */}

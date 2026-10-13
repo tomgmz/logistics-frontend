@@ -1,4 +1,6 @@
 'use client'
+
+import { nameWithRole } from '@/lib/roles'
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Users } from 'lucide-react'
@@ -88,7 +90,7 @@ function MinimizedBubbleItem({ chat, stackIndex }: { chat: ChatEntry; stackIndex
   const isGroup  = chat.kind === 'group'
   const p        = conv?.participants[0]
   const initials = p ? `${p.first_name?.[0] ?? '?'}${p.last_name?.[0] ?? '?'}`.toUpperCase() : null
-  const name     = isGroup ? (group?.name ?? '…') : (p ? `${p.first_name} ${p.last_name}` : '…')
+  const name     = isGroup ? (group?.name ?? '…') : (p ? nameWithRole(p.first_name, p.last_name, p.role) : '…')
   const bottomPos= BOTTOM_OFFSET + stackIndex * (BUBBLE_SIZE + BUBBLE_GAP)
 
   return (

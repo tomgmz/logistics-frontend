@@ -18,7 +18,7 @@ import type {
   ReactionTogglePayload,
 } from '@/app/types/messaging/messaging.types'
 import { toMessage } from '@/app/types/messaging/messaging.types'
-import { roleLabel } from '@/lib/roles'
+import { roleLabel, nameWithRole } from '@/lib/roles'
 
 interface ReplyTo { messageId: string; content: string; senderName: string }
 
@@ -232,7 +232,7 @@ export default function ChatWindow({ conversation, draftUser, currentUserId, isP
           {isOnline && <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-[var(--color-green)] border-2 border-[var(--color-bg)]" />}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="ff-body text-sm text-white leading-tight truncate">{participant.first_name} {participant.last_name}</p>
+          <p className="ff-body text-sm text-white leading-tight truncate">{nameWithRole(participant.first_name, participant.last_name, participant.role)}</p>
           <AnimatePresence mode="wait">
             {isOtherTyping ? (
               <motion.p key="typing" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.15 }} className="ff-body text-[11px] text-[var(--color-cyan)] flex items-center gap-1">
