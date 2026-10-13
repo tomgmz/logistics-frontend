@@ -2,13 +2,16 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { X, Search, Loader2, Users, Check, UserPlus, Pencil, UserMinus } from 'lucide-react'
-import { messagingService, type MessagableUser } from '@/lib/services/messaging.service'
+import { X, Search, Loader2, Users, Check, UserPlus, Pencil, UserMinus, Inbox } from 'lucide-react'
+import { messagingService, type MessagableUser, type GroupMemberRequest } from '@/lib/services/messaging.service'
+import { appToast } from '@/lib/toast'
 import { roleLabel, matchesPersonSearch } from '@/lib/roles'
 import { getApiErrorMessage } from '@/lib/api-error'
 import type { Group, GroupMember } from '@/app/types/messaging/messaging.types'
 
-export type GroupOptionsView = 'members' | 'add' | 'rename'
+export type GroupOptionsView = 'members' | 'add' | 'rename' | 'requests'
+
+const REQUEST_SENT = 'Request sent. The group creator will approve or decline it.'
 
 // Same frame as the New Group pop-up, so the group dialogs read as one family.
 function ModalFrame({ title, icon, onClose, children }: {
@@ -74,7 +77,8 @@ const PRIMARY_CLASS = 'w-full py-2.5 rounded-xl ff-body text-sm font-medium tran
 
 /**
  * Everyone in the group: who has joined, and who has been invited but not yet.
- * The group's creator can remove anyone else from here.
+ * The group's creator removes people from here; any other member asks the
+ * creator to remove them.
  */
 function MembersModal({ group, currentUserId, onClose, onChanged }: {
   group: Group; currentUserId: string; onClose: () => void; onChanged: () => void
@@ -82,14 +86,15 @@ function MembersModal({ group, currentUserId, onClose, onChanged }: {
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const [removing,  setRemoving]  = useState(false)
   const [error,     setError]     = useState<string | null>(null)
-  const canRemove = group.created_by === currentUserId
+  const isCreator = group.created_by === currentUserId
 
   const remove = async (userId: string) => {
     setRemoving(true)
     setError(null)
     try {
-      await messagingService.removeGroupMember(group.id, userId)
+      const result = await messagingService.removeGroupMember(group.id, userId)
       setConfirmId(null)
+      if (result?.requested) appToast.success(REQUEST_SENT)
       onChanged()
     } catch (err) {
       setError(getApiErrorMessage(err, 'Could not remove this person'))
@@ -99,13 +104,14 @@ function MembersModal({ group, currentUserId, onClose, onChanged }: {
   }
 
   const removeControl = (m: GroupMember) => {
-    if (!canRemove || m.user_id === currentUserId) return null
+    // Nobody removes themselves or the creator.
+    if (m.user_id === currentUserId || m.user_id === group.created_by) return null
     if (confirmId === m.user_id) {
       return (
         <div className="shrink-0 flex items-center gap-1">
           <button type="button" disabled={removing} onClick={() => void remove(m.user_id)}
             className="px-2 py-1 rounded-lg bg-red-500/80 hover:bg-red-500 ff-body text-[11px] text-white disabled:opacity-50">
-            {removing ? <Loader2 size={11} className="animate-spin" /> : 'Remove'}
+            {removing ? <Loader2 size={11} className="animate-spin" /> : isCreator ? 'Remove' : 'Ask to remove'}
           </button>
           <button type="button" disabled={removing} onClick={() => setConfirmId(null)}
             className="px-2 py-1 rounded-lg border border-white/10 ff-body text-[11px] text-white/60 hover:text-white">
@@ -115,7 +121,8 @@ function MembersModal({ group, currentUserId, onClose, onChanged }: {
       )
     }
     return (
-      <button type="button" title="Remove from group" aria-label={`Remove ${m.first_name} ${m.last_name} from group`}
+      <button type="button" title={isCreator ? 'Remove from group' : 'Ask the creator to remove'}
+        aria-label={`${isCreator ? 'Remove' : 'Ask to remove'} ${m.first_name} ${m.last_name}`}
         onClick={() => setConfirmId(m.user_id)}
         className="shrink-0 p-1.5 rounded-lg text-white/30 hover:text-red-400 hover:bg-white/5 transition-colors">
         <UserMinus size={14} />
@@ -161,9 +168,12 @@ function MembersModal({ group, currentUserId, onClose, onChanged }: {
   )
 }
 
-/** Invite more people. Anyone already in or invited is left out of the list. */
-function AddMembersModal({ group, onClose, onDone }: {
-  group: Group; onClose: () => void; onDone: () => void
+/**
+ * Invite more people. Anyone already in or invited is left out of the list.
+ * The creator adds them straight away; anyone else sends a request.
+ */
+function AddMembersModal({ group, isCreator, onClose, onDone }: {
+  group: Group; isCreator: boolean; onClose: () => void; onDone: () => void
 }) {
   const [users,    setUsers]    = useState<MessagableUser[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -196,7 +206,8 @@ function AddMembersModal({ group, onClose, onDone }: {
     setSaving(true)
     setError(null)
     try {
-      await messagingService.addGroupMembers(group.id, [...selected])
+      const result = await messagingService.addGroupMembers(group.id, [...selected])
+      if (result?.requested) appToast.success(REQUEST_SENT)
       onDone()
     } catch (err) {
       setError(getApiErrorMessage(err, 'Could not add people to the group'))
@@ -205,7 +216,12 @@ function AddMembersModal({ group, onClose, onDone }: {
   }
 
   return (
-    <ModalFrame title="Add People" icon={<UserPlus size={15} className="text-[var(--color-cyan)]/70" />} onClose={onClose}>
+    <ModalFrame title={isCreator ? 'Add People' : 'Ask to Add People'} icon={<UserPlus size={15} className="text-[var(--color-cyan)]/70" />} onClose={onClose}>
+      {!isCreator && (
+        <p className="px-4 pt-3 ff-body text-[11px] text-white/45">
+          The group creator approves who joins. They will see your request in the chat.
+        </p>
+      )}
       <div className="px-3 pt-3 pb-2 shrink-0">
         <div className="relative">
           <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/25 pointer-events-none" />
@@ -243,7 +259,9 @@ function AddMembersModal({ group, onClose, onDone }: {
       <div className="px-3 py-3 border-t border-white/[0.06] shrink-0">
         <button type="button" onClick={save} disabled={!selected.size || saving} className={PRIMARY_CLASS}>
           {saving ? <Loader2 size={14} className="animate-spin" /> : <UserPlus size={14} />}
-          {saving ? 'Adding…' : `Add to group${selected.size ? ` (${selected.size})` : ''}`}
+          {saving
+            ? (isCreator ? 'Adding…' : 'Sending…')
+            : `${isCreator ? 'Add to group' : 'Send request'}${selected.size ? ` (${selected.size})` : ''}`}
         </button>
       </div>
     </ModalFrame>
@@ -290,18 +308,74 @@ function RenameModal({ group, onClose, onDone }: {
   )
 }
 
-export default function GroupOptionsModals({ view, group, currentUserId, onClose, onChanged }: {
+/** The creator's queue: approve or decline each add/remove request. */
+function RequestsModal({ group, requests, onClose, onChanged }: {
+  group: Group; requests: GroupMemberRequest[]; onClose: () => void; onChanged: () => void
+}) {
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const [error,  setError]  = useState<string | null>(null)
+
+  const decide = async (r: GroupMemberRequest, approve: boolean) => {
+    setBusyId(r.request_id)
+    setError(null)
+    try {
+      await messagingService.decideGroupMemberRequest(group.id, r.request_id, approve)
+      onChanged()
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Could not save your decision'))
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  return (
+    <ModalFrame title="Member Requests" icon={<Inbox size={15} className="text-[var(--color-cyan)]/70" />} onClose={onClose}>
+      <div className={`${LIST_CLASS} pt-2`}>
+        {requests.length === 0 ? (
+          <p className="ff-body text-white/25 text-xs text-center py-12">No requests waiting.</p>
+        ) : requests.map(r => (
+          <div key={r.request_id} className="px-3 py-3 rounded-xl flex flex-col gap-2 border-b border-white/[0.05] last:border-b-0">
+            <p className="ff-body text-sm text-white/85 leading-snug">
+              <span className="text-white">{r.requested_by.name}</span>
+              {r.action === 'add' ? ' wants to add ' : ' wants to remove '}
+              <span className="text-white">{r.target.name}</span>
+              {r.action === 'add' ? ' to the group.' : ' from the group.'}
+            </p>
+            <div className="flex items-center gap-2">
+              <button type="button" disabled={busyId === r.request_id} onClick={() => void decide(r, true)}
+                className="flex-1 py-1.5 rounded-lg bg-[var(--color-cyan)] text-[var(--color-bg)] ff-body text-xs font-medium disabled:opacity-50 flex items-center justify-center gap-1.5">
+                {busyId === r.request_id ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />} Approve
+              </button>
+              <button type="button" disabled={busyId === r.request_id} onClick={() => void decide(r, false)}
+                className="flex-1 py-1.5 rounded-lg border border-white/10 ff-body text-xs text-white/70 hover:text-white disabled:opacity-50 flex items-center justify-center gap-1.5">
+                <X size={12} /> Decline
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+      {error && <p className="px-4 pb-3 ff-body text-xs text-red-400">{error}</p>}
+    </ModalFrame>
+  )
+}
+
+export default function GroupOptionsModals({ view, group, currentUserId, requests = [], onClose, onChanged }: {
   view:          GroupOptionsView | null
   group:         Group
   currentUserId: string
+  /** Pending add/remove requests; only the creator is given these. */
+  requests?:     GroupMemberRequest[]
   onClose:       () => void
   /** Called after a rename or an invite, so the caller can reload the group. */
   onChanged:     () => void
 }) {
   const done = () => { onChanged(); onClose() }
+  const isCreator = group.created_by === currentUserId
   // Stays open after a removal, so several people can be removed in a row.
   if (view === 'members') return <MembersModal group={group} currentUserId={currentUserId} onClose={onClose} onChanged={onChanged} />
-  if (view === 'add')     return <AddMembersModal group={group} onClose={onClose} onDone={done} />
-  if (view === 'rename')  return <RenameModal group={group} onClose={onClose} onDone={done} />
+  if (view === 'add')     return <AddMembersModal group={group} isCreator={isCreator} onClose={onClose} onDone={done} />
+  // Only the creator renames the group or decides requests.
+  if (view === 'rename' && isCreator)   return <RenameModal group={group} onClose={onClose} onDone={done} />
+  if (view === 'requests' && isCreator) return <RequestsModal group={group} requests={requests} onClose={onClose} onChanged={onChanged} />
   return null
 }

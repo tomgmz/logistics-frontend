@@ -79,12 +79,20 @@ export const messagingService = {
   renameGroup: (groupId: string, name: string) =>
     patch<{ name: string }>(`${B}/groups/${groupId}`, { name }),
 
+  // The creator adds directly; anyone else's choice becomes a request for the creator.
   addGroupMembers: (groupId: string, memberIds: string[]) =>
-    post<{ added: number }>(`${B}/groups/${groupId}/members`, { member_ids: memberIds }),
+    post<{ added: number; requested: number }>(`${B}/groups/${groupId}/members`, { member_ids: memberIds }),
 
   // Only the group's creator may remove someone.
   removeGroupMember: (groupId: string, userId: string) =>
-    del<void>(`${B}/groups/${groupId}/members/${userId}`),
+    del<{ removed: boolean; requested: boolean }>(`${B}/groups/${groupId}/members/${userId}`),
+
+  // The creator's queue of add/remove requests from other members.
+  getGroupMemberRequests: (groupId: string) =>
+    get<GroupMemberRequest[]>(`${B}/groups/${groupId}/requests`),
+
+  decideGroupMemberRequest: (groupId: string, requestId: string, approve: boolean) =>
+    post<void>(`${B}/groups/${groupId}/requests/${requestId}/decide`, { approve }),
 
   respondToGroupInvite: (groupId: string, accept: boolean) =>
     patch<void>(`${B}/groups/${groupId}/invite/respond`, { accept }),
@@ -103,4 +111,11 @@ export const messagingService = {
 
   reactToGroupMessage: (groupId: string, messageId: string, emoji: string) =>
     post<{ action: 'added' | 'removed' }>(`${B}/groups/${groupId}/messages/${messageId}/react`, { emoji }),
+}
+export interface GroupMemberRequest {
+  request_id:   string
+  action:       'add' | 'remove'
+  requested_by: { user_id: string; name: string }
+  target:       { user_id: string; name: string }
+  created_at:   string
 }

@@ -1,9 +1,9 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { ArrowLeft, MoreVertical, Users, Loader2, Check, X, CornerUpLeft, UserPlus, Pencil } from 'lucide-react'
+import { ArrowLeft, MoreVertical, Users, Loader2, Check, X, CornerUpLeft, UserPlus, Pencil, Inbox } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { messagingService } from '@/lib/services/messaging.service'
+import { messagingService, type GroupMemberRequest } from '@/lib/services/messaging.service'
 import { useMessagingRealtime } from '@/lib/hooks/useMessagingRealtime'
 import MessageInput from './MessageInput'
 import ReadTicks from './ReadTicks'
@@ -125,6 +125,19 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
   }, [menuOpen])
 
   const openOption = (view: GroupOptionsView) => { setMenuOpen(false); setOptionsView(view) }
+
+  // Only the creator renames the group and changes who is in it; everyone else asks.
+  const isCreator = group.created_by === currentUserId
+  const [requests, setRequests] = useState<GroupMemberRequest[]>([])
+  // Reloaded whenever the group is (a new request or a decision broadcasts group_updated).
+  useEffect(() => {
+    if (!isCreator) { setRequests([]); return }
+    let cancelled = false
+    messagingService.getGroupMemberRequests(group.id)
+      .then(rs => { if (!cancelled) setRequests(rs ?? []) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [group, isCreator])
 
   const typingTimeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const pendingIds     = useRef<Set<string>>(new Set())
@@ -290,12 +303,23 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
                   <>
                     <button type="button" role="menuitem" onClick={() => openOption('add')}
                       className="w-full flex items-center gap-2.5 px-3 py-2 ff-body text-sm text-white/80 hover:bg-white/[0.05] hover:text-white text-left">
-                      <UserPlus size={14} className="text-white/45" /> Add People
+                      <UserPlus size={14} className="text-white/45" /> {isCreator ? 'Add People' : 'Ask to Add People'}
                     </button>
-                    <button type="button" role="menuitem" onClick={() => openOption('rename')}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 ff-body text-sm text-white/80 hover:bg-white/[0.05] hover:text-white text-left">
-                      <Pencil size={14} className="text-white/45" /> Edit Group Name
-                    </button>
+                    {isCreator && (
+                      <>
+                        <button type="button" role="menuitem" onClick={() => openOption('rename')}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 ff-body text-sm text-white/80 hover:bg-white/[0.05] hover:text-white text-left">
+                          <Pencil size={14} className="text-white/45" /> Edit Group Name
+                        </button>
+                        <button type="button" role="menuitem" onClick={() => openOption('requests')}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 ff-body text-sm text-white/80 hover:bg-white/[0.05] hover:text-white text-left">
+                          <Inbox size={14} className="text-white/45" /> Member Requests
+                          {requests.length > 0 && (
+                            <span className="ml-auto min-w-[18px] h-[18px] px-1 rounded-full bg-[var(--color-cyan)] text-[var(--color-bg)] text-[10px] font-bold flex items-center justify-center">{requests.length}</span>
+                          )}
+                        </button>
+                      </>
+                    )}
                   </>
                 )}
               </motion.div>
@@ -308,9 +332,22 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
         view={optionsView}
         group={group}
         currentUserId={currentUserId}
+        requests={requests}
         onClose={() => setOptionsView(null)}
         onChanged={() => onGroupChanged?.()}
       />
+
+      {/* The creator's requests waiting for a decision. */}
+      {isCreator && !isPending && requests.length > 0 && (
+        <button type="button" onClick={() => setOptionsView('requests')}
+          className="shrink-0 flex items-center gap-2 px-4 py-2 border-b border-white/[0.07] bg-[var(--color-cyan)]/[0.06] hover:bg-[var(--color-cyan)]/[0.1] text-left transition-colors">
+          <Inbox size={14} className="text-[var(--color-cyan)]" />
+          <span className="ff-body text-xs text-white/85 flex-1">
+            {requests.length} member request{requests.length !== 1 ? 's' : ''} waiting for your approval
+          </span>
+          <span className="ff-body text-xs text-[var(--color-cyan)]">Review</span>
+        </button>
+      )}
 
       {/* Invite banner */}
       <AnimatePresence>
@@ -369,12 +406,14 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
                     </span>
                     <span className="ff-body text-xs text-white/70">Add</span>
                   </button>
-                  <button type="button" onClick={() => setOptionsView('rename')} className="flex flex-col items-center gap-1.5 group">
-                    <span className="w-10 h-10 rounded-full bg-white/[0.07] group-hover:bg-white/[0.12] flex items-center justify-center transition-colors">
-                      <Pencil size={16} className="text-white/80" />
-                    </span>
-                    <span className="ff-body text-xs text-white/70">Name</span>
-                  </button>
+                  {isCreator && (
+                    <button type="button" onClick={() => setOptionsView('rename')} className="flex flex-col items-center gap-1.5 group">
+                      <span className="w-10 h-10 rounded-full bg-white/[0.07] group-hover:bg-white/[0.12] flex items-center justify-center transition-colors">
+                        <Pencil size={16} className="text-white/80" />
+                      </span>
+                      <span className="ff-body text-xs text-white/70">Name</span>
+                    </button>
+                  )}
                   <button type="button" onClick={() => setOptionsView('members')} className="flex flex-col items-center gap-1.5 group">
                     <span className="w-10 h-10 rounded-full bg-white/[0.07] group-hover:bg-white/[0.12] flex items-center justify-center transition-colors">
                       <Users size={16} className="text-white/80" />
