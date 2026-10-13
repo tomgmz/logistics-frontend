@@ -50,7 +50,10 @@ export default function MessagingShell() {
         messagingService.getGroups(),
       ])
       setConversations(rawConvs.map(toConversation))
-      setGroups(rawGroups.map(toGroup))
+      const mapped = rawGroups.map(toGroup)
+      setGroups(mapped)
+      // Keep the open group in step with the list (new name, new members).
+      setSelectedGroup(prev => (prev ? mapped.find(g => g.id === prev.id) ?? prev : prev))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load conversations')
     } finally {
@@ -100,6 +103,7 @@ export default function MessagingShell() {
       if (!known) fetchAll()
     },
     onGroupInvite: () => fetchAll(),
+    onGroupUpdated: () => fetchAll(),
   })
 
   const unified: UnifiedListItem[] = [
@@ -227,6 +231,7 @@ export default function MessagingShell() {
               currentUserId={currentUserId}
               onBack={handleBack}
               onInviteResponded={handleInviteResponded}
+              onGroupChanged={fetchAll}
             />
           ) : selectedConv ? (
             <ChatWindow

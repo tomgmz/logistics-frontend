@@ -76,6 +76,12 @@ export const messagingService = {
   createGroup: (payload: { name: string; member_ids: string[] }) =>
     post<{ group_id: string }>(`${B}/groups`, payload),
 
+  renameGroup: (groupId: string, name: string) =>
+    patch<{ name: string }>(`${B}/groups/${groupId}`, { name }),
+
+  addGroupMembers: (groupId: string, memberIds: string[]) =>
+    post<{ added: number }>(`${B}/groups/${groupId}/members`, { member_ids: memberIds }),
+
   respondToGroupInvite: (groupId: string, accept: boolean) =>
     patch<void>(`${B}/groups/${groupId}/invite/respond`, { accept }),
 

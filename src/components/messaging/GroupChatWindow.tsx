@@ -1,11 +1,12 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { ArrowLeft, MoreVertical, Users, Loader2, Check, X, CornerUpLeft } from 'lucide-react'
+import { ArrowLeft, MoreVertical, Users, Loader2, Check, X, CornerUpLeft, UserPlus, Pencil } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { messagingService } from '@/lib/services/messaging.service'
 import { useMessagingRealtime } from '@/lib/hooks/useMessagingRealtime'
 import MessageInput from './MessageInput'
+import GroupOptionsModals, { type GroupOptionsView } from './GroupOptionsModals'
 import { QuickReactBar } from './EmojiPicker'
 import { groupMessagesByDate, formatMessageTime } from '@/app/utils/messaging.utils'
 import { Reply as ReplyIcon } from 'lucide-react'
@@ -26,6 +27,8 @@ interface GroupChatWindowProps {
   currentUserId:     string
   onBack:            () => void
   onInviteResponded?: (groupId: string, accepted: boolean) => void
+  /** The group was renamed or gained members; reload it. */
+  onGroupChanged?:    () => void
 }
 
 function getSeenBy(members: GroupMember[], msgCreatedAt: string, senderId: string, currentUserId: string): GroupMember[] {
@@ -88,7 +91,7 @@ function TypingDots() {
   )
 }
 
-export default function GroupChatWindow({ group, currentUserId, onBack, onInviteResponded }: GroupChatWindowProps) {
+export default function GroupChatWindow({ group, currentUserId, onBack, onInviteResponded, onGroupChanged }: GroupChatWindowProps) {
   const bottomRef    = useRef<HTMLDivElement>(null)
   const hoverTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -103,6 +106,25 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
   const [replyTo, setReplyTo]             = useState<ReplyTo | null>(null)
   const [hoveredId, setHoveredId]         = useState<string | null>(null)
   const [members, setMembers]             = useState<GroupMember[]>(group.members)
+  const [menuOpen, setMenuOpen]           = useState(false)
+  const [optionsView, setOptionsView]     = useState<GroupOptionsView | null>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  // The group is reloaded after a rename or new invitees; pick up its members.
+  useEffect(() => { setMembers(group.members) }, [group.members])
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const onDown = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuOpen(false) }
+    document.addEventListener('mousedown', onDown)
+    window.addEventListener('keydown', onKey)
+    return () => { document.removeEventListener('mousedown', onDown); window.removeEventListener('keydown', onKey) }
+  }, [menuOpen])
+
+  const openOption = (view: GroupOptionsView) => { setMenuOpen(false); setOptionsView(view) }
 
   const typingTimeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const pendingIds     = useRef<Set<string>>(new Set())
@@ -239,8 +261,47 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
             )}
           </AnimatePresence>
         </div>
-        <button type="button" className="p-2 rounded-lg hover:bg-white/5 text-white/30 hover:text-white/70 transition-colors"><MoreVertical size={15} /></button>
+        <div ref={menuRef} className="relative">
+          <button type="button" aria-label="Group options" aria-haspopup="menu" aria-expanded={menuOpen}
+            onClick={() => setMenuOpen(o => !o)}
+            className="p-2 rounded-lg hover:bg-white/5 text-white/30 hover:text-white/70 transition-colors">
+            <MoreVertical size={15} />
+          </button>
+          <AnimatePresence>
+            {menuOpen && (
+              <motion.div role="menu"
+                initial={{ opacity: 0, y: -4, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -4, scale: 0.97 }}
+                transition={{ duration: 0.12 }}
+                className="absolute right-0 top-full mt-1 z-30 w-48 rounded-xl border border-white/[0.09] bg-[var(--color-bg)] shadow-2xl py-1">
+                <button type="button" role="menuitem" onClick={() => openOption('members')}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 ff-body text-sm text-white/80 hover:bg-white/[0.05] hover:text-white text-left">
+                  <Users size={14} className="text-white/45" /> See All Members
+                </button>
+                {!isPending && (
+                  <>
+                    <button type="button" role="menuitem" onClick={() => openOption('add')}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 ff-body text-sm text-white/80 hover:bg-white/[0.05] hover:text-white text-left">
+                      <UserPlus size={14} className="text-white/45" /> Add People
+                    </button>
+                    <button type="button" role="menuitem" onClick={() => openOption('rename')}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 ff-body text-sm text-white/80 hover:bg-white/[0.05] hover:text-white text-left">
+                      <Pencil size={14} className="text-white/45" /> Edit Group Name
+                    </button>
+                  </>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
+
+      <GroupOptionsModals
+        view={optionsView}
+        group={group}
+        currentUserId={currentUserId}
+        onClose={() => setOptionsView(null)}
+        onChanged={() => onGroupChanged?.()}
+      />
 
       {/* Invite banner */}
       <AnimatePresence>

@@ -21,6 +21,8 @@ export interface UseMessagingRealtimeOptions {
   onGroupMessage?:      (msg:     GroupMessageRaw)         => void
   onGroupReadReceipt?:  (payload: GroupReadReceiptPayload) => void
   onGroupInvite?:       (payload: GroupInvitePayload)      => void
+  /** A group was renamed or gained members. */
+  onGroupUpdated?:      (payload: { group_id: string; name?: string }) => void
   onReactionToggle?:    (payload: ReactionTogglePayload)   => void
   onTyping?:            (userId: string, isTyping: boolean) => void
   onPresenceChange?:    (onlineUserIds: string[])          => void
@@ -65,6 +67,9 @@ export function useMessagingRealtime(opts: UseMessagingRealtimeOptions) {
       })
       .on('broadcast', { event: 'group_invite' }, ({ payload }: { payload: GroupInvitePayload }) => {
         optsRef.current.onGroupInvite?.(payload)
+      })
+      .on('broadcast', { event: 'group_updated' }, ({ payload }: { payload: { group_id: string; name?: string } }) => {
+        optsRef.current.onGroupUpdated?.(payload)
       })
       .on('broadcast', { event: 'reaction_toggle' }, ({ payload }: { payload: ReactionTogglePayload }) => {
         if (payload.user_id === currentUserId) return

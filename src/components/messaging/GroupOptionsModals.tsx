@@ -1,0 +1,257 @@
+'use client'
+
+import { useEffect, useRef, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { X, Search, Loader2, Users, Check, UserPlus, Pencil } from 'lucide-react'
+import { messagingService, type MessagableUser } from '@/lib/services/messaging.service'
+import { roleLabel, matchesPersonSearch } from '@/lib/roles'
+import { getApiErrorMessage } from '@/lib/api-error'
+import type { Group, GroupMember } from '@/app/types/messaging/messaging.types'
+
+export type GroupOptionsView = 'members' | 'add' | 'rename'
+
+// Same frame as the New Group pop-up, so the group dialogs read as one family.
+function ModalFrame({ title, icon, onClose, children }: {
+  title:    string
+  icon:     React.ReactNode
+  onClose:  () => void
+  children: React.ReactNode
+}) {
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4"
+        onClick={e => { if (e.target === e.currentTarget) onClose() }}
+      >
+        <motion.div
+          initial={{ opacity: 0, scale: 0.94, y: 16 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.94, y: 16 }}
+          transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+          className="w-full max-w-sm bg-[var(--color-bg)] border border-white/[0.09] rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+          style={{ maxHeight: '80vh' }}
+        >
+          <div className="px-4 pt-4 pb-3 flex items-center justify-between shrink-0 border-b border-white/[0.06]">
+            <div className="flex items-center gap-2">
+              {icon}
+              <h3 className="font-spartan text-white text-sm tracking-[0.15em] uppercase">{title}</h3>
+            </div>
+            <button type="button" onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/5 text-white/40 hover:text-white transition-colors">
+              <X size={14} />
+            </button>
+          </div>
+          {children}
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  )
+}
+
+function PersonRow({ first, last, role, right }: {
+  first: string; last: string; role: string; right?: React.ReactNode
+}) {
+  const initials = `${first?.[0] ?? '?'}${last?.[0] ?? '?'}`.toUpperCase()
+  return (
+    <div className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl">
+      <div className="w-9 h-9 rounded-full bg-[var(--color-surface-dark)] border border-white/10 flex items-center justify-center shrink-0">
+        <span className="font-card text-[0.62rem] text-white/75">{initials}</span>
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="ff-body text-sm text-white truncate">{first} {last}</p>
+        <p className="ff-body text-[11px] text-white/35 truncate">{roleLabel(role)}</p>
+      </div>
+      {right}
+    </div>
+  )
+}
+
+const LIST_CLASS = 'flex-1 overflow-y-auto px-2 pb-2 min-h-0 [&::-webkit-scrollbar]:w-[3px] [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full'
+const INPUT_CLASS = 'w-full bg-white/[0.04] border border-white/[0.07] rounded-xl px-3 py-2.5 ff-body text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[var(--color-cyan)]/30 transition-all'
+const PRIMARY_CLASS = 'w-full py-2.5 rounded-xl ff-body text-sm font-medium transition-all bg-[var(--color-cyan)] text-[var(--color-bg)] disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2'
+
+/** Everyone in the group: who has joined, and who has been invited but not yet. */
+function MembersModal({ group, currentUserId, onClose }: {
+  group: Group; currentUserId: string; onClose: () => void
+}) {
+  const joined  = group.members.filter(m => m.status === 'accepted')
+  const invited = group.members.filter(m => m.status === 'pending')
+  const sortByName = (a: GroupMember, b: GroupMember) =>
+    `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`)
+
+  const tag = (m: GroupMember) => (
+    <span className="shrink-0 ff-body text-[10px] text-white/35">
+      {m.user_id === currentUserId ? 'You' : m.user_id === group.created_by ? 'Created the group' : ''}
+    </span>
+  )
+
+  return (
+    <ModalFrame title="Members" icon={<Users size={15} className="text-[var(--color-cyan)]/70" />} onClose={onClose}>
+      <div className={`${LIST_CLASS} pt-2`}>
+        <p className="px-3 pt-1 pb-1 ff-body text-[10px] uppercase tracking-widest text-white/30">
+          In the group · {joined.length}
+        </p>
+        {[...joined].sort(sortByName).map(m => (
+          <PersonRow key={m.user_id} first={m.first_name} last={m.last_name} role={m.role} right={tag(m)} />
+        ))}
+        {invited.length > 0 && (
+          <>
+            <p className="px-3 pt-3 pb-1 ff-body text-[10px] uppercase tracking-widest text-white/30">
+              Invited · {invited.length}
+            </p>
+            {[...invited].sort(sortByName).map(m => (
+              <PersonRow key={m.user_id} first={m.first_name} last={m.last_name} role={m.role}
+                right={<span className="shrink-0 ff-body text-[10px] text-amber-400/80">Invite pending</span>} />
+            ))}
+          </>
+        )}
+      </div>
+    </ModalFrame>
+  )
+}
+
+/** Invite more people. Anyone already in or invited is left out of the list. */
+function AddMembersModal({ group, onClose, onDone }: {
+  group: Group; onClose: () => void; onDone: () => void
+}) {
+  const [users,    setUsers]    = useState<MessagableUser[]>([])
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [search,   setSearch]   = useState('')
+  const [loading,  setLoading]  = useState(true)
+  const [saving,   setSaving]   = useState(false)
+  const [error,    setError]    = useState<string | null>(null)
+  const searchRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    const inGroup = new Set(group.members.filter(m => m.status !== 'declined').map(m => m.user_id))
+    messagingService.getMessagableUsers()
+      // Clients talk one-to-one only; the API refuses them in groups.
+      .then(us => setUsers(us.filter(u => u.role !== 'client' && !inGroup.has(u.user_id))))
+      .catch(() => setError('Could not load contacts'))
+      .finally(() => setLoading(false))
+    setTimeout(() => searchRef.current?.focus(), 80)
+  }, [group.members])
+
+  const filtered = users.filter(u => matchesPersonSearch(search, u))
+
+  const toggle = (id: string) => setSelected(prev => {
+    const next = new Set(prev)
+    if (next.has(id)) next.delete(id); else next.add(id)
+    return next
+  })
+
+  const save = async () => {
+    if (!selected.size || saving) return
+    setSaving(true)
+    setError(null)
+    try {
+      await messagingService.addGroupMembers(group.id, [...selected])
+      onDone()
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Could not add people to the group'))
+      setSaving(false)
+    }
+  }
+
+  return (
+    <ModalFrame title="Add People" icon={<UserPlus size={15} className="text-[var(--color-cyan)]/70" />} onClose={onClose}>
+      <div className="px-3 pt-3 pb-2 shrink-0">
+        <div className="relative">
+          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/25 pointer-events-none" />
+          <input ref={searchRef} type="text" value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Search by name or role…" className={`${INPUT_CLASS} pl-9 py-2`} />
+        </div>
+      </div>
+
+      <div className={LIST_CLASS}>
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 size={18} className="animate-spin text-[var(--color-cyan)]/40" />
+          </div>
+        ) : filtered.length === 0 ? (
+          <p className="ff-body text-white/20 text-xs text-center py-12">
+            {search ? 'No contacts match your search' : 'Everyone you can add is already in this group'}
+          </p>
+        ) : filtered.map(u => {
+          const on = selected.has(u.user_id)
+          return (
+            <motion.button key={u.user_id} type="button" whileTap={{ scale: 0.98 }} onClick={() => toggle(u.user_id)}
+              className="w-full text-left rounded-xl transition-colors hover:bg-white/[0.04]">
+              <PersonRow first={u.first_name ?? ''} last={u.last_name ?? ''} role={u.role} right={
+                <div className={`shrink-0 w-5 h-5 rounded-full border flex items-center justify-center transition-all ${on ? 'bg-[var(--color-cyan)] border-[var(--color-cyan)]' : 'border-white/20'}`}>
+                  {on && <Check size={11} className="text-[var(--color-bg)]" />}
+                </div>
+              } />
+            </motion.button>
+          )
+        })}
+      </div>
+
+      {error && <p className="px-4 pb-2 ff-body text-xs text-red-400">{error}</p>}
+
+      <div className="px-3 py-3 border-t border-white/[0.06] shrink-0">
+        <button type="button" onClick={save} disabled={!selected.size || saving} className={PRIMARY_CLASS}>
+          {saving ? <Loader2 size={14} className="animate-spin" /> : <UserPlus size={14} />}
+          {saving ? 'Adding…' : `Add to group${selected.size ? ` (${selected.size})` : ''}`}
+        </button>
+      </div>
+    </ModalFrame>
+  )
+}
+
+function RenameModal({ group, onClose, onDone }: {
+  group: Group; onClose: () => void; onDone: () => void
+}) {
+  const [name,   setName]   = useState(group.name)
+  const [saving, setSaving] = useState(false)
+  const [error,  setError]  = useState<string | null>(null)
+  const unchanged = name.trim() === group.name.trim()
+
+  const save = async () => {
+    if (!name.trim() || unchanged || saving) return
+    setSaving(true)
+    setError(null)
+    try {
+      await messagingService.renameGroup(group.id, name.trim())
+      onDone()
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Could not rename the group'))
+      setSaving(false)
+    }
+  }
+
+  return (
+    <ModalFrame title="Edit Group Name" icon={<Pencil size={15} className="text-[var(--color-cyan)]/70" />} onClose={onClose}>
+      <div className="px-3 pt-3 pb-2">
+        <input type="text" value={name} autoFocus maxLength={100}
+          onChange={e => setName(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') void save() }}
+          placeholder="Group name…" className={INPUT_CLASS} />
+      </div>
+      {error && <p className="px-4 pb-2 ff-body text-xs text-red-400">{error}</p>}
+      <div className="px-3 py-3 border-t border-white/[0.06]">
+        <button type="button" onClick={save} disabled={!name.trim() || unchanged || saving} className={PRIMARY_CLASS}>
+          {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+          {saving ? 'Saving…' : 'Save name'}
+        </button>
+      </div>
+    </ModalFrame>
+  )
+}
+
+export default function GroupOptionsModals({ view, group, currentUserId, onClose, onChanged }: {
+  view:          GroupOptionsView | null
+  group:         Group
+  currentUserId: string
+  onClose:       () => void
+  /** Called after a rename or an invite, so the caller can reload the group. */
+  onChanged:     () => void
+}) {
+  const done = () => { onChanged(); onClose() }
+  if (view === 'members') return <MembersModal group={group} currentUserId={currentUserId} onClose={onClose} />
+  if (view === 'add')     return <AddMembersModal group={group} onClose={onClose} onDone={done} />
+  if (view === 'rename')  return <RenameModal group={group} onClose={onClose} onDone={done} />
+  return null
+}
