@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
-  Bot, CheckCircle2, ChevronRight, LifeBuoy, Loader2, MessageCircleQuestion, Send, Ticket, X,
+  Bot, CheckCircle2, ChevronRight, LifeBuoy, Loader2, MessageCircleQuestion, Pin, Send, Ticket, X,
 } from 'lucide-react'
 import { useClientMessages, ClientMessagesPanel } from './ClientMessages'
 
@@ -102,6 +102,10 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
   const [ticketsLoading, setTicketsLoading] = useState(false)
 
   const scroller = useRef<HTMLDivElement>(null)
+  // The question the client asked last, pinned to the top of the chat so a long
+  // answer never pushes it out of sight.
+  const lastQuestionRef = useRef<HTMLDivElement>(null)
+  const [questionHidden, setQuestionHidden] = useState(false)
 
   const push = useCallback((m: Omit<Msg, 'id'>) => {
     setMessages((prev) => [...prev, { ...m, id: nextId.current++ }])
@@ -134,9 +138,41 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
     window.history.replaceState(null, '', `${window.location.pathname}${rest ? `?${rest}` : ''}`)
   }, [isPublic, openConversation])
 
+  const lastQuestion = useMemo(
+    () => [...messages].reverse().find((m) => m.from === 'client') ?? null,
+    [messages],
+  )
+
+  // A new question scrolls to the top of the view with its answer below it,
+  // instead of to the bottom, where a long answer pushed the question out of
+  // sight. Anything else (the ticket form, a "glad that helped") still goes to
+  // the bottom.
+  const lastScrolledQuestion = useRef<number | null>(null)
   useEffect(() => {
-    scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: 'smooth' })
-  }, [messages, ticketOpen])
+    const box = scroller.current
+    if (!box) return
+    const q = lastQuestionRef.current
+    if (!ticketOpen && lastQuestion && q && lastScrolledQuestion.current !== lastQuestion.id) {
+      lastScrolledQuestion.current = lastQuestion.id
+      // The box is the question's offset parent (it is `relative`), so offsetTop is measured from it.
+      box.scrollTo({ top: Math.max(0, q.offsetTop - 12), behavior: 'smooth' })
+      return
+    }
+    box.scrollTo({ top: box.scrollHeight, behavior: 'smooth' })
+  }, [messages, ticketOpen, lastQuestion])
+
+  // Show the pinned bar only while the question's own bubble is scrolled away.
+  useEffect(() => {
+    const box = scroller.current
+    const q   = lastQuestionRef.current
+    if (!box || !q) { setQuestionHidden(false); return }
+    const io = new IntersectionObserver(
+      ([entry]) => setQuestionHidden(!entry.isIntersecting && entry.boundingClientRect.top < (entry.rootBounds?.top ?? 0)),
+      { root: box, threshold: 0 },
+    )
+    io.observe(q)
+    return () => io.disconnect()
+  }, [lastQuestion, open, tab])
 
   const loadTickets = useCallback(async () => {
     setTicketsLoading(true)
@@ -331,9 +367,28 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
             <ClientMessagesPanel state={inbox} userId={user.user_id} onAskAssistant={() => setTab('chat')} />
           ) : tab === 'chat' || !canTicket ? (
             <>
-              <div ref={scroller} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
+              <div ref={scroller} className="relative flex-1 space-y-3 overflow-y-auto px-4 pb-4 pt-0">
+                {/* The current question, pinned once its bubble scrolls out of view. */}
+                {lastQuestion && questionHidden ? (
+                  <button
+                    type="button"
+                    onClick={() => lastQuestionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                    className="sticky top-0 z-10 -mx-4 flex w-[calc(100%+2rem)] items-start gap-2 border-b border-white/[0.08] bg-[#121212]/95 px-4 py-2.5 text-left backdrop-blur"
+                    aria-label="Go to your question"
+                  >
+                    <Pin size={13} className="mt-0.5 shrink-0 text-[var(--color-cyan)]" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[10px] uppercase tracking-widest text-white/40">Your question</span>
+                      <span className="block truncate text-[13px] text-white/90">{lastQuestion.text}</span>
+                    </span>
+                  </button>
+                ) : (
+                  <div className="h-1" aria-hidden />
+                )}
                 {messages.map((m) => (
-                  <div key={m.id} className={`flex ${m.from === 'client' ? 'justify-end' : 'justify-start'} gap-2`}>
+                  <div key={m.id}
+                    ref={lastQuestion && m.id === lastQuestion.id ? lastQuestionRef : undefined}
+                    className={`flex ${m.from === 'client' ? 'justify-end' : 'justify-start'} gap-2 scroll-mt-14`}>
                     {m.from === 'bot' && (
                       <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-[var(--color-cyan)]">
                         <Bot size={13} />
