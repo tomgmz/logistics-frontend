@@ -20,14 +20,18 @@ export async function POST(req: NextRequest) {
     return res
 
   } catch (error: unknown) {
-    // Clear the session cookies on *any* failure, not just the ones the backend
-    // answered. An unreachable backend used to leave access_token/refresh_token
-    // in place while the client had already given up on the session — and
-    // proxy.ts reads those cookies alone, so it bounced every "go home"
-    // redirect straight back to the portal and the page reloaded in a loop.
+    // Clear the session cookies only when the backend says the session is over
+    // (401). A temporary failure (backend unreachable, slow to wake, 5xx) keeps
+    // them: the browser keeps the user signed in too and retries later
+    // (isSessionDead in lib/api/auth.api), so cookies and the page never
+    // disagree. The reload loop that once made every failure clear the cookies
+    // came from the page giving up while the cookies stayed, and it no longer
+    // gives up on these.
     const res = handleError(error)
-    res.cookies.set('access_token',  '', cookieClearOptions)
-    res.cookies.set('refresh_token', '', cookieClearOptions)
+    if (axios.isAxiosError(error) && error.response?.status === 401) {
+      res.cookies.set('access_token',  '', cookieClearOptions)
+      res.cookies.set('refresh_token', '', cookieClearOptions)
+    }
     return res
   }
 }

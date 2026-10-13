@@ -71,21 +71,47 @@ proxyApi.interceptors.request.use(
   (error: AxiosError) => Promise.reject(error)
 )
 
-let isRefreshing = false
-
-interface QueueEntry {
-  resolve: () => void
-  reject:  (reason: unknown) => void
+/**
+ * True when a refresh failed because the session is really over: the API
+ * answered 401. Anything else (backend unreachable or waking up, a 5xx) is
+ * temporary, and the user stays signed in so the next request can try again.
+ */
+export function isSessionDead(err: unknown): boolean {
+  return axios.isAxiosError(err) && err.response?.status === 401
 }
 
-let failedQueue: QueueEntry[] = []
+const REFRESHED_AT_KEY = 'auth-refreshed-at'
+let refreshInFlight: Promise<void> | null = null
 
-function processQueue(error: unknown): void {
-  failedQueue.forEach((entry) => {
-    if (error) entry.reject(error)
-    else entry.resolve()
-  })
-  failedQueue = []
+/**
+ * Renew the access token: once per tab at a time, and one tab at a time.
+ *
+ * The session row holds a single access-token hash, and every refresh replaces
+ * it. Two tabs refreshing at once could leave the browser's cookie holding the
+ * token the database had already replaced, so the next check failed, and on a
+ * page load that signed the user out. A browser-wide lock makes refreshes take
+ * turns, and a tab that waited behind another tab's refresh skips its own: the
+ * cookie it needs was just set for the whole browser.
+ */
+export function refreshSession(): Promise<void> {
+  refreshInFlight ??= runRefresh().finally(() => { refreshInFlight = null })
+  return refreshInFlight
+}
+
+async function runRefresh(): Promise<void> {
+  const requestedAt = Date.now()
+  const refresh = async () => {
+    let last = 0
+    try { last = Number(window.localStorage.getItem(REFRESHED_AT_KEY) ?? 0) } catch { /* storage blocked */ }
+    if (last >= requestedAt) return
+    await nextApi.post('/api/auth/refresh')
+    try { window.localStorage.setItem(REFRESHED_AT_KEY, String(Date.now())) } catch { /* storage blocked */ }
+  }
+  if (typeof navigator !== 'undefined' && navigator.locks) {
+    await navigator.locks.request('auth-refresh', refresh)
+  } else {
+    await refresh()
+  }
 }
 
 /**
@@ -130,30 +156,19 @@ proxyApi.interceptors.response.use(
     }
 
     if (error.response?.status === 401 && !originalRequest?._retry && !isExcluded) {
-      if (isRefreshing) {
-        return new Promise<void>((resolve, reject) => {
-          failedQueue.push({ resolve, reject })
-        })
-          .then(() => proxyApi(originalRequest!))
-          .catch((err) => Promise.reject(err))
-      }
-
       originalRequest!._retry = true
-      isRefreshing = true
 
       try {
-        await nextApi.post('/api/auth/refresh')
-        processQueue(null)
-        isRefreshing = false
-        return proxyApi(originalRequest!)
+        await refreshSession()
       } catch (refreshError) {
-        processQueue(refreshError)
-        isRefreshing = false
-        failedQueue = []
+        // Only a refused refresh ends the session. A temporary failure fails
+        // just this request; the user stays signed in.
+        if (!isSessionDead(refreshError)) return Promise.reject(error)
         broadcastLogout()
         goHomeSignedOut()
         return Promise.reject(refreshError)
       }
+      return proxyApi(originalRequest!)
     }
 
     return Promise.reject(error)

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { getMe, type AuthUser } from '@/lib/api/auth.api'
+import { getMe, isSessionDead, refreshSession, type AuthUser } from '@/lib/api/auth.api'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { readPersisted } from '@/lib/secure-storage'
 import { syncServerTime } from '@/app/utils/serverTime'
@@ -170,14 +170,19 @@ export default function AuthRehydrator() {
       }
 
       try {
-        await axios.post('/api/auth/refresh', {}, { withCredentials: true })
+        // Shared with the request interceptor, so tabs loading at the same
+        // moment take turns instead of overwriting each other's token.
+        await refreshSession()
         const user = await getMe()
         if (cancelled) return
         commitUser(user, setUser)
         openChannel(user.user_id)
         return
-      } catch {
+      } catch (err) {
         if (cancelled) return
+        // A temporary failure (backend unreachable or waking up) keeps the
+        // stored user; only a 401 means the session is over.
+        if (!isSessionDead(err)) return
         clearUser()
         const isPublic = PUBLIC_PATHS.some(
           (p) =>
