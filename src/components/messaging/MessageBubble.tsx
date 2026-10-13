@@ -1,8 +1,10 @@
 'use client'
 
+import ReadTicks from './ReadTicks'
+
 import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Check, CheckCheck, Reply, CornerUpLeft, Trash2 } from 'lucide-react'
+import { Reply, CornerUpLeft, Trash2 } from 'lucide-react'
 import { formatMessageTime } from '@/app/utils/messaging.utils'
 import { QuickReactBar } from './EmojiPicker'
 import type { Message, MessageReaction, MessageParticipant } from '@/app/types/messaging/messaging.types'
@@ -147,11 +149,7 @@ export default function MessageBubble({
         {/* Time + read receipt */}
         <div className={`flex items-center gap-1 px-1 ${isMine ? 'flex-row-reverse' : ''}`}>
           <span className="ff-body text-[10px] text-white/25">{formatMessageTime(message.created_at)}</span>
-          {isMine && (
-            showSeen
-              ? <CheckCheck size={11} className="text-[var(--color-cyan)]" />
-              : <Check size={11} className="text-white/25" />
-          )}
+          {isMine && <ReadTicks seen={showSeen} />}
         </div>
 
         {/* Reactions */}

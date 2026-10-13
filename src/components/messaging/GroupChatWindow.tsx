@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { messagingService } from '@/lib/services/messaging.service'
 import { useMessagingRealtime } from '@/lib/hooks/useMessagingRealtime'
 import MessageInput from './MessageInput'
+import ReadTicks from './ReadTicks'
 import GroupOptionsModals, { type GroupOptionsView } from './GroupOptionsModals'
 import { QuickReactBar } from './EmojiPicker'
 import { groupMessagesByDate, formatMessageTime, groupEventText } from '@/app/utils/messaging.utils'
@@ -131,6 +132,8 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
 
   const isPending       = inviteStatus === 'pending'
   const acceptedMembers = members.filter(m => m.status === 'accepted')
+  // Your message counts as seen once every other member has read it.
+  const othersInGroup   = acceptedMembers.filter(m => m.user_id !== currentUserId).length
   const memberMap       = Object.fromEntries(members.map(m => [m.user_id, m]))
   const invitedBy       = memberMap[members.find(m => m.user_id === currentUserId)?.invited_by ?? '']
   const invitedByName   = invitedBy ? `${invitedBy.first_name} ${invitedBy.last_name}` : 'Someone'
@@ -471,7 +474,10 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
                           )}
                         </div>
 
-                        <span className="ff-body text-[9px] text-white/20 px-1">{formatMessageTime(msg.created_at)}</span>
+                        <div className={`flex items-center gap-1 px-1 ${isMine ? 'flex-row-reverse' : ''}`}>
+                          <span className="ff-body text-[9px] text-white/20">{formatMessageTime(msg.created_at)}</span>
+                          {isMine && <ReadTicks seen={!isOptimistic && othersInGroup > 0 && seenBy.length >= othersInGroup} size={10} />}
+                        </div>
 
                         {grouped.length > 0 && (
                           <div className={`flex flex-wrap gap-1 px-1 ${isMine ? 'justify-end' : ''}`}>

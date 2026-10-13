@@ -21,6 +21,7 @@ import { useMessagingRealtime } from '@/lib/hooks/useMessagingRealtime'
 import { QuickReactBar } from './EmojiPicker'
 import MessageInput from './MessageInput'
 import { Reply as ReplyIcon } from 'lucide-react'
+import ReadTicks from './ReadTicks'
 
 const BUBBLE_W   = 338
 const BUBBLE_GAP = 10
@@ -221,6 +222,8 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
 
   const dateGroups = groupMessagesByDate(messages)
   const acceptedCount = members.filter(m => m.status === 'accepted').length
+  // Your message counts as seen once every other member has read it.
+  const othersInGroup = members.filter(m => m.status === 'accepted' && m.user_id !== currentUserId).length
   const isPending     = inviteStatus === 'pending'
   const invitedBy     = memberMap[members.find(m => m.user_id === currentUserId)?.invited_by ?? '']
   const invitedByName = invitedBy ? `${invitedBy.first_name} ${invitedBy.last_name}` : 'Someone'
@@ -382,7 +385,10 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
                         )}
                       </div>
 
-                      <span className="ff-body text-[8px] text-white/20 px-0.5">{formatMessageTime(msg.created_at)}</span>
+                      <div className={`flex items-center gap-0.5 px-0.5 ${isMine ? 'flex-row-reverse' : ''}`}>
+                        <span className="ff-body text-[8px] text-white/20">{formatMessageTime(msg.created_at)}</span>
+                        {isMine && <ReadTicks seen={!isOptimistic && othersInGroup > 0 && seenBy.length >= othersInGroup} size={9} />}
+                      </div>
 
                       {grouped.length > 0 && (
                         <div className={`flex flex-wrap gap-0.5 ${isMine ? 'justify-end' : ''}`}>

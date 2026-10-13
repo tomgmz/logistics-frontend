@@ -66,3 +66,12 @@ export function groupEventText(
   }
   return msg.body
 }
+
+/**
+ * Whether a message sent at `createdAt` has been read by someone whose last
+ * read is `readAt`. Everything up to their last read counts as seen.
+ */
+export function isReadBy(readAt: string | null | undefined, createdAt: string): boolean {
+  if (!readAt) return false
+  return parseDate(createdAt).getTime() <= parseDate(readAt).getTime()
+}

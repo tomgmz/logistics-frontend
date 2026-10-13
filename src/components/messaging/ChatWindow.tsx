@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { ArrowLeft, Loader2 } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { messagingService } from '@/lib/services/messaging.service'
@@ -8,7 +8,7 @@ import type { MessageRow } from '@/lib/services/messaging.service'
 import { useMessagingRealtime } from '@/lib/hooks/useMessagingRealtime'
 import MessageBubble from './MessageBubble'
 import MessageInput from './MessageInput'
-import { groupMessagesByDate } from '@/app/utils/messaging.utils'
+import { groupMessagesByDate, isReadBy } from '@/app/utils/messaging.utils'
 import type {
   Conversation,
   Message,
@@ -97,14 +97,8 @@ export default function ChatWindow({ conversation, draftUser, currentUserId, isP
   })
   const typingTimeout                         = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const lastSeenId = useMemo(() => {
-    if (!otherLastReadAt) return null
-    const toMs = (iso: string) => new Date(iso.endsWith('Z') || iso.includes('+') ? iso : `${iso}Z`).getTime()
-    const readMs = toMs(otherLastReadAt)
-    return messages
-      .filter(m => m.sender_id === currentUserId && !m.id.startsWith('optimistic-') && toMs(m.created_at) <= readMs)
-      .at(-1)?.id ?? null
-  }, [messages, otherLastReadAt, currentUserId])
+  // Every message of yours up to the other person's last read has been seen.
+  const isSeen = (m: Message) => !m.id.startsWith('optimistic-') && isReadBy(otherLastReadAt, m.created_at)
   const pendingIds                            = useRef<Set<string>>(new Set())
 
   const fetchMessages = useCallback(async () => {
@@ -292,7 +286,7 @@ export default function ChatWindow({ conversation, draftUser, currentUserId, isP
                     sender={isMine ? undefined : { ...participant, is_online: isOnline }}
                     showSenderName={showName}
                     showAvatar={showAvatar}
-                    showSeen={msg.id === lastSeenId}
+                    showSeen={isSeen(msg)}
                     onReply={handleReply}
                     onReact={handleReact}
                     onDelete={handleDelete}

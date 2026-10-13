@@ -1,13 +1,13 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Loader2, Minus, CornerUpLeft } from 'lucide-react'
 import { useMessengerStore } from '@/lib/store/messenger.store'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { messagingService } from '@/lib/services/messaging.service'
 import type { MessageRow } from '@/lib/services/messaging.service'
-import { groupMessagesByDate } from '@/app/utils/messaging.utils'
+import { groupMessagesByDate, isReadBy } from '@/app/utils/messaging.utils'
 import { toConversation, toMessage } from '@/app/types/messaging/messaging.types'
 import type {
   Conversation,
@@ -69,14 +69,8 @@ export default function MessengerChatBubble({ conversationId, index }: Props) {
   const typingTimer  = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pendingIds   = useRef<Set<string>>(new Set())
 
-  const lastSeenId = useMemo(() => {
-    if (!otherLastReadAt) return null
-    const toMs = (iso: string) => new Date(iso.endsWith('Z') || iso.includes('+') ? iso : `${iso}Z`).getTime()
-    const readMs = toMs(otherLastReadAt)
-    return messages
-      .filter(m => m.sender_id === currentUserId && !m.id.startsWith('optimistic-') && toMs(m.created_at) <= readMs)
-      .at(-1)?.id ?? null
-  }, [messages, otherLastReadAt, currentUserId])
+  // Every message of yours up to the other person's last read has been seen.
+  const isSeen = (m: Message) => !m.id.startsWith('optimistic-') && isReadBy(otherLastReadAt, m.created_at)
 
   // Load conversation metadata + initialise otherLastReadAt
   useEffect(() => {
@@ -246,7 +240,7 @@ export default function MessengerChatBubble({ conversationId, index }: Props) {
                     sender={isMine ? undefined : { ...participant!, is_online: isOnline }}
                     showSenderName={showName}
                     showAvatar={showAvatar}
-                    showSeen={msg.id === lastSeenId}
+                    showSeen={isSeen(msg)}
                     onReply={m => setReplyTo({ messageId: m.id, content: m.body, senderName: m.sender_id === currentUserId ? 'You' : participant?.first_name ?? 'Them' })}
                     onReact={handleReact}
                     replyToSenderName={msg.reply_to ? (msg.reply_to.sender_id === currentUserId ? 'You' : participant?.first_name ?? 'Them') : undefined}
