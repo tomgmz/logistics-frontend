@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -87,6 +87,11 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
   ])
   const [input, setInput] = useState('')
   const [helped, setHelped] = useState<Record<number, boolean>>({})
+  // Where the common questions are offered: under the greeting (null) until a
+  // question is wrapped up — the client says the answer helped, or sends a
+  // ticket after saying it did not. Then they move to just below that message,
+  // the bottom of the chat at that moment, ready for the next question.
+  const [questionsAfter, setQuestionsAfter] = useState<number | null>(null)
 
   // Ticket form, shown inside the chat when the client asks for a person.
   const [ticketOpen, setTicketOpen] = useState(false)
@@ -224,6 +229,7 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
         booking_id: bookingId || null, transcript,
       })
       setTicketOpen(false)
+      setQuestionsAfter(nextId.current)
       push({
         from: 'bot',
         text: `Done — ticket ${ticket.reference} is open. We emailed you a copy${user?.email ? ` at ${user.email}` : ''}. ` +
@@ -333,7 +339,8 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
             <>
               <div ref={scroller} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
                 {messages.map((m) => (
-                  <div key={m.id} className={`flex ${m.from === 'client' ? 'justify-end' : 'justify-start'} gap-2`}>
+                  <Fragment key={m.id}>
+                  <div className={`flex ${m.from === 'client' ? 'justify-end' : 'justify-start'} gap-2`}>
                     {m.from === 'bot' && (
                       <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-[var(--color-cyan)]">
                         <Bot size={13} />
@@ -362,7 +369,11 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
                       {m.faq && helped[m.id] === undefined && (
                         <div className="flex items-center gap-2 text-[11px] text-white/45">
                           Did this answer it?
-                          <button type="button" onClick={() => { setHelped((h) => ({ ...h, [m.id]: true })); push({ from: 'bot', text: 'Glad that helped! Ask anything else any time.' }) }}
+                          <button type="button" onClick={() => {
+                            setHelped((h) => ({ ...h, [m.id]: true }))
+                            setQuestionsAfter(nextId.current)
+                            push({ from: 'bot', text: 'Glad that helped! Ask anything else any time.' })
+                          }}
                             className="rounded-md border border-white/10 px-2 py-0.5 text-white/70 hover:bg-white/5">Yes</button>
                           <button type="button" onClick={() => {
                             setHelped((h) => ({ ...h, [m.id]: false }))
@@ -377,8 +388,8 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
                         </div>
                       )}
 
-                      {/* The greeting's common questions move to the bottom once the chat has moved on. */}
-                      {m.suggestions && m.suggestions.length > 0 && !(m.id === 0 && messages.length > 1) && (
+                      {/* The greeting's common questions, until a wrapped-up question moves them down. */}
+                      {m.suggestions && m.suggestions.length > 0 && !(m.id === 0 && questionsAfter !== null) && (
                         <div className="flex flex-wrap gap-1.5">
                           {m.suggestions.map((s) => (
                             <button
@@ -404,32 +415,31 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
                       )}
                     </div>
                   </div>
-                ))}
-
-                {/* After any answer, the common questions sit at the very bottom of the
-                    chat, so another can be picked without scrolling back up. */}
-                {messages.length > 1 && !ticketOpen && (
-                  <div className="flex gap-2 pt-1">
-                    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-[var(--color-cyan)]">
-                      <MessageCircleQuestion size={13} />
-                    </span>
-                    <div className="max-w-[85%] space-y-1.5">
-                      <p className="text-[11px] text-white/45">Have another question?</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {(isPublic && !canTicket ? PUBLIC_STARTER_QUESTIONS : STARTER_QUESTIONS).map((s) => (
-                          <button
-                            key={s.id}
-                            type="button"
-                            onClick={() => pick(s)}
-                            className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-left text-[11px] text-white/75 hover:border-[var(--color-cyan)]/40 hover:text-white"
-                          >
-                            {s.question}
-                          </button>
-                        ))}
+                    {/* The common questions, moved here when the question above was wrapped up. */}
+                    {m.id === questionsAfter && (
+                      <div className="flex gap-2 pt-1">
+                        <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-[var(--color-cyan)]">
+                          <MessageCircleQuestion size={13} />
+                        </span>
+                        <div className="max-w-[85%] space-y-1.5">
+                          <p className="text-[11px] text-white/45">Have another question?</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {(isPublic && !canTicket ? PUBLIC_STARTER_QUESTIONS : STARTER_QUESTIONS).map((s) => (
+                              <button
+                                key={s.id}
+                                type="button"
+                                onClick={() => pick(s)}
+                                className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-left text-[11px] text-white/75 hover:border-[var(--color-cyan)]/40 hover:text-white"
+                              >
+                                {s.question}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                )}
+                    )}
+                  </Fragment>
+                ))}
 
                 {ticketOpen && (
                   <div className="space-y-2.5 rounded-xl border border-white/[0.08] bg-white/[0.02] p-3">
