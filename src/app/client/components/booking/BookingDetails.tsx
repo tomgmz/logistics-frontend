@@ -22,7 +22,7 @@ import {
   removeExistingDocument,
 } from '@/lib/store/slice/booking.slice'
 import type { CargoMode, ItemGroup } from '@/lib/store/slice/booking.slice'
-import { documentName } from '@/lib/booking-resubmit'
+import { documentName, draftFingerprint } from '@/lib/booking-resubmit'
 
 // Stable empty list, so the selector below does not hand back a new array
 // (and re-render) on every store change.
@@ -658,6 +658,18 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
   // the required document and the three-file limit, like newly chosen ones.
   const keptDocs     = useAppSelector((s) => s.booking.resubmit?.existingDocuments) ?? NO_DOCS
   const docCount     = files.length + keptDocs.length
+
+  // Correcting a rejected booking: nothing to resubmit until something changed.
+  const resubmitBaseline = useAppSelector((s) => s.booking.resubmit?.baseline ?? null)
+  const pickupLat        = useAppSelector((s) => s.booking.pickupLat)
+  const pickupLng        = useAppSelector((s) => s.booking.pickupLng)
+  const dropoffCoords    = useAppSelector((s) => s.booking.dropoffCoords)
+  const unchanged = resubmitBaseline !== null
+    && files.length === 0
+    && draftFingerprint({
+         date, time, pickup, pickupLat, pickupLng, dropoffs, dropoffCoords, mode, sections,
+         existingDocuments: keptDocs,
+       }) === resubmitBaseline
 
   const [touched,    setTouched]    = useState(false)
   const [mapTarget,  setMapTarget]  = useState<MapPickerTarget>(null)
@@ -1411,10 +1423,15 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
 
         <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5 }}
-          className={`flex gap-3 pt-2 ${onBack ? 'justify-between' : 'justify-end'}`}
+          className={`flex items-center gap-3 pt-2 ${onBack ? 'justify-between' : 'justify-end'}`}
         >
           {onBack && <WizBtn onClick={onBack} variant="back">BACK</WizBtn>}
-          <WizBtn onClick={handleNext} variant="next">NEXT</WizBtn>
+          {unchanged && (
+            <p className="ff-sc booking-text text-xs text-white/50 text-right">
+              Change the booking details to address the rejection before resubmitting.
+            </p>
+          )}
+          <WizBtn onClick={handleNext} variant="next" disabled={unchanged}>NEXT</WizBtn>
         </motion.div>
 
       </div>

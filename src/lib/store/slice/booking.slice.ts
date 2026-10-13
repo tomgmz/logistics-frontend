@@ -1,5 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
-import type { ResubmitDraft } from '@/lib/booking-resubmit'
+import { draftFingerprint, type ResubmitDraft } from '@/lib/booking-resubmit'
 
 export type CargoMode   = 'loose' | 'palletized'
 export type ServiceType = 'fmcg' | null
@@ -50,6 +50,12 @@ export interface ResubmitContext {
   reference:         string | null
   rejectionReason:   string | null
   existingDocuments: string[]
+  /**
+   * The details as loaded, fingerprinted. Next stays disabled while the form
+   * still matches it — resubmitting an unchanged booking would only be
+   * rejected again.
+   */
+  baseline:          string
 }
 
 interface BookingState {
@@ -237,6 +243,7 @@ const bookingSlice = createSlice({
           reference:         d.reference,
           rejectionReason:   d.rejectionReason,
           existingDocuments: d.existingDocuments,
+          baseline:          draftFingerprint({ ...d, mode: 'loose' }),
         },
         date:            d.date,
         time:            d.time,

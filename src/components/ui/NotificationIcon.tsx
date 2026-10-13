@@ -27,9 +27,13 @@ const timeAgo = (iso: string): string => {
 };
 
 // Notifications that ask the recipient to do something. Everything else
-// (rejections, "vehicle assigned", reset completed, legacy accounting/fleet
-// types) is informational and gets no action button.
+// ("vehicle assigned", reset completed, legacy accounting/fleet types) is
+// informational and gets no action button. A rejection is actionable for the
+// client: it opens the booking in Transaction History, where they can edit and
+// resubmit it or cancel it.
 const ACTIONABLE_TYPES = new Set([
+  "booking.rejected_gm",
+  "booking.rejected_admin",
   "booking.gm_pending",
   "booking.ops_pending",
   "booking.assigned",

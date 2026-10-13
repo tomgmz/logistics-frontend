@@ -140,3 +140,39 @@ export function documentName(url: string): string {
   const last = url.split('?')[0].split('/').pop() ?? url
   try { return decodeURIComponent(last) } catch { return last }
 }
+
+/** The parts of the wizard a correction can change, as compared for "anything edited?". */
+export interface DraftFields {
+  date:              string
+  time:              string
+  pickup:            string
+  pickupLat:         number | null
+  pickupLng:         number | null
+  dropoffs:          string[]
+  dropoffCoords:     { lat: number | null; lng: number | null }[]
+  mode:              string
+  sections:          DropoffSection[]
+  existingDocuments: string[]
+}
+
+/**
+ * A comparable snapshot of the booking details. Group ids are left out: they
+ * are minted locally and say nothing about what the client entered.
+ */
+export function draftFingerprint(d: DraftFields): string {
+  return JSON.stringify({
+    date:      d.date,
+    time:      d.time,
+    pickup:    d.pickup.trim(),
+    pickupLat: d.pickupLat,
+    pickupLng: d.pickupLng,
+    dropoffs:  d.dropoffs.map((a) => a.trim()),
+    coords:    d.dropoffCoords,
+    mode:      d.mode,
+    sections:  d.sections.map((s) => ({
+      i: s.dropoffIndex,
+      g: s.groups.map((g) => ({ ...g, id: undefined })),
+    })),
+    docs:      d.existingDocuments,
+  })
+}
