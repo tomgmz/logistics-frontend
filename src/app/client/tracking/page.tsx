@@ -1,7 +1,7 @@
 import RouteMapWrapper from '@/components/map/RouteMapWrapper'
 
 /**
- * The client's delivery tracking map.
+ * The client's Transit Tracking map.
  *
  * This route is static, so there is no `bookingId` to read — the previous
  * version destructured one from `params` and always got `undefined`, which

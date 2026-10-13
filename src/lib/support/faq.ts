@@ -87,7 +87,7 @@ export const FAQ: FaqEntry[] = [
     answer:
       'Up to 3 drop-off points per booking. If you need more, split them across two bookings. Our team plans the ' +
       'route order; the driver may change the order on the road (for example if a site is closed), and you ' +
-      'will see where the truck is heading on Delivery Tracking.',
+      'will see where the truck is heading on Transit Tracking.',
     keywords: ['drop off', 'dropoff', 'drop-off', 'destinations', 'stops', 'how many', 'multiple', 'more than'],
     category: 'booking',
   },
@@ -128,10 +128,10 @@ export const FAQ: FaqEntry[] = [
     question: 'How do I track my delivery?',
     answer:
       'Every delivery can be followed live. Once the truck is on the road, clients see it move on the map under ' +
-      'Delivery Tracking, with the estimated arrival at each drop-off, which drop-offs are done, and which one ' +
+      'Transit Tracking, with the estimated arrival at each drop-off, which drop-offs are done, and which one ' +
       'the driver is heading to. A photo is taken at every drop-off as proof.',
     keywords: ['track', 'tracking', 'where is', 'location', 'live', 'map', 'eta', 'arrival', 'when will', 'truck now'],
-    link: { href: '/client/tracking', label: 'Open Delivery Tracking' },
+    link: { href: '/client/tracking', label: 'Open Transit Tracking' },
     category: 'tracking',
   },
   {
@@ -142,7 +142,7 @@ export const FAQ: FaqEntry[] = [
       'your pickup point. Before that the map shows the planned route. If it is in transit and still not ' +
       'showing, the driver may be in an area with no signal; the position updates again once they reconnect.',
     keywords: ['not showing', 'cant see', 'can\'t see', 'no truck', 'map empty', 'not moving', 'stuck', 'not updating'],
-    link: { href: '/client/tracking', label: 'Open Delivery Tracking' },
+    link: { href: '/client/tracking', label: 'Open Transit Tracking' },
     category: 'tracking',
   },
   {
@@ -150,9 +150,9 @@ export const FAQ: FaqEntry[] = [
     question: 'What does the planned arrival time mean?',
     answer:
       'Once a vehicle is assigned, each drop-off gets a planned arrival shown as a 30-minute window. While the ' +
-      'truck is on the road, Delivery Tracking also shows a live estimate based on traffic.',
+      'truck is on the road, Transit Tracking also shows a live estimate based on traffic.',
     keywords: ['planned', 'window', 'arrival time', 'estimate', 'late', 'delay', 'delayed', 'on time'],
-    link: { href: '/client/tracking', label: 'Open Delivery Tracking' },
+    link: { href: '/client/tracking', label: 'Open Transit Tracking' },
     category: 'tracking',
   },
   {
@@ -160,7 +160,7 @@ export const FAQ: FaqEntry[] = [
     question: 'My cargo needs more than one truckload. How does that work?',
     answer:
       'The same truck makes several trips: it loads at your pickup point, unloads at the drop-off, and comes ' +
-      'back for the next load. Each load has its own loading and delivery photo. On Delivery Tracking a ' +
+      'back for the next load. Each load has its own loading and delivery photo. On Transit Tracking a ' +
       'drop-off shows "2/3 loads" and is only marked done when the last load arrives.',
     keywords: ['trips', 'multiple trips', 'loads', 'truckload', 'too big', 'large', 'second trip', 'partial'],
     category: 'delivery',

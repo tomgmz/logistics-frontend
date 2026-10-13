@@ -422,7 +422,7 @@ export default function TransitTrackingView() {
       <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-hidden" style={SC}>
         <header className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 py-3 border-b border-white/[0.07] bg-[var(--color-bg)]">
           <div>
-            <h1 className="text-lg font-bold text-white tracking-tight">Transit tracking</h1>
+            <h1 className="text-lg font-bold text-white tracking-tight">Transit Tracking</h1>
           </div>
           <div className="flex items-center gap-2">
             {bookingDetail && <StatusBadge status={bookingDetail.status} />}

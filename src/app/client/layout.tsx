@@ -10,7 +10,7 @@ import { History, CalendarCheck, MapPin, CreditCard, LayoutDashboard } from 'luc
 const NAV_ITEMS = [
   { href: '/client/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
   { href: '/client/booking',  label: 'Booking',  icon: <CalendarCheck size={20} /> },
-  { href: '/client/tracking', label: 'Delivery Tracking', icon: <MapPin size={20} /> },
+  { href: '/client/tracking', label: 'Transit Tracking', icon: <MapPin size={20} /> },
   { href: '/client/history',  label: 'Transaction History',  icon: <History size={20} /> },
 ]
 

@@ -19,7 +19,7 @@ export const NAV_ITEMS_BY_ROLE: Record<string, { href: string; label: string; ic
   client: [
     { href: '/client/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={17} /> },
     { href: '/client/booking', label: 'Booking', icon: <CalendarCheck size={17} /> },
-    { href: '/client/tracking', label: 'Delivery Tracking', icon: <MapPin size={17} /> },
+    { href: '/client/tracking', label: 'Transit Tracking', icon: <MapPin size={17} /> },
     { href: '/client/history', label: 'Transaction History', icon: <History size={17} /> },
   ],
   fleet_manager: [

@@ -19,7 +19,7 @@ const SIDEBAR_EXPANDED  = 260
 
 const NAV: { href: string; label: string; icon: React.ReactNode }[] = [
   { href: '/client/booking',  label: 'Booking',  icon: <CalendarCheck size={20} /> },
-  { href: '/client/tracking', label: 'Tracking', icon: <MapPin size={20} /> },
+  { href: '/client/tracking', label: 'Transit Tracking', icon: <MapPin size={20} /> },
   { href: '/client/history',  label: 'History',  icon: <History size={20} /> },
 ]
 
