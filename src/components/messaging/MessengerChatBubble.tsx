@@ -148,6 +148,14 @@ export default function MessengerChatBubble({ conversationId, index }: Props) {
     finally { setSending(false) }
   }
 
+  // Delete for me: the other person keeps the message.
+  const handleDelete = async (messageId: string) => {
+    if (messageId.startsWith('optimistic-')) return
+    setMessages(prev => prev.filter(m => m.id !== messageId))
+    try { await messagingService.deleteMessage(messageId) }
+    catch { fetchMessages() }
+  }
+
   const handleReact = async (messageId: string, emoji: string) => {
     setMessages(prev => prev.map(m => {
       if (m.id !== messageId) return m
@@ -243,6 +251,7 @@ export default function MessengerChatBubble({ conversationId, index }: Props) {
                     showSeen={isSeen(msg)}
                     onReply={m => setReplyTo({ messageId: m.id, content: m.body, senderName: m.sender_id === currentUserId ? 'You' : participant?.first_name ?? 'Them' })}
                     onReact={handleReact}
+                    onDelete={handleDelete}
                     replyToSenderName={msg.reply_to ? (msg.reply_to.sender_id === currentUserId ? 'You' : participant?.first_name ?? 'Them') : undefined}
                   />
                 )

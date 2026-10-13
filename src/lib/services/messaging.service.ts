@@ -109,6 +109,10 @@ export const messagingService = {
   markGroupRead: (groupId: string) =>
     patch<void>(`${B}/groups/${groupId}/read`),
 
+  // Delete for me: hides a group message from the caller only.
+  hideGroupMessage: (groupId: string, messageId: string) =>
+    del<void>(`${B}/groups/${groupId}/messages/${messageId}`),
+
   reactToGroupMessage: (groupId: string, messageId: string, emoji: string) =>
     post<{ action: 'added' | 'removed' }>(`${B}/groups/${groupId}/messages/${messageId}/react`, { emoji }),
 }

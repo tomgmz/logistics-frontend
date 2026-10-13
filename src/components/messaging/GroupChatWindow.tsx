@@ -10,7 +10,8 @@ import ReadTicks from './ReadTicks'
 import GroupOptionsModals, { type GroupOptionsView } from './GroupOptionsModals'
 import { QuickReactBar } from './EmojiPicker'
 import { groupMessagesByDate, formatMessageTime, groupEventText, isReadBy, latestSeenPositions } from '@/app/utils/messaging.utils'
-import { Reply as ReplyIcon } from 'lucide-react'
+import { Reply as ReplyIcon, Trash2 } from 'lucide-react'
+import ConfirmDeleteDialog from './ConfirmDeleteDialog'
 import type {
   Group,
   GroupMessage,
@@ -104,6 +105,8 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
   const [inviteStatus, setInviteStatus]   = useState(group.my_status)
   const [inviteLoading, setInviteLoading] = useState<'accept' | 'decline' | null>(null)
   const [replyTo, setReplyTo]             = useState<ReplyTo | null>(null)
+  // The message waiting on "Delete this message?" — deleted for you only.
+  const [deleteId, setDeleteId] = useState<string | null>(null)
   const [hoveredId, setHoveredId]         = useState<string | null>(null)
   const [members, setMembers]             = useState<GroupMember[]>(group.members)
   const [menuOpen, setMenuOpen]           = useState(false)
@@ -239,6 +242,15 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
     finally { setSending(false) }
   }
 
+  const confirmDelete = async () => {
+    const id = deleteId
+    setDeleteId(null)
+    if (!id) return
+    setMessages(prev => prev.filter(m => m.id !== id))
+    try { await messagingService.hideGroupMessage(group.id, id) }
+    catch { fetchMessages() }
+  }
+
   const handleReact = async (messageId: string, emoji: string) => {
     setMessages(prev => prev.map(m => {
       if (m.id !== messageId) return m
@@ -260,6 +272,8 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
   const seenAt     = latestSeenPositions(messages, members, currentUserId)
 
   return (
+    <>
+    <ConfirmDeleteDialog open={deleteId !== null} onCancel={() => setDeleteId(null)} onConfirm={() => void confirmDelete()} />
     <div className="flex flex-col h-full min-h-0">
       {/* Header */}
       <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-white/[0.07] bg-[var(--color-bg)]">
@@ -498,21 +512,29 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
                         )}
 
                         <div className="flex items-center gap-1">
-                          {isMine && hoveredId === msg.id && (
+                          {isMine && hoveredId === msg.id && (<>
                             <motion.button initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} type="button"
                               onClick={() => setReplyTo({ messageId: msg.id, content: msg.body, senderName: 'You' })}
                               className="p-1.5 rounded-lg hover:bg-white/5 text-white/25 hover:text-white/60 transition-colors"
                             ><ReplyIcon size={13} /></motion.button>
-                          )}
+                            {!isOptimistic && <motion.button initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} type="button" title="Delete for me"
+                              onClick={() => setDeleteId(msg.id)}
+                              className="p-1.5 rounded-lg hover:bg-white/5 text-white/25 hover:text-red-400 transition-colors"
+                            ><Trash2 size={13} /></motion.button>}
+                          </>)}
                           <div className={`px-3 py-2 rounded-2xl ff-body text-[13px] leading-relaxed break-words ${isMine ? 'bg-[var(--color-cyan)] text-[var(--color-bg)] rounded-br-sm' : 'glass-surface text-white border border-white/[0.06] rounded-bl-sm'} ${isOptimistic ? 'opacity-70' : ''}`}>
                             {msg.body}
                           </div>
-                          {!isMine && hoveredId === msg.id && (
+                          {!isMine && hoveredId === msg.id && (<>
                             <motion.button initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} type="button"
                               onClick={() => setReplyTo({ messageId: msg.id, content: msg.body, senderName: sender?.first_name ?? 'Someone' })}
                               className="p-1.5 rounded-lg hover:bg-white/5 text-white/25 hover:text-white/60 transition-colors"
                             ><ReplyIcon size={13} /></motion.button>
-                          )}
+                            {!isOptimistic && <motion.button initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} type="button" title="Delete for me"
+                              onClick={() => setDeleteId(msg.id)}
+                              className="p-1.5 rounded-lg hover:bg-white/5 text-white/25 hover:text-red-400 transition-colors"
+                            ><Trash2 size={13} /></motion.button>}
+                          </>)}
                         </div>
 
                         <div className={`flex items-center gap-1 px-1 ${isMine ? 'flex-row-reverse' : ''}`}>
@@ -567,5 +589,6 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
         </div>
       )}
     </div>
+    </>
   )
 }

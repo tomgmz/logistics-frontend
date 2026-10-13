@@ -1,6 +1,7 @@
 'use client'
 
 import ReadTicks from './ReadTicks'
+import ConfirmDeleteDialog from './ConfirmDeleteDialog'
 
 import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -48,6 +49,7 @@ export default function MessageBubble({
   replyToSenderName,
 }: MessageBubbleProps) {
   const [hovered, setHovered] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
   const hoverTimeout          = useRef<ReturnType<typeof setTimeout> | null>(null)
   const initials              = sender
     ? `${sender.first_name?.[0] ?? '?'}${sender.last_name?.[0] ?? '?'}`.toUpperCase()
@@ -67,7 +69,7 @@ export default function MessageBubble({
         </button>
       )}
       {onDelete && (
-        <button type="button" onClick={() => onDelete(message.id)} title="Delete for me"
+        <button type="button" onClick={() => setConfirmingDelete(true)} title="Delete for me"
           className="p-1.5 rounded-lg hover:bg-white/5 text-white/25 hover:text-[var(--color-red,#f87171)] transition-colors">
           <Trash2 size={13} />
         </button>
@@ -82,6 +84,12 @@ export default function MessageBubble({
       transition={{ duration: 0.15 }}
       className={`flex items-end gap-2 ${isMine ? 'flex-row-reverse ml-auto' : 'mr-auto'} max-w-[72%]`}
     >
+      {/* Rendered into a portal, so its place in the tree does not matter. */}
+      <ConfirmDeleteDialog
+        open={confirmingDelete}
+        onCancel={() => setConfirmingDelete(false)}
+        onConfirm={() => { setConfirmingDelete(false); onDelete?.(message.id) }}
+      />
       {/* Avatar */}
       {!isMine && (
         <div className="shrink-0 self-end mb-1 w-7">

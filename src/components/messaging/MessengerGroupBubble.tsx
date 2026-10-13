@@ -20,7 +20,8 @@ import type {
 import { useMessagingRealtime } from '@/lib/hooks/useMessagingRealtime'
 import { QuickReactBar } from './EmojiPicker'
 import MessageInput from './MessageInput'
-import { Reply as ReplyIcon } from 'lucide-react'
+import { Reply as ReplyIcon, Trash2 } from 'lucide-react'
+import ConfirmDeleteDialog from './ConfirmDeleteDialog'
 import ReadTicks from './ReadTicks'
 
 const BUBBLE_W   = 338
@@ -104,6 +105,8 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
   const [onlineIds, setOnline]    = useState<string[]>([])
   const [hoveredId, setHovered]   = useState<string | null>(null)
   const [replyTo, setReplyTo]     = useState<{ messageId: string; content: string; senderName: string } | null>(null)
+  // The message waiting on "Delete this message?" — deleted for you only.
+  const [deleteId, setDeleteId] = useState<string | null>(null)
 
   const bottomRef      = useRef<HTMLDivElement>(null)
   const hoverTimeout   = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -204,6 +207,15 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
     finally { setSending(false) }
   }
 
+  const confirmDelete = async () => {
+    const id = deleteId
+    setDeleteId(null)
+    if (!id) return
+    setMessages(prev => prev.filter(m => m.id !== id))
+    try { await messagingService.hideGroupMessage(groupId, id) }
+    catch { fetchMessages() }
+  }
+
   const handleReact = async (messageId: string, emoji: string) => {
     setMessages(prev => prev.map(m => {
       if (m.id !== messageId) return m
@@ -240,6 +252,8 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
       style={isMobile ? { inset: 0, width: '100%', height: '100%' } : { right: rightOffset, width: BUBBLE_W, height: 490 }}
       className={`fixed z-50 flex flex-col overflow-hidden shadow-2xl ${isMobile ? 'inset-0 rounded-none border-0' : 'bottom-0 rounded-t-2xl border border-b-0 border-white/[0.09]'}`}
     >
+      {/* Rendered into a portal; placed here so the bubble stays a direct motion child. */}
+      <ConfirmDeleteDialog open={deleteId !== null} onCancel={() => setDeleteId(null)} onConfirm={() => void confirmDelete()} />
       {/* Header */}
       <div className="w-full flex items-center gap-2.5 px-3 py-2.5 shrink-0 bg-[var(--color-bg)] border-b border-white/[0.06]">
         <div className="w-8 h-8 rounded-full bg-[var(--color-surface-dark)] border border-white/10 flex items-center justify-center shrink-0">
@@ -370,21 +384,29 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
                       )}
 
                       <div className="flex items-center gap-0.5">
-                        {isMine && hoveredId === msg.id && (
+                        {isMine && hoveredId === msg.id && (<>
                           <motion.button initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} type="button"
                             onClick={() => setReplyTo({ messageId: msg.id, content: msg.body, senderName: 'You' })}
                             className="p-1 rounded-lg hover:bg-white/5 text-white/25 hover:text-white/60 transition-colors"
                           ><ReplyIcon size={11} /></motion.button>
-                        )}
+                            {!isOptimistic && <motion.button initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} type="button" title="Delete for me"
+                              onClick={() => setDeleteId(msg.id)}
+                              className="p-1 rounded-lg hover:bg-white/5 text-white/25 hover:text-red-400 transition-colors"
+                            ><Trash2 size={11} /></motion.button>}
+                        </>)}
                         <div className={`px-2.5 py-1.5 rounded-2xl ff-body text-[11.5px] leading-relaxed break-words ${isMine ? 'bg-[var(--color-cyan)] text-[var(--color-bg)] rounded-br-sm' : 'glass-surface text-white border border-white/[0.06] rounded-bl-sm'} ${isOptimistic ? 'opacity-60' : ''}`}>
                           {msg.body}
                         </div>
-                        {!isMine && hoveredId === msg.id && (
+                        {!isMine && hoveredId === msg.id && (<>
                           <motion.button initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} type="button"
                             onClick={() => setReplyTo({ messageId: msg.id, content: msg.body, senderName: sender?.first_name ?? 'Someone' })}
                             className="p-1 rounded-lg hover:bg-white/5 text-white/25 hover:text-white/60 transition-colors"
                           ><ReplyIcon size={11} /></motion.button>
-                        )}
+                            {!isOptimistic && <motion.button initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} type="button" title="Delete for me"
+                              onClick={() => setDeleteId(msg.id)}
+                              className="p-1 rounded-lg hover:bg-white/5 text-white/25 hover:text-red-400 transition-colors"
+                            ><Trash2 size={11} /></motion.button>}
+                        </>)}
                       </div>
 
                       <div className={`flex items-center gap-0.5 px-0.5 ${isMine ? 'flex-row-reverse' : ''}`}>
