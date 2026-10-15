@@ -24,10 +24,10 @@ import type { DashboardTicket } from '@/lib/services/admin/staff-dashboard.servi
  */
 
 /** Gmail URLs, opened in the support inbox's account (`authuser`). */
-function gmailThreadUrl(inbox: string, reference: string): string {
+export function gmailThreadUrl(inbox: string, reference: string): string {
   return `https://mail.google.com/mail/?authuser=${encodeURIComponent(inbox)}#search/${encodeURIComponent(`"${reference}"`)}`
 }
-function gmailComposeUrl(inbox: string, to: string, subject: string): string {
+export function gmailComposeUrl(inbox: string, to: string, subject: string): string {
   const q = new URLSearchParams({ authuser: inbox, view: 'cm', fs: '1', to, su: subject })
   return `https://mail.google.com/mail/?${q.toString()}`
 }

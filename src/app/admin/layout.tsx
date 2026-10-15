@@ -12,6 +12,7 @@ import {
   Layers,
   LayoutDashboard,
   Siren,
+  Ticket,
 } from 'lucide-react'
 import ReusableDashboardShell from '@/components/layout/ReusableDashboardShell'
 import { ReactNode, useEffect } from 'react'
@@ -68,6 +69,11 @@ const adminNavItems = [
     href: '/admin/audit-logs',
     label: 'Audit Logs',
     icon: <ScrollText size={17} />,
+  },
+  {
+    href: '/admin/support-tickets',
+    label: 'Tickets',
+    icon: <Ticket size={17} />,
   },
 ]
 

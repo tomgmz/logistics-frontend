@@ -34,6 +34,9 @@ export interface SupportTicket {
   clients?:        { company_name: string | null } | null
   opener?:         { first_name: string | null; last_name: string | null; email: string } | null
   bookings?:       { booking_id: string; reference_number: string | null } | null
+  /** Staff reads only: the help-assistant chat that led to the ticket. */
+  chat_transcript?: ChatLine[] | null
+  resolver?:       { first_name: string | null; last_name: string | null } | null
 }
 
 export const supportService = {
@@ -54,9 +57,10 @@ export const supportService = {
     return data.data ?? []
   },
 
-  async list(status: 'open' | 'resolved' | 'all' = 'open'): Promise<SupportTicket[]> {
-    const { data } = await proxyApi.get<{ data: SupportTicket[] }>('/support/tickets', { params: { status } })
-    return data.data ?? []
+  /** Staff queue, with the support inbox the tickets were emailed to. */
+  async list(status: 'open' | 'resolved' | 'all' = 'open'): Promise<{ tickets: SupportTicket[]; inbox: string }> {
+    const { data } = await proxyApi.get<{ data: SupportTicket[]; inbox?: string }>('/support/tickets', { params: { status } })
+    return { tickets: data.data ?? [], inbox: data.inbox ?? '' }
   },
 
   async resolve(ticketId: string, note: string | null): Promise<SupportTicket> {

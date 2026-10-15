@@ -102,10 +102,12 @@ function cardsFor(role: StaffRole, d: Data): CardSpec[] {
     count: d.open_driver_reports, href: `${base}/reports`, icon: <ShieldAlert size={16} />, tone: 'red',
   }
 
-  // Client support tickets from the help assistant; the panel is on this page.
+  // Client support tickets from the help assistant. The Company Administrator
+  // works them on the Tickets page; Operations from the panel on this page.
   const ticketsCard: CardSpec = {
     label: 'Client support tickets', hint: 'Reply by email, then mark resolved',
-    count: d.support_tickets.count, href: '#support-tickets', icon: <Ticket size={16} />, tone: 'amber',
+    count: d.support_tickets.count, href: role === 'admin' ? `${base}/support-tickets` : '#support-tickets',
+    icon: <Ticket size={16} />, tone: 'amber',
   }
 
   switch (role) {
@@ -422,7 +424,7 @@ export default function StaffDashboard({ role }: { role: StaffRole }) {
               {listsFor(role, data).map((l) => <ListPanel key={l.title} list={l} base={base} />)}
             </div>
 
-            {(role === 'admin' || role === 'operations_manager') && (
+            {role === 'operations_manager' && (
               <SupportTicketsPanel
                 count={data.support_tickets.count}
                 items={data.support_tickets.items}

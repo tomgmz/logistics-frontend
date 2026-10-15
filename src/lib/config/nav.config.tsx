@@ -1,7 +1,7 @@
 import {
   Users, FileSearch, ScrollText, Truck, CalendarCheck,
   MapPin, CreditCard, History, Layers,
-  LayoutDashboard, Activity
+  LayoutDashboard, Activity, Ticket
 } from 'lucide-react'
 
 export const NAV_ITEMS_BY_ROLE: Record<string, { href: string; label: string; icon: React.ReactNode }[]> = {
@@ -15,6 +15,7 @@ export const NAV_ITEMS_BY_ROLE: Record<string, { href: string; label: string; ic
     { href: '/admin/document-management', label: 'Document Management', icon: <FileSearch size={17} /> },
     { href: '/admin/system-maintenance', label: 'System Maintenance', icon: <Layers size={17} /> },
     { href: '/admin/audit-logs', label: 'Audit Logs', icon: <ScrollText size={17} /> },
+    { href: '/admin/support-tickets', label: 'Tickets', icon: <Ticket size={17} /> },
   ],
   client: [
     { href: '/client/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={17} /> },
