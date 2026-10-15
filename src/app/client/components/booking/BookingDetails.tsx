@@ -1,7 +1,8 @@
 'use client'
 
 import { motion, Variants, AnimatePresence } from 'framer-motion'
-import { useCallback, useState, useRef, useEffect } from 'react'
+import { useCallback, useState, useRef, useEffect, useSyncExternalStore } from 'react'
+import { createPortal } from 'react-dom'
 import {
   CalendarDays, Clock, MapPin, Package,
   Truck, Plus, X, Check, Info, Upload, CreditCard, File,
@@ -30,6 +31,8 @@ const NO_DOCS: string[] = []
 import { selectCargoSummary, selectSections } from '@/lib/store/bookingSelectors'
 import MapLocationPicker from './MapLocationPicker'
 import './BookingDetails.css'
+
+const noopSubscribe = () => () => {}
 import { cargoCatalogService } from '@/lib/services/admin/cargo-catalog.service'
 import { appToast } from '@/lib/toast'
 import type { Commodity, Product, HandlingCode } from '@/app/types/admin/cargo-catalog.types'
@@ -673,6 +676,8 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
 
   const [touched,    setTouched]    = useState(false)
   const [mapTarget,  setMapTarget]  = useState<MapPickerTarget>(null)
+  // false on the server, true in the browser — the portal needs document.body.
+  const inBrowser = useSyncExternalStore(noopSubscribe, () => true, () => false)
   const [isDragging, setIsDragging] = useState(false)
   const [docError,   setDocError]   = useState<string | null>(null)
 
@@ -793,25 +798,31 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
   return (
     <div className="relative flex flex-col h-full overflow-hidden">
 
-      <AnimatePresence>
-        {mapTarget && (
-          <motion.div
-            key="map-picker"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="absolute inset-0 z-50"
-          >
-            <MapLocationPicker
-              mode={mapPickerMode}
-              onConfirm={handleMapConfirm}
-              onClose={() => setMapTarget(null)}
-              initialValue={mapInitialValue}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Full screen, over the portal's header and sidebar. Portaled to <body>
+          because the animated wrappers around the form would otherwise trap a
+          fixed element inside the form's own box. */}
+      {inBrowser && createPortal(
+        <AnimatePresence>
+          {mapTarget && (
+            <motion.div
+              key="map-picker"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 z-[100]"
+            >
+              <MapLocationPicker
+                mode={mapPickerMode}
+                onConfirm={handleMapConfirm}
+                onClose={() => setMapTarget(null)}
+                initialValue={mapInitialValue}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body,
+      )}
 
       <div className="flex-1 overflow-auto p-4 lg:p-6 flex flex-col gap-3 sm:gap-6">
 
