@@ -8,8 +8,9 @@ import { ASSETS, CONTACT } from '@/lib/data'
  * 'full' is the landing page's: brand, links and contact details. 'compact' is
  * a single copyright line for everywhere else — the standalone pages (sign-out,
  * 404, password screens) and the portal dashboards, where a tall footer would
- * only take room from the work. The app is dark-only, so both use plain
- * white-alpha colours.
+ * only take room from the work. Both sit on the same solid --color-bg with the
+ * same border and text colours, so the footer looks identical on every page
+ * whatever it is placed over.
  */
 
 const YEAR = new Date().getFullYear()
@@ -24,7 +25,7 @@ const EXPLORE = [
 export default function SiteFooter({ variant = 'full' }: { variant?: 'full' | 'compact' }) {
   if (variant === 'compact') {
     return (
-      <footer className="shrink-0 w-full border-t border-white/[0.07] px-4 sm:px-6 py-2.5">
+      <footer className="shrink-0 w-full bg-[var(--color-bg)] border-t border-white/[0.07] px-4 sm:px-6 py-2.5">
         <p className="font-spartan text-center text-[0.65rem] tracking-[0.14em] uppercase text-white/30">
           © {YEAR} 8338 Logistics Services · All Rights Reserved
         </p>
@@ -33,7 +34,7 @@ export default function SiteFooter({ variant = 'full' }: { variant?: 'full' | 'c
   }
 
   return (
-    <footer className="w-full bg-[#0a0a0a] border-t border-white/[0.07]">
+    <footer className="w-full bg-[var(--color-bg)] border-t border-white/[0.07]">
       <div className="sep-x-cyan" />
       <div className="max-w-[1100px] mx-auto px-5 sm:px-8 md:px-12 pt-12 pb-8 grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1.4fr]">
         <div className="flex flex-col gap-4">
