@@ -617,7 +617,10 @@ export default function UserFormModal({
         readOnly: locked,
         ...(locked && { title: 'Filled from the license scan. Press Edit to change it.' }),
       },
-      lockedClass: locked ? 'opacity-70 cursor-default' : '',
+      // No cyan hover/focus border or caret while locked: it must not look typeable.
+      lockedClass: locked
+        ? 'opacity-70 cursor-default caret-transparent hover:border-[#424242]! focus:border-[#424242]!'
+        : '',
       action: locked ? (
         <button
           type="button"
