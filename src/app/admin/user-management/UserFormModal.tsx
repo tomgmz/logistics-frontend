@@ -27,6 +27,7 @@ import {
   itAdminService,
   ocrService,
   type VehicleEligibility,
+  type LicenseOCRResult,
 } from '@/lib/services/admin/user-management.service'
 import { validateForm } from '@/lib/validation/user-management.validation'
 import ReusableModal from '@/components/layout/ReusableModal'
@@ -358,6 +359,13 @@ export default function UserFormModal({
   const [scanDone,    setScanDone]    = useState(false)
   const [scanError,   setScanError]   = useState<string | null>(null)
   const [eligibility, setEligibility] = useState<ScanEligibilityState | null>(null)
+  // The license prints "LAST, FIRST MIDDLE" with nothing marking where the first
+  // name ends, so "John Georzon" (no middle name) reads the same as
+  // "Jerryfel Mandawe". The scan guesses the last word is the middle name; this
+  // holds that guess until the admin confirms it.
+  const [nameCheck, setNameCheck] = useState<{ first: string; middle: string } | null>(null)
+  // Words where the scan may have read an Ñ as a plain N.
+  const [nChecks, setNChecks] = useState<NonNullable<LicenseOCRResult['name_n_checks']>>([])
 
   const storedLicenseUrl =
     tab === 'drivers' ? (user as DriverUser | null)?.drivers?.license_image_url ?? null : null
@@ -379,9 +387,17 @@ export default function UserFormModal({
     setScanDone(false)
     setScanError(null)
     setEligibility(null)
+    setNameCheck(null)
+    setNChecks([])
 
     try {
       const result = await ocrService.scanLicense(file)
+      setNChecks((result.name_n_checks ?? []).map(c => ({
+        ...c, word: toNameCase(c.word), suggested: toNameCase(c.suggested),
+      })))
+      if (result.first_name && result.middle_name) {
+        setNameCheck({ first: toNameCase(result.first_name), middle: toNameCase(result.middle_name) })
+      }
       setForm(prev => ({
         ...prev,
         ...(result.first_name     && { first_name:     toNameCase(result.first_name) }),
@@ -444,6 +460,8 @@ export default function UserFormModal({
     setScanDone(false)
     setScanError(null)
     setEligibility(null)
+    setNameCheck(null)
+    setNChecks([])
     setShowCustomSuffix(
       !!initialState.suffix && !USER_SUFFIXES.includes(initialState.suffix as never),
     )
@@ -471,6 +489,9 @@ export default function UserFormModal({
 
   function set(key: string, value: string | boolean | number | null) {
     if (typeof value === 'string' && NAME_FIELDS.has(key)) value = toNameCase(value)
+    // Typing in either name field is its own answer to the middle-name question.
+    if (key === 'first_name' || key === 'middle_name') setNameCheck(null)
+    if (NAME_FIELDS.has(key)) setNChecks(prev => prev.filter(c => c.field !== key))
     setForm(prev => {
       const next = { ...prev, [key]: value }
       validateField(key, value, next)
@@ -841,6 +862,71 @@ export default function UserFormModal({
                 </div>
               </Field>
             </div>
+
+            {nChecks.map(c => (
+              <div
+                key={`${c.field}:${c.word}`}
+                className="flex flex-col gap-2.5 rounded-[10px] border border-[#4df9ed40] bg-[#4df9ed0d] px-3.5 py-3"
+              >
+                <p className="text-[12px] leading-snug text-[#cfcfcf]">
+                  The scan wasn&apos;t sure about an &ldquo;N&rdquo; in{' '}
+                  <span className="font-semibold text-white">&ldquo;{c.word}&rdquo;</span>. Check the license: is it spelled{' '}
+                  <span className="font-semibold text-white">&ldquo;{c.suggested}&rdquo;</span>?
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const swap = (v: string) => v.split(' ').map(w => (w === c.word ? c.suggested : w)).join(' ')
+                      setForm(prev => ({ ...prev, [c.field]: swap(String(prev[c.field] ?? '')) }))
+                      setNameCheck(prev => prev && { first: swap(prev.first), middle: swap(prev.middle) })
+                      setNChecks(prev => prev.filter(x => x !== c))
+                    }}
+                    className="rounded-[8px] border border-[#424242] px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:border-[#4df9ed]"
+                  >
+                    Yes, use &ldquo;{c.suggested}&rdquo;
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNChecks(prev => prev.filter(x => x !== c))}
+                    className="rounded-[8px] border border-[#424242] px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:border-[#4df9ed]"
+                  >
+                    No, keep &ldquo;{c.word}&rdquo;
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            {nameCheck && (
+              <div className="flex flex-col gap-2.5 rounded-[10px] border border-[#4df9ed40] bg-[#4df9ed0d] px-3.5 py-3">
+                <p className="text-[12px] leading-snug text-[#cfcfcf]">
+                  The license doesn&apos;t show where the first name ends. Is{' '}
+                  <span className="font-semibold text-white">&ldquo;{nameCheck.middle}&rdquo;</span>{' '}
+                  the middle name, or part of the first name?
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setNameCheck(null)}
+                    className="rounded-[8px] border border-[#424242] px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:border-[#4df9ed]"
+                  >
+                    Middle name
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const { first, middle } = nameCheck
+                      setForm(prev => ({ ...prev, first_name: `${first} ${middle}`, middle_name: '' }))
+                      setFieldErrors(prev => { const n = { ...prev }; delete n.first_name; delete n.middle_name; return n })
+                      setNameCheck(null)
+                    }}
+                    className="rounded-[8px] border border-[#424242] px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:border-[#4df9ed]"
+                  >
+                    Part of the first name (&ldquo;{nameCheck.first} {nameCheck.middle}&rdquo;, no middle name)
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 gap-4">
               <Field label="Email" required error={fe.email}>

@@ -201,6 +201,8 @@ export interface LicenseOCRResult {
   last_name:           string | null
   middle_name:         string | null
   suffix:              string | null
+  // Name words whose "N" the scan was unsure of — it may be an Ñ with a worn tilde.
+  name_n_checks?:      { field: 'first_name' | 'last_name' | 'middle_name'; word: string; suggested: string }[]
   dl_codes:            string[]
   restriction_codes:   string[]
   vehicle_eligibility: VehicleEligibility | null
