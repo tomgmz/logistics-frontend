@@ -466,7 +466,7 @@ export default function MapLocationPicker({
           onClick={handleUseMyLocation}
         >
           <CrosshairIcon />
-          Use my location
+          Current location
         </button>
 
         <div
