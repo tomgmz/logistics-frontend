@@ -7,6 +7,7 @@ import type { BookingWithRelations } from '@/lib/store/slice/routeMap.slice'
 import { bookingService } from '@/lib/services/client/booking.service'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { appToast } from '@/lib/toast'
+import ReusableModal from '@/components/layout/ReusableModal'
 import { formatDateTime } from './transaction-format'
 import { AMBER, BORDER_C, CYAN, ERROR, MUTED } from './transaction-theme'
 
@@ -32,6 +33,8 @@ export default function CompletionPanel({ booking, mode, onUpdated }: {
   const [busy, setBusy]         = useState(false)
   const [reporting, setReporting] = useState(false)
   const [note, setNote]         = useState('')
+  // Confirming is final — it closes the booking and ends the chance to report a problem.
+  const [askConfirm, setAskConfirm] = useState(false)
 
   if (String(booking.status ?? '').toLowerCase() !== 'delivered') return null
 
@@ -168,7 +171,7 @@ export default function CompletionPanel({ booking, mode, onUpdated }: {
         </div>
       ) : (
         <div className="flex flex-wrap gap-2">
-          <button type="button" disabled={busy} onClick={() => void confirm()}
+          <button type="button" disabled={busy} onClick={() => setAskConfirm(true)}
             className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold disabled:opacity-40 cursor-pointer"
             style={{ background: CYAN, color: '#000' }}>
             <CheckCircle2 size={14} />
@@ -183,6 +186,16 @@ export default function CompletionPanel({ booking, mode, onUpdated }: {
           )}
         </div>
       )}
+
+      <ReusableModal
+        open={askConfirm}
+        title="Confirm the booking is complete?"
+        description="This closes the booking. You will no longer be able to report a problem with this delivery."
+        confirmLabel="Yes, confirm"
+        cancelLabel="Not yet"
+        onConfirm={() => { setAskConfirm(false); void confirm() }}
+        onCancel={() => setAskConfirm(false)}
+      />
     </div>
   )
 }
