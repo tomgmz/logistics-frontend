@@ -81,6 +81,19 @@ export function openHelpAssistant(tab: HelpTab = 'chat', conversationId?: string
   if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(OPEN_HELP_EVENT, { detail: { tab, conversationId } }))
 }
 
+/**
+ * The help-assistant tab a link asks for (`/client/...?chat=tickets`), or null.
+ * The assistant is mounted once in the client layout and only reads `?chat=`
+ * on its first render, so a link into it from inside the portal is opened with
+ * openHelpAssistant() instead of a navigation that would do nothing.
+ */
+export function helpTabFromUrl(url: string): HelpTab | null {
+  const u = new URL(url, 'http://local')
+  if (!u.pathname.startsWith('/client')) return null
+  const tab = u.searchParams.get('chat')
+  return tab === 'chat' || tab === 'messages' || tab === 'tickets' ? tab : null
+}
+
 /** Where the client's messages open from outside the portal (e.g. /messages, a push tap). */
 export function clientMessagesHref(conversationId?: string): string {
   return `/client/dashboard?chat=messages${conversationId ? `&conversation=${encodeURIComponent(conversationId)}` : ''}`

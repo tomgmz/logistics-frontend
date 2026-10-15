@@ -124,13 +124,15 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
     return () => window.removeEventListener(OPEN_HELP_EVENT, onOpen)
   }, [openConversation])
 
-  // Arrived from /messages or a push tap (clientMessagesHref): open the inbox.
+  // Arrived from /messages, a push tap (clientMessagesHref) or a ticket
+  // notification (?chat=tickets): open that tab.
   useEffect(() => {
     if (isPublic) return
     const params = new URLSearchParams(window.location.search)
-    if (params.get('chat') !== 'messages') return
+    const wanted = params.get('chat')
+    if (wanted !== 'messages' && wanted !== 'tickets') return
     setOpen(true)
-    setTab('messages')
+    setTab(wanted)
     const conversationId = params.get('conversation')
     if (conversationId) void openConversation(conversationId)
     params.delete('chat')

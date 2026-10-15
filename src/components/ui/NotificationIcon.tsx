@@ -14,7 +14,9 @@ import { useNotificationStore, NOTIFICATIONS_PAGE_SIZE } from "@/lib/store/notif
 import { useNotificationsRealtime } from "@/hooks/useNotificationsRealtime";
 import { useSessionRevokedRealtime } from "@/hooks/useSessionRevokedRealtime";
 import Pagination from "@/components/ui/Pagination";
-import type { AppNotification } from "@/lib/services/notification.service";
+import type { AppNotification, NotificationFilter } from "@/lib/services/notification.service";
+import { useAuthStore } from "@/lib/store/auth.store";
+import { helpTabFromUrl, openHelpAssistant } from "@/lib/services/support.service";
 
 const timeAgo = (iso: string): string => {
   const diff = now() - new Date(iso).getTime();
@@ -47,7 +49,31 @@ const ACTIONABLE_TYPES = new Set([
   "driver.emergency",
   "driver.report",
   "auth.password_reset_requested",
+  "support.ticket_opened",
+  "support.ticket_resolved",
 ]);
+
+// The filter dropdown lists only the groups a role can actually receive, so
+// nobody picks a filter that is always empty. "driver" is the driver's own
+// license reminder for a driver, and drivers' reports for staff.
+type FilterOption = { value: NotificationFilter | ""; label: string };
+const ALL: FilterOption    = { value: "", label: "All notifications" };
+const UNREAD: FilterOption = { value: "unread", label: "Unread" };
+const BOOKINGS: FilterOption = { value: "booking", label: "Bookings" };
+const REPORTS: FilterOption  = { value: "driver", label: "Driver reports" };
+const RESETS: FilterOption   = { value: "auth", label: "Password resets" };
+const TICKETS: FilterOption  = { value: "support", label: "Support tickets" };
+
+const FILTERS_BY_ROLE: Record<string, FilterOption[]> = {
+  admin:              [ALL, UNREAD, BOOKINGS, REPORTS, RESETS, TICKETS],
+  it_admin:           [ALL, UNREAD, RESETS],
+  general_manager:    [ALL, UNREAD, BOOKINGS],
+  operations_manager: [ALL, UNREAD, BOOKINGS, REPORTS],
+  fleet_manager:      [ALL, UNREAD, BOOKINGS, REPORTS],
+  client:             [ALL, UNREAD, BOOKINGS, TICKETS],
+  driver:             [ALL, UNREAD, BOOKINGS, { value: "driver", label: "License" }],
+};
+const DEFAULT_FILTERS: FilterOption[] = [ALL, UNREAD];
 
 const actionUrlOf = (n: AppNotification): string | null =>
   ACTIONABLE_TYPES.has(n.type) && typeof n.data?.action_url === "string"
@@ -295,6 +321,16 @@ export default function NotificationIcon() {
   const totalPages  = useNotificationStore((s) => s.totalPages);
   const pageLoading = useNotificationStore((s) => s.pageLoading);
   const goToPage    = useNotificationStore((s) => s.goToPage);
+  const filter      = useNotificationStore((s) => s.filter);
+  const setFilter   = useNotificationStore((s) => s.setFilter);
+  const role        = useAuthStore((s) => s.user?.role ?? "");
+  const filterOptions = FILTERS_BY_ROLE[role] ?? DEFAULT_FILTERS;
+
+  // The filter lives in a shared store; a different account signing in on this
+  // tab may not have that group at all, so fall back to everything.
+  useEffect(() => {
+    if (filter && !filterOptions.some((o) => o.value === filter)) void setFilter(null);
+  }, [filter, filterOptions, setFilter]);
 
   const [open, setOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -345,7 +381,11 @@ export default function NotificationIcon() {
   const takeAction = useCallback(
     (url: string) => {
       changeOpen(false);
-      router.push(url);
+      // Inside the client portal the help assistant is already mounted: open its
+      // tab directly, since navigating to ?chat= would not reopen it.
+      const helpTab = helpTabFromUrl(url);
+      if (helpTab && window.location.pathname.startsWith("/client")) openHelpAssistant(helpTab);
+      else router.push(url);
     },
     [changeOpen, router],
   );
@@ -406,13 +446,41 @@ export default function NotificationIcon() {
     </div>
   );
 
+  const filterBar = (
+    <div className="flex items-center gap-2 px-[18px] pb-3 shrink-0">
+      <label
+        htmlFor="notification-filter"
+        className="text-[10px] tracking-widest uppercase text-white/30 shrink-0"
+        style={{ fontFamily: "'Aboreto', sans-serif" }}
+      >
+        Show
+      </label>
+      <select
+        id="notification-filter"
+        value={filter ?? ""}
+        onChange={(e) => { void setFilter((e.target.value || null) as NotificationFilter | null); }}
+        className="flex-1 min-w-0 cursor-pointer appearance-none rounded-lg border border-white/[0.08] bg-[#161616] px-2.5 py-1.5 pr-7 text-[13px] text-white outline-none transition-colors hover:border-white/20 focus:border-[var(--color-cyan,#22d3ee)]/60"
+        style={{
+          fontFamily: "'Darker Grotesque', sans-serif",
+          backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23777' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`,
+          backgroundRepeat: "no-repeat",
+          backgroundPosition: "right 10px center",
+        }}
+      >
+        {filterOptions.map((o) => (
+          <option key={o.value || "all"} value={o.value}>{o.label}</option>
+        ))}
+      </select>
+    </div>
+  );
+
   const list =
     notifications.length === 0 ? (
       <div
         className="text-[11px] tracking-[0.08em] uppercase text-white/20 text-center py-9"
         style={{ fontFamily: "'Aboreto', sans-serif" }}
       >
-        No notifications yet
+        {filter ? "Nothing here" : "No notifications yet"}
       </div>
     ) : (
       notifications.map((n) => {
@@ -461,6 +529,7 @@ export default function NotificationIcon() {
   const panelBody = (
     <>
       {header}
+      {filterBar}
       <div className="h-px bg-white/[0.06] shrink-0" />
 
       <div className={`${scrollClass} ${isMobile ? "flex-1 min-h-0" : "max-h-[60vh]"} ${pageLoading ? "opacity-50" : ""} transition-opacity`}>

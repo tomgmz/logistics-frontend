@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { registerWebPush } from '@/lib/push/web-push'
-import { clientMessagesHref, openHelpAssistant } from '@/lib/services/support.service'
+import { clientMessagesHref, helpTabFromUrl, openHelpAssistant } from '@/lib/services/support.service'
 
 /**
  * Registers web push for the signed-in user and routes notification taps to the
@@ -34,7 +34,10 @@ export default function PushProvider() {
     const onMessage = (event: MessageEvent) => {
       if (event.data?.type === 'OPEN_NOTIFICATION') {
         const url = typeof event.data.url === 'string' ? event.data.url : '/messages'
+        const helpTab = helpTabFromUrl(url)
         if (url === '/messages') openChat(event.data.data?.conversation_id)
+        // Already in the portal: the mounted assistant won't re-read ?chat=.
+        else if (helpTab && window.location.pathname.startsWith('/client')) openHelpAssistant(helpTab)
         else router.push(url)
       } else if (event.data?.type === 'OPEN_CONVERSATION') {
         openChat(event.data.conversation_id)

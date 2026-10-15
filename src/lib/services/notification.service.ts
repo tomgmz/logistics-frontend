@@ -25,6 +25,16 @@ interface ApiResponse<T> {
   data:   T
 }
 
+/** The bell's filter: unread only, or one group of types (booking.*, driver.*, ...). */
+export type NotificationFilter = 'unread' | 'booking' | 'driver' | 'auth' | 'support'
+
+/** Whether a notification belongs on a filtered list (used for live arrivals). */
+export function matchesNotificationFilter(n: AppNotification, filter: NotificationFilter | null): boolean {
+  if (!filter) return true
+  if (filter === 'unread') return !n.read_at
+  return n.type.startsWith(`${filter}.`)
+}
+
 export const notificationService = {
   list: async (params?: { limit?: number; before?: string }): Promise<AppNotification[]> => {
     const { data } = await proxyApi.get<ApiResponse<AppNotification[]>>('/notifications', { params })
@@ -32,10 +42,14 @@ export const notificationService = {
   },
 
   /** One numbered page, newest first, with the total for the pager. */
-  page: async (page: number, limit: number): Promise<{ items: AppNotification[]; total: number; totalPages: number }> => {
+  page: async (
+    page: number,
+    limit: number,
+    filter: NotificationFilter | null = null,
+  ): Promise<{ items: AppNotification[]; total: number; totalPages: number }> => {
     const { data } = await proxyApi.get<ApiResponse<AppNotification[]> & {
       meta?: { total: number; totalPages: number }
-    }>('/notifications', { params: { page, limit } })
+    }>('/notifications', { params: { page, limit, ...(filter && { filter }) } })
     return {
       items:      (data.data ?? []).map(normalizeNotification),
       total:      data.meta?.total ?? 0,

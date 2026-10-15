@@ -1,6 +1,8 @@
 import { create } from 'zustand'
-import type { AppNotification } from '@/lib/services/notification.service'
-import { notificationService, normalizeNotification } from '@/lib/services/notification.service'
+import type { AppNotification, NotificationFilter } from '@/lib/services/notification.service'
+import {
+  notificationService, normalizeNotification, matchesNotificationFilter,
+} from '@/lib/services/notification.service'
 
 /** Notifications per page in the bell. */
 export const NOTIFICATIONS_PAGE_SIZE = 10
@@ -14,6 +16,10 @@ interface NotificationStore {
   total:       number
   totalPages:  number
   pageLoading: boolean
+  /** The bell's filter dropdown; null shows everything. */
+  filter:      NotificationFilter | null
+  /** Switch the filter and go back to page 1 of it. */
+  setFilter:   (filter: NotificationFilter | null) => Promise<void>
   /** Reload the current page (page 1 on first load) and the unread count. */
   hydrate:     () => Promise<void>
   goToPage:    (page: number) => Promise<void>
@@ -30,10 +36,23 @@ export const useNotificationStore = create<NotificationStore>((set, get) => ({
   total:       0,
   totalPages:  1,
   pageLoading: false,
+  filter:      null,
+
+  setFilter: async (filter) => {
+    set({ filter, page: 1, pageLoading: true })
+    try {
+      const res = await notificationService.page(1, NOTIFICATIONS_PAGE_SIZE, filter)
+      // A quicker second switch wins: drop this answer if the filter moved on.
+      if (get().filter !== filter) return
+      set({ items: res.items, total: res.total, totalPages: res.totalPages })
+    } finally {
+      if (get().filter === filter) set({ pageLoading: false })
+    }
+  },
 
   hydrate: async () => {
     const [res, unreadCount] = await Promise.all([
-      notificationService.page(get().page, NOTIFICATIONS_PAGE_SIZE),
+      notificationService.page(get().page, NOTIFICATIONS_PAGE_SIZE, get().filter),
       notificationService.unreadCount(),
     ])
     // The page emptied (notifications went away): step back to the last one.
@@ -47,7 +66,7 @@ export const useNotificationStore = create<NotificationStore>((set, get) => ({
   goToPage: async (page) => {
     set({ pageLoading: true })
     try {
-      const res = await notificationService.page(page, NOTIFICATIONS_PAGE_SIZE)
+      const res = await notificationService.page(page, NOTIFICATIONS_PAGE_SIZE, get().filter)
       set({ page, items: res.items, total: res.total, totalPages: res.totalPages })
     } finally {
       set({ pageLoading: false })
@@ -59,8 +78,13 @@ export const useNotificationStore = create<NotificationStore>((set, get) => ({
   // being read doesn't shift under the reader.
   pushNew: (raw) => {
     const n = normalizeNotification(raw)
-    const { items, page, total } = get()
+    const { items, page, total, filter } = get()
     if (items.some((i) => i.notification_id === n.notification_id)) return
+    // Outside the current filter: only the unread badge moves.
+    if (!matchesNotificationFilter(n, filter)) {
+      set({ unreadCount: get().unreadCount + (n.read_at ? 0 : 1) })
+      return
+    }
     const nextTotal = total + 1
     set({
       items:       page === 1 ? [n, ...items].slice(0, NOTIFICATIONS_PAGE_SIZE) : items,
