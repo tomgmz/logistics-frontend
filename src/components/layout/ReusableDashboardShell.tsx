@@ -1,10 +1,11 @@
 'use client'
 
-import { ReactNode, useMemo, useState } from 'react'
+import { ReactNode, useMemo, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import ReusableHeader  from './ReusableHeader'
 import ReusableSidebar from './ReusableSidebar'
 import SiteFooter      from './SiteFooter'
+import { useEndOfPageFooter } from './useEndOfPageFooter'
 import PushProvider                  from '@/components/push/PushProvider'
 import { ModuleAccessProvider, ModuleNoAccess } from './ModuleAccess'
 import { useAuthStore } from '@/lib/store/auth.store'
@@ -41,6 +42,10 @@ export default function ReusableDashboardShell({ children, navItems }: ReusableD
   const currentFlags  = currentModule ? moduleFlags(user, currentModule) : ALL_FLAGS
   const blocked       = currentModule !== null && !currentFlags.can_view
 
+  const contentRef = useRef<HTMLDivElement>(null)
+  const footerRef  = useRef<HTMLDivElement>(null)
+  useEndOfPageFooter(contentRef, footerRef, pathname)
+
   return (
     <div
       suppressHydrationWarning
@@ -52,15 +57,18 @@ export default function ReusableDashboardShell({ children, navItems }: ReusableD
       <div className="flex flex-1 min-h-0 overflow-hidden">
         <ReusableSidebar navItems={visibleNavItems} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
-        <main className="min-w-0 flex-1 overflow-hidden flex flex-col bg-[var(--color-surface)]">
-          <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+        <main className="relative min-w-0 flex-1 overflow-hidden flex flex-col bg-[var(--color-surface)]">
+          <div ref={contentRef} className="flex-1 min-h-0 flex flex-col overflow-hidden">
             {blocked ? (
               <ModuleNoAccess />
             ) : (
               <ModuleAccessProvider flags={currentFlags}>{children}</ModuleAccessProvider>
             )}
           </div>
-          <SiteFooter variant="compact" />
+          {/* Inside <main>, so never under the sidebar; useEndOfPageFooter docks it. */}
+          <div ref={footerRef} className="shrink-0 left-0 right-0 bottom-0">
+            <SiteFooter variant="compact" />
+          </div>
         </main>
       </div>
 

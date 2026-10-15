@@ -23,6 +23,7 @@ import ChatWindow        from './ChatWindow'
 import GroupChatWindow   from './GroupChatWindow'
 import NewConversationModal from './NewConversationModal'
 import NewGroupModal     from './NewGroupModal'
+import SiteFooter        from '@/components/layout/SiteFooter'
 
 export default function MessagingShell() {
   const { user }        = useAuthStore()
@@ -225,6 +226,7 @@ export default function MessagingShell() {
 
         {/* Chat panel */}
         <div className={`flex-1 min-w-0 flex flex-col ${hasActiveChat ? 'flex' : 'hidden lg:flex'} bg-[var(--color-surface)]`}>
+          <div className="flex-1 min-h-0 flex flex-col">
           {selectedGroup ? (
             <GroupChatWindow
               key={selectedGroup.id}
@@ -261,6 +263,9 @@ export default function MessagingShell() {
           ) : (
             <EmptyState onNewConversation={() => setShowNewDm(true)} onNewGroup={() => setShowNewGroup(true)} />
           )}
+          </div>
+          {/* Under the chat pane only — never under the conversation list. */}
+          <SiteFooter variant="compact" />
         </div>
       </div>
 
