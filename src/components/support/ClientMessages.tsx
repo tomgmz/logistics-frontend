@@ -1,7 +1,8 @@
 'use client'
 
+import { useStickToBottom } from '@/lib/hooks/useStickToBottom'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, ChevronRight, Loader2, MessageSquare, Send, Truck, UserRound } from 'lucide-react'
+import { ArrowLeft, ChevronRight, ImagePlus, Loader2, MessageSquare, Send, Truck, UserRound } from 'lucide-react'
 
 import { messagingService } from '@/lib/services/messaging.service'
 import { useMessagingRealtime } from '@/lib/hooks/useMessagingRealtime'
@@ -11,6 +12,8 @@ import { roleLabel } from '@/lib/roles'
 import { bookingRef } from '@/lib/booking'
 import { formatConversationTime, formatMessageTime } from '@/app/utils/messaging.utils'
 import type { ConversationWithDetails, MessageRow, MessagableUser } from '@/app/types/messaging/messaging.types'
+import PhotoSendDialog, { MAX_PHOTO_BYTES } from '@/components/messaging/PhotoSendDialog'
+import MessagePhoto from '@/components/messaging/MessagePhoto'
 
 /**
  * The client's messages, inside the help assistant rather than the staff
@@ -121,17 +124,17 @@ export function useClientMessages(userId: string | undefined, visible: boolean) 
     setMessages((prev) => (prev.some((x) => x.message_id === m.message_id) ? prev : [...prev, m]))
   }, [])
 
-  const send = useCallback(async (text: string): Promise<boolean> => {
+  const send = useCallback(async (text: string, attachmentUrl?: string): Promise<boolean> => {
     const t = threadRef.current
     const content = text.trim()
-    if (!t || !content) return false
+    if (!t || (!content && !attachmentUrl)) return false
     setSendError(null)
     try {
       if (t.kind === 'conversation') {
-        append(await messagingService.sendMessage(t.id, { content }))
+        append(await messagingService.sendMessage(t.id, { content, attachment_url: attachmentUrl }))
       } else {
         const msg = await messagingService.sendDirectMessage({
-          target_user_id: t.driver.user_id, content, booking_id: t.driver.booking_id,
+          target_user_id: t.driver.user_id, content, attachment_url: attachmentUrl, booking_id: t.driver.booking_id,
         })
         append(msg)
         setThread({ kind: 'conversation', id: msg.conversation_id })
@@ -184,11 +187,13 @@ export function ClientMessagesPanel({ state, userId, onAskAssistant }: {
   const { conversations, drivers, loading, thread, messages, threadLoading, sendError } = state
   const [input,   setInput]   = useState('')
   const [sending, setSending] = useState(false)
+  const [photo,   setPhoto]   = useState<File | null>(null)
+  const [photoError, setPhotoError] = useState<string | null>(null)
   const scroller = useRef<HTMLDivElement>(null)
+  const fileRef  = useRef<HTMLInputElement>(null)
 
-  useEffect(() => {
-    scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: 'smooth' })
-  }, [messages, thread])
+  const bottomRef = useRef<HTMLDivElement>(null)
+  useStickToBottom(bottomRef, thread?.kind === 'conversation' ? thread.id : thread ? 'draft' : null, [messages, thread])
 
   const driverIds = useMemo(() => new Set(drivers.map((d) => d.user_id)), [drivers])
 
@@ -293,6 +298,23 @@ export function ClientMessagesPanel({ state, userId, onAskAssistant }: {
     if (ok) setInput('')
   }
 
+  const pickPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    if (!file.type.startsWith('image/')) { setPhotoError('Only photos can be sent'); return }
+    if (file.size > MAX_PHOTO_BYTES) { setPhotoError('Photos can be up to 10 MB'); return }
+    setPhotoError(null)
+    setPhoto(file)
+  }
+
+  const sendPhoto = async (attachmentUrl: string, caption: string) => {
+    setPhoto(null)
+    setSending(true)
+    await state.send(caption, attachmentUrl)
+    setSending(false)
+  }
+
   return (
     <>
       <div className="flex items-center gap-2 border-b border-white/[0.07] px-3 py-2">
@@ -328,7 +350,7 @@ export function ClientMessagesPanel({ state, userId, onAskAssistant }: {
                     className={`whitespace-pre-line break-words rounded-2xl px-3.5 py-2.5 text-left text-[13px] leading-relaxed ${
                       mine ? 'rounded-br-md bg-[var(--color-cyan)] text-[#0a0a0a]' : 'rounded-bl-md bg-white/[0.06] text-white/90'}`}
                   >
-                    {m.content}
+                    <MessagePhoto body={m.content} attachmentUrl={m.attachment_url} stamped={m.attachment_stamped} />
                   </div>
                   <p className="px-1 text-[10px] text-white/30">{formatMessageTime(m.sent_at)}</p>
                 </div>
@@ -336,6 +358,7 @@ export function ClientMessagesPanel({ state, userId, onAskAssistant }: {
             )
           })
         )}
+        <div ref={bottomRef} />
       </div>
 
       {canSend ? (
@@ -344,7 +367,15 @@ export function ClientMessagesPanel({ state, userId, onAskAssistant }: {
           className="border-t border-white/[0.07] px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
         >
           {sendError && <p className="mb-2 text-[11px] text-red-400">{sendError}</p>}
+          {photoError && <p className="mb-2 text-[11px] text-red-400">{photoError}</p>}
+          <PhotoSendDialog file={photo} onCancel={() => setPhoto(null)} onSend={(url, caption) => void sendPhoto(url, caption)} />
           <div className="flex items-center gap-2">
+            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={pickPhoto} />
+            <button type="button" onClick={() => fileRef.current?.click()} disabled={sending}
+              title="Send a photo (up to 10 MB)" aria-label="Send a photo"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 text-white/60 hover:text-white disabled:opacity-30">
+              <ImagePlus size={16} />
+            </button>
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}

@@ -1,5 +1,6 @@
 'use client'
 
+import { useStickToBottom } from '@/lib/hooks/useStickToBottom'
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Loader2, Minus, CornerUpLeft } from 'lucide-react'
@@ -8,7 +9,7 @@ import { useAuthStore } from '@/lib/store/auth.store'
 import { messagingService } from '@/lib/services/messaging.service'
 import type { MessageRow } from '@/lib/services/messaging.service'
 import { groupMessagesByDate, isReadBy } from '@/app/utils/messaging.utils'
-import { toConversation, toMessage } from '@/app/types/messaging/messaging.types'
+import { toConversation, toMessage, PHOTO_PLACEHOLDER } from '@/app/types/messaging/messaging.types'
 import type {
   Conversation,
   Message,
@@ -97,7 +98,7 @@ export default function MessengerChatBubble({ conversationId, index }: Props) {
 
   useEffect(() => { fetchMessages() }, [fetchMessages])
   useEffect(() => { messagingService.markAsRead(conversationId).catch(() => {}) }, [conversationId])
-  useEffect(() => { setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50) }, [messages, isTyping])
+  useStickToBottom(bottomRef, conversationId, [messages, isTyping])
 
   const participant = conv?.participants[0]
   // Online status from the app-wide presence channel (not the per-conversation one).
@@ -130,7 +131,8 @@ export default function MessengerChatBubble({ conversationId, index }: Props) {
     },
   })
 
-  const handleSend = async (body: string, replyToMessageId?: string) => {
+  const handleSend = async (text: string, replyToMessageId?: string, attachmentUrl?: string) => {
+    const body = attachmentUrl && !text ? PHOTO_PLACEHOLDER : text
     const oid = `optimistic-${Date.now()}`
     pendingIds.current.add(oid)
     setMessages(prev => [...prev, {
@@ -138,11 +140,12 @@ export default function MessengerChatBubble({ conversationId, index }: Props) {
       body, created_at: new Date().toISOString(),
       reply_to: replyTo ? { message_id: replyTo.messageId, content: replyTo.content, sender_id: '' } : null,
       reactions: [],
+      attachment_url: attachmentUrl ?? null,
     }])
     setReplyTo(null)
     try {
       setSending(true)
-      const saved = await messagingService.sendMessage(conversationId, { content: body, reply_to_message_id: replyToMessageId })
+      const saved = await messagingService.sendMessage(conversationId, { content: text, attachment_url: attachmentUrl, reply_to_message_id: replyToMessageId })
       setMessages(prev => prev.map(m => m.id === oid ? toMessage(saved) : m))
       pendingIds.current.delete(oid)
     } catch { pendingIds.current.delete(oid); setMessages(prev => prev.filter(m => m.id !== oid)) }

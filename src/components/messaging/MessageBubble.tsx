@@ -3,6 +3,7 @@
 import { nameWithRole } from '@/lib/roles'
 
 import ReadTicks from './ReadTicks'
+import MessagePhoto from './MessagePhoto'
 import ConfirmDeleteDialog, { type DeleteScope } from './ConfirmDeleteDialog'
 
 import { useState, useRef } from 'react'
@@ -152,7 +153,7 @@ export default function MessageBubble({
               ? 'bg-[var(--color-cyan)] text-[var(--color-bg)] rounded-2xl rounded-br-sm'
               : 'glass-surface text-white border border-white/[0.06] rounded-2xl rounded-bl-sm'
           }`}>
-            {message.body}
+            <MessagePhoto body={message.body} attachmentUrl={message.attachment_url} stamped={message.attachment_stamped} />
           </div>
 
           {!isMine && hovered && actions}

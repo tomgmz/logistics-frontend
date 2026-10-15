@@ -1,5 +1,6 @@
 'use client'
 
+import { useStickToBottom } from '@/lib/hooks/useStickToBottom'
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { ArrowLeft, Loader2 } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -17,7 +18,7 @@ import type {
   MessagableUser,
   ReactionTogglePayload,
 } from '@/app/types/messaging/messaging.types'
-import { toMessage } from '@/app/types/messaging/messaging.types'
+import { toMessage, PHOTO_PLACEHOLDER } from '@/app/types/messaging/messaging.types'
 import { roleLabel, nameWithRole } from '@/lib/roles'
 
 interface ReplyTo { messageId: string; content: string; senderName: string }
@@ -118,7 +119,7 @@ export default function ChatWindow({ conversation, draftUser, currentUserId, isP
 
   useEffect(() => { fetchMessages() }, [fetchMessages])
   useEffect(() => { if (convId) messagingService.markAsRead(convId).catch(() => {}) }, [convId])
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, isOtherTyping])
+  useStickToBottom(bottomRef, realtimeConvId, [messages, isOtherTyping])
 
   const { broadcastTyping } = useMessagingRealtime({
     currentUserId,
@@ -149,14 +150,18 @@ export default function ChatWindow({ conversation, draftUser, currentUserId, isP
     },
   })
 
-  const handleSend = async (body: string, replyToMessageId?: string) => {
+  const handleSend = async (text: string, replyToMessageId?: string, attachmentUrl?: string) => {
+    // A photo without a caption is stored with the placeholder text; matching
+    // it here lets the live echo replace the optimistic bubble.
+    const body = attachmentUrl && !text ? PHOTO_PLACEHOLDER : text
     if (isDraft) {
       setReplyTo(null)
       try {
         setSending(true)
         const saved = await messagingService.sendDirectMessage({
           target_user_id:      participant.user_id,
-          content:             body,
+          content:             text,
+          attachment_url:      attachmentUrl,
           reply_to_message_id: replyToMessageId,
           booking_id:          draftUser?.booking_id,
         })
@@ -173,6 +178,7 @@ export default function ChatWindow({ conversation, draftUser, currentUserId, isP
       body, created_at: new Date().toISOString(),
       reply_to: replyTo ? { message_id: replyTo.messageId, content: replyTo.content, sender_id: '' } : null,
       reactions: [],
+      attachment_url: attachmentUrl ?? null,
     }
     pendingIds.current.add(oid)
     setMessages(prev => [...prev, optimistic])
@@ -180,7 +186,7 @@ export default function ChatWindow({ conversation, draftUser, currentUserId, isP
     onMessageSent?.(convId, body, currentUserId)
     try {
       setSending(true)
-      const saved = await messagingService.sendMessage(convId, { content: body, reply_to_message_id: replyToMessageId })
+      const saved = await messagingService.sendMessage(convId, { content: text, attachment_url: attachmentUrl, reply_to_message_id: replyToMessageId })
       setMessages(prev => prev.map(m => m.id === oid ? toMessage2(saved) : m))
       pendingIds.current.delete(oid)
     } catch {

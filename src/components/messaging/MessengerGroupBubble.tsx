@@ -1,5 +1,6 @@
 'use client'
 
+import { useStickToBottom } from '@/lib/hooks/useStickToBottom'
 import { nameWithRole } from '@/lib/roles'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
@@ -10,7 +11,7 @@ import { useAuthStore } from '@/lib/store/auth.store'
 import { messagingService } from '@/lib/services/messaging.service'
 import { useIsMobile } from '@/lib/hooks/useIsMobile'
 import { groupMessagesByDate, formatMessageTime, groupEventText, isReadBy, latestSeenPositions } from '@/app/utils/messaging.utils'
-import { toGroup, toGroupMessage } from '@/app/types/messaging/messaging.types'
+import { toGroup, toGroupMessage, PHOTO_PLACEHOLDER } from '@/app/types/messaging/messaging.types'
 import type {
   Group,
   GroupMessage,
@@ -21,6 +22,7 @@ import type {
 } from '@/app/types/messaging/messaging.types'
 import { useMessagingRealtime } from '@/lib/hooks/useMessagingRealtime'
 import { QuickReactBar } from './EmojiPicker'
+import MessagePhoto from './MessagePhoto'
 import MessageInput from './MessageInput'
 import { Reply as ReplyIcon, Trash2 } from 'lucide-react'
 import ConfirmDeleteDialog, { type DeleteScope } from './ConfirmDeleteDialog'
@@ -152,7 +154,7 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
     } catch { /* silent */ }
     finally { setInviteLoading(null) }
   }
-  useEffect(() => { setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50) }, [messages, typingUsers])
+  useStickToBottom(bottomRef, groupId, [messages, typingUsers])
 
   const memberMap = Object.fromEntries(members.map(m => [m.user_id, m]))
   const nameOf    = (id: string) => memberMap[id] ? `${memberMap[id].first_name} ${memberMap[id].last_name}`.trim() : undefined
@@ -190,7 +192,8 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
     onPresenceChange: setOnline,
   })
 
-  const handleSend = async (body: string, replyToMessageId?: string) => {
+  const handleSend = async (text: string, replyToMessageId?: string, attachmentUrl?: string) => {
+    const body = attachmentUrl && !text ? PHOTO_PLACEHOLDER : text
     const oid = `optimistic-${Date.now()}`
     pendingIds.current.add(oid)
     setMessages(prev => [...prev, {
@@ -199,11 +202,12 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
       reply_to: replyTo ? { message_id: replyTo.messageId, content: replyTo.content, sender_id: currentUserId } : null,
       kind: 'text' as const, meta: null,
       reactions: [],
+      attachment_url: attachmentUrl ?? null,
     }])
     setReplyTo(null)
     try {
       setSending(true)
-      const saved = await messagingService.sendGroupMessage(groupId, { content: body, reply_to_message_id: replyToMessageId })
+      const saved = await messagingService.sendGroupMessage(groupId, { content: text, attachment_url: attachmentUrl, reply_to_message_id: replyToMessageId })
       setMessages(prev => prev.map(m => m.id === oid ? coerce(saved) : m))
       pendingIds.current.delete(oid)
     } catch { pendingIds.current.delete(oid); setMessages(prev => prev.filter(m => m.id !== oid)) }
@@ -398,7 +402,7 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
                             ><Trash2 size={11} /></motion.button>}
                         </>)}
                         <div className={`px-2.5 py-1.5 rounded-2xl ff-body text-[11.5px] leading-relaxed break-words ${isMine ? 'bg-[var(--color-cyan)] text-[var(--color-bg)] rounded-br-sm' : 'glass-surface text-white border border-white/[0.06] rounded-bl-sm'} ${isOptimistic ? 'opacity-60' : ''}`}>
-                          {msg.body}
+                          <MessagePhoto body={msg.body} attachmentUrl={msg.attachment_url} stamped={msg.attachment_stamped} />
                         </div>
                         {!isMine && hoveredId === msg.id && (<>
                           <motion.button initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} type="button"

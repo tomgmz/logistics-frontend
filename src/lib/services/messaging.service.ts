@@ -36,7 +36,38 @@ async function del<T>(url: string): Promise<T> {
 
 const B = '/messaging'
 
+/** Where and when a stamped photo was taken; the server prints the rest. */
+export interface PhotoStampInput {
+  takenAt:    Date
+  latitude?:  number
+  longitude?: number
+  accuracyM?: number
+}
+
 export const messagingService = {
+  /**
+   * Store a photo for a chat message; send the returned url as attachment_url.
+   * `stamp` set: the server burns in the time-and-place stamp. Not set: plain.
+   */
+  uploadPhoto: async (file: Blob, stamp: PhotoStampInput | null): Promise<{ url: string; stamped: boolean }> => {
+    await initCsrf()
+    const form = new FormData()
+    form.append('image', file, 'photo.jpg')
+    if (stamp) {
+      form.append('stamp', '1')
+      form.append('taken_at', stamp.takenAt.toISOString())
+      if (stamp.latitude != null && stamp.longitude != null) {
+        form.append('latitude', String(stamp.latitude))
+        form.append('longitude', String(stamp.longitude))
+        if (stamp.accuracyM != null) form.append('accuracy_m', String(stamp.accuracyM))
+      }
+    }
+    const { data } = await proxyApi.post<ApiResponse<{ url: string; stamped: boolean }>>(`${B}/photos`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return data.data
+  },
+
   getConversations: () =>
     get<ConversationWithDetails[]>(`${B}/conversations`),
 
@@ -46,7 +77,7 @@ export const messagingService = {
   resolveConversation: (target_user_id: string) =>
     get<{ conversation_id: string | null }>(`${B}/conversations/resolve`, { target_user_id }),
 
-  sendDirectMessage: (payload: { target_user_id: string; content: string; reply_to_message_id?: string; booking_id?: string }) =>
+  sendDirectMessage: (payload: { target_user_id: string; content: string; attachment_url?: string; reply_to_message_id?: string; booking_id?: string }) =>
     post<MessageRow>(`${B}/conversations/direct`, payload),
 
   getMessages: (conversationId: string, query?: { limit?: number; before?: string }) =>
@@ -55,7 +86,7 @@ export const messagingService = {
       before: query?.before,
     }),
 
-  sendMessage: (conversationId: string, payload: { content: string; reply_to_message_id?: string }) =>
+  sendMessage: (conversationId: string, payload: { content: string; attachment_url?: string; reply_to_message_id?: string }) =>
     post<MessageRow>(`${B}/conversations/${conversationId}/messages`, payload),
 
   markAsRead: (conversationId: string) =>
@@ -104,7 +135,7 @@ export const messagingService = {
       before: query?.before,
     }),
 
-  sendGroupMessage: (groupId: string, payload: { content: string; reply_to_message_id?: string }) =>
+  sendGroupMessage: (groupId: string, payload: { content: string; attachment_url?: string; reply_to_message_id?: string }) =>
     post<GroupMessageRaw>(`${B}/groups/${groupId}/messages`, payload),
 
   markGroupRead: (groupId: string) =>

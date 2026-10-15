@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useRef, useCallback } from 'react'
-import { Send, Smile, X, CornerUpLeft } from 'lucide-react'
+import { Send, Smile, X, CornerUpLeft, ImagePlus } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import EmojiPicker from './EmojiPicker'
+import PhotoSendDialog, { MAX_PHOTO_BYTES } from './PhotoSendDialog'
 
 export interface ReplyToPreview {
   messageId: string
@@ -12,7 +13,8 @@ export interface ReplyToPreview {
 }
 
 interface MessageInputProps {
-  onSend:          (body: string, replyToMessageId?: string) => void
+  /** `attachmentUrl`: a photo already uploaded; `body` is then its caption (may be empty). */
+  onSend:          (body: string, replyToMessageId?: string, attachmentUrl?: string) => void
   onTypingChange?: (isTyping: boolean) => void
   disabled?:       boolean
   replyTo?:        ReplyToPreview | null
@@ -34,6 +36,24 @@ export default function MessageInput({
   const textareaRef               = useRef<HTMLTextAreaElement>(null)
   const typingTimeout             = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isTyping                  = useRef(false)
+  const fileRef                   = useRef<HTMLInputElement>(null)
+  const [photo, setPhoto]         = useState<File | null>(null)
+  const [photoError, setPhotoError] = useState<string | null>(null)
+
+  const pickPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    if (!file.type.startsWith('image/')) { setPhotoError('Only photos can be sent'); return }
+    if (file.size > MAX_PHOTO_BYTES) { setPhotoError('Photos can be up to 10 MB'); return }
+    setPhotoError(null)
+    setPhoto(file)
+  }
+
+  const sendPhoto = (attachmentUrl: string, caption: string) => {
+    setPhoto(null)
+    onSend(caption, replyTo?.messageId, attachmentUrl)
+  }
 
   const stopTyping = useCallback(() => {
     if (!isTyping.current) return
@@ -111,7 +131,27 @@ export default function MessageInput({
         )}
       </AnimatePresence>
 
+      <PhotoSendDialog file={photo} onCancel={() => setPhoto(null)} onSend={sendPhoto} />
+      {photoError && (
+        <div className="flex items-center gap-2 px-4 pt-2">
+          <p className="ff-body text-[11px] text-red-400 flex-1">{photoError}</p>
+          <button type="button" onClick={() => setPhotoError(null)} className="p-0.5 text-white/30 hover:text-white/60"><X size={11} /></button>
+        </div>
+      )}
+
       <div className={`${px} flex items-end gap-2`}>
+        {/* Photo */}
+        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={pickPhoto} />
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          title="Send a photo (up to 10 MB)"
+          aria-label="Send a photo"
+          className="shrink-0 mb-0.5 p-1.5 rounded-lg transition-colors hover:bg-white/5 text-white/30 hover:text-white/60"
+        >
+          <ImagePlus size={compact ? 14 : 16} />
+        </button>
+
         {/* Emoji trigger */}
         <div className="relative shrink-0 mb-0.5">
           <button

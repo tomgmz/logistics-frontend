@@ -49,6 +49,9 @@ export interface MessageRow {
   reply_to_message_id: string | null
   reply_to: MessageReplyTo | null
   reactions: MessageReaction[]
+  message_type?: 'text' | 'image' | 'system'
+  attachment_url?: string | null
+  attachment_stamped?: boolean
 }
 
 export interface MessagableUser {
@@ -79,7 +82,13 @@ export interface Message {
   created_at: string
   reply_to: MessageReplyTo | null
   reactions: MessageReaction[]
+  /** A photo message's picture; `body` is then its caption (or PHOTO_PLACEHOLDER). */
+  attachment_url?: string | null
+  attachment_stamped?: boolean
 }
+
+/** What the server stores as the caption of a photo sent without one. */
+export const PHOTO_PLACEHOLDER = '📷 Photo'
 
 export interface Conversation {
   id: string
@@ -130,6 +139,8 @@ export function toMessage(raw: MessageRow): Message {
     created_at:      raw.sent_at,
     reply_to:        raw.reply_to?.message_id ? raw.reply_to : null,
     reactions:       raw.reactions ?? [],
+    attachment_url:     raw.attachment_url ?? null,
+    attachment_stamped: !!raw.attachment_stamped,
   }
 }
 
@@ -142,8 +153,10 @@ export interface GroupMessageRaw {
   reply_to_message_id: string | null
   reply_to: MessageReplyTo | null
   reactions: MessageReaction[]
-  message_type?: 'text' | 'system'
+  message_type?: 'text' | 'image' | 'system'
   meta?: GroupSystemEvent | null
+  attachment_url?: string | null
+  attachment_stamped?: boolean
 }
 
 /** A group event shown as a centered line in the chat, not a speech bubble. */
@@ -186,6 +199,8 @@ export interface GroupMessage {
   reactions: MessageReaction[]
   kind: 'text' | 'system'
   meta: GroupSystemEvent | null
+  attachment_url?: string | null
+  attachment_stamped?: boolean
 }
 
 export interface GroupMember {
@@ -248,6 +263,8 @@ export function toGroupMessage(raw: GroupMessageRaw): GroupMessage {
     reactions:  raw.reactions  ?? [],
     kind:       raw.message_type === 'system' ? 'system' : 'text',
     meta:       raw.meta ?? null,
+    attachment_url:     raw.attachment_url ?? null,
+    attachment_stamped: !!raw.attachment_stamped,
   }
 }
 

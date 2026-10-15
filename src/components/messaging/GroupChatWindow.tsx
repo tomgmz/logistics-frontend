@@ -1,5 +1,6 @@
 'use client'
 
+import { useStickToBottom } from '@/lib/hooks/useStickToBottom'
 import { nameWithRole } from '@/lib/roles'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
@@ -11,6 +12,7 @@ import MessageInput from './MessageInput'
 import ReadTicks from './ReadTicks'
 import GroupOptionsModals, { type GroupOptionsView } from './GroupOptionsModals'
 import { QuickReactBar } from './EmojiPicker'
+import MessagePhoto from './MessagePhoto'
 import { groupMessagesByDate, formatMessageTime, groupEventText, isReadBy, latestSeenPositions } from '@/app/utils/messaging.utils'
 import { Reply as ReplyIcon, Trash2 } from 'lucide-react'
 import ConfirmDeleteDialog, { type DeleteScope } from './ConfirmDeleteDialog'
@@ -22,7 +24,7 @@ import type {
   MessageReaction,
   ReactionTogglePayload,
 } from '@/app/types/messaging/messaging.types'
-import { toGroupMessage } from '@/app/types/messaging/messaging.types'
+import { toGroupMessage, PHOTO_PLACEHOLDER } from '@/app/types/messaging/messaging.types'
 
 interface ReplyTo     { messageId: string; content: string; senderName: string }
 
@@ -176,7 +178,7 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
   }, [group.id, isPending, coerce])
 
   useEffect(() => { fetchMessages() }, [fetchMessages])
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, typingUsers])
+  useStickToBottom(bottomRef, group.id, [messages, typingUsers])
 
   const handleInvite = async (accept: boolean) => {
     setInviteLoading(accept ? 'accept' : 'decline')
@@ -224,7 +226,8 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
     onPresenceChange: setOnlineIds,
   })
 
-  const handleSend = async (body: string, replyToMessageId?: string) => {
+  const handleSend = async (text: string, replyToMessageId?: string, attachmentUrl?: string) => {
+    const body = attachmentUrl && !text ? PHOTO_PLACEHOLDER : text
     const oid = `optimistic-${Date.now()}`
     const opt: GroupMessage = {
       id: oid, group_id: group.id, sender_id: currentUserId, body,
@@ -232,13 +235,14 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
       reply_to: replyTo ? { message_id: replyTo.messageId, content: replyTo.content, sender_id: currentUserId } : null,
       reactions: [],
       kind: 'text', meta: null,
+      attachment_url: attachmentUrl ?? null,
     }
     pendingIds.current.add(oid)
     setMessages(p => [...p, opt])
     setReplyTo(null)
     try {
       setSending(true)
-      const saved = await messagingService.sendGroupMessage(group.id, { content: body, reply_to_message_id: replyToMessageId })
+      const saved = await messagingService.sendGroupMessage(group.id, { content: text, attachment_url: attachmentUrl, reply_to_message_id: replyToMessageId })
       setMessages(p => p.map(m => m.id === oid ? coerce(saved) : m))
       pendingIds.current.delete(oid)
     } catch { pendingIds.current.delete(oid); setMessages(p => p.filter(m => m.id !== oid)) }
@@ -526,7 +530,7 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
                             ><Trash2 size={13} /></motion.button>}
                           </>)}
                           <div className={`px-3 py-2 rounded-2xl ff-body text-[13px] leading-relaxed break-words ${isMine ? 'bg-[var(--color-cyan)] text-[var(--color-bg)] rounded-br-sm' : 'glass-surface text-white border border-white/[0.06] rounded-bl-sm'} ${isOptimistic ? 'opacity-70' : ''}`}>
-                            {msg.body}
+                            <MessagePhoto body={msg.body} attachmentUrl={msg.attachment_url} stamped={msg.attachment_stamped} />
                           </div>
                           {!isMine && hoveredId === msg.id && (<>
                             <motion.button initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} type="button"
