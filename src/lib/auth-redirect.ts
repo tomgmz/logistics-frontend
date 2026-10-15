@@ -38,4 +38,9 @@ export function goHomeSignedOut(reason?: SignedOutReason): void {
   leaving = true
   const suffix = reason ? `&${SIGNED_OUT_REASON_PARAM}=${reason}` : ''
   window.location.replace(`/?${SIGNED_OUT_PARAM}=1${suffix}`)
+  // A successful navigation unloads the page long before this fires. If
+  // something cancelled it (a client-side navigation started next to it),
+  // release the latch so the next sign-out attempt can leave instead of the tab
+  // being stuck on a portal it has no session for.
+  window.setTimeout(() => { leaving = false }, 3000)
 }

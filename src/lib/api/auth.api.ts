@@ -80,6 +80,12 @@ export function isSessionDead(err: unknown): boolean {
   return axios.isAxiosError(err) && err.response?.status === 401
 }
 
+/** The session ended because the account was deactivated or archived. */
+export function isAccountInactive(err: unknown): boolean {
+  return isSessionDead(err)
+    && (err as AxiosError<{ code?: string }>).response?.data?.code === 'ACCOUNT_INACTIVE'
+}
+
 const REFRESHED_AT_KEY = 'auth-refreshed-at'
 let refreshInFlight: Promise<void> | null = null
 
@@ -165,7 +171,7 @@ proxyApi.interceptors.response.use(
         // just this request; the user stays signed in.
         if (!isSessionDead(refreshError)) return Promise.reject(error)
         broadcastLogout()
-        goHomeSignedOut()
+        goHomeSignedOut(isAccountInactive(refreshError) ? 'inactive' : undefined)
         return Promise.reject(refreshError)
       }
       return proxyApi(originalRequest!)

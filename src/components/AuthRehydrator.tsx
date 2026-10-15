@@ -2,11 +2,12 @@
 
 import { useEffect, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { getMe, isSessionDead, refreshSession, type AuthUser } from '@/lib/api/auth.api'
+import { getMe, isAccountInactive, isSessionDead, refreshSession, type AuthUser } from '@/lib/api/auth.api'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { readPersisted } from '@/lib/secure-storage'
 import { syncServerTime } from '@/app/utils/serverTime'
 import { ROLE_ROUTES } from '@/constants/roles'
+import { goHomeSignedOut } from '@/lib/auth-redirect'
 import axios from 'axios'
 
 const PUBLIC_PATHS = ['/']
@@ -79,7 +80,7 @@ export default function AuthRehydrator() {
         const isPublic = PUBLIC_PATHS.some(
           (p) => pathname === p || pathname.startsWith(p + '/')
         )
-        if (!isPublic) router.replace('/')
+        if (!isPublic) goHomeSignedOut()
       }
     }
     const onStorage = (e: StorageEvent) => { void handleStorage(e) }
@@ -110,7 +111,14 @@ export default function AuthRehydrator() {
               pathnameRef.current === p ||
               pathnameRef.current.startsWith(p + '/')
           )
-          if (!isPublic) router.replace('/')
+          // Never a soft router.replace('/') here. The tab that broadcast
+          // LOGOUT hears it too, and a client navigation fired next to its
+          // goHomeSignedOut() could cancel that full-page one. The cookies are
+          // still set at that moment, so the proxy sent '/' straight back to
+          // the portal, the portal (no user) bounced to '/' again, and the tab
+          // looped forever. goHomeSignedOut is latched, so this is a no-op in
+          // the tab already leaving and the one safe exit in every other tab.
+          if (!isPublic) goHomeSignedOut()
           return
         }
 
@@ -167,6 +175,15 @@ export default function AuthRehydrator() {
       } catch (err) {
         const status = axios.isAxiosError(err) ? err.response?.status : null
         if (status !== 401) return
+        // Deactivated or archived while away: refreshing can't bring that
+        // back, so sign out now and say why.
+        const code = axios.isAxiosError(err) ? (err.response?.data as { code?: string } | undefined)?.code : undefined
+        if (code === 'ACCOUNT_INACTIVE') {
+          if (cancelled) return
+          clearUser()
+          goHomeSignedOut('inactive')
+          return
+        }
       }
 
       try {
@@ -189,7 +206,7 @@ export default function AuthRehydrator() {
             pathnameRef.current === p ||
             pathnameRef.current.startsWith(p + '/')
         )
-        if (!isPublic) router.replace('/')
+        if (!isPublic) goHomeSignedOut(isAccountInactive(err) ? 'inactive' : undefined)
       }
     }
 
