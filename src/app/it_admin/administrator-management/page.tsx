@@ -28,6 +28,7 @@ import UserFormModal from '@/app/admin/user-management/UserFormModal'
 import { useRecordLocks } from '@/lib/hooks/useRecordLock'
 import { RecordLockBadge } from '@/components/ui/RecordLockBanner'
 import PermissionsModal from './PermissionsModal'
+import AccountTypePicker, { type AccountTypeOption } from '@/components/admin/AccountTypePicker'
 import PasswordResetQueue from '@/components/admin/PasswordResetQueue'
 import ModuleSectionTabs, { type ModuleSection } from '@/components/admin/ModuleSectionTabs'
 import { passwordResetService } from '@/lib/services/admin/password-reset.service'
@@ -52,6 +53,13 @@ const TABS: { key: TabValue; label: string }[] = [
   { key: 'general-managers',   label: 'General Managers'    },
   { key: 'fleet-admins',       label: 'Fleet Managers'      },
   { key: 'operations-admins',  label: 'Operations Managers' },
+]
+
+const NEW_ACCOUNT_TYPES: AccountTypeOption<AdminMgmtTab>[] = [
+  { key: 'admins',            label: 'Company Administrator', hint: 'Manages users, bookings and company settings.' },
+  { key: 'general-managers',  label: 'General Manager',       hint: 'Approves client bookings.' },
+  { key: 'operations-admins', label: 'Operations Manager',    hint: 'Plans trips and assigns the vehicle and driver.' },
+  { key: 'fleet-admins',      label: 'Fleet Manager',         hint: 'Looks after vehicles, maintenance and odometer checks.' },
 ]
 
 // Roles aggregated by the "All Administrators" view and the stats cards.
@@ -358,6 +366,7 @@ export default function AdminManagementClient() {
   const [editUser,         setEditUser]         = useState<AnyUser | null>(null)
   const [formViewOnly,     setFormViewOnly]     = useState(false)
   const [formTab,          setFormTab]          = useState<AdminMgmtTab>('admins')
+  const [showTypePicker,   setShowTypePicker]   = useState(false)
   const [permUser,         setPermUser]         = useState<AnyUser | null>(null)
   const userLocks = useRecordLocks('user')
 
@@ -507,8 +516,14 @@ export default function AdminManagementClient() {
     setShowForm(true)
   }
 
+  // "Add Account" asks for the account type first; the form opens once one is picked.
   function openCreate() {
-    setFormTab(activeTab === 'all' ? 'admins' : activeTab)
+    setShowTypePicker(true)
+  }
+
+  function createAccount(type: AdminMgmtTab) {
+    setShowTypePicker(false)
+    setFormTab(type)
     setEditUser(null)
     setFormViewOnly(false)
     setShowForm(true)
@@ -788,6 +803,13 @@ export default function AdminManagementClient() {
           }}
         />
       )}
+
+      <AccountTypePicker
+        open={showTypePicker}
+        options={NEW_ACCOUNT_TYPES}
+        onPick={createAccount}
+        onClose={() => setShowTypePicker(false)}
+      />
 
       {permUser && (
         <PermissionsModal

@@ -209,17 +209,22 @@ interface FieldProps {
   required?: boolean
   error?: string
   hint?: string
+  /** Shown at the right of the label row, e.g. the Edit button on a scanned field. */
+  action?: React.ReactNode
   children: React.ReactNode
 }
 
-function Field({ label, required, error, hint, children }: FieldProps) {
+function Field({ label, required, error, hint, action, children }: FieldProps) {
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-[10px] font-bold tracking-[0.12em] uppercase text-[#818181]">
-        {label}
-        {hint && <span className="ml-1 normal-case font-normal text-[#555]">({hint})</span>}
-        {required && <span className="ml-0.5 text-[#4df9ed]">*</span>}
-      </label>
+      <div className="flex items-center justify-between gap-2">
+        <label className="text-[10px] font-bold tracking-[0.12em] uppercase text-[#818181]">
+          {label}
+          {hint && <span className="ml-1 normal-case font-normal text-[#555]">({hint})</span>}
+          {required && <span className="ml-0.5 text-[#4df9ed]">*</span>}
+        </label>
+        {action}
+      </div>
       {children}
       {error && (
         <p className="text-[11px] text-red-400 leading-tight whitespace-pre-line">{error}</p>
@@ -364,6 +369,9 @@ export default function UserFormModal({
   // "Jerryfel Mandawe". The scan guesses the last word is the middle name; this
   // holds that guess until the admin confirms it.
   const [nameCheck, setNameCheck] = useState<{ first: string; middle: string } | null>(null)
+  // Fields the scan filled stay read-only until the admin presses their Edit, so
+  // the license's values aren't changed by a stray keystroke.
+  const [scanLocked, setScanLocked] = useState<Set<string>>(() => new Set())
   // Words where the scan may have read an Ñ as a plain N.
   const [nChecks, setNChecks] = useState<NonNullable<LicenseOCRResult['name_n_checks']>>([])
 
@@ -389,6 +397,7 @@ export default function UserFormModal({
     setEligibility(null)
     setNameCheck(null)
     setNChecks([])
+    setScanLocked(new Set())
 
     try {
       const result = await ocrService.scanLicense(file)
@@ -407,6 +416,10 @@ export default function UserFormModal({
         ...(result.license_number && { license_number: result.license_number }),
         ...(result.license_expiry && { license_expiry: result.license_expiry }),
       }))
+      setScanLocked(new Set(
+        (['first_name', 'last_name', 'middle_name', 'license_number', 'license_expiry'] as const)
+          .filter(k => result[k]),
+      ))
       if (result.vehicle_eligibility) {
         setEligibility({
           dl_codes:            result.dl_codes          ?? [],
@@ -462,6 +475,7 @@ export default function UserFormModal({
     setEligibility(null)
     setNameCheck(null)
     setNChecks([])
+    setScanLocked(new Set())
     setShowCustomSuffix(
       !!initialState.suffix && !USER_SUFFIXES.includes(initialState.suffix as never),
     )
@@ -589,15 +603,31 @@ export default function UserFormModal({
   const isVendorDriver = tab === 'drivers' && form.is_external === true
   const formLabel      = isVendorDriver ? 'Vendor Driver' : TAB_LABELS[tab]
 
-  // Switching kind on create: drop the other kind's errors, and the vendor fields
-  // when going back to 8338, so a stale vendor name is never sent.
-  function setDriverSource(source: DriverSource) {
-    setForm(prev => ({
-      ...prev,
-      is_external: source === 'vendor',
-      ...(source === 'company' && { vendor_name: '', vendor_contact: '' }),
-    }))
-    setFieldErrors(prev => { const n = { ...prev }; delete n.vendor_name; delete n.vendor_contact; return n })
+  function unlockScanned(key: string) {
+    setScanLocked(prev => { const n = new Set(prev); n.delete(key); return n })
+    requestAnimationFrame(() => document.getElementById(`user-form-${key}`)?.focus())
+  }
+
+  /** Read-only props for a field the scan filled, plus the Edit button that unlocks it. */
+  function scanned(key: string) {
+    const locked = scanLocked.has(key)
+    return {
+      input: {
+        id: `user-form-${key}`,
+        readOnly: locked,
+        ...(locked && { title: 'Filled from the license scan. Press Edit to change it.' }),
+      },
+      lockedClass: locked ? 'opacity-70 cursor-default' : '',
+      action: locked ? (
+        <button
+          type="button"
+          onClick={() => unlockScanned(key)}
+          className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#4df9ed] transition hover:text-[#7bfbf5]"
+        >
+          <Pencil size={11} /> Edit
+        </button>
+      ) : undefined,
+    }
   }
 
   const isKnownSuffix = USER_SUFFIXES.includes(form.suffix as never)
@@ -647,35 +677,10 @@ export default function UserFormModal({
             {tab === 'drivers' && (
               <div>
                 <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-[#818181]">Driver from</p>
-                {isEdit ? (
-                  <p className="text-sm text-white">
-                    {isVendorDriver ? 'Vendor' : '8338 Logistics (company driver)'}
-                  </p>
-                ) : (
-                  <div className="grid grid-cols-2 gap-2">
-                    {([
-                      { key: 'company', label: '8338 Logistics', hint: 'Company driver. Signs in with a password.' },
-                      { key: 'vendor',  label: 'Vendor',         hint: 'Supplied by a vendor. Signs in with a passkey.' },
-                    ] as const).map(opt => {
-                      const active = (opt.key === 'vendor') === isVendorDriver
-                      return (
-                        <button
-                          key={opt.key}
-                          type="button"
-                          onClick={() => setDriverSource(opt.key)}
-                          className={`rounded-xl border px-4 py-3 text-left transition ${
-                            active
-                              ? 'border-[#4df9ed] bg-[#4df9ed]/10'
-                              : 'border-[#424242] hover:border-[#818181]'
-                          }`}
-                        >
-                          <p className={`text-sm font-semibold ${active ? 'text-[#4df9ed]' : 'text-white'}`}>{opt.label}</p>
-                          <p className="mt-0.5 text-[11px] leading-snug text-[#818181]">{opt.hint}</p>
-                        </button>
-                      )
-                    })}
-                  </div>
-                )}
+                {/* Picked before the form opened (Add User → type), and fixed once the driver exists. */}
+                <p className="text-sm text-white">
+                  {isVendorDriver ? 'Vendor' : '8338 Logistics (company driver)'}
+                </p>
               </div>
             )}
             {tab === 'drivers' && (
@@ -798,16 +803,20 @@ export default function UserFormModal({
             >
 
             <div className="grid grid-cols-2 gap-4">
-              <Field label="First Name" required error={fe.first_name}>
+              <Field label="First Name" required error={fe.first_name} action={scanned('first_name').action}>
                 <Input
+                  {...scanned('first_name').input}
+                  className={scanned('first_name').lockedClass}
                   value={form.first_name as string}
                   onChange={e => set('first_name', e.target.value)}
                   placeholder="Juan"
                   error={fe.first_name}
                 />
               </Field>
-              <Field label="Last Name" required error={fe.last_name}>
+              <Field label="Last Name" required error={fe.last_name} action={scanned('last_name').action}>
                 <Input
+                  {...scanned('last_name').input}
+                  className={scanned('last_name').lockedClass}
                   value={form.last_name as string}
                   onChange={e => set('last_name', e.target.value)}
                   placeholder="Dela Cruz"
@@ -817,8 +826,10 @@ export default function UserFormModal({
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <Field label="Middle Name" hint="Optional" error={fe.middle_name}>
+              <Field label="Middle Name" hint="Optional" error={fe.middle_name} action={scanned('middle_name').action}>
                 <Input
+                  {...scanned('middle_name').input}
+                  className={scanned('middle_name').lockedClass}
                   value={form.middle_name as string}
                   onChange={e => set('middle_name', e.target.value)}
                   placeholder="Reyes"
@@ -1010,21 +1021,24 @@ export default function UserFormModal({
               )}
 
               <div className="grid grid-cols-2 gap-4">
-                <Field label="License Number" required error={fe.license_number}>
+                <Field label="License Number" required error={fe.license_number} action={scanned('license_number').action}>
                   <Input
+                    {...scanned('license_number').input}
+                    className={scanned('license_number').lockedClass}
                     value={form.license_number as string}
                     onChange={e => set('license_number', e.target.value)}
                     placeholder="N01-23-456789"
                     error={fe.license_number}
                   />
                 </Field>
-                <Field label="License Expiry" required error={fe.license_expiry}>
+                <Field label="License Expiry" required error={fe.license_expiry} action={scanned('license_expiry').action}>
                   <Input
+                    {...scanned('license_expiry').input}
                     type="date"
                     value={form.license_expiry as string}
                     onChange={e => set('license_expiry', e.target.value)}
                     error={fe.license_expiry}
-                    className="[color-scheme:dark]"
+                    className={`[color-scheme:dark] ${scanned('license_expiry').lockedClass}`}
                   />
                 </Field>
               </div>

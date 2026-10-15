@@ -25,6 +25,7 @@ import {
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import UserFormModal, { type DriverSource } from './UserFormModal'
+import AccountTypePicker, { type AccountTypeOption } from '@/components/admin/AccountTypePicker'
 import { useRecordLocks } from '@/lib/hooks/useRecordLock'
 import { RecordLockBadge } from '@/components/ui/RecordLockBanner'
 import PasswordResetQueue from '@/components/admin/PasswordResetQueue'
@@ -60,6 +61,15 @@ const TABS: { key: TabValue; label: string }[] = [
   { key: 'clients',    label: 'Clients'   },
   { key: 'drivers',    label: 'Drivers'   },
   { key: 'it-admins',  label: 'IT Administrator'  },
+]
+
+type NewAccountType = 'clients' | 'company-driver' | 'vendor-driver' | 'it-admins'
+
+const NEW_ACCOUNT_TYPES: AccountTypeOption<NewAccountType>[] = [
+  { key: 'clients',        label: 'Client',                  hint: 'A company that books deliveries.' },
+  { key: 'company-driver', label: 'Company Driver',          hint: '8338 Logistics driver. Signs in with a password.' },
+  { key: 'vendor-driver',  label: 'Vendor Driver',           hint: 'Supplied by a vendor. Signs in with a passkey.' },
+  { key: 'it-admins',      label: 'IT Administrator',        hint: 'Runs the system. Only one can be active.' },
 ]
 
 const muiTheme = createTheme({
@@ -616,6 +626,7 @@ export default function UserManagementClient() {
   const [formTab,          setFormTab]          = useState<UserMgmtTab>('clients')
   const [formDriverSource, setFormDriverSource] = useState<DriverSource>('company')
   const [showTransition,   setShowTransition]   = useState(false)
+  const [showTypePicker,   setShowTypePicker]   = useState(false)
 
   // Only the primary administrator may hand the IT Admin role over. The API
   // enforces it; this just keeps a button that would 403 out of the way.
@@ -798,14 +809,26 @@ export default function UserManagementClient() {
     setShowForm(true)
   }
 
+  // "Add User" asks for the account type first; the form opens once one is picked.
   function openCreate() {
-    setFormTab(isDriverTab ? 'drivers' : 'clients')
-    // The driver form starts on whichever tab it was opened from.
-    setFormDriverSource(activeTab === 'vendor-drivers' ? 'vendor' : 'company')
+    setShowTypePicker(true)
+  }
+
+  function createAccount(type: NewAccountType) {
+    setShowTypePicker(false)
+    setFormTab(type === 'company-driver' || type === 'vendor-driver' ? 'drivers' : type)
+    setFormDriverSource(type === 'vendor-driver' ? 'vendor' : 'company')
     setEditUser(null)
     setFormViewOnly(false)
     setShowForm(true)
   }
+
+  // Only one IT Administrator may be active, and the seat is only known while
+  // its tab is open: offer it there when it is empty. A filled seat is handed
+  // over with Transition IT Administrator instead.
+  const newAccountTypes = NEW_ACCOUNT_TYPES.filter(
+    (t) => t.key !== 'it-admins' || (isITAdminTab && !loading && !activeITAdmin),
+  )
 
   function handleRefresh() {
     void refetchCurrentTab()
@@ -841,7 +864,7 @@ export default function UserManagementClient() {
                   onClick={openCreate}
                   className="flex items-center gap-2 rounded-xl bg-[#4df9ed] px-5 py-2.5 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5] active:scale-95"
                 >
-                  <UserPlus size={15} /> {activeTab === 'vendor-drivers' ? 'Add Vendor Driver' : activeTab === 'drivers' ? 'Add Driver' : 'Add User'}
+                  <UserPlus size={15} /> Add User
                 </button>
               )
             )}
@@ -1139,6 +1162,13 @@ export default function UserManagementClient() {
           }}
         />
       )}
+
+      <AccountTypePicker
+        open={showTypePicker}
+        options={newAccountTypes}
+        onPick={createAccount}
+        onClose={() => setShowTypePicker(false)}
+      />
 
       <ItAdminTransitionModal
         open={showTransition}
