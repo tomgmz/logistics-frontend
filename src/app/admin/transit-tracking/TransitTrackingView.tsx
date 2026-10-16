@@ -27,6 +27,7 @@ import { useLiveDriverPosition } from '@/lib/hooks/useLiveDriverPosition'
 import { LiveTruckMarker } from '@/components/map/LiveTruckMarker'
 import { useFleetPositions } from '@/lib/hooks/useFleetPositions'
 import { useRouteChanged } from '@/hooks/useRouteChanged'
+import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { pauseReasonLabel } from '@/lib/pause-reasons'
 import { useLiveRoute, LiveRoutePolyline, FollowTruck, remainingStops } from '@/components/map/LiveRoute'
 import { RouteStepper, bookingRouteSteps, dropoffSummary } from '@/components/map/RouteStepper'
@@ -244,6 +245,9 @@ export default function TransitTrackingView() {
 
   useEffect(() => { dispatch(clearSelection()) }, [dispatch])
   useEffect(() => { if (!user) return; loadBookings() }, [loadBookings, user])
+  // Live: a pause starting or ending, a stop confirmed — the cards follow
+  // without a reload (DB triggers broadcast on live:bookings).
+  useLiveTable(['live:bookings'], () => { if (user) loadBookings() })
 
   const searchFiltered = useMemo(() => {
     const q = search.trim().toLowerCase()

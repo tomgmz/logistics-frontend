@@ -26,6 +26,7 @@ import { bookingRef } from '@/lib/booking'
 import { useLiveDriverPosition, formatAge } from '@/lib/hooks/useLiveDriverPosition'
 import { LiveTruckMarker } from './LiveTruckMarker'
 import { useRouteChanged } from '@/hooks/useRouteChanged'
+import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { useLiveRoute, LiveRoutePolyline, FollowTruck, remainingStops } from './LiveRoute'
 
 const GOOGLE_MAPS_KEY    = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!
@@ -307,6 +308,13 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
     if (user.role === 'client' && !user.clients?.client_id) return
     loadBookings()
   }, [loadBookings, user])
+
+  // Live: the client's list follows a pause or a confirmed stop without a reload.
+  useLiveTable(['live:bookings'], () => {
+    if (!user) return
+    if (user.role === 'client' && !user.clients?.client_id) return
+    loadBookings()
+  })
 
   useEffect(() => {
     if (!initialBookingId) return

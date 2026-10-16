@@ -117,7 +117,9 @@ const routeMapSlice = createSlice({
   extraReducers: (builder) => {
     builder
       .addCase(fetchBookings.pending, (state) => {
-        state.listLoading = true
+        // Only the first load shows the spinner. The list is re-read live (a
+        // pause, a stop confirmed); blanking it each time would flash the list.
+        state.listLoading = state.bookings.length === 0
         state.listError   = null
       })
       .addCase(fetchBookings.fulfilled, (state, action) => {

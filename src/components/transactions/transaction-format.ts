@@ -13,16 +13,31 @@ import type {
  * field is.
  */
 
+/**
+ * Many columns are `timestamp WITHOUT time zone` holding UTC (bookings.created_at,
+ * booking_destinations.delivered_at, …), so the API returns them with no zone.
+ * `new Date()` reads a zoneless string as the BROWSER's local time, which put a
+ * drop-off delivered at 4:03 PM in Manila on screen as 8:03 AM. Treat a zoneless
+ * string as the UTC it is; leave real offsets and Date objects alone.
+ */
+function parseServerTime(iso: string | Date): Date {
+  if (iso instanceof Date) return iso
+  const zoned = /([zZ]|[+-]\d\d:?\d\d)$/.test(iso) || !iso.includes('T')
+  return new Date(zoned ? iso : `${iso}Z`)
+}
+
 export function formatDate(iso: string | Date | null | undefined): string {
   if (!iso) return '—'
-  return new Date(iso).toLocaleDateString('en-PH', {
+  return parseServerTime(iso).toLocaleDateString('en-PH', {
+    timeZone: 'Asia/Manila',
     year: 'numeric', month: 'short', day: 'numeric',
   })
 }
 
 export function formatDateTime(iso: string | Date | null | undefined): string {
   if (!iso) return '—'
-  return new Date(iso).toLocaleString('en-PH', {
+  return parseServerTime(iso).toLocaleString('en-PH', {
+    timeZone: 'Asia/Manila',
     year: 'numeric', month: 'short', day: 'numeric',
     hour: '2-digit', minute: '2-digit', hour12: false,
   })
