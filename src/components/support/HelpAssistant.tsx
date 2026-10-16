@@ -21,6 +21,8 @@ import {
   supportService, TICKET_CATEGORY_LABEL, OPEN_HELP_EVENT,
   type ChatLine, type HelpTab, type SupportTicket, type TicketCategory,
 } from '@/lib/services/support.service'
+import { useIsMobile } from '@/lib/hooks/useIsMobile'
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 
 /**
  * The help assistant: an FAQ chatbot, and a ticket to our team when it can't
@@ -76,6 +78,9 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
 
   const [open, setOpen] = useState(false)
   const [tab,  setTab]  = useState<HelpTab>('chat')
+  // Below `sm` the panel is full-screen; keep the page under it still (iOS).
+  const isMobile = useIsMobile()
+  useBodyScrollLock(open && isMobile)
   const inbox = useClientMessages(!isPublic && canTicket ? user?.user_id : undefined, open && tab === 'messages')
   const { openConversation } = inbox
 

@@ -11,6 +11,7 @@ import { useAuthStore } from '@/lib/store/auth.store'
 import ReusableModal from '@/components/layout/ReusableModal'
 import SigningOutOverlay from '@/components/layout/SigningOutOverlay'
 import { roleLabel } from '@/lib/roles'
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 
 const SIDEBAR_COLLAPSED = 56
 const SIDEBAR_EXPANDED = 260
@@ -47,6 +48,8 @@ export default function ReusableSidebar({
 }: ReusableSidebarProps) {
   const pathname = usePathname()
   const isMobile = useIsMobile()
+  // Open over the page on phones: keep the page under it still (iOS).
+  useBodyScrollLock(isMobile && sidebarOpen)
   const user = useAuthStore((state) => state.user)
   const clearUser = useAuthStore((state) => state.clearUser)
   const [logoutModalOpen, setLogoutModalOpen] = useState(false)
@@ -95,14 +98,14 @@ export default function ReusableSidebar({
         )}
       </AnimatePresence>
 
-      <div className="relative shrink-0 z-40 max-lg:fixed max-lg:left-0 max-lg:top-[70px] max-lg:h-[calc(100vh-70px)]">
+      <div className="relative shrink-0 z-40 max-lg:fixed max-lg:left-0 max-lg:top-[70px] max-lg:h-[calc(100dvh-70px)]">
         <motion.aside
           initial={false}
           animate={{ width: sidebarOpen ? SIDEBAR_EXPANDED : isMobile ? 0 : SIDEBAR_COLLAPSED }}
           transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] as [number, number, number, number] }}
           className="h-full border-r border-white/[0.07] bg-[var(--color-bg)] overflow-x-hidden overflow-y-hidden"
         >
-          <div style={{ width: SIDEBAR_EXPANDED }} className="h-full flex flex-col py-5 min-h-0">
+          <div style={{ width: SIDEBAR_EXPANDED }} className="h-full flex flex-col pt-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] min-h-0">
 
             <div className="flex items-center gap-3 px-4 mb-7 overflow-hidden shrink-0">
               <div className="w-8 h-8 rounded-full bg-[var(--color-cyan)] glow-cyan flex items-center justify-center shrink-0">

@@ -6,7 +6,7 @@ import { motion } from 'framer-motion'
 const RouteMap = dynamic(() => import('./RouteMap'), {
   ssr: false,
   loading: () => (
-    <div className="flex items-center justify-center h-screen" style={{ background: 'var(--color-bg)' }}>
+    <div className="flex items-center justify-center h-dvh" style={{ background: 'var(--color-bg)' }}>
       <motion.div
         initial={{ opacity: 0, scale: 0.8 }}
         animate={{ opacity: 1, scale: 1 }}

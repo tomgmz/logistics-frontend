@@ -93,7 +93,7 @@ export default function AdminShell({ children }: AdminShellProps) {
   }, [hasHydrated, user])
 
   if (!hasHydrated || !user || user.role !== 'admin') {
-    return <div className="min-h-screen bg-[#0a0a0a]" />
+    return <div className="min-h-dvh bg-[#0a0a0a]" />
   }
 
   return (

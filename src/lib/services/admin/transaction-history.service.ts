@@ -304,5 +304,7 @@ export function downloadCsv(filename: string, csv: string): void {
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)
-  URL.revokeObjectURL(url)
+  // Safari (iOS especially) reads the blob after click() returns; revoking
+  // straight away can leave it an empty or failed download.
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
 }

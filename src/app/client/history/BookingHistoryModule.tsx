@@ -37,6 +37,13 @@ import {
   BG_PAGE, BG_PANEL, BG_CARD, BORDER, BORDER_C, CYAN, MUTED, ERROR, RADIUS,
 } from '@/components/transactions/transaction-theme'
 
+
+/* showPicker() is missing on iOS Safari before 16.4 (and throws if the input
+   cannot open a picker); focusing the field opens the native wheel there. */
+function openDatePicker(input: HTMLInputElement | null) {
+  if (!input) return
+  try { input.showPicker() } catch { input.focus() }
+}
 function fieldSx(bg: string, border: string): SxProps<Theme> {
   return {
     '& .MuiInputBase-root': {
@@ -435,7 +442,7 @@ export default function BookingHistoryModule() {
                               endAdornment: (
                                 <InputAdornment position="end">
                                   <Calendar size={14} className="cursor-pointer hover:text-white transition-colors"
-                                    style={{ color: MUTED }} onClick={() => dateFromRef.current?.showPicker()} />
+                                    style={{ color: MUTED }} onClick={() => openDatePicker(dateFromRef.current)} />
                                 </InputAdornment>
                               ),
                             }}
@@ -456,7 +463,7 @@ export default function BookingHistoryModule() {
                               endAdornment: (
                                 <InputAdornment position="end">
                                   <Calendar size={14} className="cursor-pointer hover:text-white transition-colors"
-                                    style={{ color: MUTED }} onClick={() => dateToRef.current?.showPicker()} />
+                                    style={{ color: MUTED }} onClick={() => openDatePicker(dateToRef.current)} />
                                 </InputAdornment>
                               ),
                             }}

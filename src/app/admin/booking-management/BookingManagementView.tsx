@@ -73,6 +73,7 @@ import { pauseReasonLabel } from '@/lib/services/admin/pause.service'
 import type { BookingWithRelations } from '@/lib/store/slice/routeMap.slice'
 import { useRecordLock, useRecordLocks } from '@/lib/hooks/useRecordLock'
 import RecordLockBanner, { RecordLockBadge } from '@/components/ui/RecordLockBanner'
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 
 const PAGE_SIZE = 12
 
@@ -1024,13 +1025,9 @@ function CrewPickerDialog({
     if (!open) return
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !busy) onClose() }
     window.addEventListener('keydown', onKey)
-    const prevOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      window.removeEventListener('keydown', onKey)
-      document.body.style.overflow = prevOverflow
-    }
+    return () => window.removeEventListener('keydown', onKey)
   }, [open, busy, onClose])
+  useBodyScrollLock(open)
 
   return (
     <AnimatePresence>
@@ -1054,7 +1051,7 @@ function CrewPickerDialog({
             exit={{ opacity: 0, y: 12, scale: 0.98 }}
             transition={{ type: 'spring', stiffness: 320, damping: 30 }}
             onClick={(e) => e.stopPropagation()}
-            className="relative flex flex-col w-full sm:max-w-2xl max-h-[92vh] rounded-t-[18px] sm:rounded-[18px]
+            className="relative flex flex-col w-full sm:max-w-2xl max-h-[92dvh] rounded-t-[18px] sm:rounded-[18px]
                        border border-white/[0.08] bg-[#232323]"
           >
             <div className="flex items-start justify-between gap-3 px-4 sm:px-5 pt-4 pb-3 border-b border-white/[0.06]">

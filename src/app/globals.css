@@ -21,7 +21,19 @@
     scroll-behavior: smooth;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* iOS rubber-band overscroll shows the <html> background, not the body's:
+       without this the page bounces into white bands top and bottom. */
+    background-color: #0a0a0a;
+    /* Native controls (date/time pickers, selects, scrollbars) draw dark. */
+    color-scheme: dark;
+    /* No grey flash over every tapped link/button on iOS. */
+    -webkit-tap-highlight-color: transparent;
     @apply font-sans;
+  }
+
+  /* iOS centres the value of date/time inputs; the forms are left-aligned. */
+  input::-webkit-date-and-time-value {
+    text-align: left;
   }
 
   body {
@@ -99,7 +111,10 @@
     text-transform: uppercase;
     text-shadow: 0 4px 6px rgba(0, 0, 0, 0.4);
     letter-spacing: 0.02em;
-    font-size: 2.3rem;
+    /* Fluid on phones: the face is ~1em per letter, so the longest headline
+       word (PERFORMANCE, 11.06em) must stay under ~7.6vw to fit a 320px screen
+       inside the section padding. Reaches the old 2.3rem from ~480px up. */
+    font-size: clamp(1.25rem, 7.6vw, 2.3rem);
   }
 
   @media (min-width: 640px) {
@@ -265,9 +280,11 @@
     animation: marquee-reverse 26s linear infinite;
   }
 
-  .marquee-track:hover,
-  .marquee-track-reverse:hover {
-    animation-play-state: paused;
+  @media (hover: hover) {
+    .marquee-track:hover,
+    .marquee-track-reverse:hover {
+      animation-play-state: paused;
+    }
   }
 
   .border-gradient-cyan {
@@ -304,9 +321,12 @@
   .card-hover {
     transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
   }
-  .card-hover:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+  /* Hover-capable pointers only: on touch the tapped card would stay lifted. */
+  @media (hover: hover) {
+    .card-hover:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+    }
   }
 
   .noise::after {

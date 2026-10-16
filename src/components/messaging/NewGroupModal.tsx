@@ -73,7 +73,7 @@ export default function NewGroupModal({ onClose, onGroupCreated }: NewGroupModal
           exit={{ opacity: 0, scale: 0.94, y: 16 }}
           transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
           className="w-full max-w-sm bg-[var(--color-bg)] border border-white/[0.09] rounded-2xl shadow-2xl overflow-hidden flex flex-col"
-          style={{ maxHeight: '80vh' }}
+          style={{ maxHeight: '80dvh' }}
         >
           {/* Header */}
           <div className="px-4 pt-4 pb-3 flex items-center justify-between shrink-0 border-b border-white/[0.06]">

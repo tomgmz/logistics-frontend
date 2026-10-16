@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import ThemeRegistry from '@/components/ui/ThemeRegistry';
 import CsrfInit from '@/components/CsrfInit';
+import IosViewportFix from '@/components/IosViewportFix';
 import { alegreyaSansSC, alegreyaSans, aboreto, fredoka, leagueSpartan, eurostile } from '@/app/fonts';
 import StoreProvider from '@/lib/store/StoreProvider';
 import AuthRehydrator from '@/components/AuthRehydrator';
@@ -37,6 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     >
       <body suppressHydrationWarning className={`bg-[#0a0a0a] text-white overflow-x-hidden ${alegreyaSansSC.className}`}>
         <CsrfInit />
+        <IosViewportFix />
         <StoreProvider>
           <AuthRehydrator />
           <ThemeRegistry>{children}</ThemeRegistry>

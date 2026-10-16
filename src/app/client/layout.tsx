@@ -26,7 +26,7 @@ export default function ClientLayout({ children }: { children: ReactNode }) {
   }, [hasHydrated, user])
 
   if (!hasHydrated || !user || user.role !== 'client') {
-    return <div className="min-h-screen bg-[#0a0a0a]" />
+    return <div className="min-h-dvh bg-[#0a0a0a]" />
   }
 
   return (

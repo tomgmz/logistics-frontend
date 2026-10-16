@@ -25,6 +25,7 @@ import type {
   ReactionTogglePayload,
 } from '@/app/types/messaging/messaging.types'
 import { toGroupMessage, PHOTO_PLACEHOLDER } from '@/app/types/messaging/messaging.types'
+import { useLongPress } from '@/lib/hooks/useLongPress'
 
 interface ReplyTo     { messageId: string; content: string; senderName: string }
 
@@ -112,6 +113,8 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
   // The message waiting on "Delete this message?" — deleted for you only.
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [hoveredId, setHoveredId]         = useState<string | null>(null)
+  // Touch: a long press stands in for hover (reply / react / remove).
+  const longPress = useLongPress()
   const [members, setMembers]             = useState<GroupMember[]>(group.members)
   const [menuOpen, setMenuOpen]           = useState(false)
   const [optionsView, setOptionsView]     = useState<GroupOptionsView | null>(null)
@@ -479,9 +482,10 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
                   return (
                     <div key={msg.id}>
                     <div
-                      className={`flex gap-2 ${isMine ? 'justify-end' : 'justify-start'}`}
-                      onMouseEnter={() => { if (hoverTimeout.current) clearTimeout(hoverTimeout.current); hoverTimeout.current = setTimeout(() => setHoveredId(msg.id), 60) }}
-                      onMouseLeave={() => { if (hoverTimeout.current) clearTimeout(hoverTimeout.current); setHoveredId(null) }}
+                      className={`flex gap-2 ${isMine ? 'justify-end' : 'justify-start'} pointer-coarse:select-none [-webkit-touch-callout:none]`}
+                      onPointerEnter={(e) => { if (e.pointerType !== 'mouse') return; if (hoverTimeout.current) clearTimeout(hoverTimeout.current); hoverTimeout.current = setTimeout(() => setHoveredId(msg.id), 60) }}
+                      onPointerLeave={(e) => { if (e.pointerType !== 'mouse') return; if (hoverTimeout.current) clearTimeout(hoverTimeout.current); setHoveredId(null) }}
+                      {...longPress(() => setHoveredId(msg.id), () => setHoveredId(null))}
                     >
                       {!isMine && (
                         <div className="shrink-0 self-end mb-1">

@@ -536,7 +536,7 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: 12, opacity: 0 }}
               transition={{ type: 'spring', damping: 26, stiffness: 280 }}
-              className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-white/10 bg-[var(--color-surface)] shadow-2xl"
+              className="w-full max-w-lg max-h-[90dvh] overflow-y-auto rounded-2xl border border-white/10 bg-[var(--color-surface)] shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header */}
@@ -817,7 +817,7 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
               role="dialog"
               aria-modal="true"
               aria-label={`Details for ${viewModel.name}`}
-              className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-white/10 bg-[var(--color-surface)] shadow-2xl"
+              className="w-full max-w-lg max-h-[90dvh] overflow-y-auto rounded-2xl border border-white/10 bg-[var(--color-surface)] shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.07]">

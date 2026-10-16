@@ -19,7 +19,7 @@ function ModalShell({ onClose, children }: { onClose: () => void; children: Reac
           initial={{ opacity: 0, scale: 0.94, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.94, y: 16 }}
           transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
           className="w-full max-w-sm bg-[var(--color-bg)] border border-white/[0.09] rounded-2xl shadow-2xl overflow-hidden flex flex-col"
-          style={{ maxHeight: '80vh' }}
+          style={{ maxHeight: '80dvh' }}
         >
           {children}
         </motion.div>

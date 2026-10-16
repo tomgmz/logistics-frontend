@@ -3,6 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
 /**
  * Render into <body>, not where the modal is declared. A modal declared inside
@@ -101,13 +102,7 @@ export default function ReusableModal({
     return () => window.removeEventListener("keydown", handler);
   }, [open, onCancel]);
 
-  useEffect(() => {
-    document.body.style.overflow = open ? "hidden" : "";
-
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [open]);
+  useBodyScrollLock(open);
 
   const isMobile =
     typeof window !== "undefined" && window.innerWidth < 640;
@@ -285,13 +280,7 @@ export function RemarksModal({
     return () => window.removeEventListener("keydown", handler);
   }, [open, busy]);
 
-  useEffect(() => {
-    document.body.style.overflow = open ? "hidden" : "";
-
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [open]);
+  useBodyScrollLock(open);
 
   const isMobile =
     typeof window !== "undefined" && window.innerWidth < 640;

@@ -139,7 +139,7 @@ export default function UploadDocumentModal({
             role="dialog"
             aria-modal="true"
             aria-label="Upload document"
-            className="w-full sm:max-w-lg max-h-[92vh] flex flex-col rounded-t-2xl sm:rounded-2xl border border-white/10 bg-[var(--color-surface)] shadow-2xl"
+            className="w-full sm:max-w-lg max-h-[92dvh] flex flex-col rounded-t-2xl sm:rounded-2xl border border-white/10 bg-[var(--color-surface)] shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.07] shrink-0">

@@ -23,7 +23,7 @@ export default function FleetAdminLayout({ children }: { children: ReactNode }) 
   }, [hasHydrated, user])
 
   if (!hasHydrated || !user || user.role !== 'fleet_manager') {
-    return <div className="min-h-screen bg-[#0a0a0a]" />
+    return <div className="min-h-dvh bg-[#0a0a0a]" />
   }
 
   return <ReusableDashboardShell navItems={NAV_ITEMS}>{children}</ReusableDashboardShell>

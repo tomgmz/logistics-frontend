@@ -423,6 +423,7 @@ export default function MapLocationPicker({
                   background:     PANEL,
                   border:         '1px solid rgba(255,255,255,0.07)',
                   backdropFilter: 'blur(16px)',
+                  WebkitBackdropFilter: 'blur(16px)',
                   maxHeight:      240,
                   overflowY:      'auto',
                 }}

@@ -22,7 +22,7 @@ export default function ItAdminLayout({ children }: { children: ReactNode }) {
   }, [hasHydrated, user])
 
   if (!hasHydrated || !user || user.role !== 'it_admin') {
-    return <div className="min-h-screen bg-[#0a0a0a]" />
+    return <div className="min-h-dvh bg-[#0a0a0a]" />
   }
 
   return <ReusableDashboardShell navItems={NAV_ITEMS}>{children}</ReusableDashboardShell>

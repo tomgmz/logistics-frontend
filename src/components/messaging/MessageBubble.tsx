@@ -6,12 +6,13 @@ import ReadTicks from './ReadTicks'
 import MessagePhoto from './MessagePhoto'
 import ConfirmDeleteDialog, { type DeleteScope } from './ConfirmDeleteDialog'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, type PointerEvent } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Reply, CornerUpLeft, Trash2 } from 'lucide-react'
 import { formatMessageTime } from '@/app/utils/messaging.utils'
 import { QuickReactBar } from './EmojiPicker'
 import type { Message, MessageReaction, MessageParticipant } from '@/app/types/messaging/messaging.types'
+import { useLongPress } from '@/lib/hooks/useLongPress'
 
 interface ReactionGroup { emoji: string; count: number; reacted: boolean }
 
@@ -60,14 +61,23 @@ export default function MessageBubble({
     : '??'
   const grouped = groupReactions(message.reactions, currentUserId)
 
-  const onEnter = () => { hoverTimeout.current = setTimeout(() => setHovered(true), 60) }
-  const onLeave = () => { if (hoverTimeout.current) clearTimeout(hoverTimeout.current); setHovered(false) }
+  // Hover for a mouse only; touch opens the same actions with a long press.
+  const onEnter = (e: PointerEvent) => {
+    if (e.pointerType !== 'mouse') return
+    hoverTimeout.current = setTimeout(() => setHovered(true), 60)
+  }
+  const onLeave = (e: PointerEvent) => {
+    if (e.pointerType !== 'mouse') return
+    if (hoverTimeout.current) clearTimeout(hoverTimeout.current)
+    setHovered(false)
+  }
+  const longPress = useLongPress()
   
   const actions = (onReply || onDelete) ? (
     <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }}
       className="flex items-center gap-0.5 shrink-0">
       {onReply && (
-        <button type="button" onClick={() => onReply(message)} title="Reply"
+        <button type="button" onClick={() => { onReply(message); setHovered(false) }} title="Reply"
           className="p-1.5 rounded-lg hover:bg-white/5 text-white/25 hover:text-white/60 transition-colors">
           <Reply size={13} />
         </button>
@@ -114,9 +124,10 @@ export default function MessageBubble({
       )}
 
       <div
-        className={`relative flex flex-col gap-0.5 ${isMine ? 'items-end' : 'items-start'}`}
-        onMouseEnter={onEnter}
-        onMouseLeave={onLeave}
+        className={`relative flex flex-col gap-0.5 ${isMine ? 'items-end' : 'items-start'} pointer-coarse:select-none [-webkit-touch-callout:none]`}
+        onPointerEnter={onEnter}
+        onPointerLeave={onLeave}
+        {...longPress(() => setHovered(true), () => setHovered(false))}
       >
         {!isMine && showSenderName && sender && (
           <span className="ff-body text-[10px] text-white/40 px-1">{nameWithRole(sender.first_name, sender.last_name, sender.role)}</span>

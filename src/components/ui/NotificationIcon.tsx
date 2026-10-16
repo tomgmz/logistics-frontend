@@ -17,6 +17,7 @@ import Pagination from "@/components/ui/Pagination";
 import type { AppNotification, NotificationFilter } from "@/lib/services/notification.service";
 import { useAuthStore } from "@/lib/store/auth.store";
 import { helpTabFromUrl, openHelpAssistant } from "@/lib/services/support.service";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
 const timeAgo = (iso: string): string => {
   const diff = now() - new Date(iso).getTime();
@@ -228,7 +229,7 @@ function NotifDetailModal({
             exit={isMobile ? { y: "100%" } : { opacity: 0, scale: 0.97, y: -8 }}
             transition={{ type: "spring", stiffness: 320, damping: 30 }}
             onClick={(e) => e.stopPropagation()}
-            className="flex flex-col w-full sm:max-w-[640px] max-h-[90vh] sm:max-h-[calc(100vh-5rem)] rounded-t-[18px] sm:rounded-2xl border border-white/[0.08] bg-[#0d0d0d] shadow-[0_32px_80px_rgba(0,0,0,0.9)] pb-[env(safe-area-inset-bottom)]"
+            className="flex flex-col w-full sm:max-w-[640px] max-h-[90dvh] sm:max-h-[calc(100dvh-5rem)] rounded-t-[18px] sm:rounded-2xl border border-white/[0.08] bg-[#0d0d0d] shadow-[0_32px_80px_rgba(0,0,0,0.9)] pb-[env(safe-area-inset-bottom)]"
           >
             <div className="flex items-center justify-between gap-3 px-5 sm:px-6 pt-4 pb-3 shrink-0">
               <h2
@@ -368,15 +369,11 @@ export default function NotificationIcon() {
   // the details pop-up is up, which Escape closes first).
   useEffect(() => {
     if (!isMobile || !open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && !selectedId) changeOpen(false); };
     window.addEventListener("keydown", onKey);
-    return () => {
-      document.body.style.overflow = prev;
-      window.removeEventListener("keydown", onKey);
-    };
+    return () => window.removeEventListener("keydown", onKey);
   }, [isMobile, open, selectedId, changeOpen]);
+  useBodyScrollLock(isMobile && open);
 
   const onItemClick = useCallback(
     (n: AppNotification) => {
@@ -542,7 +539,7 @@ export default function NotificationIcon() {
       {filterBar}
       <div className="h-px bg-white/[0.06] shrink-0" />
 
-      <div className={`${scrollClass} ${isMobile ? "flex-1 min-h-0" : "max-h-[60vh]"} ${pageLoading ? "opacity-50" : ""} transition-opacity`}>
+      <div className={`${scrollClass} ${isMobile ? "flex-1 min-h-0" : "max-h-[60dvh]"} ${pageLoading ? "opacity-50" : ""} transition-opacity`}>
         {list}
       </div>
 

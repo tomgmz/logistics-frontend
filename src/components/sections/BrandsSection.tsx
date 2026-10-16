@@ -46,7 +46,7 @@ export default function BrandsSection() {
   const inView = useInView(ref, { once: true, margin: '-80px' });
 
   return (
-    <section className="relative w-full min-h-screen bg-[#0a0a0a] overflow-hidden flex flex-col items-center justify-center py-16 lg:py-0">
+    <section className="relative w-full min-h-svh bg-[#0a0a0a] overflow-hidden flex flex-col items-center justify-center py-16 lg:py-0">
 
       <div className="absolute top-0    inset-x-0 sep-x" />
       <div className="absolute bottom-0 inset-x-0 sep-x" />
@@ -55,7 +55,7 @@ export default function BrandsSection() {
         <div className="w-full h-full rounded-full bg-[#4df9ed]/[0.04] blur-[130px]" />
       </div>
 
-      <div ref={ref} className="max-w-[1600px] mx-auto px-6 md:px-12 lg:px-16">
+      <div ref={ref} className="w-full max-w-[1600px] mx-auto px-5 sm:px-6 md:px-12 lg:px-16">
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-14 lg:gap-20 items-center">
 
           <motion.div
@@ -72,7 +72,7 @@ export default function BrandsSection() {
             </h2>
 
             <p className="ff-sc text-[#818181] leading-relaxed
-              tracking-wide max-w-[340px] mb-10">
+              tracking-wide max-w-[340px] mx-auto sm:mx-0 mb-10">
               Move nationwide with unmatched precision
             </p>
           </motion.div>

@@ -86,7 +86,7 @@ export default function AboutSection() {
         </motion.h2>
       </div>
 
-      <div className="hidden md:block relative w-full max-w-[1600px] mx-auto px-12 lg:px-16 py-28 min-h-screen">
+      <div className="hidden md:block relative w-full max-w-[1600px] mx-auto px-12 lg:px-16 py-28 min-h-svh">
 
         <motion.div
           initial={{ opacity: 0, scale: 0.94 }}

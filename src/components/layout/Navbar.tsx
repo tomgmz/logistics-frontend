@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, type MouseEvent } from 'react';
 import { motion, AnimatePresence, useScroll, useSpring } from 'framer-motion';
 import { ASSETS } from '@/lib/data';
 import Image from 'next/image';
 import SignInModal from '../SignInModal';
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 
 const NAV_LINKS = [
   { label: 'Home',     href: '#hero' },
@@ -30,10 +31,7 @@ export default function Navbar() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  useEffect(() => {
-    document.body.style.overflow = menuOpen ? 'hidden' : '';
-    return () => { document.body.style.overflow = ''; };
-  }, [menuOpen]);
+  useBodyScrollLock(menuOpen);
 
   useEffect(() => {
     const ids = NAV_LINKS.map(l => l.href.slice(1));
@@ -56,6 +54,18 @@ export default function Navbar() {
   }, []);
 
   const closeMenu = useCallback(() => setMenuOpen(false), []);
+
+  // Drawer links: the native #anchor jump would land while the page is
+  // scroll-locked (body pinned), and the unlock then puts the page back where
+  // it was. Close first, scroll once the lock has let go.
+  const goToFromMenu = useCallback((e: MouseEvent<HTMLAnchorElement>, href: string) => {
+    e.preventDefault();
+    setMenuOpen(false);
+    setTimeout(() => {
+      document.getElementById(href.slice(1))?.scrollIntoView({ behavior: 'smooth' });
+      history.replaceState(null, '', href);
+    }, 50);
+  }, []);
 
   return (
     <>
@@ -166,7 +176,7 @@ export default function Navbar() {
             >
               <div className="flex justify-between items-center p-6 pb-5
                 border-b border-white/[0.07]">
-                <a href="#hero" className="flex items-center no-underline shrink-0">
+                <a href="#hero" onClick={e => goToFromMenu(e, '#hero')} className="flex items-center no-underline shrink-0">
                   <Image
                     src={ASSETS.logo}
                     alt="8338 Logistics"
@@ -196,7 +206,7 @@ export default function Navbar() {
                   >
                     <a
                       href={item.href}
-                      onClick={closeMenu}
+                      onClick={e => goToFromMenu(e, item.href)}
                       className={`text-[1rem] py-3 px-4 rounded-xl
                         transition-colors tracking-wider no-underline block
                         ${activeIdx === i

@@ -155,7 +155,7 @@ export default function ItAdminTransitionModal({
               exit={{ opacity: 0, scale: 0.97, y: 8 }}
               transition={{ duration: 0.18 }}
               onClick={(e) => e.stopPropagation()}
-              className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-[#2a2a2a] bg-[#1b1b1b]"
+              className="flex max-h-[88dvh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-[#2a2a2a] bg-[#1b1b1b]"
             >
               {/* Header */}
               <div className="flex items-start justify-between gap-4 border-b border-[#2a2a2a] px-6 py-4">

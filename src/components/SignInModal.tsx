@@ -11,6 +11,7 @@ import {
 import { useAuthStore } from '@/lib/store/auth.store'
 import { ROLE_ROUTES } from '@/constants/roles'
 import { now } from '@/app/utils/serverTime'
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 
 const OTP_LENGTH  = 6
 const RESEND_SECS = 60
@@ -138,6 +139,7 @@ function GlassInput({
           background: 'rgba(255,255,255,0.08)',
           border: '1px solid rgba(255,255,255,0.13)',
           backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
         }}
       >
         <span className="text-white/40 shrink-0">{icon}</span>
@@ -478,6 +480,7 @@ function ItAdminOtpResetStep({
                     ? '1px solid rgba(77,249,237,0.4)'
                     : '1px solid rgba(255,255,255,0.13)',
                   backdropFilter: 'blur(12px)',
+                  WebkitBackdropFilter: 'blur(12px)',
                   color: digit ? '#4df9ed' : '#fff',
                   fontFamily: 'monospace',
                 }}
@@ -746,6 +749,7 @@ function MethodStep({
             background: 'rgba(77,249,237,0.06)',
             border: '1px solid rgba(77,249,237,0.2)',
             backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
           }}
         >
           <div
@@ -785,6 +789,7 @@ function MethodStep({
             background: 'rgba(255,255,255,0.05)',
             border: '1px solid rgba(255,255,255,0.1)',
             backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
           }}
         >
           <div
@@ -1089,6 +1094,7 @@ function OtpStep({
                   ? '1px solid rgba(77,249,237,0.4)'
                   : '1px solid rgba(255,255,255,0.13)',
               backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
               color: digit ? '#4df9ed' : '#fff',
               fontFamily: 'monospace',
             }}
@@ -1480,10 +1486,7 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
     onClose()
   }, [onClose])
 
-  useEffect(() => {
-    document.body.style.overflow = isOpen ? 'hidden' : ''
-    return () => { document.body.style.overflow = '' }
-  }, [isOpen])
+  useBodyScrollLock(isOpen)
 
   useEffect(() => {
     if (!isOpen) return
@@ -1590,6 +1593,7 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
               style={{
                 background: 'rgba(10, 10, 10, 0.2)',
                 backdropFilter: 'blur(5px)',
+                WebkitBackdropFilter: 'blur(5px)',
                 borderLeft: '1px solid rgba(255,255,255,0.07)',
               }}
               onClick={e => e.stopPropagation()}
@@ -1597,7 +1601,7 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
               <div className="absolute top-0 left-0 right-0 h-[1px]
                 bg-gradient-to-r from-transparent via-[#4df9ed]/40 to-transparent" />
 
-              <div className="relative flex flex-col h-full px-8 sm:px-12 py-10 overflow-y-auto">
+              <div className="relative flex flex-col h-full px-8 sm:px-12 py-10 overflow-y-auto overscroll-contain">
                 <button
                   onClick={handleClose}
                   aria-label="Close"

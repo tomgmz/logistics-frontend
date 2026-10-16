@@ -71,7 +71,7 @@ export default function NewConversationModal({
             w-full max-w-sm bg-[var(--color-bg)] border border-white/[0.09]
             rounded-2xl shadow-2xl overflow-hidden flex flex-col
           "
-          style={{ maxHeight: '75vh' }}
+          style={{ maxHeight: '75dvh' }}
         >
           {/* Header */}
           <div className="px-4 pt-4 pb-3 flex items-center justify-between shrink-0 border-b border-white/[0.06]">

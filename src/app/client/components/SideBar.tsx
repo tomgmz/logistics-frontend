@@ -13,6 +13,7 @@ import { setSidebarOpen } from '@/lib/store/slice/booking.slice'
 import ReusableModal from '@/components/layout/ReusableModal'
 import SigningOutOverlay from '@/components/layout/SigningOutOverlay'
 import { History, CalendarCheck, MapPin, CreditCard } from 'lucide-react'
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 
 const SIDEBAR_COLLAPSED = 56
 const SIDEBAR_EXPANDED  = 260
@@ -39,6 +40,8 @@ export default function Sidebar() {
   const isMobile        = useIsMobile()
   const dispatch        = useAppDispatch()
   const sidebarOpen     = useAppSelector((s) => s.booking.sidebarOpen)
+  // Open over the page on phones: keep the page under it still (iOS).
+  useBodyScrollLock(isMobile && sidebarOpen)
   const user            = useAuthStore((state) => state.user)
   const clearUser       = useAuthStore((state) => state.clearUser)
   const [logoutModalOpen, setLogoutModalOpen] = useState(false)
@@ -90,16 +93,16 @@ export default function Sidebar() {
         )}
       </AnimatePresence>
 
-      <div className="relative shrink-0 z-40 max-lg:fixed max-lg:left-0 max-lg:top-[70px] max-lg:h-[calc(100vh-70px)]">
+      <div className="relative shrink-0 z-40 max-lg:fixed max-lg:left-0 max-lg:top-[70px] max-lg:h-[calc(100dvh-70px)]">
         <motion.aside
           initial={false}
           animate={{ width: sidebarOpen ? SIDEBAR_EXPANDED : isMobile ? 0 : SIDEBAR_COLLAPSED }}
           transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] as [number, number, number, number] }}
           className="h-full border-r border-white/[0.07] bg-[var(--color-bg)] overflow-hidden"
         >
-          <div style={{ width: SIDEBAR_EXPANDED }} className="h-full flex flex-col py-5">
+          <div style={{ width: SIDEBAR_EXPANDED }} className="h-full flex flex-col pt-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] min-h-0">
 
-            <div className="flex items-center gap-3 px-4 mb-7 overflow-hidden">
+            <div className="flex items-center gap-3 px-4 mb-7 overflow-hidden shrink-0">
               <div className="w-8 h-8 rounded-full bg-[var(--color-cyan)] glow-cyan flex items-center justify-center shrink-0">
                 <span className="font-card sm:!text-[0.8rem] md:!text-[0.9rem] lg:!text-[1.1rem] text-[var(--color-bg)] text-xs font-bold">
                   {user?.first_name?.[0]?.toUpperCase() ?? 'A'}
@@ -121,9 +124,9 @@ export default function Sidebar() {
               </motion.div>
             </div>
 
-            <div className="sep-x-cyan mx-4 mb-4" />
+            <div className="sep-x-cyan mx-4 mb-4 shrink-0" />
 
-            <nav className="flex-1 px-2 space-y-0.5">
+            <nav className="flex-1 min-h-0 px-2 space-y-0.5 overflow-y-auto overflow-x-hidden">
               {NAV.map((item, i) => (
                 <NavItem
                   key={item.href}
@@ -136,7 +139,7 @@ export default function Sidebar() {
               ))}
             </nav>
 
-            <div className="px-2 space-y-0.5 pt-4 border-t border-white/[0.07]">
+            <div className="px-2 space-y-0.5 pt-4 border-t border-white/[0.07] shrink-0">
               <motion.button
                 onClick={() => setLogoutModalOpen(true)}
                 whileHover={{ x: sidebarOpen ? 2 : 0 }}

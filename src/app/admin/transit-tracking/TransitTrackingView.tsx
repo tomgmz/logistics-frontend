@@ -449,7 +449,7 @@ export default function TransitTrackingView() {
         </header>
 
         <div className="flex flex-1 min-h-0 flex-col lg:flex-row overflow-hidden">
-          <aside className="w-full lg:w-[300px] shrink-0 flex flex-col border-b lg:border-b-0 lg:border-r border-white/[0.07] bg-[var(--color-bg)] min-h-0 max-h-[42vh] lg:max-h-none">
+          <aside className="w-full lg:w-[300px] shrink-0 flex flex-col border-b lg:border-b-0 lg:border-r border-white/[0.07] bg-[var(--color-bg)] min-h-0 max-h-[42dvh] lg:max-h-none">
             <div className="p-2.5 flex-shrink-0">
               <div className="flex items-center gap-2 rounded-[10px] px-3 py-2" style={{ background: '#2a2828' }}>
                 <SearchIcon sx={{ fontSize: 16, color: '#9f9c9c' }} />

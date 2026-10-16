@@ -87,7 +87,7 @@ export default function DocumentPreviewModal({
             role="dialog"
             aria-modal="true"
             aria-label={`Document ${doc.file_name}`}
-            className="w-full max-w-5xl h-[92vh] flex flex-col rounded-2xl border border-white/10 bg-[var(--color-surface)] shadow-2xl overflow-hidden"
+            className="w-full max-w-5xl h-[92dvh] flex flex-col rounded-2xl border border-white/10 bg-[var(--color-surface)] shadow-2xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-white/[0.07] shrink-0">

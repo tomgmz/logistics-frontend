@@ -653,7 +653,7 @@ export default function UserFormModal({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.96, y: 12 }}
           transition={{ type: 'spring', duration: 0.3, bounce: 0.15 }}
-          className="relative z-10 w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-[#2a2a2a] bg-[#1b1b1b] shadow-2xl [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+          className="relative z-10 w-full max-w-2xl max-h-[90dvh] overflow-y-auto rounded-2xl border border-[#2a2a2a] bg-[#1b1b1b] shadow-2xl [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
         >
           <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#2a2a2a] bg-[#1b1b1b] px-6 py-4">
             <div>
@@ -1141,7 +1141,7 @@ export default function UserFormModal({
             src={licensePreview ?? storedLicenseUrl!}
             alt="Driver license"
             onClick={e => e.stopPropagation()}
-            className="max-h-[90vh] max-w-full rounded-lg object-contain shadow-2xl"
+            className="max-h-[90dvh] max-w-full rounded-lg object-contain shadow-2xl"
           />
         </motion.div>
       )}

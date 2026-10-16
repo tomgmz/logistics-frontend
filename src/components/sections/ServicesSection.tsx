@@ -48,11 +48,8 @@ function CyclingWord() {
 
   return (
     <span
-      className="inline-block align-bottom max-w-full overflow-hidden"
-      style={{ 
-        fontFamily: "'Eurostile Extended', sans-serif",
-        color: currentColor 
-      }}
+      className="inline-block align-bottom max-w-full"
+      style={{ color: currentColor }}
     >
       <span className="inline-block break-words">
         {displayText}
@@ -103,7 +100,7 @@ export default function ServicesSection() {
   const inView = useInView(ref, { once: true, margin: '-80px' });
 
   return (
-    <section id="services" className="relative w-full min-h-screen bg-[#1b1b1b] overflow-hidden py-14 sm:py-20 md:py-24 flex items-center justify-center">
+    <section id="services" className="relative w-full min-h-svh bg-[#1b1b1b] overflow-hidden py-14 sm:py-20 md:py-24 flex items-center justify-center">
   <div className="relative z-10 max-w-[1600px] w-full mx-auto px-5 sm:px-8 md:px-12 lg:px-16">
 
         <motion.div

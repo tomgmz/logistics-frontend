@@ -6,7 +6,7 @@ import { ASSETS } from '@/lib/data';
 
 export default function HeroSection() {
   return (
-    <section id="hero" className="relative w-full min-h-screen bg-[#0a0a0a] overflow-hidden flex items-center">
+    <section id="hero" className="relative w-full min-h-svh bg-[#0a0a0a] overflow-hidden flex items-center">
 
       <div className="absolute inset-0 z-0">
         <Image
@@ -63,7 +63,7 @@ export default function HeroSection() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.5 }}
-          className="ff-sc text-white max-w-[90%] sm:max-w-xl md:max-w-2xl lg:max-w-3xl leading-relaxed mb-8 sm:mb-10 tracking-wide justify-self-center sm:justify-self-start"
+          className="ff-sc text-white max-w-[90%] sm:max-w-xl md:max-w-2xl lg:max-w-3xl mx-auto sm:mx-0 leading-relaxed mb-8 sm:mb-10 tracking-wide"
         >
           Book, track, and manage deliveries in one place. Real-time updates,
           seamless booking, and efficient support for all your logistics needs.

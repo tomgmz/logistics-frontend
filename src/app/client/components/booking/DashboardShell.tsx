@@ -6,7 +6,7 @@ import Sidebar from '../SideBar'
 
 export default function DashboardShell({ children }: { children: ReactNode }) {
   return (
-    <div suppressHydrationWarning className="flex flex-col h-screen bg-[var(--color-bg)] overflow-hidden">
+    <div suppressHydrationWarning className="flex flex-col h-dvh bg-[var(--color-bg)] overflow-hidden">
       <Header />
 
       <div className="flex flex-1 min-h-0 overflow-hidden">

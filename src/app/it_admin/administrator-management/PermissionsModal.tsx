@@ -105,7 +105,7 @@ export default function PermissionsModal({ userId, userName, onClose, onSaved }:
         initial={{ opacity: 0, scale: 0.96, y: 8 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ duration: 0.16 }}
-        className="relative z-10 flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-[#2a2a2a] bg-[#1b1b1b] shadow-2xl"
+        className="relative z-10 flex max-h-[85dvh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-[#2a2a2a] bg-[#1b1b1b] shadow-2xl"
       >
         {/* Header */}
         <div className="flex items-start justify-between border-b border-[#2a2a2a] px-6 py-4">

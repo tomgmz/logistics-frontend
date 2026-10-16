@@ -149,7 +149,7 @@ export default function BlowbagetsInspectionModal({
             role="dialog"
             aria-modal="true"
             aria-label={`BLOWBAGETS inspection for ${truck.plate_number}`}
-            className="fixed z-[61] inset-x-0 bottom-0 sm:inset-0 sm:m-auto sm:h-fit sm:max-h-[88vh] w-full sm:max-w-lg
+            className="fixed z-[61] inset-x-0 bottom-0 sm:inset-0 sm:m-auto sm:h-fit sm:max-h-[88dvh] w-full sm:max-w-lg
                        rounded-t-2xl sm:rounded-2xl border border-white/[0.10] bg-[var(--color-surface)]
                        flex flex-col shadow-2xl overflow-hidden"
           >

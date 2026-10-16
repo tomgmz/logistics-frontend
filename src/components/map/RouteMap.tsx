@@ -573,7 +573,7 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
     <APIProvider apiKey={GOOGLE_MAPS_KEY} libraries={['routes']}>
 
       <div
-        className="hidden lg:flex h-screen overflow-hidden flex-col"
+        className="hidden lg:flex h-dvh overflow-hidden flex-col"
         style={{ fontFamily: "var(--font-alegreya-sc), 'Alegreya Sans SC', sans-serif", background: 'var(--color-bg)' }}
       >
         <div
@@ -646,7 +646,7 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
       </div>
 
       <div
-        className="hidden md:flex lg:hidden h-screen overflow-hidden flex-col"
+        className="hidden md:flex lg:hidden h-dvh overflow-hidden flex-col"
         style={{ fontFamily: "var(--font-alegreya-sc), 'Alegreya Sans SC', sans-serif", background: 'var(--color-bg)' }}
       >
         <div className="h-14 flex items-center justify-end px-4 flex-shrink-0 border-b"
@@ -680,7 +680,7 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
       </div>
 
       <div
-        className="flex md:hidden h-screen overflow-hidden flex-col"
+        className="flex md:hidden h-dvh overflow-hidden flex-col"
         style={{ fontFamily: "var(--font-alegreya-sc), 'Alegreya Sans SC', sans-serif",background: 'var(--color-bg)' }}
       >
         <div className="h-12 flex items-center justify-between px-4 flex-shrink-0 border-b"
