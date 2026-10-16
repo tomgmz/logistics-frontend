@@ -1174,6 +1174,27 @@ function PasswordStep({
   const [error,         setError]         = useState('')
   const [lockState,     setLockState]     = useState<'none' | 'temporary' | 'permanent'>('none')
   const [lockRemaining, setLockRemaining] = useState(0)
+  const [statusChecked, setStatusChecked] = useState(false)
+
+  useEffect(() => {
+    async function checkStatus() {
+      try {
+        const status = await getAuthStatus(email)
+        if (status.permanent) {
+          setLockState('permanent')
+        } else if (status.locked_until) {
+          const expiry = new Date(status.locked_until).getTime()
+          lockExpiresAt.current = expiry
+          setLockState('temporary')
+          setLockRemaining(Math.max(0, Math.floor((expiry - now()) / 1000)))
+        }
+      } catch {
+      } finally {
+        setStatusChecked(true)
+      }
+    }
+    checkStatus()
+  }, [email])
 
   useEffect(() => {
     if (lockState !== 'temporary') return
@@ -1247,6 +1268,15 @@ function PasswordStep({
         setLoading(false)
       }
     }
+  }
+
+  if (!statusChecked) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <span className="inline-block w-5 h-5 border-2 border-white/20
+          border-t-white/60 rounded-full animate-spin" />
+      </div>
+    )
   }
 
   if (lockState === 'permanent') {
