@@ -6,6 +6,7 @@ import {
   AlertTriangle, KeyRound, MailCheck, RefreshCw, Send, X,
 } from 'lucide-react'
 import ReusableModal from '@/components/layout/ReusableModal'
+import { useModuleAccess } from '@/components/layout/ModuleAccess'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { useRecordLock, useRecordLocks } from '@/lib/hooks/useRecordLock'
@@ -89,6 +90,8 @@ export default function PasswordResetQueue({
   // the admin starts working through the queue.
   onPendingCountChange?: (count: number) => void
 }) {
+  // Sending a link is a create, dismissing a request an edit (user-management tier).
+  const { canCreate, canEdit } = useModuleAccess()
   const [rows,          setRows]          = useState<PasswordResetRequest[]>([])
   const [loading,       setLoading]       = useState(true)
   const [busyId,        setBusyId]        = useState<string | null>(null)
@@ -294,7 +297,7 @@ export default function PasswordResetQueue({
                       <td className="px-4 py-3.5">
                         <div className="flex items-center justify-end gap-2">
                           <RecordLockBadge holder={lockedBy} />
-                          {SENDABLE.includes(r.status) && (
+                          {canCreate && SENDABLE.includes(r.status) && (
                             <button
                               onClick={() => setPending({ kind: 'send', request: r })}
                               disabled={busy}
@@ -303,7 +306,7 @@ export default function PasswordResetQueue({
                               <Send size={12} /> {r.status === 'expired' ? 'Send a new link' : 'Send reset link'}
                             </button>
                           )}
-                          {CANCELLABLE.includes(r.status) && (
+                          {canEdit && CANCELLABLE.includes(r.status) && (
                             <button
                               onClick={() => setPending({ kind: 'cancel', request: r })}
                               disabled={busy}

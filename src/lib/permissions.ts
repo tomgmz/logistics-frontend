@@ -22,6 +22,9 @@ export function moduleFlags(
 ): ModuleFlags {
   if (!user) return { ...EMPTY_FLAGS }
   if (!isManagedRole(user.role)) return { ...ALL_FLAGS }
+  // The root administrator is never restricted on the server (isProtectedAdmin),
+  // so hiding its buttons would only misreport what it can do.
+  if (user.is_root_admin) return { ...ALL_FLAGS }
   if (!hasCustomPerms(user)) return { ...ALL_FLAGS }
 
   const row = user.module_permissions!.find((p) => p.module_key === moduleKey)

@@ -381,7 +381,7 @@ function licenseNote(expiry: string | null | undefined): string {
  * passkeys stay dead. The vendor snapshot on the delivery is untouched by all
  * of them, because that is the record of who drove.
  */
-function ExternalDriverAccessRow({ userId }: { userId: string }) {
+function ExternalDriverAccessRow({ userId, canEdit }: { userId: string; canEdit: boolean }) {
   const [access, setAccess] = useState<ExternalDriverAccess | null>(null)
   const [busy,   setBusy]   = useState(false)
 
@@ -459,6 +459,7 @@ function ExternalDriverAccessRow({ userId }: { userId: string }) {
         <KeyRound size={11} className="text-white/30 shrink-0" />
         <span>{status}</span>
       </div>
+      {canEdit && (
       <div className="flex gap-1.5">
         {revoked ? (
           <button
@@ -493,6 +494,7 @@ function ExternalDriverAccessRow({ userId }: { userId: string }) {
           </button>
         )}
       </div>
+      )}
     </div>
   )
 }
@@ -526,6 +528,7 @@ function AssignmentPanel({
   onAssign,
   onOpenPicker,
   onClosePicker,
+  canEdit,
 }: {
   detail:          BookingDetail
   drivers:         DriverUser[]
@@ -564,6 +567,8 @@ function AssignmentPanel({
   onOpenPicker:    () => void
   /** Closes without saving and puts back what is on the booking. */
   onClosePicker:   () => void
+  /** Booking Management tier allows edits; Read-only shows the crew without the picker. */
+  canEdit:         boolean
 }) {
   const isAssigned = normalizeBookingStatus(detail.status) === 'assigned'
 
@@ -696,7 +701,7 @@ function AssignmentPanel({
             <div className="text-[11px] text-white/45">Vendor: {vendorLabel}</div>
           )}
           {vendorMode && externalDriverUserId && (
-            <ExternalDriverAccessRow userId={externalDriverUserId} />
+            <ExternalDriverAccessRow userId={externalDriverUserId} canEdit={canEdit} />
           )}
           {selectedCoding && !pickerOpen && <CodingNotice flag={selectedCoding} plate={selectedPlate!} />}
         </div>
@@ -704,7 +709,7 @@ function AssignmentPanel({
         <p className="text-xs text-white/45">No vehicle or driver assigned yet.</p>
       )}
 
-      <button
+      {canEdit && <button
         type="button"
         disabled={assignBusy}
         onClick={onOpenPicker}
@@ -717,10 +722,10 @@ function AssignmentPanel({
       >
         <Truck size={14} />
         {title}
-      </button>
+      </button>}
 
       <CrewPickerDialog
-        open={pickerOpen}
+        open={pickerOpen && canEdit}
         busy={assignBusy}
         title={title}
         subtitle={[detail.reference_number, detail.clients?.company_name, detail.schedule_date].filter(Boolean).join(' · ')}
@@ -1900,7 +1905,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
   // is still awaiting a decision, and to admins on the top-level status control.
   const showStageActions = !!detail && (
     (roleView === 'admin' && canEdit && normalizeBookingStatus(detail.status) === 'pending') ||
-    (actsAsGm && d?.gm_status === 'pending')
+    (actsAsGm && canEdit && d?.gm_status === 'pending')
   )
   const showAssignment = !!detail &&
     (roleView === 'admin' || roleView === 'operations_manager') &&
@@ -1932,7 +1937,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
    */
   const bookingOpen = !!detail &&
     !['delivered', 'completed', 'cancelled'].includes(String(detail.status ?? '').toLowerCase())
-  const mayEditBooking = roleView !== 'fleet_manager' && (canEdit || actsAsGm)
+  const mayEditBooking = roleView !== 'fleet_manager' && canEdit
   const bookingLock = useRecordLock({
     type:    'booking',
     id:      detail?.booking_id ?? null,
@@ -2465,6 +2470,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                           }
                           onAssign={() => void handleAssign()}
                           onOpenPicker={() => setAssignEditMode(true)}
+                          canEdit={canEdit}
                           onClosePicker={() => {
                             setAssignEditMode(false)
                             const restore = committedAssignment.driverId || committedAssignment.truckId
@@ -2485,7 +2491,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                           compare the load against, and nothing to plan around. */}
                       {/* Delivered: waiting on the client. Staff can only resolve a reported problem. */}
                       {(roleView === 'admin' || roleView === 'operations_manager') && (
-                        <CompletionPanel booking={detail as unknown as BookingWithRelations} mode="staff"
+                        <CompletionPanel booking={detail as unknown as BookingWithRelations} mode="staff" canAct={canEdit}
                           onUpdated={() => { void refreshDetail(detail.booking_id); void loadPage() }} />
                       )}
 

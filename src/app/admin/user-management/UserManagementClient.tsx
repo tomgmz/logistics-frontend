@@ -35,6 +35,7 @@ import ModuleSectionTabs, { type ModuleSection } from '@/components/admin/Module
 import { passwordResetService } from '@/lib/services/admin/password-reset.service'
 import { externalDriverService, type VendorDriverUser } from '@/lib/services/admin/external-driver.service'
 import { useAuthStore } from '@/lib/store/auth.store'
+import { useModuleAccess } from '@/components/layout/ModuleAccess'
 
 type UserMgmtTab = Extract<UserTab, 'clients' | 'drivers' | 'it-admins'>
 // The dropdown below filters the directory by role. Password resets are a queue
@@ -154,6 +155,7 @@ interface RowMenuProps {
 }
 
 function RowMenu({ user, tab, onView, onEdit, onStatusChange, lockedBy }: RowMenuProps) {
+  const access = useModuleAccess()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -170,8 +172,11 @@ function RowMenu({ user, tab, onView, onEdit, onStatusChange, lockedBy }: RowMen
     { label: 'Deactivate', status: 'deactivated' as UserStatus, icon: <ShieldOff size={13} />   },
     { label: 'Archive',    status: 'archived'    as UserStatus, icon: <Archive size={13} />     },
   ]).filter((a) => a.status !== user.status)
+    // Activate/deactivate is an edit; archiving goes through DELETE, so it
+    // needs the delete permission (the module's "All" tier).
+    .filter((a) => (a.status === 'archived' ? access.canDelete : access.canEdit))
 
-  const canEdit = tab !== 'all'
+  const canEdit = tab !== 'all' && access.canEdit
 
   // Viewing is read-only, so it stays available while someone else is editing.
   if (lockedBy) {
@@ -301,6 +306,7 @@ function VendorRowMenu({ user, onDone, onView, onEdit, lockedBy }: {
   onEdit:    () => void
   lockedBy?: string
 }) {
+  const { canEdit } = useModuleAccess()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -377,11 +383,13 @@ function VendorRowMenu({ user, onDone, onView, onEdit, lockedBy }: {
             <button onClick={() => { setOpen(false); onView() }} className={`${item} text-[#818181] hover:bg-[#2a2a2a] hover:text-white`}>
               <Eye size={13} /> View Details
             </button>
-            <button onClick={() => { setOpen(false); onEdit() }} className={`${item} text-[#818181] hover:bg-[#2a2a2a] hover:text-white`}>
-              <Pencil size={13} /> Edit Details
-            </button>
-            <div className="my-1 border-t border-[#2a2a2a]" />
-            {user.access.account_active ? (
+            {canEdit && (
+              <button onClick={() => { setOpen(false); onEdit() }} className={`${item} text-[#818181] hover:bg-[#2a2a2a] hover:text-white`}>
+                <Pencil size={13} /> Edit Details
+              </button>
+            )}
+            {canEdit && <div className="my-1 border-t border-[#2a2a2a]" />}
+            {!canEdit ? null : user.access.account_active ? (
               <>
                 <button onClick={resend} className={`${item} text-[#818181] hover:bg-[#2a2a2a] hover:text-white`}>
                   <Send size={13} /> Resend Setup Link
@@ -425,7 +433,7 @@ function TableSkeleton({ cols }: { cols: number }) {
   )
 }
 
-function EmptyState({ tab, onAdd }: { tab: TabValue; onAdd: () => void }) {
+function EmptyState({ tab, onAdd, canAdd }: { tab: TabValue; onAdd: () => void; canAdd: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center py-24 text-center">
       <div className="mb-4 rounded-full border border-[#2a2a2a] bg-[#1b1b1b] p-4">
@@ -437,7 +445,7 @@ function EmptyState({ tab, onAdd }: { tab: TabValue; onAdd: () => void }) {
           ? 'No vendor drivers yet. Add one here, then pick them in Booking Management for a vendor-supplied delivery.'
           : `No ${tab === 'all' ? 'users' : tab} match your current filters.`}
       </p>
-      {tab !== 'all' && (
+      {tab !== 'all' && canAdd && (
         <button
           onClick={onAdd}
           className="mt-6 flex items-center gap-2 rounded-lg bg-[#4df9ed] px-4 py-2 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5]"
@@ -631,6 +639,8 @@ export default function UserManagementClient() {
   // Only the primary administrator may hand the IT Admin role over. The API
   // enforces it; this just keeps a button that would 403 out of the way.
   const isRootAdmin = useAuthStore((s) => s.user?.is_root_admin ?? false)
+  // This module's tier for a managed role: Read-only hides every write control.
+  const access = useModuleAccess()
 
   const isResetsTab    = section === 'password-resets'
   // Both driver tabs sit under the one "Drivers" entry in the role dropdown.
@@ -859,7 +869,7 @@ export default function UserManagementClient() {
                     <ArrowLeftRight size={15} /> Transition IT Administrator
                   </button>
                 )
-              ) : (
+              ) : access.canCreate && (
                 <button
                   onClick={openCreate}
                   className="flex items-center gap-2 rounded-xl bg-[#4df9ed] px-5 py-2.5 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5] active:scale-95"
@@ -1055,7 +1065,7 @@ export default function UserManagementClient() {
                   ) : users.length === 0 ? (
                     <tr>
                       <td colSpan={colCount}>
-                        <EmptyState tab={activeTab} onAdd={openCreate} />
+                        <EmptyState tab={activeTab} onAdd={openCreate} canAdd={access.canCreate} />
                       </td>
                     </tr>
                   ) : (
@@ -1153,7 +1163,7 @@ export default function UserManagementClient() {
           driverSource={formDriverSource}
           startInView={formViewOnly}
           // Same rule as the row menu: the combined list can't open the edit form.
-          canEdit={activeTab !== 'all'}
+          canEdit={activeTab !== 'all' && access.canEdit}
           lockedBy={editUser ? userLocks.get(editUser.user_id) : undefined}
           onClose={() => setShowForm(false)}
           onSaved={async () => {

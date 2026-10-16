@@ -25,10 +25,12 @@ import { AMBER, BORDER_C, CYAN, ERROR, MUTED } from './transaction-theme'
 
 const AUTO_COMPLETE_DAYS = 3
 
-export default function CompletionPanel({ booking, mode, onUpdated }: {
+export default function CompletionPanel({ booking, mode, onUpdated, canAct = true }: {
   booking:   BookingWithRelations
   mode:      'client' | 'staff'
   onUpdated: (next: BookingWithRelations) => void
+  /** Staff only: false on a Read-only Booking Management tier hides "Mark problem resolved". */
+  canAct?:   boolean
 }) {
   const [busy, setBusy]         = useState(false)
   const [reporting, setReporting] = useState(false)
@@ -140,7 +142,7 @@ export default function CompletionPanel({ booking, mode, onUpdated }: {
       )}
 
       {mode === 'staff' ? (
-        openIssue && (
+        openIssue && canAct && (
           <div className="flex flex-wrap gap-2">
             <button type="button" disabled={busy} onClick={() => void resolve()}
               className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold disabled:opacity-40 cursor-pointer"
