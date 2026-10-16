@@ -9,12 +9,14 @@ import {
   Truck,
   PackageCheck,
   ArrowRight,
+  PauseCircle,
 } from 'lucide-react'
 import type { OptimizeRouteResponse, BookingDetail } from '@/app/types/maps/routemap.types'
 import { fetchTruckModels } from '@/lib/api/client/truck-model'
 import { formatEta, formatEtaClock, type StopEta } from '@/lib/hooks/useLiveDriverPosition'
 import { arrivalWindow, formatArrivalWindow, isPastWindow } from '@/lib/arrival-window'
 import { RouteStepper, routeSteps } from './RouteStepper'
+import { pauseReasonLabel } from '@/lib/pause-reasons'
 
 const SC = { fontFamily: "var(--font-alegreya-sc), 'Alegreya Sans SC', sans-serif" } as const
 
@@ -230,6 +232,21 @@ export function DetailsPanelContent({
           </div>
         ))}
       </div>
+
+      {/* The driver paused the delivery. Reason only — the same thing the client
+          is told; the driver's note stays with the office. */}
+      {!isLoading && bookingDetail?.paused_at && !done && (
+        <div
+          className="mx-3 mt-3 flex items-center gap-2 rounded-[8px] border px-3 py-2"
+          style={{ borderColor: 'rgba(251,191,36,0.4)', background: 'rgba(251,191,36,0.08)' }}
+        >
+          <PauseCircle size={15} className="shrink-0" style={{ color: '#fbbf24' }} />
+          <span className="text-[12px] leading-snug text-white/85" style={SC}>
+            <span style={{ color: '#fbbf24' }}>Delivery paused · {pauseReasonLabel(bookingDetail.pause_reason)}</span>
+            {' '}since {formatEtaClock(bookingDetail.paused_at)}. It continues as soon as the driver can move again.
+          </span>
+        </div>
+      )}
 
       <p className="text-center text-[18px] text-white mt-1" style={SC}>
         {isLoading ? <Skeleton style={{ width: '4rem' }} /> : truckType}

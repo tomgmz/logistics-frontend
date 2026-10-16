@@ -24,6 +24,7 @@ import {
   ClipboardCheck,
   KeyRound,
   AlertTriangle,
+  PauseCircle,
 } from 'lucide-react'
 
 import { supabase } from '@/lib/supabase'
@@ -67,6 +68,8 @@ import ReusableModal, { RemarksModal } from '@/components/layout/ReusableModal'
 import TripPlanner from './TripPlanner'
 import VehiclePicker, { cargoSummaryFromBooking } from './VehiclePicker'
 import CompletionPanel from '@/components/transactions/CompletionPanel'
+import PausePanel from '@/components/transactions/PausePanel'
+import { pauseReasonLabel } from '@/lib/services/admin/pause.service'
 import type { BookingWithRelations } from '@/lib/store/slice/routeMap.slice'
 import { useRecordLock, useRecordLocks } from '@/lib/hooks/useRecordLock'
 import RecordLockBanner, { RecordLockBadge } from '@/components/ui/RecordLockBanner'
@@ -229,6 +232,20 @@ function VehiclePulledBanner({
   )
 }
 
+/** List badge: the driver has the delivery paused (weather, breakdown, closed stop…). */
+function PausedBadge({ reason }: { reason: string }) {
+  return (
+    <span
+      title={`Paused by the driver: ${pauseReasonLabel(reason)}`}
+      className="flex w-fit items-center gap-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border mt-1"
+      style={{ color: '#fbbf24', borderColor: '#fbbf2455', background: '#fbbf2414' }}
+    >
+      <PauseCircle size={9} />
+      Paused · {pauseReasonLabel(reason)}
+    </span>
+  )
+}
+
 /** Server-corrected "now", re-read each minute so the badge drops at midnight. */
 function useMinuteClock(): Date {
   const [now, setNow] = useState(() => nowDate())
@@ -249,6 +266,8 @@ interface ListRow {
   company?: string | null
   stops: number
   created_at: string | null
+  /** Set while the driver has the delivery paused. */
+  pause_reason: string | null
 }
 
 function toRows(raw: Record<string, unknown>[]): ListRow[] {
@@ -266,6 +285,7 @@ function toRows(raw: Record<string, unknown>[]): ListRow[] {
       company:           clients?.company_name ?? null,
       stops:             Array.isArray(dests) ? dests.length : 0,
       created_at:        typeof b.created_at === 'string' ? b.created_at : null,
+      pause_reason:      b.paused_at && typeof b.pause_reason === 'string' ? b.pause_reason : null,
     }
   })
 }
@@ -2131,6 +2151,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                               >
                                 {fmtStatus(r.status)}
                               </span>
+                              {r.pause_reason && <PausedBadge reason={r.pause_reason} />}
                             </td>
                             <td className="px-3 py-2.5 text-white/75 whitespace-nowrap">{r.schedule_date ?? '—'}</td>
                             <td className="px-3 py-2.5 text-white/70 max-w-[180px] truncate hidden md:table-cell">{r.company ?? '—'}</td>
@@ -2422,6 +2443,15 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                           onTheRoad={normalizeBookingStatus(detail.status) !== 'assigned'}
                         />
                       )}
+
+                      {/* The driver paused the delivery: reason, note, and a way to end
+                          it from the office. Also lists every earlier pause. */}
+                      <PausePanel
+                        bookingId={detail.booking_id}
+                        pausedAt={(detail as { paused_at?: string | null }).paused_at}
+                        canResume={(roleView === 'admin' || roleView === 'operations_manager') && canEdit && !bookingReadOnly}
+                        onUpdated={() => { void refreshDetail(detail.booking_id); void loadPage(true) }}
+                      />
 
                       {/* Driver / vehicle assignment */}
                       {showAssignment && (

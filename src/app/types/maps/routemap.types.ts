@@ -37,6 +37,12 @@ export interface BookingDetail {
   call_time:      string
   status:         string
 
+  // Set while the driver has the delivery paused. The reason category is the
+  // only part the client is told; the driver's note is staff-only and is not
+  // on this record.
+  paused_at?:     string | null
+  pause_reason?:  string | null
+
   required_volume_cbm?:  number | null
   required_weight_kg?:   number | null
   required_length_cm?:   number | null

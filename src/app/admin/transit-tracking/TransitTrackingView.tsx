@@ -27,6 +27,7 @@ import { useLiveDriverPosition } from '@/lib/hooks/useLiveDriverPosition'
 import { LiveTruckMarker } from '@/components/map/LiveTruckMarker'
 import { useFleetPositions } from '@/lib/hooks/useFleetPositions'
 import { useRouteChanged } from '@/hooks/useRouteChanged'
+import { pauseReasonLabel } from '@/lib/pause-reasons'
 import { useLiveRoute, LiveRoutePolyline, FollowTruck, remainingStops } from '@/components/map/LiveRoute'
 import { RouteStepper, bookingRouteSteps, dropoffSummary } from '@/components/map/RouteStepper'
 
@@ -75,7 +76,11 @@ function TransitBookingRow({
   loading:  boolean
   onClick:  () => void
 }) {
-  const color           = statusColor(booking.status)
+  // The driver paused it: say so instead of a plain "In transit", in amber.
+  const pausedReason    = (booking as { paused_at?: string | null }).paused_at
+    ? ((booking as { pause_reason?: string | null }).pause_reason ?? 'other')
+    : null
+  const color           = pausedReason ? '#fbbf24' : statusColor(booking.status)
   const label           = fmtStatus(booking.status)
   const origin          = booking.origin?.split(',')[0] ?? '—'
   const lastDestAddress = booking.booking_destinations?.[booking.booking_destinations.length - 1]?.address
@@ -105,7 +110,9 @@ function TransitBookingRow({
         <span className="text-[11px] font-mono font-bold text-white/70 truncate">
           {bookingRef(booking)}
         </span>
-        <span className="text-[11px] font-bold shrink-0" style={{ ...SC, color }}>{label}</span>
+        <span className="text-[11px] font-bold shrink-0" style={{ ...SC, color }}>
+          {pausedReason ? `Paused · ${pauseReasonLabel(pausedReason)}` : label}
+        </span>
       </div>
 
       <div className="flex items-center gap-2.5 mb-2 px-0.5">
