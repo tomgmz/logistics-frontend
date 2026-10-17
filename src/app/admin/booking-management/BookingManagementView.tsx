@@ -10,12 +10,8 @@ import {
   ChevronRight,
   X,
   MapPin,
-  Calendar,
-  Clock,
   Truck,
-  Building2,
   User,
-  UserCheck,
   Package,
   Weight,
   Layers,
@@ -25,6 +21,10 @@ import {
   KeyRound,
   AlertTriangle,
   PauseCircle,
+  ChevronDown,
+  Boxes,
+  History,
+  CalendarRange,
 } from 'lucide-react'
 
 import { supabase } from '@/lib/supabase'
@@ -76,6 +76,19 @@ import type { BookingWithRelations } from '@/lib/store/slice/routeMap.slice'
 import { useRecordLock, useRecordLocks } from '@/lib/hooks/useRecordLock'
 import RecordLockBanner, { RecordLockBadge } from '@/components/ui/RecordLockBanner'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
+import { PALETTE } from '@/lib/palette'
+import {
+  CARD_CLASS,
+  PANEL_BG,
+  Tag,
+  SectionHeading,
+  AssetIcon,
+  BookingInfoCard,
+  CargoItemCard,
+  CargoSummaryTiles,
+  StopCard,
+  DocumentRow,
+} from './BookingDetailParts'
 
 const PAGE_SIZE = 12
 
@@ -692,45 +705,56 @@ function AssignmentPanel({
 
   const title = isAssigned ? 'Change vehicle and driver' : 'Choose vehicle and driver'
 
+  // The sidebar card only shows the choice. The fields and Assign open the
+  // pop-up below, which is where the crew is actually picked and saved.
+  const hasDriver  = vendorMode ? !!vendorForm.vendor_driver_user_id : !!assignDriverId
+  const hasVehicle = vendorMode ? !!vendorForm.vendor_vehicle_plate  : !!assignTruckId
+  const driverHint = vendorMode
+    ? 'Vendor drivers registered in User Management.'
+    : drivers.length === 0
+      ? `No driver marked ${detail.schedule_date ?? 'this day'} as a day they can work.`
+      : `${drivers.length} driver${drivers.length === 1 ? '' : 's'} available`
+  const vehicleHint = vendorMode
+    ? 'Vendor vehicles are typed in, not registered.'
+    : `${trucks.length} vehicle${trucks.length === 1 ? '' : 's'} cleared by BLOWBAGETS`
+
+  const fieldClass =
+    'w-full min-h-9 flex items-center justify-between gap-2 rounded-[5px] border-[0.5px] border-[#818181] ' +
+    'px-3 py-1.5 text-left text-sm font-bold text-white transition-colors hover:border-[#4df9ed]/60 disabled:opacity-40'
+  const crewRowIcon = { size: 18, strokeWidth: 2, className: 'text-white shrink-0' }
+
   return (
-    <div className="rounded-xl border border-white/[0.08] p-3 space-y-3 bg-black/20">
-      <div className="flex items-center gap-2">
-        <UserCheck size={14} className="text-[var(--color-cyan)]" />
-        <h3 className="text-[11px] font-bold uppercase tracking-wider text-white/40">
-          Driver and vehicle assignment
-        </h3>
+    <div className={`${CARD_CLASS} px-3.5 pt-2 pb-3.5 space-y-2.5`}>
+      <div className="flex items-center gap-[5px]">
+        <AssetIcon name="steering-wheel" />
+        <h3 className="text-sm font-bold text-[#818181]">Driver and Vehicle Assignment</h3>
       </div>
 
       {isAssigned ? (
-        <div className="space-y-2 text-sm text-white/70">
-          {vendorMode && (
-            <span className="inline-flex text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border"
-              style={{ color: '#ffea00', borderColor: 'rgba(255,122,48,0.35)', background: 'rgba(255,122,48,0.12)' }}>
-              Vendor-supplied
-            </span>
-          )}
-          <div className="flex items-center gap-2">
-            <User size={13} className="text-white/35 shrink-0" />
-            <span>{driverLabel}</span>
+        <div className="space-y-2.5 text-sm font-bold text-[#818181]">
+          {vendorMode && <Tag color={PALETTE.orange}>Vendor-Supplied</Tag>}
+          <div className="flex items-start gap-[5px]">
+            <User {...crewRowIcon} />
+            <span className="min-w-0 break-words">{driverLabel}</span>
           </div>
           {secondDriverLabel && (
-            <div className="flex items-center gap-2">
-              <User size={13} className="text-white/35 shrink-0" />
-              <span>{secondDriverLabel} <span className="text-[11px] text-white/40">· second driver</span></span>
+            <div className="flex items-start gap-[5px]">
+              <User {...crewRowIcon} />
+              <span className="min-w-0 break-words">{secondDriverLabel} <span className="text-xs font-normal">· second driver</span></span>
             </div>
           )}
           {savedHelperName && (
-            <div className="flex items-center gap-2">
-              <User size={13} className="text-white/35 shrink-0" />
-              <span>{savedHelperName} <span className="text-[11px] text-white/40">· helper</span></span>
+            <div className="flex items-start gap-[5px]">
+              <User {...crewRowIcon} />
+              <span className="min-w-0 break-words">{savedHelperName} <span className="text-xs font-normal">· helper</span></span>
             </div>
           )}
-          <div className="flex items-center gap-2">
-            <Truck size={13} className="text-white/35 shrink-0" />
-            <span>{truckLabel}</span>
+          <div className="flex items-start gap-[5px]">
+            <Truck {...crewRowIcon} />
+            <span className="min-w-0 break-words">{truckLabel}</span>
           </div>
           {vendorMode && vendorLabel && (
-            <div className="text-[11px] text-white/45">Vendor: {vendorLabel}</div>
+            <div className="text-xs font-normal">Vendor: {vendorLabel}</div>
           )}
           {vendorMode && externalDriverUserId && (
             <ExternalDriverAccessRow userId={externalDriverUserId} canEdit={canEdit} />
@@ -738,23 +762,72 @@ function AssignmentPanel({
           {selectedCoding && !pickerOpen && <CodingNotice flag={selectedCoding} plate={selectedPlate!} />}
         </div>
       ) : (
-        <p className="text-xs text-white/45">No vehicle or driver assigned yet.</p>
+        <>
+          <Tag color={PALETTE.yellow}>Pending</Tag>
+          {canEdit ? (
+            <>
+              {/* Company vs vendor-supplied: carried into the pop-up. */}
+              <div className="flex h-7 rounded-[5px] border-[0.5px] border-[#818181] p-[1.5px]">
+                {([false, true] as const).map((vendor) => {
+                  const on = vendorMode === vendor
+                  return (
+                    <button
+                      key={String(vendor)}
+                      type="button"
+                      disabled={assignBusy}
+                      aria-pressed={on}
+                      onClick={() => onVendorModeChange(vendor)}
+                      className="flex-1 rounded-[3px] text-sm transition-colors disabled:opacity-40"
+                      style={on
+                        ? { background: 'rgba(77,249,237,0.19)', color: PALETTE.cyan }
+                        : { color: '#ffffff' }}
+                    >
+                      {vendor ? 'Vendor-Supplied' : 'Company Fleet'}
+                    </button>
+                  )
+                })}
+              </div>
+
+              <div>
+                <p className="text-sm font-bold text-[#818181] mb-1.5">Driver</p>
+                <button type="button" disabled={assignBusy} onClick={onOpenPicker} aria-haspopup="dialog" className={fieldClass}>
+                  <span className="min-w-0 truncate">
+                    {hasDriver ? driverLabel : vendorMode ? 'Select vendor driver' : 'Select driver'}
+                  </span>
+                  <ChevronDown size={15} strokeWidth={2} className="shrink-0 text-[#818181]" />
+                </button>
+                <p className="text-xs text-white/35 mt-1 leading-snug">{driverHint}</p>
+              </div>
+
+              <div>
+                <p className="text-sm font-bold text-[#818181] mb-1.5">Vehicle</p>
+                <button type="button" disabled={assignBusy} onClick={onOpenPicker} aria-haspopup="dialog" className={fieldClass}>
+                  <span className="min-w-0 truncate">
+                    {hasVehicle ? truckLabel : vendorMode ? 'Enter vehicle plate' : 'Select vehicle'}
+                  </span>
+                  <ChevronDown size={15} strokeWidth={2} className="shrink-0 text-[#818181]" />
+                </button>
+                <p className="text-xs text-white/35 mt-1 leading-snug">{vehicleHint}</p>
+              </div>
+            </>
+          ) : (
+            <p className="text-xs text-white/45">No vehicle or driver assigned yet.</p>
+          )}
+        </>
       )}
 
-      {canEdit && <button
-        type="button"
-        disabled={assignBusy}
-        onClick={onOpenPicker}
-        className="w-full py-2 rounded-lg text-sm font-bold transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
-        style={{
-          background: 'rgba(77,249,237,0.12)',
-          border:     '1px solid rgba(77,249,237,0.30)',
-          color:      'var(--color-cyan)',
-        }}
-      >
-        <Truck size={14} />
-        {title}
-      </button>}
+      {canEdit && (
+        <button
+          type="button"
+          disabled={assignBusy}
+          onClick={onOpenPicker}
+          aria-haspopup="dialog"
+          className="w-full min-h-[46px] px-6 py-2 rounded-[10px] border text-base font-bold transition-colors disabled:opacity-40"
+          style={{ background: 'rgba(77,249,237,0.19)', borderColor: PALETTE.cyan, color: PALETTE.cyan }}
+        >
+          {isAssigned ? title : 'Assign'}
+        </button>
+      )}
 
       <CrewPickerDialog
         open={pickerOpen && canEdit}
@@ -1219,53 +1292,20 @@ function ProofPhoto({
 
 function TransactionDocs({ docs }: { docs: string[] }) {
   return (
-    <div>
-      <h3 className="text-[11px] font-bold uppercase tracking-wider text-white/40 mb-2">
-        Transaction Documents
-      </h3>
-      <ul className="space-y-1.5">
-        {docs.map((url, i) => {
-          const filename  = fileNameFromUrl(url) || `Document ${i + 1}`
-          const ext       = filename.split('.').pop()?.toLowerCase() ?? ''
-          const fileLabel = ext === 'pdf'  ? 'PDF'
-                          : ext === 'xlsx' ? 'XLSX'
-                          : ext === 'docx' ? 'DOCX'
-                          : ext === 'doc'  ? 'DOC'
-                          : ext.toUpperCase() || 'FILE'
-          return (
+    <section>
+      <SectionHeading icon={<History size={18} strokeWidth={2} />}>Transaction Documents</SectionHeading>
+      {docs.length === 0 ? (
+        <p className="text-sm text-white/40">No documents attached.</p>
+      ) : (
+        <ul className="space-y-2">
+          {docs.map((url, i) => (
             <li key={url}>
-              <a
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2.5 rounded-lg border border-white/[0.08]
-                           bg-black/20 px-3 py-2 text-sm text-white/80
-                           hover:border-[var(--color-cyan)]/40 hover:text-white
-                           transition-colors group"
-              >
-                <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide
-                                 px-1.5 py-0.5 rounded border
-                                 border-[var(--color-cyan)]/30 text-[var(--color-cyan)]">
-                  {fileLabel}
-                </span>
-                <span className="flex-1 truncate font-mono text-xs">{filename}</span>
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="13" height="13" viewBox="0 0 24 24"
-                  fill="none" stroke="currentColor" strokeWidth="2"
-                  strokeLinecap="round" strokeLinejoin="round"
-                  className="shrink-0 opacity-40 group-hover:opacity-80 transition-opacity"
-                >
-                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                  <polyline points="15 3 21 3 21 9"/>
-                  <line x1="10" y1="14" x2="21" y2="3"/>
-                </svg>
-              </a>
+              <DocumentRow url={url} filename={fileNameFromUrl(url) || `Document ${i + 1}`} />
             </li>
-          )
-        })}
-      </ul>
-    </div>
+          ))}
+        </ul>
+      )}
+    </section>
   )
 }
 
@@ -1927,6 +1967,13 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
   const docCount = ((detail as DetailWithExtra | null)?.transaction_documents?.length) ?? 0
   const d        = detail as DetailWithExtra | null
   const cargoItems: CargoItem[] = d?.booking_cargo_items ?? []
+  const cargoPieces = cargoItems.reduce((n, i) => n + (i.quantity ?? 0), 0)
+  const sortedStops = (detail?.booking_destinations ?? [])
+    .slice()
+    .sort((a, b) => a.sequence_order - b.sequence_order)
+  const stopCount = sortedStops.length
+  // "Cargo 2 (drop off 1)": each line names the stop it goes to, numbered as listed.
+  const stopNumberById = new Map(sortedStops.map((s, i) => [s.destination_id, i + 1]))
 
   /**
    * Whether this user's Approve/Reject acts on the GM stage specifically.
@@ -2223,16 +2270,22 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                 animate={{ x: 0 }}
                 exit={{ x: '100%' }}
                 transition={{ type: 'spring', damping: 28, stiffness: 260 }}
-                className="fixed lg:relative z-[50] inset-y-0 right-0 w-full max-w-md lg:max-w-[420px] shrink-0 border-l border-white/[0.08] bg-[var(--color-surface)] flex flex-col shadow-2xl lg:shadow-none"
+                className="fixed lg:relative z-[50] inset-y-0 right-0 w-full max-w-[455px] shrink-0 border-l border-[#424242] flex flex-col shadow-2xl lg:shadow-none"
+                style={{ background: PANEL_BG }}
               >
-                <div className="shrink-0 flex items-center justify-between px-3 py-2.5 border-b border-white/[0.07]">
-                  <span className="text-xs font-bold uppercase tracking-widest text-white/45">Booking</span>
-                  <button type="button" onClick={closeDetail} className="p-2 rounded-lg hover:bg-white/5 text-white/60" aria-label="Close">
-                    <X size={18} />
-                  </button>
+                <div className="shrink-0 flex items-center justify-between gap-3 pl-4 sm:pl-[26px] pr-2 sm:pr-3 min-h-[59px] border-b border-[#424242]">
+                  <span className="text-base font-bold uppercase text-[#818181]">Booking</span>
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    {detail && !detailLoading && (
+                      <Tag color={statusColor(detail.status)} size="md">{fmtStatus(detail.status)}</Tag>
+                    )}
+                    <button type="button" onClick={closeDetail} className="p-2 rounded-lg hover:bg-white/5 text-[#818181] hover:text-white transition-colors" aria-label="Close">
+                      <X size={19} strokeWidth={2} />
+                    </button>
+                  </div>
                 </div>
 
-                <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-4">
+                <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 pt-[18px] pb-6 space-y-[18px]">
                   {detailLoading && (
                     <div className="flex flex-col items-center justify-center py-16 gap-2">
                       <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--color-cyan)' }} />
@@ -2247,186 +2300,172 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                       <RecordLockBanner lock={bookingLock} noun="booking" />
 
                       {/* Booking info */}
-                      <div className="rounded-xl border border-white/[0.08] p-3 space-y-2 bg-black/20">
-                        <p className="text-[10px] font-mono text-white/35 break-all">
-                          {bookingRef(detail)}
-                        </p>
-                        {detail.created_at && (
-                          <div className="flex flex-wrap items-center gap-2 text-[11px] text-white/45">
-                            <span>Submitted {formatPhDateTime(detail.created_at)}</span>
-                            {showAfterHours(detail.status, detail.created_at) && <AfterHoursBadge />}
+                      <BookingInfoCard
+                        reference={bookingRef(detail)}
+                        extras={(detail.created_at || hasOpenClientIssue(detail as unknown as Record<string, unknown>)) && (
+                          <div className="space-y-1.5">
+                            {detail.created_at && (
+                              <div className="flex flex-wrap items-center gap-2 text-xs text-[#818181]">
+                                <span>Submitted {formatPhDateTime(detail.created_at)}</span>
+                                {showAfterHours(detail.status, detail.created_at) && <AfterHoursBadge />}
+                              </div>
+                            )}
+                            {hasOpenClientIssue(detail as unknown as Record<string, unknown>) && (
+                              <ProblemReportedBadge className="" note={(detail as { client_issue_note?: string | null }).client_issue_note} />
+                            )}
                           </div>
                         )}
-                        {hasOpenClientIssue(detail as unknown as Record<string, unknown>) && (
-                          <ProblemReportedBadge className="" note={(detail as { client_issue_note?: string | null }).client_issue_note} />
-                        )}
-                        <div className="flex items-start gap-2 text-white/90 text-sm">
-                          <MapPin size={16} className="text-[var(--color-cyan)] shrink-0 mt-0.5" />
-                          <span>{detail.origin}</span>
-                        </div>
-                        <div className="grid gap-2 text-sm text-white/70">
-                          <div className="flex items-center gap-2">
-                            <Building2 size={14} className="text-white/35" />
-                            {detail.clients?.company_name ?? '—'}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Calendar size={14} className="text-white/35" />
-                            {detail.schedule_date}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Clock size={14} className="text-white/35" />
-                            {detail.call_time}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Truck size={14} className="text-white/35" />
-                            {detail.truck_type_needed ?? 'Vehicle not assigned yet'}
-                          </div>
-                          {detail.driver?.name && (
-                            <div className="flex items-center gap-2">
-                              <User size={14} className="text-white/35" />
-                              Driver: {detail.driver.name}
-                              {detail.driver.truck?.plate_number ? ` · ${detail.driver.truck.plate_number}` : ''}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Transaction documents */}
-                      {(d?.transaction_documents?.length ?? 0) > 0 && (
-                        <TransactionDocs docs={d!.transaction_documents!} />
-                      )}
-
-                      {/* Cargo summary */}
-                      {(d?.required_weight_kg || d?.required_volume_cbm || d?.required_length_cm) && (
-                        <div>
-                          <h3 className="text-[11px] font-bold uppercase tracking-wider text-white/40 mb-2 flex items-center gap-1.5">
-                            <Layers size={12} className="text-white/35" />
-                            Cargo Summary
-                          </h3>
-                          <div className="grid grid-cols-3 gap-1.5">
-                            {d.required_weight_kg != null && d.required_weight_kg > 0 && (
-                              <div className="rounded-lg border border-white/[0.07] bg-black/20 px-2.5 py-2 flex flex-col gap-0.5">
-                                <span className="text-[9px] uppercase tracking-widest text-white/35 flex items-center gap-1"><Weight size={9} />Gross Wt.</span>
-                                <span className="text-white text-sm font-bold tabular-nums">{d.required_weight_kg.toFixed(2)}</span>
-                                <span className="text-[9px] text-white/35">kg</span>
-                              </div>
-                            )}
-                            {d.required_volume_cbm != null && d.required_volume_cbm > 0 && (
-                              <div className="rounded-lg border border-white/[0.07] bg-black/20 px-2.5 py-2 flex flex-col gap-0.5">
-                                <span className="text-[9px] uppercase tracking-widest text-white/35 flex items-center gap-1"><Package size={9} />Volume</span>
-                                <span className="text-white text-sm font-bold tabular-nums">{d.required_volume_cbm.toFixed(4)}</span>
-                                <span className="text-[9px] text-white/35">CBM</span>
-                              </div>
-                            )}
-                            {d.required_length_cm != null && d.required_length_cm > 0 && (
-                              <div className="rounded-lg border border-white/[0.07] bg-black/20 px-2.5 py-2 flex flex-col gap-0.5">
-                                <span className="text-[9px] uppercase tracking-widest text-white/35 flex items-center gap-1"><Ruler size={9} />Max Len.</span>
-                                <span className="text-white text-sm font-bold tabular-nums">{d.required_length_cm.toFixed(0)}</span>
-                                <span className="text-[9px] text-white/35">cm</span>
-                              </div>
-                            )}
-                          </div>
-                          {/* The constraint worth flagging is cargo that must NOT
-                              be stacked — it dictates how the truck is loaded.
-                              `stackable_required` is the old field, set with the
-                              opposite sense and never populated for loose cargo;
-                              it is still read so historical bookings keep their
-                              note. */}
-                          {d.non_stackable_cargo ? (
-                            <p className="text-[11px] text-amber-400 mt-1.5 flex items-center gap-1.5">
-                              <Layers size={11} />Contains non-stackable cargo
-                            </p>
-                          ) : d.stackable_required ? (
-                            <p className="text-[11px] text-[var(--color-cyan)] mt-1.5 flex items-center gap-1.5">
-                              <Layers size={11} />Stackable pallets included
-                            </p>
-                          ) : null}
-                        </div>
-                      )}
+                        origin={detail.origin}
+                        company={detail.clients?.company_name}
+                        date={detail.schedule_date}
+                        time={detail.call_time}
+                        vehicleType={detail.truck_type_needed}
+                        // The assignment card carries the crew where it is shown.
+                        driverLine={!showAssignment && detail.driver?.name
+                          ? `${detail.driver.name}${detail.driver.truck?.plate_number ? ` · ${detail.driver.truck.plate_number}` : ''}`
+                          : null}
+                      />
 
                       {/* Cargo items */}
                       {cargoItems.length > 0 && (
-                        <div>
-                          <h3 className="text-[11px] font-bold uppercase tracking-wider text-white/40 mb-2 flex items-center gap-1.5">
-                            <Package size={12} className="text-white/35" />
+                        <section>
+                          <SectionHeading
+                            icon={<Boxes size={18} strokeWidth={2} />}
+                            right={
+                              <span className="text-xs font-bold text-[#818181] whitespace-nowrap">
+                                {cargoPieces > 0 ? cargoPieces : cargoItems.length} item{(cargoPieces > 0 ? cargoPieces : cargoItems.length) === 1 ? '' : 's'}
+                                <span className="inline-block w-4" />
+                                {stopCount} stop{stopCount === 1 ? '' : 's'}
+                              </span>
+                            }
+                          >
                             Cargo Items
-                            <span className="ml-auto text-white/25 font-normal normal-case tracking-normal">
-                              {cargoItems.length} item{cargoItems.length !== 1 ? 's' : ''}
-                            </span>
-                          </h3>
-                          <div className="space-y-2">
+                          </SectionHeading>
+                          <div className="space-y-3">
                             {cargoItems.map((item, idx) => {
-                              const commodity = resolveLabel(item.commodity_id, item.commodity_text, item.commodities)
-                              const product   = resolveLabel(item.product_id,   item.product_text,   item.products)
-                              const shc       = item.shc?.code  ?? item.shc_text  ?? null
-                              const ashc      = item.ashc?.code ?? item.ashc_text ?? null
-                              const weightStr = fmtNum(item.weight_kg,  'kg')
-                              const volumeStr = fmtNum(item.volume_cbm, 'CBM', 4)
-                              const hasDims   = item.length_cm && item.width_cm && item.height_cm
-                              const dimsStr   = hasDims ? `${item.length_cm} × ${item.width_cm} × ${item.height_cm} cm` : null
-
+                              const hasDims = item.length_cm && item.width_cm && item.height_cm
+                              const dropOff = item.destination_id ? stopNumberById.get(item.destination_id) ?? null : null
                               return (
-                                <div key={item.item_id ?? idx} className="rounded-lg border border-white/[0.07] bg-black/20 overflow-hidden">
-                                  <div className="px-2.5 py-1.5 border-b border-white/[0.05] flex items-center justify-between">
-                                    <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--color-cyan)]">Item {idx + 1}</span>
-                                    {item.quantity != null && item.quantity > 0 && (
-                                      <span className="text-[10px] text-white/40 tabular-nums">×{item.quantity}</span>
-                                    )}
-                                  </div>
-                                  <div className="divide-y divide-white/[0.04]">
-                                    {commodity  && <CargoRow label="Commodity" value={commodity} />}
-                                    {product    && <CargoRow label="Product"   value={product} />}
-                                    {shc        && <CargoRow label="Special Handling Code"            value={shc}  mono />}
-                                    {ashc       && <CargoRow label="Additional Special Handling Code" value={ashc} mono />}
-                                    {weightStr  && <CargoRow label="Weight"    value={weightStr} accent />}
-                                    {volumeStr  && <CargoRow label="Volume"    value={volumeStr} accent />}
-                                    {dimsStr    && <CargoRow label="L × W × H" value={dimsStr} />}
-                                    {item.notes && <CargoRow label="Notes"     value={item.notes} />}
-                                  </div>
-                                </div>
+                                <CargoItemCard
+                                  key={item.item_id ?? idx}
+                                  index={idx + 1}
+                                  dropOff={dropOff}
+                                  quantity={item.quantity}
+                                  commodity={resolveLabel(item.commodity_id, item.commodity_text, item.commodities)}
+                                  product={resolveLabel(item.product_id, item.product_text, item.products)}
+                                  shc={item.shc?.name ?? item.shc?.code ?? item.shc_text ?? null}
+                                  ashc={item.ashc?.name ?? item.ashc?.code ?? item.ashc_text ?? null}
+                                  weight={fmtNum(item.weight_kg, 'KG')}
+                                  volume={fmtNum(item.volume_cbm, 'CBM', 4)}
+                                  dims={hasDims ? `${item.length_cm} × ${item.width_cm} × ${item.height_cm} cm` : null}
+                                  notes={item.notes}
+                                />
                               )
                             })}
                           </div>
-                        </div>
+                        </section>
                       )}
 
+                      {/* Cargo summary */}
+                      <section>
+                        <SectionHeading icon={<AssetIcon name="cargo-summary" />}>Cargo Summary</SectionHeading>
+                        <CargoSummaryTiles
+                          weightKg={d?.required_weight_kg ?? null}
+                          volumeCbm={d?.required_volume_cbm ?? null}
+                          lengthCm={d?.required_length_cm ?? null}
+                        />
+                        {/* The constraint worth flagging is cargo that must NOT
+                            be stacked — it dictates how the truck is loaded.
+                            `stackable_required` is the old field, set with the
+                            opposite sense and never populated for loose cargo;
+                            it is still read so historical bookings keep their
+                            note. */}
+                        {d?.non_stackable_cargo ? (
+                          <p className="text-xs text-amber-400 mt-2 flex items-center gap-1.5">
+                            <Layers size={12} />Contains non-stackable cargo
+                          </p>
+                        ) : d?.stackable_required ? (
+                          <p className="text-xs text-[var(--color-cyan)] mt-2 flex items-center gap-1.5">
+                            <Layers size={12} />Stackable pallets included
+                          </p>
+                        ) : null}
+                      </section>
+
+                      {/* Proof of pickup, photographed by the driver at the origin. */}
+                      {d?.pickup_proof_photo_url && (
+                        <section>
+                          <SectionHeading icon={<MapPin size={18} strokeWidth={2} />}>Proof of pickup</SectionHeading>
+                          <ProofPhoto
+                            url={d.pickup_proof_photo_url}
+                            at={d.pickup_proof_at}
+                            label="Pickup confirmed by driver"
+                          />
+                        </section>
+                      )}
+
+                      {/* Delivery stops */}
+                      <section>
+                        <SectionHeading icon={<AssetIcon name="delivery-stops" />}>Delivery Stops</SectionHeading>
+                        <ul className="space-y-3">
+                          {sortedStops.map((dest) => (
+                            <StopCard
+                              key={dest.destination_id}
+                              address={dest.address}
+                              status={dest.status}
+                              statuses={DEST_STATUSES}
+                              label={fmtStatus}
+                            >
+                              {/* Proof of delivery, photographed by the driver at this stop. */}
+                              {dest.proof_photo_url
+                                ? (
+                                  <ProofPhoto
+                                    url={dest.proof_photo_url}
+                                    at={dest.proof_at ?? dest.delivered_at}
+                                    label="Proof of delivery"
+                                  />
+                                )
+                                : dest.status === 'delivered' && (
+                                  <p className="text-xs text-white/30">No proof photo on file.</p>
+                                )}
+                            </StopCard>
+                          ))}
+                        </ul>
+                        {sortedStops.length === 0 && (
+                          <p className="text-sm text-white/40">No stops on this booking.</p>
+                        )}
+                      </section>
+
+                      {/* Transaction documents */}
+                      <TransactionDocs docs={d?.transaction_documents ?? []} />
+
                       {/* Booking status */}
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <label className="text-[11px] font-bold uppercase tracking-wider text-white/40">
-                            Booking status
-                          </label>
-                          <span
-                            className="inline-flex text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border"
-                            style={{
-                              color:       statusColor(detail.status),
-                              borderColor: `${statusColor(detail.status)}55`,
-                              background:  `${statusColor(detail.status)}14`,
-                            }}
-                          >
-                            {fmtStatus(detail.status)}
-                          </span>
-                        </div>
+                      <section className="space-y-3">
+                        <SectionHeading
+                          icon={<CalendarRange size={18} strokeWidth={2} />}
+                          right={<Tag color={statusColor(detail.status)}>{fmtStatus(detail.status)}</Tag>}
+                        >
+                          Booking Status
+                        </SectionHeading>
 
                         {showStageActions && (
-                          <fieldset disabled={bookingReadOnly} className="flex gap-2 min-w-0 border-0 p-0 m-0">
-                            <button
-                              type="button"
-                              disabled={pendingStatus || pendingReject}
-                              onClick={() => setApproveModalOpen(true)}
-                              className="flex-1 py-2 rounded-lg text-sm font-bold transition-colors disabled:opacity-40"
-                              style={{ background: 'rgba(77,249,237,0.12)', border: '1px solid rgba(77,249,237,0.30)', color: 'var(--color-cyan)' }}
-                            >
-                              {pendingStatus ? 'Approving…' : 'Approve'}
-                            </button>
+                          <fieldset disabled={bookingReadOnly} className="flex gap-2.5 min-w-0 border-0 p-0 m-0">
                             <button
                               type="button"
                               disabled={pendingStatus || pendingReject}
                               onClick={() => setRejectModalOpen(true)}
-                              className="flex-1 py-2 rounded-lg text-sm font-bold transition-colors disabled:opacity-40"
-                              style={{ background: 'rgba(246,38,38,0.10)', border: '1px solid rgba(246,38,38,0.30)', color: '#f62626' }}
+                              className="flex-1 min-h-[46px] px-3 py-2 rounded-[10px] border text-base font-bold transition-colors disabled:opacity-40"
+                              style={{ background: 'rgba(246,38,38,0.10)', borderColor: PALETTE.red, color: PALETTE.red }}
                             >
                               {pendingReject ? 'Rejecting…' : 'Reject'}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={pendingStatus || pendingReject}
+                              onClick={() => setApproveModalOpen(true)}
+                              className="flex-1 min-h-[46px] px-3 py-2 rounded-[10px] border text-base font-bold transition-colors disabled:opacity-40"
+                              style={{ background: 'rgba(77,249,237,0.19)', borderColor: PALETTE.cyan, color: PALETTE.cyan }}
+                            >
+                              {pendingStatus ? 'Approving…' : 'Approve'}
                             </button>
                           </fieldset>
                         )}
@@ -2434,7 +2473,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                         {/* Fleet sees where each vehicle went; readiness is managed
                             per vehicle in Vehicle Management, not per booking. */}
                         {roleView === 'fleet_manager' && (
-                          <p className="text-[11px] text-white/40 leading-snug">
+                          <p className="text-xs text-white/40 leading-snug">
                             Read-only. Run BLOWBAGETS inspections in Vehicle Management — only a vehicle
                             whose latest inspection passed can be assigned to a booking.
                           </p>
@@ -2443,111 +2482,111 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                         {/* The GM's remarks on a rejected booking. */}
                         {d?.gm_status === 'rejected' && d?.rejection_reason && (
                           <div
-                            className="rounded-lg border px-2.5 py-2"
+                            className="rounded-[10px] border px-3 py-2"
                             style={{ borderColor: 'rgba(246,38,38,0.30)', background: 'rgba(246,38,38,0.08)' }}
                           >
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-[#f62626]/80 mb-1">
+                            <p className="text-xs font-bold uppercase text-[#f62626]/80 mb-1">
                               Rejected by the General Manager
                             </p>
-                            <p className="text-xs text-white/75 leading-snug">{d.rejection_reason}</p>
+                            <p className="text-sm text-white/75 leading-snug">{d.rejection_reason}</p>
                           </div>
                         )}
-                      </div>
 
-                      {/* Inspection recorded against the booking itself, on records
-                          predating the move to per-vehicle inspections. */}
-                      {d?.blowbagets_check && <BlowbagetsRecord check={d.blowbagets_check} />}
+                        {/* Inspection recorded against the booking itself, on records
+                            predating the move to per-vehicle inspections. */}
+                        {d?.blowbagets_check && <BlowbagetsRecord check={d.blowbagets_check} />}
 
-                      {/* The vehicle was pulled after it was assigned. Shown at every
-                          stage and to every role, not only inside the crew panel. */}
-                      {pulledByBooking.get(detail.booking_id) && (
-                        <VehiclePulledBanner
-                          {...pulledByBooking.get(detail.booking_id)!}
-                          onTheRoad={normalizeBookingStatus(detail.status) !== 'assigned'}
+                        {/* The vehicle was pulled after it was assigned. Shown at every
+                            stage and to every role, not only inside the crew panel. */}
+                        {pulledByBooking.get(detail.booking_id) && (
+                          <VehiclePulledBanner
+                            {...pulledByBooking.get(detail.booking_id)!}
+                            onTheRoad={normalizeBookingStatus(detail.status) !== 'assigned'}
+                          />
+                        )}
+
+                        {/* The driver paused the delivery: reason, note, and a way to end
+                            it from the office. Also lists every earlier pause. */}
+                        <PausePanel
+                          bookingId={detail.booking_id}
+                          pausedAt={(detail as { paused_at?: string | null }).paused_at}
+                          canResume={(roleView === 'admin' || roleView === 'operations_manager') && canEdit && !bookingReadOnly}
+                          onUpdated={() => { void refreshDetail(detail.booking_id); void loadPage(true) }}
                         />
-                      )}
 
-                      {/* The driver paused the delivery: reason, note, and a way to end
-                          it from the office. Also lists every earlier pause. */}
-                      <PausePanel
-                        bookingId={detail.booking_id}
-                        pausedAt={(detail as { paused_at?: string | null }).paused_at}
-                        canResume={(roleView === 'admin' || roleView === 'operations_manager') && canEdit && !bookingReadOnly}
-                        onUpdated={() => { void refreshDetail(detail.booking_id); void loadPage(true) }}
-                      />
+                        {/* Driver / vehicle assignment */}
+                        {showAssignment && (
+                          <fieldset disabled={bookingReadOnly} className="min-w-0 border-0 p-0 m-0">
+                          <AssignmentPanel
+                            detail={detail}
+                            drivers={availableDrivers}
+                            trucks={availableTrucks}
+                            assignDriverId={assignDriverId}
+                            assignSecondDriverId={assignSecondDriverId}
+                            secondDriver={
+                              allAssignments.find((a) => a.booking_id === detail.booking_id)?.second_driver ?? null
+                            }
+                            onSecondDriverChange={setAssignSecondDriverId}
+                            helperName={assignHelperName}
+                            savedHelperName={
+                              allAssignments.find((a) => a.booking_id === detail.booking_id)?.helper_name ?? null
+                            }
+                            onHelperNameChange={setAssignHelperName}
+                            route={routeDistance}
+                            routeLoading={routeLoading}
+                            assignTruckId={assignTruckId}
+                            assignBusy={assignBusy}
+                            pickerOpen={assignEditMode}
+                            vendorMode={assignVendorMode}
+                            vendorForm={vendorForm}
+                            vendorDrivers={vendorDrivers}
+                            vendorDriversLoading={vendorDriversLoading}
+                            externalDriverUserId={
+                              allAssignments.find((a) => a.booking_id === detail.booking_id)
+                                ?.vendor_driver_user_id ?? null
+                            }
+                            selectClass={selectClass}
+                            onDriverChange={handleDriverChange}
+                            onTruckChange={handleTruckChange}
+                            onVendorModeChange={setAssignVendorMode}
+                            onVendorFieldChange={(key, value) =>
+                              setVendorForm((prev) => {
+                                const next = { ...prev, [key]: value }
+                                // Never the same person as both drivers.
+                                if (key === 'vendor_driver_user_id' && value && value === prev.second_vendor_driver_user_id) {
+                                  next.second_vendor_driver_user_id = ''
+                                }
+                                return next
+                              })
+                            }
+                            onAssign={() => void handleAssign()}
+                            onOpenPicker={() => setAssignEditMode(true)}
+                            canEdit={canEdit}
+                            onClosePicker={() => {
+                              setAssignEditMode(false)
+                              const restore = committedAssignment.driverId || committedAssignment.truckId
+                                ? committedAssignment
+                                : getPrefillFromBookingDetail(detail, trucks)
+                              setAssignDriverId(restore.driverId)
+                              setAssignTruckId(restore.truckId)
+                              setAssignSecondDriverId(committedAssignment.secondDriverId ?? '')
+                              setAssignHelperName(committedAssignment.helperName ?? '')
+                              setPairFilled(null)
+                            }}
+                          />
+                          </fieldset>
+                        )}
+                      </section>
 
-                      {/* Driver / vehicle assignment */}
-                      {showAssignment && (
-                        <fieldset disabled={bookingReadOnly} className="min-w-0 border-0 p-0 m-0">
-                        <AssignmentPanel
-                          detail={detail}
-                          drivers={availableDrivers}
-                          trucks={availableTrucks}
-                          assignDriverId={assignDriverId}
-                          assignSecondDriverId={assignSecondDriverId}
-                          secondDriver={
-                            allAssignments.find((a) => a.booking_id === detail.booking_id)?.second_driver ?? null
-                          }
-                          onSecondDriverChange={setAssignSecondDriverId}
-                          helperName={assignHelperName}
-                          savedHelperName={
-                            allAssignments.find((a) => a.booking_id === detail.booking_id)?.helper_name ?? null
-                          }
-                          onHelperNameChange={setAssignHelperName}
-                          route={routeDistance}
-                          routeLoading={routeLoading}
-                          assignTruckId={assignTruckId}
-                          assignBusy={assignBusy}
-                          pickerOpen={assignEditMode}
-                          vendorMode={assignVendorMode}
-                          vendorForm={vendorForm}
-                          vendorDrivers={vendorDrivers}
-                          vendorDriversLoading={vendorDriversLoading}
-                          externalDriverUserId={
-                            allAssignments.find((a) => a.booking_id === detail.booking_id)
-                              ?.vendor_driver_user_id ?? null
-                          }
-                          selectClass={selectClass}
-                          onDriverChange={handleDriverChange}
-                          onTruckChange={handleTruckChange}
-                          onVendorModeChange={setAssignVendorMode}
-                          onVendorFieldChange={(key, value) =>
-                            setVendorForm((prev) => {
-                              const next = { ...prev, [key]: value }
-                              // Never the same person as both drivers.
-                              if (key === 'vendor_driver_user_id' && value && value === prev.second_vendor_driver_user_id) {
-                                next.second_vendor_driver_user_id = ''
-                              }
-                              return next
-                            })
-                          }
-                          onAssign={() => void handleAssign()}
-                          onOpenPicker={() => setAssignEditMode(true)}
-                          canEdit={canEdit}
-                          onClosePicker={() => {
-                            setAssignEditMode(false)
-                            const restore = committedAssignment.driverId || committedAssignment.truckId
-                              ? committedAssignment
-                              : getPrefillFromBookingDetail(detail, trucks)
-                            setAssignDriverId(restore.driverId)
-                            setAssignTruckId(restore.truckId)
-                            setAssignSecondDriverId(committedAssignment.secondDriverId ?? '')
-                            setAssignHelperName(committedAssignment.helperName ?? '')
-                            setPairFilled(null)
-                          }}
-                        />
-                        </fieldset>
-                      )}
-
-                      {/* How many runs the assigned vehicle makes. Only once a
-                          vehicle actually exists: until then there is no body to
-                          compare the load against, and nothing to plan around. */}
                       {/* Delivered: waiting on the client. Staff can only resolve a reported problem. */}
                       {(roleView === 'admin' || roleView === 'operations_manager') && (
                         <CompletionPanel booking={detail as unknown as BookingWithRelations} mode="staff" canAct={canEdit}
                           onUpdated={() => { void refreshDetail(detail.booking_id); void loadPage() }} />
                       )}
 
+                      {/* How many runs the assigned vehicle makes. Only once a
+                          vehicle actually exists: until then there is no body to
+                          compare the load against, and nothing to plan around. */}
                       {showTripPlanner && (
                         <TripPlanner
                           key={`${detail.booking_id}:${plannerTick}`}
@@ -2555,75 +2594,6 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                           canEdit={canEdit && !bookingReadOnly}
                         />
                       )}
-
-                      {/* Proof of pickup, photographed by the driver at the origin. */}
-                      {d?.pickup_proof_photo_url && (
-                        <div>
-                          <h3 className="text-[11px] font-bold uppercase tracking-wider text-white/40 mb-2">
-                            Proof of pickup
-                          </h3>
-                          <ProofPhoto
-                            url={d.pickup_proof_photo_url}
-                            at={d.pickup_proof_at}
-                            label="Pickup confirmed by driver"
-                          />
-                        </div>
-                      )}
-
-                      {/* Delivery stops */}
-                      <div>
-                        <h3 className="text-[11px] font-bold uppercase tracking-wider text-white/40 mb-2">
-                          Delivery stops
-                        </h3>
-                        <ul className="space-y-2">
-                          {(detail.booking_destinations ?? [])
-                            .slice()
-                            .sort((a, b) => a.sequence_order - b.sequence_order)
-                            .map((dest) => (
-                              <li key={dest.destination_id} className="rounded-lg border border-white/[0.08] p-2.5 space-y-2 bg-black/20">
-                                <div className="flex items-start justify-between gap-2">
-                                  <p className="text-sm text-white/85 leading-snug min-w-0">{dest.address}</p>
-                                  <span
-                                    className="shrink-0 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded border"
-                                    style={{ color: statusColor(dest.status), borderColor: `${statusColor(dest.status)}44` }}
-                                  >
-                                    {fmtStatus(dest.status)}
-                                  </span>
-                                </div>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {DEST_STATUSES.map((st) => (
-                                    <span
-                                      key={st}
-                                      className="text-[11px] font-semibold px-2 py-1 rounded-md border border-white/10"
-                                      style={
-                                        dest.status === st
-                                          ? { borderColor: 'var(--color-cyan)', color: 'var(--color-cyan)' }
-                                          : { color: 'rgba(255,255,255,0.3)' }
-                                      }
-                                    >
-                                      {fmtStatus(st)}
-                                    </span>
-                                  ))}
-                                </div>
-                                {/* Proof of delivery, photographed by the driver at this stop. */}
-                                {dest.proof_photo_url
-                                  ? (
-                                    <ProofPhoto
-                                      url={dest.proof_photo_url}
-                                      at={dest.proof_at ?? dest.delivered_at}
-                                      label="Proof of delivery"
-                                    />
-                                  )
-                                  : dest.status === 'delivered' && (
-                                    <p className="text-[11px] text-white/30">No proof photo on file.</p>
-                                  )}
-                              </li>
-                            ))}
-                        </ul>
-                        {(detail.booking_destinations?.length ?? 0) === 0 && (
-                          <p className="text-sm text-white/40">No stops on this booking.</p>
-                        )}
-                      </div>
                     </>
                   )}
                 </div>
@@ -2636,26 +2606,3 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
   )
 }
 
-function CargoRow({
-  label,
-  value,
-  accent = false,
-  mono   = false,
-}: {
-  label:   string
-  value:   string
-  accent?: boolean
-  mono?:   boolean
-}) {
-  return (
-    <div className="flex items-center justify-between px-2.5 py-1.5 gap-3">
-      <span className="text-[10px] uppercase tracking-wider text-white/30 leading-tight">{label}</span>
-      <span
-        className={`text-xs text-right truncate ${mono ? 'font-mono' : ''}`}
-        style={{ color: accent ? 'var(--color-cyan)' : 'rgba(255,255,255,0.75)' }}
-      >
-        {value}
-      </span>
-    </div>
-  )
-}
