@@ -747,18 +747,21 @@ function AssignmentPanel({
         <p className="text-xs text-white/45">No vehicle or driver assigned yet.</p>
       )}
 
-      {canEdit && (
-        <button
-          type="button"
-          disabled={assignBusy}
-          onClick={onOpenPicker}
-          aria-haspopup="dialog"
-          className="w-full min-h-[46px] px-6 py-2 rounded-[10px] border text-base font-bold transition-colors disabled:opacity-40"
-          style={{ background: 'rgba(77,249,237,0.19)', borderColor: PALETTE.cyan, color: PALETTE.cyan }}
-        >
-          {title}
-        </button>
-      )}
+      {canEdit && <button
+        type="button"
+        disabled={assignBusy}
+        onClick={onOpenPicker}
+        aria-haspopup="dialog"
+        className="w-full py-2 rounded-lg text-sm font-bold transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
+        style={{
+          background: 'rgba(77,249,237,0.12)',
+          border:     '1px solid rgba(77,249,237,0.30)',
+          color:      'var(--color-cyan)',
+        }}
+      >
+        <Truck size={14} />
+        {title}
+      </button>}
 
       <CrewPickerDialog
         open={pickerOpen && canEdit}
