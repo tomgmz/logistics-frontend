@@ -21,7 +21,6 @@ import {
   KeyRound,
   AlertTriangle,
   PauseCircle,
-  ChevronDown,
   Boxes,
   History,
   CalendarRange,
@@ -704,23 +703,6 @@ function AssignmentPanel({
   const cargo = useMemo(() => cargoSummaryFromBooking(detail), [detail])
 
   const title = isAssigned ? 'Change vehicle and driver' : 'Choose vehicle and driver'
-
-  // The sidebar card only shows the choice. The fields and Assign open the
-  // pop-up below, which is where the crew is actually picked and saved.
-  const hasDriver  = vendorMode ? !!vendorForm.vendor_driver_user_id : !!assignDriverId
-  const hasVehicle = vendorMode ? !!vendorForm.vendor_vehicle_plate  : !!assignTruckId
-  const driverHint = vendorMode
-    ? 'Vendor drivers registered in User Management.'
-    : drivers.length === 0
-      ? `No driver marked ${detail.schedule_date ?? 'this day'} as a day they can work.`
-      : `${drivers.length} driver${drivers.length === 1 ? '' : 's'} available`
-  const vehicleHint = vendorMode
-    ? 'Vendor vehicles are typed in, not registered.'
-    : `${trucks.length} vehicle${trucks.length === 1 ? '' : 's'} cleared by BLOWBAGETS`
-
-  const fieldClass =
-    'w-full min-h-9 flex items-center justify-between gap-2 rounded-[5px] border-[0.5px] border-[#818181] ' +
-    'px-3 py-1.5 text-left text-sm font-bold text-white transition-colors hover:border-[#4df9ed]/60 disabled:opacity-40'
   const crewRowIcon = { size: 18, strokeWidth: 2, className: 'text-white shrink-0' }
 
   return (
@@ -762,58 +744,7 @@ function AssignmentPanel({
           {selectedCoding && !pickerOpen && <CodingNotice flag={selectedCoding} plate={selectedPlate!} />}
         </div>
       ) : (
-        <>
-          <Tag color={PALETTE.yellow}>Pending</Tag>
-          {canEdit ? (
-            <>
-              {/* Company vs vendor-supplied: carried into the pop-up. */}
-              <div className="flex h-7 rounded-[5px] border-[0.5px] border-[#818181] p-[1.5px]">
-                {([false, true] as const).map((vendor) => {
-                  const on = vendorMode === vendor
-                  return (
-                    <button
-                      key={String(vendor)}
-                      type="button"
-                      disabled={assignBusy}
-                      aria-pressed={on}
-                      onClick={() => onVendorModeChange(vendor)}
-                      className="flex-1 rounded-[3px] text-sm transition-colors disabled:opacity-40"
-                      style={on
-                        ? { background: 'rgba(77,249,237,0.19)', color: PALETTE.cyan }
-                        : { color: '#ffffff' }}
-                    >
-                      {vendor ? 'Vendor-Supplied' : 'Company Fleet'}
-                    </button>
-                  )
-                })}
-              </div>
-
-              <div>
-                <p className="text-sm font-bold text-[#818181] mb-1.5">Driver</p>
-                <button type="button" disabled={assignBusy} onClick={onOpenPicker} aria-haspopup="dialog" className={fieldClass}>
-                  <span className="min-w-0 truncate">
-                    {hasDriver ? driverLabel : vendorMode ? 'Select vendor driver' : 'Select driver'}
-                  </span>
-                  <ChevronDown size={15} strokeWidth={2} className="shrink-0 text-[#818181]" />
-                </button>
-                <p className="text-xs text-white/35 mt-1 leading-snug">{driverHint}</p>
-              </div>
-
-              <div>
-                <p className="text-sm font-bold text-[#818181] mb-1.5">Vehicle</p>
-                <button type="button" disabled={assignBusy} onClick={onOpenPicker} aria-haspopup="dialog" className={fieldClass}>
-                  <span className="min-w-0 truncate">
-                    {hasVehicle ? truckLabel : vendorMode ? 'Enter vehicle plate' : 'Select vehicle'}
-                  </span>
-                  <ChevronDown size={15} strokeWidth={2} className="shrink-0 text-[#818181]" />
-                </button>
-                <p className="text-xs text-white/35 mt-1 leading-snug">{vehicleHint}</p>
-              </div>
-            </>
-          ) : (
-            <p className="text-xs text-white/45">No vehicle or driver assigned yet.</p>
-          )}
-        </>
+        <p className="text-xs text-white/45">No vehicle or driver assigned yet.</p>
       )}
 
       {canEdit && (
@@ -825,7 +756,7 @@ function AssignmentPanel({
           className="w-full min-h-[46px] px-6 py-2 rounded-[10px] border text-base font-bold transition-colors disabled:opacity-40"
           style={{ background: 'rgba(77,249,237,0.19)', borderColor: PALETTE.cyan, color: PALETTE.cyan }}
         >
-          {isAssigned ? title : 'Assign'}
+          {title}
         </button>
       )}
 
