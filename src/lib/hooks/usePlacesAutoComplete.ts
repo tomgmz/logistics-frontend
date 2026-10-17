@@ -82,14 +82,16 @@ export function usePlacesAutocomplete({
         return
       }
 
-      await loadGoogleMapsScript()
-
-      if (!sessionTokenRef.current) {
-        sessionTokenRef.current = new google.maps.places.AutocompleteSessionToken()
-      }
-
       setLoading(true)
       try {
+        // Inside the try: this runs from a debounce timer, so a failed script
+        // load (no key, offline) would otherwise be an unhandled rejection.
+        await loadGoogleMapsScript()
+
+        if (!sessionTokenRef.current) {
+          sessionTokenRef.current = new google.maps.places.AutocompleteSessionToken()
+        }
+
         const requestParams: google.maps.places.AutocompleteRequest = {
           input,
           sessionToken: sessionTokenRef.current,

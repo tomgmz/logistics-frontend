@@ -5,7 +5,6 @@ import {
   useEffect,
   useMemo,
   type InputHTMLAttributes,
-  type TextareaHTMLAttributes,
   type SelectHTMLAttributes,
 } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -34,6 +33,7 @@ import ReusableModal from '@/components/layout/ReusableModal'
 import { appToast } from '@/lib/toast'
 import { extractApiError } from '@/lib/api-error'
 import LandlineInputRow, { toLocalLandlineDigits } from './LandLineInputRow'
+import BillingAddressField from './BillingAddressField'
 import { ScanLine, CheckCircle } from 'lucide-react'
 import proxyApi from '@/lib/api/auth.api'
 import { EMPTY_FLAGS, MODULES_BY_ROLE, type ManagedRole, type ModuleFlags } from '@/constants/modules'
@@ -245,20 +245,6 @@ function Input({
     <input
       {...props}
       className={`${inputBase} ${error ? 'border-red-500/60' : ''} ${className}`}
-    />
-  )
-}
-
-function Textarea({
-  error,
-  className = '',
-  ...props
-}: Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'required'> & { error?: string }) {
-  return (
-    <textarea
-      {...props}
-      rows={props.rows ?? 2}
-      className={`${inputBase} resize-none ${error ? 'border-red-500/60' : ''} ${className}`}
     />
   )
 }
@@ -988,12 +974,13 @@ export default function UserFormModal({
               </div>
 
               <Field label="Billing Address" required error={fe.billing_address}>
-                <Textarea
+                <BillingAddressField
                   value={form.billing_address as string}
-                  onChange={e => set('billing_address', e.target.value)}
-                  placeholder="123 Main St, Makati City, Metro Manila"
+                  onChange={v => set('billing_address', v)}
+                  placeholder="Unit 1203, 12/F Tower A, Ayala Ave, Makati City"
                   rows={2}
-                  error={fe.billing_address}
+                  maxLength={300}
+                  textareaClassName={`${inputBase} resize-none ${fe.billing_address ? 'border-red-500/60' : ''}`}
                 />
               </Field>
             </>)}
