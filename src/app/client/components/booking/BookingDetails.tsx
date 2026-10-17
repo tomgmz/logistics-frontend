@@ -198,7 +198,8 @@ const MENU_PROPS = {
       bgcolor: '#2A2828', color: '#fff',
       border: `1px solid ${BORDER_CARD}`, borderRadius: RADIUS,
       '& .MuiMenuItem-root': {
-        fontSize: '0.875rem', fontFamily: 'inherit',
+        // Portaled to <body>, so 'inherit' would pick up the small caps face.
+        fontSize: '0.875rem', fontFamily: "var(--font-alegreya), 'Alegreya Sans', sans-serif",
         '&:hover':              { bgcolor: 'rgba(77,249,237,0.08)' },
         '&.Mui-selected':       { bgcolor: 'rgba(77,249,237,0.14)' },
         '&.Mui-selected:hover': { bgcolor: 'rgba(77,249,237,0.20)' },
@@ -1016,7 +1017,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                           return (
                             <motion.div key={g.id}
                               initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}
-                              className="bg-[#424242] rounded-xl p-3 lg:p-4 border border-white/[0.07]"
+                              className="ff-regular bg-[#424242] rounded-xl p-3 lg:p-4 border border-white/[0.07]"
                             >
                               <div className="flex items-center justify-between mb-3">
                                 <span className="ff-sc booking-text text-sm font-bold text-[var(--color-cyan)]">
@@ -1241,7 +1242,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                       <motion.button onClick={() => handleAddGroup(section.dropoffIndex)}
                         whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
                         className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-white/10
-                                   ff-sc booking-text text-sm text-white/50 hover:border-white/20 hover:text-white/80
+                                   ff-regular booking-text text-sm text-white/50 hover:border-white/20 hover:text-white/80
                                    transition-all cursor-pointer">
                         Add another product
                       </motion.button>
@@ -1726,7 +1727,7 @@ function CheckRow({ checked, onChange, label }: { checked: boolean; onChange: (v
           ${checked ? 'bg-[var(--color-cyan)] border-[var(--color-cyan)]' : 'bg-transparent border-white/30 hover:border-white/60'}`}>
         {checked && <Check size={10} strokeWidth={3} className="text-[var(--color-bg)]" />}
       </div>
-      <span className="ff-sc booking-text text-xs lg:text-sm">{label}</span>
+      <span className="ff-regular booking-text text-xs lg:text-sm">{label}</span>
     </label>
   )
 }

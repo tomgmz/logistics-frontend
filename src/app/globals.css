@@ -351,6 +351,15 @@
     font-family: var(--font-alegreya), 'Alegreya Sans', sans-serif;
   }
 
+  /* Regular Alegreya Sans where the Figma uses it instead of the small caps
+     face. On a container it also overrides any .ff-sc inside, so children's
+     classes don't need touching. Popups portaled to <body> (MUI menus) sit
+     outside the container and set the family themselves. */
+  .ff-regular,
+  .ff-regular .ff-sc {
+    font-family: var(--font-alegreya), 'Alegreya Sans', sans-serif;
+  }
+
   @media (min-width: 640px) {
     .ff-body {
       font-size: 0.875rem;

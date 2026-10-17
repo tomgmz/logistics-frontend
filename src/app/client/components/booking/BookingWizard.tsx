@@ -163,7 +163,7 @@ export default function BookingWizard() {
           ))}
         </div>
 
-        <span className="sm:hidden justify-self-end ff-sc text-sm whitespace-nowrap text-white">
+        <span className="sm:hidden justify-self-end ff-regular text-sm whitespace-nowrap text-white">
           {STEPS.find((s) => s.id === step)?.label}
         </span>
 
@@ -258,7 +258,7 @@ function StepPip({
           </span>
         )}
       </motion.div>
-      <span className={`ff-sc booking-text text-xs lg:text-sm transition-colors whitespace-nowrap
+      <span className={`ff-regular booking-text text-xs lg:text-sm transition-colors whitespace-nowrap
         ${isActive ? 'text-white' : isDone ? 'text-[var(--color-cyan)]' : 'text-[var(--color-muted)]'}`}>
         {step.label}
       </span>
