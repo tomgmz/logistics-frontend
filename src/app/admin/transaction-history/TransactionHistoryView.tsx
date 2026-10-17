@@ -19,6 +19,7 @@ import CompanyFilter from '@/components/transactions/CompanyFilter'
 import TransactionDetail from '@/components/transactions/TransactionDetail'
 import TransactionRecord from '@/components/transactions/TransactionRecord'
 import { StatusBadge, getStatusMeta } from '@/components/transactions/TransactionStatus'
+import ProblemReportedBadge, { hasOpenClientIssue } from '@/components/transactions/ProblemReportedBadge'
 import {
   formatDate, formatPeso, formatPesoExact, getCompanyName, getDropoffs,
 } from '@/components/transactions/transaction-format'
@@ -460,6 +461,9 @@ export default function TransactionHistoryView() {
                                 }}>
                                 {meta.label}
                               </span>
+                              {hasOpenClientIssue(b) && (
+                                <ProblemReportedBadge note={b.client_issue_note as string | null | undefined} />
+                              )}
                             </td>
                             <td className="whitespace-nowrap px-3 py-2.5 text-right font-semibold tabular-nums text-white/90">
                               {formatPeso(b.total_cost as number | null | undefined)}
@@ -528,7 +532,10 @@ export default function TransactionHistoryView() {
                     <X size={16} />
                   </button>
                   <span className="font-mono text-sm font-bold text-white">{bookingRef(selected)}</span>
-                  <div className="ml-auto">
+                  <div className="ml-auto flex items-center gap-2">
+                    {hasOpenClientIssue(selected) && (
+                      <ProblemReportedBadge className="" note={selected.client_issue_note as string | null | undefined} />
+                    )}
                     <StatusBadge status={selected.status} />
                   </div>
                 </div>

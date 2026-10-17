@@ -30,6 +30,7 @@ import RejectionPanel from '@/components/transactions/RejectionPanel'
 import CompletionPanel from '@/components/transactions/CompletionPanel'
 import BookingDocuments from '@/components/transactions/BookingDocuments'
 import { StatusBadge } from '@/components/transactions/TransactionStatus'
+import ProblemReportedBadge, { hasOpenClientIssue } from '@/components/transactions/ProblemReportedBadge'
 import {
   formatDate, formatPeso, buildCargoSummary, getDropoffs,
 } from '@/components/transactions/transaction-format'
@@ -165,6 +166,9 @@ function BookingCard({ booking, onSelect }: {
             <Calendar size={11} />
             <span>Scheduled {formatDate(schedDate)}</span>
           </div>
+          {hasOpenClientIssue(booking) && (
+            <ProblemReportedBadge className="" note={booking.client_issue_note as string | null | undefined} />
+          )}
         </div>
         <div className="flex items-center gap-2">
           <StatusBadge status={booking.status} />
@@ -348,7 +352,12 @@ export default function BookingHistoryModule() {
           </>
         )}
         {view === 'detail' && selected && (
-          <div className="ml-auto"><StatusBadge status={selected.status} /></div>
+          <div className="ml-auto flex items-center gap-2">
+            {hasOpenClientIssue(selected) && (
+              <ProblemReportedBadge className="" note={selected.client_issue_note as string | null | undefined} />
+            )}
+            <StatusBadge status={selected.status} />
+          </div>
         )}
       </div>
 

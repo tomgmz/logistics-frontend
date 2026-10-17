@@ -68,6 +68,7 @@ import ReusableModal, { RemarksModal } from '@/components/layout/ReusableModal'
 import TripPlanner from './TripPlanner'
 import VehiclePicker, { cargoSummaryFromBooking } from './VehiclePicker'
 import CompletionPanel from '@/components/transactions/CompletionPanel'
+import ProblemReportedBadge, { hasOpenClientIssue } from '@/components/transactions/ProblemReportedBadge'
 import PausePanel from '@/components/transactions/PausePanel'
 import { pauseReasonLabel } from '@/lib/services/admin/pause.service'
 import type { BookingWithRelations } from '@/lib/store/slice/routeMap.slice'
@@ -269,6 +270,9 @@ interface ListRow {
   created_at: string | null
   /** Set while the driver has the delivery paused. */
   pause_reason: string | null
+  /** True while the client's reported problem is unresolved. */
+  issue_open: boolean
+  issue_note: string | null
 }
 
 function toRows(raw: Record<string, unknown>[]): ListRow[] {
@@ -287,6 +291,8 @@ function toRows(raw: Record<string, unknown>[]): ListRow[] {
       stops:             Array.isArray(dests) ? dests.length : 0,
       created_at:        typeof b.created_at === 'string' ? b.created_at : null,
       pause_reason:      b.paused_at && typeof b.pause_reason === 'string' ? b.pause_reason : null,
+      issue_open:        hasOpenClientIssue(b),
+      issue_note:        typeof b.client_issue_note === 'string' ? b.client_issue_note : null,
     }
   })
 }
@@ -2149,6 +2155,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                                 {fmtStatus(r.status)}
                               </span>
                               {r.pause_reason && <PausedBadge reason={r.pause_reason} />}
+                              {r.issue_open && <ProblemReportedBadge note={r.issue_note} />}
                             </td>
                             <td className="px-3 py-2.5 text-white/75 whitespace-nowrap">{r.schedule_date ?? '—'}</td>
                             <td className="px-3 py-2.5 text-white/70 max-w-[180px] truncate hidden md:table-cell">{r.company ?? '—'}</td>
@@ -2233,6 +2240,9 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                             <span>Submitted {formatPhDateTime(detail.created_at)}</span>
                             {showAfterHours(detail.status, detail.created_at) && <AfterHoursBadge />}
                           </div>
+                        )}
+                        {hasOpenClientIssue(detail as unknown as Record<string, unknown>) && (
+                          <ProblemReportedBadge className="" note={(detail as { client_issue_note?: string | null }).client_issue_note} />
                         )}
                         <div className="flex items-start gap-2 text-white/90 text-sm">
                           <MapPin size={16} className="text-[var(--color-cyan)] shrink-0 mt-0.5" />
