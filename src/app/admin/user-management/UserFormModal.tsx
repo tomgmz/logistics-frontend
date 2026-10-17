@@ -805,7 +805,7 @@ export default function UserFormModal({
               }`}
             >
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="First Name" required error={fe.first_name} action={scanned('first_name').action}>
                 <Input
                   {...scanned('first_name').input}
@@ -828,7 +828,7 @@ export default function UserFormModal({
               </Field>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Middle Name" hint="Optional" error={fe.middle_name} action={scanned('middle_name').action}>
                 <Input
                   {...scanned('middle_name').input}
@@ -840,7 +840,7 @@ export default function UserFormModal({
                 />
               </Field>
               <Field label="Suffix" error={fe.suffix}>
-                <div className="grid gap-2 items-end ${suffixSelectValue === 'others' ? 'grid-cols-[1fr_1.4fr]' : 'grid-cols-1'}">
+                <div className={`grid gap-2 items-end grid-cols-1 ${suffixSelectValue === 'others' ? 'sm:grid-cols-[1fr_1.4fr]' : ''}`}>
                   <Select
                     value={suffixSelectValue}
                     onChange={e => {
@@ -976,7 +976,7 @@ export default function UserFormModal({
                 />
               </Field>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label="Company Name" required error={fe.company_name}>
                   <Input
                     value={form.company_name as string}
@@ -1001,8 +1001,8 @@ export default function UserFormModal({
             {tab === 'drivers' && (<>
 
               {isVendorDriver && (
-                <div className="grid grid-cols-2 gap-4">
-                  <Field label="Vendor Name" required error={fe.vendor_name}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Field label="Company Name" required error={fe.vendor_name}>
                     <Input
                       value={form.vendor_name as string}
                       onChange={e => set('vendor_name', e.target.value)}
@@ -1023,7 +1023,7 @@ export default function UserFormModal({
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label="License Number" required error={fe.license_number} action={scanned('license_number').action}>
                   <Input
                     {...scanned('license_number').input}
