@@ -68,6 +68,7 @@ import ReusableModal, { RemarksModal } from '@/components/layout/ReusableModal'
 import TripPlanner from './TripPlanner'
 import VehiclePicker, { cargoSummaryFromBooking } from './VehiclePicker'
 import CompletionPanel from '@/components/transactions/CompletionPanel'
+import { formatPlateNumber, plateError } from '@/lib/validation/plate'
 import ProblemReportedBadge, { hasOpenClientIssue } from '@/components/transactions/ProblemReportedBadge'
 import PausePanel from '@/components/transactions/PausePanel'
 import { pauseReasonLabel } from '@/lib/services/admin/pause.service'
@@ -646,8 +647,12 @@ function AssignmentPanel({
 
   const rule = crewRule(route)
   const hasSecond = vendorMode ? !!vendorForm.second_vendor_driver_user_id : !!assignSecondDriverId
+  // Same plate rule as Vehicle Management. Shown once something is typed.
+  const vendorPlateError = vendorMode && vendorForm.vendor_vehicle_plate.trim()
+    ? plateError(vendorForm.vendor_vehicle_plate)
+    : null
   const canSubmit = !routeLoading && (rule.second !== 'required' || hasSecond) && (vendorMode
-    ? !!vendorForm.vendor_driver_user_id && !!vendorForm.vendor_vehicle_plate.trim()
+    ? !!vendorForm.vendor_driver_user_id && !plateError(vendorForm.vendor_vehicle_plate)
     : !!assignDriverId && !!assignTruckId)
 
   const secondDriverLabelText = rule.second === 'required'
@@ -903,7 +908,7 @@ function AssignmentPanel({
             </div>
             )}
             {helperField}
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <div>
                 <label className="text-[11px] text-white/40 block mb-1">
                   Vehicle plate<span className="text-red-400"> *</span>
@@ -911,11 +916,20 @@ function AssignmentPanel({
                 <input
                   value={vendorForm.vendor_vehicle_plate}
                   disabled={assignBusy}
-                  onChange={(e) => onVendorFieldChange('vendor_vehicle_plate', e.target.value)}
-                  className={selectClass}
+                  onChange={(e) => onVendorFieldChange('vendor_vehicle_plate', formatPlateNumber(e.target.value))}
+                  className={`${selectClass} font-mono tracking-widest uppercase`}
+                  style={vendorPlateError ? { borderColor: 'rgba(246,38,38,0.6)' } : undefined}
                   placeholder="ABC 1234"
-                  maxLength={30}
+                  maxLength={8}
+                  spellCheck={false}
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="characters"
+                  aria-invalid={!!vendorPlateError}
                 />
+                {vendorPlateError && (
+                  <p className="text-[10px] text-red-400 mt-1 leading-snug">{vendorPlateError}</p>
+                )}
               </div>
               <div>
                 <label className="text-[11px] text-white/40 block mb-1">Vehicle type</label>
@@ -1636,7 +1650,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     setVendorForm(isVendor ? {
       vendor_driver_user_id: record?.vendor_driver_user_id ?? '',
       second_vendor_driver_user_id: record?.second_driver?.users?.user_id ?? '',
-      vendor_vehicle_plate:  record?.vendor_vehicle_plate  ?? '',
+      vendor_vehicle_plate:  formatPlateNumber(record?.vendor_vehicle_plate ?? ''),
       vendor_vehicle_type:   record?.vendor_vehicle_type   ?? '',
       vendor_driver_name:    record?.vendor_driver_name    ?? '',
       vendor_name:           record?.vendor_name           ?? '',
@@ -1774,7 +1788,9 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
   const handleAssign = async () => {
     if (!selectedId) return
     if (assignVendorMode) {
-      if (!vendorForm.vendor_driver_user_id || !vendorForm.vendor_vehicle_plate.trim()) return
+      if (!vendorForm.vendor_driver_user_id) return
+      const plateMsg = plateError(vendorForm.vendor_vehicle_plate)
+      if (plateMsg) { appToast.error(plateMsg); return }
     } else if (!assignDriverId || !assignTruckId) {
       return
     }

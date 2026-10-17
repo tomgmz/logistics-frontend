@@ -68,16 +68,9 @@ import RecordLockBanner, { RecordLockBadge } from '@/components/ui/RecordLockBan
 import RowActionMenu, { type RowAction } from '@/components/ui/RowActionMenu'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
+import { formatPlateNumber, plateError } from '@/lib/validation/plate'
 
 const PAGE_SIZE = 10
-
-function formatPlateNumber(raw: string): string {
-  const cleaned = raw.toUpperCase().replace(/[^A-ZÑ0-9]/g, '')
-  if (cleaned.length > 3 && /^[A-ZÑ]{3}/.test(cleaned)) {
-    return cleaned.slice(0, 3) + ' ' + cleaned.slice(3, 7)
-  }
-  return cleaned.slice(0, 7)
-}
 
 type FormMode    = 'create' | 'edit' | null
 type ConfirmKind = 'save' | 'archive' | null
@@ -545,13 +538,9 @@ export default function VehicleManagementView() {
 
   function validateForm(): boolean {
     setFormError(null)
-    if (!form.plate_number.trim()) {
-      setFormError('Plate number is required.')
-      return false
-    }
-    const plateRegex = /^(?:[A-ZÑ]{3} \d{4}|[A-ZÑ]{2,3} \d{2,3})$/
-    if (!plateRegex.test(form.plate_number)) {
-      setFormError('Invalid plate format (e.g. ABC 1234). Only letters, and numbers allowed.')
+    const plateMsg = plateError(form.plate_number)
+    if (plateMsg) {
+      setFormError(plateMsg)
       return false
     }
 
