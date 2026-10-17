@@ -330,7 +330,7 @@ export default function MaintenanceTab({
                       <td className="px-3 py-2.5">
                         <div className="flex items-center justify-end gap-1.5">
                           <RecordLockBadge holder={truckLocks.get(t.truck_id)} />
-                          <RowActionMenu label={`Actions for ${t.plate_number}`} actions={rowActions(t)} />
+                          <RowActionMenu brightText label={`Actions for ${t.plate_number}`} actions={rowActions(t)} />
                         </div>
                       </td>
                     </tr>

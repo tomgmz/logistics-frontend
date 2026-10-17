@@ -24,13 +24,23 @@ const TONE: Record<NonNullable<RowAction['tone']>, string> = {
   accent:  'text-[var(--color-cyan)] hover:bg-[rgba(77,249,237,0.08)]',
 }
 
+/** Default items in white instead of grey. Coloured tones (archive, accent) keep their colour. */
+const DEFAULT_BRIGHT = 'text-white hover:bg-[#2a2a2a]'
+
 /**
  * The 3-dot actions menu used in every management table's Actions column.
  *
  * Portalled, so it is never clipped by a scrolling table body. Each item only
  * starts its action — the destructive ones still confirm in a modal.
  */
-export default function RowActionMenu({ actions, label = 'Actions' }: { actions: RowAction[]; label?: string }) {
+export default function RowActionMenu({
+  actions, label = 'Actions', brightText = false,
+}: {
+  actions:     RowAction[]
+  label?:      string
+  /** White default items (Vehicle Management). Off elsewhere, which keep grey. */
+  brightText?: boolean
+}) {
   const [open, setOpen] = useState(false)
   if (actions.length === 0) return null
 
@@ -61,7 +71,7 @@ export default function RowActionMenu({ actions, label = 'Actions' }: { actions:
               disabled={a.disabled}
               title={a.title}
               onClick={() => { setOpen(false); a.onSelect() }}
-              className={`flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm transition disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent ${TONE[a.tone ?? 'default']}`}
+              className={`flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm transition disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent ${brightText && (a.tone ?? 'default') === 'default' ? DEFAULT_BRIGHT : TONE[a.tone ?? 'default']}`}
             >
               {a.icon} {a.label}
             </button>
