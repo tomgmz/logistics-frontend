@@ -6,7 +6,7 @@ import Link from 'next/link'
 import {
   LayoutDashboard, RefreshCw, AlertCircle, Truck, Clock,
   CheckCircle2, MapPin, Package, Plus, ChevronRight, Bell,
-  CalendarDays, CreditCard, XCircle, Inbox, LifeBuoy,
+  CreditCard, XCircle, Inbox, LifeBuoy,
 } from 'lucide-react'
 
 import { bookingService } from '@/lib/services/client/booking.service'
@@ -26,6 +26,7 @@ import { useLiveTable } from '@/lib/hooks/useLiveTable'
 const BG_PAGE  = '#0a0a0a'
 const BG_PANEL = '#2A2828'
 const BG_CARD  = '#424242'
+const EDGE     = '#424242'
 const BORDER   = 'rgba(255,255,255,0.07)'
 const BORDER_C = 'rgba(255,255,255,0.12)'
 const CYAN     = '#4DF9ED'
@@ -111,11 +112,6 @@ function formatDate(iso: string | Date | null | undefined): string {
   return new Date(iso).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-function formatDayShort(iso: string | Date | null | undefined): string {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })
-}
-
 function timeAgo(iso: string): string {
   const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
   if (m < 1) return 'just now'
@@ -158,7 +154,7 @@ function StatusBadge({ status }: { status: string }) {
   return (
     <span
       className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-sm shrink-0"
-      style={{ color: m.color, background: `${m.color}18`, border: `1px solid ${m.color}40` }}
+      style={{ color: m.color, background: `${m.color}1f`, border: `1px solid ${m.color}` }}
     >
       {m.icon}{m.label}
     </span>
@@ -181,7 +177,7 @@ function HelpPanel() {
   const latest = (tickets ?? [])[0]
 
   return (
-    <Panel>
+    <Panel accent={GREEN}>
       <SectionHeader icon={<LifeBuoy size={16} />} title="Help & Support" />
       <p className="text-xs leading-snug" style={{ color: MUTED }}>
         {open.length > 0
@@ -201,15 +197,15 @@ function HelpPanel() {
           type="button"
           onClick={() => openHelpAssistant('chat')}
           className="flex-1 rounded-lg px-3 py-2 text-xs font-bold cursor-pointer"
-          style={{ background: CYAN, color: '#000' }}
+          style={{ background: `${GREEN}1f`, border: `1px solid ${GREEN}`, color: GREEN }}
         >
           Ask the assistant
         </button>
         <button
           type="button"
           onClick={() => openHelpAssistant('tickets')}
-          className="rounded-lg border px-3 py-2 text-xs font-semibold text-white/80 cursor-pointer hover:bg-white/5"
-          style={{ borderColor: BORDER }}
+          className="rounded-lg border px-3 py-2 text-xs font-semibold cursor-pointer hover:bg-white/5"
+          style={{ borderColor: MUTED, color: GREEN }}
         >
           My tickets
         </button>
@@ -218,12 +214,14 @@ function HelpPanel() {
   )
 }
 
-function Panel({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+function Panel({ children, accent, className = '' }: {
+  children: React.ReactNode; accent: string; className?: string
+}) {
   return (
     <motion.div
       variants={fadeUp}
       className={`rounded-xl border p-4 flex flex-col gap-3 ${className}`}
-      style={{ background: BG_PANEL, borderColor: BORDER }}
+      style={{ background: BG_PANEL, borderColor: BORDER, borderTopColor: accent }}
     >
       {children}
     </motion.div>
@@ -237,7 +235,7 @@ function KpiTile({ label, value, sub, color }: {
     <motion.div
       variants={fadeUp}
       className="rounded-xl border p-3 flex flex-col gap-1"
-      style={{ background: BG_PANEL, borderColor: BORDER }}
+      style={{ background: BG_PANEL, borderColor: EDGE }}
     >
       <p className="text-[10px] font-bold uppercase tracking-[0.15em]" style={{ color: MUTED }}>{label}</p>
       <p className="text-2xl font-bold tabular-nums leading-none" style={{ color }}>{value}</p>
@@ -253,7 +251,7 @@ function StopProgressBar({ done, total }: { done: number; total: number }) {
       <div className="flex-1 min-w-0">
         <RouteStepper steps={countSteps(done, total)} compact />
       </div>
-      <span className="text-[10px] font-bold tabular-nums shrink-0" style={{ color: MUTED }}>
+      <span className="text-[10px] font-bold tabular-nums shrink-0 text-white">
         {done}/{total} stops
       </span>
     </div>
@@ -293,7 +291,7 @@ function ActiveShipmentRow({ booking }: { booking: BookingWithRelations }) {
   return (
     <div
       className="rounded-lg border p-3 flex flex-col gap-2"
-      style={{ background: BG_PAGE, borderColor: BORDER }}
+      style={{ background: BG_CARD, borderColor: BORDER }}
     >
       <div className="flex items-center gap-2 flex-wrap">
         <Link
@@ -346,7 +344,7 @@ function RejectedRow({ booking, onUpdated }: {
 }) {
   const reason = booking.rejection_reason as string | undefined
   return (
-    <div className="rounded-lg border p-3 flex flex-col gap-1.5" style={{ background: BG_PAGE, borderColor: `${ERROR}40` }}>
+    <div className="rounded-lg border p-3 flex flex-col gap-1.5" style={{ background: BG_CARD, borderColor: `${ERROR}40` }}>
       <div className="flex items-center gap-2">
         <XCircle size={13} style={{ color: ERROR }} />
         <Link
@@ -424,18 +422,6 @@ export default function ClientDashboardView() {
     ).length
   }, [bookings])
 
-  const upcoming = useMemo(() => {
-    const today = phToday()
-    return bookings
-      .filter((b) => {
-        const s = asBookingStatus(b.status)
-        return (s === 'PENDING' || s === 'APPROVED' || s === 'ASSIGNED') &&
-               String(b.schedule_date ?? '') >= today
-      })
-      .sort((a, b) => String(a.schedule_date ?? '').localeCompare(String(b.schedule_date ?? '')))
-      .slice(0, 5)
-  }, [bookings])
-
   // A rejection is easy to miss otherwise: it is the one thing on this screen
   // the client has to act on rather than just watch. It leaves the list once
   // the client resubmits it or cancels it.
@@ -485,7 +471,7 @@ export default function ClientDashboardView() {
           href="/client/booking"
           className="ml-auto flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold
                      uppercase tracking-wider transition-opacity hover:opacity-85 shrink-0"
-          style={{ background: CYAN, color: '#000' }}
+          style={{ background: `${CYAN}30`, border: `1px solid ${CYAN}`, color: CYAN }}
         >
           <Plus size={14} /> <span className="hidden sm:inline">New Booking</span>
         </Link>
@@ -528,19 +514,19 @@ export default function ClientDashboardView() {
             {/* KPIs */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
               <KpiTile label="Active Shipments" value={active.length}
-                sub="approved, assigned or moving" color="#fff" />
+                sub="approved, assigned or moving" color={CYAN} />
               <KpiTile label="Awaiting Approval" value={pending.length}
                 sub="with 8338" color={AMBER} />
               <KpiTile label="Completed This Month" value={completedThisMonth}
                 sub="deliveries finished" color={GREEN} />
               <KpiTile label="Needs Your Attention" value={attentionCount}
-                sub="rejected bookings" color={CYAN} />
+                sub="rejected bookings" color="#fff" />
             </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
 
               {/* Active shipments */}
-              <Panel className="xl:col-span-2">
+              <Panel accent={CYAN} className="xl:col-span-2">
                 <SectionHeader
                   icon={<Truck size={16} />}
                   title="Active Shipments"
@@ -576,7 +562,7 @@ export default function ClientDashboardView() {
               {/* Right column */}
               <div className="flex flex-col gap-3">
 
-                <Panel>
+                <Panel accent={ERROR}>
                   <SectionHeader icon={<AlertCircle size={16} />} title="Needs Your Attention" />
                   {attentionCount === 0 ? (
                     <EmptyPanel icon={<CheckCircle2 size={26} />} message="Nothing needs you right now." />
@@ -593,47 +579,11 @@ export default function ClientDashboardView() {
 
                 <HelpPanel />
 
-                <Panel>
-                  <SectionHeader icon={<CalendarDays size={16} />} title="Upcoming Pickups" />
-                  {upcoming.length === 0 ? (
-                    <EmptyPanel icon={<CalendarDays size={26} />} message="No pickups scheduled." />
-                  ) : (
-                    <div className="flex flex-col gap-2">
-                      {upcoming.map((b) => (
-                        <Link
-                          key={b.booking_id}
-                          href={`/client/history?booking=${b.booking_id}`}
-                          className="flex items-center gap-2.5 rounded-lg border p-2.5 transition-colors hover:border-white/20"
-                          style={{ background: BG_PAGE, borderColor: BORDER }}
-                        >
-                          <div className="flex flex-col items-center justify-center w-11 shrink-0">
-                            <span className="text-[10px] uppercase tracking-widest" style={{ color: MUTED }}>
-                              {formatDayShort(b.schedule_date).split(' ')[0]}
-                            </span>
-                            <span className="text-base font-bold leading-none" style={{ color: CYAN }}>
-                              {formatDayShort(b.schedule_date).split(' ')[1]}
-                            </span>
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-xs font-bold text-white truncate">{bookingRef(b)}</p>
-                            <p className="text-[11px] truncate" style={{ color: MUTED }}>
-                              {(b.origin as string | undefined) ?? '—'}
-                            </p>
-                          </div>
-                          <span className="text-[10px] uppercase tracking-wider shrink-0" style={{ color: MUTED }}>
-                            {(b.truck_type_needed as string | undefined) ?? ''}
-                          </span>
-                        </Link>
-                      ))}
-                    </div>
-                  )}
-                </Panel>
-
               </div>
             </div>
 
             {/* Recent activity */}
-            <Panel>
+            <Panel accent="#fff">
               <SectionHeader icon={<Bell size={16} />} title="Recent Activity" />
               {notes.length === 0 ? (
                 <EmptyPanel icon={<Inbox size={26} />} message="No activity yet." />
