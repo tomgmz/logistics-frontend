@@ -24,11 +24,11 @@ function fmtWhen(iso: string | null | undefined): string {
 export function reportStatusStyle(status: ReportStatus): { bg: string; color: string; border: string } {
   switch (status) {
     case 'reported':
-      return { bg: 'rgba(248,113,113,0.12)', color: '#fca5a5', border: 'rgba(248,113,113,0.35)' }
+      return { bg: 'rgba(246,38,38,0.12)', color: '#f62626', border: 'rgba(246,38,38,0.35)' }
     case 'acknowledged':
-      return { bg: 'rgba(250,204,21,0.12)', color: '#fde047', border: 'rgba(250,204,21,0.35)' }
+      return { bg: 'rgba(255,234,0,0.12)', color: '#ffea00', border: 'rgba(255,234,0,0.35)' }
     default:
-      return { bg: 'rgba(58,246,38,0.12)', color: '#86efac', border: 'rgba(58,246,38,0.35)' }
+      return { bg: 'rgba(58,246,38,0.12)', color: '#3af626', border: 'rgba(58,246,38,0.35)' }
   }
 }
 
@@ -48,7 +48,7 @@ export function UrgentBadge() {
   return (
     <span
       className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border"
-      style={{ color: '#fca5a5', borderColor: 'rgba(248,113,113,0.45)', background: 'rgba(248,113,113,0.15)' }}
+      style={{ color: '#f62626', borderColor: 'rgba(246,38,38,0.45)', background: 'rgba(246,38,38,0.15)' }}
       title="Sent as an emergency alert, or the driver said the trip cannot continue"
     >
       <AlertTriangle size={10} />

@@ -531,7 +531,7 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
                         <span
                           className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold"
                           style={t.status === 'open'
-                            ? { color: '#fbbf24', borderColor: 'rgba(251,191,36,0.35)', background: 'rgba(251,191,36,0.08)' }
+                            ? { color: '#ffea00', borderColor: 'rgba(255,234,0,0.35)', background: 'rgba(255,234,0,0.08)' }
                             : { color: 'var(--color-cyan)', borderColor: 'rgba(77,249,237,0.35)', background: 'rgba(77,249,237,0.08)' }}
                         >
                           {t.status === 'open' ? 'Waiting for reply' : <><CheckCircle2 size={10} /> Resolved</>}

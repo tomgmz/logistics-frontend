@@ -84,7 +84,7 @@ export default function MessageBubble({
       )}
       {onDelete && (
         <button type="button" onClick={() => setConfirmingDelete(true)} title="Remove message"
-          className="p-1.5 rounded-lg hover:bg-white/5 text-white/25 hover:text-[var(--color-red,#f87171)] transition-colors">
+          className="p-1.5 rounded-lg hover:bg-white/5 text-white/25 hover:text-[var(--color-red,#f62626)] transition-colors">
           <Trash2 size={13} />
         </button>
       )}

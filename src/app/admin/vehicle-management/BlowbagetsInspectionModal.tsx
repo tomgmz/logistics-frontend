@@ -241,7 +241,7 @@ export default function BlowbagetsInspectionModal({
 
               <div>
                 <label htmlFor="inspection-notes" className="text-[11px] text-white/40 block mb-1">
-                  Notes {!willPass && <span className="text-[#fca5a5]">— describe the fault</span>}
+                  Notes {!willPass && <span className="text-[#f62626]">— describe the fault</span>}
                 </label>
                 <textarea
                   id="inspection-notes"
@@ -283,7 +283,7 @@ export default function BlowbagetsInspectionModal({
                               style={
                                 row.passed
                                   ? { color: 'var(--color-cyan)', borderColor: 'rgba(77,249,237,0.35)', background: 'rgba(77,249,237,0.10)' }
-                                  : { color: '#fca5a5', borderColor: 'rgba(248,113,113,0.35)', background: 'rgba(248,113,113,0.10)' }
+                                  : { color: '#f62626', borderColor: 'rgba(246,38,38,0.35)', background: 'rgba(246,38,38,0.10)' }
                               }
                             >
                               {row.passed ? 'Passed' : 'Failed'}
@@ -291,7 +291,7 @@ export default function BlowbagetsInspectionModal({
                             <span className="text-[10px] text-white/35">{fmtWhen(row.inspected_at)}</span>
                           </div>
                           {failed.length > 0 && (
-                            <p className="text-[11px] text-[#fca5a5]/90 mt-1 leading-snug">
+                            <p className="text-[11px] text-[#f62626]/90 mt-1 leading-snug">
                               {failed.map((f) => f.label).join(', ')}
                             </p>
                           )}
@@ -323,7 +323,7 @@ export default function BlowbagetsInspectionModal({
                 style={
                   willPass
                     ? { background: 'rgba(77,249,237,0.12)', border: '1px solid rgba(77,249,237,0.30)', color: 'var(--color-cyan)' }
-                    : { background: 'rgba(248,113,113,0.10)', border: '1px solid rgba(248,113,113,0.30)', color: '#fca5a5' }
+                    : { background: 'rgba(246,38,38,0.10)', border: '1px solid rgba(246,38,38,0.30)', color: '#f62626' }
                 }
               >
                 {busy ? 'Recording…' : willPass ? 'Record pass' : `Record fail (${total - doneCount})`}

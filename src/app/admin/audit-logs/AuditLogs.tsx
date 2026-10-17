@@ -18,32 +18,32 @@ import ExportLogsButton from '@/components/admin/ExportLogsButton'
 import { expandCode, roleLabel } from '@/lib/roles'
 
 const BADGE_STYLES: Record<LogType, string> = {
-  auth:              'bg-[rgba(160,120,255,0.12)] text-[#b08aff] border border-[rgba(160,120,255,0.25)]',
+  auth:              'bg-[rgba(138,56,245,0.12)] text-[#8a38f5] border border-[rgba(138,56,245,0.25)]',
   user_management:   'bg-[rgba(77,249,237,0.12)] text-[#4df9ed] border border-[rgba(77,249,237,0.25)]',
-  access_control:    'bg-[rgba(255,80,80,0.10)] text-[#ff6060] border border-[rgba(255,80,80,0.25)]',
-  document_activity: 'bg-[rgba(120,180,255,0.12)] text-[#78b4ff] border border-[rgba(120,180,255,0.25)]',
-  data_export:       'bg-[rgba(255,120,200,0.12)] text-[#ff78c8] border border-[rgba(255,120,200,0.25)]',
-  admin_activity:    'bg-[rgba(255,140,0,0.10)] text-[#ff9a3c] border border-[rgba(255,140,0,0.25)]',
+  access_control:    'bg-[rgba(246,38,38,0.10)] text-[#f62626] border border-[rgba(246,38,38,0.25)]',
+  document_activity: 'bg-[rgba(77,249,237,0.12)] text-[#4df9ed] border border-[rgba(77,249,237,0.25)]',
+  data_export:       'bg-[rgba(138,56,245,0.12)] text-[#8a38f5] border border-[rgba(138,56,245,0.25)]',
+  admin_activity:    'bg-[rgba(255,122,48,0.10)] text-[#ff7a30] border border-[rgba(255,122,48,0.25)]',
   vehicle_activity:  'bg-[rgba(58,246,38,0.10)] text-[#3af626] border border-[rgba(58,246,38,0.25)]',
-  booking:           'bg-[rgba(255,200,60,0.10)] text-[#ffc83c] border border-[rgba(255,200,60,0.25)]',
+  booking:           'bg-[rgba(255,234,0,0.10)] text-[#ffea00] border border-[rgba(255,234,0,0.25)]',
   driver_activity:   'bg-[rgba(58,246,38,0.10)] text-[#3af626] border border-[rgba(58,246,38,0.25)]',
   user_activity:     'bg-[rgba(130,130,130,0.12)] text-[#9a9a9a] border border-[rgba(130,130,130,0.25)]',
-  system_error:      'bg-[rgba(255,80,80,0.10)] text-[#ff6060] border border-[rgba(255,80,80,0.25)]',
+  system_error:      'bg-[rgba(246,38,38,0.10)] text-[#f62626] border border-[rgba(246,38,38,0.25)]',
 }
 
 const STAT_COLORS: Record<string, string> = {
   total:             '#ffffff',
-  auth:              '#b08aff',
+  auth:              '#8a38f5',
   user_management:   '#4df9ed',
-  access_control:    '#ff6060',
-  document_activity: '#78b4ff',
-  data_export:       '#ff78c8',
-  admin_activity:    '#ff9a3c',
+  access_control:    '#f62626',
+  document_activity: '#4df9ed',
+  data_export:       '#8a38f5',
+  admin_activity:    '#ff7a30',
   vehicle_activity:  '#3af626',
-  booking:           '#ffc83c',
+  booking:           '#ffea00',
   driver_activity:   '#3af626',
   user_activity:     '#9a9a9a',
-  system_error:      '#ff6060',
+  system_error:      '#f62626',
 }
 
 const PAGE_SIZE = 15

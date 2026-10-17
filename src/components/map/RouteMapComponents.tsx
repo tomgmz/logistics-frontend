@@ -4,22 +4,24 @@ import { motion } from 'framer-motion'
 import CheckCircleIcon  from '@mui/icons-material/CheckCircle'
 import PlaceIcon        from '@mui/icons-material/Place'
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'
+import { bookingStatusColor } from '@/lib/palette'
 
 export type BookingStatus =
   | 'PENDING' | 'ASSIGNED' | 'IN_TRANSIT' | 'IN TRANSIT'
   | 'COMPLETED' | 'CANCELLED' | 'BOOKED'
   | string
 
-const STATUS_MAP: Record<string, { label: string; color: string; bg: string; border: string }> = {
-  PENDING:      { label: 'Pending',    color: '#9ca3af',             bg: 'rgba(156,163,175,0.12)', border: 'rgba(156,163,175,0.3)'  },
-  ASSIGNED:     { label: 'Assigned',   color: '#f69f26',             bg: 'rgba(246,159,38,0.12)',  border: 'rgba(246,159,38,0.3)'   },
-  IN_TRANSIT:   { label: 'In Transit', color: 'var(--color-cyan)',   bg: 'rgba(77,249,237,0.12)',  border: 'rgba(77,249,237,0.3)'   },
-  'IN TRANSIT': { label: 'In Transit', color: 'var(--color-cyan)',   bg: 'rgba(77,249,237,0.12)',  border: 'rgba(77,249,237,0.3)'   },
-  BOOKED:       { label: 'Booked',     color: '#f69f26',             bg: 'rgba(246,159,38,0.12)',  border: 'rgba(246,159,38,0.3)'   },
-  DELIVERED:    { label: 'Delivered',  color: '#fbbf24',             bg: 'rgba(251,191,36,0.12)',  border: 'rgba(251,191,36,0.3)'   },
-  COMPLETED:    { label: 'Completed',  color: 'var(--color-green)',  bg: 'rgba(58,246,38,0.12)',   border: 'rgba(58,246,38,0.3)'    },
-  CANCELLED:    { label: 'Cancelled',  color: '#f62626',             bg: 'rgba(246,38,38,0.12)',   border: 'rgba(246,38,38,0.3)'    },
+const STATUS_LABEL: Record<string, string> = {
+  PENDING: 'Pending', BOOKED: 'Booked', APPROVED: 'Approved', ASSIGNED: 'Assigned',
+  IN_TRANSIT: 'In Transit', 'IN TRANSIT': 'In Transit', ARRIVED: 'Arrived',
+  DELIVERED: 'Delivered', COMPLETED: 'Completed', CANCELLED: 'Cancelled',
 }
+
+const STATUS_MAP: Record<string, { label: string; color: string; bg: string; border: string }> =
+  Object.fromEntries(Object.entries(STATUS_LABEL).map(([key, label]) => {
+    const color = bookingStatusColor(key)
+    return [key, { label, color, bg: `${color}1f`, border: `${color}4d` }]
+  }))
 
 export function StatusBadge({ status }: { status: string }) {
   const key = status.toUpperCase().replace(/-/g, '_')
@@ -55,7 +57,7 @@ export function RouteStop({
   const dotColor = isOrigin  ? 'var(--color-cyan)'
     : delivered              ? 'var(--color-green)'
     : failed                 ? '#f62626'
-    : isLast                 ? '#ef4444'
+    : isLast                 ? '#f62626'
     : 'var(--color-cyan)'
 
   const dotBg = isOrigin  ? 'rgba(77,249,237,0.15)'

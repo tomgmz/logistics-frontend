@@ -81,7 +81,7 @@ function TransitBookingRow({
   const pausedReason    = (booking as { paused_at?: string | null }).paused_at
     ? ((booking as { pause_reason?: string | null }).pause_reason ?? 'other')
     : null
-  const color           = pausedReason ? '#fbbf24' : statusColor(booking.status)
+  const color           = pausedReason ? '#ffea00' : statusColor(booking.status)
   const label           = fmtStatus(booking.status)
   const origin          = booking.origin?.split(',')[0] ?? '—'
   const lastDestAddress = booking.booking_destinations?.[booking.booking_destinations.length - 1]?.address

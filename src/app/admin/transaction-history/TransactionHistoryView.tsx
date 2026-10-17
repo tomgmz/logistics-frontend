@@ -52,7 +52,7 @@ const PAGE_SIZE = 20
 const BORDER = 'rgba(255,255,255,0.07)'
 const CYAN   = '#4DF9ED'
 const MUTED  = '#818181'
-const ERROR  = '#f87171'
+const ERROR  = '#f62626'
 
 const TABS: { key: string; label: string }[] = [
   { key: 'all',        label: 'All' },

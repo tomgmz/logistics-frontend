@@ -44,7 +44,7 @@ const BASE: Record<StaffRole, string> = {
 // Validated (dataviz validate_palette, dark, surface #1b1b1b): both inside the
 // lightness band, CVD and normal-vision separation pass. The brand cyan itself
 // is too light to read as a filled bar on this surface.
-const SERIES = { created: '#14a399', delivered: '#8a7cf0' } as const
+const SERIES = { created: '#4df9ed', delivered: '#8a38f5' } as const
 
 const STATUS_LABEL: Record<string, string> = {
   pending:    'Pending approval',
@@ -60,8 +60,8 @@ const STATUS_ORDER = ['pending', 'approved', 'assigned', 'in_transit', 'delivere
 type Tone = 'cyan' | 'amber' | 'red' | 'muted'
 const TONE: Record<Tone, string> = {
   cyan:  'var(--color-cyan)',
-  amber: '#fbbf24',
-  red:   '#f87171',
+  amber: '#ffea00',
+  red:   '#f62626',
   muted: '#818181',
 }
 

@@ -561,7 +561,7 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
                     className="relative flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed cursor-pointer transition-colors overflow-hidden"
                     style={{
                       borderColor: fieldErrors.image
-                        ? 'rgba(248,113,113,0.6)'
+                        ? 'rgba(246,38,38,0.6)'
                         : imagePreview ? 'transparent' : 'rgba(255,255,255,0.12)',
                       minHeight: 140,
                     }}

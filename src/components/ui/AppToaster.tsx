@@ -59,13 +59,13 @@ export default function AppToaster() {
         error: {
           duration: 4500,
           iconTheme: {
-            primary:    '#f87171',
+            primary:    '#f62626',
             secondary:  '#0a0a0a',
           },
           style: {
             background:   '#1b1b1b',
             color:        '#ffffff',
-            border:       '1px solid rgba(248,113,113,0.25)',
+            border:       '1px solid rgba(246,38,38,0.25)',
             borderRadius: '12px',
             fontSize:     '15px',
             fontWeight:   500,

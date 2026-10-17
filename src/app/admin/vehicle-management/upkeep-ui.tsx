@@ -153,10 +153,10 @@ export function PhotoField({
 export function ServiceStatusBadge({ status }: { status: ServiceStatus | undefined }) {
   if (!status) return null
   const tone = {
-    overdue:  { label: 'Service overdue',  color: '#fca5a5', border: 'rgba(248,113,113,0.40)', bg: 'rgba(248,113,113,0.12)' },
-    due_soon: { label: 'Service due soon', color: '#fde047', border: 'rgba(250,204,21,0.35)',  bg: 'rgba(250,204,21,0.10)' },
+    overdue:  { label: 'Service overdue',  color: '#f62626', border: 'rgba(246,38,38,0.40)', bg: 'rgba(246,38,38,0.12)' },
+    due_soon: { label: 'Service due soon', color: '#ffea00', border: 'rgba(255,234,0,0.35)',  bg: 'rgba(255,234,0,0.10)' },
     missing:  { label: 'Not set up',       color: 'rgba(255,255,255,0.5)', border: 'rgba(255,255,255,0.15)', bg: 'transparent' },
-    ok:       { label: 'Up to date',       color: '#86efac', border: 'rgba(58,246,38,0.30)',   bg: 'rgba(58,246,38,0.08)' },
+    ok:       { label: 'Up to date',       color: '#3af626', border: 'rgba(58,246,38,0.30)',   bg: 'rgba(58,246,38,0.08)' },
   }[status.state]
 
   const detail = status.state === 'missing'

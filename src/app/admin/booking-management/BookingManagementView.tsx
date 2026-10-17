@@ -184,7 +184,7 @@ function AfterHoursBadge() {
     <span
       title="Submitted after 5:00 PM today — due for review when the office opens"
       className="inline-flex text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border mt-0.5"
-      style={{ color: '#facc15', borderColor: '#facc1555', background: '#facc1514' }}
+      style={{ color: '#ffea00', borderColor: '#facc1555', background: '#facc1514' }}
     >
       After hours
     </span>
@@ -203,7 +203,7 @@ function VehiclePulledBadge({ plate, status }: { plate: string; status: string }
     <span
       title={`${plate} is ${OUT_OF_SERVICE_WORDS[status] ?? status}. Choose another vehicle.`}
       className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border mt-0.5"
-      style={{ color: '#f87171', borderColor: '#f8717155', background: '#f8717114' }}
+      style={{ color: '#f62626', borderColor: '#f8717155', background: '#f8717114' }}
     >
       <AlertTriangle size={9} />
       Vehicle out of service
@@ -221,7 +221,7 @@ function VehiclePulledBanner({
   return (
     <div
       className="flex gap-2 rounded-lg border px-3 py-2 text-xs leading-snug"
-      style={{ color: '#fca5a5', borderColor: 'rgba(248,113,113,0.35)', background: 'rgba(248,113,113,0.08)' }}
+      style={{ color: '#f62626', borderColor: 'rgba(246,38,38,0.35)', background: 'rgba(246,38,38,0.08)' }}
     >
       <AlertTriangle size={14} className="shrink-0 mt-0.5" />
       <span>
@@ -240,7 +240,7 @@ function PausedBadge({ reason }: { reason: string }) {
     <span
       title={`Paused by the driver: ${pauseReasonLabel(reason)}`}
       className="flex w-fit items-center gap-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border mt-1"
-      style={{ color: '#fbbf24', borderColor: '#fbbf2455', background: '#fbbf2414' }}
+      style={{ color: '#ffea00', borderColor: '#fbbf2455', background: '#fbbf2414' }}
     >
       <PauseCircle size={9} />
       Paused · {pauseReasonLabel(reason)}
@@ -515,7 +515,7 @@ function ExternalDriverAccessRow({ userId, canEdit }: { userId: string; canEdit:
             onClick={revoke}
             disabled={busy}
             className="text-[10px] font-bold px-2 py-1 rounded-md border transition-colors disabled:opacity-40"
-            style={{ color: '#f87171', borderColor: 'rgba(248,113,113,0.3)' }}
+            style={{ color: '#f62626', borderColor: 'rgba(246,38,38,0.3)' }}
           >
             Revoke access
           </button>
@@ -700,7 +700,7 @@ function AssignmentPanel({
         <div className="space-y-2 text-sm text-white/70">
           {vendorMode && (
             <span className="inline-flex text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border"
-              style={{ color: '#fbbf24', borderColor: 'rgba(246,159,38,0.35)', background: 'rgba(246,159,38,0.12)' }}>
+              style={{ color: '#ffea00', borderColor: 'rgba(255,122,48,0.35)', background: 'rgba(255,122,48,0.12)' }}>
               Vendor-supplied
             </span>
           )}
@@ -803,7 +803,7 @@ function AssignmentPanel({
             onClick={() => onVendorModeChange(true)}
             className="flex-1 py-1.5 rounded-md transition-colors disabled:opacity-40"
             style={vendorMode
-              ? { background: 'rgba(246,159,38,0.14)', color: '#fbbf24' }
+              ? { background: 'rgba(255,122,48,0.14)', color: '#ffea00' }
               : { color: '#888' }}
           >
             Vendor-supplied
@@ -1098,7 +1098,7 @@ function CodingNotice({ flag, plate }: { flag: CodingFlag; plate: string }) {
   return (
     <div
       className="rounded-lg border px-2.5 py-2 flex items-start gap-2"
-      style={{ borderColor: 'rgba(246,159,38,0.35)', background: 'rgba(246,159,38,0.10)' }}
+      style={{ borderColor: 'rgba(255,122,48,0.35)', background: 'rgba(255,122,48,0.10)' }}
     >
       <AlertTriangle size={14} className="mt-0.5 shrink-0 text-amber-400" />
       <div className="min-w-0 space-y-0.5">
@@ -1149,7 +1149,7 @@ function BlowbagetsRecord({ check }: { check: BlowbagetsCheck }) {
               style={
                 on
                   ? { color: 'var(--color-cyan)', borderColor: 'rgba(77,249,237,0.35)', background: 'rgba(77,249,237,0.10)' }
-                  : { color: '#fca5a5', borderColor: 'rgba(248,113,113,0.35)', background: 'rgba(248,113,113,0.10)' }
+                  : { color: '#f62626', borderColor: 'rgba(246,38,38,0.35)', background: 'rgba(246,38,38,0.10)' }
               }
             >
               {on ? <Check size={11} strokeWidth={3} /> : <X size={11} strokeWidth={3} />}
@@ -1160,7 +1160,7 @@ function BlowbagetsRecord({ check }: { check: BlowbagetsCheck }) {
       </div>
 
       {failed.length > 0 && (
-        <p className="text-[11px] text-[#fca5a5]/90 leading-snug">
+        <p className="text-[11px] text-[#f62626]/90 leading-snug">
           {failed.length} item{failed.length > 1 ? 's' : ''} failed: {failed.map((f) => f.label).join(', ')}
         </p>
       )}
@@ -2408,7 +2408,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                               disabled={pendingStatus || pendingReject}
                               onClick={() => setRejectModalOpen(true)}
                               className="flex-1 py-2 rounded-lg text-sm font-bold transition-colors disabled:opacity-40"
-                              style={{ background: 'rgba(248,113,113,0.10)', border: '1px solid rgba(248,113,113,0.30)', color: '#fca5a5' }}
+                              style={{ background: 'rgba(246,38,38,0.10)', border: '1px solid rgba(246,38,38,0.30)', color: '#f62626' }}
                             >
                               {pendingReject ? 'Rejecting…' : 'Reject'}
                             </button>
@@ -2428,9 +2428,9 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                         {d?.gm_status === 'rejected' && d?.rejection_reason && (
                           <div
                             className="rounded-lg border px-2.5 py-2"
-                            style={{ borderColor: 'rgba(248,113,113,0.30)', background: 'rgba(248,113,113,0.08)' }}
+                            style={{ borderColor: 'rgba(246,38,38,0.30)', background: 'rgba(246,38,38,0.08)' }}
                           >
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-[#fca5a5]/80 mb-1">
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-[#f62626]/80 mb-1">
                               Rejected by the General Manager
                             </p>
                             <p className="text-xs text-white/75 leading-snug">{d.rejection_reason}</p>

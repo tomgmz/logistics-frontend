@@ -90,7 +90,7 @@ export default function FaqSection() {
 
       <div className="absolute left-1/2 -translate-x-1/2 top-[40%] -translate-y-1/2
         w-[500px] h-[500px] pointer-events-none z-0">
-        <div className="w-full h-full rounded-full bg-[#f5c518]/[0.03] blur-[120px]" />
+        <div className="w-full h-full rounded-full bg-[#ffea00]/[0.03] blur-[120px]" />
       </div>
 
       <div className="relative z-10 max-w-[860px] mx-auto px-5 sm:px-8 md:px-12">
@@ -105,7 +105,7 @@ export default function FaqSection() {
           <h2 className="font-display-italic xs:!text-[2rem] text-white leading-[1.0]">
             FREQUENTLY ASKED
             <br />
-            <span className="font-eurostile xs:!text-[2rem] text-[#f5c518]">QUESTIONS</span>
+            <span className="font-eurostile xs:!text-[2rem] text-[#ffea00]">QUESTIONS</span>
           </h2>
         </motion.div>
 

@@ -24,8 +24,8 @@ export default function NewEntriesBar({
       type="button"
       onClick={onRefresh}
       className="shrink-0 w-full flex items-center justify-center gap-2 px-4 py-2 text-xs font-semibold cursor-pointer
-                 text-[var(--color-cyan,#22d3ee)] bg-[var(--color-cyan,#22d3ee)]/10 border-b border-[var(--color-cyan,#22d3ee)]/20
-                 hover:bg-[var(--color-cyan,#22d3ee)]/15 transition-colors"
+                 text-[var(--color-cyan,#4df9ed)] bg-[var(--color-cyan,#4df9ed)]/10 border-b border-[var(--color-cyan,#4df9ed)]/20
+                 hover:bg-[var(--color-cyan,#4df9ed)]/15 transition-colors"
     >
       <RefreshCw size={13} />
       <span>

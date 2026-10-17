@@ -276,7 +276,7 @@ export function RouteStepper({
               {step.loads && (
                 <span
                   className="mt-0.5 text-[10px] font-semibold tabular-nums"
-                  style={{ color: step.loads.done === step.loads.total ? CYAN : '#fbbf24' }}
+                  style={{ color: step.loads.done === step.loads.total ? CYAN : '#ffea00' }}
                 >
                   {step.loads.done}/{step.loads.total} loads
                 </span>

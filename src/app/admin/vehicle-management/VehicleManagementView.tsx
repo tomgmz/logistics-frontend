@@ -979,7 +979,7 @@ export default function VehicleManagementView() {
                               {t.return_odometer_due && (
                                 <span
                                   className="inline-flex text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border"
-                                  style={{ color: '#fbbf24', borderColor: 'rgba(246,159,38,0.35)', background: 'rgba(246,159,38,0.12)' }}
+                                  style={{ color: '#ffea00', borderColor: 'rgba(255,122,48,0.35)', background: 'rgba(255,122,48,0.12)' }}
                                   title="Back from a delivery — record the return odometer before it can be assigned again"
                                 >
                                   Return odometer due

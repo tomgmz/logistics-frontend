@@ -28,9 +28,9 @@ const POLL_MS = 60_000
 const COLOR = {
   cyan:     '#4df9ed',
   green:    '#3af626',
-  amber:    '#ffc83c',
-  red:      '#ff6060',
-  critical: '#ff3030',
+  amber:    '#ffea00',
+  red:      '#f62626',
+  critical: '#f62626',
   muted:    '#818181',
 } as const
 
@@ -251,13 +251,13 @@ function SchedulerRow({ s, now }: { s: SchedulerHealth; now: number }) {
           Last run: <span className="text-white">{ago(s.last_success_at, now)}</span>
         </span>
         {s.errors_24h > 0 && (
-          <Link href={logsHref({ event_type: 'cron_job', search: s.source })} className="text-[#ff6060] hover:underline">
+          <Link href={logsHref({ event_type: 'cron_job', search: s.source })} className="text-[#f62626] hover:underline">
             {s.errors_24h} error{s.errors_24h === 1 ? '' : 's'} today
           </Link>
         )}
       </div>
       {s.status === 'failing' && s.last_error_message && (
-        <p className="mt-1 text-[11px] text-[#ff6060] break-words">{s.last_error_message}</p>
+        <p className="mt-1 text-[11px] text-[#f62626] break-words">{s.last_error_message}</p>
       )}
     </li>
   )
@@ -305,7 +305,7 @@ function ServiceTile({ s, now }: { s: ServiceHealth; now: number }) {
       {s.last_failure_at && (
         <p className="mt-2 text-[11px] text-[#818181] break-words" title={formatDateTime(s.last_failure_at)}>
           Last failure {ago(s.last_failure_at, now).toLowerCase()}
-          {s.last_failure_message && <>: <span className="text-[#ff9a9a]">{s.last_failure_message}</span></>}
+          {s.last_failure_message && <>: <span className="text-[#f62626]">{s.last_failure_message}</span></>}
         </p>
       )}
     </div>
@@ -391,7 +391,7 @@ function SecurityCard({ data }: { data: ItDashboardSummary['security'] }) {
               {data.most_failed_accounts.map((a) => (
                 <li key={a.email} className="flex items-center justify-between gap-2 px-3 py-2 text-xs">
                   <span className="truncate text-white">{a.email}</span>
-                  <span className="font-mono font-bold text-[#ffc83c]">{a.count}</span>
+                  <span className="font-mono font-bold text-[#ffea00]">{a.count}</span>
                 </li>
               ))}
             </ul>
@@ -426,7 +426,7 @@ function SecurityCard({ data }: { data: ItDashboardSummary['security'] }) {
         <span>Signed-in sessions now: <span className="font-mono text-white">{data.active_sessions}</span></span>
         <span>
           Open password reset requests:{' '}
-          <Link href="/it_admin/administrator-management" className={data.open_reset_requests > 0 ? 'font-mono text-[#ffc83c] hover:underline' : 'font-mono text-white'}>
+          <Link href="/it_admin/administrator-management" className={data.open_reset_requests > 0 ? 'font-mono text-[#ffea00] hover:underline' : 'font-mono text-white'}>
             {data.open_reset_requests}
           </Link>
         </span>
@@ -494,7 +494,7 @@ function AccountsCard({ data, now }: { data: ItDashboardSummary['accounts']; now
             </p>
           </div>
         ) : (
-          <p className="rounded-xl border border-[#ff3030]/40 bg-[#ff3030]/10 px-3 py-2 text-xs text-[#ff6060]">
+          <p className="rounded-xl border border-[#f62626]/40 bg-[#f62626]/10 px-3 py-2 text-xs text-[#f62626]">
             No active IT Administrator. Staff password resets cannot be handled until one is set.
           </p>
         )}
@@ -513,7 +513,7 @@ function AccountsCard({ data, now }: { data: ItDashboardSummary['accounts']; now
               </div>
               <div className="shrink-0 text-right">
                 {a.status !== 'active' && <Pill label={a.status === 'inactive' ? 'Inactive' : 'Locked'} color={COLOR.amber} />}
-                <p className={a.last_login_at ? 'text-[#818181]' : 'text-[#ffc83c]'}
+                <p className={a.last_login_at ? 'text-[#818181]' : 'text-[#ffea00]'}
                    title={a.last_login_at ? formatDateTime(a.last_login_at) : undefined}>
                   {a.last_login_at ? ago(a.last_login_at, now) : 'Never signed in'}
                 </p>
@@ -555,11 +555,11 @@ function StatusBanner({ summary }: { summary: ItDashboardSummary }) {
     )
   }
   return (
-    <div className="rounded-2xl border border-[#ff6060]/30 bg-[#ff6060]/[0.06] px-4 py-3">
-      <p className="flex items-center gap-2 text-sm font-semibold text-[#ff6060]">
+    <div className="rounded-2xl border border-[#f62626]/30 bg-[#f62626]/[0.06] px-4 py-3">
+      <p className="flex items-center gap-2 text-sm font-semibold text-[#f62626]">
         <AlertOctagon size={16} /> {items.length} item{items.length === 1 ? '' : 's'} need{items.length === 1 ? 's' : ''} attention
       </p>
-      <ul className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 pl-6 text-xs text-[#ff9a9a] list-disc">
+      <ul className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 pl-6 text-xs text-[#f62626] list-disc">
         {items.map((t) => <li key={t}>{t}</li>)}
       </ul>
     </div>
@@ -649,7 +649,7 @@ export default function ItAdminDashboard() {
         </div>
 
         {error && (
-          <div className="rounded-xl border border-[#ff6060]/30 bg-[#ff6060]/10 px-4 py-2.5 text-sm text-[#ff6060]">
+          <div className="rounded-xl border border-[#f62626]/30 bg-[#f62626]/10 px-4 py-2.5 text-sm text-[#f62626]">
             {error}
           </div>
         )}

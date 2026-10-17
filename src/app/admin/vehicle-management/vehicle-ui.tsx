@@ -77,13 +77,13 @@ export function fmtLabel(s: string) {
 export function statusStyle(status: string): { bg: string; color: string; border: string } {
   switch (status) {
     case 'available':
-      return { bg: 'rgba(58,246,38,0.12)', color: '#86efac', border: 'rgba(58,246,38,0.35)' }
+      return { bg: 'rgba(58,246,38,0.12)', color: '#3af626', border: 'rgba(58,246,38,0.35)' }
     case 'in_use':
       return { bg: 'rgba(77,249,237,0.12)', color: 'var(--color-cyan)', border: 'rgba(77,249,237,0.35)' }
     case 'recheck_due':
-      return { bg: 'rgba(250,204,21,0.12)', color: '#fde047', border: 'rgba(250,204,21,0.35)' }
+      return { bg: 'rgba(255,234,0,0.12)', color: '#ffea00', border: 'rgba(255,234,0,0.35)' }
     case 'under_maintenance':
-      return { bg: 'rgba(246,159,38,0.12)', color: '#fbbf24', border: 'rgba(246,159,38,0.35)' }
+      return { bg: 'rgba(255,122,48,0.12)', color: '#ffea00', border: 'rgba(255,122,48,0.35)' }
     case 'inactive':
       return { bg: 'rgba(156,163,175,0.12)', color: '#d1d5db', border: 'rgba(156,163,175,0.3)' }
     case 'archived':
@@ -148,7 +148,7 @@ export function InspectionBadge({ inspection, dueRecheck }: { inspection: TruckI
       <span className="flex flex-col gap-0.5 items-start">
         <span
           className="inline-flex text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border"
-          style={{ color: '#fbbf24', borderColor: 'rgba(246,159,38,0.35)', background: 'rgba(246,159,38,0.12)' }}
+          style={{ color: '#ffea00', borderColor: 'rgba(255,122,48,0.35)', background: 'rgba(255,122,48,0.12)' }}
           title="Back from a booking since its last check — inspect it again before it can be assigned"
         >
           Re-check due
@@ -165,7 +165,7 @@ export function InspectionBadge({ inspection, dueRecheck }: { inspection: TruckI
         style={
           inspection.passed
             ? { color: 'var(--color-cyan)', borderColor: 'rgba(77,249,237,0.40)', background: 'rgba(77,249,237,0.12)' }
-            : { color: '#fca5a5', borderColor: 'rgba(248,113,113,0.35)', background: 'rgba(248,113,113,0.10)' }
+            : { color: '#f62626', borderColor: 'rgba(246,38,38,0.35)', background: 'rgba(246,38,38,0.10)' }
         }
         title={inspection.passed
           ? 'Cleared — the Operations Manager can assign this vehicle'

@@ -251,7 +251,7 @@ function PermanentLockScreen({
       transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
       className="flex flex-col gap-6"
     >
-      <div className="flex items-center gap-2" style={{ color: 'rgba(239,68,68,0.85)' }}>
+      <div className="flex items-center gap-2" style={{ color: 'rgba(246,38,38,0.85)' }}>
         <IconAlert />
         <span
           className="text-[0.72rem] font-semibold tracking-[0.18em] uppercase"
@@ -264,9 +264,9 @@ function PermanentLockScreen({
       <div
         className="rounded-xl px-4 py-4 text-[0.78rem] leading-relaxed flex flex-col gap-3"
         style={{
-          background: 'rgba(239,68,68,0.08)',
-          border: '1px solid rgba(239,68,68,0.25)',
-          color: 'rgba(239,68,68,0.85)',
+          background: 'rgba(246,38,38,0.08)',
+          border: '1px solid rgba(246,38,38,0.25)',
+          color: 'rgba(246,38,38,0.85)',
           fontFamily: "'League Spartan', sans-serif",
         }}
       >
@@ -1089,7 +1089,7 @@ function OtpStep({
                 ? 'rgba(255,255,255,0.04)'
                 : digit ? 'rgba(77,249,237,0.08)' : 'rgba(255,255,255,0.08)',
               border: lockState === 'temporary'
-                ? '1px solid rgba(251,146,60,0.4)'
+                ? '1px solid rgba(255,122,48,0.4)'
                 : digit
                   ? '1px solid rgba(77,249,237,0.4)'
                   : '1px solid rgba(255,255,255,0.13)',
@@ -1110,16 +1110,16 @@ function OtpStep({
             exit={{ opacity: 0 }}
             className="rounded-xl px-4 py-3 text-[0.78rem] leading-relaxed flex items-center justify-between gap-4"
             style={{
-              background: 'rgba(251,146,60,0.08)',
-              border: '1px solid rgba(251,146,60,0.25)',
-              color: 'rgba(251,146,60,0.85)',
+              background: 'rgba(255,122,48,0.08)',
+              border: '1px solid rgba(255,122,48,0.25)',
+              color: 'rgba(255,122,48,0.85)',
               fontFamily: "'League Spartan', sans-serif",
             }}
           >
             <span>Account temporarily locked. Try again in</span>
             <span
               className="font-bold shrink-0"
-              style={{ fontFamily: 'monospace', fontSize: '0.95rem', color: 'rgba(251,146,60,1)' }}
+              style={{ fontFamily: 'monospace', fontSize: '0.95rem', color: 'rgba(255,122,48,1)' }}
             >
               {formatCountdown(lockRemaining)}
             </span>
@@ -1353,16 +1353,16 @@ function PasswordStep({
               exit={{ opacity: 0 }}
               className="rounded-xl px-4 py-3 text-[0.78rem] leading-relaxed flex items-center justify-between gap-4"
               style={{
-                background: 'rgba(251,146,60,0.08)',
-                border: '1px solid rgba(251,146,60,0.25)',
-                color: 'rgba(251,146,60,0.85)',
+                background: 'rgba(255,122,48,0.08)',
+                border: '1px solid rgba(255,122,48,0.25)',
+                color: 'rgba(255,122,48,0.85)',
                 fontFamily: "'League Spartan', sans-serif",
               }}
             >
               <span>Account temporarily locked. Try again in</span>
               <span
                 className="font-bold shrink-0"
-                style={{ fontFamily: 'monospace', fontSize: '0.95rem', color: 'rgba(251,146,60,1)' }}
+                style={{ fontFamily: 'monospace', fontSize: '0.95rem', color: 'rgba(255,122,48,1)' }}
               >
                 {formatCountdown(lockRemaining)}
               </span>

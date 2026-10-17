@@ -86,8 +86,8 @@ const INPUT_BG_PANEL = '#2A2828'
 const BORDER_PANEL   = 'rgba(255,255,255,0.12)'
 const BORDER_CARD    = BORDER_PANEL
 const CYAN           = '#4DF9ED'
-const RED            = '#f87171'
-const ERROR_COLOR    = '#f87171'
+const RED            = '#f62626'
+const ERROR_COLOR    = '#f62626'
 const ERROR_BORDER   = `${ERROR_COLOR}99`
 const RADIUS         = '8px'
 
@@ -590,7 +590,7 @@ function OfficeHoursNotice() {
     return () => clearInterval(id)
   }, [])
 
-  const accent = open ? CYAN : '#facc15'
+  const accent = open ? CYAN : '#ffea00'
 
   return (
     <div

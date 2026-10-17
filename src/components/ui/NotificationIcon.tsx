@@ -264,7 +264,7 @@ function NotifDetailModal({
               <div className="h-px bg-white/[0.06]" />
 
               <div className="flex flex-col items-center text-center gap-4">
-                <div className="w-14 h-14 rounded-full flex items-center justify-center bg-[var(--color-cyan,#22d3ee)]/10 text-[var(--color-cyan,#22d3ee)]">
+                <div className="w-14 h-14 rounded-full flex items-center justify-center bg-[var(--color-cyan,#4df9ed)]/10 text-[var(--color-cyan,#4df9ed)]">
                   <Bell size={24} />
                 </div>
                 <p
@@ -299,7 +299,7 @@ function NotifDetailModal({
               {url && (
                 <button
                   onClick={() => onTakeAction(url)}
-                  className="self-center flex items-center justify-center gap-2 w-full sm:w-auto sm:px-8 rounded-xl py-2.5 text-[11px] tracking-widest uppercase font-bold cursor-pointer transition-opacity hover:opacity-85 bg-[var(--color-cyan,#22d3ee)] text-[#0a0a0a] border-none"
+                  className="self-center flex items-center justify-center gap-2 w-full sm:w-auto sm:px-8 rounded-xl py-2.5 text-[11px] tracking-widest uppercase font-bold cursor-pointer transition-opacity hover:opacity-85 bg-[var(--color-cyan,#4df9ed)] text-[#0a0a0a] border-none"
                   style={{ fontFamily: "'Aboreto', sans-serif" }}
                 >
                   Take action
@@ -423,7 +423,7 @@ export default function NotificationIcon() {
         </span>
         {unreadCount > 0 && (
           <span
-            className="text-[11px] font-bold bg-[var(--color-cyan,#22d3ee)] text-[#0a0a0a] rounded-full px-1.5 leading-relaxed"
+            className="text-[11px] font-bold bg-[var(--color-cyan,#4df9ed)] text-[#0a0a0a] rounded-full px-1.5 leading-relaxed"
             style={{ fontFamily: "'Darker Grotesque', sans-serif" }}
           >
             {unreadCount}
@@ -466,7 +466,7 @@ export default function NotificationIcon() {
         id="notification-filter"
         value={filter ?? ""}
         onChange={(e) => { void setFilter((e.target.value || null) as NotificationFilter | null); }}
-        className="flex-1 min-w-0 cursor-pointer appearance-none rounded-lg border border-white/[0.08] bg-[#161616] px-2.5 py-1.5 pr-7 text-[13px] text-white outline-none transition-colors hover:border-white/20 focus:border-[var(--color-cyan,#22d3ee)]/60"
+        className="flex-1 min-w-0 cursor-pointer appearance-none rounded-lg border border-white/[0.08] bg-[#161616] px-2.5 py-1.5 pr-7 text-[13px] text-white outline-none transition-colors hover:border-white/20 focus:border-[var(--color-cyan,#4df9ed)]/60"
         style={{
           fontFamily: "'Darker Grotesque', sans-serif",
           backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23777' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`,
@@ -506,7 +506,7 @@ export default function NotificationIcon() {
             <div className="flex items-start gap-2.5">
               <div className="pt-1.5">
                 {isUnread
-                  ? <div className="w-1.5 h-1.5 rounded-full bg-[var(--color-cyan,#22d3ee)] shadow-[0_0_7px_var(--color-cyan,#22d3ee)] shrink-0" />
+                  ? <div className="w-1.5 h-1.5 rounded-full bg-[var(--color-cyan,#4df9ed)] shadow-[0_0_7px_var(--color-cyan,#4df9ed)] shrink-0" />
                   : <div className="w-1.5 h-1.5" />
                 }
               </div>

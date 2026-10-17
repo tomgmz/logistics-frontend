@@ -136,7 +136,7 @@ export default function ResetPasswordPage() {
     confirm.length > 0
       ? passwordsMatch
         ? '1px solid rgba(77,249,237,0.3)'
-        : '1px solid rgba(239,68,68,0.35)'
+        : '1px solid rgba(246,38,38,0.35)'
       : '1px solid rgba(255,255,255,0.11)'
 
   return (
@@ -481,11 +481,11 @@ function InvalidLinkView({ reason }: { reason?: string }) {
         <div
           className="w-14 h-14 rounded-full flex items-center justify-center"
           style={{
-            background: 'rgba(239,68,68,0.08)',
-            border: '1px solid rgba(239,68,68,0.25)',
+            background: 'rgba(246,38,38,0.08)',
+            border: '1px solid rgba(246,38,38,0.25)',
           }}
         >
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="1.6">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#f62626" strokeWidth="1.6">
             <circle cx="12" cy="12" r="10" />
             <line x1="12" y1="8"  x2="12" y2="13" strokeLinecap="round" />
             <line x1="12" y1="16" x2="12" y2="16" strokeLinecap="round" />

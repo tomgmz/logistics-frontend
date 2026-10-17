@@ -58,7 +58,7 @@ export function DirectionsRenderer({
 
     polylineRef.current = new google.maps.Polyline({
       path,
-      strokeColor:   '#06b6d4',
+      strokeColor:   '#4df9ed',
       strokeWeight:  4,
       strokeOpacity: 0.9,
       map,
@@ -127,7 +127,7 @@ export function DirectionsRenderer({
         polylineRef.current?.setMap(null)
         polylineRef.current = new google.maps.Polyline({
           path:          decodePolyline(encoded),
-          strokeColor:   '#06b6d4',
+          strokeColor:   '#4df9ed',
           strokeWeight:  4,
           strokeOpacity: 0.9,
           map,

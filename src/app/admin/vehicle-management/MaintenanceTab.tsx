@@ -69,11 +69,11 @@ function flaggedAt(t: MaintenanceTruck): string | null {
 }
 
 const REASON_TONE: Record<MaintenanceReason, { color: string; border: string; bg: string }> = {
-  driver_report:            { color: '#fca5a5', border: 'rgba(248,113,113,0.35)', bg: 'rgba(248,113,113,0.10)' },
-  service_overdue:          { color: '#fca5a5', border: 'rgba(248,113,113,0.35)', bg: 'rgba(248,113,113,0.10)' },
-  failed_inspection:        { color: '#fdba74', border: 'rgba(251,146,60,0.35)',  bg: 'rgba(251,146,60,0.10)' },
-  under_maintenance:        { color: '#fbbf24', border: 'rgba(246,159,38,0.35)',  bg: 'rgba(246,159,38,0.12)' },
-  service_due_soon:         { color: '#fde047', border: 'rgba(250,204,21,0.35)',  bg: 'rgba(250,204,21,0.10)' },
+  driver_report:            { color: '#f62626', border: 'rgba(246,38,38,0.35)', bg: 'rgba(246,38,38,0.10)' },
+  service_overdue:          { color: '#f62626', border: 'rgba(246,38,38,0.35)', bg: 'rgba(246,38,38,0.10)' },
+  failed_inspection:        { color: '#ff7a30', border: 'rgba(255,122,48,0.35)',  bg: 'rgba(255,122,48,0.10)' },
+  under_maintenance:        { color: '#ffea00', border: 'rgba(255,122,48,0.35)',  bg: 'rgba(255,122,48,0.12)' },
+  service_due_soon:         { color: '#ffea00', border: 'rgba(255,234,0,0.35)',  bg: 'rgba(255,234,0,0.10)' },
   service_schedule_missing: { color: 'rgba(255,255,255,0.55)', border: 'rgba(255,255,255,0.15)', bg: 'transparent' },
 }
 

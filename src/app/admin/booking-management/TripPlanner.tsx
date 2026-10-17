@@ -249,7 +249,7 @@ export default function TripPlanner({ detail, canEdit }: Props) {
                 <div
                   key={draft.key}
                   className="rounded-lg border p-2.5 space-y-2 bg-black/25"
-                  style={{ borderColor: isEmpty ? 'rgba(248,113,113,0.35)' : 'rgba(255,255,255,0.08)' }}
+                  style={{ borderColor: isEmpty ? 'rgba(246,38,38,0.35)' : 'rgba(255,255,255,0.08)' }}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-[11px] font-bold uppercase tracking-wider text-white/70">
@@ -423,7 +423,7 @@ export default function TripPlanner({ detail, canEdit }: Props) {
                             className="shrink-0 text-[10px] font-bold uppercase"
                             style={{
                               color: stop.status === 'delivered' ? 'var(--color-cyan)'
-                                   : stop.status === 'failed'    ? '#f87171'
+                                   : stop.status === 'failed'    ? '#f62626'
                                    : 'rgba(255,255,255,0.3)',
                             }}
                           >
@@ -470,9 +470,9 @@ export default function TripPlanner({ detail, canEdit }: Props) {
 
 function TripStatusPill({ status }: { status: Trip['status'] }) {
   const tone =
-    status === 'completed'  ? { label: 'Completed',  color: 'var(--color-cyan)' } :
-    status === 'in_transit' ? { label: 'Out now',    color: '#fbbf24'           } :
-    status === 'cancelled'  ? { label: 'Cancelled',  color: '#f87171'           } :
+    status === 'completed'  ? { label: 'Completed',  color: 'var(--color-green)' } :
+    status === 'in_transit' ? { label: 'Out now',    color: 'var(--color-cyan)' } :
+    status === 'cancelled'  ? { label: 'Cancelled',  color: '#f62626'           } :
                               { label: 'Not loaded', color: 'rgba(255,255,255,0.35)' }
 
   return (

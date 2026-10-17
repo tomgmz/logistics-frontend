@@ -9,7 +9,7 @@ import {
 } from '@/lib/hooks/usePlacesAutoComplete'
 
 const CYAN  = '#4DF9ED'
-const RED   = '#f87171'
+const RED   = '#f62626'
 const BG    = '#0b0b14'
 const PANEL = 'rgba(13,13,22,0.96)'
 
@@ -473,8 +473,8 @@ export default function MapLocationPicker({
         <div
           className="flex items-start gap-3 p-4 rounded-2xl transition-colors"
           style={{
-            background: outOfBounds ? 'rgba(248,113,113,0.07)' : 'rgba(255,255,255,0.05)',
-            border:     `1px solid ${outOfBounds ? 'rgba(248,113,113,0.25)' : 'rgba(255,255,255,0.07)'}`,
+            background: outOfBounds ? 'rgba(246,38,38,0.07)' : 'rgba(255,255,255,0.05)',
+            border:     `1px solid ${outOfBounds ? 'rgba(246,38,38,0.25)' : 'rgba(255,255,255,0.07)'}`,
           }}
         >
           <div

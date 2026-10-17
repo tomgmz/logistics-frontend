@@ -108,7 +108,7 @@ export default function ChangePasswordPage() {
     confirm.length > 0
       ? passwordsMatch
         ? '1px solid rgba(77,249,237,0.3)'
-        : '1px solid rgba(239,68,68,0.35)'
+        : '1px solid rgba(246,38,38,0.35)'
       : '1px solid rgba(255,255,255,0.11)'
 
   return (

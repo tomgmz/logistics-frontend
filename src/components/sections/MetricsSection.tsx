@@ -115,7 +115,7 @@ export default function MetricsSection({ metrics }: { metrics: PublicMetrics | n
         >
           <h2 className="font-display-italic text-white leading-[1.05]
             text-[1.5rem] xs:text-[1.5rem] sm:text-[2.4rem] md:text-[3rem] lg:text-[5rem]">
-            <span className="text-[#f97316] font-display-italic">METRICS</span>{' '}
+            <span className="text-[#ff7a30] font-display-italic">METRICS</span>{' '}
             THAT MOVE
             <br />
             YOUR BUSINESS

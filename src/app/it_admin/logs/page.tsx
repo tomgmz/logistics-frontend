@@ -30,33 +30,33 @@ import { expandCode, roleLabel } from '@/lib/roles'
 export type { SystemLogLevel, SystemLogEventType, SystemLogStats }
 
 const AUDIT_BADGE: Record<LogType, string> = {
-  auth:              'bg-[rgba(160,120,255,0.12)] text-[#b08aff] border border-[rgba(160,120,255,0.25)]',
+  auth:              'bg-[rgba(138,56,245,0.12)] text-[#8a38f5] border border-[rgba(138,56,245,0.25)]',
   user_management:   'bg-[rgba(77,249,237,0.12)] text-[#4df9ed] border border-[rgba(77,249,237,0.25)]',
-  access_control:    'bg-[rgba(255,80,80,0.10)] text-[#ff6060] border border-[rgba(255,80,80,0.25)]',
-  document_activity: 'bg-[rgba(120,180,255,0.12)] text-[#78b4ff] border border-[rgba(120,180,255,0.25)]',
-  data_export:       'bg-[rgba(255,120,200,0.12)] text-[#ff78c8] border border-[rgba(255,120,200,0.25)]',
-  admin_activity:    'bg-[rgba(255,140,0,0.10)] text-[#ff9a3c] border border-[rgba(255,140,0,0.25)]',
+  access_control:    'bg-[rgba(246,38,38,0.10)] text-[#f62626] border border-[rgba(246,38,38,0.25)]',
+  document_activity: 'bg-[rgba(77,249,237,0.12)] text-[#4df9ed] border border-[rgba(77,249,237,0.25)]',
+  data_export:       'bg-[rgba(138,56,245,0.12)] text-[#8a38f5] border border-[rgba(138,56,245,0.25)]',
+  admin_activity:    'bg-[rgba(255,122,48,0.10)] text-[#ff7a30] border border-[rgba(255,122,48,0.25)]',
   vehicle_activity:  'bg-[rgba(58,246,38,0.10)] text-[#3af626] border border-[rgba(58,246,38,0.25)]',
-  booking:           'bg-[rgba(255,200,60,0.10)] text-[#ffc83c] border border-[rgba(255,200,60,0.25)]',
+  booking:           'bg-[rgba(255,234,0,0.10)] text-[#ffea00] border border-[rgba(255,234,0,0.25)]',
   driver_activity:   'bg-[rgba(58,246,38,0.10)] text-[#3af626] border border-[rgba(58,246,38,0.25)]',
   user_activity:     'bg-[rgba(130,130,130,0.12)] text-[#9a9a9a] border border-[rgba(130,130,130,0.25)]',
-  system_error:      'bg-[rgba(255,80,80,0.10)] text-[#ff6060] border border-[rgba(255,80,80,0.25)]',
+  system_error:      'bg-[rgba(246,38,38,0.10)] text-[#f62626] border border-[rgba(246,38,38,0.25)]',
 }
 
 const LEVEL_BADGE: Record<SystemLogLevel, string> = {
   info:     'bg-[rgba(77,249,237,0.12)] text-[#4df9ed] border border-[rgba(77,249,237,0.25)]',
-  warn:     'bg-[rgba(255,200,60,0.10)] text-[#ffc83c] border border-[rgba(255,200,60,0.25)]',
-  error:    'bg-[rgba(255,80,80,0.10)] text-[#ff6060] border border-[rgba(255,80,80,0.25)]',
-  critical: 'bg-[rgba(255,50,50,0.18)] text-[#ff3030] border border-[rgba(255,50,50,0.40)]',
+  warn:     'bg-[rgba(255,234,0,0.10)] text-[#ffea00] border border-[rgba(255,234,0,0.25)]',
+  error:    'bg-[rgba(246,38,38,0.10)] text-[#f62626] border border-[rgba(246,38,38,0.25)]',
+  critical: 'bg-[rgba(246,38,38,0.18)] text-[#f62626] border border-[rgba(246,38,38,0.40)]',
 }
 
 const EVENT_BADGE: Record<SystemLogEventType, string> = {
-  server_error: 'bg-[rgba(255,80,80,0.10)] text-[#ff6060] border border-[rgba(255,80,80,0.25)]',
-  auth_event:   'bg-[rgba(160,120,255,0.12)] text-[#b08aff] border border-[rgba(160,120,255,0.25)]',
+  server_error: 'bg-[rgba(246,38,38,0.10)] text-[#f62626] border border-[rgba(246,38,38,0.25)]',
+  auth_event:   'bg-[rgba(138,56,245,0.12)] text-[#8a38f5] border border-[rgba(138,56,245,0.25)]',
   email_event:  'bg-[rgba(77,249,237,0.12)] text-[#4df9ed] border border-[rgba(77,249,237,0.25)]',
   external_api: 'bg-[rgba(58,246,38,0.10)] text-[#3af626] border border-[rgba(58,246,38,0.25)]',
-  cron_job:     'bg-[rgba(255,200,60,0.10)] text-[#ffc83c] border border-[rgba(255,200,60,0.25)]',
-  db_event:     'bg-[rgba(255,140,0,0.10)] text-[#ff9a3c] border border-[rgba(255,140,0,0.25)]',
+  cron_job:     'bg-[rgba(255,234,0,0.10)] text-[#ffea00] border border-[rgba(255,234,0,0.25)]',
+  db_event:     'bg-[rgba(255,122,48,0.10)] text-[#ff7a30] border border-[rgba(255,122,48,0.25)]',
 }
 
 const PAGE_SIZE = 15
@@ -628,7 +628,7 @@ function SystemLogsTab() {
                       <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-[0.1em] ${
                         log.resolved
                           ? 'bg-[rgba(58,246,38,0.10)] text-[#3af626] border border-[rgba(58,246,38,0.25)]'
-                          : 'bg-[rgba(255,80,80,0.10)] text-[#ff6060] border border-[rgba(255,80,80,0.25)]'
+                          : 'bg-[rgba(246,38,38,0.10)] text-[#f62626] border border-[rgba(246,38,38,0.25)]'
                       }`}>
                         {log.resolved ? 'Yes' : 'No'}
                       </span>
@@ -720,11 +720,11 @@ export default function LogsPage() {
                 {(
                   [
                     ['Total',    auditStats.total,             '#ffffff'],
-                    ['Sign-ins', auditStats.auth,              '#b08aff'],
+                    ['Sign-ins', auditStats.auth,              '#8a38f5'],
                     ['Accounts', auditStats.user_management,   '#4df9ed'],
-                    ['Access',   auditStats.access_control,    '#ff6060'],
+                    ['Access',   auditStats.access_control,    '#f62626'],
                     ['Vehicles', auditStats.vehicle_activity,  '#3af626'],
-                    ['Bookings', auditStats.booking,           '#ffc83c'],
+                    ['Bookings', auditStats.booking,           '#ffea00'],
                   ] as [string, number, string][]
                 ).map(([label, val, color]) => (
                   <div key={label} className="rounded-lg border border-[#2a2a2a] bg-[#1b1b1b] px-3 py-1 text-center min-w-[52px]">
@@ -741,10 +741,10 @@ export default function LogsPage() {
                   [
                     ['Total',      systemStats.total,      '#ffffff'],
                     ['Info',       systemStats.info,       '#4df9ed'],
-                    ['Warn',       systemStats.warn,       '#ffc83c'],
-                    ['Error',      systemStats.error,      '#ff6060'],
-                    ['Critical',   systemStats.critical,   '#ff3030'],
-                    ['Unresolved', systemStats.unresolved, '#ff9a3c'],
+                    ['Warn',       systemStats.warn,       '#ffea00'],
+                    ['Error',      systemStats.error,      '#f62626'],
+                    ['Critical',   systemStats.critical,   '#f62626'],
+                    ['Unresolved', systemStats.unresolved, '#ff7a30'],
                   ] as [string, number, string][]
                 ).map(([label, val, color]) => (
                   <div key={label} className="rounded-lg border border-[#2a2a2a] bg-[#1b1b1b] px-3 py-1 text-center min-w-[52px]">

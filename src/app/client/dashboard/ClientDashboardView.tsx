@@ -15,6 +15,7 @@ import { useAuthStore } from '@/lib/store/auth.store'
 import type { BookingWithRelations, BookingDestination } from '@/lib/store/slice/routeMap.slice'
 import { type BookingStatus, asBookingStatus } from '@/app/types/maps/routemap.types'
 import { bookingRef } from '@/lib/booking'
+import { bookingStatusColor } from '@/lib/palette'
 import { isAwaitingResubmit } from '@/lib/booking-resubmit'
 import RejectionPanel from '@/components/transactions/RejectionPanel'
 import { getApiErrorMessage } from '@/lib/api-error'
@@ -29,8 +30,8 @@ const BORDER   = 'rgba(255,255,255,0.07)'
 const BORDER_C = 'rgba(255,255,255,0.12)'
 const CYAN     = '#4DF9ED'
 const MUTED    = '#818181'
-const ERROR    = '#f87171'
-const AMBER    = '#FBBF24'
+const ERROR    = '#f62626'
+const AMBER    = '#ffea00'
 const GREEN    = '#3af626'
 
 /** Statuses that mean a shipment is live: accepted, and not yet finished. */
@@ -41,15 +42,15 @@ const ACTIVE_STATUSES: BookingStatus[] = ['APPROVED', 'ASSIGNED', 'IN_TRANSIT', 
 const ACTIVE_SORT: Record<string, number> = { DELIVERED: -1, IN_TRANSIT: 0, ASSIGNED: 1, APPROVED: 2 }
 
 const STATUS_META: Record<BookingStatus, { label: string; color: string; icon: React.ReactNode }> = {
-  BOOKED:     { label: 'Booked',     color: CYAN,  icon: <CheckCircle2 size={11} /> },
-  PENDING:    { label: 'Pending',    color: AMBER, icon: <Clock        size={11} /> },
-  APPROVED:   { label: 'Approved',   color: CYAN,  icon: <CheckCircle2 size={11} /> },
-  ASSIGNED:   { label: 'Assigned',   color: CYAN,  icon: <Truck        size={11} /> },
-  IN_TRANSIT: { label: 'In Transit', color: GREEN, icon: <Truck        size={11} /> },
-  ARRIVED:    { label: 'Arrived',    color: GREEN, icon: <MapPin       size={11} /> },
-  DELIVERED:  { label: 'Delivered — Please Confirm', color: AMBER, icon: <CheckCircle2 size={11} /> },
-  COMPLETED:  { label: 'Completed',  color: CYAN,  icon: <CheckCircle2 size={11} /> },
-  CANCELLED:  { label: 'Cancelled',  color: ERROR, icon: <XCircle      size={11} /> },
+  BOOKED:     { label: 'Booked',     color: bookingStatusColor('BOOKED'),  icon: <CheckCircle2 size={11} /> },
+  PENDING:    { label: 'Pending',    color: bookingStatusColor('PENDING'), icon: <Clock        size={11} /> },
+  APPROVED:   { label: 'Approved',   color: bookingStatusColor('APPROVED'),  icon: <CheckCircle2 size={11} /> },
+  ASSIGNED:   { label: 'Assigned',   color: bookingStatusColor('ASSIGNED'),  icon: <Truck        size={11} /> },
+  IN_TRANSIT: { label: 'In Transit', color: bookingStatusColor('IN_TRANSIT'), icon: <Truck        size={11} /> },
+  ARRIVED:    { label: 'Arrived',    color: bookingStatusColor('ARRIVED'), icon: <MapPin       size={11} /> },
+  DELIVERED:  { label: 'Delivered — Please Confirm', color: bookingStatusColor('DELIVERED'), icon: <CheckCircle2 size={11} /> },
+  COMPLETED:  { label: 'Completed',  color: bookingStatusColor('COMPLETED'),  icon: <CheckCircle2 size={11} /> },
+  CANCELLED:  { label: 'Cancelled',  color: bookingStatusColor('CANCELLED'), icon: <XCircle      size={11} /> },
 }
 
 const UNKNOWN_META = { label: 'Unknown', color: MUTED, icon: <AlertCircle size={11} /> }

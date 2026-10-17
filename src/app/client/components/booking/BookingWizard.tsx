@@ -177,8 +177,8 @@ export default function BookingWizard() {
       {/* Why the booking being corrected was turned down, kept in view while editing. */}
       {resubmit && (
         <div className="shrink-0 flex items-start gap-2 px-4 lg:px-6 py-2.5 border-b border-white/[0.07]"
-          style={{ background: 'rgba(248,113,113,0.08)' }}>
-          <XCircle size={15} className="shrink-0 mt-0.5" style={{ color: '#f87171' }} />
+          style={{ background: 'rgba(246,38,38,0.08)' }}>
+          <XCircle size={15} className="shrink-0 mt-0.5" style={{ color: '#f62626' }} />
           <p className="ff-sc booking-text text-xs lg:text-sm text-white/85">
             This booking was not approved{resubmit.rejectionReason ? <>: <span className="text-white">{resubmit.rejectionReason}</span></> : '.'}
             {' '}Correct the details below and resubmit it for another review.

@@ -56,8 +56,8 @@ function warn(message: string, opts?: AppToastOptions): string {
     icon: '⚠️',
     style: {
       background: '#2a2a2a',
-      color: '#facc15',
-      border: '1px solid rgba(234,179,8,0.3)',
+      color: '#ffea00',
+      border: '1px solid rgba(255,234,0,0.3)',
     },
     ...toastOpts,
   })

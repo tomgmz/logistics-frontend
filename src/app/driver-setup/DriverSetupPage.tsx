@@ -102,7 +102,7 @@ export default function DriverSetupPage() {
               Open the app
             </a>
           ) : (
-            <p className="text-[#ef4444]/80 text-[0.78rem] leading-relaxed">
+            <p className="text-[#f62626]/80 text-[0.78rem] leading-relaxed">
               This link is missing its setup code. Ask your dispatcher to send a
               new one.
             </p>

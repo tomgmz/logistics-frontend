@@ -7,7 +7,7 @@ import CircularProgress from '@mui/material/CircularProgress'
 import { usePlacesAutocomplete, PlaceSuggestion, ResolvedPlace } from '@/lib/hooks/usePlacesAutoComplete'
 
 const CYAN  = '#4DF9ED'
-const ERROR = '#f87171'
+const ERROR = '#f62626'
 
 type PlacesInputProps = Omit<TextFieldProps, 'onChange'> & {
   value: string

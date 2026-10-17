@@ -6,6 +6,7 @@ import {
 
 import { type BookingStatus, asBookingStatus } from '@/app/types/maps/routemap.types'
 import type { BookingWithRelations } from '@/lib/store/slice/routeMap.slice'
+import { bookingStatusColor } from '@/lib/palette'
 import { formatDateTime } from './transaction-format'
 import { CYAN, MUTED, ERROR, AMBER, GREEN, BORDER_C } from './transaction-theme'
 
@@ -15,19 +16,24 @@ import { CYAN, MUTED, ERROR, AMBER, GREEN, BORDER_C } from './transaction-theme'
  * booking see the same colour and the same wording for its state.
  */
 
+const S = Object.fromEntries(
+  (['BOOKED', 'APPROVED', 'PENDING', 'ASSIGNED', 'IN_TRANSIT', 'ARRIVED', 'DELIVERED', 'COMPLETED', 'CANCELLED'] as const)
+    .map((k) => [k, bookingStatusColor(k)]),
+) as Record<BookingStatus, string>
+
 export const STATUS_META: Record<
   BookingStatus,
   { label: string; color: string; bg: string; icon: React.ReactNode }
 > = {
-  BOOKED:     { label: 'Booked',     color: CYAN,  bg: `${CYAN}18`,  icon: <CheckCircle2 size={12} /> },
-  APPROVED:   { label: 'Approved',   color: CYAN,  bg: `${CYAN}18`,  icon: <CheckCircle2 size={12} /> },
-  PENDING:    { label: 'Pending',    color: AMBER, bg: `${AMBER}18`, icon: <Clock        size={12} /> },
-  ASSIGNED:   { label: 'Assigned',   color: CYAN,  bg: `${CYAN}18`,  icon: <CheckCircle2 size={12} /> },
-  IN_TRANSIT: { label: 'In Transit', color: GREEN, bg: `${GREEN}18`, icon: <Truck        size={12} /> },
-  ARRIVED:    { label: 'Arrived',    color: GREEN, bg: `${GREEN}18`, icon: <MapPin       size={12} /> },
-  DELIVERED:  { label: 'Delivered',  color: AMBER, bg: `${AMBER}18`, icon: <PackageCheck size={12} /> },
-  COMPLETED:  { label: 'Completed',  color: CYAN,  bg: `${CYAN}18`,  icon: <CheckCircle2 size={12} /> },
-  CANCELLED:  { label: 'Cancelled',  color: ERROR, bg: `${ERROR}18`, icon: <XCircle      size={12} /> },
+  BOOKED:     { label: 'Booked',     color: S.BOOKED, bg: `${S.BOOKED}18`,  icon: <CheckCircle2 size={12} /> },
+  APPROVED:   { label: 'Approved',   color: S.APPROVED, bg: `${S.APPROVED}18`,  icon: <CheckCircle2 size={12} /> },
+  PENDING:    { label: 'Pending',    color: S.PENDING, bg: `${S.PENDING}18`, icon: <Clock        size={12} /> },
+  ASSIGNED:   { label: 'Assigned',   color: S.ASSIGNED, bg: `${S.ASSIGNED}18`,  icon: <CheckCircle2 size={12} /> },
+  IN_TRANSIT: { label: 'In Transit', color: S.IN_TRANSIT, bg: `${S.IN_TRANSIT}18`, icon: <Truck        size={12} /> },
+  ARRIVED:    { label: 'Arrived',    color: S.ARRIVED, bg: `${S.ARRIVED}18`, icon: <MapPin       size={12} /> },
+  DELIVERED:  { label: 'Delivered',  color: S.DELIVERED, bg: `${S.DELIVERED}18`, icon: <PackageCheck size={12} /> },
+  COMPLETED:  { label: 'Completed',  color: S.COMPLETED, bg: `${S.COMPLETED}18`,  icon: <CheckCircle2 size={12} /> },
+  CANCELLED:  { label: 'Cancelled',  color: S.CANCELLED, bg: `${S.CANCELLED}18`, icon: <XCircle      size={12} /> },
 }
 
 const UNKNOWN_META = {

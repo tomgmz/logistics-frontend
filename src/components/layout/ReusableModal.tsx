@@ -399,7 +399,7 @@ export function RemarksModal({
                     ? {
                         scale: 1.03,
                         backgroundColor:
-                          "rgba(248,113,113,0.25)",
+                          "rgba(246,38,38,0.25)",
                       }
                     : {}
                 }
@@ -414,14 +414,14 @@ export function RemarksModal({
                            select-none w-full h-[44px] sm:w-[88px] sm:h-[40px] disabled:opacity-40
                            disabled:cursor-not-allowed transition-colors"
                 style={{
-                  backgroundColor: "rgba(248,113,113,0.15)",
+                  backgroundColor: "rgba(246,38,38,0.15)",
                   border:
-                    "1px solid rgba(248,113,113,0.35)",
+                    "1px solid rgba(246,38,38,0.35)",
                   fontFamily:
                     "'Alegreya Sans SC', sans-serif",
                   fontWeight: 400,
                   fontSize: "clamp(13px, 2.5vw, 15px)",
-                  color: "#fca5a5",
+                  color: "#f62626",
                 }}
               >
                 {busy ? "Submitting…" : confirmLabel}

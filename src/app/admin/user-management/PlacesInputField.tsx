@@ -119,13 +119,13 @@ export default function PlacesInput({
                 fontSize:        '13px',
                 transition:      'border-color 150ms',
                 '& fieldset': {
-                  borderColor: error ? 'rgba(239,68,68,0.6)' : '#424242',
+                  borderColor: error ? 'rgba(246,38,38,0.6)' : '#424242',
                 },
                 '&:hover fieldset': {
-                  borderColor: error ? 'rgba(239,68,68,0.6)' : 'rgba(77,249,237,0.3)',
+                  borderColor: error ? 'rgba(246,38,38,0.6)' : 'rgba(77,249,237,0.3)',
                 },
                 '&.Mui-focused fieldset': {
-                  borderColor: error ? '#ef4444' : '#4df9ed',
+                  borderColor: error ? '#f62626' : '#4df9ed',
                   borderWidth: '1px',
                 },
               },

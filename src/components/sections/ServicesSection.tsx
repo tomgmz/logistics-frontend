@@ -8,10 +8,10 @@ import { SERVICES, CYCLING_WORDS } from '@/lib/data';
 const WORD_COLORS = [
   '#4df9ed',
   '#3af626',
-  '#a855f7',
-  '#ef4444',
-  '#f97316',
-  '#84cc16',
+  '#8a38f5',
+  '#f62626',
+  '#ff7a30',
+  '#3af626',
 ];
 
 function CyclingWord() {

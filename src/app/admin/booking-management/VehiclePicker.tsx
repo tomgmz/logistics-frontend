@@ -108,7 +108,7 @@ export default function VehiclePicker({
             style={{
               borderColor: selected
                 ? 'var(--color-cyan)'
-                : fit?.isOverloaded ? 'rgba(248,113,113,0.35)' : 'rgba(255,255,255,0.08)',
+                : fit?.isOverloaded ? 'rgba(246,38,38,0.35)' : 'rgba(255,255,255,0.08)',
               boxShadow: selected ? '0 0 0 1px var(--color-cyan) inset' : undefined,
             }}
           >
@@ -195,7 +195,7 @@ function Cap({ label, value, over }: { label: string; value: string; over: boole
   return (
     <div
       className="rounded-md border px-1.5 py-1"
-      style={{ borderColor: over ? 'rgba(248,113,113,0.45)' : 'rgba(255,255,255,0.08)' }}
+      style={{ borderColor: over ? 'rgba(246,38,38,0.45)' : 'rgba(255,255,255,0.08)' }}
     >
       <p className={`text-[9px] uppercase tracking-wider ${over ? 'text-red-400' : 'text-white/35'}`}>{label}</p>
       <p className={`text-[11px] font-bold truncate ${over ? 'text-red-400' : 'text-white/80'}`}>{value}</p>
@@ -205,8 +205,8 @@ function Cap({ label, value, over }: { label: string; value: string; over: boole
 
 const TONES = {
   cyan:  { color: 'var(--color-bg)', background: 'var(--color-cyan)', borderColor: 'transparent' },
-  red:   { color: '#fca5a5', background: 'rgba(248,113,113,0.12)', borderColor: 'rgba(248,113,113,0.35)' },
-  amber: { color: '#fbbf24', background: 'rgba(246,159,38,0.12)', borderColor: 'rgba(246,159,38,0.35)' },
+  red:   { color: '#f62626', background: 'rgba(246,38,38,0.12)', borderColor: 'rgba(246,38,38,0.35)' },
+  amber: { color: '#ffea00', background: 'rgba(255,122,48,0.12)', borderColor: 'rgba(255,122,48,0.35)' },
   muted: { color: 'rgba(255,255,255,0.55)', background: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.10)' },
 } as const
 

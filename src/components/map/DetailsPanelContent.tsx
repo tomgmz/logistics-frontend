@@ -238,11 +238,11 @@ export function DetailsPanelContent({
       {!isLoading && bookingDetail?.paused_at && !done && (
         <div
           className="mx-3 mt-3 flex items-center gap-2 rounded-[8px] border px-3 py-2"
-          style={{ borderColor: 'rgba(251,191,36,0.4)', background: 'rgba(251,191,36,0.08)' }}
+          style={{ borderColor: 'rgba(255,234,0,0.4)', background: 'rgba(255,234,0,0.08)' }}
         >
-          <PauseCircle size={15} className="shrink-0" style={{ color: '#fbbf24' }} />
+          <PauseCircle size={15} className="shrink-0" style={{ color: '#ffea00' }} />
           <span className="text-[12px] leading-snug text-white/85" style={SC}>
-            <span style={{ color: '#fbbf24' }}>Delivery paused · {pauseReasonLabel(bookingDetail.pause_reason)}</span>
+            <span style={{ color: '#ffea00' }}>Delivery paused · {pauseReasonLabel(bookingDetail.pause_reason)}</span>
             {' '}since {formatEtaClock(bookingDetail.paused_at)}. It continues as soon as the driver can move again.
           </span>
         </div>
@@ -414,7 +414,7 @@ export function DetailsPanelContent({
               <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
             </svg>
             {!isLoading && isLate && (
-              <span className="text-[10px] font-bold" style={{ color: '#fd2cbe' }}>Late</span>
+              <span className="text-[10px] font-bold" style={{ color: '#f62626' }}>Late</span>
             )}
           </div>
           <p className="text-[10px] mb-0.5" style={{ color: 'var(--color-muted)' }}>Planned Arrival</p>
@@ -428,7 +428,7 @@ export function DetailsPanelContent({
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-muted)" strokeWidth="1.5">
               <rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>
             </svg>
-            {!isLoading && <span className="text-[10px] font-bold" style={{ color: '#c2f626' }}>Paid</span>}
+            {!isLoading && <span className="text-[10px] font-bold" style={{ color: '#3af626' }}>Paid</span>}
           </div>
           <p className="text-[10px] mb-0.5" style={{ color: 'var(--color-muted)' }}>Total Cost</p>
           <p className="text-white text-[13px]" style={SC}>

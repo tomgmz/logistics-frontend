@@ -53,7 +53,7 @@ export function getStrength(password: string): number {
 }
 
 export function StrengthBar({ strength }: { strength: number }) {
-  const colors = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#4df9ed', '#4df9ed']
+  const colors = ['#f62626', '#ff7a30', '#ffea00', '#3af626', '#4df9ed', '#4df9ed']
   const labels = ['', 'Weak', 'Fair', 'Good', 'Strong', 'Excellent', 'Excellent']
 
   return (

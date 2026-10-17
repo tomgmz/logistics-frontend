@@ -220,7 +220,7 @@ export function LiveRoutePolyline({ path, truck }: { path: LatLng[] | null; truc
   useEffect(() => {
     if (!map) return
     line.current = new google.maps.Polyline({
-      strokeColor:   '#06b6d4',
+      strokeColor:   '#4df9ed',
       strokeWeight:  5,
       strokeOpacity: 0.95,
       zIndex:        2,

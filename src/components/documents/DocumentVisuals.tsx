@@ -56,11 +56,11 @@ export function DocumentThumb({ doc, size = 40, big = false }: { doc: ThumbDoc; 
 }
 
 const TYPE_TONE: Record<LibraryDocumentType, string> = {
-  transaction_document: '#93c5fd',
-  pickup_proof:         '#fcd34d',
-  delivery_proof:       '#86efac',
-  odometer_photo:       '#c4b5fd',
-  service_receipt:      '#f9a8d4',
+  transaction_document: '#4df9ed',
+  pickup_proof:         '#ffea00',
+  delivery_proof:       '#3af626',
+  odometer_photo:       '#8a38f5',
+  service_receipt:      '#8a38f5',
   delivery_receipt:     '#4df9ed',
   trip_ticket:          '#4df9ed',
   dtr:                  '#4df9ed',
@@ -84,9 +84,9 @@ export function DocumentTypeBadge({ type }: { type: LibraryDocumentType }) {
 
 function reviewStyle(status: ReviewStatus) {
   switch (status) {
-    case 'pending':  return { bg: 'rgba(250,204,21,0.12)', color: '#fde047', border: 'rgba(250,204,21,0.35)' }
-    case 'approved': return { bg: 'rgba(58,246,38,0.12)',  color: '#86efac', border: 'rgba(58,246,38,0.35)' }
-    default:         return { bg: 'rgba(248,113,113,0.12)', color: '#fca5a5', border: 'rgba(248,113,113,0.35)' }
+    case 'pending':  return { bg: 'rgba(255,234,0,0.12)', color: '#ffea00', border: 'rgba(255,234,0,0.35)' }
+    case 'approved': return { bg: 'rgba(58,246,38,0.12)',  color: '#3af626', border: 'rgba(58,246,38,0.35)' }
+    default:         return { bg: 'rgba(246,38,38,0.12)', color: '#f62626', border: 'rgba(246,38,38,0.35)' }
   }
 }
 
