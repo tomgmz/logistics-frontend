@@ -1940,6 +1940,13 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
    * hidden again once the run starts — the panel is where operations reads the
    * per-run proof of loading, which only exists after the driver is moving.
    */
+  // The assigned vehicle's limits, for the planner's per-trip warning.
+  const plannerCapacity = useMemo(() => {
+    if (!detail) return null
+    const m = trucks.find((t) => t.truck_id === getAssignedTruckId(detail, trucks))?.truck_model
+    return m ? { maxWeightKg: m.max_weight_kg ?? 0, maxVolumeCbm: m.max_volume_cbm ?? 0 } : null
+  }, [detail, trucks])
+
   const showTripPlanner = !!detail &&
     (roleView === 'admin' || roleView === 'operations_manager') &&
     ['assigned', 'in_transit', 'delivered', 'completed'].includes(normalizeBookingStatus(detail.status))
@@ -2526,6 +2533,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                           key={`${detail.booking_id}:${plannerTick}`}
                           detail={detail}
                           canEdit={canEdit && !bookingReadOnly}
+                          capacity={plannerCapacity}
                         />
                       )}
                     </>

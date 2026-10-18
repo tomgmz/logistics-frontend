@@ -32,6 +32,8 @@ export interface TripStop {
   planned_arrival_at?: string | null
   proof_photo_url: string | null
   proof_at:        string | null
+  /** How much of each cargo line this stop unloads on this run. */
+  booking_trip_cargo?: TripCargo[]
   booking_destinations?: {
     destination_id: string
     address:        string
@@ -41,6 +43,15 @@ export interface TripStop {
     notes:          string | null
     status:         string
   } | null
+}
+
+/** One cargo line's share of one run. */
+export interface TripCargo {
+  trip_cargo_id: string
+  item_id:       string
+  planned_qty:   number
+  /** Null until the run is loaded; what the driver actually put on the truck. */
+  loaded_qty:    number | null
 }
 
 export interface Trip {
@@ -59,10 +70,11 @@ export interface Trip {
   booking_trip_stops: TripStop[]
 }
 
-/** One run as operations plans it. */
+/** One run as operations plans it: its drop-offs and how much goes to each. */
 export interface TripPlanEntry {
   trip_number?:    number
   destination_ids: string[]
+  stops?:          Array<{ destination_id: string; items: Array<{ item_id: string; quantity: number }> }>
   notes?:          string | null
 }
 
@@ -85,13 +97,12 @@ export const tripService = {
   getTrips: (bookingId: string) => get<Trip[]>(`${B}/${bookingId}/trips`),
 
   /**
-   * Replace the plan wholesale.
+   * Replace the runs not loaded yet.
    *
-   * A replace rather than a diff: the plan is small, it is edited as a whole in
-   * one panel, and a partial apply would leave a booking half-planned — a state
-   * the driver app has no way to render. The server refuses once any run has
-   * started, so a driver holding a loaded truck never has their route redefined
-   * underneath them.
+   * A replace rather than a diff: the plan is small and edited as a whole in one
+   * panel. Runs already loaded or finished are kept by the server exactly as
+   * they are — a driver holding a loaded truck never has their route redefined
+   * underneath them — and their quantities count as already delivered.
    */
   setTripPlan: async (bookingId: string, trips: TripPlanEntry[]) => {
     await initCsrf()
@@ -103,8 +114,8 @@ export const tripService = {
 /* ── Reading a plan ───────────────────────────────────────────────────────── */
 
 /** A run that has been loaded, or run and returned, can no longer be re-planned. */
-export function planIsLocked(trips: Trip[]): boolean {
-  return trips.some((t) => t.status !== 'pending' && t.status !== 'cancelled')
+export function isStartedTrip(t: Pick<Trip, 'status'>): boolean {
+  return t.status === 'in_transit' || t.status === 'completed'
 }
 
 /**
