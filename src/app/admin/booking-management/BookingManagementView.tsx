@@ -69,6 +69,8 @@ import VehiclePicker, { cargoSummaryFromBooking } from './VehiclePicker'
 import CompletionPanel from '@/components/transactions/CompletionPanel'
 import { formatPlateNumber, plateError } from '@/lib/validation/plate'
 import ProblemReportedBadge, { hasOpenClientIssue } from '@/components/transactions/ProblemReportedBadge'
+import ReplaceCrewPanel from '@/components/transactions/ReplaceCrewPanel'
+import StopTimesPanel from '@/components/transactions/StopTimesPanel'
 import PausePanel from '@/components/transactions/PausePanel'
 import { pauseReasonLabel } from '@/lib/services/admin/pause.service'
 import type { BookingWithRelations } from '@/lib/store/slice/routeMap.slice'
@@ -1287,6 +1289,9 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
   const [page, setPage]                   = useState(0)
 
   const [selectedId, setSelectedId]       = useState<string | null>(null)
+  // For async callbacks: is this booking still the one open when they land?
+  const selectedIdRef = useRef<string | null>(null)
+  selectedIdRef.current = selectedId
   const [detail, setDetail]               = useState<BookingDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError]     = useState<string | null>(null)
@@ -1465,6 +1470,28 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
   useLiveTable(['live:bookings'], () => {
     void loadPage(true)
     assignmentService.getAll().then(setAllAssignments).catch(() => {})
+    // The exceptions are what the DRIVER does to the booking open here, which
+    // decides what the office may do with it: pressing Start Navigation ends
+    // re-assigning (a picker left open must not stay offering it), and pausing
+    // or resuming opens and closes replacing the crew. Re-read it when either
+    // moved, and say why the picker closed.
+    const openId = selectedId
+    const live   = detail && ['approved', 'assigned', 'in_transit'].includes(String(detail.status))
+    if (openId && detail && live) {
+      const wasStatus = detail.status
+      const wasPaused = (detail as { paused_at?: string | null }).paused_at ?? null
+      bookingService.getBookingById(openId).then((b) => {
+        if (selectedIdRef.current !== openId) return
+        const now = b as BookingDetail & { paused_at?: string | null }
+        if (now?.status === wasStatus && (now?.paused_at ?? null) === wasPaused) return
+        void refreshDetail(openId)
+        if (now?.status === 'in_transit' && wasStatus !== 'in_transit') {
+          appToast.info('The driver has started this delivery. The driver and vehicle can no longer be changed.', {
+            action: 'assign', entityId: openId,
+          })
+        }
+      }).catch(() => {})
+    }
   })
   useLiveTable(['live:trucks'], () => {
     adminFetchTrucks().then(setTrucks).catch(() => {})
@@ -1813,7 +1840,10 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
         appToast.success('Driver and vehicle assigned.', { action: 'assign', entityId: selectedId })
       }
     } catch (e) {
-      appToast.error(getApiErrorMessage(e, 'Request failed. Please try again.'), { action: 'assign', entityId: selectedId })
+      const message = getApiErrorMessage(e, 'Request failed. Please try again.')
+      appToast.error(message, { action: 'assign', entityId: selectedId })
+      // The driver started first: show the booking as it now stands.
+      if (/already started/i.test(message)) void refreshDetail(selectedId)
     } finally {
       setAssignBusy(false)
     }
@@ -2453,6 +2483,36 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                           pausedAt={(detail as { paused_at?: string | null }).paused_at}
                           canResume={(roleView === 'admin' || roleView === 'operations_manager') && canEdit && !bookingReadOnly}
                           onUpdated={() => { void refreshDetail(detail.booking_id); void loadPage(true) }}
+                        />
+
+                        {/* On the road the crew can no longer be re-assigned; while the
+                            driver has it paused, it can be replaced. Lists every
+                            replacement on the booking too. */}
+                        <ReplaceCrewPanel
+                          bookingId={detail.booking_id}
+                          reference={detail.reference_number ?? null}
+                          inTransit={normalizeBookingStatus(detail.status) === 'in_transit'}
+                          paused={!!(detail as { paused_at?: string | null }).paused_at}
+                          canReplace={(roleView === 'admin' || roleView === 'operations_manager') && canEdit && !bookingReadOnly}
+                          drivers={drivers}
+                          trucks={trucks}
+                          currentDriverId={committedAssignment.driverId || null}
+                          currentSecondDriverId={committedAssignment.secondDriverId || null}
+                          currentTruckId={committedAssignment.truckId || null}
+                          onReplaced={() => {
+                            void refreshDetail(detail.booking_id)
+                            void loadPage(true)
+                            assignmentService.getAll().then(setAllAssignments).catch(() => {})
+                            adminFetchTrucks().then(setTrucks).catch(() => {})
+                          }}
+                        />
+
+                        {/* Arrival, docking, start, finish and departure at the loading
+                            and each drop-off, and the total loaded per trip. */}
+                        <StopTimesPanel
+                          bookingId={detail.booking_id}
+                          staff
+                          canEdit={(roleView === 'admin' || roleView === 'operations_manager') && canEdit && !bookingReadOnly}
                         />
 
                         {/* Driver / vehicle assignment */}

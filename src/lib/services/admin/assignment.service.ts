@@ -1,4 +1,5 @@
 import proxyApi, { initCsrf } from '@/lib/api/auth.api'
+import type { TimelineStage, TimelineTrip } from '@/lib/services/client/booking.service'
 
 interface ApiResponse<T> {
   status: string
@@ -142,6 +143,12 @@ async function post<T>(url: string, payload: unknown): Promise<T> {
   return data.data
 }
 
+async function put<T>(url: string, payload: unknown): Promise<T> {
+  await initCsrf()
+  const { data } = await proxyApi.put<ApiResponse<T>>(url, payload)
+  return data.data
+}
+
 async function patch<T>(url: string, payload: unknown): Promise<T> {
   await initCsrf()
   const { data } = await proxyApi.patch<ApiResponse<T>>(url, payload)
@@ -160,6 +167,37 @@ export interface CapacityWarning {
   overLength:      boolean
   overFloorSpace:  boolean
   usableVolumeCbm: number | null
+}
+
+/** Replacing the crew of a delivery already on the road (it must be paused). */
+export interface ReplaceCrewPayload {
+  driver_id:         string
+  truck_id:          string
+  second_driver_id?: string | null
+  helper_name?:      string | null
+  reason_note:       string
+}
+
+type PersonRef = { driver_id: string; users: { first_name: string | null; last_name: string | null } | null } | null
+
+/** One crew replacement on a booking, as the staff history lists it. */
+export interface CrewReplacement {
+  replacement_id:        string
+  booking_id:            string
+  reason_note:           string
+  replaced_at:           string
+  replaced_by_role:      string | null
+  transfer_required:     boolean
+  transfer_confirmed_at: string | null
+  transfer_photo_url:    string | null
+  old_vehicle_plate:     string | null
+  old_driver:            PersonRef
+  new_driver:            PersonRef
+  old_second_driver:     PersonRef
+  new_second_driver:     PersonRef
+  old_truck:             { plate_number: string } | null
+  new_truck:             { plate_number: string } | null
+  replaced_by_user:      { first_name: string | null; last_name: string | null } | null
 }
 
 const B = '/admin/assignments'
@@ -184,4 +222,17 @@ export const assignmentService = {
 
   updateDeliveryStatus: (bookingId: string, payload: UpdateDeliveryStatusPayload) =>
     patch<AssignmentRecord>(`${B}/${bookingId}/status`, payload),
+
+  replaceCrew: (bookingId: string, payload: ReplaceCrewPayload) =>
+    post<CrewReplacement>(`${B}/${bookingId}/replace-crew`, payload),
+
+  getReplacements: (bookingId: string) => get<CrewReplacement[]>(`${B}/${bookingId}/replacements`),
+
+  /** Stop times with the office's correction notes. */
+  getTimeline: (bookingId: string) => get<TimelineTrip[]>(`${B}/${bookingId}/timeline`),
+
+  /** Fill in or correct one stop time, with a reason. Returns the new timeline. */
+  setStopTime: (bookingId: string, payload: {
+    trip_id: string; trip_stop_id?: string | null; stage: TimelineStage; at: string; note: string
+  }) => put<TimelineTrip[]>(`${B}/${bookingId}/timeline`, payload),
 }

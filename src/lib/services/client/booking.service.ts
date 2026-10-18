@@ -116,6 +116,45 @@ export type ClientDocumentType =
   | 'transaction_document' | 'pickup_proof' | 'delivery_proof'
   | 'delivery_receipt' | 'proof_of_delivery' | 'trip_ticket' | 'purchase_order' | 'other'
 
+/** One step's time at a stop. `proof` = the photo confirmation (the finish). */
+export interface StepTime {
+  at:         string
+  source:     'driver' | 'staff' | 'proof'
+  corrected?: boolean
+  note?:      string | null
+  /** The phone's clock was changed between the tap and its sync, so the time
+   *  was moved to keep the steps in order — worth checking. */
+  clock_adjusted?: boolean
+}
+
+export interface StopTimes {
+  arrived_parking: StepTime | null
+  docked:          StepTime | null
+  started:         StepTime | null
+  finished:        StepTime | null
+  departed:        StepTime | null
+}
+
+export interface TimelineStop extends StopTimes {
+  trip_stop_id:   string
+  destination_id: string
+  sequence_order: number
+  stop_number:    number | null
+  address:        string | null
+  status:         string
+}
+
+export interface TimelineTrip {
+  trip_id:      string
+  trip_number:  number
+  status:       string
+  total_loaded: { pieces: number; weight_kg: number | null } | null
+  loading:      StopTimes
+  stops:        TimelineStop[]
+}
+
+export type TimelineStage = 'arrived_parking' | 'docked' | 'started' | 'departed'
+
 export interface ClientBookingDocument {
   doc_key:     string
   doc_type:    ClientDocumentType
@@ -287,6 +326,11 @@ export const bookingService = {
   // pickup and drop-off proof photos, and approved staff paperwork.
   fetchBookingDocuments: (bookingId: string) =>
     get<ClientBookingDocument[]>(`/booking/${bookingId}/documents`),
+
+  // The times at each stop (arrival, docking, start, finish, departure) and the
+  // total loaded per run. Correction notes are staff-only (admin route).
+  fetchBookingTimeline: (bookingId: string) =>
+    get<TimelineTrip[]>(`/booking/${bookingId}/timeline`),
 
   fetchBookingsByClient: async (clientId: string): Promise<BookingWithRelations[]> => {
     const { data } = await proxyApi.get<{ status: string; data: BookingWithRelations[] }>(

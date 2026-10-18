@@ -31,6 +31,7 @@ import {
   type CompanyOption, type DateBasis, type SortKey,
   type TransactionFilters, type TransactionListMeta, type TransactionSummary,
 } from '@/lib/services/admin/transaction-history.service'
+import StopTimesPanel from '@/components/transactions/StopTimesPanel'
 
 /**
  * Transaction history for staff — the client's own history widened across every
@@ -544,6 +545,9 @@ export default function TransactionHistoryView() {
                   <TransactionDetail booking={selected} animated={false} showCrew={false} />
                   {/* Staff-only: crew, vehicle, proof photos, inspections, reports. */}
                   <TransactionRecord key={selected.booking_id as string} booking={selected} />
+                  <div className="mt-4">
+                    <StopTimesPanel key={`times-${selected.booking_id as string}`} bookingId={selected.booking_id as string} staff />
+                  </div>
                 </div>
               </motion.aside>
             </>

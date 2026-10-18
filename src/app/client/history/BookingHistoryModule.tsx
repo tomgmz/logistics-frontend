@@ -37,6 +37,7 @@ import {
 import {
   BG_PAGE, BG_PANEL, BG_CARD, BORDER, BORDER_C, CYAN, MUTED, ERROR, RADIUS,
 } from '@/components/transactions/transaction-theme'
+import StopTimesPanel from '@/components/transactions/StopTimesPanel'
 
 
 /* showPicker() is missing on iOS Safari before 16.4 (and throws if the input
@@ -606,6 +607,7 @@ export default function BookingHistoryModule() {
                 setBookings((prev) => prev.map((b) => (b.booking_id === next.booking_id ? next : b)))
               }} />
               <TransactionDetail booking={selected} showDocuments={false} />
+              <StopTimesPanel key={`times-${selected.booking_id as string}`} bookingId={selected.booking_id as string} />
               <BookingDocuments key={selected.booking_id as string} bookingId={selected.booking_id as string} />
             </div>
           )}
