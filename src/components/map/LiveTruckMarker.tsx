@@ -24,6 +24,7 @@ export function LiveTruckMarker({
   nextEta,
   caption,
   onClick,
+  paused = false,
 }: {
   position: { lat: number; lng: number } | null
   latest:   DriverPosition | null
@@ -33,6 +34,8 @@ export function LiveTruckMarker({
   /** Which truck this is — the fleet map shows several, the booking map one. */
   caption?: string | null
   onClick?: () => void
+  /** The driver paused the delivery: no countdown to an arrival that isn't happening. */
+  paused?: boolean
 }) {
   if (!position || !latest) return null
 
@@ -42,7 +45,7 @@ export function LiveTruckMarker({
   // so it goes on the truck rather than only in the side panel. Suppressed when
   // the position is stale: an ETA computed from a position we no longer trust is
   // exactly the kind of confident-sounding wrong answer to avoid.
-  const etaLabel = !isStale && nextEta ? formatEta(nextEta.eta_seconds) : null
+  const etaLabel = paused ? 'Paused' : !isStale && nextEta ? formatEta(nextEta.eta_seconds) : null
 
   return (
     <AdvancedMarker

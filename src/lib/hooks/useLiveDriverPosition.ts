@@ -249,12 +249,15 @@ export function formatEta(seconds: number | null | undefined): string | null {
   return `${hours} h ${minutes % 60} m`
 }
 
-/** The clock time the truck is expected, e.g. "2:45 PM". */
+/**
+ * The clock time the truck is expected, e.g. "2:45 PM" — in Manila time, where
+ * the delivery is, whatever time zone the viewer's device happens to be set to.
+ */
 export function formatEtaClock(etaAt: string | null | undefined): string | null {
   if (!etaAt) return null
   const at = new Date(etaAt)
   if (Number.isNaN(at.getTime())) return null
-  return at.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+  return at.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Manila' })
 }
 
 /** "just now" / "8s ago" / "4m ago" — the map's freshness line. */

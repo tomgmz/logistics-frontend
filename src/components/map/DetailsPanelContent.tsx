@@ -63,6 +63,20 @@ function BlockSkeleton({ style }: { style?: React.CSSProperties }) {
   )
 }
 
+/** Whole minutes since `pausedAt`, re-read every 30 s; 0 when not paused. */
+function usePausedMinutes(pausedAt: string | null): number {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (!pausedAt) return
+    setNow(Date.now())
+    const id = setInterval(() => setNow(Date.now()), 30_000)
+    return () => clearInterval(id)
+  }, [pausedAt])
+  if (!pausedAt) return 0
+  const since = Date.parse(pausedAt)
+  return Number.isFinite(since) ? Math.max(0, Math.floor((now - since) / 60_000)) : 0
+}
+
 function useTruckImage(truckType: string) {
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [loading,  setLoading]  = useState(true)
@@ -129,7 +143,14 @@ export function DetailsPanelContent({
   // The planned arrival at the last stop of the last run, as a window. Before
   // it's planned (no truck yet) this falls back to the scheduled day.
   const plannedAt   = bookingDetail?.estimated_delivery ?? null
-  const estDelivery = formatArrivalWindow(plannedAt) ?? scheduleDate
+  // A pause (or anything else) can push the expected arrival to another day than
+  // the one booked; say so plainly rather than leave it to the date prefix.
+  const plannedDay  = plannedAt
+    ? new Date(plannedAt).toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
+    : null
+  const movedDay    = !!plannedDay && !!scheduleDate && plannedDay !== scheduleDate.slice(0, 10)
+  const windowText  = formatArrivalWindow(plannedAt)
+  const estDelivery = windowText ? (movedDay ? `Now expected ${windowText}` : windowText) : scheduleDate
 
   // The final stop's live ETA, which is what "estimate arrival" has always meant
   // on this panel and never actually showed — `estimated_arrival` was a declared
@@ -141,17 +162,25 @@ export function DetailsPanelContent({
   // is nothing to be late against.
   const plannedEnd = arrivalWindow(plannedAt)?.end ?? null
   const done       = ['DELIVERED', 'COMPLETED', 'CANCELLED'].includes(status.toUpperCase())
-  const isLate     = !done && !!plannedEnd && (
+  // Paused by the driver: the delay is explained on screen, so it is not
+  // flagged "Late", and there is no countdown to an arrival that isn't moving.
+  const pausedAt   = !done ? bookingDetail?.paused_at ?? null : null
+  const pausedMin  = usePausedMinutes(pausedAt)
+  const isLate     = !done && !pausedAt && !!plannedEnd && (
     destEta ? Date.parse(destEta.eta_at) > plannedEnd.getTime() : isPastWindow(plannedAt)
   )
 
-  const arrivalLabel = destEta
-    ? `${formatEtaClock(destEta.eta_at)} · ${formatEta(destEta.eta_seconds)}`
-    : '—'
+  const arrivalLabel = pausedAt
+    ? 'Paused'
+    : destEta
+      ? `${formatEtaClock(destEta.eta_at)} · ${formatEta(destEta.eta_seconds)}`
+      : '—'
 
   // Time still to run, live, falling back to the planned duration before the
   // truck starts reporting.
-  const travelTime = nextEta
+  const travelTime = pausedAt
+    ? `Delayed ${formatEta(pausedMin * 60) === 'arriving' ? 'under a minute' : formatEta(pausedMin * 60)} so far`
+    : nextEta
     ? `${formatEta(nextEta.eta_seconds)} to next stop`
     : routeData.total_duration
       ? `${Math.floor(routeData.total_duration / 60)}HR ${routeData.total_duration % 60}MINS`

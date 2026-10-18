@@ -220,6 +220,11 @@ export default function TransitTrackingView() {
   const user     = useAuthStore((s) => s.user)
 
   const bookings        = useAppSelector((s) => s.routeMap.bookings)
+  // Which trucks on the fleet map are paused, so their label says so.
+  const pausedBookingIds = useMemo(
+    () => new Set(bookings.filter((b) => (b as { paused_at?: string | null }).paused_at).map((b) => String(b.booking_id))),
+    [bookings],
+  )
   const listLoading     = useAppSelector((s) => s.routeMap.listLoading)
   const listError       = useAppSelector((s) => s.routeMap.listError)
   const selectedId      = useAppSelector((s) => s.routeMap.selectedId)
@@ -379,6 +384,7 @@ export default function TransitTrackingView() {
                 isStale={live.isStale}
                 ageMs={live.ageMs}
                 nextEta={live.nextEta}
+                paused={!!bookingDetail?.paused_at}
               />
             )}
             {showLiveRoute ? (
@@ -405,6 +411,7 @@ export default function TransitTrackingView() {
             isStale={t.isStale}
             ageMs={t.ageMs}
             nextEta={t.nextEta}
+            paused={pausedBookingIds.has(t.latest.booking_id)}
             caption={t.latest.plate_number ?? bookingRef({
               booking_id:       t.latest.booking_id,
               reference_number: t.latest.reference_number,

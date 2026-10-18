@@ -402,6 +402,7 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
           isStale={live.isStale}
           ageMs={live.ageMs}
           nextEta={live.nextEta}
+          paused={!!bookingDetail?.paused_at}
         />
       )}
       {showLiveRoute ? (
