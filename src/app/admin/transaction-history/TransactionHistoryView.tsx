@@ -27,7 +27,7 @@ import {
   DATE_PRESETS, resolvePreset, type DatePreset,
 } from '@/components/transactions/date-presets'
 import {
-  transactionHistoryService, buildTransactionCsv, downloadCsv,
+  transactionHistoryService, downloadDispatchXlsx,
   type CompanyOption, type DateBasis, type SortKey,
   type TransactionFilters, type TransactionListMeta, type TransactionSummary,
 } from '@/lib/services/admin/transaction-history.service'
@@ -220,10 +220,11 @@ export default function TransactionHistoryView() {
         return
       }
       const stamp = dateFrom && dateTo ? `${dateFrom}_${dateTo}` : new Date().toISOString().slice(0, 10)
-      downloadCsv(`transactions_${stamp}.csv`, buildTransactionCsv(exportRows))
-      appToast.success(`Exported ${exportRows.length.toLocaleString()} transactions.`)
+      await downloadDispatchXlsx(`transactions_${stamp}.xlsx`, exportRows)
+      const bookings = new Set(exportRows.map((r) => r.booking_id)).size
+      appToast.success(`Exported ${bookings.toLocaleString()} booking${bookings === 1 ? '' : 's'} (${exportRows.length.toLocaleString()} rows).`)
       if (truncated) {
-        appToast.error('Export was capped at 5,000 rows — narrow the filters for the rest.')
+        appToast.error('Export was capped at 5,000 bookings — narrow the filters for the rest.')
       }
     } catch (err) {
       appToast.error(getApiErrorMessage(err, 'Export failed. Please try again.'))
@@ -255,7 +256,7 @@ export default function TransactionHistoryView() {
               className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold
                          transition-colors disabled:opacity-40 cursor-pointer"
               style={{ borderColor: `${CYAN}55`, background: `${CYAN}10`, color: CYAN }}>
-              <Download size={14} />{exporting ? 'Exporting…' : 'Export CSV'}
+              <Download size={14} />{exporting ? 'Exporting…' : 'Export Excel'}
             </button>
           )}
         </div>

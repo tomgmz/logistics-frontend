@@ -1,5 +1,6 @@
 import proxyApi from '@/lib/api/auth.api'
 import type { BookingWithRelations } from '@/lib/store/slice/routeMap.slice'
+import { downloadXlsx, type XlsxColumn } from '@/lib/xlsx-export'
 
 /**
  * Staff transaction history.
@@ -53,21 +54,22 @@ export interface CompanyOption {
   count:       number
 }
 
+/**
+ * One row of the exported dispatch sheet: one trip's visit to one drop-off.
+ * A booking with no trip plan yet has one row per drop-off and no trip number.
+ */
 export interface ExportRow {
-  reference_number: string | null
-  company_name:     string
-  status:           string
-  booked_date:      string | null
-  schedule_date:    string | null
-  completed_date:   string | null
-  origin:           string | null
-  destinations:     string | null
-  truck_type:       string | null
-  driver_name:      string | null
-  vehicle_plate:    string | null
-  vehicle_type:     string | null
-  vendor_name:      string | null
-  total_cost:       number | null
+  booking_id:      string
+  dispatched_date: string | null   // YYYY-MM-DD
+  vendor_name:     string | null
+  plate_number:    string | null
+  driver_id:       string | null   // the driver's license number
+  fleet_type:      string | null
+  driver_name:     string | null
+  call_time:       string | null   // HH:MM
+  origin:          string | null
+  trip_number:     number | null
+  destination:     string | null
 }
 
 /** One run's proof at a drop-off. */
@@ -246,65 +248,44 @@ export const transactionHistoryService = {
   },
 }
 
-const CSV_COLUMNS: { key: keyof ExportRow; label: string; date?: true }[] = [
-  { key: 'reference_number', label: 'Reference' },
-  { key: 'company_name',     label: 'Company' },
-  { key: 'status',           label: 'Status' },
-  { key: 'booked_date',      label: 'Booked Date',    date: true },
-  { key: 'schedule_date',    label: 'Scheduled Date', date: true },
-  { key: 'completed_date',   label: 'Completed Date', date: true },
-  { key: 'origin',           label: 'Pick Up' },
-  { key: 'destinations',     label: 'Drop Offs' },
-  { key: 'truck_type',       label: 'Truck Type' },
-  { key: 'driver_name',      label: 'Driver' },
-  { key: 'vehicle_plate',    label: 'Vehicle Plate' },
-  { key: 'vehicle_type',     label: 'Vehicle Type' },
-  { key: 'vendor_name',      label: 'Vendor' },
-  { key: 'total_cost',       label: 'Total Cost' },
+/** "MFM-TUNASAN" out of "MFM-TUNASAN, 123 Some Rd, Muntinlupa, …": the place, not the street. */
+function placeName(address: string | null): string | null {
+  if (!address) return null
+  return address.split(',')[0].trim() || address
+}
+
+/** 1 → "1ST", 2 → "2ND", 11 → "11TH". */
+function ordinal(n: number | null): string | null {
+  if (n == null) return null
+  const tens = n % 100
+  const suffix = tens >= 11 && tens <= 13 ? 'TH' : ({ 1: 'ST', 2: 'ND', 3: 'RD' } as Record<number, string>)[n % 10] ?? 'TH'
+  return `${n}${suffix}`
+}
+
+/** A YYYY-MM-DD day as an Excel date cell (the writer stores Dates by their UTC fields). */
+function dayCell(day: string | null): Date | null {
+  if (!day || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return null
+  return new Date(`${day}T00:00:00Z`)
+}
+
+/** The dispatch sheet's columns, in operations' own order and words. */
+export const DISPATCH_COLUMNS: XlsxColumn<ExportRow>[] = [
+  { label: 'Dispatched Date',    width: 14, value: (r) => dayCell(r.dispatched_date), format: 'mm/dd/yyyy', align: 'center' },
+  { label: 'Vendor Name',        width: 28, value: (r) => r.vendor_name },
+  { label: 'Plate Number',       width: 13, value: (r) => r.plate_number, align: 'center' },
+  { label: "Driver's ID",        width: 17, value: (r) => r.driver_id, align: 'center' },
+  { label: 'Fleet Type',         width: 13, value: (r) => r.fleet_type, align: 'center' },
+  { label: 'Drivers Name',       width: 30, value: (r) => r.driver_name },
+  { label: 'Assigned Call Time', width: 12, value: (r) => r.call_time, align: 'center' },
+  { label: 'Origin',             width: 26, value: (r) => placeName(r.origin) },
+  { label: 'Trip Sequence',      width: 11, value: (r) => ordinal(r.trip_number), align: 'center' },
+  { label: 'Destination',        width: 28, value: (r) => placeName(r.destination) },
 ]
 
-function csvCell(value: unknown): string {
-  if (value === null || value === undefined) return ''
-  const s = String(value)
-  // A leading =, +, - or @ makes a spreadsheet treat the cell as a formula.
-  // Addresses and company names are user-supplied, so neutralise them.
-  const safe = /^[=+\-@]/.test(s) ? `'${s}` : s
-  return /[",\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe
-}
-
-/**
- * A bare YYYY-MM-DD is re-parsed by Excel as a real date and re-rendered in the
- * machine's short-date format, which is wider than the default column and shows
- * as `#######` until every date column is widened by hand. A CSV carries no
- * column widths, so the only fix is to keep the cell text: Excel reads
- * ="2026-09-09" as a formula returning a string, and text overflows the column
- * instead of hashing out. ISO text still sorts chronologically.
- */
-function csvDateCell(value: unknown): string {
-  if (value === null || value === undefined || value === '') return ''
-  // Emitted as the already-escaped CSV field so csvCell's formula guard, which
-  // exists for user-supplied text, does not neutralise our own formula.
-  return `"=""${String(value).replace(/"/g, '')}"""`
-}
-
-export function buildTransactionCsv(rows: ExportRow[]): string {
-  const header = CSV_COLUMNS.map((c) => csvCell(c.label)).join(',')
-  const body   = rows.map((r) =>
-    CSV_COLUMNS.map((c) => (c.date ? csvDateCell(r[c.key]) : csvCell(r[c.key]))).join(','))
-  // BOM so Excel opens the peso amounts and Filipino place names as UTF-8.
-  return '﻿' + [header, ...body].join('\r\n')
-}
-
-export function downloadCsv(filename: string, csv: string): void {
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-  const url  = URL.createObjectURL(blob)
-  const a    = document.createElement('a')
-  a.href     = url
-  a.download = filename
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  // Safari (iOS especially) reads the blob after click() returns; revoking
-  // straight away can leave it an empty or failed download.
-  setTimeout(() => URL.revokeObjectURL(url), 1000)
+/** Builds and downloads the dispatch sheet (.xlsx) with the header in the sheet's blue. */
+export function downloadDispatchXlsx(fileName: string, rows: ExportRow[]): Promise<void> {
+  return downloadXlsx(fileName, 'Dispatch', rows, DISPATCH_COLUMNS, {
+    headerBackground: '#1F3D7A',
+    headerTextColor:  '#FFFFFF',
+  })
 }

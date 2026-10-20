@@ -15,6 +15,15 @@ export interface XlsxColumn<T> {
   /** Column width in characters. */
   width: number
   value: (row: T) => XlsxValue
+  /** Excel number/date format for this column's dates, e.g. 'mm/dd/yyyy'. */
+  format?: string
+  align?:  'left' | 'center' | 'right'
+}
+
+/** Optional look for the header row (defaults: bold, no fill). */
+export interface XlsxOptions {
+  headerBackground?: string
+  headerTextColor?:  string
 }
 
 // Excel caps a cell at 32,767 characters and refuses to open the file if one
@@ -26,6 +35,7 @@ export async function downloadXlsx<T>(
   sheet: string,
   rows: T[],
   columns: XlsxColumn<T>[],
+  options: XlsxOptions = {},
 ): Promise<void> {
   // Loaded on click so the writer stays out of the page bundle.
   const { default: writeXlsxFile } = await import('write-excel-file/browser')
@@ -35,14 +45,22 @@ export async function downloadXlsx<T>(
     stickyRowsCount: 1,
     columns: columns.map((c) => ({
       width:  c.width,
-      header: { value: c.label, fontWeight: 'bold' as const },
+      header: {
+        value: c.label,
+        fontWeight: 'bold' as const,
+        align: 'center' as const,
+        wrap: true,
+        ...(options.headerBackground ? { backgroundColor: options.headerBackground } : {}),
+        ...(options.headerTextColor  ? { textColor: options.headerTextColor }        : {}),
+      },
       cell:   (row: T) => {
         const v = c.value(row)
-        if (v instanceof Date) return { value: v, type: Date, format: 'yyyy-mm-dd hh:mm:ss' }
+        const align = c.align ? { align: c.align } : {}
+        if (v instanceof Date) return { value: v, type: Date, format: c.format ?? 'yyyy-mm-dd hh:mm:ss', ...align }
         if (typeof v === 'string' && v.length > MAX_CELL_CHARS) {
           return `${v.slice(0, MAX_CELL_CHARS)}… [truncated]`
         }
-        return v ?? null
+        return c.align && v != null ? { value: v, ...align } : v ?? null
       },
     })),
   }).toFile(fileName)
