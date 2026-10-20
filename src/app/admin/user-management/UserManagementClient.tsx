@@ -254,7 +254,9 @@ function RowMenu({ user, tab, onView, onEdit, onStatusChange, lockedBy }: RowMen
 }
 
 /** Where a vendor driver's passkey sign-in stands, in one badge. */
-function AccessBadge({ access }: { access: VendorDriverUser['access'] }) {
+function AccessBadge({ access }: { access: VendorDriverUser['access'] | undefined }) {
+  // A row without access state is not a vendor account (or not loaded yet).
+  if (!access) return <span className="text-sm text-[#818181]">—</span>
   const cfg = !access.account_active
     ? { label: 'Revoked',          cls: 'bg-red-500/15 text-red-400 border-red-500/30' }
     : access.enrolled
@@ -279,7 +281,7 @@ function AccessBadge({ access }: { access: VendorDriverUser['access'] }) {
  * picks a vendor crew next knows to restore access first.
  */
 function RevokedFlag({ user }: { user: VendorDriverUser }) {
-  if (user.access.account_active) return null
+  if (!user.access || user.access.account_active) return null
   const at     = user.drivers?.access_revoked_at ?? null
   const reason = user.drivers?.access_revoked_reason ?? null
   return (
@@ -389,7 +391,7 @@ function VendorRowMenu({ user, onDone, onView, onEdit, lockedBy }: {
               </button>
             )}
             {canEdit && <div className="my-1 border-t border-[#2a2a2a]" />}
-            {!canEdit ? null : user.access.account_active ? (
+            {!canEdit || !user.access ? null : user.access.account_active ? (
               <>
                 <button onClick={resend} className={`${item} text-[#818181] hover:bg-[#2a2a2a] hover:text-white`}>
                   <Send size={13} /> Resend Setup Link
@@ -697,6 +699,8 @@ export default function UserManagementClient() {
         userService.getAll({ search: searchQuery || undefined, role: 'client,driver' }),
         userService.getStats('client,driver'),
       ])
+      // Left the All tab while this was in flight: its rows don't belong here.
+      if (currentTabRef.current !== 'all') return
       setAllRows(result.data)
       setServerTotal(result.total)
       setServerTotalPages(Math.ceil(result.total / PAGE_SIZE))
@@ -711,6 +715,13 @@ export default function UserManagementClient() {
     }
   }, [])
 
+  // The tab whose rows may land. A request for a tab the admin has already left
+  // (Drivers, then straight to Vendor Drivers, with Drivers answering last) must
+  // not put its rows under the new tab's columns — company drivers drawn
+  // through the vendor cells crashed the page on their missing `access`.
+  const currentTabRef = useRef<TabValue>(activeTab)
+  currentTabRef.current = activeTab
+
   const fetchTabUsers = useCallback(async (tab: DirectoryTab, quiet = false) => {
     if (!quiet) {
       setLoading(true)
@@ -722,12 +733,13 @@ export default function UserManagementClient() {
         fetchByTab(tab),
         userService.getStats('client,driver')
       ])
+      if (currentTabRef.current !== tab) return
       setAllRows(rows)
       setStats({ total: statsResult.total, active: statsResult.active, archived: statsResult.archived })
     } catch {
-      if (!quiet) setError('Failed to load users. Check your connection or permissions.')
+      if (!quiet && currentTabRef.current === tab) setError('Failed to load users. Check your connection or permissions.')
     } finally {
-      if (!quiet) setLoading(false)
+      if (!quiet && currentTabRef.current === tab) setLoading(false)
     }
   }, [])
 

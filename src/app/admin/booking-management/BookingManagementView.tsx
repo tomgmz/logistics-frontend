@@ -656,7 +656,7 @@ function AssignmentPanel({
 
   // Only accounts that can sign in are offered; a revoked one would be refused.
   const pickableVendorDrivers = vendorDrivers.filter(
-    (v) => v.access.account_active || v.user_id === vendorForm.vendor_driver_user_id,
+    (v) => v.access?.account_active || v.user_id === vendorForm.vendor_driver_user_id,
   )
 
   const rule = crewRule(route)
