@@ -146,6 +146,29 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
     window.history.replaceState(null, '', `${window.location.pathname}${rest ? `?${rest}` : ''}`)
   }, [isPublic, openConversation])
 
+  // A press anywhere outside the panel (or Escape) closes it, so other UI that
+  // opens over the page isn't left sitting under or behind the chat. Presses
+  // inside are flagged through React's tree, so the panel's own portaled
+  // dialogs (the photo send dialog) still count as inside.
+  const pressedInside = useRef(false)
+  const markInside = useCallback(() => { pressedInside.current = true }, [])
+  useEffect(() => {
+    if (!open) return
+    // The launcher press that opened the panel flagged itself; drop it.
+    pressedInside.current = false
+    const onPointerDown = () => {
+      if (!pressedInside.current) setOpen(false)
+      pressedInside.current = false
+    }
+    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [open])
+
   useEffect(() => {
     scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: 'smooth' })
   }, [messages, ticketOpen])
@@ -270,6 +293,7 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
     <motion.button
       type="button"
       onClick={() => setOpen((o) => !o)}
+      onPointerDownCapture={markInside}
       whileHover={{ scale: 1.05 }}
       whileTap={{ scale: 0.95 }}
       aria-label={open ? 'Close help' : inbox.totalUnread > 0 ? `Help and messages, ${inbox.totalUnread} unread` : 'Help and messages'}
@@ -291,6 +315,7 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
         <motion.div
           role="dialog"
           aria-label="Help assistant"
+          onPointerDownCapture={markInside}
           initial={{ opacity: 0, y: 16, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 16, scale: 0.98 }}
