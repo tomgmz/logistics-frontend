@@ -92,6 +92,8 @@ const humanize = (s: string): string =>
 // Labels for the payload keys the backend sends; anything else scalar is shown
 // with a humanized key. Routing/ids are left out — the Open button covers them.
 const FIELD_LABELS: Record<string, string> = {
+  plate_number:      "Plate number",
+  driver_name:       "Driver",
   reference_number:  "Reference",
   stage:             "Stage",
   incident_type:     "Incident",
@@ -130,6 +132,8 @@ const VALUE_LABELS: Record<string, Record<string, string>> = {
     day_of:     "Day of dispatch",
   },
 };
+// Shown exactly as sent: a plate or a name must not be re-cased or "expanded".
+const AS_IS_FIELDS = new Set(["reference_number", "plate_number", "driver_name"]);
 const HIDDEN_FIELDS = new Set(["action_url", "type", "handler_group", "latitude", "longitude"]);
 
 function detailFields(n: AppNotification): { label: string; value: string }[] {
@@ -141,7 +145,7 @@ function detailFields(n: AppNotification): { label: string; value: string }[] {
     if (raw === null || raw === undefined || raw === "" || typeof raw === "object") continue;
     const value =
       typeof raw === "boolean" ? (raw ? "Yes" : "No")
-      : key === "reference_number" ? String(raw)
+      : AS_IS_FIELDS.has(key) ? String(raw)
       : key === "requested_role" ? roleLabel(String(raw))
       : VALUE_LABELS[key]?.[String(raw)] ?? humanize(expandCode(String(raw)));
     fields.push({ label: FIELD_LABELS[key] ?? humanize(key), value });
