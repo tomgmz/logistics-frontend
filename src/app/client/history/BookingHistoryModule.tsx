@@ -5,9 +5,8 @@ import { motion, Variants, AnimatePresence } from 'framer-motion'
 import { Suspense, useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import {
-  History, Search, ChevronRight, ChevronLeft,
-  MapPin, Truck, Package, Calendar, Hash,
-  X, AlertCircle, RefreshCw, ArrowUpRight, Filter,
+  ChevronRight, ChevronLeft, Package, Calendar,
+  X, AlertCircle, RefreshCw,
 } from 'lucide-react'
 
 import TextField from '@mui/material/TextField'
@@ -29,10 +28,10 @@ import TransactionDetail from '@/components/transactions/TransactionDetail'
 import RejectionPanel from '@/components/transactions/RejectionPanel'
 import CompletionPanel from '@/components/transactions/CompletionPanel'
 import BookingDocuments from '@/components/transactions/BookingDocuments'
-import { StatusBadge } from '@/components/transactions/TransactionStatus'
+import { StatusBadge, getStatusMeta } from '@/components/transactions/TransactionStatus'
 import ProblemReportedBadge, { hasOpenClientIssue } from '@/components/transactions/ProblemReportedBadge'
 import {
-  formatDate, formatPeso, buildCargoSummary, getDropoffs,
+  formatDate, getDropoffs,
 } from '@/components/transactions/transaction-format'
 import {
   BG_PAGE, BG_PANEL, BG_CARD, BORDER, BORDER_C, CYAN, MUTED, ERROR, RADIUS,
@@ -97,12 +96,25 @@ const MENU_PROPS = {
   },
 }
 
+/** An icon exported from the Figma Transaction History (public/icons/transaction-history). */
+function HistoryIcon({ name, size, className = '' }: { name: string; size: number; className?: string }) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={`/icons/transaction-history/${name}`} alt="" width={size} height={size}
+      className={`shrink-0 ${className}`} draggable={false} />
+  )
+}
+
+// Figma lines and chips.
+const LINE      = '#424242'
+const CHIP_IDLE = '#343434'
+
 const TABS: { key: BookingStatus | 'all'; label: string }[] = [
   { key: 'all',        label: 'All' },
   { key: 'PENDING',    label: 'Pending' },
   { key: 'APPROVED',   label: 'Approved' },
   { key: 'ASSIGNED',   label: 'Assigned' },
-  { key: 'IN_TRANSIT', label: 'In Transit' },
+  { key: 'IN_TRANSIT', label: 'In transit' },
   { key: 'DELIVERED',  label: 'Delivered' },
   { key: 'COMPLETED',  label: 'Completed' },
   { key: 'CANCELLED',  label: 'Cancelled' },
@@ -141,62 +153,80 @@ function SkeletonCard() {
   )
 }
 
+/** The status as the Figma tags it: coloured outline, tinted fill, no icon. */
+function StatusTag({ status }: { status: string }) {
+  const m = getStatusMeta(status)
+  return (
+    <span className="ff-sc !text-xs sm:!text-sm leading-none px-1.5 py-1 rounded-[5px] border whitespace-nowrap"
+      style={{ color: m.color, borderColor: m.color, background: `${m.color}1f` }}>
+      {m.label}
+    </span>
+  )
+}
+
+/** "16 items  1600.0 KG  13.00 CBM" — whatever of it the booking has. */
+function cargoLine(booking: BookingWithRelations): string {
+  const items  = (booking.booking_cargo_items as Array<{ quantity?: number | null }> | undefined) ?? []
+  const count  = items.reduce((n, it) => n + (it.quantity ?? 0), 0)
+  const weight = booking.required_weight_kg as number | null | undefined
+  const volume = booking.required_volume_cbm as number | null | undefined
+  const parts: string[] = []
+  if (count)  parts.push(`${count} item${count !== 1 ? 's' : ''}`)
+  if (weight) parts.push(`${Number(weight).toFixed(1)} KG`)
+  if (volume) parts.push(`${Number(volume).toFixed(2)} CBM`)
+  return parts.length > 0 ? parts.join('   ') : 'No cargo details'
+}
+
 function BookingCard({ booking, onSelect }: {
   booking: BookingWithRelations
   onSelect: () => void
 }) {
-  const dropoffs   = getDropoffs(booking)
-  const summary    = buildCargoSummary(booking)
-  const schedDate  = booking.schedule_date as string | undefined
-  const totalCost  = booking.total_cost as number | null | undefined
+  const dropoffs  = getDropoffs(booking)
+  const schedDate = booking.schedule_date as string | undefined
 
   return (
     <motion.div variants={fadeUp} layout
-      className="rounded-xl border p-4 flex flex-col gap-3 cursor-pointer group transition-colors"
-      style={{ background: BG_PANEL, borderColor: BORDER }}
+      role="button" tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect() } }}
+      className="ff-sc rounded-[10px] p-4 flex flex-col gap-3 cursor-pointer
+                 shadow-[0_4px_4px_rgba(0,0,0,0.25)] outline-none focus-visible:ring-1 focus-visible:ring-[#4DF9ED]/60"
+      style={{ background: BG_PANEL }}
       onClick={onSelect}>
       <div className="flex items-start justify-between gap-3">
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <Hash size={12} style={{ color: CYAN }} />
-            <span className="font-bold text-white text-sm tracking-wide font-mono">
-              {bookingRef(booking)}
-            </span>
-          </div>
-          <div className="flex items-center gap-1.5 text-xs" style={{ color: MUTED }}>
-            <Calendar size={11} />
-            <span>Scheduled {formatDate(schedDate)}</span>
+        <div className="flex flex-col gap-1 min-w-0">
+          <p className="font-bold text-base text-white truncate">
+            <span style={{ color: CYAN }}>#</span><span className="ml-2">{bookingRef(booking)}</span>
+          </p>
+          <div className="flex items-center gap-1.5 text-sm" style={{ color: MUTED }}>
+            <HistoryIcon name="calendar.svg" size={16} />
+            <span className="truncate">Scheduled {formatDate(schedDate)}</span>
           </div>
           {hasOpenClientIssue(booking) && (
             <ProblemReportedBadge className="" note={booking.client_issue_note as string | null | undefined} />
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <StatusBadge status={booking.status} />
-          <ArrowUpRight size={14} style={{ color: MUTED }}
-            className="opacity-0 group-hover:opacity-100 transition-opacity" />
-        </div>
+        <StatusTag status={booking.status} />
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <div className="flex items-center gap-2 text-xs">
-          <Truck size={11} style={{ color: CYAN }} />
-          <span className="truncate text-white/70">{booking.origin as string | undefined}</span>
+        <div className="flex items-center gap-2 text-sm">
+          <HistoryIcon name="pin-pickup.svg" size={17} />
+          <span className="truncate text-white">{booking.origin as string | undefined}</span>
         </div>
         {dropoffs.map((d, i) => (
-          <div key={i} className="flex items-center gap-2 text-xs pl-0.5">
-            <MapPin size={11} style={{ color: ERROR }} />
-            <span className="truncate text-white/70">{d}</span>
+          <div key={i} className="flex items-center gap-2 text-sm">
+            <HistoryIcon name="pin-dropoff.svg" size={17} />
+            <span className="truncate text-white">{d}</span>
           </div>
         ))}
       </div>
 
-      <div className="flex items-center justify-between gap-3 pt-2 border-t" style={{ borderColor: BORDER }}>
-        <div className="flex items-center gap-1.5 text-xs" style={{ color: MUTED }}>
-          <Package size={11} />
-          <span>{summary}</span>
+      <div className="flex items-center justify-between gap-3 pt-2 border-t border-white/80">
+        <div className="flex items-center gap-1.5 text-[13px] min-w-0" style={{ color: MUTED }}>
+          <HistoryIcon name="cargo.svg" size={18} />
+          <span className="truncate whitespace-pre">{cargoLine(booking)}</span>
         </div>
-        <span className="text-sm font-bold text-white">{formatPeso(totalCost)}</span>
+        <HistoryIcon name="open.svg" size={18} />
       </div>
     </motion.div>
   )
@@ -332,25 +362,23 @@ export default function BookingHistoryModule() {
             <ChevronLeft size={16} />
           </button>
         )}
-        <div className="flex items-center gap-2">
-          <History size={18} style={{ color: CYAN }} />
-          <h1 className="font-bold text-white text-base tracking-wide">
-            {view === 'list' ? 'Transaction History' : bookingRef(selected)}
-          </h1>
-        </div>
+        <h1 className="ff-sc text-white text-lg lg:text-xl truncate">
+          {view === 'list' ? 'Transaction History' : bookingRef(selected)}
+        </h1>
         {view === 'list' && !loading && (
-          <>
-            <button onClick={() => void loadBookings()} title="Refresh"
-              className="ml-2 flex items-center justify-center w-7 h-7 rounded-lg border transition-colors
-                         hover:border-white/30 hover:text-white cursor-pointer"
-              style={{ borderColor: BORDER_C, color: MUTED }}>
-              <RefreshCw size={13} />
-            </button>
-            <span className="ml-auto text-xs uppercase tracking-widest font-bold px-2 py-0.5 rounded"
-              style={{ background: `${CYAN}18`, color: CYAN }}>
+          <div className="ml-auto flex items-center gap-3 shrink-0">
+            <span className="ff-sc font-bold !text-[11px] uppercase whitespace-nowrap px-4 h-[30px] inline-flex items-center
+                             rounded-full border"
+              style={{ background: 'rgba(77,249,237,0.11)', borderColor: CYAN, color: CYAN }}>
               {bookings.length} booking{bookings.length !== 1 ? 's' : ''}
             </span>
-          </>
+            <button onClick={() => void loadBookings()} title="Refresh" aria-label="Refresh"
+              className="relative flex items-center justify-center w-[30px] h-[30px] rounded-full
+                         opacity-90 hover:opacity-100 transition-opacity cursor-pointer">
+              <HistoryIcon name="refresh-ring.svg" size={30} className="absolute inset-0" />
+              <HistoryIcon name="refresh.svg" size={16} />
+            </button>
+          </div>
         )}
         {view === 'detail' && selected && (
           <div className="ml-auto flex items-center gap-2">
@@ -384,18 +412,18 @@ export default function BookingHistoryModule() {
               className="flex flex-col gap-4">
 
               {/* Search + filter toggle */}
-              <div className="flex gap-2">
-                <div className="flex-1">
+              <div className="ff-sc flex gap-2">
+                <div className="flex-1 min-w-0">
                   <TextField
                     fullWidth
-                    placeholder="Search by reference number, pickup, or drop-off…"
+                    placeholder="Search by booking reference or location…"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     variant="outlined"
                     InputProps={{
                       startAdornment: (
                         <InputAdornment position="start">
-                          <Search size={15} style={{ color: MUTED }} />
+                          <HistoryIcon name="search.svg" size={20} />
                         </InputAdornment>
                       ),
                       endAdornment: search ? (
@@ -409,24 +437,32 @@ export default function BookingHistoryModule() {
                       ) : null,
                     }}
                     sx={{
-                      ...fieldSx(BG_PANEL, BORDER),
+                      ...fieldSx(BG_PANEL, MUTED),
+                      '& .MuiInputBase-root': {
+                        height: 44, borderRadius: '15px', backgroundColor: BG_PANEL, paddingLeft: '14px',
+                        color: '#fff', fontSize: '0.95rem', fontFamily: 'inherit',
+                      },
+                      '& .MuiOutlinedInput-notchedOutline': { borderColor: MUTED, borderRadius: '15px' },
                       '& .MuiInputBase-input': {
-                        padding: '0 8px', height: 36, boxSizing: 'border-box',
-                        '&::placeholder': { color: 'rgba(255,255,255,0.2)', opacity: 1 },
+                        padding: '0 8px', height: 44, boxSizing: 'border-box',
+                        '&::placeholder': { color: MUTED, opacity: 1 },
                       },
                     }}
                   />
                 </div>
                 <button
                   onClick={() => setShowFilters((v) => !v)}
-                  className="flex items-center gap-1.5 px-3 h-9 rounded-lg border text-xs font-bold
-                             uppercase tracking-wider transition-all cursor-pointer shrink-0"
+                  aria-expanded={showFilters}
+                  aria-label="Filters"
+                  className="ff-sc flex items-center gap-2 px-4 sm:px-6 h-11 rounded-[15px] border text-base font-bold
+                             uppercase transition-all cursor-pointer shrink-0"
                   style={{
-                    borderColor: showFilters ? `${CYAN}60` : BORDER_C,
+                    borderColor: showFilters ? CYAN : MUTED,
                     background:  showFilters ? `${CYAN}10` : 'transparent',
                     color:       showFilters ? CYAN : MUTED,
                   }}>
-                  <Filter size={13} />Filters
+                  <HistoryIcon name="filter.svg" size={18} />
+                  <span className="hidden sm:inline">Filters</span>
                   {hasActiveFilters && (
                     <span className="w-1.5 h-1.5 rounded-full" style={{ background: CYAN }} />
                   )}
@@ -511,28 +547,35 @@ export default function BookingHistoryModule() {
                 )}
               </AnimatePresence>
 
-              {/* Tab bar */}
-              <div className="flex items-center gap-0 border-b overflow-x-auto scrollbar-none"
-                style={{ borderColor: BORDER }}>
-                {TABS.map((t) => (
-                  <button key={t.key} onClick={() => setActiveTab(t.key)}
-                    className="flex items-center gap-1.5 pb-2 px-3 text-xs font-bold uppercase
-                               tracking-wider transition-colors whitespace-nowrap cursor-pointer"
-                    style={
-                      activeTab === t.key
-                        ? { color: '#fff', borderBottom: `2px solid ${CYAN}`, marginBottom: -1 }
-                        : { color: MUTED }
-                    }>
-                    {t.label}
-                    <span className="px-1.5 py-0.5 rounded-sm text-[10px]"
-                      style={{
-                        background: activeTab === t.key ? `${CYAN}22` : 'rgba(255,255,255,0.06)',
-                        color:      activeTab === t.key ? CYAN : MUTED,
-                      }}>
-                      {counts[t.key] ?? 0}
-                    </span>
-                  </button>
-                ))}
+              {/* Tab bar + legend */}
+              <div className="ff-sc flex flex-col-reverse gap-2 lg:flex-row lg:items-end border-b"
+                style={{ borderColor: LINE }}>
+                <div className="flex items-end gap-1 overflow-x-auto scrollbar-none -mb-px">
+                  {TABS.map((t) => {
+                    const active = activeTab === t.key
+                    return (
+                      <button key={t.key} onClick={() => setActiveTab(t.key)}
+                        className="flex items-center gap-2 pb-2 px-3 text-sm lg:text-base font-bold
+                                   transition-colors whitespace-nowrap cursor-pointer border-b-[1.5px]"
+                        style={{ color: active ? '#fff' : MUTED, borderColor: active ? CYAN : 'transparent' }}>
+                        {t.label}
+                        <span className="min-w-5 h-5 px-1 inline-flex items-center justify-center rounded-[3px] text-sm"
+                          style={{
+                            background: active ? 'rgba(77,249,237,0.23)' : CHIP_IDLE,
+                            color:      active ? CYAN : MUTED,
+                          }}>
+                          {counts[t.key] ?? 0}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+                <div className="lg:ml-auto flex flex-wrap items-center gap-x-3 gap-y-1 pb-2 text-sm lg:text-base font-bold"
+                  style={{ color: MUTED }}>
+                  <span>Legend:</span>
+                  <span className="flex items-center gap-1"><HistoryIcon name="pin-pickup.svg" size={17} />Pick Up Point</span>
+                  <span className="flex items-center gap-1"><HistoryIcon name="pin-dropoff.svg" size={17} />Drop Off Point</span>
+                </div>
               </div>
 
               {/* Results count */}
