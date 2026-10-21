@@ -60,16 +60,21 @@ export default function RecordLockBanner({
   return null
 }
 
-/** Small pill for list rows: "🔒 Maria". */
+/**
+ * Small lock pill for list rows — icon only. Who holds it is shown by the
+ * banner once the record is opened; the name stays in the tooltip and for
+ * screen readers.
+ */
 export function RecordLockBadge({ holder }: { holder: string | undefined }) {
   if (!holder) return null
   return (
     <span
+      role="img"
       title={`${holder} is updating this`}
-      className="inline-flex items-center gap-1 rounded-md border border-amber-400/30 bg-amber-400/[0.08] px-1.5 py-0.5 text-[10px] font-bold text-amber-200 max-w-[140px]"
+      aria-label={`${holder} is updating this`}
+      className="inline-flex items-center justify-center rounded-md border border-amber-400/30 bg-amber-400/[0.08] p-1 text-amber-200 shrink-0"
     >
-      <Lock size={10} className="shrink-0" />
-      <span className="truncate">{holder}</span>
+      <Lock size={12} className="shrink-0" />
     </span>
   )
 }
