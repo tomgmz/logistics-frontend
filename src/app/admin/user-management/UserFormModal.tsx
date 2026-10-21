@@ -644,12 +644,10 @@ export default function UserFormModal({
           <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#2a2a2a] bg-[#1b1b1b] px-6 py-4">
             <div>
               <p className="text-[10px] font-bold tracking-[0.14em] uppercase text-[#4df9ed]">
-                {viewing ? 'View' : isEdit ? 'Edit' : 'Create'} {formLabel}
+                {viewing ? 'View' : isEdit ? 'Edit' : 'Create'}
               </p>
               <h2 className="mt-0.5 text-lg font-bold text-white">
-                {viewing
-                  ? `${formLabel} Details`
-                  : isEdit ? `Update ${formLabel}` : `New ${formLabel} Account`}
+                {formLabel}
               </h2>
             </div>
             <button
