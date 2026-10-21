@@ -35,6 +35,7 @@ import './BookingDetails.css'
 const noopSubscribe = () => () => {}
 import { cargoCatalogService } from '@/lib/services/admin/cargo-catalog.service'
 import { appToast } from '@/lib/toast'
+import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import type { Commodity, Product, HandlingCode } from '@/app/types/admin/cargo-catalog.types'
 
 import Select, { SelectChangeEvent } from '@mui/material/Select'
@@ -689,28 +690,34 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
   const [shcStandardList, setShcStandardList] = useState<HandlingCode[]>([])
   const [shcAdditionalList, setShcAdditionalList] = useState<HandlingCode[]>([])
 
-  useEffect(() => {
-    let mounted = true
-    async function loadCatalog() {
-      try {
-        const [comms, prods, std, add] = await Promise.all([
-          cargoCatalogService.getCommodities(),
-          cargoCatalogService.getProducts(),
-          cargoCatalogService.getHandlingCodes('standard'),
-          cargoCatalogService.getHandlingCodes('additional'),
-        ])
-        if (!mounted) return
+  const catalogMounted = useRef(true)
+  // quiet = a live re-read: a failure keeps the lists already on screen, no toast.
+  function loadCatalog(quiet = false) {
+    return Promise.all([
+      cargoCatalogService.getCommodities(),
+      cargoCatalogService.getProducts(),
+      cargoCatalogService.getHandlingCodes('standard'),
+      cargoCatalogService.getHandlingCodes('additional'),
+    ])
+      .then(([comms, prods, std, add]) => {
+        if (!catalogMounted.current) return
         setCommodities(comms)
         setProductsCatalog(prods)
         setShcStandardList(std)
         setShcAdditionalList(add)
-      } catch (err: unknown) {
-        appToast.error('Unable to load cargo catalog')
-      }
-    }
-    loadCatalog()
-    return () => { mounted = false }
+      })
+      .catch(() => {
+        if (!quiet) appToast.error('Unable to load cargo catalog')
+      })
+  }
+
+  useEffect(() => {
+    catalogMounted.current = true
+    void loadCatalog()
+    return () => { catalogMounted.current = false }
   }, [])
+  // Commodities, products and handling codes edited in System Maintenance reach the form live.
+  useLiveTable(['live:catalog'], () => { void loadCatalog(true) })
 
   const computedAllNonTiltable  = allGroups.length > 0 && allGroups.every((g) => g.nonTiltable)
   const computedAllNonStackable = allGroups.length > 0 && allGroups.every((g) => g.nonStackable)
@@ -969,7 +976,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
           </div>
 
           <div className="flex items-center gap-6 border-b border-white/[0.07]">
-            {(['loose', 'palletized'] as CargoMode[]).map((m) => (
+            {(['palletized', 'loose'] as CargoMode[]).map((m) => (
               <button key={m} onClick={() => dispatch(setMode(m))}
                 className={`pb-2 ff-sc booking-text text-sm capitalize transition-colors cursor-pointer
                   ${mode === m ? 'text-white border-b-2 border-white -mb-px' : 'text-[var(--color-muted)] hover:text-white'}`}>

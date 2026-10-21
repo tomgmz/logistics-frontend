@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type InputHTMLAttributes } from 'react'
 import { systemMaintenanceService, type LandlinePrefix } from '@/lib/services/admin/system-maintenance.service'
+import { useLiveTable } from '@/lib/hooks/useLiveTable'
 
 const inputBase =
   'w-full rounded-[10px] border border-[#424242] bg-[#2a2a2a99] px-3 py-2 text-[13px] text-white placeholder-[#555] outline-none transition-colors duration-150 focus:border-[#4df9ed] hover:border-[#4df9ed50]'
@@ -54,11 +55,15 @@ interface LandlineInputRowProps {
 export default function LandlineInputRow({ value, onChange, error }: LandlineInputRowProps) {
   const [areaCodes, setAreaCodes] = useState<LandlinePrefix[]>([])
 
-  useEffect(() => {
+  function loadPrefixes() {
     systemMaintenanceService.getLandlinePrefixes()
       .then(prefixes => setAreaCodes(prefixes.filter(p => p.is_active)))
       .catch(() => {})
-  }, [])
+  }
+
+  useEffect(() => { loadPrefixes() }, [])
+  // A prefix added or switched off in System Maintenance shows up here right away.
+  useLiveTable(['live:catalog'], loadPrefixes)
 
   const { areaCode, subscriber } = splitDigits(value, areaCodes)
   const maxSub = subscriberMaxLength(areaCode)
