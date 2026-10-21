@@ -4,7 +4,8 @@ import { useEffect, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { Bell, X, Check, CheckCheck, ChevronRight, RefreshCw } from "lucide-react";
+import { Bell, X, Check, CheckCheck, ChevronRight } from "lucide-react";
+import RefreshButton from '@/components/ui/RefreshButton'
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import ReusableModal from "../layout/ReusableModal";
 import { now } from "@/app/utils/serverTime";
@@ -558,14 +559,7 @@ export default function NotificationIcon() {
           disabled={pageLoading}
           onPageChange={(p) => { void goToPage(p) }}
         />
-        <button
-          title="Refresh"
-          aria-label="Refresh notifications"
-          className="flex h-7 w-7 shrink-0 items-center justify-center text-white/40 bg-transparent border border-white/[0.08] rounded-md cursor-pointer transition-all hover:text-white hover:border-white/20 hover:bg-white/5"
-          onClick={() => hydrate()}
-        >
-          <RefreshCw size={12} />
-        </button>
+        <RefreshButton onClick={() => void hydrate()} ariaLabel="Refresh notifications" />
       </div>
     </>
   );

@@ -3,7 +3,7 @@
 import { useLiveTable, useLivePending } from '@/lib/hooks/useLiveTable'
 import NewEntriesBar from '@/components/ui/NewEntriesBar'
 import { useEffect, useState, useCallback } from 'react'
-import { RefreshCw, ChevronLeft, ChevronRight, ScrollText, Server } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ScrollText, Server } from 'lucide-react'
 import ExportLogsButton from '@/components/admin/ExportLogsButton'
 import {
   auditLogService,
@@ -25,6 +25,7 @@ import {
 import { formatDate, formatTime, formatDateTime } from '@/app/utils/timeFormat'
 import { expandCode, roleLabel } from '@/lib/roles'
 
+import RefreshButton from '@/components/ui/RefreshButton'
 // Types now come from the service — see system-logs.service.ts. They used to be
 // declared here because there was no system-logs endpoint to type against.
 export type { SystemLogLevel, SystemLogEventType, SystemLogStats }
@@ -163,13 +164,7 @@ function AuditLogsTab() {
             <option value="desc">Newest First</option>
             <option value="asc">Oldest First</option>
           </select>
-          <button
-            onClick={() => setRefreshKey(k => k + 1)}
-            disabled={loading}
-            className="flex items-center gap-1.5 rounded-lg border border-[#424242] px-3 py-2 text-sm text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white disabled:opacity-40"
-          >
-            <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
-          </button>
+          <RefreshButton onClick={() => setRefreshKey(k => k + 1)} loading={loading} disabled={loading} />
           <ExportLogsButton
             noun="audit logs"
             cap={AUDIT_EXPORT_ROW_CAP}
@@ -489,13 +484,7 @@ function SystemLogsTab() {
             <option value="desc">Newest First</option>
             <option value="asc">Oldest First</option>
           </select>
-          <button
-            onClick={() => setRefreshKey(k => k + 1)}
-            disabled={loading}
-            className="flex items-center gap-1.5 rounded-lg border border-[#424242] px-3 py-2 text-sm text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white disabled:opacity-40"
-          >
-            <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
-          </button>
+          <RefreshButton onClick={() => setRefreshKey(k => k + 1)} loading={loading} disabled={loading} />
           <ExportLogsButton
             noun="system logs"
             cap={SYSTEM_EXPORT_ROW_CAP}

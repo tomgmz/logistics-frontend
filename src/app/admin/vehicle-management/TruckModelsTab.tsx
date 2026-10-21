@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Upload, Truck as TruckIcon, Pencil, Archive, Eye, Plus, RefreshCw, Search } from 'lucide-react'
+import { X, Upload, Truck as TruckIcon, Pencil, Archive, Eye, Plus, Search } from 'lucide-react'
 import type { CreateTruckModelInput, UpdateTruckModelInput } from '@/app/types/truck.types'
 import { TruckModel } from '@/app/types/truck-model'
 import {
@@ -22,6 +22,7 @@ import RecordLockBanner, { RecordLockBadge } from '@/components/ui/RecordLockBan
 import RowActionMenu, { type RowAction } from '@/components/ui/RowActionMenu'
 import { ModelThumb, fmtDimensions, kgToTons } from './vehicle-ui'
 
+import RefreshButton from '@/components/ui/RefreshButton'
 export const VEHICLE_TYPES = [
   'Closed Van',
   'Wing Van',
@@ -419,14 +420,7 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
             />
           </div>
           <div className="flex items-center gap-2 sm:ml-auto">
-            <button
-              type="button"
-              onClick={() => void loadModels()}
-              className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/5 transition-colors"
-            >
-              <RefreshCw size={14} />
-              Refresh
-            </button>
+            <RefreshButton onClick={() => void loadModels()} />
             {canCreate && (
               <button
                 type="button"

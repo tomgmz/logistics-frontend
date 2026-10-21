@@ -5,7 +5,6 @@ import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Search,
-  RefreshCw,
   ChevronLeft,
   ChevronRight,
   X,
@@ -91,6 +90,7 @@ import {
   DocumentRow,
 } from './BookingDetailParts'
 
+import RefreshButton from '@/components/ui/RefreshButton'
 const PAGE_SIZE = 12
 
 const BOOKING_STATUSES: AdminBookingLifecycleStatus[] = [
@@ -2074,14 +2074,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
 
       <header className="shrink-0 px-3 py-3 lg:px-4 border-b border-white/[0.07] flex flex-col sm:flex-row sm:items-end justify-between gap-3">
         <h1 className="text-lg font-bold text-white tracking-tight">{ROLE_TITLE[roleView]}</h1>
-        <button
-          type="button"
-          onClick={() => void loadPage()}
-          className="inline-flex items-center gap-2 self-start rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/5 transition-colors"
-        >
-          <RefreshCw size={14} />
-          Refresh
-        </button>
+        <RefreshButton onClick={() => void loadPage()} className="self-start" />
       </header>
 
       <div className="flex flex-1 min-h-0 overflow-hidden">

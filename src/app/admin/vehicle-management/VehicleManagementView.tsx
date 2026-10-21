@@ -5,7 +5,6 @@ import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Search,
-  RefreshCw,
   Plus,
   Pencil,
   Archive,
@@ -70,6 +69,7 @@ import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { formatPlateNumber, plateError } from '@/lib/validation/plate'
 
+import RefreshButton from '@/components/ui/RefreshButton'
 const PAGE_SIZE = 10
 
 type FormMode    = 'create' | 'edit' | null
@@ -841,14 +841,7 @@ export default function VehicleManagementView() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2 xl:ml-auto">
-            <button
-              type="button"
-              onClick={() => void refreshAll()}
-              className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/5 transition-colors"
-            >
-              <RefreshCw size={14} />
-              Refresh
-            </button>
+            <RefreshButton onClick={() => void refreshAll()} />
             {canCreate && (
               <button
                 type="button"

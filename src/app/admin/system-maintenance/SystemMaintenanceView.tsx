@@ -2,7 +2,7 @@
 
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, RefreshCw, Tag, Layers, Package, Phone, Pencil, Trash2, X } from 'lucide-react'
+import { Plus, Tag, Layers, Package, Phone, Pencil, Trash2, X } from 'lucide-react'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { systemMaintenanceService } from '@/lib/services/admin/system-maintenance.service'
@@ -22,6 +22,7 @@ import type {
   UpdateLandlinePrefixPayload,
 } from '@/lib/services/admin/system-maintenance.service'
 
+import RefreshButton from '@/components/ui/RefreshButton'
 const TABS = [
   { key: 'handling',    label: 'Handling Codes',   singular: 'Handling Code',   icon: Tag },
   { key: 'commodities', label: 'Commodities',       singular: 'Commodity',       icon: Layers },
@@ -602,13 +603,7 @@ export default function SystemMaintenanceView() {
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/35">Administrator</p>
           <h1 className="mt-0.5 text-lg font-bold tracking-tight text-white">System Maintenance</h1>
         </div>
-        <button
-          type="button"
-          onClick={() => void load()}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-white/60 hover:bg-white/5 transition-colors"
-        >
-          <RefreshCw size={13} /> Refresh
-        </button>
+        <RefreshButton onClick={() => void load()} />
       </header>
 
       {/* tab bar */}

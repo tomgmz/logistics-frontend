@@ -8,6 +8,7 @@ import {
   ChevronRight, ChevronLeft, Package, Calendar,
   X, AlertCircle, RefreshCw,
 } from 'lucide-react'
+import RefreshButton from '@/components/ui/RefreshButton'
 
 import TextField from '@mui/material/TextField'
 import Select, { SelectChangeEvent } from '@mui/material/Select'
@@ -156,9 +157,13 @@ function SkeletonCard() {
 /** The status as the Figma tags it: coloured outline, tinted fill, no icon. */
 function StatusTag({ status }: { status: string }) {
   const m = getStatusMeta(status)
+  // Delivered (awaiting the client's confirmation) is white in the Figma, not
+  // the green Completed uses.
+  const delivered = asBookingStatus(status) === 'DELIVERED'
+  const color = delivered ? '#ffffff' : m.color
   return (
     <span className="ff-sc !text-xs sm:!text-sm leading-none px-1.5 py-1 rounded-[5px] border whitespace-nowrap"
-      style={{ color: m.color, borderColor: m.color, background: `${m.color}1f` }}>
+      style={{ color, borderColor: color, background: delivered ? 'rgba(255,255,255,0.2)' : `${color}1f` }}>
       {m.label}
     </span>
   )
@@ -372,12 +377,7 @@ export default function BookingHistoryModule() {
               style={{ background: 'rgba(77,249,237,0.11)', borderColor: CYAN, color: CYAN }}>
               {bookings.length} booking{bookings.length !== 1 ? 's' : ''}
             </span>
-            <button onClick={() => void loadBookings()} title="Refresh" aria-label="Refresh"
-              className="relative flex items-center justify-center w-[30px] h-[30px] rounded-full
-                         opacity-90 hover:opacity-100 transition-opacity cursor-pointer">
-              <HistoryIcon name="refresh-ring.svg" size={30} className="absolute inset-0" />
-              <HistoryIcon name="refresh.svg" size={16} />
-            </button>
+            <RefreshButton onClick={() => void loadBookings()} />
           </div>
         )}
         {view === 'detail' && selected && (

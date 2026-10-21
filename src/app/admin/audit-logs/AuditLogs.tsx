@@ -3,7 +3,7 @@
 import { useLiveTable, useLivePending } from '@/lib/hooks/useLiveTable'
 import NewEntriesBar from '@/components/ui/NewEntriesBar'
 import { useEffect, useState, useCallback } from 'react'
-import { RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import {
   auditLogService as systemLogService,
   exportAuditLogsXlsx,
@@ -17,6 +17,7 @@ import { useModuleAccess } from '@/components/layout/ModuleAccess'
 import ExportLogsButton from '@/components/admin/ExportLogsButton'
 import { expandCode, roleLabel } from '@/lib/roles'
 
+import RefreshButton from '@/components/ui/RefreshButton'
 const BADGE_STYLES: Record<LogType, string> = {
   auth:              'bg-[rgba(138,56,245,0.12)] text-[#8a38f5] border border-[rgba(138,56,245,0.25)]',
   user_management:   'bg-[rgba(77,249,237,0.12)] text-[#4df9ed] border border-[rgba(77,249,237,0.25)]',
@@ -188,13 +189,7 @@ export default function AuditLogsPage() {
               <option value="desc">Newest First</option>
               <option value="asc">Oldest First</option>
             </select>
-            <button
-              onClick={() => { fetchLogs(); fetchStats() }}
-              disabled={loading}
-              className="flex items-center gap-1.5 rounded-lg border border-[#424242] px-3 py-2 text-sm text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white disabled:opacity-40"
-            >
-              <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
-            </button>
+            <RefreshButton onClick={() => { fetchLogs(); fetchStats() }} loading={loading} disabled={loading} />
             {/* Gated on can_export, the tier the IT Admin sets for this module. */}
             {canExport && (
               <ExportLogsButton

@@ -8,7 +8,7 @@ import {
 } from 'recharts'
 import {
   AlertTriangle, CalendarCheck, CheckCircle2, ClipboardCheck, Gauge, Flag,
-  MapPin, PackageCheck, RefreshCw, ShieldAlert, Truck, Wrench, ChevronRight, Clock, Ticket,
+  MapPin, PackageCheck, ShieldAlert, Truck, Wrench, ChevronRight, Clock, Ticket,
 } from 'lucide-react'
 import SupportTicketsPanel from './SupportTicketsPanel'
 
@@ -22,6 +22,7 @@ import {
   type DashboardVehicle,
 } from '@/lib/services/admin/staff-dashboard.service'
 
+import RefreshButton from '@/components/ui/RefreshButton'
 /**
  * The staff dashboards.
  *
@@ -391,13 +392,7 @@ export default function StaffDashboard({ role }: { role: StaffRole }) {
       <div className="w-full space-y-5 px-4 py-4 lg:px-5">
         <header className="flex items-center justify-between gap-3">
           <h1 className="text-lg font-bold tracking-tight text-white">Dashboard</h1>
-          <button
-            type="button"
-            onClick={() => { setLoading(true); void load() }}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/5"
-          >
-            <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
-          </button>
+          <RefreshButton onClick={() => { setLoading(true); void load() }} loading={loading} />
         </header>
 
         {error && !data && (

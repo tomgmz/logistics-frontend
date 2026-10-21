@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, ChevronDown, ExternalLink, Mail, RefreshCw, Search, Ticket } from 'lucide-react'
+import { CheckCircle2, ChevronDown, ExternalLink, Mail, Search, Ticket } from 'lucide-react'
 
 import { RemarksModal } from '@/components/layout/ReusableModal'
 import { gmailComposeUrl, gmailThreadUrl } from '@/components/dashboard/SupportTicketsPanel'
@@ -13,6 +13,7 @@ import {
   supportService, TICKET_CATEGORY_LABEL, type SupportTicket, type TicketCategory,
 } from '@/lib/services/support.service'
 
+import RefreshButton from '@/components/ui/RefreshButton'
 /**
  * Tickets — the Company Administrator's full view of client support tickets.
  *
@@ -137,14 +138,7 @@ export default function SupportTicketsView() {
             Client support tickets · {counts.open} open · {counts.resolved} resolved
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => void load()}
-          className="inline-flex items-center gap-2 self-start sm:self-auto rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/5 transition-colors"
-        >
-          <RefreshCw size={14} />
-          Refresh
-        </button>
+        <RefreshButton onClick={() => void load()} className="self-start sm:self-auto" />
       </header>
 
       <div className="flex flex-1 min-h-0 flex-col p-3 lg:p-4 gap-3 overflow-hidden">

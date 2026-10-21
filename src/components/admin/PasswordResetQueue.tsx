@@ -3,7 +3,7 @@
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { useCallback, useEffect, useState } from 'react'
 import {
-  AlertTriangle, KeyRound, MailCheck, RefreshCw, Send, X,
+  AlertTriangle, KeyRound, MailCheck, Send, X,
 } from 'lucide-react'
 import ReusableModal from '@/components/layout/ReusableModal'
 import { useModuleAccess } from '@/components/layout/ModuleAccess'
@@ -17,6 +17,7 @@ import {
   type ResetRequestStatus,
 } from '@/lib/services/admin/password-reset.service'
 
+import RefreshButton from '@/components/ui/RefreshButton'
 /**
  * The pending-reset queue, shared by the Company Admin's User Management page and
  * the IT Admin's Administrator Management page.
@@ -199,13 +200,7 @@ export default function PasswordResetQueue({
             Show history
           </label>
 
-          <button
-            onClick={() => void load(includeClosed)}
-            disabled={loading}
-            className="flex items-center gap-1.5 rounded-lg border border-[#424242] px-3 py-2 text-sm text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white disabled:opacity-40"
-          >
-            <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
-          </button>
+          <RefreshButton onClick={() => void load(includeClosed)} loading={loading} disabled={loading} />
 
           <span className="ml-auto text-xs text-[#818181]">
             {rows.length} request{rows.length !== 1 ? 's' : ''}

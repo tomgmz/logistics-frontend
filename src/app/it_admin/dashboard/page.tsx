@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import {
   AlertOctagon, CheckCircle2, Clock, ExternalLink, Loader2,
-  Mail, MapPin, Bell, ScanLine, Cloud, RefreshCw, ShieldAlert, Users, Plug,
+  Mail, MapPin, Bell, ScanLine, Cloud, ShieldAlert, Users, Plug,
 } from 'lucide-react'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { systemLogService, type SystemLogEventType, type SystemLogLevel } from '@/lib/services/admin/system-logs.service'
@@ -20,6 +20,7 @@ import {
 import { formatDateTime } from '@/app/utils/timeFormat'
 import { roleLabel } from '@/lib/roles'
 
+import RefreshButton from '@/components/ui/RefreshButton'
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Scheduler staleness is a function of time, not of any row changing. */
@@ -638,13 +639,7 @@ export default function ItAdminDashboard() {
                 Updated {ago(summary.generated_at, now).toLowerCase()}
               </span>
             )}
-            <button
-              onClick={() => load()}
-              disabled={loading}
-              className="flex items-center gap-1.5 rounded-lg border border-[#424242] px-3 py-2 text-sm text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white disabled:opacity-40"
-            >
-              <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
-            </button>
+            <RefreshButton onClick={() => load()} loading={loading} disabled={loading} />
           </div>
         </div>
 

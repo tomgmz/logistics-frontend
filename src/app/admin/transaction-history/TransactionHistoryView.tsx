@@ -33,6 +33,7 @@ import {
 } from '@/lib/services/admin/transaction-history.service'
 import StopTimesPanel from '@/components/transactions/StopTimesPanel'
 
+import RefreshButton from '@/components/ui/RefreshButton'
 /**
  * Transaction history for staff — the client's own history widened across every
  * company.
@@ -245,11 +246,7 @@ export default function TransactionHistoryView() {
           <h1 className="text-lg font-bold tracking-tight text-white">Transaction History</h1>
         </div>
         <div className="flex items-center gap-2 self-start">
-          <button type="button" onClick={() => void load()}
-            className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2
-                       text-xs font-semibold text-white/80 transition-colors hover:bg-white/5 cursor-pointer">
-            <RefreshCw size={14} />Refresh
-          </button>
+          <RefreshButton onClick={() => void load()} />
           {/* Gated on can_export, the tier the IT Admin sets for this module. */}
           {canExport && (
             <button type="button" onClick={() => void handleExport()} disabled={exporting || loading}

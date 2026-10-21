@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Search, RefreshCw, Eye, CheckCheck, CircleCheck, Siren, Tags } from 'lucide-react'
+import { Search, Eye, CheckCheck, CircleCheck, Siren, Tags } from 'lucide-react'
 
 import {
   fetchDriverReports,
@@ -34,6 +34,7 @@ import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { useAuthStore } from '@/lib/store/auth.store'
 
+import RefreshButton from '@/components/ui/RefreshButton'
 /**
  * The Reports module — the staff side of the driver app's Reports tab.
  *
@@ -314,14 +315,7 @@ export default function ReportsView() {
             )}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => void load()}
-          className="inline-flex items-center gap-2 self-start sm:self-auto rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/5 transition-colors"
-        >
-          <RefreshCw size={14} />
-          Refresh
-        </button>
+        <RefreshButton onClick={() => void load()} className="self-start sm:self-auto" />
       </header>
 
       <div className="flex flex-1 min-h-0 flex-col p-3 lg:p-4 gap-3 overflow-hidden">

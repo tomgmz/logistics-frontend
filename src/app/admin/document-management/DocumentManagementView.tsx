@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import {
-  Search, RefreshCw, Eye, Download, ExternalLink, CheckCircle2, XCircle, Archive,
+  Search, Eye, Download, ExternalLink, CheckCircle2, XCircle, Archive,
   ArchiveRestore, Upload, FileSearch, LayoutGrid, List, ChevronLeft, ChevronRight,
   MapPinOff, X, FileSpreadsheet,
 } from 'lucide-react'
@@ -42,6 +42,7 @@ import { formatDate, formatTime } from '@/app/utils/timeFormat'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 
+import RefreshButton from '@/components/ui/RefreshButton'
 /**
  * Document Management — one library over every file the system keeps, shared
  * by the Company Administrator, General Manager and Operations Manager portals.
@@ -383,13 +384,7 @@ export default function DocumentManagementView() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-          <button
-            type="button"
-            onClick={() => void load()}
-            className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/5 transition-colors"
-          >
-            <RefreshCw size={14} /> Refresh
-          </button>
+          <RefreshButton onClick={() => void load()} />
           {canExport && (
             <button
               type="button"

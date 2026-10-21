@@ -8,6 +8,7 @@ import {
   CheckCircle2, MapPin, Package, Plus, ChevronRight, Bell,
   CreditCard, XCircle, Inbox, LifeBuoy,
 } from 'lucide-react'
+import RefreshButton from '@/components/ui/RefreshButton'
 
 import { bookingService } from '@/lib/services/client/booking.service'
 import { notificationService, type AppNotification } from '@/lib/services/notification.service'
@@ -459,12 +460,7 @@ export default function ClientDashboardView() {
         </div>
 
         {!loading && (
-          <button onClick={load} title="Refresh"
-            className="flex items-center justify-center w-7 h-7 rounded-lg border transition-colors
-                       hover:border-white/30 hover:text-white cursor-pointer shrink-0"
-            style={{ borderColor: BORDER_C, color: MUTED }}>
-            <RefreshCw size={13} />
-          </button>
+          <RefreshButton onClick={() => void load()} />
         )}
 
         <Link

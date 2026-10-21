@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Search, RefreshCw, Wrench, ClipboardCheck, FileWarning, Ban, Settings2 } from 'lucide-react'
+import { Search, Wrench, ClipboardCheck, FileWarning, Ban, Settings2 } from 'lucide-react'
 
 import type { MaintenanceReason, MaintenanceTruck, TruckInspection } from '@/app/types/truck.types'
 import { assignedDriverName } from '@/app/types/truck.types'
@@ -21,6 +21,7 @@ import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { ModelThumb, TruckStatusBadge, resolveModelImageUrl } from './vehicle-ui'
 
+import RefreshButton from '@/components/ui/RefreshButton'
 /**
  * Vehicle Management → Maintenance: the vehicles that need a mechanic, and why.
  *
@@ -223,14 +224,7 @@ export default function MaintenanceTab({
             className="bg-transparent border-none outline-none text-sm flex-1 text-white/80 placeholder:text-white/35"
           />
         </div>
-        <button
-          type="button"
-          onClick={() => void load()}
-          className="inline-flex items-center gap-2 self-start sm:self-auto sm:ml-auto rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/5 transition-colors"
-        >
-          <RefreshCw size={14} />
-          Refresh
-        </button>
+        <RefreshButton onClick={() => void load()} className="self-start sm:self-auto sm:ml-auto" />
       </div>
 
       <div className="flex-1 min-h-0 rounded-xl border border-white/[0.08] overflow-hidden flex flex-col bg-[#0f0f0f]">

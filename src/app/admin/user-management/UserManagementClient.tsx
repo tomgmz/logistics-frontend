@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Users, UserPlus, Search, RefreshCw, MoreVertical,
+  Users, UserPlus, Search, MoreVertical,
   Pencil, Eye, ShieldCheck, ShieldOff, Archive,
   ChevronLeft, ChevronRight, AlertTriangle, ArrowLeftRight,
   KeyRound, Send, RotateCcw, Flag,
@@ -37,6 +37,7 @@ import { externalDriverService, type VendorDriverUser } from '@/lib/services/adm
 import { useAuthStore } from '@/lib/store/auth.store'
 import { useModuleAccess } from '@/components/layout/ModuleAccess'
 
+import RefreshButton from '@/components/ui/RefreshButton'
 type UserMgmtTab = Extract<UserTab, 'clients' | 'drivers' | 'it-admins'>
 // The dropdown below filters the directory by role. Password resets are a queue
 // you act on, not a slice of the directory, so they are a top-level section
@@ -1022,13 +1023,7 @@ export default function UserManagementClient() {
                   className="w-full rounded-lg border border-[#424242] bg-[#2a2a2a]/60 py-2 pl-9 pr-4 text-sm text-white placeholder-[#818181] outline-none transition focus:border-[#4df9ed] focus:ring-1 focus:ring-[#4df9ed]/20"
                 />
               </div>
-              <button
-                onClick={handleRefresh}
-                disabled={loading || fetching}
-                className="flex items-center gap-1.5 rounded-lg border border-[#424242] px-3 py-2 text-sm text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white disabled:opacity-40"
-              >
-                <RefreshCw size={13} className={(loading || fetching) ? 'animate-spin' : ''} /> Refresh
-              </button>
+              <RefreshButton onClick={handleRefresh} loading={(loading || fetching)} disabled={loading || fetching} />
               <span className="ml-auto text-xs text-[#818181]">
                 {total} record{total !== 1 ? 's' : ''}
               </span>
