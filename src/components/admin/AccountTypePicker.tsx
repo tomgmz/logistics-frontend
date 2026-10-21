@@ -18,7 +18,7 @@ interface AccountTypePickerProps<K extends string> {
 }
 
 /**
- * First step of "Add User": choose the kind of account, then the matching form
+ * First step of "Create User": choose the kind of account, then the matching form
  * opens. Keeps the create form to the fields that kind actually needs.
  */
 export default function AccountTypePicker<K extends string>({

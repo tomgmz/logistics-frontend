@@ -664,7 +664,7 @@ export default function UserFormModal({
             {tab === 'drivers' && (
               <div>
                 <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-[#818181]">Driver from</p>
-                {/* Picked before the form opened (Add User → type), and fixed once the driver exists. */}
+                {/* Picked before the form opened (Create User → type), and fixed once the driver exists. */}
                 <p className="text-sm text-white">
                   {isVendorDriver ? 'Vendor' : '8338 Logistics (company driver)'}
                 </p>

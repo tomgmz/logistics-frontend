@@ -516,7 +516,7 @@ export default function AdminManagementClient() {
     setShowForm(true)
   }
 
-  // "Add Account" asks for the account type first; the form opens once one is picked.
+  // "Create Administrator" asks for the account type first; the form opens once one is picked.
   function openCreate() {
     setShowTypePicker(true)
   }
@@ -541,16 +541,16 @@ export default function AdminManagementClient() {
         <div className="flex flex-col flex-1 min-h-0 px-3 py-3 lg:px-4 gap-6 overflow-hidden">
 
           {/* Header */}
-          <div className="flex items-start justify-between shrink-0">
+          <div className="flex flex-wrap items-start justify-between gap-3 shrink-0">
             <div>
               <h1 className="mt-1 text-2xl font-bold tracking-tight text-white">Administrator Management</h1>
             </div>
             {!isResetsTab && (
             <button
               onClick={openCreate}
-              className="flex items-center gap-2 rounded-xl bg-[#4df9ed] px-5 py-2.5 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5] active:scale-95"
+              className="flex items-center gap-2 whitespace-nowrap rounded-xl bg-[#4df9ed] px-5 py-2.5 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5] active:scale-95"
             >
-              <UserPlus size={15} /> Add Account
+              <UserPlus size={15} /> Create Administrator
             </button>
             )}
           </div>

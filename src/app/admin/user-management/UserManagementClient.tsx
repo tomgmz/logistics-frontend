@@ -831,7 +831,7 @@ export default function UserManagementClient() {
     setShowForm(true)
   }
 
-  // "Add User" asks for the account type first; the form opens once one is picked.
+  // "Create User" asks for the account type first; the form opens once one is picked.
   function openCreate() {
     setShowTypePicker(true)
   }
@@ -864,10 +864,10 @@ export default function UserManagementClient() {
         <div className="flex flex-col flex-1 min-h-0 px-3 py-3 lg:px-4 gap-6 overflow-hidden">
 
           {/* Header */}
-          <div className="flex items-start justify-between shrink-0">
+          <div className="flex flex-wrap items-start justify-between gap-3 shrink-0">
             <h1 className="mt-1 text-2xl font-bold tracking-tight text-white">User Management</h1>
             {/*
-              On the IT Admin tab "Add User" is the wrong verb: only one may be
+              On the IT Admin tab "Create User" is the wrong verb: only one may be
               active, so while the seat is filled the only move is to hand it over.
               If it is somehow empty, creating one is exactly right.
             */}
@@ -876,7 +876,7 @@ export default function UserManagementClient() {
                 isRootAdmin && (
                   <button
                     onClick={() => setShowTransition(true)}
-                    className="flex items-center gap-2 rounded-xl bg-[#4df9ed] px-5 py-2.5 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5] active:scale-95"
+                    className="flex items-center gap-2 whitespace-nowrap rounded-xl bg-[#4df9ed] px-5 py-2.5 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5] active:scale-95"
                   >
                     <ArrowLeftRight size={15} /> Transition IT Administrator
                   </button>
@@ -884,9 +884,9 @@ export default function UserManagementClient() {
               ) : access.canCreate && (
                 <button
                   onClick={openCreate}
-                  className="flex items-center gap-2 rounded-xl bg-[#4df9ed] px-5 py-2.5 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5] active:scale-95"
+                  className="flex items-center gap-2 whitespace-nowrap rounded-xl bg-[#4df9ed] px-5 py-2.5 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5] active:scale-95"
                 >
-                  <UserPlus size={15} /> Add User
+                  <UserPlus size={15} /> Create User
                 </button>
               )
             )}
