@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { ArrowUpRight, Ban, FileWarning, Wrench } from 'lucide-react'
+import { ArrowUpRight, Ban, ClipboardCheck, FileWarning, Gauge, Settings2, Wrench } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { canViewModule } from '@/lib/permissions'
@@ -20,7 +20,7 @@ import DriverReportDetailModal from '@/components/reports/DriverReportDetailModa
 import ReusableModal from '@/components/layout/ReusableModal'
 import { useRecordLocks } from '@/lib/hooks/useRecordLock'
 import { RecordLockBadge } from '@/components/ui/RecordLockBanner'
-import RowActionMenu from '@/components/ui/RowActionMenu'
+import RowActionMenu, { type RowAction } from '@/components/ui/RowActionMenu'
 import Pagination from '@/components/ui/Pagination'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
@@ -156,7 +156,6 @@ export function toProblems(trucks: MaintenanceTruck[]): Problem[] {
   })
 }
 
-const BTN = 'inline-flex h-7 items-center justify-center whitespace-nowrap rounded-[10px] border px-2.5 text-[13px] 3xl:text-[15px] font-bold transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100'
 
 export default function UpkeepTab({
   rows,
@@ -236,40 +235,45 @@ export default function UpkeepTab({
     }
   }
 
-  /** The one button that fixes this row. */
-  function primaryAction(p: Problem) {
+  /** The row's 3-dot menu: the action that fixes it first, then anything extra. */
+  function rowActions(p: Problem): RowAction[] {
     const t        = p.truck
     const lockedBy = truckLocks.get(t.truck_id)
     const locked   = lockedBy ? `${lockedBy} is editing this vehicle` : undefined
-    const cyan     = 'border-[#4df9ed] bg-[#4df9ed]/[0.19] text-[#4df9ed] hover:bg-[#4df9ed]/30'
-    const grey     = 'border-[#818181] text-white hover:bg-white/5'
+    const actions: RowAction[] = []
 
-    // Driver reports have no button: View Report sits in the row's 3-dot menu.
-    if (p.type === 'report' || !canEdit) return null
+    if (p.type === 'report' && p.report) {
+      const report = p.report
+      actions.push({ label: 'View Report', icon: <FileWarning size={13} />, tone: 'accent', onSelect: () => setViewReport(report) })
+      // A driver report alone leaves the vehicle reading as serviceable;
+      // someone may need to take it off the road.
+      const holdable = canEdit && !t.maintenance_reasons.includes('under_maintenance')
+        && (t.status === 'available' || t.status === 'recheck_due')
+      if (holdable) {
+        actions.push({
+          label: 'Take Out of Service', icon: <Ban size={13} />, tone: 'warning', separated: true,
+          onSelect: () => setHoldTarget(t), disabled: !!lockedBy, title: locked,
+        })
+      }
+      return actions
+    }
+    if (!canEdit) return actions
+
     if (p.type === 'odometer') {
-      return (
-        <button type="button" className={`${BTN} ${cyan}`} disabled={!!lockedBy} title={locked}
-          onClick={() => onRecordOdometer?.(t)}>Record odometer</button>
-      )
-    }
-    if (p.type === 'inspection') {
+      actions.push({ label: 'Record Odometer', icon: <Gauge size={13} />, tone: 'accent', onSelect: () => onRecordOdometer?.(t), disabled: !!lockedBy, title: locked })
+    } else if (p.type === 'inspection') {
       const onTrip = t.status === 'in_use'
-      return (
-        <button type="button" className={`${BTN} ${cyan}`} disabled={!!lockedBy || onTrip}
-          title={locked ?? (onTrip ? 'Out on a booking — inspect it once it is back in the yard' : 'Record a BLOWBAGETS inspection; a pass clears it')}
-          onClick={() => setInspectTruck(t)}>Inspect</button>
-      )
+      actions.push({
+        label: 'Inspect', icon: <ClipboardCheck size={13} />, tone: 'accent',
+        onSelect: () => setInspectTruck(t), disabled: !!lockedBy || onTrip,
+        title: locked ?? (onTrip ? 'Out on a booking — inspect it once it is back in the yard' : 'Record a BLOWBAGETS inspection; a pass clears it'),
+      })
+    } else if (p.reason === 'service_schedule_missing') {
+      actions.push({ label: 'Set Up Schedule', icon: <Settings2 size={13} />, tone: 'accent', onSelect: () => onSetUpSchedule?.(t), disabled: !!lockedBy, title: locked })
+    } else {
+      actions.push({ label: 'Record Service', icon: <Wrench size={13} />, tone: 'accent', onSelect: () => setServiceTruck(t), disabled: !!lockedBy, title: locked })
     }
-    if (p.reason === 'service_schedule_missing') {
-      return (
-        <button type="button" className={`${BTN} ${grey}`} disabled={!!lockedBy} title={locked}
-          onClick={() => onSetUpSchedule?.(t)}>Set up schedule</button>
-      )
-    }
-    return (
-      <button type="button" className={`${BTN} ${p.blocking ? cyan : grey}`} disabled={!!lockedBy} title={locked}
-        onClick={() => setServiceTruck(t)}>Record service</button>
-    )
+    return actions
   }
 
   return (
@@ -348,8 +352,6 @@ export default function UpkeepTab({
                   {pageRows.map((p) => {
                     const t   = p.truck
                     const cfg = NEEDS[p.reason]
-                    const holdable = p.type === 'report' && canEdit && !t.maintenance_reasons.includes('under_maintenance')
-                      && (t.status === 'available' || t.status === 'recheck_due')
                     return (
                       <tr key={p.key} className="border-b border-[#818181] hover:bg-white/[0.03] transition-colors [&>td]:px-3 3xl:[&>td]:px-6 [&>td]:py-2 3xl:h-[55px]">
                         <td className="align-middle">
@@ -381,19 +383,12 @@ export default function UpkeepTab({
                         <td>
                           <div className="flex items-center justify-end gap-1.5">
                             <RecordLockBadge holder={truckLocks.get(t.truck_id)} />
-                            {primaryAction(p)}
-                            {/* Driver report rows: View Report, plus Take Out of Service while
-                                the report alone leaves the vehicle reading as serviceable. */}
-                            {p.type === 'report' && p.report && (
-                              <RowActionMenu brightText label={`Actions for ${t.plate_number}`} actions={[
-                                { label: 'View Report', icon: <FileWarning size={13} />, onSelect: () => setViewReport(p.report!) },
-                                ...(holdable ? [{
-                                  label: 'Take Out of Service', icon: <Ban size={13} />, tone: 'warning' as const, separated: true,
-                                  onSelect: () => setHoldTarget(t),
-                                  disabled: !!truckLocks.get(t.truck_id),
-                                }] : []),
-                              ]} />
-                            )}
+                            {(() => {
+                              const actions = rowActions(p)
+                              return actions.length > 0 && (
+                                <RowActionMenu brightText label={`Actions for ${t.plate_number}`} actions={actions} />
+                              )
+                            })()}
                           </div>
                         </td>
                       </tr>
