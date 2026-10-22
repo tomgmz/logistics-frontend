@@ -387,10 +387,6 @@ export default function UpkeepTab({
                             {p.type === 'report' && p.report && (
                               <RowActionMenu brightText label={`Actions for ${t.plate_number}`} actions={[
                                 { label: 'View Report', icon: <FileWarning size={13} />, onSelect: () => setViewReport(p.report!) },
-                                ...(reportsBase ? [{
-                                  label: 'Open in Reports', icon: <ArrowUpRight size={13} />,
-                                  onSelect: () => router.push(`${reportsBase}?report=${encodeURIComponent(p.report!.report_id)}`),
-                                }] : []),
                                 ...(holdable ? [{
                                   label: 'Take Out of Service', icon: <Ban size={13} />, tone: 'warning' as const, separated: true,
                                   onSelect: () => setHoldTarget(t),
@@ -412,7 +408,20 @@ export default function UpkeepTab({
       </div>
 
       {/* Read-only here: answering a report is the Reports desk's job. */}
-      <DriverReportDetailModal report={viewReport} onClose={() => setViewReport(null)} />
+      <DriverReportDetailModal
+        report={viewReport}
+        onClose={() => setViewReport(null)}
+        // Answering a report is the Reports desk's job, so the way out leads there.
+        replaceClose={reportsBase && viewReport ? (
+          <button
+            type="button"
+            onClick={() => router.push(`${reportsBase}?report=${encodeURIComponent(viewReport.report_id)}`)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[#4df9ed] bg-[#4df9ed]/[0.19] px-4 py-2 text-sm font-bold text-[#4df9ed] transition hover:bg-[#4df9ed]/30 active:scale-95"
+          >
+            <ArrowUpRight size={15} /> View in Reports
+          </button>
+        ) : undefined}
+      />
 
       <RecordServiceModal truck={serviceTruck} onClose={() => setServiceTruck(null)} onRecorded={onReload} />
 

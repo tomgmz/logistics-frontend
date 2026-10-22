@@ -76,11 +76,14 @@ export default function DriverReportDetailModal({
   onClose,
   banner,
   actions,
+  replaceClose,
 }: {
   report:   DriverReport | null
   onClose:  () => void
   banner?:  ReactNode
   actions?: ReactNode
+  /** Takes the footer Close button's place (the header X still closes). */
+  replaceClose?: ReactNode
 }) {
   return (
     <AnimatePresence>
@@ -248,13 +251,15 @@ export default function DriverReportDetailModal({
             </div>
 
             <div className="flex justify-end gap-2 px-4 py-3 border-t border-white/[0.07] shrink-0">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 rounded-lg border border-white/15 text-sm text-white/80 hover:bg-white/5"
-              >
-                Close
-              </button>
+              {replaceClose ?? (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-4 py-2 rounded-lg border border-white/15 text-sm text-white/80 hover:bg-white/5"
+                >
+                  Close
+                </button>
+              )}
               {actions}
             </div>
           </motion.div>
