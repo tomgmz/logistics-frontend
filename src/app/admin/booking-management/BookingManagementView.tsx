@@ -4,9 +4,6 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type React
 import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Search,
-  ChevronLeft,
-  ChevronRight,
   X,
   MapPin,
   Truck,
@@ -2078,32 +2075,32 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
       </header>
 
       <div className="flex flex-1 min-h-0 overflow-hidden">
-        <div className="flex-1 flex flex-col min-w-0 min-h-0 p-3 lg:p-4 gap-3">
+        <div className="flex-1 flex flex-col min-w-0 min-h-0 p-3 lg:p-4 3xl:p-[34px] 3xl:pl-9 gap-3 3xl:gap-[14px] bg-[#0a0a0a]">
 
           {/* Filters */}
           <div className="flex flex-col lg:flex-row gap-2 lg:items-center lg:justify-between shrink-0">
-            <div
-              className="flex items-center gap-2 rounded-[10px] px-3 py-2 flex-1 max-w-md"
-              style={{ background: '#2a2828' }}
-            >
-              <Search size={16} className="text-white/40 shrink-0" />
+            <div className="relative min-w-0 flex-1 lg:max-w-[360px] 3xl:max-w-[466px]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/icons/booking-management/search.svg" alt="" width={22} height={22} draggable={false}
+                className="pointer-events-none absolute left-3 3xl:left-[18px] top-1/2 size-4 3xl:size-[22px] -translate-y-1/2" />
               <input
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setPage(0) }}
-                placeholder="Search ID, client, origin, truck type…"
-                className="bg-transparent border-none outline-none text-sm flex-1 text-white/80 placeholder:text-white/35"
+                placeholder="Search ID, client, origin, truck type..."
+                aria-label="Search bookings"
+                className="h-9 3xl:h-[46px] w-full rounded-[10px] border border-[#818181] bg-[#424242] pl-9 3xl:pl-[49px] pr-4 text-[14px] 3xl:text-[18px] text-white placeholder:text-[#818181] outline-none transition focus:border-[#4df9ed]"
               />
             </div>
             {!forcedStatus && (
               <div className="flex items-center gap-2 shrink-0">
-                <label htmlFor="booking-status-filter" className="text-[10px] uppercase tracking-wider text-white/35">
-                  Status
+                <label htmlFor="booking-status-filter" className="text-[13px] 3xl:text-[16px] font-bold text-[#818181]">
+                  status
                 </label>
                 <select
                   id="booking-status-filter"
                   value={statusFilter}
                   onChange={(e) => { setStatusFilter(e.target.value); setPage(0) }}
-                  className="rounded-lg border border-white/10 bg-[#1a1a1a] text-xs font-bold text-white/80 px-3 py-2 outline-none focus:border-[var(--color-cyan)]/50 cursor-pointer"
+                  className="appearance-none h-8 3xl:h-[38px] min-w-[120px] 3xl:min-w-[141px] rounded-[10px] border-[0.5px] border-[#818181] bg-[#2a2828] px-3 3xl:px-[15px] text-[13px] 3xl:text-[16px] font-bold text-white outline-none focus:border-[#4df9ed] cursor-pointer [&>option]:bg-[#2a2828]"
                 >
                   {(['all', ...BOOKING_STATUSES.filter((s) => !hidePending || s !== 'pending')]).map((key) => {
                     const label = key === 'all' ? (hidePending ? 'All (active)' : 'All') : fmtStatus(key)
@@ -2120,7 +2117,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
           </div>
 
           {/* Table */}
-          <div className="flex-1 min-h-0 rounded-xl border border-white/[0.08] overflow-hidden flex flex-col bg-[#0f0f0f]">
+          <div className="flex-1 min-h-0 rounded-[10px] border-[0.5px] border-[#424242] overflow-hidden flex flex-col bg-[#1b1b1b] shadow-[0_4px_4px_rgba(0,0,0,0.25)]">
             {listLoading ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-3 py-16">
                 <div className="w-9 h-9 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--color-cyan)' }} />
@@ -2138,19 +2135,20 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
             ) : (
               <>
                 <div className="overflow-auto flex-1 min-h-0">
-                  <table className="w-full text-left text-sm border-collapse">
-                    <thead className="sticky top-0 z-[1] bg-[#141414] border-b border-white/[0.07]">
-                      <tr className="text-[11px] uppercase tracking-wider text-white/40">
-                        <th className="px-3 py-2.5 font-bold">Booking</th>
-                        <th className="px-3 py-2.5 font-bold">Status</th>
-                        <th className="px-3 py-2.5 font-bold">Schedule</th>
-                        <th className="px-3 py-2.5 font-bold hidden md:table-cell">Client</th>
-                        <th className="px-3 py-2.5 font-bold">Origin</th>
-                        <th className="px-3 py-2.5 font-bold hidden lg:table-cell">Vehicle</th>
-                        <th className="px-3 py-2.5 font-bold text-right">Stops</th>
+                  <table className="w-full text-left border-collapse">
+                    {/* Headers keep the small caps face; the data rows are regular Alegreya Sans. */}
+                    <thead className="sticky top-0 z-[1] bg-[#181717]">
+                      <tr className="text-[13px] 3xl:text-[16px] text-[#818181] [&>th]:border-b-[0.5px] [&>th]:border-[#818181] [&>th]:font-bold [&>th]:px-4 3xl:[&>th]:px-6 [&>th]:py-2.5 3xl:[&>th]:py-[13px] [&>th]:whitespace-nowrap">
+                        <th>booking</th>
+                        <th>status</th>
+                        <th>schedule</th>
+                        <th className="hidden md:table-cell">client</th>
+                        <th>origin</th>
+                        <th className="hidden lg:table-cell">vehicle</th>
+                        <th>stops</th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="ff-regular text-[13px] 3xl:text-[16px] text-[#818181]">
                       {listRows.map((r) => {
                         const active = selectedId === r.booking_id
                         const c      = statusColor(r.status)
@@ -2163,10 +2161,11 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                             onKeyDown={(e) => {
                               if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); void openDetail(r.booking_id) }
                             }}
-                            className="border-b border-white/[0.05] cursor-pointer transition-colors hover:bg-white/[0.04]"
-                            style={{ background: active ? 'rgba(77,249,237,0.06)' : undefined }}
+                            className={`border-b-[0.5px] border-[#818181] cursor-pointer transition-colors 3xl:h-[55px] [&>td]:px-4 3xl:[&>td]:px-6 [&>td]:py-2.5 3xl:[&>td]:py-3 ${
+                              active ? 'bg-[#4df9ed]/10' : 'hover:bg-white/[0.03]'
+                            }`}
                           >
-                            <td className="px-3 py-2.5 text-white/85 max-w-[200px]">
+                            <td className="font-bold max-w-[200px]">
                               <div className="truncate">{r.display_id}</div>
                               {showAfterHours(r.status, r.created_at) && <AfterHoursBadge />}
                               {pulledByBooking.get(r.booking_id) && (
@@ -2174,40 +2173,42 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                               )}
                               <RecordLockBadge holder={bookingLocks.get(r.booking_id)} />
                             </td>
-                            <td className="px-3 py-2.5">
+                            <td>
                               <span
-                                className="inline-flex text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border"
-                                style={{ color: c, borderColor: `${c}55`, background: `${c}14` }}
+                                className="inline-flex items-center justify-center whitespace-nowrap rounded-[5px] border p-1 text-[12px] 3xl:text-[16px] leading-none"
+                                style={{ color: c, borderColor: c, background: `${c}2e` }}
                               >
                                 {fmtStatus(r.status)}
                               </span>
                               {r.pause_reason && <PausedBadge reason={r.pause_reason} />}
                               {r.issue_open && <ProblemReportedBadge note={r.issue_note} />}
                             </td>
-                            <td className="px-3 py-2.5 text-white/75 whitespace-nowrap">{r.schedule_date ?? '—'}</td>
-                            <td className="px-3 py-2.5 text-white/70 max-w-[180px] truncate hidden md:table-cell">{r.company ?? '—'}</td>
-                            <td className="px-3 py-2.5 text-white/85 max-w-[220px] truncate">{r.origin ?? '—'}</td>
-                            <td className="px-3 py-2.5 text-white/55 text-xs hidden lg:table-cell">{r.truck_type_needed ?? '—'}</td>
-                            <td className="px-3 py-2.5 text-right text-white/60">{r.stops}</td>
+                            <td className="whitespace-nowrap">{r.schedule_date ?? '—'}</td>
+                            <td className="max-w-[180px] 3xl:max-w-[260px] truncate hidden md:table-cell">{r.company ?? '—'}</td>
+                            <td className="max-w-[220px] truncate">{r.origin ?? '—'}</td>
+                            <td className="hidden lg:table-cell">{r.truck_type_needed ?? '—'}</td>
+                            <td>{r.stops}</td>
                           </tr>
                         )
                       })}
                     </tbody>
                   </table>
                 </div>
-                <div className="shrink-0 flex items-center justify-between px-3 py-2 border-t border-white/[0.07] text-xs text-white/50">
+                <div className="shrink-0 flex items-center justify-between h-11 3xl:h-12 px-4 3xl:px-[26px] bg-[#181717] border-t-[0.5px] border-[#818181] text-[12px] text-[#818181]">
                   <span>
                     Showing{' '}
-                    {totalRows === 0 ? '0' : `${pageSafe * PAGE_SIZE + 1}–${Math.min((pageSafe + 1) * PAGE_SIZE, totalRows)}`}
+                    {totalRows === 0 ? '0' : `${pageSafe * PAGE_SIZE + 1}-${Math.min((pageSafe + 1) * PAGE_SIZE, totalRows)}`}
                     {' '}of {totalRows}
                   </span>
-                  <div className="flex items-center gap-1">
-                    <button type="button" disabled={pageSafe <= 0} onClick={() => setPage((p) => Math.max(0, p - 1))} className="p-1.5 rounded-md border border-white/10 disabled:opacity-30 hover:bg-white/5">
-                      <ChevronLeft size={16} />
+                  <div className="flex items-center gap-[7px]">
+                    <button type="button" aria-label="Previous page" disabled={pageSafe <= 0} onClick={() => setPage((p) => Math.max(0, p - 1))} className="flex items-center justify-center size-[30px] rounded-[5px] border-[0.5px] border-[#424242] disabled:opacity-40 hover:bg-white/5">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src="/icons/booking-management/chevron-left.svg" alt="" width={20} height={20} draggable={false} />
                     </button>
-                    <span className="px-2 tabular-nums">{pageSafe + 1} / {pageCount}</span>
-                    <button type="button" disabled={pageSafe >= pageCount - 1} onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))} className="p-1.5 rounded-md border border-white/10 disabled:opacity-30 hover:bg-white/5">
-                      <ChevronRight size={16} />
+                    <span className="min-w-[28px] text-center tabular-nums">{pageSafe + 1}/{pageCount}</span>
+                    <button type="button" aria-label="Next page" disabled={pageSafe >= pageCount - 1} onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))} className="flex items-center justify-center size-[30px] rounded-[5px] border-[0.5px] border-[#424242] disabled:opacity-40 hover:bg-white/5">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src="/icons/booking-management/chevron-left.svg" alt="" width={20} height={20} draggable={false} className="rotate-180" />
                     </button>
                   </div>
                 </div>
