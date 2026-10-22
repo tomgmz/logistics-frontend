@@ -1,13 +1,14 @@
 'use client'
 
+import Pagination from '@/components/ui/Pagination'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, Children, cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Users, UserPlus, Search, MoreVertical,
+  Users, UserPlus, UserRoundPlus, Search, MoreVertical, ChevronDown,
   Pencil, Eye, ShieldCheck, ShieldOff, Archive,
-  ChevronLeft, ChevronRight, AlertTriangle, ArrowLeftRight,
+  AlertTriangle, ArrowLeftRight,
   KeyRound, Send, RotateCcw, Flag,
 } from 'lucide-react'
 import Select, { SelectChangeEvent } from '@mui/material/Select'
@@ -128,18 +129,84 @@ function formatDateTime(iso: string | null): string {
   })
 }
 
+// Table text, per the Figma: names in regular Alegreya Sans bold white, the rest
+// bold grey. Headers and status tags stay in the small-caps face.
+// MUI sx has no 3xl; this is the same 1920px step.
+const FIGMA_MQ = '@media (min-width: 1920px)'
+const REGULAR_FONT = "var(--font-alegreya), 'Alegreya Sans', sans-serif"
+const NAME_TEXT = 'ff-regular text-[14px] 3xl:text-[18px] font-bold text-white'
+const TD_NAME   = `px-4 3xl:px-6 py-2.5 3xl:py-4 ${NAME_TEXT}`
+const TD_MUTED  = 'ff-regular px-4 3xl:px-6 py-2.5 3xl:py-4 text-[13px] 3xl:text-[16px] font-bold text-[#818181]'
+
+// The page-header action (Add User / Transition IT Administrator): cyan outline.
+// The Figma is drawn at 1920px; its exact sizes apply only from 3xl (1920px) up.
+// Below that everything is compact, so laptops (1366x768, or 1920 at 125%
+// scaling = 1536x864) still show a useful number of rows.
+const HEADER_BTN =
+  'flex h-8 3xl:h-11 items-center gap-2 3xl:gap-[9px] whitespace-nowrap rounded-[10px] border border-[#4df9ed] bg-[#4df9ed]/[0.19] ' +
+  'px-3 3xl:px-6 text-[14px] 3xl:text-[20px] text-[#4df9ed] transition hover:bg-[#4df9ed]/30 active:scale-95'
+const HEADER_ICON = 'size-4 3xl:size-6'
+
+/**
+ * Below lg the table turns into one card per user: rows stack, each cell shows
+ * its column name (data-label, from withLabels) on the left, the name leads
+ * without a label and the row menu sits in the top-right corner. Two cards a
+ * row on tablets. One table, so every tab's columns work without a second
+ * renderer.
+ */
+const CARD_TBODY = [
+  'max-lg:grid max-lg:grid-cols-1 max-lg:gap-3 max-lg:p-3 md:max-lg:grid-cols-2',
+  'max-lg:[&>tr]:relative max-lg:[&>tr]:flex max-lg:[&>tr]:flex-col max-lg:[&>tr]:gap-2',
+  'max-lg:[&>tr]:rounded-[10px] max-lg:[&>tr]:border max-lg:[&>tr]:border-[#424242] max-lg:[&>tr]:bg-[#2a2828] max-lg:[&>tr]:p-4',
+  'max-lg:[&>tr>td]:flex max-lg:[&>tr>td]:min-w-0 max-lg:[&>tr>td]:items-center max-lg:[&>tr>td]:justify-between max-lg:[&>tr>td]:gap-3',
+  'max-lg:[&>tr>td]:p-0 max-lg:[&>tr>td]:text-right',
+  'max-lg:[&>tr>td]:before:shrink-0 max-lg:[&>tr>td]:before:content-[attr(data-label)] max-lg:[&>tr>td]:before:lowercase',
+  'max-lg:[&>tr>td]:before:text-[13px] max-lg:[&>tr>td]:before:font-bold max-lg:[&>tr>td]:before:text-[#818181]',
+  'max-lg:[&>tr>td]:before:font-[family-name:var(--font-alegreya-sc)]',
+  'max-lg:[&>tr>td:first-child]:justify-start max-lg:[&>tr>td:first-child]:pr-10 max-lg:[&>tr>td:first-child]:text-left',
+  'max-lg:[&>tr>td:first-child]:before:hidden',
+  'max-lg:[&>tr>td:last-child:not(:first-child)]:absolute max-lg:[&>tr>td:last-child:not(:first-child)]:right-2',
+  'max-lg:[&>tr>td:last-child:not(:first-child)]:top-3 max-lg:[&>tr>td:last-child:not(:first-child)]:before:hidden',
+  'max-lg:[&>tr>td:last-child:not(:first-child)]:w-auto',
+].join(' ')
+
+/** Tags each cell with its column name, for the stacked card layout. */
+function withLabels(cells: ReactNode, labels: string[]) {
+  if (!isValidElement(cells)) return cells
+  return Children.toArray((cells as ReactElement<{ children?: ReactNode }>).props.children).map((c, i) =>
+    isValidElement(c) ? cloneElement(c as ReactElement<Record<string, unknown>>, { 'data-label': labels[i] }) : c,
+  )
+}
+
+/** Long addresses are cut short with an ellipsis at the edge of their column. */
+function EmailText({ value }: { value: string | null | undefined }) {
+  return <span title={value ?? undefined} className="block min-w-0 max-lg:max-w-[170px] truncate">{value ?? '—'}</span>
+}
+
+/** "[date], [time]": two lines at the Figma's full size, one line when compact. */
+function LastLogin({ iso }: { iso: string | null }) {
+  if (!iso) return <>Never</>
+  const d = new Date(iso)
+  return (
+    <span className="inline-flex max-lg:justify-end gap-x-1.5 whitespace-nowrap 3xl:flex-col">
+      <span>{d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}<span className="3xl:hidden">,</span></span>
+      <span>{d.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })}</span>
+    </span>
+  )
+}
+
 const STATUS_CFG: Record<UserStatus, { label: string; cls: string }> = {
-  active:             { label: 'Active',      cls: 'bg-[#4df9ed]/10 text-[#4df9ed] border-[#4df9ed]/30'    },
-  inactive:           { label: 'Inactive',    cls: 'bg-[#818181]/10 text-[#818181] border-[#818181]/30'    },
-  deactivated:        { label: 'Deactivated', cls: 'bg-orange-500/15 text-orange-400 border-orange-500/30' },
-  archived:           { label: 'Archived',    cls: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30' },
-  permanently_locked: { label: 'Locked',      cls: 'bg-red-500/15 text-red-400 border-red-500/30'          },
+  active:             { label: 'Active',      cls: 'bg-[#4df9ed]/[0.24] text-[#4df9ed] border-[#4df9ed]' },
+  inactive:           { label: 'Inactive',    cls: 'bg-[#818181]/20 text-[#818181] border-[#818181]'     },
+  deactivated:        { label: 'Deactivated', cls: 'bg-[#ff7a30]/20 text-[#ff7a30] border-[#ff7a30]'     },
+  archived:           { label: 'Archived',    cls: 'bg-[#ffea00]/20 text-[#ffea00] border-[#ffea00]'     },
+  permanently_locked: { label: 'Locked',      cls: 'bg-[#f62626]/20 text-[#f62626] border-[#f62626]'     },
 }
 
 function StatusBadge({ status }: { status: UserStatus }) {
   const { label, cls } = STATUS_CFG[status] ?? STATUS_CFG.inactive
   return (
-    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold tracking-wide ${cls}`}>
+    <span className={`inline-flex h-5 min-w-[58px] 3xl:h-[25px] 3xl:min-w-[70px] items-center justify-center whitespace-nowrap rounded-[15px] border-[0.5px] px-1.5 pb-0.5 text-[12px] 3xl:text-[15px] font-bold ${cls}`}>
       {label}
     </span>
   )
@@ -201,7 +268,7 @@ function RowMenu({ user, tab, onView, onEdit, onStatusChange, lockedBy }: RowMen
         onClick={(e) => { e.stopPropagation(); setOpen(!open) }}
         className="rounded-md p-1.5 text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white"
       >
-        <MoreVertical size={15} />
+        <MoreVertical size={20} />
       </button>
       <AnimatePresence>
         {open && (
@@ -210,7 +277,7 @@ function RowMenu({ user, tab, onView, onEdit, onStatusChange, lockedBy }: RowMen
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -4 }}
             transition={{ duration: 0.12 }}
-            className="absolute right-0 top-8 z-50 w-48 rounded-xl border border-[#2a2a2a] bg-[#1b1b1b] py-1 shadow-xl"
+            className="absolute right-0 top-8 z-50 w-48 rounded-xl border border-[#424242] bg-[#1b1b1b] py-1 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -229,7 +296,7 @@ function RowMenu({ user, tab, onView, onEdit, onStatusChange, lockedBy }: RowMen
             )}
             {statusActions.length > 0 && (
               <>
-                <div className="my-1 border-t border-[#2a2a2a]" />
+                <div className="my-1 border-t border-[#424242]" />
                 {statusActions.map((a) => (
                   <button
                     key={a.status}
@@ -371,7 +438,7 @@ function VendorRowMenu({ user, onDone, onView, onEdit, lockedBy }: {
         onClick={(e) => { e.stopPropagation(); setOpen(!open) }}
         className="rounded-md p-1.5 text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white"
       >
-        <MoreVertical size={15} />
+        <MoreVertical size={20} />
       </button>
       <AnimatePresence>
         {open && (
@@ -380,7 +447,7 @@ function VendorRowMenu({ user, onDone, onView, onEdit, lockedBy }: {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -4 }}
             transition={{ duration: 0.12 }}
-            className="absolute right-0 top-8 z-50 w-52 rounded-xl border border-[#2a2a2a] bg-[#1b1b1b] py-1 shadow-xl"
+            className="absolute right-0 top-8 z-50 w-52 rounded-xl border border-[#424242] bg-[#1b1b1b] py-1 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <button onClick={() => { setOpen(false); onView() }} className={`${item} text-[#818181] hover:bg-[#2a2a2a] hover:text-white`}>
@@ -391,13 +458,13 @@ function VendorRowMenu({ user, onDone, onView, onEdit, lockedBy }: {
                 <Pencil size={13} /> Edit Details
               </button>
             )}
-            {canEdit && <div className="my-1 border-t border-[#2a2a2a]" />}
+            {canEdit && <div className="my-1 border-t border-[#424242]" />}
             {!canEdit || !user.access ? null : user.access.account_active ? (
               <>
                 <button onClick={resend} className={`${item} text-[#818181] hover:bg-[#2a2a2a] hover:text-white`}>
                   <Send size={13} /> Resend Setup Link
                 </button>
-                <div className="my-1 border-t border-[#2a2a2a]" />
+                <div className="my-1 border-t border-[#424242]" />
                 <button onClick={revoke} className={`${item} text-red-400 hover:bg-red-500/10`}>
                   <ShieldOff size={13} /> Revoke Access
                 </button>
@@ -418,9 +485,9 @@ function TableSkeleton({ cols }: { cols: number }) {
   return (
     <>
       {Array.from({ length: PAGE_SIZE }).map((_, i) => (
-        <tr key={i} className="border-b border-[#2a2a2a]/60">
+        <tr key={i} className="border-b border-[#424242]">
           {Array.from({ length: cols }).map((_, j) => (
-            <td key={j} className="px-4 py-3.5">
+            <td key={j} className="px-4 3xl:px-6 py-2.5 3xl:py-4">
               <div
                 className="h-3 animate-pulse rounded bg-[#2a2a2a]"
                 style={{ width: j === 0 ? '140px' : j === cols - 1 ? '60px' : '100px', animationDelay: `${i * 40}ms` }}
@@ -439,7 +506,7 @@ function TableSkeleton({ cols }: { cols: number }) {
 function EmptyState({ tab, onAdd, canAdd }: { tab: TabValue; onAdd: () => void; canAdd: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center py-24 text-center">
-      <div className="mb-4 rounded-full border border-[#2a2a2a] bg-[#1b1b1b] p-4">
+      <div className="mb-4 rounded-full border border-[#424242] bg-[#1b1b1b] p-4">
         <Users size={28} className="text-[#818181]" />
       </div>
       <p className="text-base font-semibold text-white">No records found</p>
@@ -513,11 +580,11 @@ function renderCells(user: AnyUser, tab: TabValue) {
     const name = [user.first_name, user.middle_name, user.last_name, user.suffix].filter(Boolean).join(' ') || '—'
     return (
       <>
-        <td className="px-4 py-3.5"><p className="font-medium text-white">{name}</p></td>
-        <td className="px-4 py-3.5 text-sm text-[#818181]">{user.email}</td>
-        <td className="px-4 py-3.5 text-sm text-[#818181]">{user.phone ?? '—'}</td>
-        <td className="px-4 py-3.5"><RoleBadge role={user.role} /></td>
-        <td className="px-4 py-3.5"><StatusBadge status={user.status} /></td>
+        <td className={TD_NAME}>{name}</td>
+        <td className={TD_MUTED}><EmailText value={user.email} /></td>
+        <td className={TD_MUTED}>{user.phone ?? '—'}</td>
+        <td className="px-4 3xl:px-6 py-2.5 3xl:py-4"><RoleBadge role={user.role} /></td>
+        <td className="px-4 3xl:px-6 py-2.5 3xl:py-4"><StatusBadge status={user.status} /></td>
       </>
     )
   }
@@ -528,11 +595,11 @@ function renderCells(user: AnyUser, tab: TabValue) {
       const name = [u.first_name, u.middle_name, u.last_name, u.suffix].filter(Boolean).join(' ') || '—'
       return (
         <>
-          <td className="px-4 py-3.5"><p className="font-medium text-white">{name}</p></td>
-          <td className="px-4 py-3.5 text-sm text-[#818181]">{u.email}</td>
-          <td className="px-4 py-3.5 text-sm text-[#818181]">{u.clients?.company_name ?? '—'}</td>
-          <td className="px-4 py-3.5"><StatusBadge status={u.status} /></td>
-          <td className="px-4 py-3.5 text-xs text-[#818181]">{formatDateTime(u.last_login_at ?? null)}</td>
+          <td className={TD_NAME}>{name}</td>
+          <td className={TD_MUTED}><EmailText value={u.email} /></td>
+          <td className={TD_MUTED}>{u.clients?.company_name ?? '—'}</td>
+          <td className="px-4 3xl:px-6 py-2.5 3xl:py-4"><StatusBadge status={u.status} /></td>
+          <td className={TD_MUTED}><LastLogin iso={u.last_login_at ?? null} /></td>
         </>
       )
     }
@@ -542,22 +609,22 @@ function renderCells(user: AnyUser, tab: TabValue) {
       const drvStatus = u.drivers?.status
       return (
         <>
-          <td className="px-4 py-3.5"><p className="font-medium text-white">{name}</p></td>
-          <td className="px-4 py-3.5 text-sm font-mono text-[#818181]">{u.drivers?.license_number ?? '—'}</td>
-          <td className="px-4 py-3.5 text-sm text-[#818181]">
+          <td className={TD_NAME}>{name}</td>
+          <td className={TD_MUTED}>{u.drivers?.license_number ?? '—'}</td>
+          <td className="px-4 3xl:px-6 py-2.5 3xl:py-4 text-[16px] text-[#818181]">
             <div className="flex flex-col items-start gap-1">
-              <span>{formatDate(u.drivers?.license_expiry ?? null)}</span>
+              <span className="ff-regular font-bold">{formatDate(u.drivers?.license_expiry ?? null)}</span>
               <LicenseExpiryBadge expiry={u.drivers?.license_expiry ?? null} />
             </div>
           </td>
-          <td className="px-4 py-3.5">
+          <td className="px-4 3xl:px-6 py-2.5 3xl:py-4">
             {drvStatus && (
               <span className="inline-flex items-center rounded-full border border-[#4df9ed]/30 bg-[#4df9ed]/10 px-2 py-0.5 text-[11px] font-semibold text-[#4df9ed]">
                 {drvStatus.replace(/_/g, ' ')}
               </span>
             )}
           </td>
-          <td className="px-4 py-3.5"><StatusBadge status={u.status} /></td>
+          <td className="px-4 3xl:px-6 py-2.5 3xl:py-4"><StatusBadge status={u.status} /></td>
         </>
       )
     }
@@ -566,20 +633,20 @@ function renderCells(user: AnyUser, tab: TabValue) {
       const name = [u.first_name, u.middle_name, u.last_name, u.suffix].filter(Boolean).join(' ') || '—'
       return (
         <>
-          <td className="px-4 py-3.5">
-            <p className="font-medium text-white">{name}</p>
+          <td className="px-4 3xl:px-6 py-2.5 3xl:py-4">
+            <p className={NAME_TEXT}>{name}</p>
             <RevokedFlag user={u} />
           </td>
-          <td className="px-4 py-3.5 text-sm text-[#818181]">{u.drivers?.vendor_name || '—'}</td>
-          <td className="px-4 py-3.5 text-sm text-[#818181]">{u.email}</td>
-          <td className="px-4 py-3.5 text-sm text-[#818181]">
+          <td className={TD_MUTED}>{u.drivers?.vendor_name || '—'}</td>
+          <td className={TD_MUTED}><EmailText value={u.email} /></td>
+          <td className="px-4 3xl:px-6 py-2.5 3xl:py-4 text-[16px] text-[#818181]">
             <div className="flex flex-col items-start gap-1">
-              <span>{formatDate(u.drivers?.license_expiry ?? null)}</span>
+              <span className="ff-regular font-bold">{formatDate(u.drivers?.license_expiry ?? null)}</span>
               <LicenseExpiryBadge expiry={u.drivers?.license_expiry ?? null} />
             </div>
           </td>
-          <td className="px-4 py-3.5"><AccessBadge access={u.access} /></td>
-          <td className="px-4 py-3.5"><StatusBadge status={u.status} /></td>
+          <td className="px-4 3xl:px-6 py-2.5 3xl:py-4"><AccessBadge access={u.access} /></td>
+          <td className="px-4 3xl:px-6 py-2.5 3xl:py-4"><StatusBadge status={u.status} /></td>
         </>
       )
     }
@@ -587,15 +654,24 @@ function renderCells(user: AnyUser, tab: TabValue) {
       const name = [user.first_name, user.middle_name, user.last_name, user.suffix].filter(Boolean).join(' ') || '—'
       return (
         <>
-          <td className="px-4 py-3.5"><p className="font-medium text-white">{name}</p></td>
-          <td className="px-4 py-3.5 text-sm text-[#818181]">{user.email}</td>
-          <td className="px-4 py-3.5 text-sm text-[#818181]">{user.phone ?? '—'}</td>
-          <td className="px-4 py-3.5"><StatusBadge status={user.status} /></td>
-          <td className="px-4 py-3.5 text-xs text-[#818181]">{formatDateTime(user.last_login_at ?? null)}</td>
+          <td className={TD_NAME}>{name}</td>
+          <td className={TD_MUTED}><EmailText value={user.email} /></td>
+          <td className={TD_MUTED}>{user.phone ?? '—'}</td>
+          <td className="px-4 3xl:px-6 py-2.5 3xl:py-4"><StatusBadge status={user.status} /></td>
+          <td className={TD_MUTED}><LastLogin iso={user.last_login_at ?? null} /></td>
         </>
       )
     }
   }
+}
+
+// What the count beside the search bar calls a row: "2 Client Accounts".
+const ACCOUNT_NOUN: Record<TabValue, string> = {
+  all:              'User',
+  clients:          'Client',
+  drivers:          'Company Driver',
+  'vendor-drivers': 'Vendor Driver',
+  'it-admins':      'IT Administrator',
 }
 
 // The resets panel brings its own table, so only the directory tabs are here.
@@ -861,12 +937,14 @@ export default function UserManagementClient() {
 
   return (
     <ThemeProvider theme={muiTheme}>
-      <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-hidden bg-[#0a0a0a] text-white">
-        <div className="flex flex-col flex-1 min-h-0 px-3 py-3 lg:px-4 gap-6 overflow-hidden">
+      <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-y-auto overflow-x-hidden lg:overflow-hidden bg-[#0a0a0a] text-white">
+        <div className="flex flex-col lg:flex-1 lg:min-h-0 px-3 py-3 sm:px-4 lg:px-6 3xl:px-9 lg:pt-3 lg:pb-4 3xl:pb-9 gap-3 3xl:gap-[34px] lg:overflow-hidden">
 
           {/* Header */}
-          <div className="flex flex-wrap items-start justify-between gap-3 shrink-0">
-            <h1 className="mt-1 text-2xl font-bold tracking-tight text-white">User Management</h1>
+          {/* As tall as the Add User button even when it is hidden (Password Reset tab),
+              so switching tabs doesn't shift the page. */}
+          <div className="flex lg:min-h-8 3xl:min-h-11 flex-wrap items-center justify-between gap-3 shrink-0">
+            <h1 className="text-[18px] 3xl:text-[24px] font-bold text-white">User Management</h1>
             {/*
               On the IT Admin tab "Create User" is the wrong verb: only one may be
               active, so while the seat is filled the only move is to hand it over.
@@ -877,78 +955,85 @@ export default function UserManagementClient() {
                 isRootAdmin && (
                   <button
                     onClick={() => setShowTransition(true)}
-                    className="flex items-center gap-2 whitespace-nowrap rounded-xl bg-[#4df9ed] px-5 py-2.5 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5] active:scale-95"
+                    className={HEADER_BTN}
                   >
-                    <ArrowLeftRight size={15} /> Transition IT Administrator
+                    Transition IT Administrator <ArrowLeftRight className={HEADER_ICON} />
                   </button>
                 )
               ) : access.canCreate && (
                 <button
                   onClick={openCreate}
-                  className="flex items-center gap-2 whitespace-nowrap rounded-xl bg-[#4df9ed] px-5 py-2.5 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5] active:scale-95"
+                  className={HEADER_BTN}
                 >
-                  <UserPlus size={15} /> Create User
+                  Add User <UserRoundPlus className={HEADER_ICON} />
                 </button>
               )
             )}
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-3 gap-4 shrink-0">
+          <div className="grid grid-cols-3 gap-2.5 sm:gap-4 3xl:gap-[26px] shrink-0">
             {[
-              { label: 'Total Users', value: stats.total,    color: 'text-white'        },
-              { label: 'Active',      value: stats.active,   color: 'text-[#4df9ed]'    },
-              { label: 'Archived',    value: stats.archived, color: 'text-yellow-400'   },
+              { label: 'Total Users', value: stats.total,    color: 'text-white'     },
+              { label: 'Active',      value: stats.active,   color: 'text-[#4df9ed]' },
+              { label: 'Archived',    value: stats.archived, color: 'text-[#ffea00]' },
             ].map((s) => (
-              <div key={s.label} className="rounded-xl border border-[#2a2a2a] bg-[#1b1b1b] px-5 py-4">
-                <p className="text-xs font-semibold uppercase tracking-widest text-[#818181]">{s.label}</p>
-                <p className={`mt-1 text-3xl font-bold font-mono ${s.color}`}>{s.value}</p>
+              <div key={s.label} className="min-w-0 rounded-[10px] border border-[#424242] bg-[#2a2828] px-2.5 py-2.5 sm:px-4 3xl:px-[25px] 3xl:pt-4 3xl:pb-3 shadow-[0_4px_4px_rgba(0,0,0,0.25)]">
+                <p className="text-[11px] leading-tight sm:text-[12px] 3xl:text-[16px] font-bold uppercase text-[#818181]">{s.label}</p>
+                <p className={`mt-1.5 3xl:mt-4 text-[20px] sm:text-[22px] 3xl:text-[32px] font-bold leading-none ${s.color}`}>{s.value}</p>
               </div>
             ))}
           </div>
 
           {/* Table card */}
-          <div className="flex flex-col flex-1 min-h-0 rounded-2xl border border-[#2a2a2a] bg-[#1b1b1b] overflow-hidden">
+          <div className="flex flex-col lg:flex-1 lg:min-h-0 rounded-[10px] border-[0.5px] border-[#424242] bg-[#1b1b1b] shadow-[0_4px_4px_rgba(0,0,0,0.25)] lg:overflow-hidden">
 
             {/* Directory vs. queue — two different jobs, so two top-level tabs. */}
             <ModuleSectionTabs
               value={section}
               onChange={setSection}
               directoryLabel="Users"
+              resetsLabel="Password Reset"
               pendingCount={resetCount}
+              variant="large"
             />
 
-            {/* Role filter. Belongs to the directory only — there is nothing to
-                filter by role in a queue. */}
+            {/* Role filter, search, refresh and the count, on one row as the
+                Figma lays them out. The role filter belongs to the directory
+                only: there is nothing to filter by role in a queue. */}
             {!isResetsTab && (
-            <div className="px-4 pt-3 pb-3 border-b border-[#2a2a2a] shrink-0">
-              <FormControl size="small" sx={{ minWidth: 200 }}>
+            <div className="flex flex-wrap items-center gap-3 3xl:gap-5 border-b border-[#424242] px-3 sm:px-4 3xl:px-[25px] py-2.5 3xl:py-4 shrink-0">
+              <FormControl size="small" sx={{ width: { xs: '100%', sm: 200 }, [FIGMA_MQ]: { width: 260 } }}>
                 <Select
                   value={dropdownTab}
                   onChange={(e: SelectChangeEvent) => switchTab(e.target.value as TabValue)}
+                  IconComponent={(props) => <ChevronDown size={18} {...props} />}
                   MenuProps={{
                     PaperProps: {
                       sx: {
-                        bgcolor: '#1b1b1b', border: '1px solid #2a2a2a',
-                        borderRadius: '12px', boxShadow: '0 20px 40px rgba(0,0,0,0.6)',
+                        bgcolor: '#1b1b1b', border: '1px solid #424242',
+                        borderRadius: '10px', boxShadow: '0 20px 40px rgba(0,0,0,0.6)',
                         mt: '6px', '& .MuiList-root': { p: '4px' },
+                        // Portaled to <body>, so it sets the regular face itself.
+                        fontFamily: REGULAR_FONT,
                       },
                     },
                   }}
                   sx={{
-                    borderRadius: '10px', fontSize: '13px', fontWeight: 500,
-                    color: '#4df9ed', bgcolor: '#2a2a2a',
-                    '& .MuiOutlinedInput-notchedOutline': { borderColor: '#424242' },
-                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#4df9ed50' },
+                    height: '36px', borderRadius: '10px', fontFamily: REGULAR_FONT, fontSize: '14px',
+                    color: '#4df9ed', bgcolor: '#424242',
+                    '& .MuiOutlinedInput-notchedOutline': { borderColor: '#818181' },
+                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#4df9ed80' },
                     '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#4df9ed', borderWidth: '1px' },
-                    '& .MuiSelect-icon': { color: '#818181' },
-                    '& .MuiSelect-select': { display: 'flex', alignItems: 'center', gap: '8px', paddingTop: '8px', paddingBottom: '8px' },
+                    '& .MuiSelect-icon': { color: '#818181', right: '10px', top: 'calc(50% - 9px)' },
+                    '& .MuiSelect-select': { display: 'flex', alignItems: 'center', paddingLeft: '12px' },
+                    [FIGMA_MQ]: { height: '46px', fontSize: '18px', '& .MuiSelect-select': { paddingLeft: '18px' } },
                   }}
                   renderValue={(value) => {
                     const tab = TABS.find((t) => t.key === value)!
                     return (
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#4df9ed', fontSize: '13px', fontWeight: 500 }}>
-                        <Users size={14} /> {tab.label}
+                      <span className="flex items-center gap-2 3xl:gap-[9px] text-[14px] 3xl:text-[18px] text-[#4df9ed]">
+                        <Users className="size-4 3xl:size-[22px]" /> {tab.label}
                       </span>
                     )
                   }}
@@ -957,12 +1042,12 @@ export default function UserManagementClient() {
                     <MenuItem
                       key={t.key} value={t.key}
                       sx={{
-                        borderRadius: '8px', mb: '2px', fontSize: '13px',
-                        fontWeight: t.key === 'all' ? 600 : 500,
+                        borderRadius: '8px', mb: '2px', fontFamily: REGULAR_FONT, fontSize: '14px', [FIGMA_MQ]: { fontSize: '16px' },
+                        fontWeight: t.key === 'all' ? 700 : 400,
                         color: dropdownTab === t.key ? '#4df9ed' : '#818181',
                         bgcolor: dropdownTab === t.key ? '#4df9ed0d' : 'transparent',
                         display: 'flex', alignItems: 'center', gap: '10px',
-                        borderTop: t.key === 'clients' ? '1px solid #2a2a2a' : 'none',
+                        borderTop: t.key === 'clients' ? '1px solid #424242' : 'none',
                         marginTop: t.key === 'clients' ? '4px' : '0',
                         paddingTop: t.key === 'clients' ? '8px' : undefined,
                         '&:hover': {
@@ -973,7 +1058,7 @@ export default function UserManagementClient() {
                       }}
                     >
                       <span style={{ color: dropdownTab === t.key ? '#4df9ed' : '#818181', display: 'flex' }}>
-                        <Users size={14} />
+                        <Users size={16} />
                       </span>
                       {t.label}
                       {dropdownTab === t.key && (
@@ -983,17 +1068,31 @@ export default function UserManagementClient() {
                   ))}
                 </Select>
               </FormControl>
+
+              <div className="relative min-w-0 flex-1 sm:max-w-[360px] 3xl:max-w-[466px]">
+                <Search className="pointer-events-none absolute left-3 3xl:left-[18px] top-1/2 size-4 3xl:size-[22px] -translate-y-1/2 text-[#818181]" />
+                <input
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  placeholder="Search name or email..."
+                  className="h-9 3xl:h-[46px] w-full rounded-[10px] border border-[#818181] bg-[#424242] pl-9 3xl:pl-[49px] pr-4 text-[14px] 3xl:text-[18px] text-white placeholder-[#818181] outline-none transition focus:border-[#4df9ed]"
+                />
+              </div>
+              <RefreshButton iconOnly onClick={handleRefresh} loading={(loading || fetching)} disabled={loading || fetching} />
+              <span className="basis-full text-right sm:basis-auto sm:ml-auto text-[10px] 3xl:text-[11px] font-bold text-[#4df9ed] whitespace-nowrap">
+                {total} {ACCOUNT_NOUN[activeTab]} Account{total !== 1 ? 's' : ''}
+              </span>
             </div>
             )}
 
             {!isResetsTab && isDriverTab && (
-              <div className="flex gap-1 border-b border-[#2a2a2a] px-4 shrink-0">
+              <div className="flex gap-1 border-b border-[#424242] px-3 sm:px-4 3xl:px-[25px] shrink-0">
                 {DRIVER_TABS.map((t) => (
                   <button
                     key={t.key}
                     type="button"
                     onClick={() => switchTab(t.key)}
-                    className={`-mb-px border-b-2 px-3 py-2.5 text-[13px] font-semibold transition ${
+                    className={`-mb-px border-b px-3 py-2 text-[13px] 3xl:text-[16px] font-bold transition ${
                       activeTab === t.key
                         ? 'border-[#4df9ed] text-[#4df9ed]'
                         : 'border-transparent text-[#818181] hover:text-white'
@@ -1009,26 +1108,10 @@ export default function UserManagementClient() {
               <PasswordResetQueue
                 focusRequestId={focusRequestId}
                 onPendingCountChange={setResetCount}
+                regularData
               />
             ) : (
             <>
-            {/* Search + refresh bar */}
-            <div className="flex items-center gap-3 border-b border-[#2a2a2a] px-4 py-3 shrink-0">
-              <div className="relative flex-1 max-w-sm">
-                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#818181]" />
-                <input
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  placeholder="Search name or email…"
-                  className="w-full rounded-lg border border-[#424242] bg-[#2a2a2a]/60 py-2 pl-9 pr-4 text-sm text-white placeholder-[#818181] outline-none transition focus:border-[#4df9ed] focus:ring-1 focus:ring-[#4df9ed]/20"
-                />
-              </div>
-              <RefreshButton onClick={handleRefresh} loading={(loading || fetching)} disabled={loading || fetching} />
-              <span className="ml-auto text-xs text-[#818181]">
-                {total} record{total !== 1 ? 's' : ''}
-              </span>
-            </div>
-
             {isDriverTab && licenseFlagCount > 0 && (
               <div className="flex items-center gap-3 border-b border-amber-500/20 bg-amber-500/10 px-5 py-3 text-sm text-amber-400 shrink-0">
                 <AlertTriangle size={14} className="shrink-0" />
@@ -1052,26 +1135,29 @@ export default function UserManagementClient() {
             )}
 
             {/* Table */}
-            <div className="flex-1 overflow-auto min-h-0">
-              <table className="w-full text-sm">
-                <thead className="sticky top-0 z-10 bg-[#1b1b1b]">
-                  <tr className="border-b border-[#2a2a2a]">
+            <div className="lg:flex-1 lg:overflow-auto lg:min-h-0">
+              {/* Fixed layout: every column, Actions included, gets the same width.
+                  Content starts at the left of its column; the row menu sits right. */}
+              <table className="w-full max-lg:block lg:table-fixed">
+                {/* Headers in the small-caps face, every cell below in regular Alegreya Sans. */}
+                <thead className="sticky top-0 z-10 bg-[#1b1b1b] max-lg:hidden font-[family-name:var(--font-alegreya-sc)]">
+                  <tr className="border-b border-[#424242]">
                     {HEADERS[activeTab].map((h) => (
-                      <th key={h} className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#818181]">
+                      <th key={h} className={`px-4 3xl:px-6 py-2 3xl:py-3 text-[12px] 3xl:text-[16px] font-bold lowercase whitespace-nowrap text-left text-[#818181]`}>
                         {h}
                       </th>
                     ))}
-                    <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-widest text-[#818181]">
-                      Actions
+                    <th className="px-4 3xl:px-6 py-2 3xl:py-3 text-right text-[12px] 3xl:text-[16px] font-bold lowercase text-[#818181]">
+                      actions
                     </th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className={`ff-regular ${CARD_TBODY}`}>
                   {(loading || fetching) ? (
                     <TableSkeleton cols={colCount} />
                   ) : users.length === 0 ? (
-                    <tr>
-                      <td colSpan={colCount}>
+                    <tr className="col-span-full">
+                      <td colSpan={colCount} className="max-lg:!justify-center">
                         <EmptyState tab={activeTab} onAdd={openCreate} canAdd={access.canCreate} />
                       </td>
                     </tr>
@@ -1083,10 +1169,11 @@ export default function UserManagementClient() {
                           initial={{ opacity: 0, y: 6 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: i * 0.02 }}
-                          className="border-b border-[#2a2a2a]/60 transition-colors hover:bg-[#2a2a2a]/40"
+                          className="border-b border-[#424242] transition-colors hover:bg-[#2a2a2a]/40"
                         >
-                          {renderCells(user, activeTab)}
-                          <td className="px-4 py-3.5 text-right">
+                          {withLabels(renderCells(user, activeTab), HEADERS[activeTab])}
+                          {/* The row menu sits at the far right of the table. */}
+                          <td className="px-4 3xl:px-6 py-2.5 3xl:py-4 text-right">
                             {activeTab === 'vendor-drivers' ? (
                               <VendorRowMenu
                                 user={user as VendorDriverUser}
@@ -1115,47 +1202,8 @@ export default function UserManagementClient() {
             </div>
 
             {/* Pagination */}
-            {!loading && totalPages > 1 && (
-              <div className="shrink-0 border-t border-[#2a2a2a] bg-[#1b1b1b] px-5 py-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs text-[#818181]">
-                    Page {safePage} of {totalPages} &mdash; {total} record{total !== 1 ? 's' : ''}
-                  </p>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => setPage((p) => Math.max(1, p - 1))}
-                      disabled={safePage === 1 || fetching}
-                      className="rounded-lg p-1.5 text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white disabled:opacity-30"
-                    >
-                      <ChevronLeft size={15} />
-                    </button>
-                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                      const n = Math.max(1, Math.min(totalPages - 4, safePage - 2)) + i
-                      return (
-                        <button
-                          key={n}
-                          onClick={() => setPage(n)}
-                          disabled={fetching}
-                          className={`h-7 w-7 rounded-lg text-xs font-medium transition ${
-                            n === safePage
-                              ? 'bg-[#4df9ed] text-[#0a0a0a]'
-                              : 'text-[#818181] hover:bg-[#2a2a2a] hover:text-white'
-                          } disabled:opacity-50`}
-                        >
-                          {n}
-                        </button>
-                      )
-                    })}
-                    <button
-                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                      disabled={safePage === totalPages || fetching}
-                      className="rounded-lg p-1.5 text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white disabled:opacity-30"
-                    >
-                      <ChevronRight size={15} />
-                    </button>
-                  </div>
-                </div>
-              </div>
+            {!loading && total > 0 && (
+              <Pagination page={safePage} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPageChange={setPage} disabled={fetching} />
             )}
             </>
             )}

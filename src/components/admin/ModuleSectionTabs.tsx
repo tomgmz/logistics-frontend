@@ -21,25 +21,35 @@ export default function ModuleSectionTabs({
   value,
   onChange,
   directoryLabel = 'Directory',
+  resetsLabel = 'Password Resets',
   pendingCount,
+  variant = 'compact',
 }: {
   value:           ModuleSection
   onChange:        (next: ModuleSection) => void
   /** What this module's list is called — "Users" here, "Administrators" there. */
   directoryLabel?: string
+  resetsLabel?:    string
   /** Unactioned requests, surfaced on the tab so the queue announces itself. */
   pendingCount?:   number
+  /** 'large' is the User Management look: bigger small-caps labels on #424242 rules. */
+  variant?:        'compact' | 'large'
 }) {
+  const large    = variant === 'large'
+  // Large icons step down below 3xl (1920px), like the rest of the User Management Figma.
+  const iconCls = large ? 'size-4 3xl:size-[22px]' : 'size-[14px]'
   const tabs: { key: ModuleSection; label: string; icon: React.ReactNode }[] = [
-    { key: 'directory',       label: directoryLabel,    icon: <Users size={14} />     },
-    { key: 'password-resets', label: 'Password Resets', icon: <KeyRound size={14} /> },
+    { key: 'directory',       label: directoryLabel, icon: <Users className={iconCls} />     },
+    { key: 'password-resets', label: resetsLabel,    icon: <KeyRound className={iconCls} /> },
   ]
 
   return (
     <div
       role="tablist"
       aria-label="Module sections"
-      className="flex items-center gap-1 border-b border-[#2a2a2a] px-4 pt-2 shrink-0 overflow-x-auto"
+      className={large
+        ? 'flex items-center shadow-[inset_0_-1px_0_#424242] px-1 sm:px-2 pt-1 3xl:pt-3 shrink-0 overflow-x-auto overflow-y-hidden'
+        : 'flex items-center gap-1 shadow-[inset_0_-1px_0_#2a2a2a] px-4 pt-2 shrink-0 overflow-x-auto overflow-y-hidden'}
     >
       {tabs.map((t) => {
         const active = value === t.key
@@ -51,7 +61,8 @@ export default function ModuleSectionTabs({
             role="tab"
             aria-selected={active}
             onClick={() => onChange(t.key)}
-            className={`relative flex items-center gap-2 whitespace-nowrap rounded-t-lg px-4 py-2.5 text-[13px] font-semibold transition-colors
+            className={`relative flex items-center whitespace-nowrap rounded-t-lg transition-colors
+              ${large ? 'gap-2 3xl:gap-[9px] px-3 3xl:px-[18px] pt-1.5 pb-2 3xl:pb-3 text-[14px] 3xl:text-[18px] font-bold' : 'gap-2 px-4 py-2.5 text-[13px] font-semibold'}
               ${active
                 ? 'text-[#4df9ed]'
                 : 'text-[#818181] hover:bg-[#2a2a2a]/50 hover:text-white'}`}
@@ -71,9 +82,11 @@ export default function ModuleSectionTabs({
               </span>
             )}
 
-            {/* The active underline sits on the container's border, not above it. */}
+            {/* The active underline covers the divider. The divider is an inset shadow,
+                not a border, so the underline lies inside the row: a border would
+                push it 1px outside, and that overhang made the row scroll. */}
             {active && (
-              <span className="absolute inset-x-0 -bottom-px h-[2px] rounded-full bg-[#4df9ed]" />
+              <span className={`absolute inset-x-0 bottom-0 rounded-full bg-[#4df9ed] ${large ? 'h-px' : 'h-[2px]'}`} />
             )}
           </button>
         )

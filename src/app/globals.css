@@ -663,6 +663,7 @@
 
 @theme inline {
   --breakpoint-xs:     480px;
+  --breakpoint-3xl:    120rem; /* 1920px, in rem so it sorts after the built-in breakpoints */
   --font-heading:      var(--font-sans);
   --font-sans:      var(--font-sans);
   --color-sidebar-ring:      var(--sidebar-ring);

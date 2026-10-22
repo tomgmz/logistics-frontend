@@ -35,6 +35,9 @@ import { getApiErrorMessage } from '@/lib/api-error'
 import { useAuthStore } from '@/lib/store/auth.store'
 
 import RefreshButton from '@/components/ui/RefreshButton'
+import Pagination from '@/components/ui/Pagination'
+
+const PAGE_SIZE = 15
 /**
  * The Reports module — the staff side of the driver app's Reports tab.
  *
@@ -90,6 +93,7 @@ export default function ReportsView() {
   const [search,       setSearch]       = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('open')
   const [typeFilter,   setTypeFilter]   = useState<'all' | IncidentType | 'unspecified'>('all')
+  const [page,         setPage]         = useState(1)
 
   const [viewId,      setViewId]      = useState<string | null>(null)
   const [confirmAck,  setConfirmAck]  = useState<DriverReport | null>(null)
@@ -188,6 +192,12 @@ export default function ReportsView() {
       ].some((v) => v?.toLowerCase().includes(q))
     })
   }, [reports, search, statusFilter, typeFilter])
+
+  // A new search or filter starts again from the first page.
+  useEffect(() => { setPage(1) }, [search, statusFilter, typeFilter])
+  const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE))
+  const safePage   = Math.min(page, totalPages)
+  const pageRows   = visible.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
   async function applyStatus(r: DriverReport, next: 'acknowledged' | 'resolved', note?: string) {
     setBusy(true)
@@ -389,6 +399,7 @@ export default function ReportsView() {
               </p>
             </div>
           ) : (
+            <>
             <div className="overflow-auto flex-1 min-h-0">
               <table className="w-full text-left text-sm border-collapse min-w-[760px]">
                 <thead className="sticky top-0 z-[1] bg-[#141414] border-b border-white/[0.07]">
@@ -403,7 +414,7 @@ export default function ReportsView() {
                   </tr>
                 </thead>
                 <tbody>
-                  {visible.map((r) => (
+                  {pageRows.map((r) => (
                     <tr
                       key={r.report_id}
                       className="border-b border-white/[0.05] hover:bg-white/[0.03] transition-colors cursor-pointer"
@@ -437,6 +448,8 @@ export default function ReportsView() {
                 </tbody>
               </table>
             </div>
+            <Pagination page={safePage} totalPages={totalPages} total={visible.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
+            </>
           )}
         </div>
       </div>

@@ -9,6 +9,7 @@ import {
   X, AlertCircle, RefreshCw,
 } from 'lucide-react'
 import RefreshButton from '@/components/ui/RefreshButton'
+import Pagination from '@/components/ui/Pagination'
 
 import TextField from '@mui/material/TextField'
 import Select, { SelectChangeEvent } from '@mui/material/Select'
@@ -109,6 +110,9 @@ function HistoryIcon({ name, size, className = '' }: { name: string; size: numbe
 // Figma lines and chips.
 const LINE      = '#424242'
 const CHIP_IDLE = '#343434'
+
+// Twelve cards a page: whole rows in the 1-, 2- and 3-column layouts.
+const PAGE_SIZE = 12
 
 const TABS: { key: BookingStatus | 'all'; label: string }[] = [
   { key: 'all',        label: 'All' },
@@ -262,6 +266,7 @@ export default function BookingHistoryModule() {
   const [dateFrom,    setDateFrom]    = useState('')
   const [dateTo,      setDateTo]      = useState('')
   const [showFilters, setShowFilters] = useState(false)
+  const [page,        setPage]        = useState(1)
   const dateFromRef = useRef<HTMLInputElement>(null)
   const dateToRef   = useRef<HTMLInputElement>(null)
 
@@ -333,6 +338,12 @@ export default function BookingHistoryModule() {
       if (sortBy === 'amount_asc')  return aCost - bCost
       return 0
     })
+
+  // A new search, tab, sort or date range starts again from the first page.
+  useEffect(() => { setPage(1) }, [search, activeTab, sortBy, dateFrom, dateTo])
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const safePage   = Math.min(page, totalPages)
+  const pageCards  = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
   const counts = TABS.reduce<Record<string, number>>((acc, t) => {
     acc[t.key] = t.key === 'all'
@@ -625,13 +636,16 @@ export default function BookingHistoryModule() {
 
               {/* Cards */}
               {!loading && !error && filtered.length > 0 && (
-                <motion.div variants={stagger} initial="hidden" animate="show"
+                <>
+                <motion.div key={safePage} variants={stagger} initial="hidden" animate="show"
                   className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                  {filtered.map((b) => (
+                  {pageCards.map((b) => (
                     <BookingCard key={b.booking_id} booking={b}
                       onSelect={() => { setSelected(b); setView('detail') }} />
                   ))}
                 </motion.div>
+                <Pagination page={safePage} totalPages={totalPages} total={filtered.length} pageSize={PAGE_SIZE} onPageChange={setPage} className="mt-3 rounded-[10px]" />
+                </>
               )}
             </motion.div>
           )}

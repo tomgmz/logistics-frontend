@@ -56,7 +56,7 @@ const PAGE_SIZE = 10
 
 // Action buttons: live, or greyed out once the request has been decided.
 const BTN_BASE =
-  'flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[10px] px-2 text-[13px] 3xl:text-[15px] font-bold ' +
+  'flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[10px] px-1.5 max-lg:px-2 3xl:px-2 text-[12px] max-lg:text-[13px] 3xl:text-[15px] font-bold ' +
   'transition active:scale-95 disabled:cursor-not-allowed disabled:active:scale-100'
 
 function fullName(r: PasswordResetRequest): string {
@@ -198,14 +198,18 @@ export default function PasswordResetQueue({
 
         {/* Table */}
         <div className="flex-1 overflow-auto min-h-0">
-          <table className="w-full text-sm">
+          {/* Desktop (lg+): six equal columns (fixed layout), as in the Figma.
+              Phones and tablets keep the earlier layout: columns sized to their
+              content, at least 960px wide, scrolling sideways. The max-lg: classes
+              below are that earlier mobile look. */}
+          <table className="w-full max-lg:min-w-[960px] max-lg:text-sm lg:min-w-[1080px] lg:table-fixed">
             <thead className={`sticky top-0 z-10 bg-[#1b1b1b] ${regularData ? 'font-[family-name:var(--font-alegreya-sc)]' : ''}`}>
-              <tr className="border-b border-[#818181]">
+              <tr className="border-b border-[#424242] max-lg:border-[#818181]">
                 {['name', 'email', 'Role', 'Requested', 'Status', 'actions'].map((h, i) => (
                   <th
                     key={i}
-                    className={`px-4 3xl:px-6 py-3 text-[13px] 3xl:text-[16px] font-bold text-[#818181] whitespace-nowrap ${
-                      i === 3 || i === 4 ? 'text-center' : i === 5 ? 'text-right' : 'text-left'
+                    className={`px-4 3xl:px-6 py-2 max-lg:py-3 3xl:py-3 text-[12px] max-lg:text-[13px] 3xl:text-[16px] font-bold text-[#818181] whitespace-nowrap ${
+                      i === 5 ? 'text-right' : i === 3 || i === 4 ? 'text-left max-lg:text-center' : 'text-left'
                     }`}
                   >
                     {h}
@@ -245,37 +249,40 @@ export default function PasswordResetQueue({
                   return (
                     <tr
                       key={r.request_id}
-                      className={`border-b border-[#818181] transition-colors ${
+                      // Same row height as the Users table (its row menu button sets it there).
+                      className={`h-[54px] max-lg:h-auto 3xl:h-[66px] border-b border-[#424242] max-lg:border-[#818181] transition-colors ${
                         isFocus ? 'bg-[#4df9ed]/[0.06]' : 'hover:bg-[#2a2a2a]/40'
                       }`}
                     >
-                      <td className="px-4 3xl:px-6 py-3">
-                        <p className="text-[14px] 3xl:text-[18px] font-bold text-white">{fullName(r)}</p>
+                      <td className="px-4 3xl:px-6 py-2.5 max-lg:py-3 3xl:py-4">
+                        <p className="text-[14px] 3xl:text-[18px] font-bold text-[#4df9ed]">{fullName(r)}</p>
                       </td>
-                      <td className="px-4 3xl:px-6 py-3 text-[13px] 3xl:text-[16px] font-bold text-[#818181]">{r.email}</td>
-                      <td className="px-4 3xl:px-6 py-3 text-[13px] 3xl:text-[16px] font-bold text-[#818181]">
+                      <td title={r.email} className="truncate px-4 3xl:px-6 py-2.5 max-lg:py-3 3xl:py-4 text-[13px] 3xl:text-[16px] font-bold text-white">{r.email}</td>
+                      <td className="px-4 3xl:px-6 py-2.5 max-lg:py-3 3xl:py-4 text-[13px] 3xl:text-[16px] font-bold text-white">
                         {ROLE_LABELS[r.requested_role] ?? r.requested_role.replace(/_/g, ' ')}
                       </td>
-                      <td className="px-4 3xl:px-6 py-3 text-center text-[13px] 3xl:text-[16px] font-bold text-[#818181] whitespace-nowrap">
+                      <td className="px-4 3xl:px-6 py-2.5 max-lg:py-3 3xl:py-4 max-lg:text-center text-[13px] 3xl:text-[16px] font-bold text-white whitespace-nowrap">
                         {requestedAt(r.created_at)}
                       </td>
-                      <td className="px-4 3xl:px-6 py-3">
-                        <div className="flex flex-col items-center gap-1">
-                          <span className={`inline-flex h-[25px] items-center justify-center whitespace-nowrap rounded-[15px] border-[0.5px] px-1.5 pb-0.5 text-[12px] 3xl:text-[15px] font-bold ${cfg.cls}`}>
+                      <td className="max-lg:min-w-[150px] px-4 3xl:px-6 py-2.5 max-lg:py-3 3xl:py-4">
+                        <div className="flex flex-col items-start max-lg:items-center gap-1">
+                          <span className={`inline-flex h-5 max-lg:h-[25px] 3xl:h-[25px] items-center justify-center whitespace-nowrap rounded-[15px] border-[0.5px] px-1.5 pb-0.5 text-[12px] 3xl:text-[15px] font-bold ${cfg.cls}`}>
                             {cfg.label}
                           </span>
                           {r.status === 'sent' && left !== null && (
                             <span className="text-[10px] text-[#818181]">expires in {left}m</span>
                           )}
                           {(r.status === 'expired' || (r.status === 'sent' && left === null)) && (
-                            <span className="text-[10px] text-orange-400/70">
+                            <span className="max-lg:max-w-[150px] max-lg:text-center text-[10px] text-orange-400/70">
                               never used — send a new link
                             </span>
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-3.5">
-                        <div className="flex items-center justify-end gap-2">
+                      <td className="pl-2 max-lg:pl-8 pr-4 3xl:px-6 py-2.5 max-lg:py-3.5 3xl:py-4">
+                        {/* A sixth of the width like every other column; if that is too narrow for
+                            both buttons they wrap onto two lines instead of overflowing. */}
+                        <div className="flex flex-wrap max-lg:flex-nowrap items-center justify-end gap-1.5 max-lg:gap-2">
                           <RecordLockBadge holder={lockedBy} />
                           {canCreate && (() => {
                             const live  = SENDABLE.includes(r.status) && !busy

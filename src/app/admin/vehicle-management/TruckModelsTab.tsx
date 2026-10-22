@@ -23,6 +23,7 @@ import RowActionMenu, { type RowAction } from '@/components/ui/RowActionMenu'
 import { ModelThumb, fmtDimensions, kgToTons } from './vehicle-ui'
 
 import RefreshButton from '@/components/ui/RefreshButton'
+import Pagination from '@/components/ui/Pagination'
 export const VEHICLE_TYPES = [
   'Closed Van',
   'Wing Van',
@@ -36,6 +37,7 @@ export const VEHICLE_TYPES = [
 export type VehicleType = (typeof VEHICLE_TYPES)[number]
 
 const KNOWN_TYPES = VEHICLE_TYPES.slice(0, -1)
+const PAGE_SIZE = 15
 
 interface ModelFormState {
   name:               string
@@ -105,6 +107,7 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
   const [listLoading, setListLoading] = useState(true)
   const [listError,   setListError]   = useState<string | null>(null)
   const [search,      setSearch]      = useState('')
+  const [page,        setPage]        = useState(1)
 
   const [formMode,     setFormMode]    = useState<FormMode>(null)
   const [editingId,    setEditingId]   = useState<string | null>(null)
@@ -158,6 +161,12 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
       [m.name, m.vehicle_type, m.suitable_for].some((v) => v?.toLowerCase().includes(q)),
     )
   }, [models, search])
+
+  // A new search starts again from the first page.
+  useEffect(() => { setPage(1) }, [search])
+  const totalPages = Math.max(1, Math.ceil(visibleModels.length / PAGE_SIZE))
+  const safePage   = Math.min(page, totalPages)
+  const pageModels = visibleModels.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
   const openCreate = () => {
     setEditingId(null)
@@ -464,6 +473,7 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
               )}
             </div>
           ) : (
+            <>
             <div className="overflow-auto flex-1 min-h-0">
               <table className="w-full text-left text-sm border-collapse min-w-[700px]">
                 <thead className="sticky top-0 z-[1] bg-[#141414] border-b border-white/[0.07]">
@@ -479,7 +489,7 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
                   </tr>
                 </thead>
                 <tbody>
-                  {visibleModels.map((m) => (
+                  {pageModels.map((m) => (
                     <tr key={m.model_id} className="border-b border-white/[0.05] hover:bg-white/[0.03] transition-colors">
                       <td className="px-2 py-2 align-middle">
                         <div className="flex justify-center">
@@ -511,6 +521,8 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
                 </tbody>
               </table>
             </div>
+            <Pagination page={safePage} totalPages={totalPages} total={visibleModels.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
+            </>
           )}
         </div>
       </div>

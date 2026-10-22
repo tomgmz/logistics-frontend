@@ -97,8 +97,9 @@ export default function Pagination({
                 disabled={disabled}
                 aria-current={p === page ? 'page' : undefined}
                 aria-label={`Page ${p}`}
-                className={`flex h-[18px] min-w-[14px] items-center justify-center rounded-[5px] px-[3px] tabular-nums transition-colors ${
-                  p === page ? 'bg-[#d9d9d9] text-black' : 'hover:text-white'
+                // Current page: cyan outline chip with cyan text (User Management Figma, 3144:1508).
+                className={`flex h-[15px] min-w-[16px] items-center justify-center rounded-[5px] border px-[3px] tabular-nums transition-colors ${
+                  p === page ? 'border-[#4df9ed] bg-[#4df9ed]/[0.11] text-[#4df9ed]' : 'border-transparent hover:text-white'
                 }`}
               >
                 {p}

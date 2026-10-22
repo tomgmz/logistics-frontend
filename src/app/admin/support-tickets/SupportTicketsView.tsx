@@ -14,6 +14,7 @@ import {
 } from '@/lib/services/support.service'
 
 import RefreshButton from '@/components/ui/RefreshButton'
+import Pagination from '@/components/ui/Pagination'
 /**
  * Tickets — the Company Administrator's full view of client support tickets.
  *
@@ -25,6 +26,8 @@ import RefreshButton from '@/components/ui/RefreshButton'
  */
 
 type StatusFilter = 'open' | 'resolved' | 'all'
+
+const PAGE_SIZE = 15
 
 const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
   { key: 'open',     label: 'Open' },
@@ -59,6 +62,7 @@ export default function SupportTicketsView() {
 
   const [search,       setSearch]       = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('open')
+  const [page,         setPage]         = useState(1)
   const [expanded,     setExpanded]     = useState<string | null>(null)
   const [resolving,    setResolving]    = useState<SupportTicket | null>(null)
   const [busy,         setBusy]         = useState(false)
@@ -109,6 +113,12 @@ export default function SupportTicketsView() {
       ? a.created_at.localeCompare(b.created_at)
       : b.created_at.localeCompare(a.created_at)))
   }, [tickets, search, statusFilter])
+
+  // A new search or filter starts again from the first page.
+  useEffect(() => { setPage(1) }, [search, statusFilter])
+  const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE))
+  const safePage   = Math.min(page, totalPages)
+  const pageRows   = visible.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
   async function resolve(note: string) {
     if (!resolving) return
@@ -201,8 +211,9 @@ export default function SupportTicketsView() {
               </p>
             </div>
           ) : (
+            <>
             <ul className="overflow-auto flex-1 min-h-0 divide-y divide-white/[0.05]">
-              {visible.map((t) => {
+              {pageRows.map((t) => {
                 const isOpen   = expanded === t.ticket_id
                 const opener   = personName(t.opener)
                 const resolver = personName(t.resolver)
@@ -313,6 +324,8 @@ export default function SupportTicketsView() {
                 )
               })}
             </ul>
+            <Pagination page={safePage} totalPages={totalPages} total={visible.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
+            </>
           )}
         </div>
       </div>

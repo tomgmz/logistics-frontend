@@ -23,6 +23,10 @@ import type {
 } from '@/lib/services/admin/system-maintenance.service'
 
 import RefreshButton from '@/components/ui/RefreshButton'
+import Pagination from '@/components/ui/Pagination'
+
+const PAGE_SIZE = 15
+
 const TABS = [
   { key: 'handling',    label: 'Handling Codes',   singular: 'Handling Code',   icon: Tag },
   { key: 'commodities', label: 'Commodities',       singular: 'Commodity',       icon: Layers },
@@ -59,6 +63,7 @@ export default function SystemMaintenanceView() {
   const { canCreate, canEdit, canDelete } = useModuleAccess()
 
   const [tab, setTab] = useState<TabKey>('handling')
+  const [page, setPage] = useState(1)
 
   const [handlingCodes, setHandling]    = useState<HandlingCode[]>([])
   const [commodities,   setCommodities] = useState<Commodity[]>([])
@@ -452,6 +457,17 @@ export default function SystemMaintenanceView() {
     )
   }
 
+  // Each tab pages its own list; switching tab or the product filter starts on page 1.
+  useEffect(() => { setPage(1) }, [tab, pForm.commodity_id])
+  const tabList: unknown[] =
+    tab === 'handling'    ? handlingCodes :
+    tab === 'commodities' ? commodities :
+    tab === 'products'    ? (pForm.commodity_id ? filteredProducts : products) :
+    prefixes
+  const totalPages = Math.max(1, Math.ceil(tabList.length / PAGE_SIZE))
+  const safePage   = Math.min(page, totalPages)
+  const pageSlice  = <T,>(list: T[]) => list.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+
   function renderList() {
     if (loading) return (
       <div className="flex items-center justify-center py-12">
@@ -463,7 +479,7 @@ export default function SystemMaintenanceView() {
       if (!handlingCodes.length) return <EmptyState />
       return (
         <div className="space-y-2">
-          {handlingCodes.map(hc => (
+          {pageSlice(handlingCodes).map(hc => (
             <div key={hc.handling_code_id} className="rounded-lg border border-white/[0.07] bg-black/30 p-3">
               <div className="flex flex-wrap items-center gap-3">
                 <span className="font-mono text-sm font-bold text-[#4DF9ED]">{hc.code}</span>
@@ -483,7 +499,7 @@ export default function SystemMaintenanceView() {
       if (!commodities.length) return <EmptyState />
       return (
         <div className="space-y-2">
-          {commodities.map(c => (
+          {pageSlice(commodities).map(c => (
             <div key={c.commodity_id} className="rounded-lg border border-white/[0.07] bg-black/30 p-3">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
@@ -504,7 +520,7 @@ export default function SystemMaintenanceView() {
       if (!list.length) return <EmptyState />
       return (
         <div className="space-y-2">
-          {list.map(prod => (
+          {pageSlice(list).map(prod => (
             <div key={prod.product_id} className="rounded-lg border border-white/[0.07] bg-black/30 p-3">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
@@ -528,7 +544,7 @@ export default function SystemMaintenanceView() {
     if (!prefixes.length) return <EmptyState />
     return (
       <div className="space-y-2">
-        {prefixes.map(pfx => {
+        {pageSlice(prefixes).map(pfx => {
           const isBeingEdited  = editingPrefix?.prefix_id === pfx.prefix_id
           const lockedBy       = prefixLocks.get(pfx.prefix_id)
           const isBeingDeleted = deleting === pfx.prefix_id || !!lockedBy
@@ -679,6 +695,9 @@ export default function SystemMaintenanceView() {
           <div className="flex-1 min-h-0 overflow-y-auto p-4">
             {renderList()}
           </div>
+          {!loading && tabList.length > 0 && (
+            <Pagination page={safePage} totalPages={totalPages} total={tabList.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
+          )}
         </div>
       </div>
     </div>

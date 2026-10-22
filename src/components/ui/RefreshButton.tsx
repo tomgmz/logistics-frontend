@@ -11,6 +11,7 @@ export default function RefreshButton({
   disabled = false,
   className = '',
   ariaLabel,
+  iconOnly = false,
 }: {
   onClick: () => void
   /** Spins the icon while a re-read is in flight. */
@@ -19,7 +20,27 @@ export default function RefreshButton({
   /** Layout only (margins, self-alignment); the look is fixed here. */
   className?: string
   ariaLabel?: string
+  /** The round 30px icon-only form some Figma frames use (User Management). */
+  iconOnly?: boolean
 }) {
+  if (iconOnly) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        aria-label={ariaLabel ?? 'Refresh'}
+        title="Refresh"
+        className={`inline-flex items-center justify-center size-[30px] rounded-full border border-[#818181] shrink-0
+                    cursor-pointer transition-colors hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/icons/ui/refresh.svg" alt="" width={16} height={16} draggable={false}
+          className={`shrink-0 ${loading ? 'animate-spin' : ''}`} />
+      </button>
+    )
+  }
+
   return (
     <button
       type="button"
