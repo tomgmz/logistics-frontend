@@ -1,11 +1,12 @@
 'use client'
 
+import Pagination from '@/components/ui/Pagination'
 import { useLivePending } from '@/lib/hooks/useLiveTable'
 import NewEntriesBar from '@/components/ui/NewEntriesBar'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
-  AlertCircle, ChevronLeft, ChevronRight,
+  AlertCircle, 
   Download, History, RefreshCw, Search, X,
 } from 'lucide-react'
 
@@ -474,32 +475,7 @@ export default function TransactionHistoryView() {
                   </table>
                 </div>
 
-                <div className="flex shrink-0 items-center justify-between border-t px-3 py-2
-                                text-xs text-white/50"
-                  style={{ borderColor: BORDER }}>
-                  <span>
-                    Showing{' '}
-                    {totalRows === 0
-                      ? '0'
-                      : `${pageSafe * PAGE_SIZE + 1}–${Math.min((pageSafe + 1) * PAGE_SIZE, totalRows)}`}
-                    {' '}of {totalRows.toLocaleString()}
-                  </span>
-                  <div className="flex items-center gap-1">
-                    <button type="button" disabled={pageSafe <= 0}
-                      onClick={() => setPage((p) => Math.max(0, p - 1))}
-                      className="rounded-md border border-white/10 p-1.5 hover:bg-white/5
-                                 disabled:opacity-30 cursor-pointer">
-                      <ChevronLeft size={16} />
-                    </button>
-                    <span className="px-2 tabular-nums">{pageSafe + 1} / {pageCount}</span>
-                    <button type="button" disabled={pageSafe >= pageCount - 1}
-                      onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
-                      className="rounded-md border border-white/10 p-1.5 hover:bg-white/5
-                                 disabled:opacity-30 cursor-pointer">
-                      <ChevronRight size={16} />
-                    </button>
-                  </div>
-                </div>
+                <Pagination page={pageSafe + 1} totalPages={pageCount} total={totalRows} pageSize={PAGE_SIZE} onPageChange={(p) => setPage(p - 1)} />
               </>
             )}
           </div>

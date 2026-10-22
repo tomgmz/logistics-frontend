@@ -1,9 +1,10 @@
 'use client'
 
+import Pagination from '@/components/ui/Pagination'
 import { useLiveTable, useLivePending } from '@/lib/hooks/useLiveTable'
 import NewEntriesBar from '@/components/ui/NewEntriesBar'
 import { useEffect, useState, useCallback } from 'react'
-import { ChevronLeft, ChevronRight, ScrollText, Server } from 'lucide-react'
+import { ScrollText, Server } from 'lucide-react'
 import ExportLogsButton from '@/components/admin/ExportLogsButton'
 import {
   auditLogService,
@@ -296,42 +297,8 @@ function AuditLogsTab() {
         </div>
 
         {/* Pagination */}
-        {!loading && totalPages > 1 && (
-          <div className="shrink-0 border-t border-[#2a2a2a] px-5 py-3">
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-[#818181]">Page {safePage} of {totalPages} &mdash; {total} records</p>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setPage(p => Math.max(1, p - 1))}
-                  disabled={safePage === 1}
-                  className="rounded-lg p-1.5 text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white disabled:opacity-30"
-                >
-                  <ChevronLeft size={15} />
-                </button>
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  const n = Math.max(1, Math.min(totalPages - 4, safePage - 2)) + i
-                  return (
-                    <button
-                      key={n}
-                      onClick={() => setPage(n)}
-                      className={`h-7 w-7 rounded-lg text-xs font-medium transition ${
-                        n === safePage ? 'bg-[#4df9ed] text-[#0a0a0a]' : 'text-[#818181] hover:bg-[#2a2a2a] hover:text-white'
-                      }`}
-                    >
-                      {n}
-                    </button>
-                  )
-                })}
-                <button
-                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                  disabled={safePage === totalPages}
-                  className="rounded-lg p-1.5 text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white disabled:opacity-30"
-                >
-                  <ChevronRight size={15} />
-                </button>
-              </div>
-            </div>
-          </div>
+        {!loading && total > 0 && (
+          <Pagination page={safePage} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPageChange={setPage} />
         )}
       </div>
     </div>
@@ -630,42 +597,8 @@ function SystemLogsTab() {
         </div>
 
         {/* Pagination */}
-        {!loading && totalPages > 1 && (
-          <div className="shrink-0 border-t border-[#2a2a2a] px-5 py-3">
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-[#818181]">Page {safePage} of {totalPages} &mdash; {total} records</p>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setPage(p => Math.max(1, p - 1))}
-                  disabled={safePage === 1}
-                  className="rounded-lg p-1.5 text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white disabled:opacity-30"
-                >
-                  <ChevronLeft size={15} />
-                </button>
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  const n = Math.max(1, Math.min(totalPages - 4, safePage - 2)) + i
-                  return (
-                    <button
-                      key={n}
-                      onClick={() => setPage(n)}
-                      className={`h-7 w-7 rounded-lg text-xs font-medium transition ${
-                        n === safePage ? 'bg-[#4df9ed] text-[#0a0a0a]' : 'text-[#818181] hover:bg-[#2a2a2a] hover:text-white'
-                      }`}
-                    >
-                      {n}
-                    </button>
-                  )
-                })}
-                <button
-                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                  disabled={safePage === totalPages}
-                  className="rounded-lg p-1.5 text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white disabled:opacity-30"
-                >
-                  <ChevronRight size={15} />
-                </button>
-              </div>
-            </div>
-          </div>
+        {!loading && total > 0 && (
+          <Pagination page={safePage} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPageChange={setPage} />
         )}
       </div>
     </div>

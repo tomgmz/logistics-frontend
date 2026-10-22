@@ -1,5 +1,6 @@
 'use client'
 
+import Pagination from '@/components/ui/Pagination'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -2194,24 +2195,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                     </tbody>
                   </table>
                 </div>
-                <div className="shrink-0 flex items-center justify-between h-11 3xl:h-12 px-4 3xl:px-[26px] bg-[#181717] border-t-[0.5px] border-[#818181] text-[12px] text-[#818181]">
-                  <span>
-                    Showing{' '}
-                    {totalRows === 0 ? '0' : `${pageSafe * PAGE_SIZE + 1}-${Math.min((pageSafe + 1) * PAGE_SIZE, totalRows)}`}
-                    {' '}of {totalRows}
-                  </span>
-                  <div className="flex items-center gap-[7px]">
-                    <button type="button" aria-label="Previous page" disabled={pageSafe <= 0} onClick={() => setPage((p) => Math.max(0, p - 1))} className="flex items-center justify-center size-[30px] rounded-[5px] border-[0.5px] border-[#424242] disabled:opacity-40 hover:bg-white/5">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src="/icons/booking-management/chevron-left.svg" alt="" width={20} height={20} draggable={false} />
-                    </button>
-                    <span className="min-w-[28px] text-center tabular-nums">{pageSafe + 1}/{pageCount}</span>
-                    <button type="button" aria-label="Next page" disabled={pageSafe >= pageCount - 1} onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))} className="flex items-center justify-center size-[30px] rounded-[5px] border-[0.5px] border-[#424242] disabled:opacity-40 hover:bg-white/5">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src="/icons/booking-management/chevron-left.svg" alt="" width={20} height={20} draggable={false} className="rotate-180" />
-                    </button>
-                  </div>
-                </div>
+                <Pagination page={pageSafe + 1} totalPages={pageCount} total={totalRows} pageSize={PAGE_SIZE} onPageChange={(p) => setPage(p - 1)} />
               </>
             )}
           </div>

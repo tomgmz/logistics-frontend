@@ -1,10 +1,11 @@
 'use client'
 
+import Pagination from '@/components/ui/Pagination'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import {
   Search, Eye, Download, ExternalLink, CheckCircle2, XCircle, Archive,
-  ArchiveRestore, Upload, FileSearch, LayoutGrid, List, ChevronLeft, ChevronRight,
+  ArchiveRestore, Upload, FileSearch, LayoutGrid, List, 
   MapPinOff, X, FileSpreadsheet,
 } from 'lucide-react'
 
@@ -655,22 +656,7 @@ export default function DocumentManagementView() {
           )}
 
           {!loading && !error && total > 0 && (
-            <div className="shrink-0 flex items-center justify-between gap-3 px-3 py-2 border-t border-white/[0.07] text-xs text-white/45">
-              <span className="tabular-nums">
-                {((page - 1) * PAGE_SIZE + 1).toLocaleString()}–{Math.min(page * PAGE_SIZE, total).toLocaleString()} of {total.toLocaleString()}
-              </span>
-              <div className="flex items-center gap-1">
-                <button type="button" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}
-                  className="p-1.5 rounded-lg hover:bg-white/5 disabled:opacity-30" aria-label="Previous page">
-                  <ChevronLeft size={15} />
-                </button>
-                <span className="tabular-nums px-1">Page {page} of {pages}</span>
-                <button type="button" disabled={page >= pages} onClick={() => setPage((p) => p + 1)}
-                  className="p-1.5 rounded-lg hover:bg-white/5 disabled:opacity-30" aria-label="Next page">
-                  <ChevronRight size={15} />
-                </button>
-              </div>
-            </div>
+            <Pagination page={page} totalPages={pages} total={total} pageSize={PAGE_SIZE} onPageChange={setPage} />
           )}
         </div>
       </div>

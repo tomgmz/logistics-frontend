@@ -77,21 +77,24 @@ export function fmtLabel(s: string) {
 export function statusStyle(status: string): { bg: string; color: string; border: string } {
   switch (status) {
     case 'available':
-      return { bg: 'rgba(58,246,38,0.12)', color: '#3af626', border: 'rgba(58,246,38,0.35)' }
+      return { bg: 'rgba(58,246,38,0.1)', color: '#3af626', border: 'rgba(58,246,38,0.35)' }
     case 'in_use':
-      return { bg: 'rgba(77,249,237,0.12)', color: 'var(--color-cyan)', border: 'rgba(77,249,237,0.35)' }
+      return { bg: 'rgba(77,249,237,0.12)', color: '#4df9ed', border: 'rgba(77,249,237,0.35)' }
     case 'recheck_due':
       return { bg: 'rgba(255,234,0,0.12)', color: '#ffea00', border: 'rgba(255,234,0,0.35)' }
     case 'under_maintenance':
-      return { bg: 'rgba(255,122,48,0.12)', color: '#ffea00', border: 'rgba(255,122,48,0.35)' }
+      return { bg: 'rgba(255,122,48,0.1)', color: '#ff7a30', border: 'rgba(255,122,48,0.35)' }
     case 'inactive':
-      return { bg: 'rgba(156,163,175,0.12)', color: '#d1d5db', border: 'rgba(156,163,175,0.3)' }
+      return { bg: 'rgba(255,234,0,0.2)', color: '#ffea00', border: 'rgba(255,234,0,0.35)' }
     case 'archived':
-      return { bg: 'rgba(107,114,128,0.15)', color: '#9ca3af', border: 'rgba(107,114,128,0.35)' }
+      return { bg: 'rgba(138,56,245,0.12)', color: '#8a38f5', border: 'rgba(138,56,245,0.35)' }
     default:
       return { bg: 'rgba(156,163,175,0.12)', color: '#9ca3af', border: 'rgba(156,163,175,0.3)' }
   }
 }
+
+/** The table tag as the Figma draws it: square-ish corners, a solid border in the tag colour. */
+export const TABLE_TAG = 'inline-flex items-center justify-center whitespace-nowrap rounded-[5px] border p-1 text-[12px] 3xl:text-[16px] leading-none'
 
 /** Cargo bed as "L x W x H" in mm, or '—' when any side is missing. */
 export function fmtDimensions(m: { length_mm?: number | null; width_mm?: number | null; height_mm?: number | null } | null | undefined): string {
@@ -126,8 +129,8 @@ export function InspectionBadge({ inspection, dueRecheck }: { inspection: TruckI
   if (!inspection) {
     return (
       <span
-        className="inline-flex text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border"
-        style={{ color: 'rgba(255,255,255,0.45)', borderColor: 'rgba(255,255,255,0.15)' }}
+        className={TABLE_TAG}
+        style={{ color: '#818181', borderColor: '#818181', background: 'rgba(129,129,129,0.1)' }}
         title="Never inspected — cannot be assigned to a booking"
       >
         Not inspected
@@ -147,13 +150,13 @@ export function InspectionBadge({ inspection, dueRecheck }: { inspection: TruckI
     return (
       <span className="flex flex-col gap-0.5 items-start">
         <span
-          className="inline-flex text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border"
-          style={{ color: '#ffea00', borderColor: 'rgba(255,122,48,0.35)', background: 'rgba(255,122,48,0.12)' }}
+          className={TABLE_TAG}
+          style={{ color: '#ffea00', borderColor: '#ffea00', background: 'rgba(255,234,0,0.12)' }}
           title="Back from a booking since its last check — inspect it again before it can be assigned"
         >
           Re-check due
         </span>
-        <span className="text-[10px] text-white/30 tabular-nums">last {whenLabel}</span>
+        <span className="text-[11px] text-[#818181]/70 tabular-nums">last {whenLabel}</span>
       </span>
     )
   }
@@ -161,11 +164,11 @@ export function InspectionBadge({ inspection, dueRecheck }: { inspection: TruckI
   return (
     <span className="flex flex-col gap-0.5 items-start">
       <span
-        className="inline-flex text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border"
+        className={TABLE_TAG}
         style={
           inspection.passed
-            ? { color: 'var(--color-cyan)', borderColor: 'rgba(77,249,237,0.40)', background: 'rgba(77,249,237,0.12)' }
-            : { color: '#f62626', borderColor: 'rgba(246,38,38,0.35)', background: 'rgba(246,38,38,0.10)' }
+            ? { color: '#4df9ed', borderColor: '#4df9ed', background: 'rgba(77,249,237,0.19)' }
+            : { color: '#f62626', borderColor: '#f62626', background: 'rgba(246,38,38,0.13)' }
         }
         title={inspection.passed
           ? 'Cleared — the Operations Manager can assign this vehicle'
@@ -173,7 +176,7 @@ export function InspectionBadge({ inspection, dueRecheck }: { inspection: TruckI
       >
         {inspection.passed ? 'Passed' : 'Failed'}
       </span>
-      <span className="text-[10px] text-white/30 tabular-nums">{whenLabel}</span>
+      <span className="text-[11px] text-[#818181]/70 tabular-nums">{whenLabel}</span>
     </span>
   )
 }

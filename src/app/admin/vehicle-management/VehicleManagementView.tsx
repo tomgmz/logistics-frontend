@@ -1,16 +1,14 @@
 'use client'
 
+import Pagination from '@/components/ui/Pagination'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Search,
   Plus,
   Pencil,
   Archive,
   Eye,
-  ChevronLeft,
-  ChevronRight,
   X,
   Truck as TruckIcon,
   Layers,
@@ -29,6 +27,7 @@ import {
   kgToTons,
   fmtDimensions,
   InspectionBadge,
+  TABLE_TAG,
 } from './vehicle-ui'
 import { assignedDriverName, isRoadworthy, needsReinspection, type Truck, type TruckInspection, type CreateTruckInput, type UpdateTruckInput } from '@/app/types/truck.types'
 import type { TruckModel } from '@/app/types/truck-model'
@@ -800,47 +799,45 @@ export default function VehicleManagementView() {
       )}
 
       {tab === 'vehicles' && (
-      <div className="flex flex-1 min-h-0 flex-col p-3 lg:p-4 gap-3 overflow-hidden">
+      <div className="flex flex-1 min-h-0 flex-col p-3 lg:p-4 3xl:p-[34px] 3xl:pl-9 gap-3 3xl:gap-[14px] overflow-hidden bg-[#0a0a0a]">
 
         {/* Filters */}
         <div className="flex flex-col xl:flex-row gap-2 xl:items-center shrink-0">
-          <div
-            className="flex items-center gap-2 rounded-[10px] px-3 py-2 flex-1 max-w-md"
-            style={{ background: '#2a2828' }}
-          >
-            <Search size={16} className="text-white/40 shrink-0" />
+          <div className="relative min-w-0 flex-1 xl:max-w-[360px] 3xl:max-w-[466px]">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/icons/booking-management/search.svg" alt="" width={22} height={22} draggable={false}
+              className="pointer-events-none absolute left-3 3xl:left-[18px] top-1/2 size-4 3xl:size-[22px] -translate-y-1/2" />
             <input
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(0) }}
-              placeholder="Search plate, model, status…"
-              className="bg-transparent border-none outline-none text-sm flex-1 text-white/80 placeholder:text-white/35"
+              placeholder="Search plate, model, status..."
+              aria-label="Search vehicles"
+              className="h-9 3xl:h-[46px] w-full rounded-[10px] border border-[#818181] bg-[#424242] pl-9 3xl:pl-[49px] pr-4 text-[14px] 3xl:text-[18px] text-white placeholder:text-[#818181] outline-none transition focus:border-[#4df9ed]"
             />
           </div>
 
-          <div className="flex flex-wrap gap-1.5">
-            <span className="text-[10px] uppercase tracking-wider text-white/35 self-center mr-1">Status</span>
-            {(['all', ...STATUSES] as const).map((key) => {
-              const label  = key === 'all' ? 'All' : fmtLabel(key)
-              const active = statusFilter === key
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => { setStatusFilter(key); setPage(0) }}
-                  className="px-2 py-1 rounded-lg text-[11px] font-bold border transition-colors"
-                  style={{
-                    background:  active ? 'rgba(77,249,237,0.12)' : 'transparent',
-                    borderColor: active ? 'rgba(77,249,237,0.35)' : 'rgba(255,255,255,0.08)',
-                    color:       active ? 'var(--color-cyan)' : '#888',
-                  }}
-                >
-                  {label}
-                </button>
-              )
-            })}
+          <div className="flex items-center gap-2 shrink-0 xl:ml-auto">
+            <label htmlFor="vehicle-status-filter" className="text-[13px] 3xl:text-[16px] font-bold text-[#818181]">
+              status
+            </label>
+            <div className="relative">
+              <select
+                id="vehicle-status-filter"
+                value={statusFilter}
+                onChange={(e) => { setStatusFilter(e.target.value); setPage(0) }}
+                className="appearance-none h-8 3xl:h-[38px] min-w-[140px] 3xl:min-w-[141px] rounded-[10px] border-[0.5px] border-[#818181] bg-[#2a2828] pl-3 3xl:pl-[15px] pr-8 text-[13px] 3xl:text-[16px] font-bold text-[#4df9ed] outline-none focus:border-[#4df9ed] cursor-pointer [&>option]:bg-[#2a2828] [&>option]:text-white"
+              >
+                {(['all', ...STATUSES] as const).map((key) => (
+                  <option key={key} value={key}>{key === 'all' ? 'All' : fmtLabel(key)}</option>
+                ))}
+              </select>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/icons/vehicle-management/chevron-down.svg" alt="" width={15} height={15} draggable={false}
+                className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2" />
+            </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 xl:ml-auto">
+          <div className="flex flex-wrap items-center gap-2">
             <RefreshButton onClick={() => void refreshAll()} />
             {canCreate && (
               <button
@@ -857,7 +854,7 @@ export default function VehicleManagementView() {
         </div>
 
         {/* Table */}
-        <div className="flex-1 min-h-0 rounded-xl border border-white/[0.08] overflow-hidden flex flex-col bg-[#0f0f0f]">
+        <div className="flex-1 min-h-0 rounded-[10px] border-[0.5px] border-[#424242] overflow-hidden flex flex-col bg-[#1b1b1b] shadow-[0_4px_4px_rgba(0,0,0,0.25)]">
           {listLoading ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-3 py-16">
               <div
@@ -890,22 +887,23 @@ export default function VehicleManagementView() {
           ) : (
             <>
               <div className="overflow-auto flex-1 min-h-0">
-                <table className="w-full text-left text-sm border-collapse min-w-[760px]">
-                  <thead className="sticky top-0 z-[1] bg-[#141414] border-b border-white/[0.07]">
-                    <tr className="text-[11px] uppercase tracking-wider text-white/40">
-                      <th className="px-2 py-2.5 font-bold w-14 text-center">Image</th>
-                      <th className="px-3 py-2.5 font-bold">Plate</th>
-                      <th className="px-3 py-2.5 font-bold">Vehicle type</th>
-                      <th className="px-3 py-2.5 font-bold hidden md:table-cell">Model</th>
-                      <th className="px-3 py-2.5 font-bold hidden md:table-cell">Max weight</th>
-                      <th className="px-3 py-2.5 font-bold hidden lg:table-cell">Driver</th>
-                      <th className="px-3 py-2.5 font-bold">Status</th>
-                      <th className="px-3 py-2.5 font-bold">BLOWBAGETS</th>
-                      <th className="px-3 py-2.5 font-bold hidden md:table-cell">Service</th>
-                      <th className="px-3 py-2.5 font-bold text-right w-[90px]">Actions</th>
+                <table className="w-full text-left border-collapse min-w-[760px]">
+                  {/* Headers keep the small caps face; the data rows are regular Alegreya Sans. */}
+                  <thead className="sticky top-0 z-[1] bg-[#181717]">
+                    <tr className="text-[13px] 3xl:text-[16px] text-[#818181] [&>th]:border-b [&>th]:border-[#818181] [&>th]:font-bold [&>th]:px-3 3xl:[&>th]:px-6 [&>th]:py-2.5 3xl:[&>th]:py-[13px] [&>th]:whitespace-nowrap">
+                      <th className="w-14 3xl:w-[100px]">image</th>
+                      <th>plate no.</th>
+                      <th>vehicle type</th>
+                      <th className="hidden md:table-cell">model</th>
+                      <th className="hidden md:table-cell">max weight</th>
+                      <th className="hidden lg:table-cell">driver</th>
+                      <th>status</th>
+                      <th>blowbagets</th>
+                      <th className="hidden md:table-cell">service</th>
+                      <th className="text-right w-[90px]">actions</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="ff-regular text-[13px] 3xl:text-[16px] text-[#818181]">
                     {trucks.map((t) => {
                       const st         = statusStyle(t.status)
                       const modelLabel = t.truck_model?.name ?? 'Vehicle'
@@ -913,55 +911,50 @@ export default function VehicleManagementView() {
                       return (
                         <tr
                           key={t.truck_id}
-                          className="border-b border-white/[0.05] hover:bg-white/[0.03] transition-colors"
+                          className="border-b border-[#818181] hover:bg-white/[0.03] transition-colors [&>td]:px-3 3xl:[&>td]:px-6 [&>td]:py-2 3xl:h-[55px]"
                         >
-                          <td className="px-2 py-2 align-middle">
-                            <div className="flex justify-center">
-                              <ModelThumb imageUrl={thumbUrl} label={modelLabel} size={44} />
-                            </div>
+                          <td className="align-middle">
+                            <ModelThumb imageUrl={thumbUrl} label={modelLabel} size={40} />
                           </td>
-                          <td className="px-3 py-2.5 font-mono font-semibold text-white">{t.plate_number}</td>
-                          <td className="px-3 py-2.5 text-white/70">
+                          <td className="font-bold text-white whitespace-nowrap">{t.plate_number}</td>
+                          <td>
                             {t.truck_model?.vehicle_type ?? '—'}
                           </td>
-                          <td className="px-3 py-2.5 text-white/60 text-xs max-w-[200px] truncate hidden md:table-cell">
+                          <td className="max-w-[200px] truncate hidden md:table-cell">
                             {t.truck_model?.name ?? '—'}
                           </td>
-                          <td className="px-3 py-2.5 text-white/60 text-xs hidden md:table-cell tabular-nums">
+                          <td className="hidden md:table-cell tabular-nums whitespace-nowrap">
                             {t.truck_model?.max_weight_kg != null
                               ? `${t.truck_model.max_weight_kg.toLocaleString()} kg · ${kgToTons(t.truck_model.max_weight_kg)} t`
                               : '—'}
                           </td>
-                          <td className="px-3 py-2.5 text-xs hidden lg:table-cell">
+                          <td className="hidden lg:table-cell">
                             {assignedDriverName(t)
                               ? (
-                                <span className="text-white/70">
+                                <span>
                                   {assignedDriverName(t)}
                                   {t.assigned_driver?.license_number && (
-                                    <span className="block text-[10px] text-white/30 font-mono">
+                                    <span className="block text-[11px] text-[#818181]/70">
                                       {t.assigned_driver.license_number}
                                     </span>
                                   )}
                                 </span>
                               )
-                              : <span className="text-white/25">Unassigned</span>}
+                              : <span className="text-[#818181]/60">Unassigned</span>}
                           </td>
-                          <td className="px-3 py-2.5">
-                            <span
-                              className="inline-flex text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border"
-                              style={{ color: st.color, borderColor: st.border, background: st.bg }}
-                            >
+                          <td>
+                            <span className={TABLE_TAG} style={{ color: st.color, borderColor: st.color, background: st.bg }}>
                               {fmtLabel(t.status)}
                             </span>
                           </td>
                           {/* Readiness for assignment: operations can only pick a
                               vehicle whose latest inspection passed. */}
-                          <td className="px-3 py-2.5">
+                          <td>
                             <div className="flex flex-col gap-1 items-start">
                               {t.return_odometer_due && (
                                 <span
-                                  className="inline-flex text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border"
-                                  style={{ color: '#ffea00', borderColor: 'rgba(255,122,48,0.35)', background: 'rgba(255,122,48,0.12)' }}
+                                  className={TABLE_TAG}
+                                  style={{ color: '#ffea00', borderColor: '#ffea00', background: 'rgba(255,234,0,0.12)' }}
                                   title="Back from a delivery — record the return odometer before it can be assigned again"
                                 >
                                   Return odometer due
@@ -970,10 +963,10 @@ export default function VehicleManagementView() {
                               <InspectionBadge inspection={t.latest_inspection ?? null} dueRecheck={needsReinspection(t)} />
                             </div>
                           </td>
-                          <td className="px-3 py-2.5 hidden md:table-cell">
+                          <td className="hidden md:table-cell">
                             <ServiceStatusBadge status={t.service_status} />
                           </td>
-                          <td className="px-3 py-2.5">
+                          <td>
                             <div className="flex items-center justify-end gap-1.5">
                               <RecordLockBadge holder={truckLocks.get(t.truck_id)} />
                               <RowActionMenu brightText label={`Actions for ${t.plate_number}`} actions={rowActions(t)} />
@@ -986,33 +979,7 @@ export default function VehicleManagementView() {
                 </table>
               </div>
 
-              <div className="shrink-0 flex items-center justify-between px-3 py-2 border-t border-white/[0.07] text-xs text-white/50">
-                <span>
-                  {totalRows === 0
-                    ? '0'
-                    : `${pageSafe * PAGE_SIZE + 1}–${Math.min((pageSafe + 1) * PAGE_SIZE, totalRows)}`}{' '}
-                  of {totalRows}
-                </span>
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    disabled={pageSafe <= 0}
-                    onClick={() => setPage((p) => Math.max(0, p - 1))}
-                    className="p-1.5 rounded-md border border-white/10 disabled:opacity-30"
-                  >
-                    <ChevronLeft size={16} />
-                  </button>
-                  <span className="px-2 tabular-nums">{pageSafe + 1} / {pageCount}</span>
-                  <button
-                    type="button"
-                    disabled={pageSafe >= pageCount - 1}
-                    onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
-                    className="p-1.5 rounded-md border border-white/10 disabled:opacity-30"
-                  >
-                    <ChevronRight size={16} />
-                  </button>
-                </div>
-              </div>
+              <Pagination page={pageSafe + 1} totalPages={pageCount} total={totalRows} pageSize={PAGE_SIZE} onPageChange={(p) => setPage(p - 1)} />
             </>
           )}
         </div>

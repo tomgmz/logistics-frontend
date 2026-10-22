@@ -552,6 +552,8 @@ export default function NotificationIcon() {
       <div className="flex items-center justify-between gap-3 px-[18px] py-2.5 shrink-0">
         <Pagination
           className="flex-1"
+          bar={false}
+          jump={false}
           page={page}
           totalPages={totalPages}
           total={total}
