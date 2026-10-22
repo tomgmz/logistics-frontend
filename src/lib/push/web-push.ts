@@ -20,6 +20,18 @@ function isSupported(): boolean {
   )
 }
 
+/**
+ * True when the subscription was made with `current`. Browsers that don't expose
+ * options.applicationServerKey give no way to tell, so their subscription is kept.
+ */
+function sameKey(existing: ArrayBuffer | null | undefined, current: Uint8Array): boolean {
+  if (!existing) return true
+  const a = new Uint8Array(existing)
+  if (a.length !== current.length) return false
+  for (let i = 0; i < a.length; i++) if (a[i] !== current[i]) return false
+  return true
+}
+
 async function getRegistration(): Promise<ServiceWorkerRegistration> {
   const existing = await navigator.serviceWorker.getRegistration('/sw.js')
   return existing ?? (await navigator.serviceWorker.register('/sw.js'))
@@ -43,12 +55,22 @@ export async function registerWebPush(): Promise<void> {
     return
   }
 
-  const subscription =
-    (await registration.pushManager.getSubscription()) ??
-    (await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) as BufferSource,
-    }))
+  const serverKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+  let subscription = await registration.pushManager.getSubscription()
+
+  // A subscription made under an older VAPID key (after a key rotation) can no
+  // longer receive pushes, so drop it and subscribe again with the current key.
+  if (subscription && !sameKey(subscription.options?.applicationServerKey, serverKey)) {
+    const staleEndpoint = subscription.endpoint
+    await subscription.unsubscribe().catch(() => {})
+    await proxyApi.post('/notifications/push/unsubscribe', { token: staleEndpoint }).catch(() => {})
+    subscription = null
+  }
+
+  subscription ??= await registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: serverKey as BufferSource,
+  })
 
   const json = subscription.toJSON()
   await proxyApi.post('/notifications/push/subscribe', {
