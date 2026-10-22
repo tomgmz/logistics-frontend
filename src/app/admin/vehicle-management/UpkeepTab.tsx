@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Ban, Wrench } from 'lucide-react'
+import { Ban, FileWarning, Wrench } from 'lucide-react'
 
 import type { MaintenanceReason, MaintenanceTruck } from '@/app/types/truck.types'
 import { assignedDriverName } from '@/app/types/truck.types'
@@ -228,11 +228,8 @@ export default function UpkeepTab({
     const cyan     = 'border-[#4df9ed] bg-[#4df9ed]/[0.19] text-[#4df9ed] hover:bg-[#4df9ed]/30'
     const grey     = 'border-[#818181] text-white hover:bg-white/5'
 
-    if (p.type === 'report' && p.report) {
-      const report = p.report
-      return <button type="button" className={`${BTN} ${grey}`} onClick={() => setViewReport(report)}>View report</button>
-    }
-    if (!canEdit) return null
+    // Driver reports have no button: View Report sits in the row's 3-dot menu.
+    if (p.type === 'report' || !canEdit) return null
     if (p.type === 'odometer') {
       return (
         <button type="button" className={`${BTN} ${cyan}`} disabled={!!lockedBy} title={locked}
@@ -369,14 +366,17 @@ export default function UpkeepTab({
                           <div className="flex items-center justify-end gap-1.5">
                             <RecordLockBadge holder={truckLocks.get(t.truck_id)} />
                             {primaryAction(p)}
-                            {/* A driver report alone leaves the vehicle reading as serviceable;
-                                someone may need to take it off the road. */}
-                            {holdable && (
-                              <RowActionMenu brightText label={`More for ${t.plate_number}`} actions={[{
-                                label: 'Take Out of Service', icon: <Ban size={13} />, tone: 'warning',
-                                onSelect: () => setHoldTarget(t),
-                                disabled: !!truckLocks.get(t.truck_id),
-                              }]} />
+                            {/* Driver report rows: View Report, plus Take Out of Service while
+                                the report alone leaves the vehicle reading as serviceable. */}
+                            {p.type === 'report' && p.report && (
+                              <RowActionMenu brightText label={`Actions for ${t.plate_number}`} actions={[
+                                { label: 'View Report', icon: <FileWarning size={13} />, onSelect: () => setViewReport(p.report!) },
+                                ...(holdable ? [{
+                                  label: 'Take Out of Service', icon: <Ban size={13} />, tone: 'warning' as const, separated: true,
+                                  onSelect: () => setHoldTarget(t),
+                                  disabled: !!truckLocks.get(t.truck_id),
+                                }] : []),
+                              ]} />
                             )}
                           </div>
                         </td>
