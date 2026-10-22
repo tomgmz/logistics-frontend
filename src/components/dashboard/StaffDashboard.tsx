@@ -141,7 +141,7 @@ function cardsFor(role: StaffRole, d: Data): CardSpec[] {
         { label: 'Dispatching tomorrow', hint: 'Re-check these vehicles the day before', count: q.dispatch_tomorrow.count,
           href: `${base}/vehicle-management`, icon: <CalendarCheck size={16} />, tone: 'cyan' },
         { label: 'Failed or service overdue', hint: 'Blocked from assignment', count: v.failed_inspection.count + v.service_overdue.count,
-          href: `${base}/vehicle-management?tab=maintenance`, icon: <Wrench size={16} />, tone: 'red' },
+          href: `${base}/vehicle-management?tab=upkeep`, icon: <Wrench size={16} />, tone: 'red' },
         { ...reportsCard, hint: 'Vehicle-related reports from drivers' },
       ]
     case 'admin':

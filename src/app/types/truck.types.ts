@@ -154,12 +154,20 @@ export function needsReinspection(
 }
 
 /**
- * Why a vehicle is on the Maintenance tab (it can carry several):
- *   under_maintenance — someone took it out of service
- *   failed_inspection — its latest BLOWBAGETS failed
- *   driver_report     — a driver has an unresolved breakdown/accident open on it
+ * What a vehicle owes before it can go out — the Upkeep tab, one row per reason
+ * (a vehicle can carry several):
+ *   return_odometer_due — the after-delivery odometer is still owed
+ *   recheck_due         — back from a job since its last pass
+ *   never_inspected     — no BLOWBAGETS on record yet
+ *   under_maintenance   — someone took it out of service
+ *   failed_inspection   — its latest BLOWBAGETS failed
+ *   driver_report       — a driver has an unresolved breakdown/accident open on it
+ *   service_*           — routine service overdue / due soon / not set up
  */
 export type MaintenanceReason =
+  | 'return_odometer_due'
+  | 'recheck_due'
+  | 'never_inspected'
   | 'under_maintenance'
   | 'failed_inspection'
   | 'driver_report'
