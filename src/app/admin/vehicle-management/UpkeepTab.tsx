@@ -1,7 +1,12 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Ban, FileWarning, Wrench } from 'lucide-react'
+import { ArrowUpRight, Ban, FileWarning, Wrench } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { useAuthStore } from '@/lib/store/auth.store'
+import { canViewModule } from '@/lib/permissions'
+import { MODULES_BY_ROLE, isManagedRole } from '@/constants/modules'
+import { ROLE_ROUTES } from '@/constants/roles'
 
 import type { MaintenanceReason, MaintenanceTruck } from '@/app/types/truck.types'
 import { assignedDriverName } from '@/app/types/truck.types'
@@ -189,6 +194,17 @@ export default function UpkeepTab({
 
   const truckLocks = useRecordLocks('truck', canEdit)
 
+  // The Reports page for this user's portal, or null when they can't open it
+  // (the General Manager has no Reports module; others may have it revoked).
+  const router = useRouter()
+  const user   = useAuthStore((s) => s.user)
+  const reportsBase = useMemo(() => {
+    const role = user?.role
+    if (!role || !isManagedRole(role) || !MODULES_BY_ROLE[role].includes('reports')) return null
+    if (!canViewModule(user, 'reports')) return null
+    return `${ROLE_ROUTES[role]}/reports`
+  }, [user])
+
   const problems = useMemo(() => toProblems(rows), [rows])
   const visible  = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -371,6 +387,10 @@ export default function UpkeepTab({
                             {p.type === 'report' && p.report && (
                               <RowActionMenu brightText label={`Actions for ${t.plate_number}`} actions={[
                                 { label: 'View Report', icon: <FileWarning size={13} />, onSelect: () => setViewReport(p.report!) },
+                                ...(reportsBase ? [{
+                                  label: 'Open in Reports', icon: <ArrowUpRight size={13} />,
+                                  onSelect: () => router.push(`${reportsBase}?report=${encodeURIComponent(p.report!.report_id)}`),
+                                }] : []),
                                 ...(holdable ? [{
                                   label: 'Take Out of Service', icon: <Ban size={13} />, tone: 'warning' as const, separated: true,
                                   onSelect: () => setHoldTarget(t),
