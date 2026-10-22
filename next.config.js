@@ -27,6 +27,14 @@ const nextConfig = {
         source: '/.well-known/apple-app-site-association',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
       },
+      // Keep the Vercel address (*.vercel.app) out of search results; only
+      // 8338logistics.delivery should be indexed. The custom domain never
+      // matches this host rule, so it stays indexable.
+      {
+        source: '/:path*',
+        has: [{ type: 'host', value: '(?<project>.+)\\.vercel\\.app' }],
+        headers: [{ key: 'X-Robots-Tag', value: 'noindex' }],
+      },
     ]
   },
 }

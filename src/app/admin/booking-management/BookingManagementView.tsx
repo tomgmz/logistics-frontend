@@ -2167,7 +2167,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                             }`}
                           >
                             <td className="font-bold max-w-[200px]">
-                              <div className="truncate">{r.display_id}</div>
+                              <div className="truncate text-[#4df9ed]">{r.display_id}</div>
                               {showAfterHours(r.status, r.created_at) && <AfterHoursBadge />}
                               {pulledByBooking.get(r.booking_id) && (
                                 <VehiclePulledBadge {...pulledByBooking.get(r.booking_id)!} />
@@ -2184,11 +2184,11 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                               {r.pause_reason && <PausedBadge reason={r.pause_reason} />}
                               {r.issue_open && <ProblemReportedBadge note={r.issue_note} />}
                             </td>
-                            <td className="whitespace-nowrap">{r.schedule_date ?? '—'}</td>
-                            <td className="max-w-[180px] 3xl:max-w-[260px] truncate hidden md:table-cell">{r.company ?? '—'}</td>
-                            <td className="max-w-[220px] truncate">{r.origin ?? '—'}</td>
-                            <td className="hidden lg:table-cell">{r.truck_type_needed ?? '—'}</td>
-                            <td>{r.stops}</td>
+                            <td className="whitespace-nowrap text-white">{r.schedule_date ?? '—'}</td>
+                            <td className="max-w-[180px] 3xl:max-w-[260px] truncate hidden md:table-cell text-white">{r.company ?? '—'}</td>
+                            <td className="max-w-[220px] truncate text-white">{r.origin ?? '—'}</td>
+                            <td className="hidden lg:table-cell text-white">{r.truck_type_needed ?? '—'}</td>
+                            <td className="text-white">{r.stops}</td>
                           </tr>
                         )
                       })}
