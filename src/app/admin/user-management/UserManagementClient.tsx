@@ -129,14 +129,14 @@ function formatDateTime(iso: string | null): string {
   })
 }
 
-// Table text, per the Figma: names in regular Alegreya Sans bold white, the rest
-// bold grey. Headers and status tags stay in the small-caps face.
+// Table text, per the Figma (3156:400): names in regular Alegreya Sans bold cyan,
+// the rest bold white. Headers stay grey small caps.
 // MUI sx has no 3xl; this is the same 1920px step.
 const FIGMA_MQ = '@media (min-width: 1920px)'
 const REGULAR_FONT = "var(--font-alegreya), 'Alegreya Sans', sans-serif"
-const NAME_TEXT = 'ff-regular text-[14px] 3xl:text-[18px] font-bold text-white'
+const NAME_TEXT = 'ff-regular text-[14px] 3xl:text-[18px] font-bold text-[#4df9ed]'
 const TD_NAME   = `px-4 3xl:px-6 py-2.5 3xl:py-4 ${NAME_TEXT}`
-const TD_MUTED  = 'ff-regular px-4 3xl:px-6 py-2.5 3xl:py-4 text-[13px] 3xl:text-[16px] font-bold text-[#818181]'
+const TD_MUTED  = 'ff-regular px-4 3xl:px-6 py-2.5 3xl:py-4 text-[13px] 3xl:text-[16px] font-bold text-white'
 
 // The page-header action (Add User / Transition IT Administrator): cyan outline.
 // The Figma is drawn at 1920px; its exact sizes apply only from 3xl (1920px) up.
@@ -611,7 +611,7 @@ function renderCells(user: AnyUser, tab: TabValue) {
         <>
           <td className={TD_NAME}>{name}</td>
           <td className={TD_MUTED}>{u.drivers?.license_number ?? '—'}</td>
-          <td className="px-4 3xl:px-6 py-2.5 3xl:py-4 text-[16px] text-[#818181]">
+          <td className="px-4 3xl:px-6 py-2.5 3xl:py-4 text-[16px] text-white">
             <div className="flex flex-col items-start gap-1">
               <span className="ff-regular font-bold">{formatDate(u.drivers?.license_expiry ?? null)}</span>
               <LicenseExpiryBadge expiry={u.drivers?.license_expiry ?? null} />
@@ -639,7 +639,7 @@ function renderCells(user: AnyUser, tab: TabValue) {
           </td>
           <td className={TD_MUTED}>{u.drivers?.vendor_name || '—'}</td>
           <td className={TD_MUTED}><EmailText value={u.email} /></td>
-          <td className="px-4 3xl:px-6 py-2.5 3xl:py-4 text-[16px] text-[#818181]">
+          <td className="px-4 3xl:px-6 py-2.5 3xl:py-4 text-[16px] text-white">
             <div className="flex flex-col items-start gap-1">
               <span className="ff-regular font-bold">{formatDate(u.drivers?.license_expiry ?? null)}</span>
               <LicenseExpiryBadge expiry={u.drivers?.license_expiry ?? null} />
