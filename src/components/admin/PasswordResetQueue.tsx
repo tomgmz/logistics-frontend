@@ -2,9 +2,8 @@
 
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { useCallback, useEffect, useState } from 'react'
-import {
-  AlertTriangle, KeyRound, MailCheck, Send, X,
-} from 'lucide-react'
+import { AlertTriangle, MailCheck } from 'lucide-react'
+import Pagination from '@/components/ui/Pagination'
 import ReusableModal from '@/components/layout/ReusableModal'
 import { useModuleAccess } from '@/components/layout/ModuleAccess'
 import { appToast } from '@/lib/toast'
@@ -17,7 +16,6 @@ import {
   type ResetRequestStatus,
 } from '@/lib/services/admin/password-reset.service'
 
-import RefreshButton from '@/components/ui/RefreshButton'
 /**
  * The pending-reset queue, shared by the Company Admin's User Management page and
  * the IT Admin's Administrator Management page.
@@ -38,33 +36,38 @@ const ROLE_LABELS: Record<string, string> = {
   client:             'Client',
 }
 
+// Status pills as the Figma draws them (node 3144:1276).
 const STATUS_CFG: Record<ResetRequestStatus, { label: string; cls: string }> = {
-  pending:   { label: 'Awaiting link', cls: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30' },
-  sent:      { label: 'Link sent',     cls: 'bg-sky-500/15 text-sky-400 border-sky-500/30'          },
-  completed: { label: 'Reset done',    cls: 'bg-[#4df9ed]/15 text-[#4df9ed] border-[#4df9ed]/30'    },
-  cancelled: { label: 'Cancelled',     cls: 'bg-[#818181]/10 text-[#818181] border-[#818181]/30'    },
-  expired:   { label: 'Link expired',  cls: 'bg-orange-500/15 text-orange-400 border-orange-500/30' },
+  pending:   { label: 'Awaiting Link', cls: 'bg-[#ffea00]/20 text-[#ffea00] border-[#ffea00]'     },
+  sent:      { label: 'Link Sent',     cls: 'bg-[#4df9ed]/10 text-[#4df9ed] border-[#4df9ed]'     },
+  completed: { label: 'Reset Done',    cls: 'bg-[#3af626]/10 text-[#3af626] border-[#3af626]'     },
+  cancelled: { label: 'Rejected',      cls: 'bg-[#f62626]/[0.13] text-[#f62626] border-[#f62626]' },
+  expired:   { label: 'Link Expired',  cls: 'bg-[#ff7a30]/10 text-[#ff7a30] border-[#ff7a30]'     },
 }
 
 // Rows an admin can still issue a link for. 'expired' counts: the previous link
 // timed out unused and the person behind it is still locked out.
 const SENDABLE: ResetRequestStatus[] = ['pending', 'expired']
-const CANCELLABLE: ResetRequestStatus[] = ['pending', 'sent', 'expired']
+// Only an untouched request can be rejected. Once a link has gone out the
+// decision stands (the API refuses too), so Reject stays disabled from then on.
+const CANCELLABLE: ResetRequestStatus[] = ['pending']
 
+const PAGE_SIZE = 10
 
+// Action buttons: live, or greyed out once the request has been decided.
+const BTN_BASE =
+  'flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[10px] px-2 text-[13px] 3xl:text-[15px] font-bold ' +
+  'transition active:scale-95 disabled:cursor-not-allowed disabled:active:scale-100'
 
 function fullName(r: PasswordResetRequest): string {
   return [r.first_name, r.last_name].filter(Boolean).join(' ') || '—'
 }
 
-function relativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime()
-  const m = Math.floor(diff / 60000)
-  if (m < 1)  return 'just now'
-  if (m < 60) return `${m}m ago`
-  const h = Math.floor(m / 60)
-  if (h < 24) return `${h}h ago`
-  return `${Math.floor(h / 24)}d ago`
+/** "Oct 22, 2026, 9:41 AM" in Philippine time. */
+function requestedAt(iso: string): string {
+  return new Date(iso).toLocaleString('en-PH', {
+    timeZone: 'Asia/Manila', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
+  })
 }
 
 /** Minutes left on a sent link, or null once it is past due. */
@@ -81,6 +84,7 @@ type PendingAction =
 export default function PasswordResetQueue({
   focusRequestId,
   onPendingCountChange,
+  regularData = false,
 }: {
   // Set from ?request= on a notification deep-link, so the row the admin was
   // notified about is highlighted instead of lost in the list.
@@ -90,6 +94,8 @@ export default function PasswordResetQueue({
   // panel only mounts when its tab is open); this keeps that number honest once
   // the admin starts working through the queue.
   onPendingCountChange?: (count: number) => void
+  // Small-caps headers over regular Alegreya Sans cells (User Management's look).
+  regularData?: boolean
 }) {
   // Sending a link is a create, dismissing a request an edit (user-management tier).
   const { canCreate, canEdit } = useModuleAccess()
@@ -97,7 +103,9 @@ export default function PasswordResetQueue({
   const [loading,       setLoading]       = useState(true)
   const [busyId,        setBusyId]        = useState<string | null>(null)
   const [error,         setError]         = useState<string | null>(null)
-  const [includeClosed, setIncludeClosed] = useState(false)
+  // The whole history is listed; decided rows keep their buttons, greyed out.
+  const includeClosed = true
+  const [page,          setPage]          = useState(1)
   const [pending,       setPending]       = useState<PendingAction | null>(null)
 
   // `quiet` re-reads in place (a live signal): no spinner, and a failed re-read
@@ -146,13 +154,13 @@ export default function PasswordResetQueue({
           ? passwordResetService.send(request.request_id)
           : passwordResetService.cancel(request.request_id),
         {
-          loading: kind === 'send' ? 'Sending reset link…' : 'Cancelling request…',
+          loading: kind === 'send' ? 'Sending reset link…' : 'Rejecting request…',
           success: kind === 'send'
             ? `Reset link sent to ${request.email}`
-            : 'Request cancelled',
+            : 'Request rejected',
           error: (e) => getApiErrorMessage(
             e,
-            kind === 'send' ? 'Failed to send reset link.' : 'Failed to cancel request.',
+            kind === 'send' ? 'Failed to send reset link.' : 'Failed to reject request.',
           ),
         },
         { action: `password-reset-${kind}`, entityId: request.request_id },
@@ -169,6 +177,10 @@ export default function PasswordResetQueue({
   // Anything an admin still has to act on, not just untouched requests.
   const pendingCount = rows.filter((r) => SENDABLE.includes(r.status)).length
 
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE))
+  const safePage   = Math.min(page, totalPages)
+  const pageRows   = rows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+
   useEffect(() => {
     // Only meaningful once a load has finished — reporting 0 from the empty
     // initial state would blank the badge the parent just seeded.
@@ -178,35 +190,6 @@ export default function PasswordResetQueue({
   return (
     <>
       <div className="flex flex-col flex-1 min-h-0">
-        {/* Toolbar */}
-        <div className="flex flex-wrap items-center gap-3 border-b border-[#2a2a2a] px-4 py-3 shrink-0">
-          <div className="flex items-center gap-2 text-sm text-white">
-            <KeyRound size={14} className="text-[#4df9ed]" />
-            <span className="font-semibold">Password Resets</span>
-            {pendingCount > 0 && (
-              <span className="rounded-full border border-yellow-500/30 bg-yellow-500/15 px-2 py-0.5 text-[11px] font-semibold text-yellow-400">
-                {pendingCount} awaiting
-              </span>
-            )}
-          </div>
-
-          <label className="flex cursor-pointer items-center gap-2 text-xs text-[#818181]">
-            <input
-              type="checkbox"
-              checked={includeClosed}
-              onChange={(e) => setIncludeClosed(e.target.checked)}
-              className="h-3.5 w-3.5 cursor-pointer accent-[#4df9ed]"
-            />
-            Show history
-          </label>
-
-          <RefreshButton onClick={() => void load(includeClosed)} loading={loading} disabled={loading} />
-
-          <span className="ml-auto text-xs text-[#818181]">
-            {rows.length} request{rows.length !== 1 ? 's' : ''}
-          </span>
-        </div>
-
         {error && (
           <div className="flex items-center gap-3 border-b border-red-500/20 bg-red-500/10 px-5 py-3 text-sm text-red-400 shrink-0">
             <AlertTriangle size={14} /> {error}
@@ -216,19 +199,21 @@ export default function PasswordResetQueue({
         {/* Table */}
         <div className="flex-1 overflow-auto min-h-0">
           <table className="w-full text-sm">
-            <thead className="sticky top-0 z-10 bg-[#1b1b1b]">
-              <tr className="border-b border-[#2a2a2a]">
-                {['User', 'Email', 'Role', 'Requested', 'Status', ''].map((h, i) => (
+            <thead className={`sticky top-0 z-10 bg-[#1b1b1b] ${regularData ? 'font-[family-name:var(--font-alegreya-sc)]' : ''}`}>
+              <tr className="border-b border-[#818181]">
+                {['name', 'email', 'Role', 'Requested', 'Status', 'actions'].map((h, i) => (
                   <th
                     key={i}
-                    className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#818181]"
+                    className={`px-4 3xl:px-6 py-3 text-[13px] 3xl:text-[16px] font-bold text-[#818181] whitespace-nowrap ${
+                      i === 3 || i === 4 ? 'text-center' : i === 5 ? 'text-right' : 'text-left'
+                    }`}
                   >
                     {h}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody>
+            <tbody className={regularData ? 'ff-regular' : undefined}>
               {loading ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-16 text-center">
@@ -250,7 +235,7 @@ export default function PasswordResetQueue({
                   </td>
                 </tr>
               ) : (
-                rows.map((r) => {
+                pageRows.map((r) => {
                   const cfg     = STATUS_CFG[r.status]
                   const isFocus = focusRequestId === r.request_id
                   const lockedBy = heldLocks.get(r.request_id)
@@ -260,23 +245,23 @@ export default function PasswordResetQueue({
                   return (
                     <tr
                       key={r.request_id}
-                      className={`border-b border-[#2a2a2a] transition-colors ${
+                      className={`border-b border-[#818181] transition-colors ${
                         isFocus ? 'bg-[#4df9ed]/[0.06]' : 'hover:bg-[#2a2a2a]/40'
                       }`}
                     >
-                      <td className="px-4 py-3.5">
-                        <p className="font-medium text-white">{fullName(r)}</p>
+                      <td className="px-4 3xl:px-6 py-3">
+                        <p className="text-[14px] 3xl:text-[18px] font-bold text-white">{fullName(r)}</p>
                       </td>
-                      <td className="px-4 py-3.5 text-sm text-[#818181]">{r.email}</td>
-                      <td className="px-4 py-3.5 text-sm text-[#818181]">
+                      <td className="px-4 3xl:px-6 py-3 text-[13px] 3xl:text-[16px] font-bold text-[#818181]">{r.email}</td>
+                      <td className="px-4 3xl:px-6 py-3 text-[13px] 3xl:text-[16px] font-bold text-[#818181]">
                         {ROLE_LABELS[r.requested_role] ?? r.requested_role.replace(/_/g, ' ')}
                       </td>
-                      <td className="px-4 py-3.5 text-xs text-[#818181]">
-                        {relativeTime(r.created_at)}
+                      <td className="px-4 3xl:px-6 py-3 text-center text-[13px] 3xl:text-[16px] font-bold text-[#818181] whitespace-nowrap">
+                        {requestedAt(r.created_at)}
                       </td>
-                      <td className="px-4 py-3.5">
-                        <div className="flex flex-col gap-1">
-                          <span className={`inline-flex w-fit items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold tracking-wide ${cfg.cls}`}>
+                      <td className="px-4 3xl:px-6 py-3">
+                        <div className="flex flex-col items-center gap-1">
+                          <span className={`inline-flex h-[25px] items-center justify-center whitespace-nowrap rounded-[15px] border-[0.5px] px-1.5 pb-0.5 text-[12px] 3xl:text-[15px] font-bold ${cfg.cls}`}>
                             {cfg.label}
                           </span>
                           {r.status === 'sent' && left !== null && (
@@ -292,25 +277,44 @@ export default function PasswordResetQueue({
                       <td className="px-4 py-3.5">
                         <div className="flex items-center justify-end gap-2">
                           <RecordLockBadge holder={lockedBy} />
-                          {canCreate && SENDABLE.includes(r.status) && (
-                            <button
-                              onClick={() => setPending({ kind: 'send', request: r })}
-                              disabled={busy}
-                              className="flex items-center gap-1.5 rounded-lg bg-[#4df9ed] px-3 py-1.5 text-xs font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5] active:scale-95 disabled:opacity-40"
-                            >
-                              <Send size={12} /> {r.status === 'expired' ? 'Send a new link' : 'Send reset link'}
-                            </button>
-                          )}
-                          {canEdit && CANCELLABLE.includes(r.status) && (
-                            <button
-                              onClick={() => setPending({ kind: 'cancel', request: r })}
-                              disabled={busy}
-                              title="Dismiss this request"
-                              className="flex items-center gap-1.5 rounded-lg border border-[#424242] px-3 py-1.5 text-xs text-[#818181] transition hover:border-red-500/40 hover:text-red-400 disabled:opacity-40"
-                            >
-                              <X size={12} /> Cancel
-                            </button>
-                          )}
+                          {canCreate && (() => {
+                            const live  = SENDABLE.includes(r.status) && !busy
+                            const label = r.status === 'expired' ? 'Send a new link'
+                              : r.status === 'sent' || r.status === 'completed' ? 'Reset link Sent'
+                              : 'Send reset link'
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => setPending({ kind: 'send', request: r })}
+                                disabled={!live}
+                                className={`${BTN_BASE} ${live
+                                  ? 'bg-[#4df9ed] text-black hover:bg-[#7bfbf5]'
+                                  : 'border border-[#424242] text-[#424242]'}`}
+                              >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={live ? '/icons/password-reset/send.svg' : '/icons/password-reset/send-disabled.svg'} alt="" width={18} height={18} draggable={false} />
+                                {label}
+                              </button>
+                            )
+                          })()}
+                          {canEdit && (() => {
+                            const live = CANCELLABLE.includes(r.status) && !busy
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => setPending({ kind: 'cancel', request: r })}
+                                disabled={!live}
+                                title={live ? 'Reject this request' : undefined}
+                                className={`${BTN_BASE} border ${live
+                                  ? 'border-[#818181] text-[#818181] hover:border-[#f62626] hover:text-[#f62626]'
+                                  : 'border-[#424242] text-[#424242]'}`}
+                              >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={live ? '/icons/password-reset/reject.svg' : '/icons/password-reset/reject-disabled.svg'} alt="" width={18} height={18} draggable={false} />
+                                Reject
+                              </button>
+                            )
+                          })()}
                         </div>
                       </td>
                     </tr>
@@ -320,13 +324,16 @@ export default function PasswordResetQueue({
             </tbody>
           </table>
         </div>
+        {!loading && rows.length > 0 && (
+          <Pagination page={safePage} totalPages={totalPages} total={rows.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
+        )}
       </div>
 
       <ReusableModal
         open={!!pending}
         title={
           pending?.kind !== 'send'
-            ? 'Cancel this request?'
+            ? 'Reject this request?'
             : pending.request.status === 'expired'
               ? 'Send a new reset link?'
               : 'Send reset link?'
@@ -336,14 +343,14 @@ export default function PasswordResetQueue({
             ? `${pending.request.status === 'expired'
                  ? `The previous link expired unused. A fresh one will be emailed to ${pending.request.email}, and the old one stops working.`
                  : `A one-time reset link will be emailed to ${pending.request.email}.`
-               } It works once and expires in 60 minutes. Their account unlocks only when they finish setting a new password.`
+               } It works once and expires 60 minutes after it is sent. Once sent, this request can no longer be rejected.`
             : pending
-              ? `${fullName(pending.request)} will not get a reset link. Any link already sent stops working, and they can request again from the sign-in screen.`
+              ? `${fullName(pending.request)} will not get a reset link, and this cannot be undone. They can request again from the sign-in screen.`
               : undefined
         }
         confirmLabel={
           pending?.kind !== 'send'
-            ? 'Cancel request'
+            ? 'Reject request'
             : pending.request.status === 'expired' ? 'Send new link' : 'Send link'
         }
         onConfirm={() => { if (pending) void runAction(pending) }}
