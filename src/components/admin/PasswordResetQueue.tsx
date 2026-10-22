@@ -266,7 +266,7 @@ export default function PasswordResetQueue({
                       </td>
                       <td className="max-lg:min-w-[150px] px-4 3xl:px-6 py-2.5 max-lg:py-3 3xl:py-4">
                         <div className="flex flex-col items-start max-lg:items-center gap-1">
-                          <span className={`inline-flex h-5 max-lg:h-[25px] 3xl:h-[25px] items-center justify-center whitespace-nowrap rounded-[15px] border-[0.5px] px-1.5 pb-0.5 text-[12px] 3xl:text-[15px] font-bold ${cfg.cls}`}>
+                          <span className={`font-[family-name:var(--font-alegreya-sc)] inline-flex h-5 max-lg:h-[25px] 3xl:h-[25px] items-center justify-center whitespace-nowrap rounded-[15px] border-[0.5px] px-1.5 pb-0.5 text-[12px] 3xl:text-[15px] font-bold ${cfg.cls}`}>
                             {cfg.label}
                           </span>
                           {r.status === 'sent' && left !== null && (

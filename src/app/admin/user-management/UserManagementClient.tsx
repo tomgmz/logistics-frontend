@@ -206,7 +206,7 @@ const STATUS_CFG: Record<UserStatus, { label: string; cls: string }> = {
 function StatusBadge({ status }: { status: UserStatus }) {
   const { label, cls } = STATUS_CFG[status] ?? STATUS_CFG.inactive
   return (
-    <span className={`inline-flex h-5 min-w-[58px] 3xl:h-[25px] 3xl:min-w-[70px] items-center justify-center whitespace-nowrap rounded-[15px] border-[0.5px] px-1.5 pb-0.5 text-[12px] 3xl:text-[15px] font-bold ${cls}`}>
+    <span className={`font-[family-name:var(--font-alegreya-sc)] inline-flex h-5 min-w-[58px] 3xl:h-[25px] 3xl:min-w-[70px] items-center justify-center whitespace-nowrap rounded-[15px] border-[0.5px] px-1.5 pb-0.5 text-[12px] 3xl:text-[15px] font-bold ${cls}`}>
       {label}
     </span>
   )
@@ -336,7 +336,7 @@ function AccessBadge({ access }: { access: VendorDriverUser['access'] | undefine
   return (
     <span
       title={access.last_used_at ? `Last used ${formatDateTime(access.last_used_at)}` : undefined}
-      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold tracking-wide ${cfg.cls}`}
+      className={`font-[family-name:var(--font-alegreya-sc)] inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold tracking-wide ${cfg.cls}`}
     >
       <KeyRound size={10} /> {cfg.label}
     </span>
@@ -355,7 +355,7 @@ function RevokedFlag({ user }: { user: VendorDriverUser }) {
   return (
     <span
       title={at ? `Revoked ${formatDateTime(at)}` : undefined}
-      className="mt-1 inline-flex max-w-[260px] items-center gap-1 rounded-md border border-red-500/30 bg-red-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-red-300"
+      className="font-[family-name:var(--font-alegreya-sc)] mt-1 inline-flex max-w-[260px] items-center gap-1 rounded-md border border-red-500/30 bg-red-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-red-300"
     >
       <Flag size={10} className="shrink-0" />
       <span className="truncate">
@@ -540,7 +540,7 @@ function RoleBadge({ role }: { role: string }) {
   const cls = ROLE_COLORS[role] ?? 'bg-[#818181]/10 text-[#818181] border-[#818181]/30'
   const label = ROLE_LABELS[role] ?? role
   return (
-    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold tracking-wide ${cls}`}>
+    <span className={`font-[family-name:var(--font-alegreya-sc)] inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold tracking-wide ${cls}`}>
       {label}
     </span>
   )
@@ -568,7 +568,7 @@ function LicenseExpiryBadge({ expiry }: { expiry: string | null }) {
   return (
     <span
       title="Update this driver's license details once it is renewed."
-      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold tracking-wide whitespace-nowrap ${cls}`}
+      className={`font-[family-name:var(--font-alegreya-sc)] inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold tracking-wide whitespace-nowrap ${cls}`}
     >
       <AlertTriangle size={11} /> {label}
     </span>
@@ -619,7 +619,7 @@ function renderCells(user: AnyUser, tab: TabValue) {
           </td>
           <td className="px-4 3xl:px-6 py-2.5 3xl:py-4">
             {drvStatus && (
-              <span className="inline-flex items-center rounded-full border border-[#4df9ed]/30 bg-[#4df9ed]/10 px-2 py-0.5 text-[11px] font-semibold text-[#4df9ed]">
+              <span className="font-[family-name:var(--font-alegreya-sc)] inline-flex items-center rounded-full border border-[#4df9ed]/30 bg-[#4df9ed]/10 px-2 py-0.5 text-[11px] font-semibold text-[#4df9ed]">
                 {drvStatus.replace(/_/g, ' ')}
               </span>
             )}

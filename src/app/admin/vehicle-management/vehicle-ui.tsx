@@ -55,10 +55,12 @@ export const ModelThumb = memo(function ModelThumb({
   )
 })
 
+// The finalized vehicle statuses (Figma 3158:613). The backend still stores
+// 'recheck_due' for a vehicle back from a job; it reads as Available here, and
+// what stops it being assigned is the inspection check (the Maintenance column
+// and tab show "Blowbagets" until it passes), not the status.
 export const STATUSES: Truck['status'][] = [
   'available',
-  // Back from a job; set by the driver's return, lifted by the next passing BLOWBAGETS.
-  'recheck_due',
   'in_use',
   'under_maintenance',
   'inactive',
@@ -70,18 +72,17 @@ export const STATUSES: Truck['status'][] = [
 export const EDITABLE_STATUSES = STATUSES.filter((s) => s !== 'archived')
 
 export function fmtLabel(s: string) {
-  if (s === 'recheck_due') return 'Re-check Due'
+  if (s === 'recheck_due') return 'Available'
   return (s ?? '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
 export function statusStyle(status: string): { bg: string; color: string; border: string } {
   switch (status) {
     case 'available':
+    case 'recheck_due':
       return { bg: 'rgba(58,246,38,0.1)', color: '#3af626', border: 'rgba(58,246,38,0.35)' }
     case 'in_use':
       return { bg: 'rgba(77,249,237,0.12)', color: '#4df9ed', border: 'rgba(77,249,237,0.35)' }
-    case 'recheck_due':
-      return { bg: 'rgba(255,234,0,0.12)', color: '#ffea00', border: 'rgba(255,234,0,0.35)' }
     case 'under_maintenance':
       return { bg: 'rgba(255,122,48,0.1)', color: '#ff7a30', border: 'rgba(255,122,48,0.35)' }
     case 'inactive':
@@ -93,8 +94,9 @@ export function statusStyle(status: string): { bg: string; color: string; border
   }
 }
 
-/** The table tag as the Figma draws it: square-ish corners, a solid border in the tag colour. */
-export const TABLE_TAG = 'inline-flex items-center justify-center whitespace-nowrap rounded-[5px] border p-1 text-[12px] 3xl:text-[16px] leading-none'
+/** The table tag as the Figma draws it: square-ish corners, a solid border in the tag colour.
+ *  Always the small-caps face, even inside a table body set in regular Alegreya Sans. */
+export const TABLE_TAG = 'inline-flex items-center justify-center whitespace-nowrap rounded-[5px] border p-1 text-[12px] 3xl:text-[16px] leading-none font-[family-name:var(--font-alegreya-sc)]'
 
 /** Cargo bed as "L x W x H" in mm, or '—' when any side is missing. */
 export function fmtDimensions(m: { length_mm?: number | null; width_mm?: number | null; height_mm?: number | null } | null | undefined): string {

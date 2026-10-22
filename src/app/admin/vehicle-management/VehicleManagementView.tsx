@@ -4,6 +4,7 @@ import Pagination from '@/components/ui/Pagination'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 import {
   Pencil,
   Archive,
@@ -12,6 +13,7 @@ import {
   Truck as TruckIcon,
   Wrench,
   Gauge,
+  ChevronRight,
 } from 'lucide-react'
 
 import {
@@ -42,7 +44,7 @@ import type { DriverUser } from '@/app/types/admin/user-management.types'
 import ReusableModal from '@/components/layout/ReusableModal'
 import { useModuleAccess } from '@/components/layout/ModuleAccess'
 import TruckModelsTab from './TruckModelsTab'
-import UpkeepTab, { toProblems } from './UpkeepTab'
+import UpkeepTab, { toProblems, NEED_GROUPS, NEED_GROUP_ORDER, type NeedGroup } from './UpkeepTab'
 import OdometerModal from './OdometerModal'
 import RecordServiceModal from './RecordServiceModal'
 import UpkeepHistory from './UpkeepHistory'
@@ -59,7 +61,7 @@ import {
 import { useRecordLock, useRecordLocks } from '@/lib/hooks/useRecordLock'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import RecordLockBanner, { RecordLockBadge } from '@/components/ui/RecordLockBanner'
-import RowActionMenu, { type RowAction } from '@/components/ui/RowActionMenu'
+import { type RowAction } from '@/components/ui/RowActionMenu'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { formatPlateNumber, plateError } from '@/lib/validation/plate'
@@ -104,7 +106,7 @@ function truckToForm(t: Truck): TruckFormState {
   return {
     plate_number: t.plate_number ?? '',
     model_id:     t.model_id ?? '',
-    status:       t.status,
+    status:       t.status === 'recheck_due' ? 'available' : t.status,
     assigned_driver_id: t.assigned_driver_id ?? '',
     odometer_km:              numStr(t.odometer_km),
     service_interval_km:      numStr(t.service_interval_km),
@@ -282,14 +284,15 @@ function VehicleDetailsModal({
   )
 }
 
-// Two tabs, one job each: Vehicles is what each vehicle is, Upkeep is what it
-// owes before it can go out. Models is not a tab; the header's Manage Models
-// button opens it.
+// Two tabs, one job each: Vehicles is what each vehicle is, Maintenance is what
+// it owes before it can go out (the 'upkeep' key is the old name, kept for
+// links). Models is not a tab; the header's Manage Models button opens it in a
+// pop-up ('models' survives only so old ?tab=models links still open it).
 type VehicleTab = 'vehicles' | 'models' | 'upkeep'
 
 const TABS: { key: VehicleTab; label: string; icon: ReactNode }[] = [
   { key: 'vehicles', label: 'Vehicles', icon: <TruckIcon size={14} /> },
-  { key: 'upkeep',   label: 'Upkeep',   icon: <Wrench size={14} /> },
+  { key: 'upkeep',   label: 'Maintenance', icon: <Wrench size={14} /> },
 ]
 
 /** ?tab= value -> tab. 'maintenance' is the old name, kept so earlier links still land. */
@@ -298,7 +301,7 @@ function tabFromParam(v: string | null): VehicleTab | null {
   return v === 'vehicles' || v === 'models' || v === 'upkeep' ? v : null
 }
 
-// Reads ?tab= (the fleet manager's report notification opens Upkeep) once.
+// Reads ?tab= (the fleet manager's report notification opens Maintenance) once.
 // Isolated so useSearchParams sits under its own Suspense boundary.
 function TabDeepLink({ onTab }: { onTab: (t: VehicleTab) => void }) {
   const searchParams = useSearchParams()
@@ -315,12 +318,17 @@ function TabDeepLink({ onTab }: { onTab: (t: VehicleTab) => void }) {
 
 export default function VehicleManagementView() {
   const [tab, setTab] = useState<VehicleTab>('vehicles')
-  // The upkeep queue lives here, not in the tab: the tab badge and the Vehicles
-  // rows' "N issues" links read the same list.
+  // The maintenance queue lives here, not in the tab: the tab badge and the
+  // Vehicles rows' maintenance tags read the same list.
   const [upkeep,        setUpkeep]        = useState<MaintenanceTruck[]>([])
   const [upkeepLoading, setUpkeepLoading] = useState(true)
   const [upkeepError,   setUpkeepError]   = useState<string | null>(null)
   const [upkeepSearch,  setUpkeepSearch]  = useState('')
+  // The vehicle clicked on the Vehicles tab; the Maintenance tab highlights it.
+  const [focusId,       setFocusId]       = useState<string | null>(null)
+  // Manage Models: a pop-up over the page, not a tab.
+  const [modelsOpen,    setModelsOpen]    = useState(false)
+  useBodyScrollLock(modelsOpen)
 
   const [trucks,  setTrucks]  = useState<Truck[]>([])
   const [models,  setModels]  = useState<TruckModel[]>([])
@@ -419,7 +427,7 @@ export default function VehicleManagementView() {
       setUpkeepError(null)
       setUpkeep(await adminFetchMaintenanceQueue())
     } catch (e) {
-      if (!quiet) setUpkeepError(getApiErrorMessage(e, 'Could not load the upkeep list. Please try again.'))
+      if (!quiet) setUpkeepError(getApiErrorMessage(e, 'Could not load the maintenance list. Please try again.'))
     } finally {
       if (!quiet) setUpkeepLoading(false)
     }
@@ -427,15 +435,45 @@ export default function VehicleManagementView() {
 
   useEffect(() => { void loadUpkeep() }, [loadUpkeep])
 
-  // truck_id -> its open problems, for the Vehicles rows' badge.
-  const issuesByTruck = useMemo(() => {
-    const map = new Map<string, { count: number; blocking: boolean }>()
+  // truck_id -> which of the three needs it has open, for the Vehicles rows'
+  // maintenance column. No entry means nothing owed: "Passed".
+  const needsByTruck = useMemo(() => {
+    const map = new Map<string, Set<NeedGroup>>()
     for (const p of toProblems(upkeep)) {
-      const cur = map.get(p.truck.truck_id) ?? { count: 0, blocking: false }
-      map.set(p.truck.truck_id, { count: cur.count + 1, blocking: cur.blocking || p.blocking })
+      const set = map.get(p.truck.truck_id) ?? new Set<NeedGroup>()
+      set.add(p.group)
+      map.set(p.truck.truck_id, set)
     }
     return map
   }, [upkeep])
+  // The maintenance queue leaves Inactive vehicles out, so theirs is worked out
+  // from the vehicle itself: inspection missing, failed or expired -> Blowbagets;
+  // service not up to date -> Vehicle Maintenance. (Their driver reports are not
+  // known here.)
+  const needsFor = useCallback((t: Truck): Set<NeedGroup> | undefined => {
+    if (t.status !== 'inactive') return needsByTruck.get(t.truck_id)
+    const set = new Set<NeedGroup>()
+    const insp = t.latest_inspection
+    if (!insp || !insp.passed || needsReinspection(t)) set.add('blowbagets')
+    const svc = t.service_status?.state
+    if (svc && svc !== 'ok') set.add('vehicle_maintenance')
+    return set.size ? set : undefined
+  }, [needsByTruck])
+  // The focused vehicle as currently loaded (the Vehicles page, else the queue),
+  // so an edit made from the Maintenance tab shows straight away.
+  const [focusSnapshot, setFocusSnapshot] = useState<Truck | null>(null)
+  const focusTruck = focusId
+    ? trucks.find((t) => t.truck_id === focusId) ?? upkeep.find((t) => t.truck_id === focusId) ?? focusSnapshot
+    : null
+
+  /** Vehicles row click: open Maintenance with this vehicle first and highlighted. */
+  function openInMaintenance(t: Truck) {
+    setUpkeepSearch('')
+    setFocusSnapshot(t)
+    setFocusId(t.truck_id)
+    switchTab('upkeep')
+  }
+
   const blockingCount = useMemo(() => toProblems(upkeep).filter((p) => p.blocking).length, [upkeep])
 
   // Live: someone else's edit, an inspection, a reading, a driver's return or
@@ -747,7 +785,7 @@ export default function VehicleManagementView() {
     <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-hidden ff-sc bg-[var(--color-bg)]">
 
       <Suspense fallback={null}>
-        <TabDeepLink onTab={setTab} />
+        <TabDeepLink onTab={(t) => (t === 'models' ? setModelsOpen(true) : setTab(t))} />
       </Suspense>
 
       <header className="shrink-0 px-3 pt-3 lg:px-4 3xl:px-[19px] border-b border-[#424242] flex flex-col gap-2 bg-[#0a0a0a]">
@@ -756,11 +794,9 @@ export default function VehicleManagementView() {
           <RefreshButton onClick={() => void refreshAll()} />
           <button
             type="button"
-            onClick={() => switchTab(tab === 'models' ? 'vehicles' : 'models')}
-            aria-pressed={tab === 'models'}
-            className={`inline-flex h-9 3xl:h-11 items-center gap-2 3xl:gap-[9px] whitespace-nowrap rounded-[10px] border px-3 3xl:px-6 text-[14px] 3xl:text-[18px] transition active:scale-95 ${
-              tab === 'models' ? 'border-[#4df9ed] text-[#4df9ed]' : 'border-[#818181] text-white hover:bg-white/5'
-            }`}
+            onClick={() => setModelsOpen(true)}
+            aria-haspopup="dialog"
+            className="inline-flex h-9 3xl:h-11 items-center gap-2 3xl:gap-[9px] whitespace-nowrap rounded-[10px] border border-[#818181] px-3 3xl:px-6 text-[14px] 3xl:text-[18px] text-white transition hover:bg-white/5 active:scale-95"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/icons/vehicle-management/manage-models.svg" alt="" width={24} height={24} draggable={false} className="size-5 3xl:size-6" />
@@ -787,7 +823,7 @@ export default function VehicleManagementView() {
                 type="button"
                 role="tab"
                 aria-selected={active}
-                onClick={() => switchTab(key)}
+                onClick={() => { setFocusId(null); switchTab(key) }}
                 className={`inline-flex items-center gap-1.5 px-3 py-2 text-[13px] 3xl:text-[16px] font-bold border-b-2 transition-colors whitespace-nowrap ${
                   active ? 'text-[var(--color-cyan)] border-[var(--color-cyan)]' : 'text-[#818181] border-transparent hover:text-white/80'
                 }`}
@@ -805,18 +841,42 @@ export default function VehicleManagementView() {
         </nav>
       </header>
 
-      {tab === 'models' && (
-        <>
-          <button
-            type="button"
-            onClick={() => switchTab('vehicles')}
-            className="self-start mx-3 lg:mx-4 mt-3 text-[13px] font-bold text-[#4df9ed] hover:underline"
+      {/* Manage Models pop-up. z-60: the models' own form (z-66), row menus (z-65)
+          and confirm pop-ups (z-70) open above it. */}
+      <AnimatePresence>
+        {modelsOpen && (
+          <motion.div
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/65 p-2 sm:p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setModelsOpen(false)}
           >
-            ← Back to vehicles
-          </button>
-          <TruckModelsTab canCreate={canCreate} canEdit={canEdit} canDelete={canDelete} />
-        </>
-      )}
+            {/* Not transformed (no scale/slide): a transformed parent would trap the
+                models' own fixed pop-ups inside this panel. */}
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Manage Models"
+              className="flex h-[90dvh] w-full max-w-[1200px] flex-col overflow-hidden rounded-[10px] border border-[#424242] bg-[#0a0a0a] shadow-[0_4px_4px_rgba(0,0,0,0.25)]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex shrink-0 items-center justify-between border-b border-[#424242] px-3 py-2.5 lg:px-4">
+                <h2 className="text-[16px] 3xl:text-[20px] font-bold text-white">Manage Models</h2>
+                <button
+                  type="button"
+                  onClick={() => setModelsOpen(false)}
+                  aria-label="Close"
+                  className="rounded-md p-1.5 text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              <TruckModelsTab canCreate={canCreate} canEdit={canEdit} canDelete={canDelete} />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {tab === 'upkeep' && (
         <UpkeepTab
@@ -829,6 +889,8 @@ export default function VehicleManagementView() {
           onSearchChange={setUpkeepSearch}
           onSetUpSchedule={(t) => openEdit(t)}
           onRecordOdometer={(t) => setOdometerTruck(t)}
+          focusTruck={focusTruck}
+          vehicleActions={rowActions}
         />
       )}
 
@@ -862,7 +924,10 @@ export default function VehicleManagementView() {
                 className="appearance-none h-8 3xl:h-[38px] min-w-[140px] 3xl:min-w-[141px] rounded-[10px] border-[0.5px] border-[#818181] bg-[#2a2828] pl-3 3xl:pl-[15px] pr-8 text-[13px] 3xl:text-[16px] font-bold text-[#4df9ed] outline-none focus:border-[#4df9ed] cursor-pointer [&>option]:bg-[#2a2828] [&>option]:text-white"
               >
                 {(['all', ...STATUSES] as const).map((key) => (
-                  <option key={key} value={key}>{key === 'all' ? 'All' : fmtLabel(key)}</option>
+                  <option key={key} value={key}>
+                    {key === 'all' ? 'All' : fmtLabel(key)}
+                    {key === statusFilter && listMeta ? ` (${listMeta.total})` : ''}
+                  </option>
                 ))}
               </select>
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -907,7 +972,7 @@ export default function VehicleManagementView() {
           ) : (
             <>
               <div className="overflow-auto flex-1 min-h-0">
-                <table className="w-full text-left border-collapse min-w-[760px]">
+                <table className="w-full text-left border-collapse min-w-[900px]">
                   {/* Headers keep the small caps face; the data rows are regular Alegreya Sans. */}
                   <thead className="sticky top-0 z-[1] bg-[#181717]">
                     <tr className="text-[13px] 3xl:text-[16px] text-[#818181] [&>th]:border-b [&>th]:border-[#818181] [&>th]:font-bold [&>th]:px-3 3xl:[&>th]:px-6 [&>th]:py-2.5 3xl:[&>th]:py-[13px] [&>th]:whitespace-nowrap">
@@ -918,23 +983,33 @@ export default function VehicleManagementView() {
                       <th className="hidden md:table-cell">max weight</th>
                       <th className="hidden lg:table-cell">driver</th>
                       <th>status</th>
-                      <th className="text-right w-[90px]">actions</th>
+                      <th>maintenance</th>
+                      {/* No header text, as in the Figma; the arrow says the row opens Maintenance. */}
+                      <th className="w-12"><span className="sr-only">open</span></th>
                     </tr>
                   </thead>
-                  <tbody className="ff-regular text-[13px] 3xl:text-[16px] text-[#818181]">
+                  <tbody className="ff-regular text-[13px] 3xl:text-[16px] text-white">
                     {trucks.map((t) => {
                       const st         = statusStyle(t.status)
+                      const needs      = needsFor(t)
                       const modelLabel = t.truck_model?.name ?? 'Vehicle'
                       const thumbUrl   = resolveModelImageUrl((t.truck_model?.image_url as string | null | undefined) ?? null)
                       return (
                         <tr
                           key={t.truck_id}
-                          className="border-b border-[#818181] hover:bg-white/[0.03] transition-colors [&>td]:px-3 3xl:[&>td]:px-6 [&>td]:py-2 3xl:h-[55px]"
+                          role="button"
+                          tabIndex={0}
+                          title="Open in the Maintenance tab"
+                          onClick={() => openInMaintenance(t)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openInMaintenance(t) }
+                          }}
+                          className="border-b border-[#818181] cursor-pointer hover:bg-white/[0.03] transition-colors [&>td]:px-3 3xl:[&>td]:px-6 [&>td]:py-2 3xl:h-[55px]"
                         >
                           <td className="align-middle">
                             <ModelThumb imageUrl={thumbUrl} label={modelLabel} size={40} />
                           </td>
-                          <td className="font-bold text-white whitespace-nowrap">{t.plate_number}</td>
+                          <td className="font-bold text-[#4df9ed] whitespace-nowrap">{t.plate_number}</td>
                           <td>
                             {t.truck_model?.vehicle_type ?? '—'}
                           </td>
@@ -961,34 +1036,37 @@ export default function VehicleManagementView() {
                               : <span className="text-[#818181]/60">Unassigned</span>}
                           </td>
                           <td>
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              <span className={TABLE_TAG} style={{ color: st.color, borderColor: st.color, background: st.bg }}>
-                                {fmtLabel(t.status)}
+                            <span className={TABLE_TAG} style={{ color: st.color, borderColor: st.color, background: st.bg }}>
+                              {fmtLabel(t.status)}
+                            </span>
+                          </td>
+                          {/* Maintenance: Passed when nothing is owed, otherwise one tag per need. */}
+                          <td>
+                            {t.status === 'archived' ? (
+                              <span className="text-white">---</span>
+                            ) : !needs ? (
+                              <span className={TABLE_TAG} style={{ color: '#3af626', borderColor: '#3af626', background: 'rgba(58,246,38,0.1)' }}>
+                                Passed
                               </span>
-                              {/* Open upkeep problems; opens the Upkeep tab on this plate. */}
-                              {issuesByTruck.get(t.truck_id) && (() => {
-                                const iss = issuesByTruck.get(t.truck_id)!
-                                return (
-                                  <button
-                                    type="button"
-                                    onClick={() => { setUpkeepSearch(t.plate_number); switchTab('upkeep') }}
-                                    title="See what this vehicle needs"
-                                    className={`${TABLE_TAG} cursor-pointer hover:brightness-125`}
-                                    style={iss.blocking
-                                      ? { color: '#f62626', borderColor: '#f62626', background: 'rgba(246,38,38,0.13)' }
-                                      : { color: '#818181', borderColor: '#818181', background: 'rgba(129,129,129,0.1)' }}
+                            ) : (
+                              <div className="flex flex-wrap items-center gap-1">
+                                {NEED_GROUP_ORDER.filter((g) => needs.has(g)).map((g) => (
+                                  <span
+                                    key={g}
+                                    className={TABLE_TAG}
+                                    style={{ color: NEED_GROUPS[g].color, borderColor: NEED_GROUPS[g].color, background: NEED_GROUPS[g].bg }}
                                   >
-                                    {iss.count} {iss.count === 1 ? 'issue' : 'issues'}
-                                  </button>
-                                )
-                              })()}
-                            </div>
+                                    {NEED_GROUPS[g].short}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </td>
 
                           <td>
                             <div className="flex items-center justify-end gap-1.5">
                               <RecordLockBadge holder={truckLocks.get(t.truck_id)} />
-                              <RowActionMenu brightText label={`Actions for ${t.plate_number}`} actions={rowActions(t)} />
+                              <ChevronRight size={18} className="text-[#818181]" aria-hidden />
                             </div>
                           </td>
                         </tr>

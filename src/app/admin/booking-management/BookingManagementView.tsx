@@ -2168,13 +2168,16 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                           >
                             <td className="font-bold max-w-[200px]">
                               <div className="truncate text-[#4df9ed]">{r.display_id}</div>
-                              {showAfterHours(r.status, r.created_at) && <AfterHoursBadge />}
-                              {pulledByBooking.get(r.booking_id) && (
-                                <VehiclePulledBadge {...pulledByBooking.get(r.booking_id)!} />
-                              )}
-                              <RecordLockBadge holder={bookingLocks.get(r.booking_id)} />
+                              {/* Status-type badges keep the small-caps face. */}
+                              <div className="font-[family-name:var(--font-alegreya-sc)]">
+                                {showAfterHours(r.status, r.created_at) && <AfterHoursBadge />}
+                                {pulledByBooking.get(r.booking_id) && (
+                                  <VehiclePulledBadge {...pulledByBooking.get(r.booking_id)!} />
+                                )}
+                                <RecordLockBadge holder={bookingLocks.get(r.booking_id)} />
+                              </div>
                             </td>
-                            <td>
+                            <td className="font-[family-name:var(--font-alegreya-sc)]">
                               <span
                                 className="inline-flex items-center justify-center whitespace-nowrap rounded-[5px] border p-1 text-[12px] 3xl:text-[16px] leading-none"
                                 style={{ color: c, borderColor: c, background: `${c}2e` }}
