@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import Navbar from '@/components/layout/Navbar';
 import SignedOutNotice from '@/components/layout/SignedOutNotice';
 import SiteFooter from '@/components/layout/SiteFooter';
@@ -10,6 +11,11 @@ import FaqSection from '@/components/sections/FaqSection';
 import ContactSection from '@/components/sections/ContactSection';
 import { getPublicMetrics } from '@/lib/server/public-metrics';
 import HelpAssistant from '@/components/support/HelpAssistant';
+
+// Only the landing page declares itself canonical; the layout would hand it to every page.
+export const metadata: Metadata = {
+  alternates: { canonical: '/' },
+};
 
 export default async function HomePage() {
   const metrics = await getPublicMetrics();

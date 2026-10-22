@@ -9,6 +9,7 @@ import AppToaster from '@/components/ui/AppToaster';
 import './globals.css';
 import { Geist } from "next/font/google";
 import { cn } from "@/lib/utils";
+import { SITE_URL } from '@/constants/site';
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
@@ -19,6 +20,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: '8338 Logistics Services',
   description:
     'Book, track, and manage deliveries in one place. Real-time updates, seamless booking, and efficient support for all your logistics needs. Serving nationwide Philippines.',
@@ -27,6 +29,7 @@ export const metadata: Metadata = {
     title: '8338 Logistics Services',
     description: 'Premium logistics. Industrial precision.',
     type: 'website',
+    siteName: '8338 Logistics Services',
   },
 };
 
