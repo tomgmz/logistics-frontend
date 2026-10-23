@@ -111,8 +111,11 @@ export default function DriverSetupPage() {
           <div className="w-full pt-4 mt-1 border-t border-white/8 flex flex-col gap-2 text-left">
             <p className="text-white/30 text-[0.72rem] leading-relaxed">
               <span className="text-white/50">Nothing happened?</span> The app may
-              not be installed on this device yet. Install 8338 Logistics first,
-              then open this link again on the phone you will use for deliveries.
+              not be installed on this device yet.{' '}
+              <a href="/download" className="text-[#4df9ed] underline underline-offset-2">
+                Download and install 8338 Logistics
+              </a>{' '}
+              first, then open this link again on the phone you will use for deliveries.
             </p>
             <p className="text-white/25 text-[0.7rem] leading-relaxed">
               This link works once and expires in 72 hours. If it has expired,

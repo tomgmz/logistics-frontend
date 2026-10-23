@@ -1,7 +1,7 @@
 'use client'
 
 import { ReactNode, useEffect } from 'react'
-import { Activity, LayoutDashboard, Users } from 'lucide-react'
+import { Activity, LayoutDashboard, Smartphone, Users } from 'lucide-react'
 import ReusableDashboardShell from '@/components/layout/ReusableDashboardShell'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { goHomeSignedOut } from '@/lib/auth-redirect'
@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { href: '/it_admin/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={17} /> },
   { href: '/it_admin/administrator-management', label: 'Administrator Management', icon: <Users size={17} /> },
   { href: '/it_admin/logs', label: 'Logs', icon: <Activity size={17} /> },
+  { href: '/it_admin/app-release', label: 'App Release', icon: <Smartphone size={17} /> },
 ]
 
 export default function ItAdminLayout({ children }: { children: ReactNode }) {
