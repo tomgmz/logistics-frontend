@@ -125,7 +125,7 @@ export default function BookingWizard() {
                       px-4 lg:px-6 h-auto py-3 lg:py-0 lg:h-[62px]
                       grid grid-cols-[1fr_auto_1fr] items-center gap-4">
 
-        <h1 className="ff-sc booking-text text-white text-base lg:text-xl tracking-wider whitespace-nowrap">
+        <h1 className="font-[family-name:var(--font-alegreya-sc)] text-[17px] 3xl:text-[20px] font-bold text-white whitespace-nowrap">
           {resubmit ? 'Edit & Resubmit' : 'New Booking'}
           {resubmit?.reference ? (
             <>

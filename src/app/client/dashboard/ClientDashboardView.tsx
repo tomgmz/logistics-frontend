@@ -454,7 +454,7 @@ export default function ClientDashboardView() {
       <div className="flex items-center gap-3 px-4 lg:px-6 py-4 border-b shrink-0" style={{ borderColor: BORDER }}>
         <LayoutDashboard size={18} style={{ color: CYAN }} />
         <div className="min-w-0">
-          <h1 className="font-bold text-white text-base tracking-wide truncate">
+          <h1 className="font-[family-name:var(--font-alegreya-sc)] text-[17px] 3xl:text-[20px] font-bold text-white truncate">
             {company ? `Welcome back, ${company}` : 'Dashboard'}
           </h1>
         </div>

@@ -378,7 +378,7 @@ export default function BookingHistoryModule() {
             <ChevronLeft size={16} />
           </button>
         )}
-        <h1 className="ff-sc text-white text-lg lg:text-xl truncate">
+        <h1 className="font-[family-name:var(--font-alegreya-sc)] text-[17px] 3xl:text-[20px] font-bold text-white truncate">
           {view === 'list' ? 'Transaction History' : bookingRef(selected)}
         </h1>
         {view === 'list' && !loading && (
