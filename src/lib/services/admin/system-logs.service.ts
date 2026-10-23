@@ -19,6 +19,23 @@ export type SystemLogEventType =
   | 'cron_job'
   | 'db_event'
 
+// Spelled out in full for display: the stored codes are abbreviated (db, auth, cron, warn).
+export const SYSTEM_LOG_EVENT_LABEL: Record<SystemLogEventType, string> = {
+  server_error: 'Server Error',
+  auth_event:   'Sign-in Event',
+  email_event:  'Email',
+  external_api: 'External Service',
+  cron_job:     'Scheduled Job',
+  db_event:     'Database',
+}
+
+export const SYSTEM_LOG_LEVEL_LABEL: Record<SystemLogLevel, string> = {
+  info:     'Info',
+  warn:     'Warning',
+  error:    'Error',
+  critical: 'Critical',
+}
+
 export interface SystemLog {
   log_id:      string
   log_level:   SystemLogLevel
@@ -101,8 +118,8 @@ export const SYSTEM_EXPORT_ROW_CAP = 10_000
 
 const SYSTEM_XLSX_COLUMNS: XlsxColumn<SystemLog>[] = [
   { label: 'Timestamp (PHT)', width: 20, value: (l) => manilaCellDate(l.timestamp) },
-  { label: 'Level',           width: 10, value: (l) => l.log_level },
-  { label: 'Event Type',      width: 14, value: (l) => l.event_type },
+  { label: 'Level',           width: 10, value: (l) => SYSTEM_LOG_LEVEL_LABEL[l.log_level] ?? l.log_level },
+  { label: 'Event Type',      width: 14, value: (l) => SYSTEM_LOG_EVENT_LABEL[l.event_type] ?? l.event_type },
   { label: 'Source',          width: 32, value: (l) => l.source },
   { label: 'Message',         width: 70, value: (l) => l.message },
   { label: 'Resolved',        width: 10, value: (l) => (l.resolved ? 'Yes' : 'No') },

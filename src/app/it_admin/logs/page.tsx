@@ -22,6 +22,8 @@ import {
   type SystemLogLevel,
   type SystemLogEventType,
   type SystemLogStats,
+  SYSTEM_LOG_EVENT_LABEL,
+  SYSTEM_LOG_LEVEL_LABEL,
 } from '@/lib/services/admin/system-logs.service'
 import { formatDate, formatTime, formatDateTime } from '@/app/utils/timeFormat'
 import { expandCode, roleLabel } from '@/lib/roles'
@@ -60,6 +62,9 @@ const EVENT_BADGE: Record<SystemLogEventType, string> = {
   cron_job:     'bg-[rgba(255,234,0,0.10)] text-[#ffea00] border border-[rgba(255,234,0,0.25)]',
   db_event:     'bg-[rgba(255,122,48,0.10)] text-[#ff7a30] border border-[rgba(255,122,48,0.25)]',
 }
+
+const EVENT_LABEL = SYSTEM_LOG_EVENT_LABEL
+const LEVEL_LABEL = SYSTEM_LOG_LEVEL_LABEL
 
 const PAGE_SIZE = 15
 
@@ -416,12 +421,7 @@ function SystemLogsTab() {
             className="bg-[#2a2a2a]/60 border border-[#424242] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-[#4df9ed] cursor-pointer ff-sc"
           >
             <option value="">All Events</option>
-            <option value="server_error">Server Error</option>
-            <option value="auth_event">Auth Event</option>
-            <option value="email_event">Email Event</option>
-            <option value="external_api">External API</option>
-            <option value="cron_job">Cron Job</option>
-            <option value="db_event">DB Event</option>
+            {EVENT_TYPES.map((t) => <option key={t} value={t}>{EVENT_LABEL[t]}</option>)}
           </select>
           <select
             value={level}
@@ -429,10 +429,7 @@ function SystemLogsTab() {
             className="bg-[#2a2a2a]/60 border border-[#424242] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-[#4df9ed] cursor-pointer ff-sc"
           >
             <option value="">All Levels</option>
-            <option value="info">Info</option>
-            <option value="warn">Warn</option>
-            <option value="error">Error</option>
-            <option value="critical">Critical</option>
+            {LEVELS.map((l) => <option key={l} value={l}>{LEVEL_LABEL[l]}</option>)}
           </select>
           <select
             value={resolved}
@@ -480,8 +477,8 @@ function SystemLogsTab() {
               {([
                 ['Log ID',    selected.log_id],
                 ['Timestamp', formatDateTime(selected.timestamp)],
-                ['Level',     selected.log_level],
-                ['Event',     selected.event_type],
+                ['Level',     LEVEL_LABEL[selected.log_level] ?? selected.log_level],
+                ['Event',     EVENT_LABEL[selected.event_type] ?? selected.event_type],
                 ['Source',    selected.source],
                 ['Message',   selected.message],
                 ['Resolved',  selected.resolved ? 'Yes' : 'No'],
@@ -568,12 +565,12 @@ function SystemLogsTab() {
                     </td>
                     <td className="px-4 py-3.5">
                       <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-[0.1em] ${LEVEL_BADGE[log.log_level]}`}>
-                        {log.log_level}
+                        {LEVEL_LABEL[log.log_level] ?? log.log_level}
                       </span>
                     </td>
                     <td className="px-4 py-3.5">
                       <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-[0.1em] whitespace-nowrap ${EVENT_BADGE[log.event_type]}`}>
-                        {log.event_type.replace('_', ' ')}
+                        {EVENT_LABEL[log.event_type] ?? log.event_type.replace('_', ' ')}
                       </span>
                     </td>
                     <td className="px-4 py-3.5">
