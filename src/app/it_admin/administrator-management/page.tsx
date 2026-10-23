@@ -2,7 +2,7 @@
 
 import Pagination from '@/components/ui/Pagination'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
-import { useState, useEffect, useCallback, useRef, Children, cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -130,35 +130,7 @@ const HEADER_BTN =
   'px-3 3xl:px-4 text-[13px] 3xl:text-[15px] text-[#4df9ed] transition hover:bg-[#4df9ed]/30 active:scale-95'
 const HEADER_ICON = 'size-4 3xl:size-[18px]'
 
-/**
- * Below lg the table turns into one card per account: rows stack, each cell
- * shows its column name (data-label, from withLabels) on the left, the name
- * leads without a label and the row menu sits in the top-right corner. Two
- * cards a row on tablets.
- */
-const CARD_TBODY = [
-  'max-lg:grid max-lg:grid-cols-1 max-lg:gap-3 max-lg:p-3 md:max-lg:grid-cols-2',
-  'max-lg:[&>tr]:relative max-lg:[&>tr]:flex max-lg:[&>tr]:flex-col max-lg:[&>tr]:gap-2',
-  'max-lg:[&>tr]:rounded-[10px] max-lg:[&>tr]:border max-lg:[&>tr]:border-[#424242] max-lg:[&>tr]:bg-[#2a2828] max-lg:[&>tr]:p-4',
-  'max-lg:[&>tr>td]:flex max-lg:[&>tr>td]:min-w-0 max-lg:[&>tr>td]:items-center max-lg:[&>tr>td]:justify-between max-lg:[&>tr>td]:gap-3',
-  'max-lg:[&>tr>td]:p-0 max-lg:[&>tr>td]:text-right',
-  'max-lg:[&>tr>td]:before:shrink-0 max-lg:[&>tr>td]:before:content-[attr(data-label)] max-lg:[&>tr>td]:before:lowercase',
-  'max-lg:[&>tr>td]:before:text-[13px] max-lg:[&>tr>td]:before:font-bold max-lg:[&>tr>td]:before:text-[#818181]',
-  'max-lg:[&>tr>td]:before:font-[family-name:var(--font-alegreya-sc)]',
-  'max-lg:[&>tr>td:first-child]:justify-start max-lg:[&>tr>td:first-child]:pr-10 max-lg:[&>tr>td:first-child]:text-left',
-  'max-lg:[&>tr>td:first-child]:before:hidden',
-  'max-lg:[&>tr>td:last-child:not(:first-child)]:absolute max-lg:[&>tr>td:last-child:not(:first-child)]:right-2',
-  'max-lg:[&>tr>td:last-child:not(:first-child)]:top-3 max-lg:[&>tr>td:last-child:not(:first-child)]:before:hidden',
-  'max-lg:[&>tr>td:last-child:not(:first-child)]:w-auto',
-].join(' ')
 
-/** Tags each cell with its column name, for the stacked card layout. */
-function withLabels(cells: ReactNode, labels: string[]) {
-  if (!isValidElement(cells)) return cells
-  return Children.toArray((cells as ReactElement<{ children?: ReactNode }>).props.children).map((c, i) =>
-    isValidElement(c) ? cloneElement(c as ReactElement<Record<string, unknown>>, { 'data-label': labels[i] }) : c,
-  )
-}
 
 /** Long addresses are cut short with an ellipsis at the edge of their column. */
 function EmailText({ value }: { value: string | null | undefined }) {
@@ -741,11 +713,11 @@ export default function AdminManagementClient() {
             )}
 
             {/* Table */}
-            <div className="lg:flex-1 lg:overflow-auto lg:min-h-0">
+            <div className="overflow-x-auto lg:flex-1 lg:overflow-auto lg:min-h-0">
               {/* Fixed layout: every column, Actions included, gets the same width. */}
-              <table className="w-full max-lg:block lg:table-fixed">
+              <table className="w-full max-lg:min-w-[900px] lg:table-fixed">
                 {/* Headers in the small-caps face, every cell below in regular Alegreya Sans. */}
-                <thead className="sticky top-0 z-10 bg-[#1b1b1b] max-lg:hidden font-[family-name:var(--font-alegreya-sc)]">
+                <thead className="sticky top-0 z-10 bg-[#1b1b1b] font-[family-name:var(--font-alegreya-sc)]">
                   <tr className="border-b border-[#424242]">
                     {HEADERS[activeTab].map((h) => (
                       <th key={h} className="px-4 3xl:px-5 py-2 3xl:py-2.5 text-[11px] 3xl:text-[13px] font-bold lowercase whitespace-nowrap text-left text-[#818181]">
@@ -757,12 +729,12 @@ export default function AdminManagementClient() {
                     </th>
                   </tr>
                 </thead>
-                <tbody className={`ff-regular ${CARD_TBODY}`}>
+                <tbody className="ff-regular max-lg:whitespace-nowrap">
                   {(loading || fetching) ? (
                     <TableSkeleton cols={colCount} />
                   ) : users.length === 0 ? (
-                    <tr className="col-span-full">
-                      <td colSpan={colCount} className="max-lg:!justify-center">
+                    <tr>
+                      <td colSpan={colCount}>
                         <EmptyState tab={activeTab} onAdd={openCreate} />
                       </td>
                     </tr>
@@ -776,7 +748,7 @@ export default function AdminManagementClient() {
                           transition={{ delay: i * 0.02 }}
                           className="border-b border-[#424242] transition-colors hover:bg-[#2a2a2a]/40"
                         >
-                          {withLabels(renderCells(user), HEADERS[activeTab])}
+                          {renderCells(user)}
                           {/* The row menu sits at the far right of the table. */}
                           <td className="px-4 3xl:px-5 py-2 3xl:py-2.5 text-right">
                             <RowMenu
