@@ -143,7 +143,7 @@ const TD_MUTED  = 'ff-regular px-4 3xl:px-5 py-2 3xl:py-2.5 text-[12px] 3xl:text
 // Below that everything is compact, so laptops (1366x768, or 1920 at 125%
 // scaling = 1536x864) still show a useful number of rows.
 const HEADER_BTN =
-  'flex h-8 3xl:h-9 items-center gap-2 whitespace-nowrap rounded-[10px] border border-[#4df9ed] bg-[#4df9ed]/[0.19] ' +
+  'flex h-8 3xl:h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-[10px] border border-[#4df9ed] bg-[#4df9ed]/[0.19] ' +
   'px-3 3xl:px-4 text-[13px] 3xl:text-[15px] text-[#4df9ed] transition hover:bg-[#4df9ed]/30 active:scale-95'
 const HEADER_ICON = 'size-4 3xl:size-[18px]'
 
@@ -914,8 +914,8 @@ export default function UserManagementClient() {
           {/* Header */}
           {/* As tall as the Add User button even when it is hidden (Password Reset tab),
               so switching tabs doesn't shift the page. */}
-          <div className="flex lg:min-h-8 3xl:min-h-9 flex-wrap items-center justify-between gap-3 shrink-0">
-            <h1 className="text-[17px] 3xl:text-[20px] font-bold text-white">User Management</h1>
+          <div className="flex lg:min-h-8 3xl:min-h-9 items-center justify-between gap-3 shrink-0">
+            <h1 className="min-w-0 text-[16px] leading-tight sm:text-[17px] 3xl:text-[20px] font-bold text-white">User Management</h1>
             {/*
               On the IT Admin tab "Create User" is the wrong verb: only one may be
               active, so while the seat is filled the only move is to hand it over.
@@ -928,7 +928,7 @@ export default function UserManagementClient() {
                     onClick={() => setShowTransition(true)}
                     className={HEADER_BTN}
                   >
-                    Transition IT Administrator <ArrowLeftRight className={HEADER_ICON} />
+                    <span className="sm:hidden">Transition</span><span className="max-sm:hidden">Transition IT Administrator</span> <ArrowLeftRight className={HEADER_ICON} />
                   </button>
                 )
               ) : access.canCreate && (
