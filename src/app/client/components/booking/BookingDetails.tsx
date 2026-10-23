@@ -54,6 +54,7 @@ import {
 import type { ResolvedPlace } from '@/lib/hooks/usePlacesAutoComplete'
 import { nowDate } from '@/app/utils/serverTime'
 import { OFFICE_HOURS_LABEL, isWithinOfficeHours } from '@/lib/office-hours'
+import { phDayPlusMonth, phEarliestBookableDay } from '@/lib/ph-date'
 
 interface Props {
   onNext: () => void
@@ -294,22 +295,26 @@ function DatePickerPopup({
   const todayM = today.getMonth()
   const todayD = today.getDate()
 
-  // Tomorrow is the earliest bookable day, so today greys out with the past.
+  // Today stays pickable until 12:00 noon, Monday to Saturday (the office needs
+  // the afternoon to dispatch it); after that tomorrow is the earliest day.
   // Every weekday is open for transit, Sundays included — only the office (the
   // acceptance of bookings) keeps Monday-to-Saturday hours.
   // And no further out than one month: the same day next month is the last
-  // bookable one (the API refuses anything later).
-  const lastDay = new Date(todayY, todayM + 1, Math.min(todayD, new Date(todayY, todayM + 2, 0).getDate()))
+  // bookable one (the API refuses anything later). All in Manila days, as the
+  // validator and the API judge them.
+  const serverNow = nowDate()
+  const earliest  = phEarliestBookableDay(serverNow)
+  const latest    = phDayPlusMonth(serverNow)
   const isDisabled = (d: number) => {
-    const dt = new Date(viewYear, viewMonth, d)
-    const td = new Date(todayY, todayM, todayD)
-    return dt <= td || dt > lastDay
+    const str = toDateStr(viewYear, viewMonth, d)
+    return str < earliest || str > latest
   }
   // Nothing to show past the month that holds the last bookable day.
-  const atLastMonth = viewYear > lastDay.getFullYear() ||
-    (viewYear === lastDay.getFullYear() && viewMonth >= lastDay.getMonth())
+  const lastDay = parseDateStr(latest)!
+  const atLastMonth = viewYear > lastDay.y ||
+    (viewYear === lastDay.y && viewMonth >= lastDay.m)
 
-  const nextAvailable = new Date(todayY, todayM, todayD + 1)
+  const nextAvailable = parseDateStr(earliest)!
 
   const idleBorder   = hasError ? ERROR_BORDER : BORDER_PANEL
   const activeBorder = hasError ? ERROR_COLOR   : `${CYAN}66`
@@ -408,9 +413,8 @@ function DatePickerPopup({
               <button
                 type="button"
                 onClick={() => {
-                  const y = nextAvailable.getFullYear()
-                  const m = nextAvailable.getMonth()
-                  onChange(toDateStr(y, m, nextAvailable.getDate()))
+                  const { y, m } = nextAvailable
+                  onChange(earliest)
                   setViewYear(y)
                   setViewMonth(m)
                   setOpen(false)

@@ -28,6 +28,30 @@ export function phDayPlus(at: Date | number, days: number): string {
 }
 
 /**
+ * Same-day bookings close at 12:00 noon, Manila time, so the office (Monday to
+ * Saturday, 8 AM – 5 PM) still has the afternoon to review and dispatch them.
+ * Sunday has no office, so it never offers today. Mirrors the API.
+ */
+export const SAME_DAY_CUTOFF_HOUR = 12
+
+export function sameDayBookingOpen(at: Date | number): boolean {
+  const ms = typeof at === 'number' ? at : at.getTime()
+  const ph = new Date(ms + PH_OFFSET_MS)
+  return ph.getUTCDay() !== 0 && ph.getUTCHours() < SAME_DAY_CUTOFF_HOUR
+}
+
+/** The earliest bookable day: today while same-day is open, else tomorrow. */
+export function phEarliestBookableDay(at: Date | number): string {
+  return sameDayBookingOpen(at) ? phDay(at) : phDayPlus(at, 1)
+}
+
+/** Manila wall-clock time as `HH:MM`, comparable with the form's call time. */
+export function phTimeHHMM(at: Date | number): string {
+  const ms = typeof at === 'number' ? at : at.getTime()
+  return new Date(ms + PH_OFFSET_MS).toISOString().slice(11, 16)
+}
+
+/**
  * Day of the week for a `YYYY-MM-DD` string, 0 = Sunday.
  *
  * Read as UTC so the answer depends only on the date itself, never on where the

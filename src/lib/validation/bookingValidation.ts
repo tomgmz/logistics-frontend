@@ -1,6 +1,6 @@
 import type { CargoMode, ItemGroup, DropoffSection } from '@/lib/store/slice/booking.slice'
 import { nowDate } from '@/app/utils/serverTime'
-import { phDayPlus, phDayPlusMonth } from '@/lib/ph-date'
+import { phDay, phDayPlusMonth, phEarliestBookableDay, phTimeHHMM } from '@/lib/ph-date'
 
 export interface ScheduleErrors {
   date?: string
@@ -64,17 +64,23 @@ export function validateSchedule(date: string, time: string): ScheduleErrors {
     // Compared as Philippine calendar days — plain YYYY-MM-DD strings, which
     // sort correctly — exactly as the API does. Doing this in browser-local time
     // meant a device in another zone disagreed with the server about which day
-    // "tomorrow" is. Every weekday is open for transit, Sundays included.
+    // "today" is. Every weekday is open for transit, Sundays included; today is
+    // bookable only until 12:00 noon, Monday to Saturday.
     const selected = date.slice(0, 10)
     const serverNow = nowDate()
 
-    const earliest = phDayPlus(serverNow, 1)
+    const today    = phDay(serverNow)
+    const earliest = phEarliestBookableDay(serverNow)
     const latest   = phDayPlusMonth(serverNow)
 
-    if (selected < earliest) {
-      errors.date = `Booking must be at least a day ahead (earliest: ${earliest})`
+    if (selected === today && earliest !== today) {
+      errors.date = 'Same-day bookings close at 12:00 noon, Monday to Saturday. Please pick a later date.'
+    } else if (selected < earliest) {
+      errors.date = `Booking date cannot be in the past (earliest: ${earliest})`
     } else if (selected > latest) {
       errors.date = `Bookings can be made up to 1 month ahead (latest: ${latest})`
+    } else if (selected === today && time.trim() && time.slice(0, 5) <= phTimeHHMM(serverNow)) {
+      errors.time = 'For a same-day booking, the call time must be later than now'
     }
   }
 

@@ -65,8 +65,9 @@ export const FAQ: FaqEntry[] = [
     id: 'lead-time',
     question: 'How far ahead do I need to book?',
     answer:
-      'At least one day ahead: the earliest date you can pick is tomorrow. You can book up to one month in ' +
-      'advance (the same date next month). Call times are set in 5-minute steps.',
+      'Same-day bookings are accepted until 12:00 noon, Monday to Saturday, with a call time later than ' +
+      'the time you book. After noon, and on Sundays, the earliest date you can pick is tomorrow. You can ' +
+      'book up to one month in advance (the same date next month). Call times are set in 5-minute steps.',
     keywords: ['same day', 'today', 'tomorrow', 'advance', 'ahead', 'earliest', 'lead time', 'urgent', 'rush', 'how soon'],
     link: { href: '/client/booking', label: 'Open Booking' },
     category: 'booking',
