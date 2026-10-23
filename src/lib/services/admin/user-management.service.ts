@@ -96,6 +96,8 @@ export const adminService = {
   remove:     (id: string) => del(`${B}/admins/${id}`),
   activate:   (id: string) => patch<AdminUser>(`${B}/admins/${id}/activate`),
   deactivate: (id: string) => patch<AdminUser>(`${B}/admins/${id}/deactivate`),
+  // Archived ("deleted") account back as active; see restoreArchivedUser on the API.
+  restore:    (id: string) => post<AdminUser>(`${B}/admins/${id}/restore`, {}),
 }
 
 export const clientService = {
@@ -106,6 +108,7 @@ export const clientService = {
   remove: (id: string) => del(`${B}/clients/${id}`),
   activate:   (id: string) => patch<ClientUser>(`${B}/clients/${id}/activate`),
   deactivate: (id: string) => patch<ClientUser>(`${B}/clients/${id}/deactivate`),
+  restore:    (id: string) => post<ClientUser>(`${B}/clients/${id}/restore`, {}),
 }
 
 export const driverService = {
@@ -129,6 +132,7 @@ export const driverService = {
   remove: (id: string) => del(`${B}/drivers/${id}`),
   activate:   (id: string) => patch<DriverUser>(`${B}/drivers/${id}/activate`),
   deactivate: (id: string) => patch<DriverUser>(`${B}/drivers/${id}/deactivate`),
+  restore:    (id: string) => post<DriverUser>(`${B}/drivers/${id}/restore`, {}),
 }
 
 export const generalManagerService = {
@@ -139,6 +143,7 @@ export const generalManagerService = {
   remove: (id: string) => del(`${B}/general-managers/${id}`),
   activate:   (id: string) => patch<AdminUser>(`${B}/general-managers/${id}/activate`),
   deactivate: (id: string) => patch<AdminUser>(`${B}/general-managers/${id}/deactivate`),
+  restore:    (id: string) => post<AdminUser>(`${B}/general-managers/${id}/restore`, {}),
 }
 
 export const fleetAdminService = {
@@ -149,6 +154,7 @@ export const fleetAdminService = {
   remove: (id: string) => del(`${B}/fleet-admins/${id}`),
   activate:   (id: string) => patch<AdminUser>(`${B}/fleet-admins/${id}/activate`),
   deactivate: (id: string) => patch<AdminUser>(`${B}/fleet-admins/${id}/deactivate`),
+  restore:    (id: string) => post<AdminUser>(`${B}/fleet-admins/${id}/restore`, {}),
 }
 
 export const operationsAdminService = {
@@ -159,6 +165,7 @@ export const operationsAdminService = {
   remove: (id: string) => del(`${B}/operations-admins/${id}`),
   activate:   (id: string) => patch<AdminUser>(`${B}/operations-admins/${id}/activate`),
   deactivate: (id: string) => patch<AdminUser>(`${B}/operations-admins/${id}/deactivate`),
+  restore:    (id: string) => post<AdminUser>(`${B}/operations-admins/${id}/restore`, {}),
 }
 
 export const itAdminService = {
@@ -169,6 +176,7 @@ export const itAdminService = {
   remove: (id: string) => del(`${B}/it-admins/${id}`),
   activate:   (id: string) => patch<AdminUser>(`${B}/it-admins/${id}/activate`),
   deactivate: (id: string) => patch<AdminUser>(`${B}/it-admins/${id}/deactivate`),
+  restore:    (id: string) => post<AdminUser>(`${B}/it-admins/${id}/restore`, {}),
   // Hand the role to a successor. The outgoing account is not named — the system
   // allows exactly one active IT Admin, so the API resolves who is being replaced
   // and retires them in the same transaction that creates the incoming account.

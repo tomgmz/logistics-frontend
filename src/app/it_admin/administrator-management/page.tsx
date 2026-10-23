@@ -7,7 +7,7 @@ import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ShieldCheck as ShieldCheckIcon, UserPlus, UserRoundPlus, Search, MoreVertical, ChevronDown,
-  Pencil, Eye, ShieldCheck, ShieldOff, Archive, SlidersHorizontal,
+  Pencil, Eye, ShieldCheck, ShieldOff, Archive, ArchiveRestore, SlidersHorizontal,
   AlertTriangle,
 } from 'lucide-react'
 import Select, { SelectChangeEvent } from '@mui/material/Select'
@@ -101,6 +101,26 @@ async function updateStatus(tab: AdminMgmtTab, id: string, status: UserStatus): 
   if (status === 'archived')    return svc.remove(id)
 
   return svc.update(id, { status } as never).then()
+}
+
+const SERVICE_FOR_TAB = {
+  admins:              adminService,
+  'general-managers':  generalManagerService,
+  'fleet-admins':      fleetAdminService,
+  'operations-admins': operationsAdminService,
+} as const
+
+// The archived view reads /admin/users?status=archived (the per-role lists hide
+// archived accounts).
+const ARCHIVED_ROLE: Record<AdminMgmtTab, string> = {
+  admins:              'admin',
+  'general-managers':  'general_manager',
+  'fleet-admins':      'fleet_manager',
+  'operations-admins': 'operations_manager',
+}
+
+function displayName(u: AnyUser): string {
+  return [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email
 }
 
 function tabFromRole(role: string): AdminMgmtTab {
@@ -318,7 +338,85 @@ function TableSkeleton({ cols }: { cols: number }) {
   )
 }
 
-function EmptyState({ tab, onAdd }: { tab: TabValue; onAdd: () => void }) {
+/** The archived view's row menu: look at the account, or bring it back. */
+function ArchivedRowMenu({ onView, onRestore, lockedBy }: {
+  onView:    () => void
+  onRestore: () => void
+  lockedBy?: string
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handle(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handle)
+    return () => document.removeEventListener('mousedown', handle)
+  }, [])
+
+  if (lockedBy) {
+    return (
+      <div className="flex items-center justify-end gap-1.5">
+        <RecordLockBadge holder={lockedBy} />
+        <button onClick={onView} title="View Details" className="rounded-md p-1.5 text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white">
+          <Eye size={15} />
+        </button>
+      </div>
+    )
+  }
+
+  const item = 'flex w-full items-center gap-2.5 px-3.5 py-2 text-sm transition'
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={(e) => { e.stopPropagation(); setOpen(!open) }}
+        className="rounded-md p-1.5 text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white"
+      >
+        <MoreVertical size={18} />
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: -4 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: -4 }}
+            transition={{ duration: 0.12 }}
+            className="absolute right-0 top-8 z-50 w-48 rounded-xl border border-[#424242] bg-[#1b1b1b] py-1 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button onClick={() => { setOpen(false); onView() }} className={`${item} text-[#818181] hover:bg-[#2a2a2a] hover:text-white`}>
+              <Eye size={13} /> View Details
+            </button>
+            <div className="my-1 border-t border-[#424242]" />
+            <button onClick={() => { setOpen(false); onRestore() }} className={`${item} text-[#4df9ed] hover:bg-[#4df9ed]/10`}>
+              <ArchiveRestore size={13} /> Restore
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+/** Shows the archived accounts instead of the current ones. */
+function ArchivedToggle({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!on)}
+      aria-pressed={on}
+      title={on ? 'Back to the current accounts' : 'Show archived accounts'}
+      className={`flex h-[34px] 3xl:h-[38px] items-center gap-1.5 whitespace-nowrap rounded-[10px] border px-3 text-[13px] 3xl:text-[15px] transition ${
+        on ? 'border-[#ffea00] bg-[#ffea00]/[0.15] text-[#ffea00]' : 'border-[#818181] bg-[#424242] text-[#818181] hover:text-white'
+      }`}
+    >
+      <Archive className="size-4" /> Archived
+    </button>
+  )
+}
+
+function EmptyState({ tab, onAdd, archived = false }: { tab: TabValue; onAdd: () => void; archived?: boolean }) {
   const label = tab === 'all' ? 'staff accounts' : TABS.find(t => t.key === tab)?.label.toLowerCase() ?? tab
   return (
     <div className="flex flex-col items-center justify-center py-24 text-center">
@@ -326,8 +424,10 @@ function EmptyState({ tab, onAdd }: { tab: TabValue; onAdd: () => void }) {
         <ShieldCheckIcon size={28} className="text-[#818181]" />
       </div>
       <p className="text-base font-semibold text-white">No records found</p>
-      <p className="mt-1 text-sm text-[#818181]">No {label} match your current filters.</p>
-      {tab !== 'all' && (
+      <p className="mt-1 text-sm text-[#818181]">
+        {archived ? `No archived ${label}.` : `No ${label} match your current filters.`}
+      </p>
+      {tab !== 'all' && !archived && (
         <button
           onClick={onAdd}
           className="mt-6 flex items-center gap-2 rounded-lg bg-[#4df9ed] px-4 py-2 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5]"
@@ -401,6 +501,13 @@ export default function AdminManagementClient() {
   const [showTypePicker,   setShowTypePicker]   = useState(false)
   const [permUser,         setPermUser]         = useState<AnyUser | null>(null)
   const userLocks = useRecordLocks('user')
+  // Archived view: the same tabs, listing archived accounts with a Restore action.
+  const [showArchived,     setShowArchived]     = useState(false)
+  const archivedRef = useRef(showArchived)
+  archivedRef.current = showArchived
+  // The tab whose rows may land: a response for a tab (or view) already left is dropped.
+  const currentTabRef = useRef<TabValue>(activeTab)
+  currentTabRef.current = activeTab
 
   const isInitialAllFetch = useRef(true)
 
@@ -431,11 +538,13 @@ export default function AdminManagementClient() {
       if (hard) setLoading(true); else setFetching(true)
       setError(null)
     }
+    const archived = archivedRef.current
     try {
       const [result, statsResult] = await Promise.all([
-        userService.getAll({ search: searchQuery || undefined, role: ADMIN_ROLE_FILTER }),
+        userService.getAll({ search: searchQuery || undefined, role: ADMIN_ROLE_FILTER, status: archived ? 'archived' : undefined }),
         userService.getStats(ADMIN_ROLE_FILTER)
       ])
+      if (currentTabRef.current !== 'all' || archivedRef.current !== archived) return
       setAllRows(result.data)
       setServerTotal(result.total)
       setServerTotalPages(Math.ceil(result.total / PAGE_SIZE))
@@ -456,11 +565,15 @@ export default function AdminManagementClient() {
       setError(null)
       setAllRows([])
     }
+    const archived = archivedRef.current
     try {
       const [rows, statsResult] = await Promise.all([
-        fetchByTab(tab),
+        archived
+          ? userService.getAll({ role: ARCHIVED_ROLE[tab], status: 'archived' }).then((r) => r.data)
+          : fetchByTab(tab),
         userService.getStats(ADMIN_ROLE_FILTER)
       ])
+      if (currentTabRef.current !== tab || archivedRef.current !== archived) return
       setAllRows(rows)
       setStats({ total: statsResult.total, active: statsResult.active, archived: statsResult.archived })
     } catch {
@@ -486,7 +599,7 @@ export default function AdminManagementClient() {
     if (isResetsTab) { setLoading(false); return }
     if (activeTab === 'all') fetchAllUsers('', true)
     else fetchTabUsers(activeTab)
-  }, [activeTab, isResetsTab]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeTab, isResetsTab, showArchived]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (isResetsTab || activeTab !== 'all') return
@@ -524,6 +637,11 @@ export default function AdminManagementClient() {
     const serviceTab = activeTab === 'all'
       ? tabFromRole(user.role)
       : activeTab
+    if (status === 'archived' && !window.confirm(
+      `Archive ${displayName(user)}?\n\n` +
+      'They are signed out everywhere and can no longer sign in. ' +
+      'Their records are kept, and you can restore the account from the Archived view.'
+    )) return
     try {
       await appToast.promise(
         updateStatus(serviceTab, user.user_id, status),
@@ -533,6 +651,21 @@ export default function AdminManagementClient() {
           error:   (e) => getApiErrorMessage(e, 'Failed to update account.'),
         },
         { action: 'update-status', entityId: user.user_id },
+      )
+      await refetchCurrentTab()
+    } catch { /* handled by toast */ }
+  }
+
+  async function handleRestore(user: AnyUser) {
+    try {
+      await appToast.promise(
+        SERVICE_FOR_TAB[tabFromRole(user.role)].restore(user.user_id),
+        {
+          loading: 'Restoring account…',
+          success: `${displayName(user)} restored and can sign in again.`,
+          error:   (e) => getApiErrorMessage(e, 'Failed to restore the account.'),
+        },
+        { action: 'restore-user', entityId: user.user_id },
       )
       await refetchCurrentTab()
     } catch { /* handled by toast */ }
@@ -692,8 +825,9 @@ export default function AdminManagementClient() {
                 />
               </div>
               <RefreshButton iconOnly onClick={handleRefresh} loading={(loading || fetching)} disabled={loading || fetching} />
-              <span className="basis-full text-right sm:basis-auto sm:ml-auto text-[10px] 3xl:text-[11px] font-bold text-[#4df9ed] whitespace-nowrap">
-                {total} {ACCOUNT_NOUN[activeTab]} Account{total !== 1 ? 's' : ''}
+              <ArchivedToggle on={showArchived} onChange={setShowArchived} />
+              <span className={`basis-full text-right sm:basis-auto sm:ml-auto text-[10px] 3xl:text-[11px] font-bold whitespace-nowrap ${showArchived ? 'text-[#ffea00]' : 'text-[#4df9ed]'}`}>
+                {total} {showArchived ? 'Archived ' : ''}{ACCOUNT_NOUN[activeTab]} Account{total !== 1 ? 's' : ''}
               </span>
             </div>
             )}
@@ -735,7 +869,7 @@ export default function AdminManagementClient() {
                   ) : users.length === 0 ? (
                     <tr>
                       <td colSpan={colCount}>
-                        <EmptyState tab={activeTab} onAdd={openCreate} />
+                        <EmptyState tab={activeTab} onAdd={openCreate} archived={showArchived} />
                       </td>
                     </tr>
                   ) : (
@@ -751,15 +885,23 @@ export default function AdminManagementClient() {
                           {renderCells(user)}
                           {/* The row menu sits at the far right of the table. */}
                           <td className="px-4 3xl:px-5 py-2 3xl:py-2.5 text-right">
-                            <RowMenu
-                              user={user}
-                              tab={activeTab}
-                              onView={() => openEdit(user, true)}
-                              onEdit={() => openEdit(user)}
-                              onManageAccess={() => setPermUser(user)}
-                              onStatusChange={(s) => handleStatusChange(user, s)}
-                              lockedBy={userLocks.get(user.user_id)}
-                            />
+                            {showArchived ? (
+                              <ArchivedRowMenu
+                                onView={() => openEdit(user, true)}
+                                onRestore={() => handleRestore(user)}
+                                lockedBy={userLocks.get(user.user_id)}
+                              />
+                            ) : (
+                              <RowMenu
+                                user={user}
+                                tab={activeTab}
+                                onView={() => openEdit(user, true)}
+                                onEdit={() => openEdit(user)}
+                                onManageAccess={() => setPermUser(user)}
+                                onStatusChange={(s) => handleStatusChange(user, s)}
+                                lockedBy={userLocks.get(user.user_id)}
+                              />
+                            )}
                           </td>
                         </motion.tr>
                       ))}
@@ -785,7 +927,7 @@ export default function AdminManagementClient() {
           user={editUser}
           startInView={formViewOnly}
           // Same rule as the row menu: the combined list can't open the edit form.
-          canEdit={activeTab !== 'all'}
+          canEdit={activeTab !== 'all' && !showArchived}
           lockedBy={editUser ? userLocks.get(editUser.user_id) : undefined}
           enablePermissions
           onClose={() => setShowForm(false)}

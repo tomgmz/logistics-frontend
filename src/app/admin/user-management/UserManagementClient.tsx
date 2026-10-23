@@ -9,7 +9,7 @@ import {
   Users, UserPlus, UserRoundPlus, Search, MoreVertical, ChevronDown,
   Pencil, Eye, ShieldCheck, ShieldOff, Archive,
   AlertTriangle, ArrowLeftRight,
-  KeyRound, Send, RotateCcw, Flag,
+  KeyRound, Send, RotateCcw, Flag, ArchiveRestore,
 } from 'lucide-react'
 import Select, { SelectChangeEvent } from '@mui/material/Select'
 import MenuItem from '@mui/material/MenuItem'
@@ -92,6 +92,26 @@ async function fetchByTab(tab: DirectoryTab): Promise<AnyUser[]> {
     case 'vendor-drivers': return externalDriverService.list() as Promise<AnyUser[]>
     case 'it-admins': return itAdminService.getAll() as unknown as Promise<AnyUser[]>
   }
+}
+
+// The archived view reads /admin/users?status=archived (the per-role lists hide
+// archived accounts). Both driver tabs read the drivers and split on is_external.
+const ARCHIVED_ROLE: Record<DirectoryTab, string> = {
+  clients:          'client',
+  drivers:          'driver',
+  'vendor-drivers': 'driver',
+  'it-admins':      'it_admin',
+}
+
+async function fetchArchivedByTab(tab: DirectoryTab): Promise<AnyUser[]> {
+  const { data } = await userService.getAll({ role: ARCHIVED_ROLE[tab], status: 'archived' })
+  if (tab === 'drivers')        return data.filter((u) => !(u as DriverUser).drivers?.is_external)
+  if (tab === 'vendor-drivers') return data.filter((u) =>  (u as DriverUser).drivers?.is_external)
+  return data
+}
+
+function displayName(u: AnyUser): string {
+  return [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email
 }
 
 function serviceForTab(tab: UserMgmtTab) {
@@ -336,6 +356,90 @@ function RevokedFlag({ user }: { user: VendorDriverUser }) {
   )
 }
 
+/** The archived view's row menu: look at the account, or bring it back. */
+function ArchivedRowMenu({ onView, onRestore, lockedBy }: {
+  onView:    () => void
+  onRestore: () => void
+  lockedBy?: string
+}) {
+  // Restoring undoes an archive, so it needs the same "All" tier archiving does.
+  const { canDelete } = useModuleAccess()
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handle(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handle)
+    return () => document.removeEventListener('mousedown', handle)
+  }, [])
+
+  if (lockedBy) {
+    return (
+      <div className="flex items-center justify-end gap-1.5">
+        <RecordLockBadge holder={lockedBy} />
+        <button onClick={onView} title="View Details" className="rounded-md p-1.5 text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white">
+          <Eye size={15} />
+        </button>
+      </div>
+    )
+  }
+
+  const item = 'flex w-full items-center gap-2.5 px-3.5 py-2 text-sm transition'
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={(e) => { e.stopPropagation(); setOpen(!open) }}
+        className="rounded-md p-1.5 text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white"
+      >
+        <MoreVertical size={18} />
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: -4 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: -4 }}
+            transition={{ duration: 0.12 }}
+            className="absolute right-0 top-8 z-50 w-48 rounded-xl border border-[#424242] bg-[#1b1b1b] py-1 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button onClick={() => { setOpen(false); onView() }} className={`${item} text-[#818181] hover:bg-[#2a2a2a] hover:text-white`}>
+              <Eye size={13} /> View Details
+            </button>
+            {canDelete && (
+              <>
+                <div className="my-1 border-t border-[#424242]" />
+                <button onClick={() => { setOpen(false); onRestore() }} className={`${item} text-[#4df9ed] hover:bg-[#4df9ed]/10`}>
+                  <ArchiveRestore size={13} /> Restore
+                </button>
+              </>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+/** Shows the archived accounts instead of the current ones. */
+function ArchivedToggle({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!on)}
+      aria-pressed={on}
+      title={on ? 'Back to the current accounts' : 'Show archived accounts'}
+      className={`flex h-[34px] 3xl:h-[38px] items-center gap-1.5 whitespace-nowrap rounded-[10px] border px-3 text-[13px] 3xl:text-[15px] transition ${
+        on ? 'border-[#ffea00] bg-[#ffea00]/[0.15] text-[#ffea00]' : 'border-[#818181] bg-[#424242] text-[#818181] hover:text-white'
+      }`}
+    >
+      <Archive className="size-4" /> Archived
+    </button>
+  )
+}
+
 /**
  * Actions for a vendor driver: the shared view/edit form, plus the access actions
  * a passkey-only account needs instead of a password reset.
@@ -474,7 +578,7 @@ function TableSkeleton({ cols }: { cols: number }) {
   )
 }
 
-function EmptyState({ tab, onAdd, canAdd }: { tab: TabValue; onAdd: () => void; canAdd: boolean }) {
+function EmptyState({ tab, onAdd, canAdd, archived = false }: { tab: TabValue; onAdd: () => void; canAdd: boolean; archived?: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center py-24 text-center">
       <div className="mb-4 rounded-full border border-[#424242] bg-[#1b1b1b] p-4">
@@ -482,11 +586,13 @@ function EmptyState({ tab, onAdd, canAdd }: { tab: TabValue; onAdd: () => void; 
       </div>
       <p className="text-base font-semibold text-white">No records found</p>
       <p className="mt-1 text-sm text-[#818181]">
-        {tab === 'vendor-drivers'
+        {archived
+          ? `No archived ${tab === 'all' ? 'users' : ACCOUNT_NOUN[tab].toLowerCase() + 's'}.`
+          : tab === 'vendor-drivers'
           ? 'No vendor drivers yet. Add one here, then pick them in Booking Management for a vendor-supplied delivery.'
           : `No ${tab === 'all' ? 'users' : tab} match your current filters.`}
       </p>
-      {tab !== 'all' && canAdd && (
+      {tab !== 'all' && canAdd && !archived && (
         <button
           onClick={onAdd}
           className="mt-6 flex items-center gap-2 rounded-lg bg-[#4df9ed] px-4 py-2 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5]"
@@ -685,6 +791,10 @@ export default function UserManagementClient() {
   const [formDriverSource, setFormDriverSource] = useState<DriverSource>('company')
   const [showTransition,   setShowTransition]   = useState(false)
   const [showTypePicker,   setShowTypePicker]   = useState(false)
+  // Archived view: the same tabs, listing archived accounts with a Restore action.
+  const [showArchived,     setShowArchived]     = useState(false)
+  const archivedRef = useRef(showArchived)
+  archivedRef.current = showArchived
 
   // Only the primary administrator may hand the IT Admin role over. The API
   // enforces it; this just keeps a button that would 403 out of the way.
@@ -742,13 +852,14 @@ export default function UserManagementClient() {
       if (hard) setLoading(true); else setFetching(true)
       setError(null)
     }
+    const archived = archivedRef.current
     try {
       const [result, statsResult] = await Promise.all([
-        userService.getAll({ search: searchQuery || undefined, role: 'client,driver' }),
+        userService.getAll({ search: searchQuery || undefined, role: 'client,driver', status: archived ? 'archived' : undefined }),
         userService.getStats('client,driver'),
       ])
-      // Left the All tab while this was in flight: its rows don't belong here.
-      if (currentTabRef.current !== 'all') return
+      // Left the All tab (or switched archived view) while this was in flight: its rows don't belong here.
+      if (currentTabRef.current !== 'all' || archivedRef.current !== archived) return
       setAllRows(result.data)
       setServerTotal(result.total)
       setServerTotalPages(Math.ceil(result.total / PAGE_SIZE))
@@ -776,12 +887,13 @@ export default function UserManagementClient() {
       setError(null)
       setAllRows([])
     }
+    const archived = archivedRef.current
     try {
       const [rows, statsResult] = await Promise.all([
-        fetchByTab(tab),
+        archived ? fetchArchivedByTab(tab) : fetchByTab(tab),
         userService.getStats('client,driver')
       ])
-      if (currentTabRef.current !== tab) return
+      if (currentTabRef.current !== tab || archivedRef.current !== archived) return
       setAllRows(rows)
       setStats({ total: statsResult.total, active: statsResult.active, archived: statsResult.archived })
     } catch {
@@ -808,7 +920,7 @@ export default function UserManagementClient() {
     if (isResetsTab) { setLoading(false); return }
     if (activeTab === 'all') fetchAllUsers('', true)
     else fetchTabUsers(activeTab)
-  }, [activeTab, isResetsTab]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeTab, isResetsTab, showArchived]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (isResetsTab || activeTab !== 'all') return
@@ -855,6 +967,11 @@ export default function UserManagementClient() {
     const serviceTab = activeTab === 'clients' || activeTab === 'drivers'
       ? activeTab
       : tabFromRole(user.role)
+    if (status === 'archived' && !window.confirm(
+      `Archive ${displayName(user)}?\n\n` +
+      'They are signed out everywhere and can no longer sign in. ' +
+      'Their records are kept, and you can restore the account from the Archived view.'
+    )) return
     try {
       await appToast.promise(
         updateStatus(serviceTab, user.user_id, status),
@@ -864,6 +981,24 @@ export default function UserManagementClient() {
           error:   (e) => getApiErrorMessage(e, 'Failed to update account.'),
         },
         { action: 'update-status', entityId: user.user_id },
+      )
+      await refetchCurrentTab()
+    } catch { /* handled by toast */ }
+  }
+
+  async function handleRestore(user: AnyUser) {
+    const vendor = !!(user as DriverUser).drivers?.is_external
+    try {
+      await appToast.promise(
+        Promise.resolve<unknown>(serviceForTab(tabFromRole(user.role)).restore(user.user_id)),
+        {
+          loading: 'Restoring account…',
+          success: vendor
+            ? `${displayName(user)} restored. Send a new setup link from Vendor Drivers so they can sign in.`
+            : `${displayName(user)} restored and can sign in again.`,
+          error:   (e) => getApiErrorMessage(e, 'Failed to restore the account.'),
+        },
+        { action: 'restore-user', entityId: user.user_id },
       )
       await refetchCurrentTab()
     } catch { /* handled by toast */ }
@@ -897,7 +1032,7 @@ export default function UserManagementClient() {
   // its tab is open: offer it there when it is empty. A filled seat is handed
   // over with Transition IT Administrator instead.
   const newAccountTypes = NEW_ACCOUNT_TYPES.filter(
-    (t) => t.key !== 'it-admins' || (isITAdminTab && !loading && !activeITAdmin),
+    (t) => t.key !== 'it-admins' || (isITAdminTab && !showArchived && !loading && !activeITAdmin),
   )
 
   function handleRefresh() {
@@ -922,8 +1057,8 @@ export default function UserManagementClient() {
               If it is somehow empty, creating one is exactly right.
             */}
             {!isResetsTab && (
-              isITAdminTab && activeITAdmin ? (
-                isRootAdmin && (
+              isITAdminTab && (activeITAdmin || showArchived) ? (
+                isRootAdmin && activeITAdmin && (
                   <button
                     onClick={() => setShowTransition(true)}
                     className={HEADER_BTN}
@@ -1050,8 +1185,9 @@ export default function UserManagementClient() {
                 />
               </div>
               <RefreshButton iconOnly onClick={handleRefresh} loading={(loading || fetching)} disabled={loading || fetching} />
-              <span className="basis-full text-right sm:basis-auto sm:ml-auto text-[10px] 3xl:text-[11px] font-bold text-[#4df9ed] whitespace-nowrap">
-                {total} {ACCOUNT_NOUN[activeTab]} Account{total !== 1 ? 's' : ''}
+              <ArchivedToggle on={showArchived} onChange={setShowArchived} />
+              <span className={`basis-full text-right sm:basis-auto sm:ml-auto text-[10px] 3xl:text-[11px] font-bold whitespace-nowrap ${showArchived ? 'text-[#ffea00]' : 'text-[#4df9ed]'}`}>
+                {total} {showArchived ? 'Archived ' : ''}{ACCOUNT_NOUN[activeTab]} Account{total !== 1 ? 's' : ''}
               </span>
             </div>
             )}
@@ -1083,7 +1219,7 @@ export default function UserManagementClient() {
               />
             ) : (
             <>
-            {isDriverTab && licenseFlagCount > 0 && (
+            {isDriverTab && !showArchived && licenseFlagCount > 0 && (
               <div className="flex items-center gap-3 border-b border-amber-500/20 bg-amber-500/10 px-5 py-3 text-sm text-amber-400 shrink-0">
                 <AlertTriangle size={14} className="shrink-0" />
                 <span>
@@ -1129,7 +1265,7 @@ export default function UserManagementClient() {
                   ) : users.length === 0 ? (
                     <tr>
                       <td colSpan={colCount}>
-                        <EmptyState tab={activeTab} onAdd={openCreate} canAdd={access.canCreate} />
+                        <EmptyState tab={activeTab} onAdd={openCreate} canAdd={access.canCreate} archived={showArchived} />
                       </td>
                     </tr>
                   ) : (
@@ -1145,7 +1281,13 @@ export default function UserManagementClient() {
                           {renderCells(user, activeTab)}
                           {/* The row menu sits at the far right of the table. */}
                           <td className="px-4 3xl:px-5 py-2 3xl:py-2.5 text-right">
-                            {activeTab === 'vendor-drivers' ? (
+                            {showArchived ? (
+                              <ArchivedRowMenu
+                                onView={() => openEdit(user, true)}
+                                onRestore={() => handleRestore(user)}
+                                lockedBy={userLocks.get(user.user_id)}
+                              />
+                            ) : activeTab === 'vendor-drivers' ? (
                               <VendorRowMenu
                                 user={user as VendorDriverUser}
                                 onDone={refetchCurrentTab}
@@ -1189,7 +1331,7 @@ export default function UserManagementClient() {
           driverSource={formDriverSource}
           startInView={formViewOnly}
           // Same rule as the row menu: the combined list can't open the edit form.
-          canEdit={activeTab !== 'all' && access.canEdit}
+          canEdit={activeTab !== 'all' && !showArchived && access.canEdit}
           lockedBy={editUser ? userLocks.get(editUser.user_id) : undefined}
           onClose={() => setShowForm(false)}
           onSaved={async () => {
