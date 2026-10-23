@@ -48,6 +48,23 @@ export interface LandlinePrefix {
   created_at: string
 }
 
+export interface VehicleType {
+  vehicle_type_id: string
+  name:            string
+  description:     string | null
+  is_active:       boolean
+  created_at:      string
+  updated_at:      string
+  /** Non-archived truck models carrying this type. */
+  model_count:     number
+}
+
+export interface VehicleTypePayload {
+  name?:        string
+  description?: string | null
+  is_active?:   boolean
+}
+
 export interface CreateHandlingCodePayload {
   code:         string
   name:         string
@@ -133,6 +150,7 @@ const HC = '/admin/handling-codes'
 const CM = '/admin/commodities'
 const PR = '/admin/products'
 const LP = '/admin/landline-prefixes'
+const VT = '/admin/vehicle-types'
 
 export const systemMaintenanceService = {
 
@@ -195,4 +213,17 @@ export const systemMaintenanceService = {
 
   deleteLandlinePrefix: (id: string) =>
     del<null>(`${LP}/${id}`),
+
+  /** `activeOnly` for pickers; System Maintenance lists them all. */
+  getVehicleTypes: (activeOnly = false) =>
+    get<VehicleType[]>(activeOnly ? `${VT}?active=true` : VT),
+
+  createVehicleType: (payload: VehicleTypePayload & { name: string }) =>
+    post<VehicleType>(VT, payload),
+
+  updateVehicleType: (id: string, payload: VehicleTypePayload) =>
+    patch<VehicleType>(`${VT}/${id}`, payload),
+
+  deleteVehicleType: (id: string) =>
+    del<null>(`${VT}/${id}`),
 }

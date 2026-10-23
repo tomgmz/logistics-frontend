@@ -24,19 +24,8 @@ import { ModelThumb, fmtDimensions, kgToTons } from './vehicle-ui'
 
 import RefreshButton from '@/components/ui/RefreshButton'
 import Pagination from '@/components/ui/Pagination'
-export const VEHICLE_TYPES = [
-  'Closed Van',
-  'Wing Van',
-  'Dropside',
-  'Refrigerated Van',
-  'Boom Truck',
-  'Flatbed',
-  'Others',
-] as const
+import { useVehicleTypeOptions } from '@/lib/hooks/useVehicleTypes'
 
-export type VehicleType = (typeof VEHICLE_TYPES)[number]
-
-const KNOWN_TYPES = VEHICLE_TYPES.slice(0, -1)
 const PAGE_SIZE = 15
 
 interface ModelFormState {
@@ -114,7 +103,6 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
   const [form,         setForm]        = useState<ModelFormState>(emptyModelForm())
   const [fieldErrors,  setFieldErrors] = useState<FieldErrors>({})
   const [touched,      setTouched]     = useState(false)
-  const [isOtherType,  setIsOtherType] = useState(false)
 
   const [imageFile,    setImageFile]    = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
@@ -127,6 +115,9 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const editingModel = models.find((m) => m.model_id === editingId) ?? null
+  // Managed in System Maintenance → Vehicle Types. An edited model keeps its
+  // type even if that type has since been made inactive.
+  const vehicleTypes = useVehicleTypeOptions(formMode === 'edit' ? editingModel?.vehicle_type : null, !!formMode)
   const initialForm  = useRef<ModelFormState | null>(null)
 
   const hasChanges = formMode === 'create' || !!imageFile || (
@@ -175,7 +166,6 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
     setImagePreview(null)
     setFieldErrors({})
     setTouched(false)
-    setIsOtherType(false)
     setFormMode('create')
     initialForm.current = null
   }
@@ -188,7 +178,6 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
     setImagePreview(m.image_url ?? null)
     setFieldErrors({})
     setTouched(false)
-    setIsOtherType(!!m.vehicle_type && !(KNOWN_TYPES as readonly string[]).includes(m.vehicle_type))
     setFormMode('edit')
     initialForm.current = formState
   }
@@ -215,7 +204,6 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
     setImagePreview(null)
     setFieldErrors({})
     setTouched(false)
-    setIsOtherType(false)
     initialForm.current = null
   }
 
@@ -243,14 +231,7 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
   }
 
   const handleVehicleTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value
-    if (val === 'Others') {
-      setIsOtherType(true)
-      setForm((f) => ({ ...f, vehicle_type: '' }))
-    } else {
-      setIsOtherType(false)
-      setForm((f) => ({ ...f, vehicle_type: val }))
-    }
+    setForm((f) => ({ ...f, vehicle_type: e.target.value }))
     setFieldErrors((prev) => ({ ...prev, vehicle_type: undefined }))
   }
 
@@ -407,7 +388,7 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
       : formMode === 'create' ? 'Create' : 'Save'
 
   const inputCls = (hasErr: boolean) =>
-    `w-full rounded-lg border bg-[#111] px-3 py-2.5 text-sm text-white outline-none transition-colors
+    `w-full rounded-lg border bg-[#111] px-3 py-2.5 text-base sm:text-sm text-white outline-none transition-colors
      ${hasErr
        ? 'border-red-400/60 focus:border-red-400'
        : 'border-white/10 focus:border-[var(--color-cyan)]/40'}`
@@ -625,26 +606,23 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
                     Vehicle type <span className="text-red-400">*</span>
                   </label>
                   <select
-                    value={isOtherType ? 'Others' : form.vehicle_type}
+                    value={form.vehicle_type}
                     onChange={handleVehicleTypeChange}
                     className={inputCls(!!fieldErrors.vehicle_type)}
+                    style={{ colorScheme: 'dark' }}
+                    disabled={vehicleTypes.loading}
                   >
-                    <option value="">Select type</option>
-                    {VEHICLE_TYPES.map((vt) => (
+                    <option value="">{vehicleTypes.loading ? 'Loading types…' : 'Select type'}</option>
+                    {vehicleTypes.options.map((vt) => (
                       <option key={vt} value={vt}>{vt}</option>
                     ))}
                   </select>
-                  {isOtherType && (
-                    <input
-                      value={form.vehicle_type}
-                      onChange={(e) => {
-                        setForm((f) => ({ ...f, vehicle_type: e.target.value }))
-                        if (touched) setFieldErrors((prev) => ({ ...prev, vehicle_type: undefined }))
-                      }}
-                      className={`mt-1.5 ${inputCls(!!fieldErrors.vehicle_type)}`}
-                      placeholder="Specify vehicle type…"
-                      autoFocus
-                    />
+                  {!vehicleTypes.loading && (vehicleTypes.error || vehicleTypes.options.length === 0) && (
+                    <p className="text-[11px] text-amber-200/90">
+                      {vehicleTypes.error
+                        ? "Couldn't load the vehicle types. Close and reopen the form to try again."
+                        : 'No vehicle types yet. An administrator adds them in System Maintenance → Vehicle Types.'}
+                    </p>
                   )}
                   {fieldErrors.vehicle_type && (
                     <p className="text-[11px] text-red-400">{fieldErrors.vehicle_type}</p>

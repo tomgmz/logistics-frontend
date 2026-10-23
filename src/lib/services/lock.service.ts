@@ -20,6 +20,7 @@ export type LockType =
   | 'commodity'
   | 'product'
   | 'landline_prefix'
+  | 'vehicle_type'
 
 export interface LockView {
   resource_type:    LockType

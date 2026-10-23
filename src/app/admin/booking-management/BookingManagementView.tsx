@@ -74,6 +74,7 @@ import type { BookingWithRelations } from '@/lib/store/slice/routeMap.slice'
 import { useRecordLock, useRecordLocks } from '@/lib/hooks/useRecordLock'
 import RecordLockBanner, { RecordLockBadge } from '@/components/ui/RecordLockBanner'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
+import { useVehicleTypeOptions } from '@/lib/hooks/useVehicleTypes'
 import { PALETTE } from '@/lib/palette'
 import {
   CARD_CLASS,
@@ -610,6 +611,9 @@ function AssignmentPanel({
   /** Booking Management tier allows edits; Read-only shows the crew without the picker. */
   canEdit:         boolean
 }) {
+  // Vendor vehicles are never registered, so their type is picked from System
+  // Maintenance → Vehicle Types. One typed in before that list existed is kept.
+  const vehicleTypes = useVehicleTypeOptions(vendorForm.vendor_vehicle_type, vendorMode)
   const isAssigned = normalizeBookingStatus(detail.status) === 'assigned'
 
   const driverLabel = (() => {
@@ -939,15 +943,25 @@ function AssignmentPanel({
                 )}
               </div>
               <div>
-                <label className="text-[11px] text-white/40 block mb-1">Vehicle type</label>
-                <input
+                <label htmlFor="vendor-vehicle-type" className="text-[11px] text-white/40 block mb-1">Vehicle type</label>
+                <select
+                  id="vendor-vehicle-type"
                   value={vendorForm.vendor_vehicle_type}
-                  disabled={assignBusy}
+                  disabled={assignBusy || vehicleTypes.loading}
                   onChange={(e) => onVendorFieldChange('vendor_vehicle_type', e.target.value)}
-                  className={selectClass}
-                  placeholder="6-wheeler closed van"
-                  maxLength={60}
-                />
+                  className={selectClass.replace('text-sm', 'text-base sm:text-sm')}
+                  style={{ colorScheme: 'dark' }}
+                >
+                  <option value="">{vehicleTypes.loading ? 'Loading types…' : 'Select type'}</option>
+                  {vehicleTypes.options.map((vt) => (
+                    <option key={vt} value={vt}>{vt}</option>
+                  ))}
+                </select>
+                {vehicleTypes.error && (
+                  <p className="text-[10px] text-amber-200/90 mt-1 leading-snug">
+                    Couldn&apos;t load the vehicle types. Close and reopen this pop-up to try again.
+                  </p>
+                )}
               </div>
             </div>
           </div>

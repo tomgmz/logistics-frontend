@@ -67,6 +67,7 @@ import { getApiErrorMessage } from '@/lib/api-error'
 import { formatPlateNumber, plateError } from '@/lib/validation/plate'
 
 import RefreshButton from '@/components/ui/RefreshButton'
+import { useVehicleTypeOptions } from '@/lib/hooks/useVehicleTypes'
 const PAGE_SIZE = 10
 
 type FormMode    = 'create' | 'edit' | null
@@ -526,6 +527,25 @@ export default function VehicleManagementView() {
   const selectedModel         = useMemo(() => models.find((m) => m.model_id === form.model_id) ?? null, [models, form.model_id])
   const selectedModelImageUrl = resolveModelImageUrl(selectedModel?.image_url ?? null)
 
+  // Vehicle type narrows the model strip. The type itself lives on the model,
+  // so this is a filter, not a field of the vehicle.
+  const [typeFilter, setTypeFilter] = useState('')
+  const vehicleTypes = useVehicleTypeOptions(selectedModel?.vehicle_type, !!modalMode)
+  const pickableModels = useMemo(
+    () => typeFilter
+      ? models.filter((m) => (m.vehicle_type ?? '').trim().toLowerCase() === typeFilter.toLowerCase())
+      : models,
+    [models, typeFilter],
+  )
+
+  function changeTypeFilter(value: string) {
+    setTypeFilter(value)
+    // A picked model of another type no longer fits the choice.
+    if (value && selectedModel && (selectedModel.vehicle_type ?? '').trim().toLowerCase() !== value.toLowerCase()) {
+      clearModelPick()
+    }
+  }
+
   function applyModelPick(modelId: string) {
     setForm((f) => ({ ...f, model_id: modelId }))
   }
@@ -542,6 +562,7 @@ export default function VehicleManagementView() {
     setForm(emptyForm())
     setOriginalForm(emptyForm())
     setFormError(null)
+    setTypeFilter('')
     setModalMode('create')
   }
 
@@ -552,6 +573,7 @@ export default function VehicleManagementView() {
     setForm(initial)
     setOriginalForm(initial)
     setFormError(null)
+    setTypeFilter(models.find((m) => m.model_id === initial.model_id)?.vehicle_type?.trim() ?? '')
     setModalMode('edit')
   }
 
@@ -1186,8 +1208,25 @@ export default function VehicleManagementView() {
 
                 {/* Model picker */}
                 <div className="block">
+                  <label htmlFor="vehicle-type-filter" className="text-[11px] font-bold uppercase text-white/40">
+                    Vehicle type
+                  </label>
+                  <select
+                    id="vehicle-type-filter"
+                    value={typeFilter}
+                    onChange={(e) => changeTypeFilter(e.target.value)}
+                    disabled={vehicleTypes.loading}
+                    style={{ colorScheme: 'dark' }}
+                    className="mt-1 mb-3 w-full rounded-lg border border-white/10 bg-[#111] px-3 py-2.5 text-base sm:text-sm text-white outline-none focus:border-[var(--color-cyan)]/40"
+                  >
+                    <option value="">{vehicleTypes.loading ? 'Loading types…' : 'All types'}</option>
+                    {vehicleTypes.options.map((vt) => (
+                      <option key={vt} value={vt}>{vt}</option>
+                    ))}
+                  </select>
+
                   <span className="text-[11px] font-bold uppercase text-white/40">
-                    Model &amp; vehicle type
+                    Model
                   </span>
 
                   <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-white/15 scrollbar-track-transparent">
@@ -1204,7 +1243,7 @@ export default function VehicleManagementView() {
                       <span className="text-[10px] font-semibold text-white/60 text-center leading-tight">No model</span>
                     </button>
 
-                    {models.map((m) => {
+                    {pickableModels.map((m) => {
                       const url    = resolveModelImageUrl(m.image_url ?? null)
                       const picked = form.model_id === m.model_id
                       return (
@@ -1230,6 +1269,11 @@ export default function VehicleManagementView() {
                       )
                     })}
                   </div>
+                  {typeFilter && pickableModels.length === 0 && (
+                    <p className="text-[11px] text-white/40 mt-1.5 leading-snug">
+                      No {typeFilter} models yet. Add one in Manage models, or pick another type.
+                    </p>
+                  )}
                 </div>
 
                 {/* Selected model preview */}
