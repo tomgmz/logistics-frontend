@@ -157,7 +157,7 @@ export default function ReplaceCrewPanel({
           <p className="text-[12px] leading-snug" style={{ color: MUTED }}>
             {paused
               ? 'The delivery is paused. You can send another driver, another vehicle, or both — the delivery continues from where it stopped and everything done so far stays on record.'
-              : 'Available only while the driver has the delivery paused (for example for a breakdown). The driver already started, so the crew can’t simply be changed.'}
+              : 'Available only while the delivery is paused (pause it above, for example for a breakdown). The driver already started, so the crew can’t simply be changed.'}
           </p>
           <div>
             <button type="button" disabled={!paused || busy} onClick={openPicker}

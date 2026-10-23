@@ -7,10 +7,11 @@ interface ApiResponse<T> {
 }
 
 /**
- * Pauses the driver put on a delivery — weather, a breakdown, a closed pickup or
- * drop-off. The pause in force is on the booking itself (`paused_at`,
- * `pause_reason`); this reads the history with the driver's notes, which are
- * staff-only, and ends a pause from the office.
+ * Pauses on a delivery in transit — weather, a breakdown, a closed pickup or
+ * drop-off. Only the Operations Manager and the Company Administrator put one
+ * on or end it; the driver can do neither. The pause in force is on the booking
+ * itself (`paused_at`, `pause_reason`); this reads the history with its notes,
+ * which are staff-only, and pauses / resumes from the office.
  */
 
 export { PAUSE_REASON_LABEL, pauseReasonLabel, type PauseReason } from '@/lib/pause-reasons'
@@ -41,6 +42,13 @@ export const pauseService = {
   list: async (bookingId: string): Promise<BookingPause[]> => {
     const { data } = await proxyApi.get<ApiResponse<BookingPause[]>>(`${B}/${bookingId}/pauses`)
     return data.data ?? []
+  },
+
+  /** Pause the delivery from the office. The note is required (3–500). */
+  pause: async (bookingId: string, reason: PauseReason, note: string) => {
+    await initCsrf()
+    const { data } = await proxyApi.patch<ApiResponse<unknown>>(`${B}/${bookingId}/pause`, { reason, note })
+    return data.data
   },
 
   /** End the pause from the office. */

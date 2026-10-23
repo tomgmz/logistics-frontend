@@ -1,5 +1,5 @@
 /**
- * Why a driver paused a delivery, in words. Shared by the staff views and the
+ * Why a delivery was paused, in words. Shared by the staff views and the
  * client's tracking page — the reason category is the one part of a pause the
  * client is shown.
  */

@@ -235,6 +235,10 @@ export interface RemarksModalProps {
   onCancel?: () => void;
   disableBackdropClose?: boolean;
   busy?: boolean;
+  /** Extra fields shown above the remarks box (e.g. a reason picker). */
+  children?: ReactNode;
+  /** Keeps Confirm disabled until those extra fields are filled in. */
+  confirmDisabled?: boolean;
 }
 
 export function RemarksModal({
@@ -249,6 +253,8 @@ export function RemarksModal({
   onCancel,
   disableBackdropClose = false,
   busy = false,
+  children,
+  confirmDisabled = false,
 }: RemarksModalProps) {
   const [remarks, setRemarks] = useState("");
 
@@ -260,7 +266,7 @@ export function RemarksModal({
   const handleConfirm = () => {
     const trimmed = remarks.trim();
 
-    if (!trimmed) return;
+    if (!trimmed || confirmDisabled) return;
 
     onConfirm?.(trimmed);
     setRemarks("");
@@ -286,6 +292,7 @@ export function RemarksModal({
     typeof window !== "undefined" && window.innerWidth < 640;
 
   const trimmed = remarks.trim();
+  const canConfirm = !!trimmed && !confirmDisabled;
 
   return (
     <BodyPortal>
@@ -355,6 +362,8 @@ export function RemarksModal({
                 </p>
               )}
 
+              {children}
+
               <div className="space-y-1">
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-white/50">
                   {remarksLabel}{" "}
@@ -395,7 +404,7 @@ export function RemarksModal({
 
               <motion.button
                 whileHover={
-                  !busy && trimmed
+                  !busy && canConfirm
                     ? {
                         scale: 1.03,
                         backgroundColor:
@@ -404,11 +413,11 @@ export function RemarksModal({
                     : {}
                 }
                 whileTap={
-                  !busy && trimmed
+                  !busy && canConfirm
                     ? { scale: 0.96 }
                     : {}
                 }
-                disabled={busy || !trimmed}
+                disabled={busy || !canConfirm}
                 onClick={handleConfirm}
                 className="flex items-center justify-center rounded-[8px] cursor-pointer
                            select-none w-full h-[44px] sm:w-[88px] sm:h-[40px] disabled:opacity-40

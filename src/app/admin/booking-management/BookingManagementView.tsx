@@ -248,11 +248,11 @@ function VehiclePulledBanner({
   )
 }
 
-/** List badge: the driver has the delivery paused (weather, breakdown, closed stop…). */
+/** List badge: the delivery is paused (weather, breakdown, closed stop…). */
 function PausedBadge({ reason }: { reason: string }) {
   return (
     <span
-      title={`Paused by the driver: ${pauseReasonLabel(reason)}`}
+      title={`Paused: ${pauseReasonLabel(reason)}`}
       className="flex w-fit items-center gap-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border mt-1"
       style={{ color: '#ffea00', borderColor: '#fbbf2455', background: '#fbbf2414' }}
     >
@@ -282,7 +282,7 @@ interface ListRow {
   company?: string | null
   stops: number
   created_at: string | null
-  /** Set while the driver has the delivery paused. */
+  /** Set while the delivery is paused. */
   pause_reason: string | null
   /** True while the client's reported problem is unresolved. */
   issue_open: boolean
@@ -2471,17 +2471,19 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                           />
                         )}
 
-                        {/* The driver paused the delivery: reason, note, and a way to end
-                            it from the office. Also lists every earlier pause. */}
+                        {/* Pausing a delivery in transit, and ending the pause: the
+                            Operations Manager's and the Company Administrator's, never
+                            the driver's. Also lists every earlier pause. */}
                         <PausePanel
                           bookingId={detail.booking_id}
                           pausedAt={(detail as { paused_at?: string | null }).paused_at}
-                          canResume={(roleView === 'admin' || roleView === 'operations_manager') && canEdit && !bookingReadOnly}
+                          inTransit={normalizeBookingStatus(detail.status) === 'in_transit'}
+                          canControl={(roleView === 'admin' || roleView === 'operations_manager') && canEdit && !bookingReadOnly}
                           onUpdated={() => { void refreshDetail(detail.booking_id); void loadPage(true) }}
                         />
 
                         {/* On the road the crew can no longer be re-assigned; while the
-                            driver has it paused, it can be replaced. Lists every
+                            delivery is paused, it can be replaced. Lists every
                             replacement on the booking too. */}
                         <ReplaceCrewPanel
                           bookingId={detail.booking_id}
