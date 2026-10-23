@@ -7,6 +7,7 @@ import ReusableSidebar from './ReusableSidebar'
 import SiteFooter      from './SiteFooter'
 import { useEndOfPageFooter } from './useEndOfPageFooter'
 import PushProvider                  from '@/components/push/PushProvider'
+import EmergencyCallProvider         from '@/components/calls/EmergencyCallProvider'
 import { ModuleAccessProvider, ModuleNoAccess } from './ModuleAccess'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { canViewModule, moduleFlags } from '@/lib/permissions'
@@ -73,6 +74,8 @@ export default function ReusableDashboardShell({ children, navItems }: ReusableD
       </div>
 
       <PushProvider />
+      {/* Rings this browser when a driver places an emergency call. */}
+      {(user?.role === 'operations_manager' || user?.role === 'admin') && <EmergencyCallProvider />}
     </div>
   )
 }
