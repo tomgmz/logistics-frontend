@@ -102,3 +102,21 @@ app — and it is deliberately not used: the driver setup email points at
 `/driver-setup`, which hands off to the app's custom scheme. That works from a
 desktop mailbox and from a phone without the app installed, neither of which App
 Links handles.
+
+# `/.well-known/apple-app-site-association` (iPhone passkeys)
+
+The iPhone half of the same pairing. The app side is already in the mobile repo:
+`app.config.ts` adds `webcredentials:8338logistics.delivery` when the build sets
+`EXPO_PUBLIC_IOS_PASSKEYS=1`.
+
+To switch iPhone passkeys on (needs a PAID Apple Developer Program membership):
+
+1. Replace `REPLACE_WITH_APPLE_TEAM_ID` in `apple-app-site-association` with the
+   10-character Team ID (developer.apple.com → Membership), then deploy.
+2. Check it is served as JSON with no redirect:
+   `curl -sI https://8338logistics.delivery/.well-known/apple-app-site-association`
+3. Set `EXPO_PUBLIC_IOS_PASSKEYS=1` in the EAS environment and make a new iOS
+   build. An OTA update cannot add the entitlement.
+
+The backend needs nothing extra: iOS reports `https://<WEBAUTHN_RP_ID>` as the
+origin, and `webauthn-config.ts` adds that origin automatically.
