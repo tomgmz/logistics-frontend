@@ -960,16 +960,14 @@ export default function UserFormModal({
                 />
               </Field>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Field label="Company Name" required error={fe.company_name}>
-                  <Input
-                    value={form.company_name as string}
-                    onChange={e => set('company_name', e.target.value)}
-                    placeholder="Acme Corp"
-                    error={fe.company_name}
-                  />
-                </Field>
-              </div>
+              <Field label="Company Name" required error={fe.company_name}>
+                <Input
+                  value={form.company_name as string}
+                  onChange={e => set('company_name', e.target.value)}
+                  placeholder="Acme Corp"
+                  error={fe.company_name}
+                />
+              </Field>
 
               <Field label="Billing Address" required error={fe.billing_address}>
                 <BillingAddressField

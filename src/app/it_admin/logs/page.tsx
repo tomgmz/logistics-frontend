@@ -603,13 +603,13 @@ function SystemLogsTab() {
 }
 
 export default function LogsPage() {
-  // Dashboard deep links land on ?tab=system. Safe to read in the initialiser:
-  // the it_admin layout renders nothing until the auth store has hydrated, so
-  // this page never renders on the server.
+  // System Logs is the first tab and the default; ?tab=audit opens Audit Logs.
+  // Safe to read in the initialiser: the it_admin layout renders nothing until
+  // the auth store has hydrated, so this page never renders on the server.
   const [activeTab, setActiveTab]   = useState<ActiveTab>(() =>
-    typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tab') === 'system'
-      ? 'system'
-      : 'audit')
+    typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tab') === 'audit'
+      ? 'audit'
+      : 'system')
   const [auditStats, setAuditStats] = useState<LogStats | null>(null)
   const [systemStats]               = useState<SystemLogStats | null>(null)
 
@@ -678,17 +678,6 @@ export default function LogsPage() {
           {/* Right: tab switcher */}
           <div className="flex items-center gap-1 rounded-xl border border-[#2a2a2a] bg-[#1b1b1b] p-1 self-start lg:self-auto">
             <button
-              onClick={() => setActiveTab('audit')}
-              className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
-                activeTab === 'audit'
-                  ? 'bg-[#4df9ed] text-[#0a0a0a]'
-                  : 'text-[#818181] hover:text-white hover:bg-[#2a2a2a]'
-              }`}
-            >
-              <ScrollText size={14} />
-              Audit Logs
-            </button>
-            <button
               onClick={() => setActiveTab('system')}
               className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
                 activeTab === 'system'
@@ -699,12 +688,23 @@ export default function LogsPage() {
               <Server size={14} />
               System Logs
             </button>
+            <button
+              onClick={() => setActiveTab('audit')}
+              className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
+                activeTab === 'audit'
+                  ? 'bg-[#4df9ed] text-[#0a0a0a]'
+                  : 'text-[#818181] hover:text-white hover:bg-[#2a2a2a]'
+              }`}
+            >
+              <ScrollText size={14} />
+              Audit Logs
+            </button>
           </div>
         </div>
 
         {/* Tab content */}
-        {activeTab === 'audit'  && <AuditLogsTab  />}
         {activeTab === 'system' && <SystemLogsTab />}
+        {activeTab === 'audit'  && <AuditLogsTab  />}
 
       </div>
     </div>
