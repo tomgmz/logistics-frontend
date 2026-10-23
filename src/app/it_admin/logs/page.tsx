@@ -632,7 +632,7 @@ export default function LogsPage() {
 
           {/* Left: title + stats inline */}
           <div className="flex flex-wrap items-center gap-2 mt-1">
-            <h1 className="text-2xl font-bold tracking-tight text-white mr-1">Logs</h1>
+            <h1 className="mr-1 font-[family-name:var(--font-alegreya-sc)] text-[17px] 3xl:text-[20px] font-bold text-white">Logs</h1>
 
             {activeTab === 'audit' && auditStats && (
               <>

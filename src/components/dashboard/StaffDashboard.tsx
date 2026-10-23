@@ -391,7 +391,7 @@ export default function StaffDashboard({ role }: { role: StaffRole }) {
     <div className="flex-1 overflow-y-auto bg-[var(--color-bg)] ff-sc">
       <div className="w-full space-y-5 px-4 py-4 lg:px-5">
         <header className="flex items-center justify-between gap-3">
-          <h1 className="text-lg font-bold tracking-tight text-white">Dashboard</h1>
+          <h1 className="font-[family-name:var(--font-alegreya-sc)] text-[17px] 3xl:text-[20px] font-bold text-white">Dashboard</h1>
           <RefreshButton onClick={() => { setLoading(true); void load() }} loading={loading} />
         </header>
 

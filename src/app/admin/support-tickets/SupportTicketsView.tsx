@@ -143,7 +143,7 @@ export default function SupportTicketsView() {
     <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-hidden ff-sc bg-[var(--color-bg)]">
       <header className="shrink-0 px-3 py-3 lg:px-4 border-b border-white/[0.07] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-bold text-white tracking-tight">Tickets</h1>
+          <h1 className="font-[family-name:var(--font-alegreya-sc)] text-[17px] 3xl:text-[20px] font-bold text-white">Tickets</h1>
           <p className="text-xs text-white/40 mt-0.5">
             Client support tickets · {counts.open} open · {counts.resolved} resolved
           </p>

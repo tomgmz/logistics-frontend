@@ -812,7 +812,7 @@ export default function VehicleManagementView() {
 
       <header className="shrink-0 px-3 pt-3 lg:px-4 3xl:px-[19px] border-b border-[#424242] flex flex-col gap-2 bg-[#0a0a0a]">
         <div className="flex flex-wrap items-center gap-2 3xl:gap-[10px]">
-          <h1 className="mr-auto text-[18px] 3xl:text-[24px] font-bold text-white">Vehicle Management</h1>
+          <h1 className="mr-auto font-[family-name:var(--font-alegreya-sc)] text-[17px] 3xl:text-[20px] font-bold text-white">Vehicle Management</h1>
           <RefreshButton onClick={() => void refreshAll()} />
           <button
             type="button"

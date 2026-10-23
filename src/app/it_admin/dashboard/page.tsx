@@ -631,7 +631,7 @@ export default function ItAdminDashboard() {
 
         <div className="flex flex-wrap items-center justify-between gap-3 mt-1">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+            <h1 className="font-[family-name:var(--font-alegreya-sc)] text-[17px] 3xl:text-[20px] font-bold text-white">Dashboard</h1>
           </div>
           <div className="flex items-center gap-3">
             {summary && (

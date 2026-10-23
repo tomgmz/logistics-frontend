@@ -131,7 +131,7 @@ export default function AuditLogsPage() {
 
         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 shrink-0">
           <div>
-            <h1 className="mt-1 text-2xl font-bold tracking-tight text-white">Audit Logs</h1>
+            <h1 className="mt-1 font-[family-name:var(--font-alegreya-sc)] text-[17px] 3xl:text-[20px] font-bold text-white">Audit Logs</h1>
           </div>
 
           {stats && (

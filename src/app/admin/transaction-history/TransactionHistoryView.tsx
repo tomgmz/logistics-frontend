@@ -244,7 +244,7 @@ export default function TransactionHistoryView() {
         style={{ borderColor: BORDER }}>
         <div className="flex items-center gap-2">
           <History size={18} style={{ color: CYAN }} />
-          <h1 className="text-lg font-bold tracking-tight text-white">Transaction History</h1>
+          <h1 className="font-[family-name:var(--font-alegreya-sc)] text-[17px] 3xl:text-[20px] font-bold text-white">Transaction History</h1>
         </div>
         <div className="flex items-center gap-2 self-start">
           <RefreshButton onClick={() => void load()} />

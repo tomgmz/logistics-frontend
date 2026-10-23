@@ -938,7 +938,7 @@ export default function SystemMaintenanceView() {
       <header className="shrink-0 border-b border-white/[0.07] px-4 py-3 flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/35">Administrator</p>
-          <h1 className="mt-0.5 text-base sm:text-lg font-bold leading-tight tracking-tight text-white">System Maintenance</h1>
+          <h1 className="mt-0.5 leading-tight font-[family-name:var(--font-alegreya-sc)] text-[17px] 3xl:text-[20px] font-bold text-white">System Maintenance</h1>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <RefreshButton onClick={() => void load()} />

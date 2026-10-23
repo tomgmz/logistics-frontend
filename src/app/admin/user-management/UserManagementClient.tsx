@@ -915,7 +915,7 @@ export default function UserManagementClient() {
           {/* As tall as the Add User button even when it is hidden (Password Reset tab),
               so switching tabs doesn't shift the page. */}
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 lg:min-h-8 3xl:min-h-9 shrink-0">
-            <h1 className="text-[17px] 3xl:text-[20px] font-bold text-white">User Management</h1>
+            <h1 className="font-[family-name:var(--font-alegreya-sc)] text-[17px] 3xl:text-[20px] font-bold text-white">User Management</h1>
             {/*
               On the IT Admin tab "Create User" is the wrong verb: only one may be
               active, so while the seat is filled the only move is to hand it over.

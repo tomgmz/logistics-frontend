@@ -2085,7 +2085,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
       />
 
       <header className="shrink-0 px-3 py-3 lg:px-4 border-b border-white/[0.07] flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-        <h1 className="text-lg font-bold text-white tracking-tight">{ROLE_TITLE[roleView]}</h1>
+        <h1 className="font-[family-name:var(--font-alegreya-sc)] text-[17px] 3xl:text-[20px] font-bold text-white">{ROLE_TITLE[roleView]}</h1>
         <RefreshButton onClick={() => void loadPage()} className="self-start" />
       </header>
 

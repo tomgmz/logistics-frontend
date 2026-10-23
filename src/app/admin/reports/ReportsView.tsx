@@ -316,7 +316,7 @@ export default function ReportsView() {
 
       <header className="shrink-0 px-3 py-3 lg:px-4 border-b border-white/[0.07] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-bold text-white tracking-tight">Reports</h1>
+          <h1 className="font-[family-name:var(--font-alegreya-sc)] text-[17px] 3xl:text-[20px] font-bold text-white">Reports</h1>
           <p className="text-xs text-white/40 mt-0.5">
             {isFleet && 'Vehicle-related reports · '}
             {counts.reported} new · {counts.acknowledged} acknowledged
