@@ -109,7 +109,7 @@ export default function ReusableSidebar({
 
             <div className="flex items-center gap-3 px-4 mb-7 overflow-hidden shrink-0">
               <div className="w-8 h-8 rounded-full bg-[var(--color-cyan)] glow-cyan flex items-center justify-center shrink-0">
-                <span className="font-card sm:!text-[0.8rem] md:!text-[0.9rem] lg:!text-[1.1rem] text-[var(--color-bg)] text-xs font-bold">
+                <span className="font-card !text-[0.8rem] lg:!text-[0.9rem] text-[var(--color-bg)] font-bold">
                   {user?.first_name?.[0]?.toUpperCase() ?? 'A'}
                 </span>
               </div>
@@ -118,12 +118,12 @@ export default function ReusableSidebar({
                 transition={{ duration: 0.2 }}
                 className="overflow-hidden"
               >
-                <p className="ff-sc sm:!text-[0.8rem] md:!text-[0.9rem] lg:!text-[1.1rem] text-white whitespace-nowrap">
+                <p className="ff-sc !text-[0.8rem] md:!text-[0.875rem] lg:!text-[0.95rem] text-white whitespace-nowrap">
                   {user?.first_name && user?.last_name
                     ? `${user.first_name} ${user.last_name}`
                     : user?.email ?? 'User'}
                 </p>
-                <p className="ff-sc sm:!text-[0.8rem] md:!text-[0.9rem] lg:!text-[1.1rem] text-white/40 whitespace-nowrap capitalize">
+                <p className="ff-sc !text-[0.75rem] lg:!text-[0.8rem] text-white/40 whitespace-nowrap capitalize">
                   {roleLabel(user?.role)}
                 </p>
               </motion.div>
@@ -174,7 +174,7 @@ export default function ReusableSidebar({
                 <motion.span
                   animate={{ opacity: sidebarOpen ? 1 : 0, width: sidebarOpen ? 'auto' : 0 }}
                   transition={{ duration: 0.2 }}
-                  className="ff-sc booking-text text-[15px] whitespace-nowrap overflow-hidden"
+                  className="ff-sc !text-[14px] whitespace-nowrap overflow-hidden"
                 >
                   Sign out
                 </motion.span>
@@ -247,7 +247,7 @@ function NavItem({ item, isActive, index, expanded, onNavigate }: NavItemProps) 
         <motion.span
           animate={{ opacity: expanded ? 1 : 0, width: expanded ? 'auto' : 0 }}
           transition={{ duration: 0.2 }}
-          className="relative z-10 ff-sc booking-text text-[15px] whitespace-nowrap overflow-hidden"
+          className="relative z-10 ff-sc !text-[14px] whitespace-nowrap overflow-hidden"
         >
           {item.label}
         </motion.span>

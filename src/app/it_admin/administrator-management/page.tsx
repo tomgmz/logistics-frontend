@@ -126,7 +126,7 @@ const TD_BADGE  = 'px-4 3xl:px-5 py-2 3xl:py-2.5'
 // The page-header action: cyan outline. The Figma's exact sizes apply from 3xl
 // (1920px) up; below that everything is compact.
 const HEADER_BTN =
-  'flex h-8 3xl:h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-[10px] border border-[#4df9ed] bg-[#4df9ed]/[0.19] ' +
+  'flex h-8 3xl:h-9 shrink-0 items-center gap-2 whitespace-nowrap max-sm:w-full max-sm:justify-center rounded-[10px] border border-[#4df9ed] bg-[#4df9ed]/[0.19] ' +
   'px-3 3xl:px-4 text-[13px] 3xl:text-[15px] text-[#4df9ed] transition hover:bg-[#4df9ed]/30 active:scale-95'
 const HEADER_ICON = 'size-4 3xl:size-[18px]'
 
@@ -575,11 +575,11 @@ export default function AdminManagementClient() {
           {/* Header */}
           {/* As tall as the button even when it is hidden (Password Reset tab),
               so switching tabs doesn't shift the page. */}
-          <div className="flex lg:min-h-8 3xl:min-h-9 items-center justify-between gap-3 shrink-0">
-            <h1 className="min-w-0 text-[16px] leading-tight sm:text-[17px] 3xl:text-[20px] font-bold text-white">Administrator Management</h1>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 lg:min-h-8 3xl:min-h-9 shrink-0">
+            <h1 className="text-[17px] 3xl:text-[20px] font-bold text-white">Administrator Management</h1>
             {!isResetsTab && (
               <button onClick={openCreate} className={HEADER_BTN}>
-                <span className="sm:hidden">Create</span><span className="max-sm:hidden">Create Administrator</span> <UserRoundPlus className={HEADER_ICON} />
+                Create Administrator <UserRoundPlus className={HEADER_ICON} />
               </button>
             )}
           </div>
