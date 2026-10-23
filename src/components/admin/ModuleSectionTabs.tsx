@@ -37,7 +37,7 @@ export default function ModuleSectionTabs({
 }) {
   const large    = variant === 'large'
   // Large icons step down below 3xl (1920px), like the rest of the User Management Figma.
-  const iconCls = large ? 'size-4 3xl:size-[22px]' : 'size-[14px]'
+  const iconCls = large ? 'size-4 3xl:size-[18px]' : 'size-[14px]'
   const tabs: { key: ModuleSection; label: string; icon: React.ReactNode }[] = [
     { key: 'directory',       label: directoryLabel, icon: <Users className={iconCls} />     },
     { key: 'password-resets', label: resetsLabel,    icon: <KeyRound className={iconCls} /> },
@@ -62,7 +62,7 @@ export default function ModuleSectionTabs({
             aria-selected={active}
             onClick={() => onChange(t.key)}
             className={`relative flex items-center whitespace-nowrap rounded-t-lg transition-colors
-              ${large ? 'gap-2 3xl:gap-[9px] px-3 3xl:px-[18px] pt-1.5 pb-2 3xl:pb-3 text-[14px] 3xl:text-[18px] font-bold' : 'gap-2 px-4 py-2.5 text-[13px] font-semibold'}
+              ${large ? 'gap-2 px-3 3xl:px-4 pt-1.5 pb-2 3xl:pb-2.5 text-[13px] 3xl:text-[15px] font-bold' : 'gap-2 px-4 py-2.5 text-[13px] font-semibold'}
               ${active
                 ? 'text-[#4df9ed]'
                 : 'text-[#818181] hover:bg-[#2a2a2a]/50 hover:text-white'}`}

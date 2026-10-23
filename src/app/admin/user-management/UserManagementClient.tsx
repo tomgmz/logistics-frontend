@@ -134,18 +134,18 @@ function formatDateTime(iso: string | null): string {
 // MUI sx has no 3xl; this is the same 1920px step.
 const FIGMA_MQ = '@media (min-width: 1920px)'
 const REGULAR_FONT = "var(--font-alegreya), 'Alegreya Sans', sans-serif"
-const NAME_TEXT = 'ff-regular text-[14px] 3xl:text-[18px] font-bold text-[#4df9ed]'
-const TD_NAME   = `px-4 3xl:px-6 py-2.5 3xl:py-4 ${NAME_TEXT}`
-const TD_MUTED  = 'ff-regular px-4 3xl:px-6 py-2.5 3xl:py-4 text-[13px] 3xl:text-[16px] font-bold text-white'
+const NAME_TEXT = 'ff-regular text-[13px] 3xl:text-[15px] font-bold text-[#4df9ed]'
+const TD_NAME   = `px-4 3xl:px-5 py-2 3xl:py-2.5 ${NAME_TEXT}`
+const TD_MUTED  = 'ff-regular px-4 3xl:px-5 py-2 3xl:py-2.5 text-[12px] 3xl:text-[14px] font-bold text-white'
 
 // The page-header action (Add User / Transition IT Administrator): cyan outline.
 // The Figma is drawn at 1920px; its exact sizes apply only from 3xl (1920px) up.
 // Below that everything is compact, so laptops (1366x768, or 1920 at 125%
 // scaling = 1536x864) still show a useful number of rows.
 const HEADER_BTN =
-  'flex h-8 3xl:h-11 items-center gap-2 3xl:gap-[9px] whitespace-nowrap rounded-[10px] border border-[#4df9ed] bg-[#4df9ed]/[0.19] ' +
-  'px-3 3xl:px-6 text-[14px] 3xl:text-[20px] text-[#4df9ed] transition hover:bg-[#4df9ed]/30 active:scale-95'
-const HEADER_ICON = 'size-4 3xl:size-6'
+  'flex h-8 3xl:h-9 items-center gap-2 whitespace-nowrap rounded-[10px] border border-[#4df9ed] bg-[#4df9ed]/[0.19] ' +
+  'px-3 3xl:px-4 text-[13px] 3xl:text-[15px] text-[#4df9ed] transition hover:bg-[#4df9ed]/30 active:scale-95'
+const HEADER_ICON = 'size-4 3xl:size-[18px]'
 
 /**
  * Below lg the table turns into one card per user: rows stack, each cell shows
@@ -206,7 +206,7 @@ const STATUS_CFG: Record<UserStatus, { label: string; cls: string }> = {
 function StatusBadge({ status }: { status: UserStatus }) {
   const { label, cls } = STATUS_CFG[status] ?? STATUS_CFG.inactive
   return (
-    <span className={`font-[family-name:var(--font-alegreya-sc)] inline-flex h-5 min-w-[58px] 3xl:h-[25px] 3xl:min-w-[70px] items-center justify-center whitespace-nowrap rounded-[15px] border-[0.5px] px-1.5 pb-0.5 text-[12px] 3xl:text-[15px] font-bold ${cls}`}>
+    <span className={`font-[family-name:var(--font-alegreya-sc)] inline-flex h-5 min-w-[58px] 3xl:h-[22px] 3xl:min-w-[64px] items-center justify-center whitespace-nowrap rounded-[15px] border-[0.5px] px-1.5 pb-0.5 text-[11px] 3xl:text-[13px] font-bold ${cls}`}>
       {label}
     </span>
   )
@@ -268,7 +268,7 @@ function RowMenu({ user, tab, onView, onEdit, onStatusChange, lockedBy }: RowMen
         onClick={(e) => { e.stopPropagation(); setOpen(!open) }}
         className="rounded-md p-1.5 text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white"
       >
-        <MoreVertical size={20} />
+        <MoreVertical size={18} />
       </button>
       <AnimatePresence>
         {open && (
@@ -438,7 +438,7 @@ function VendorRowMenu({ user, onDone, onView, onEdit, lockedBy }: {
         onClick={(e) => { e.stopPropagation(); setOpen(!open) }}
         className="rounded-md p-1.5 text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white"
       >
-        <MoreVertical size={20} />
+        <MoreVertical size={18} />
       </button>
       <AnimatePresence>
         {open && (
@@ -487,7 +487,7 @@ function TableSkeleton({ cols }: { cols: number }) {
       {Array.from({ length: PAGE_SIZE }).map((_, i) => (
         <tr key={i} className="border-b border-[#424242]">
           {Array.from({ length: cols }).map((_, j) => (
-            <td key={j} className="px-4 3xl:px-6 py-2.5 3xl:py-4">
+            <td key={j} className="px-4 3xl:px-5 py-2 3xl:py-2.5">
               <div
                 className="h-3 animate-pulse rounded bg-[#2a2a2a]"
                 style={{ width: j === 0 ? '140px' : j === cols - 1 ? '60px' : '100px', animationDelay: `${i * 40}ms` }}
@@ -583,8 +583,8 @@ function renderCells(user: AnyUser, tab: TabValue) {
         <td className={TD_NAME}>{name}</td>
         <td className={TD_MUTED}><EmailText value={user.email} /></td>
         <td className={TD_MUTED}>{user.phone ?? '—'}</td>
-        <td className="px-4 3xl:px-6 py-2.5 3xl:py-4"><RoleBadge role={user.role} /></td>
-        <td className="px-4 3xl:px-6 py-2.5 3xl:py-4"><StatusBadge status={user.status} /></td>
+        <td className="px-4 3xl:px-5 py-2 3xl:py-2.5"><RoleBadge role={user.role} /></td>
+        <td className="px-4 3xl:px-5 py-2 3xl:py-2.5"><StatusBadge status={user.status} /></td>
       </>
     )
   }
@@ -598,7 +598,7 @@ function renderCells(user: AnyUser, tab: TabValue) {
           <td className={TD_NAME}>{name}</td>
           <td className={TD_MUTED}><EmailText value={u.email} /></td>
           <td className={TD_MUTED}>{u.clients?.company_name ?? '—'}</td>
-          <td className="px-4 3xl:px-6 py-2.5 3xl:py-4"><StatusBadge status={u.status} /></td>
+          <td className="px-4 3xl:px-5 py-2 3xl:py-2.5"><StatusBadge status={u.status} /></td>
           <td className={TD_MUTED}><LastLogin iso={u.last_login_at ?? null} /></td>
         </>
       )
@@ -611,20 +611,20 @@ function renderCells(user: AnyUser, tab: TabValue) {
         <>
           <td className={TD_NAME}>{name}</td>
           <td className={TD_MUTED}>{u.drivers?.license_number ?? '—'}</td>
-          <td className="px-4 3xl:px-6 py-2.5 3xl:py-4 text-[16px] text-white">
+          <td className="px-4 3xl:px-5 py-2 3xl:py-2.5 text-[12px] 3xl:text-[14px] text-white">
             <div className="flex flex-col items-start gap-1">
               <span className="ff-regular font-bold">{formatDate(u.drivers?.license_expiry ?? null)}</span>
               <LicenseExpiryBadge expiry={u.drivers?.license_expiry ?? null} />
             </div>
           </td>
-          <td className="px-4 3xl:px-6 py-2.5 3xl:py-4">
+          <td className="px-4 3xl:px-5 py-2 3xl:py-2.5">
             {drvStatus && (
               <span className="font-[family-name:var(--font-alegreya-sc)] inline-flex items-center rounded-full border border-[#4df9ed]/30 bg-[#4df9ed]/10 px-2 py-0.5 text-[11px] font-semibold text-[#4df9ed]">
                 {drvStatus.replace(/_/g, ' ')}
               </span>
             )}
           </td>
-          <td className="px-4 3xl:px-6 py-2.5 3xl:py-4"><StatusBadge status={u.status} /></td>
+          <td className="px-4 3xl:px-5 py-2 3xl:py-2.5"><StatusBadge status={u.status} /></td>
         </>
       )
     }
@@ -633,20 +633,20 @@ function renderCells(user: AnyUser, tab: TabValue) {
       const name = [u.first_name, u.middle_name, u.last_name, u.suffix].filter(Boolean).join(' ') || '—'
       return (
         <>
-          <td className="px-4 3xl:px-6 py-2.5 3xl:py-4">
+          <td className="px-4 3xl:px-5 py-2 3xl:py-2.5">
             <p className={NAME_TEXT}>{name}</p>
             <RevokedFlag user={u} />
           </td>
           <td className={TD_MUTED}>{u.drivers?.vendor_name || '—'}</td>
           <td className={TD_MUTED}><EmailText value={u.email} /></td>
-          <td className="px-4 3xl:px-6 py-2.5 3xl:py-4 text-[16px] text-white">
+          <td className="px-4 3xl:px-5 py-2 3xl:py-2.5 text-[12px] 3xl:text-[14px] text-white">
             <div className="flex flex-col items-start gap-1">
               <span className="ff-regular font-bold">{formatDate(u.drivers?.license_expiry ?? null)}</span>
               <LicenseExpiryBadge expiry={u.drivers?.license_expiry ?? null} />
             </div>
           </td>
-          <td className="px-4 3xl:px-6 py-2.5 3xl:py-4"><AccessBadge access={u.access} /></td>
-          <td className="px-4 3xl:px-6 py-2.5 3xl:py-4"><StatusBadge status={u.status} /></td>
+          <td className="px-4 3xl:px-5 py-2 3xl:py-2.5"><AccessBadge access={u.access} /></td>
+          <td className="px-4 3xl:px-5 py-2 3xl:py-2.5"><StatusBadge status={u.status} /></td>
         </>
       )
     }
@@ -657,7 +657,7 @@ function renderCells(user: AnyUser, tab: TabValue) {
           <td className={TD_NAME}>{name}</td>
           <td className={TD_MUTED}><EmailText value={user.email} /></td>
           <td className={TD_MUTED}>{user.phone ?? '—'}</td>
-          <td className="px-4 3xl:px-6 py-2.5 3xl:py-4"><StatusBadge status={user.status} /></td>
+          <td className="px-4 3xl:px-5 py-2 3xl:py-2.5"><StatusBadge status={user.status} /></td>
           <td className={TD_MUTED}><LastLogin iso={user.last_login_at ?? null} /></td>
         </>
       )
@@ -938,13 +938,13 @@ export default function UserManagementClient() {
   return (
     <ThemeProvider theme={muiTheme}>
       <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-y-auto overflow-x-hidden lg:overflow-hidden bg-[#0a0a0a] text-white">
-        <div className="flex flex-col lg:flex-1 lg:min-h-0 px-3 py-3 sm:px-4 lg:px-6 3xl:px-9 lg:pt-3 lg:pb-4 3xl:pb-9 gap-3 3xl:gap-[34px] lg:overflow-hidden">
+        <div className="flex flex-col lg:flex-1 lg:min-h-0 px-3 py-3 sm:px-4 lg:px-5 3xl:px-6 lg:pt-3 lg:pb-4 3xl:pb-5 gap-3 3xl:gap-4 lg:overflow-hidden">
 
           {/* Header */}
           {/* As tall as the Add User button even when it is hidden (Password Reset tab),
               so switching tabs doesn't shift the page. */}
-          <div className="flex lg:min-h-8 3xl:min-h-11 flex-wrap items-center justify-between gap-3 shrink-0">
-            <h1 className="text-[18px] 3xl:text-[24px] font-bold text-white">User Management</h1>
+          <div className="flex lg:min-h-8 3xl:min-h-9 flex-wrap items-center justify-between gap-3 shrink-0">
+            <h1 className="text-[17px] 3xl:text-[20px] font-bold text-white">User Management</h1>
             {/*
               On the IT Admin tab "Create User" is the wrong verb: only one may be
               active, so while the seat is filled the only move is to hand it over.
@@ -972,15 +972,15 @@ export default function UserManagementClient() {
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-3 gap-2.5 sm:gap-4 3xl:gap-[26px] shrink-0">
+          <div className="grid grid-cols-3 gap-2.5 sm:gap-3 3xl:gap-4 shrink-0">
             {[
               { label: 'Total Users', value: stats.total,    color: 'text-white'     },
               { label: 'Active',      value: stats.active,   color: 'text-[#4df9ed]' },
               { label: 'Archived',    value: stats.archived, color: 'text-[#ffea00]' },
             ].map((s) => (
-              <div key={s.label} className="min-w-0 rounded-[10px] border border-[#424242] bg-[#2a2828] px-2.5 py-2.5 sm:px-4 3xl:px-[25px] 3xl:pt-4 3xl:pb-3 shadow-[0_4px_4px_rgba(0,0,0,0.25)]">
-                <p className="text-[11px] leading-tight sm:text-[12px] 3xl:text-[16px] font-bold uppercase text-[#818181]">{s.label}</p>
-                <p className={`mt-1.5 3xl:mt-4 text-[20px] sm:text-[22px] 3xl:text-[32px] font-bold leading-none ${s.color}`}>{s.value}</p>
+              <div key={s.label} className="min-w-0 rounded-[10px] border border-[#424242] bg-[#2a2828] px-2.5 py-2 sm:px-4 sm:py-2.5 3xl:px-5 3xl:py-3 shadow-[0_4px_4px_rgba(0,0,0,0.25)]">
+                <p className="text-[10px] leading-tight sm:text-[11px] 3xl:text-[13px] font-bold uppercase text-[#818181]">{s.label}</p>
+                <p className={`mt-1 3xl:mt-2 text-[18px] sm:text-[20px] 3xl:text-[24px] font-bold leading-none ${s.color}`}>{s.value}</p>
               </div>
             ))}
           </div>
@@ -1002,8 +1002,8 @@ export default function UserManagementClient() {
                 Figma lays them out. The role filter belongs to the directory
                 only: there is nothing to filter by role in a queue. */}
             {!isResetsTab && (
-            <div className="flex flex-wrap items-center gap-3 3xl:gap-5 border-b border-[#424242] px-3 sm:px-4 3xl:px-[25px] py-2.5 3xl:py-4 shrink-0">
-              <FormControl size="small" sx={{ width: { xs: '100%', sm: 200 }, [FIGMA_MQ]: { width: 260 } }}>
+            <div className="flex flex-wrap items-center gap-3 3xl:gap-4 border-b border-[#424242] px-3 sm:px-4 3xl:px-5 py-2 3xl:py-2.5 shrink-0">
+              <FormControl size="small" sx={{ width: { xs: '100%', sm: 200 }, [FIGMA_MQ]: { width: 220 } }}>
                 <Select
                   value={dropdownTab}
                   onChange={(e: SelectChangeEvent) => switchTab(e.target.value as TabValue)}
@@ -1020,20 +1020,20 @@ export default function UserManagementClient() {
                     },
                   }}
                   sx={{
-                    height: '36px', borderRadius: '10px', fontFamily: REGULAR_FONT, fontSize: '14px',
+                    height: '34px', borderRadius: '10px', fontFamily: REGULAR_FONT, fontSize: '13px',
                     color: '#4df9ed', bgcolor: '#424242',
                     '& .MuiOutlinedInput-notchedOutline': { borderColor: '#818181' },
                     '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#4df9ed80' },
                     '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#4df9ed', borderWidth: '1px' },
                     '& .MuiSelect-icon': { color: '#818181', right: '10px', top: 'calc(50% - 9px)' },
                     '& .MuiSelect-select': { display: 'flex', alignItems: 'center', paddingLeft: '12px' },
-                    [FIGMA_MQ]: { height: '46px', fontSize: '18px', '& .MuiSelect-select': { paddingLeft: '18px' } },
+                    [FIGMA_MQ]: { height: '38px', fontSize: '15px', '& .MuiSelect-select': { paddingLeft: '14px' } },
                   }}
                   renderValue={(value) => {
                     const tab = TABS.find((t) => t.key === value)!
                     return (
-                      <span className="flex items-center gap-2 3xl:gap-[9px] text-[14px] 3xl:text-[18px] text-[#4df9ed]">
-                        <Users className="size-4 3xl:size-[22px]" /> {tab.label}
+                      <span className="flex items-center gap-2 text-[13px] 3xl:text-[15px] text-[#4df9ed]">
+                        <Users className="size-4 3xl:size-[18px]" /> {tab.label}
                       </span>
                     )
                   }}
@@ -1042,7 +1042,7 @@ export default function UserManagementClient() {
                     <MenuItem
                       key={t.key} value={t.key}
                       sx={{
-                        borderRadius: '8px', mb: '2px', fontFamily: REGULAR_FONT, fontSize: '14px', [FIGMA_MQ]: { fontSize: '16px' },
+                        borderRadius: '8px', mb: '2px', fontFamily: REGULAR_FONT, fontSize: '13px', [FIGMA_MQ]: { fontSize: '14px' },
                         fontWeight: t.key === 'all' ? 700 : 400,
                         color: dropdownTab === t.key ? '#4df9ed' : '#818181',
                         bgcolor: dropdownTab === t.key ? '#4df9ed0d' : 'transparent',
@@ -1069,13 +1069,13 @@ export default function UserManagementClient() {
                 </Select>
               </FormControl>
 
-              <div className="relative min-w-0 flex-1 sm:max-w-[360px] 3xl:max-w-[466px]">
-                <Search className="pointer-events-none absolute left-3 3xl:left-[18px] top-1/2 size-4 3xl:size-[22px] -translate-y-1/2 text-[#818181]" />
+              <div className="relative min-w-0 flex-1 sm:max-w-[360px] 3xl:max-w-[400px]">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 3xl:size-[18px] -translate-y-1/2 text-[#818181]" />
                 <input
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
                   placeholder="Search name or email..."
-                  className="h-9 3xl:h-[46px] w-full rounded-[10px] border border-[#818181] bg-[#424242] pl-9 3xl:pl-[49px] pr-4 text-[14px] 3xl:text-[18px] text-white placeholder-[#818181] outline-none transition focus:border-[#4df9ed]"
+                  className="h-[34px] 3xl:h-[38px] w-full rounded-[10px] border border-[#818181] bg-[#424242] pl-9 3xl:pl-10 pr-4 text-[13px] 3xl:text-[15px] text-white placeholder-[#818181] outline-none transition focus:border-[#4df9ed]"
                 />
               </div>
               <RefreshButton iconOnly onClick={handleRefresh} loading={(loading || fetching)} disabled={loading || fetching} />
@@ -1086,13 +1086,13 @@ export default function UserManagementClient() {
             )}
 
             {!isResetsTab && isDriverTab && (
-              <div className="flex gap-1 border-b border-[#424242] px-3 sm:px-4 3xl:px-[25px] shrink-0">
+              <div className="flex gap-1 border-b border-[#424242] px-3 sm:px-4 3xl:px-5 shrink-0">
                 {DRIVER_TABS.map((t) => (
                   <button
                     key={t.key}
                     type="button"
                     onClick={() => switchTab(t.key)}
-                    className={`-mb-px border-b px-3 py-2 text-[13px] 3xl:text-[16px] font-bold transition ${
+                    className={`-mb-px border-b px-3 py-2 text-[12px] 3xl:text-[14px] font-bold transition ${
                       activeTab === t.key
                         ? 'border-[#4df9ed] text-[#4df9ed]'
                         : 'border-transparent text-[#818181] hover:text-white'
@@ -1143,11 +1143,11 @@ export default function UserManagementClient() {
                 <thead className="sticky top-0 z-10 bg-[#1b1b1b] max-lg:hidden font-[family-name:var(--font-alegreya-sc)]">
                   <tr className="border-b border-[#424242]">
                     {HEADERS[activeTab].map((h) => (
-                      <th key={h} className={`px-4 3xl:px-6 py-2 3xl:py-3 text-[12px] 3xl:text-[16px] font-bold lowercase whitespace-nowrap text-left text-[#818181]`}>
+                      <th key={h} className={`px-4 3xl:px-5 py-2 3xl:py-2.5 text-[11px] 3xl:text-[13px] font-bold lowercase whitespace-nowrap text-left text-[#818181]`}>
                         {h}
                       </th>
                     ))}
-                    <th className="px-4 3xl:px-6 py-2 3xl:py-3 text-right text-[12px] 3xl:text-[16px] font-bold lowercase text-[#818181]">
+                    <th className="px-4 3xl:px-5 py-2 3xl:py-2.5 text-right text-[11px] 3xl:text-[13px] font-bold lowercase text-[#818181]">
                       actions
                     </th>
                   </tr>
@@ -1173,7 +1173,7 @@ export default function UserManagementClient() {
                         >
                           {withLabels(renderCells(user, activeTab), HEADERS[activeTab])}
                           {/* The row menu sits at the far right of the table. */}
-                          <td className="px-4 3xl:px-6 py-2.5 3xl:py-4 text-right">
+                          <td className="px-4 3xl:px-5 py-2 3xl:py-2.5 text-right">
                             {activeTab === 'vendor-drivers' ? (
                               <VendorRowMenu
                                 user={user as VendorDriverUser}
