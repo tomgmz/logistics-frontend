@@ -177,12 +177,13 @@ export const itAdminService = {
   activate:   (id: string) => patch<AdminUser>(`${B}/it-admins/${id}/activate`),
   deactivate: (id: string) => patch<AdminUser>(`${B}/it-admins/${id}/deactivate`),
   restore:    (id: string) => post<AdminUser>(`${B}/it-admins/${id}/restore`, {}),
-  // Hand the role to a successor. The outgoing account is not named — the system
-  // allows exactly one active IT Admin, so the API resolves who is being replaced
-  // and retires them in the same transaction that creates the incoming account.
-  // Root administrator only; anyone else gets a 403.
+  // The signed-in IT Admin hands their role to a successor created here. The
+  // outgoing account is the caller; it stays active for a 30-day render period.
+  // IT Admin only.
   transition: (p: TransitionITAdminPayload) =>
     post<ITAdminTransitionResult>(`${B}/it-admins/transition`, p),
+  /** The signed-in IT Admin's place in a handover. */
+  handoverStatus: () => get<ITAdminHandoverStatus>(`${B}/it-admins/handover`),
 }
 
 export interface TransitionITAdminPayload extends CreateITAdminPayload {
@@ -191,8 +192,16 @@ export interface TransitionITAdminPayload extends CreateITAdminPayload {
 }
 
 export interface ITAdminTransitionResult {
-  outgoing: { user_id: string; email: string; status: string }
+  outgoing: { user_id: string; email: string; status: string; render_ends_at: string }
   incoming: AdminUser
+}
+
+export interface ITAdminHandoverStatus {
+  render_days:    number
+  /** Set once the caller has handed over: their account is deactivated then. */
+  render_ends_at: string | null
+  /** The other active IT Admins (the successor, or a predecessor rendering). */
+  others: { user_id: string; email: string; first_name: string | null; last_name: string | null; render_ends_at: string | null }[]
 }
 
 export interface VehicleEligibility {

@@ -45,6 +45,8 @@ export interface BaseUser {
 
 export interface AdminUser extends BaseUser {
   role: AdminRole
+  /** IT Admin only: set once they hand the role over; deactivated at this time. */
+  render_ends_at?: string | null
 }
 
 export interface ClientUser extends BaseUser {

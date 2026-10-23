@@ -21,6 +21,7 @@ import { formatDateTime } from '@/app/utils/timeFormat'
 import { roleLabel } from '@/lib/roles'
 
 import RefreshButton from '@/components/ui/RefreshButton'
+import ItAdminHandoverPanel from '@/components/admin/ItAdminHandoverPanel'
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Scheduler staleness is a function of time, not of any row changing. */
@@ -642,6 +643,8 @@ export default function ItAdminDashboard() {
             <RefreshButton onClick={() => load()} loading={loading} disabled={loading} />
           </div>
         </div>
+
+        <ItAdminHandoverPanel />
 
         {error && (
           <div className="rounded-xl border border-[#f62626]/30 bg-[#f62626]/10 px-4 py-2.5 text-sm text-[#f62626]">

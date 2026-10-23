@@ -14,7 +14,6 @@ export interface ModulePermissionSummary extends ModuleFlags {
 export interface UserPermissionsResponse {
   role:        string
   modules:     ModuleKey[]
-  protected:   boolean
   permissions: ModulePermissionSummary[]
 }
 

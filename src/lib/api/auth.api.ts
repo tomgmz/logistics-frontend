@@ -198,11 +198,6 @@ export interface AuthUser {
   role:       string
   status:     string
   must_change_password: boolean
-  // True for the primary administrator account (the earliest-created admin),
-  // which is never permission-restricted and is the only one allowed to hand the
-  // IT Admin role to a successor. The API enforces that independently; this only
-  // keeps a button that would 403 out of everyone else's way.
-  is_root_admin?: boolean
   module_permissions?: ModulePermission[]
   clients?: {
     client_id:       string

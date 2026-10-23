@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { X, ShieldCheck, Loader2, Lock } from 'lucide-react'
+import { X, ShieldCheck, Loader2 } from 'lucide-react'
 import { EMPTY_FLAGS, ModuleFlags, ModuleKey, defaultFlagsForRole } from '@/constants/modules'
 import { permissionsService } from '@/lib/services/admin/permissions.service'
 import { appToast } from '@/lib/toast'
@@ -36,7 +36,6 @@ export default function PermissionsModal({ userId, userName, onClose, onSaved }:
   const [error,       setError]       = useState<string | null>(null)
   const [modules,     setModules]     = useState<ModuleKey[]>([])
   const [flags,       setFlags]       = useState<Record<string, ModuleFlags>>({})
-  const [isProtected, setIsProtected] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -59,7 +58,6 @@ export default function PermissionsModal({ userId, userName, onClose, onSaved }:
         }
         setModules(res.modules)
         setFlags(map)
-        setIsProtected(res.protected)
       } catch (e) {
         if (active) setError(getApiErrorMessage(e, 'Failed to load permissions.'))
       } finally {
@@ -138,15 +136,6 @@ export default function PermissionsModal({ userId, userName, onClose, onSaved }:
             </p>
           ) : (
             <>
-              {isProtected && (
-                <div className="mb-4 flex items-center gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
-                  <Lock size={15} className="shrink-0" />
-                  <span>
-                    This is the primary Administrator account and cannot be restricted, so there is
-                    always one Administrator with full access.
-                  </span>
-                </div>
-              )}
               <p className="mb-4 text-xs text-[#818181]">
                 Pick one access level per module: <b>Read-only</b> (view only),
                 <b> Manage</b> (view, create, edit &amp; export), or <b>All</b> (Manage plus delete).
@@ -157,7 +146,7 @@ export default function PermissionsModal({ userId, userName, onClose, onSaved }:
                 modules={modules}
                 value={flags}
                 onChange={(m, next) => setFlags((prev) => ({ ...prev, [m]: next }))}
-                disabled={isProtected || lock.readOnly}
+                disabled={lock.readOnly}
               />
             </>
           )}
@@ -175,7 +164,7 @@ export default function PermissionsModal({ userId, userName, onClose, onSaved }:
             </button>
             <button
               onClick={handleSave}
-              disabled={loading || saving || !!error || isProtected || lock.readOnly}
+              disabled={loading || saving || !!error || lock.readOnly}
               className="flex items-center gap-2 rounded-lg bg-[#4df9ed] px-5 py-2 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5] disabled:opacity-40"
             >
               {saving && <Loader2 size={14} className="animate-spin" />} Save Access

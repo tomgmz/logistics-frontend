@@ -4,25 +4,25 @@ import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Loader2, ShieldAlert, X } from 'lucide-react'
 import { RemarksModal } from '@/components/layout/ReusableModal'
-import { itAdminService } from '@/lib/services/admin/user-management.service'
-import type { AdminUser } from '@/app/types/admin/user-management.types'
+import { itAdminService, type ITAdminTransitionResult } from '@/lib/services/admin/user-management.service'
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
+import { useAuthStore } from '@/lib/store/auth.store'
 import { validateForm } from '@/lib/validation/user-management.validation'
 import { extractApiError } from '@/lib/api-error'
 import { appToast } from '@/lib/toast'
 
 /**
- * Hand the IT Admin role to a successor.
+ * The signed-in IT Admin hands their role to a successor.
  *
- * Deliberately not an "add user" form. The system permits exactly one active IT
- * Admin, so there is no such thing as adding a second — the only way to change who
- * holds the role is to replace the incumbent, and the API does both halves in one
- * transaction so the seat is never briefly empty. (It matters: every staff
- * password reset routes to the IT Admin's queue, and nobody else is allowed to
- * action those.)
+ * Deliberately not an "add user" form. The system permits exactly one IT Admin
+ * holding the role, so the only way to change who holds it is a handover: the
+ * successor's account is created and takes the role at once, and the outgoing
+ * IT Admin (the person filling this in) stays active for a 30-day render period,
+ * after which their account is deactivated automatically.
  *
  * Two steps on purpose. The first collects the successor's details; the second
- * makes the consequence unmissable — this deactivates a named colleague's account
- * — and requires a reason that goes on the audit record.
+ * makes the consequence unmissable — the role leaves you now and your account
+ * closes in 30 days — and requires a reason that goes on the audit record.
  */
 
 interface FormState {
@@ -61,21 +61,24 @@ function Field({
 
 export default function ItAdminTransitionModal({
   open,
-  outgoing,
+  renderDays = 30,
   onClose,
   onDone,
 }: {
-  open:     boolean
-  /** The incumbent being replaced. Shown so the confirmation names a person. */
-  outgoing: AdminUser | null
-  onClose:  () => void
-  onDone:   () => void | Promise<void>
+  open:        boolean
+  /** How long the outgoing account stays active, from the API. */
+  renderDays?: number
+  onClose:     () => void
+  onDone:      (result: ITAdminTransitionResult) => void | Promise<void>
 }) {
+  const me = useAuthStore((s) => s.user)
   const [form,       setForm]       = useState<FormState>(EMPTY)
   const [errors,     setErrors]     = useState<Record<string, string>>({})
   const [apiError,   setApiError]   = useState('')
   const [confirming, setConfirming] = useState(false)
   const [busy,       setBusy]       = useState(false)
+
+  useBodyScrollLock(open || confirming)
 
   useEffect(() => {
     if (!open) { setForm(EMPTY); setErrors({}); setApiError(''); setConfirming(false); setBusy(false) }
@@ -115,14 +118,14 @@ export default function ItAdminTransitionModal({
       const result = await appToast.promise(
         itAdminService.transition({ ...payload(), reason }),
         {
-          loading: 'Transitioning the IT Administrator role…',
-          success: 'Role transitioned. The outgoing account has been deactivated.',
-          error:   (e) => extractApiError(e).message || 'Transition failed.',
+          loading: 'Handing over the IT Administrator role…',
+          success: `Role handed over. Your account stays active for ${renderDays} days.`,
+          error:   (e) => extractApiError(e).message || 'Handover failed.',
         },
-        { action: 'it-admin-transition', entityId: outgoing?.user_id },
+        { action: 'it-admin-transition', entityId: me?.user_id },
       )
       setConfirming(false)
-      await onDone()
+      await onDone(result)
       onClose()
       // Said separately from the toast: the successor cannot sign in until they
       // deal with this, and it is the one part nobody else can do for them.
@@ -131,14 +134,11 @@ export default function ItAdminTransitionModal({
       )
     } catch (err) {
       setConfirming(false)
-      setApiError(extractApiError(err).message || 'Transition failed.')
+      setApiError(extractApiError(err).message || 'Handover failed.')
     } finally {
       setBusy(false)
     }
   }
-
-  const outgoingName =
-    [outgoing?.first_name, outgoing?.last_name].filter(Boolean).join(' ') || outgoing?.email || 'the current IT Administrator'
 
   return (
     <>
@@ -160,9 +160,9 @@ export default function ItAdminTransitionModal({
               {/* Header */}
               <div className="flex items-start justify-between gap-4 border-b border-[#2a2a2a] px-6 py-4">
                 <div>
-                  <h2 className="text-lg font-bold text-white">Transition IT Administrator</h2>
+                  <h2 className="text-lg font-bold text-white">Hand Over IT Administrator Role</h2>
                   <p className="mt-0.5 text-[13px] text-[#818181]">
-                    Replace <span className="text-white">{outgoingName}</span> with a successor.
+                    Create the account of the person taking over from you.
                   </p>
                 </div>
                 <button
@@ -179,9 +179,10 @@ export default function ItAdminTransitionModal({
                 <div className="flex gap-3 rounded-xl border border-yellow-500/25 bg-yellow-500/[0.07] px-4 py-3">
                   <ShieldAlert size={16} className="mt-0.5 shrink-0 text-yellow-400" />
                   <div className="text-[13px] leading-relaxed text-yellow-200/80">
-                    Completing this deactivates <span className="font-semibold">{outgoingName}</span> and
-                    signs them out everywhere, immediately. Their record is kept, so the
-                    change can be undone by reactivating them.
+                    Your successor becomes the IT Administrator straight away. You keep your
+                    access for a <span className="font-semibold">{renderDays}-day render period</span> to
+                    hand over the work; after that your account is deactivated and signed out
+                    automatically. This cannot be started again once done.
                   </div>
                 </div>
 
@@ -247,13 +248,12 @@ export default function ItAdminTransitionModal({
         open={confirming}
         title="Confirm the handover"
         description={
-          `${form.first_name} ${form.last_name} (${form.email.trim().toLowerCase()}) becomes the IT Administrator, ` +
-          `and ${outgoingName} is deactivated and signed out immediately. Both happen together — ` +
-          `there is no moment where the role is vacant.`
+          `${form.first_name} ${form.last_name} (${form.email.trim().toLowerCase()}) becomes the IT Administrator now. ` +
+          `Your account stays active for ${renderDays} days, then it is deactivated and signed out automatically.`
         }
         remarksLabel="Reason for the handover"
-        remarksPlaceholder="e.g. Resignation effective 30 September; successor onboarded."
-        confirmLabel="Transition Role"
+        remarksPlaceholder="e.g. Resignation effective 30 November; successor onboarded."
+        confirmLabel="Hand Over Role"
         cancelLabel="Back"
         busy={busy}
         disableBackdropClose

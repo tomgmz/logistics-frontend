@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Users, UserPlus, UserRoundPlus, Search, MoreVertical, ChevronDown,
   Pencil, Eye, ShieldCheck, ShieldOff, Archive,
-  AlertTriangle, ArrowLeftRight,
+  AlertTriangle,
   KeyRound, Send, RotateCcw, Flag, ArchiveRestore,
 } from 'lucide-react'
 import Select, { SelectChangeEvent } from '@mui/material/Select'
@@ -31,11 +31,9 @@ import { useRecordLocks } from '@/lib/hooks/useRecordLock'
 import { RecordLockBadge } from '@/components/ui/RecordLockBanner'
 import PasswordResetQueue from '@/components/admin/PasswordResetQueue'
 import { licenseExpiryState, needsLicenseUpdate } from '@/lib/license-expiry'
-import ItAdminTransitionModal from '@/components/admin/ItAdminTransitionModal'
 import ModuleSectionTabs, { type ModuleSection } from '@/components/admin/ModuleSectionTabs'
 import { passwordResetService } from '@/lib/services/admin/password-reset.service'
 import { externalDriverService, type VendorDriverUser } from '@/lib/services/admin/external-driver.service'
-import { useAuthStore } from '@/lib/store/auth.store'
 import { useModuleAccess } from '@/components/layout/ModuleAccess'
 
 import RefreshButton from '@/components/ui/RefreshButton'
@@ -192,6 +190,13 @@ const STATUS_CFG: Record<UserStatus, { label: string; cls: string }> = {
   deactivated:        { label: 'Deactivated', cls: 'bg-[#ff7a30]/20 text-[#ff7a30] border-[#ff7a30]'     },
   archived:           { label: 'Archived',    cls: 'bg-[#ffea00]/20 text-[#ffea00] border-[#ffea00]'     },
   permanently_locked: { label: 'Locked',      cls: 'bg-[#f62626]/20 text-[#f62626] border-[#f62626]'     },
+}
+
+/** When an outgoing IT Admin's render period ends, in Manila time. */
+function formatRenderEnd(iso: string) {
+  return new Date(iso).toLocaleDateString('en-US', {
+    timeZone: 'Asia/Manila', month: 'short', day: 'numeric', year: 'numeric',
+  })
 }
 
 function StatusBadge({ status }: { status: UserStatus }) {
@@ -734,7 +739,15 @@ function renderCells(user: AnyUser, tab: TabValue) {
           <td className={TD_NAME}>{name}</td>
           <td className={TD_MUTED}><EmailText value={user.email} /></td>
           <td className={TD_MUTED}>{user.phone ?? '—'}</td>
-          <td className="px-4 3xl:px-5 py-2 3xl:py-2.5"><StatusBadge status={user.status} /></td>
+          <td className="px-4 3xl:px-5 py-2 3xl:py-2.5">
+            <StatusBadge status={user.status} />
+            {/* Handed the role over: still active until the render period ends. */}
+            {user.status === 'active' && (user as AdminUser).render_ends_at && (
+              <p className="mt-1 text-[11px] text-[#818181] whitespace-nowrap">
+                Leaving {formatRenderEnd((user as AdminUser).render_ends_at!)}
+              </p>
+            )}
+          </td>
           <td className={TD_MUTED}><LastLogin iso={user.last_login_at ?? null} /></td>
         </>
       )
@@ -789,16 +802,12 @@ export default function UserManagementClient() {
   const userLocks = useRecordLocks('user')
   const [formTab,          setFormTab]          = useState<UserMgmtTab>('clients')
   const [formDriverSource, setFormDriverSource] = useState<DriverSource>('company')
-  const [showTransition,   setShowTransition]   = useState(false)
   const [showTypePicker,   setShowTypePicker]   = useState(false)
   // Archived view: the same tabs, listing archived accounts with a Restore action.
   const [showArchived,     setShowArchived]     = useState(false)
   const archivedRef = useRef(showArchived)
   archivedRef.current = showArchived
 
-  // Only the primary administrator may hand the IT Admin role over. The API
-  // enforces it; this just keeps a button that would 403 out of the way.
-  const isRootAdmin = useAuthStore((s) => s.user?.is_root_admin ?? false)
   // This module's tier for a managed role: Read-only hides every write control.
   const access = useModuleAccess()
 
@@ -807,10 +816,11 @@ export default function UserManagementClient() {
   const isDriverTab    = activeTab === 'drivers' || activeTab === 'vendor-drivers'
   const dropdownTab: TabValue = isDriverTab ? 'drivers' : activeTab
   const isITAdminTab   = activeTab === 'it-admins'
-  // The system allows exactly one active IT Admin, so the row that matters on
-  // this tab is the active one — the rest are kept records of predecessors.
+  // The system allows exactly one IT Admin holding the role (active, not in a
+  // render period), so that is the row that matters on this tab — the rest are
+  // predecessors, rendering or kept as records.
   const activeITAdmin  = isITAdminTab
-    ? (allRows.find((u) => u.status === 'active') ?? null)
+    ? (allRows.find((u) => u.status === 'active' && !(u as AdminUser).render_ends_at) ?? null)
     : null
 
   const isInitialAllFetch = useRef(true)
@@ -1028,9 +1038,9 @@ export default function UserManagementClient() {
     setShowForm(true)
   }
 
-  // Only one IT Administrator may be active, and the seat is only known while
+  // Only one IT Administrator may hold the role, and the seat is only known while
   // its tab is open: offer it there when it is empty. A filled seat is handed
-  // over with Transition IT Administrator instead.
+  // over by the IT Administrator themselves, from their own portal.
   const newAccountTypes = NEW_ACCOUNT_TYPES.filter(
     (t) => t.key !== 'it-admins' || (isITAdminTab && !showArchived && !loading && !activeITAdmin),
   )
@@ -1052,21 +1062,12 @@ export default function UserManagementClient() {
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 lg:min-h-8 3xl:min-h-9 shrink-0">
             <h1 className="font-[family-name:var(--font-alegreya-sc)] text-[17px] 3xl:text-[20px] font-bold text-white">User Management</h1>
             {/*
-              On the IT Admin tab "Create User" is the wrong verb: only one may be
-              active, so while the seat is filled the only move is to hand it over.
-              If it is somehow empty, creating one is exactly right.
+              On the IT Admin tab, while the seat is filled there is nothing to add:
+              the IT Administrator hands the role over from their own portal. If it
+              is somehow empty, creating one is exactly right.
             */}
             {!isResetsTab && (
-              isITAdminTab && (activeITAdmin || showArchived) ? (
-                isRootAdmin && activeITAdmin && (
-                  <button
-                    onClick={() => setShowTransition(true)}
-                    className={HEADER_BTN}
-                  >
-                    Transition IT Administrator <ArrowLeftRight className={HEADER_ICON} />
-                  </button>
-                )
-              ) : access.canCreate && (
+              isITAdminTab && (activeITAdmin || showArchived) ? null : access.canCreate && (
                 <button
                   onClick={openCreate}
                   className={HEADER_BTN}
@@ -1346,13 +1347,6 @@ export default function UserManagementClient() {
         options={newAccountTypes}
         onPick={createAccount}
         onClose={() => setShowTypePicker(false)}
-      />
-
-      <ItAdminTransitionModal
-        open={showTransition}
-        outgoing={activeITAdmin as AdminUser | null}
-        onClose={() => setShowTransition(false)}
-        onDone={refetchCurrentTab}
       />
     </ThemeProvider>
   )
