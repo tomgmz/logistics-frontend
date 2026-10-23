@@ -585,6 +585,11 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
     </AnimatePresence>
   )
 
-  return createPortal(<>{panel}{launcher}</>, document.body)
+  // No floating button in the client's Booking module: it sat over the booking
+  // form. A message notification can still open the panel there (OPEN_HELP_EVENT),
+  // and then the button shows so it can be closed.
+  const hideLauncher = !isPublic && !!pathname?.startsWith('/client/booking') && !open
+
+  return createPortal(<>{panel}{!hideLauncher && launcher}</>, document.body)
 }
 
