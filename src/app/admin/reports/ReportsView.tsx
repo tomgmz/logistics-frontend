@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Search, Eye, CheckCheck, CircleCheck, Siren, Tags } from 'lucide-react'
+import { Search, Siren, ChevronRight } from 'lucide-react'
 
 import {
   fetchDriverReports,
@@ -29,7 +29,6 @@ import { useModuleAccess } from '@/components/layout/ModuleAccess'
 import { useRecordLock, useRecordLocks } from '@/lib/hooks/useRecordLock'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import RecordLockBanner, { RecordLockBadge } from '@/components/ui/RecordLockBanner'
-import RowActionMenu, { type RowAction } from '@/components/ui/RowActionMenu'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { useAuthStore } from '@/lib/store/auth.store'
@@ -246,32 +245,6 @@ export default function ReportsView() {
     setClassifyOf(r)
   }
 
-  function rowActions(r: DriverReport): RowAction[] {
-    const lockedBy = reportLocks.get(r.report_id)
-    const lockedTitle = lockedBy ? `${lockedBy} is handling this report` : undefined
-    const actions: RowAction[] = [
-      { label: 'View Details', icon: <Eye size={13} />, onSelect: () => setViewId(r.report_id) },
-    ]
-    if (canClassify && !r.incident_type) {
-      actions.push({
-        label: 'Classify', icon: <Tags size={13} />, tone: 'accent',
-        onSelect: () => openClassify(r), disabled: !!lockedBy, title: lockedTitle,
-      })
-    }
-    if (!canEdit || r.status === 'resolved') return actions
-    if (r.status === 'reported') {
-      actions.push({
-        label: 'Acknowledge', icon: <CheckCheck size={13} />, tone: 'accent',
-        onSelect: () => setConfirmAck(r), disabled: !!lockedBy, title: lockedTitle,
-      })
-    }
-    actions.push({
-      label: 'Resolve', icon: <CircleCheck size={13} />, separated: r.status === 'reported',
-      onSelect: () => setResolveOf(r), disabled: !!lockedBy, title: lockedTitle,
-    })
-    return actions
-  }
-
   const detailActions = viewReport && canEdit && (viewReport.status !== 'resolved' || (canClassify && !viewReport.incident_type)) ? (
     <>
       {canClassify && !viewReport.incident_type && (
@@ -410,7 +383,8 @@ export default function ReportsView() {
                     <th className="px-3 py-2.5 font-bold">Vehicle</th>
                     <th className="px-3 py-2.5 font-bold hidden lg:table-cell">Booking</th>
                     <th className="px-3 py-2.5 font-bold">Status</th>
-                    <th className="px-3 py-2.5 font-bold text-right w-[90px]">Actions</th>
+                    {/* No header text, as on Vehicle Management; the arrow says the row opens the report. */}
+                    <th className="px-3 py-2.5 w-12"><span className="sr-only">open</span></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -437,10 +411,10 @@ export default function ReportsView() {
                       <td className="px-3 py-2.5 font-mono text-white/70">{r.trucks?.plate_number ?? <span className="text-white/25 font-sans">—</span>}</td>
                       <td className="px-3 py-2.5 text-xs text-white/60 hidden lg:table-cell">{r.bookings?.reference_number ?? '—'}</td>
                       <td className="px-3 py-2.5"><ReportStatusBadge status={r.status} /></td>
-                      <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
+                      <td className="px-3 py-2.5">
                         <div className="flex items-center justify-end gap-1.5">
                           <RecordLockBadge holder={reportLocks.get(r.report_id)} />
-                          <RowActionMenu label={`Actions for report from ${reportDriverName(r)}`} actions={rowActions(r)} />
+                          <ChevronRight size={18} className="text-[#818181]" aria-hidden />
                         </div>
                       </td>
                     </tr>
