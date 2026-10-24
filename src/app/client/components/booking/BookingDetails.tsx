@@ -239,6 +239,18 @@ const stagger: Variants = {
   show:   { transition: { staggerChildren: 0.07 } },
 }
 
+// Counts (pieces, pallets): digits only, so a letter never makes it into the box.
+function digitsOnly(value: string): string {
+  return value.replace(/\D/g, '')
+}
+
+// Lengths and weights: digits and a single "." for the decimal.
+function decimalOnly(value: string): string {
+  const clean = value.replace(/[^\d.]/g, '')
+  const dot   = clean.indexOf('.')
+  return dot === -1 ? clean : clean.slice(0, dot + 1) + clean.slice(dot + 1).replace(/\./g, '')
+}
+
 function Req() {
   return <span style={{ color: ERROR_COLOR, marginLeft: 2 }}>*</span>
 }
@@ -702,6 +714,12 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
        }) === resubmitBaseline
 
   const [touched,    setTouched]    = useState(false)
+  // Fields the client has typed in, picked, or left: their errors show live,
+  // without waiting for Next. Next (touched) reveals every field at once.
+  const [seen,       setSeen]       = useState<ReadonlySet<string>>(() => new Set())
+  const touchField = (key: string) =>
+    setSeen((prev) => (prev.has(key) ? prev : new Set(prev).add(key)))
+  const shown = (key: string) => touched || seen.has(key)
   const [mapTarget,  setMapTarget]  = useState<MapPickerTarget>(null)
   // false on the server, true in the browser — the portal needs document.body.
   const inBrowser = useSyncExternalStore(noopSubscribe, () => true, () => false)
@@ -761,7 +779,26 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
   const summary = useAppSelector(selectCargoSummary)
 
   const rawErrors = validateBooking(date, time, pickup, dropoffs, sections, mode, docCount)
-  const errors    = touched ? rawErrors : { schedule: {}, route: { dropoffs: {} }, sections: [], documents: undefined }
+  const errors = {
+    schedule: {
+      date: shown('date') ? rawErrors.schedule.date : undefined,
+      time: shown('time') ? rawErrors.schedule.time : undefined,
+    },
+    route: {
+      pickup:   shown('pickup') ? rawErrors.route.pickup : undefined,
+      dropoffs: Object.fromEntries(
+        Object.entries(rawErrors.route.dropoffs).filter(([i]) => shown(`dropoff:${i}`)),
+      ) as Record<number, string>,
+    },
+  }
+
+  /** A product's errors, limited to the fields that should show one yet. */
+  const visibleGroupErrors = (dropoffIndex: number, groupId: string): GroupErrors => {
+    const all = getGroupErrors(rawErrors.sections, dropoffIndex, groupId)
+    return Object.fromEntries(
+      Object.entries(all).filter(([field]) => shown(`${groupId}:${field}`)),
+    ) as GroupErrors
+  }
 
   const handleNext = () => {
     setTouched(true)
@@ -773,6 +810,12 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
 
   const handleUpdateGroup = (dropoffIndex: number, groupId: string, patch: Partial<ItemGroup>) =>
     dispatch(updateGroupAction({ dropoffIndex, groupId, patch }))
+
+  /** A typed value for one product field: marks it touched so its error shows live. */
+  const setGroupField = (dropoffIndex: number, groupId: string, field: keyof GroupErrors, value: string) => {
+    touchField(`${groupId}:${field}`)
+    handleUpdateGroup(dropoffIndex, groupId, { [field]: value })
+  }
 
   const handleRemoveGroup = (dropoffIndex: number, groupId: string) =>
     dispatch(removeGroupAction({ dropoffIndex, groupId }))
@@ -790,6 +833,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
   const handleMapConfirm = useCallback(
     (place: ResolvedPlace) => {
       if (!mapTarget) return
+      touchField(mapTarget.kind === 'pickup' ? 'pickup' : `dropoff:${mapTarget.index}`)
       if (mapTarget.kind === 'pickup') {
         dispatch(setPickup(place.address))
         dispatch(setPickupCoords({ lat: place.latitude, lng: place.longitude }))
@@ -883,7 +927,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
               <span className="ff-sc booking-text text-xs">Date<Req /></span>
               <DatePickerPopup
                 value={date}
-                onChange={(v) => dispatch(setDate(v))}
+                onChange={(v) => { touchField('date'); dispatch(setDate(v)) }}
                 hasError={!!errors.schedule?.date}
                 errorMsg={errors.schedule?.date}
               />
@@ -893,7 +937,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
               <span className="ff-sc booking-text text-xs">Time<Req /></span>
               <TimePickerPopup
                 value={time}
-                onChange={(v) => dispatch(setTime(v))}
+                onChange={(v) => { touchField('time'); dispatch(setTime(v)) }}
                 hasError={!!errors.schedule?.time}
                 errorMsg={errors.schedule?.time}
               />
@@ -1064,9 +1108,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                     <div className="flex flex-col gap-3">
                       <AnimatePresence>
                         {section.groups.map((g, idx) => {
-                          const gErr = touched
-                            ? getGroupErrors(rawErrors.sections, section.dropoffIndex, g.id)
-                            : {}
+                          const gErr = visibleGroupErrors(section.dropoffIndex, g.id)
                           return (
                             <motion.div key={g.id}
                               initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}
@@ -1090,6 +1132,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                               <ProductFieldsRow
                                 group={g} errors={gErr}
                                 onUpdate={(patch) => handleUpdateGroup(section.dropoffIndex, g.id, patch)}
+                                onTouch={(field) => touchField(`${g.id}:${field}`)}
                                 commodities={commodities}
                                 productsCatalog={productsCatalog}
                                 shcStandardList={shcStandardList}
@@ -1101,7 +1144,9 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                                   <div className="flex flex-col gap-1">
                                     <label className="ff-regular booking-text text-xs whitespace-nowrap">Pieces<Req /></label>
                                     <TextField value={g.pieces}
-                                      onChange={(e) => handleUpdateGroup(section.dropoffIndex, g.id, { pieces: e.target.value })}
+                                      onChange={(e) => setGroupField(section.dropoffIndex, g.id, 'pieces', digitsOnly(e.target.value))}
+                                      onBlur={() => touchField(`${g.id}:pieces`)}
+                                      inputProps={{ inputMode: 'numeric' }}
                                       placeholder="0" variant="outlined" error={!!gErr.pieces}
                                       sx={{ ...fieldSx(INPUT_BG_CARD, BORDER_CARD, !!gErr.pieces), width: { xs: 90, lg: 120 } }} />
                                     {gErr.pieces && <FormHelperText sx={HELPER_SX}>{gErr.pieces}</FormHelperText>}
@@ -1113,7 +1158,9 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                                       {(['looseLength', 'looseWidth', 'looseHeight'] as const).map((dim) => (
                                         <div key={dim} className="flex flex-col gap-0.5 flex-1 min-w-0">
                                           <TextField value={g[dim]}
-                                            onChange={(e) => handleUpdateGroup(section.dropoffIndex, g.id, { [dim]: e.target.value })}
+                                            onChange={(e) => setGroupField(section.dropoffIndex, g.id, dim, decimalOnly(e.target.value))}
+                                            onBlur={() => touchField(`${g.id}:${dim}`)}
+                                            inputProps={{ inputMode: 'decimal' }}
                                             placeholder={dim === 'looseLength' ? 'L' : dim === 'looseWidth' ? 'W' : 'H'}
                                             variant="outlined" error={!!gErr[dim]}
                                             sx={{ ...fieldSx(INPUT_BG_CARD, BORDER_CARD, !!gErr[dim]), width: '100%' }} />
@@ -1129,7 +1176,9 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                                     <div className="flex gap-1.5">
                                       <div className="flex flex-col gap-0.5 flex-1 lg:flex-none">
                                         <TextField value={g.weight}
-                                          onChange={(e) => handleUpdateGroup(section.dropoffIndex, g.id, { weight: e.target.value })}
+                                          onChange={(e) => setGroupField(section.dropoffIndex, g.id, 'weight', decimalOnly(e.target.value))}
+                                      onBlur={() => touchField(`${g.id}:weight`)}
+                                      inputProps={{ inputMode: 'decimal' }}
                                           placeholder="0" variant="outlined" error={!!gErr.weight}
                                           sx={{ ...fieldSx(INPUT_BG_CARD, BORDER_CARD, !!gErr.weight), width: { xs: '100%', lg: 90 } }} />
                                         {gErr.weight && <FormHelperText sx={HELPER_SX}>{gErr.weight}</FormHelperText>}
@@ -1162,7 +1211,9 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                                   <div className="flex flex-col gap-1 w-full sm:w-[120px]">
                                     <label className="ff-regular booking-text text-xs whitespace-nowrap">No. of Pallets<Req /></label>
                                     <TextField fullWidth value={g.numPallets}
-                                      onChange={(e) => handleUpdateGroup(section.dropoffIndex, g.id, { numPallets: e.target.value })}
+                                      onChange={(e) => setGroupField(section.dropoffIndex, g.id, 'numPallets', digitsOnly(e.target.value))}
+                                      onBlur={() => touchField(`${g.id}:numPallets`)}
+                                      inputProps={{ inputMode: 'numeric' }}
                                       placeholder="0" variant="outlined" error={!!gErr.numPallets}
                                       sx={fieldSx(INPUT_BG_CARD, BORDER_CARD, !!gErr.numPallets)} />
                                     {gErr.numPallets && <FormHelperText sx={HELPER_SX}>{gErr.numPallets}</FormHelperText>}
@@ -1189,7 +1240,9 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                                       {(['palletLength', 'palletWidth', 'palletHeight'] as const).map((dim) => (
                                         <div key={dim} className="flex flex-col gap-0.5 flex-1 min-w-0">
                                           <TextField value={g[dim]}
-                                            onChange={(e) => handleUpdateGroup(section.dropoffIndex, g.id, { [dim]: e.target.value })}
+                                            onChange={(e) => setGroupField(section.dropoffIndex, g.id, dim, decimalOnly(e.target.value))}
+                                            onBlur={() => touchField(`${g.id}:${dim}`)}
+                                            inputProps={{ inputMode: 'decimal' }}
                                             placeholder={dim === 'palletLength' ? 'L' : dim === 'palletWidth' ? 'W' : 'H'}
                                             variant="outlined" error={!!gErr[dim as keyof GroupErrors]}
                                             sx={{ ...fieldSx(INPUT_BG_CARD, BORDER_CARD, !!gErr[dim as keyof GroupErrors]), width: '100%' }} />
@@ -1205,7 +1258,9 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                                   <div className="flex flex-col gap-1 w-full sm:w-[160px]">
                                     <label className="ff-regular booking-text text-xs whitespace-nowrap">Gross weight per pallet<Req /></label>
                                     <TextField fullWidth value={g.grossWeightPerPallet}
-                                      onChange={(e) => handleUpdateGroup(section.dropoffIndex, g.id, { grossWeightPerPallet: e.target.value })}
+                                      onChange={(e) => setGroupField(section.dropoffIndex, g.id, 'grossWeightPerPallet', decimalOnly(e.target.value))}
+                                      onBlur={() => touchField(`${g.id}:grossWeightPerPallet`)}
+                                      inputProps={{ inputMode: 'decimal' }}
                                       placeholder="0" variant="outlined" error={!!gErr.grossWeightPerPallet}
                                       sx={fieldSx(INPUT_BG_CARD, BORDER_CARD, !!gErr.grossWeightPerPallet)} />
                                     {gErr.grossWeightPerPallet && <FormHelperText sx={HELPER_SX}>{gErr.grossWeightPerPallet}</FormHelperText>}
@@ -1216,7 +1271,9 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                                     <div className="flex gap-1.5 items-start">
                                       <div className="flex flex-col gap-0.5 flex-1 min-w-0">
                                         <TextField fullWidth value={g.netWeightPerPallet}
-                                          onChange={(e) => handleUpdateGroup(section.dropoffIndex, g.id, { netWeightPerPallet: e.target.value })}
+                                          onChange={(e) => setGroupField(section.dropoffIndex, g.id, 'netWeightPerPallet', decimalOnly(e.target.value))}
+                                      onBlur={() => touchField(`${g.id}:netWeightPerPallet`)}
+                                      inputProps={{ inputMode: 'decimal' }}
                                           placeholder="0" variant="outlined" error={!!gErr.netWeightPerPallet}
                                           sx={fieldSx(INPUT_BG_CARD, BORDER_CARD, !!gErr.netWeightPerPallet)} />
                                         {gErr.netWeightPerPallet && <FormHelperText sx={HELPER_SX}>{gErr.netWeightPerPallet}</FormHelperText>}
@@ -1488,6 +1545,7 @@ function ComboboxField({
   placeholder,
   hasError,
   errorMsg,
+  onTouch,
 }: {
   label: string
   required?: boolean
@@ -1501,6 +1559,8 @@ function ComboboxField({
   placeholder?: string
   hasError?: boolean
   errorMsg?: string
+  /** Called whenever the client types, picks, clears, or leaves the box. */
+  onTouch?: () => void
 }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -1542,10 +1602,12 @@ function ComboboxField({
         <input
           value={inputValue}
           onChange={(e) => {
+            onTouch?.()
             onType(e.target.value)
             setOpen(true)
           }}
           onFocus={() => setOpen(true)}
+          onBlur={() => onTouch?.()}
           placeholder={placeholder ?? 'Search or type…'}
           className="flex-1 min-w-0 bg-transparent outline-none px-3 text-sm text-white placeholder:text-white/25 text-ellipsis"
           style={{ height: 36 }}
@@ -1554,7 +1616,7 @@ function ComboboxField({
           <button
             type="button"
             aria-label={`Clear ${label}`}
-            onClick={() => { onClear(); setOpen(false) }}
+            onClick={() => { onTouch?.(); onClear(); setOpen(false) }}
             className="px-1.5 opacity-80 hover:opacity-100 transition-opacity"
           >
             <FormIcon name="clear.svg" size={16} />
@@ -1585,7 +1647,7 @@ function ComboboxField({
                   <button
                     key={o.id}
                     type="button"
-                    onClick={() => { onSelect(o.id, o.label); setOpen(false) }}
+                    onClick={() => { onTouch?.(); onSelect(o.id, o.label); setOpen(false) }}
                     className="w-full text-left px-3 py-2 text-sm transition-colors flex items-center justify-between gap-2"
                     style={{
                       background: o.id === value ? 'rgba(77,249,237,0.10)' : 'transparent',
@@ -1607,7 +1669,7 @@ function ComboboxField({
                   <div className="border-t border-white/[0.07] mx-3" />
                   <button
                     type="button"
-                    onClick={() => { onSelect('', inputValue.trim()); setOpen(false) }}
+                    onClick={() => { onTouch?.(); onSelect('', inputValue.trim()); setOpen(false) }}
                     className="w-full text-left px-3 py-2 text-sm text-white/50 hover:text-white transition-colors flex items-center gap-2"
                     style={{ background: 'transparent' }}
                   >
@@ -1630,11 +1692,13 @@ function ComboboxField({
 }
 
 function ProductFieldsRow({
-  group, errors, onUpdate, commodities, productsCatalog, shcStandardList, shcAdditionalList,
+  group, errors, onUpdate, onTouch, commodities, productsCatalog, shcStandardList, shcAdditionalList,
 }: {
   group: ItemGroup
   errors: GroupErrors
   onUpdate: (patch: Partial<ItemGroup>) => void
+  /** The client typed in, picked from, cleared, or left this field. */
+  onTouch: (field: keyof GroupErrors) => void
   commodities: Commodity[]
   productsCatalog: Product[]
   shcStandardList: HandlingCode[]
@@ -1678,6 +1742,7 @@ function ProductFieldsRow({
         placeholder="Search commodity…"
         hasError={!!errors.commodity}
         errorMsg={errors.commodity}
+        onTouch={() => onTouch('commodity')}
       />
 
       {/* Product */}
@@ -1699,6 +1764,7 @@ function ProductFieldsRow({
         placeholder={group.commodity ? 'Search product…' : 'Select commodity first'}
         hasError={!!errors.product}
         errorMsg={errors.product}
+        onTouch={() => onTouch('product')}
       />
 
       {/* Special Handling Code */}
@@ -1716,6 +1782,7 @@ function ProductFieldsRow({
         placeholder="Search code…"
         hasError={!!errors.shc}
         errorMsg={errors.shc}
+        onTouch={() => onTouch('shc')}
       />
 
       {/* Additional Special Handling Code */}
