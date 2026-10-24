@@ -30,12 +30,23 @@ export function ModuleAccessProvider({ flags, children }: { flags: ModuleFlags; 
 }
 
 // Read the current module's access inside any page/view.
-// Use `canCreate` / `canEdit` / `canDelete` to hide write controls.
+// Use `canCreate` / `canEdit` / `canDelete` with writeAccess() to disable write controls.
 export function useModuleAccess(): ModuleAccessValue {
   return useContext(ModuleAccessContext)
 }
 
 export const FULL_ACCESS_FLAGS: ModuleFlags = ALL_FLAGS
+
+/** Hint on a control a Read Only user can see but not use. */
+export const READ_ONLY_HINT = 'Read Only access: you can view this but not change it.'
+
+/**
+ * Props for a write control. Read Only shows the control DISABLED rather than
+ * hiding it, so the user can see what exists. Spread last so the hint wins.
+ */
+export function writeAccess(allowed: boolean): { disabled?: boolean; title?: string; 'aria-disabled'?: boolean } {
+  return allowed ? {} : { disabled: true, title: READ_ONLY_HINT, 'aria-disabled': true }
+}
 
 export function ModuleNoAccess() {
   return (

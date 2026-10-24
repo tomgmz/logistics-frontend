@@ -11,6 +11,7 @@ import { validateForm } from '@/lib/validation/user-management.validation'
 import { extractApiError } from '@/lib/api-error'
 import { appToast } from '@/lib/toast'
 import PhoneInputRow, { attachCountryCode } from '@/components/ui/PhoneInputRow'
+import { blockPaste, confirmEmailError } from '@/lib/validation/fields'
 
 /**
  * The signed-in IT Admin hands their role to a successor.
@@ -32,11 +33,13 @@ interface FormState {
   middle_name: string
   suffix:      string
   email:       string
+  /** Typed a second time; never sent. */
+  confirm_email: string
   phone:       string
 }
 
 const EMPTY: FormState = {
-  first_name: '', last_name: '', middle_name: '', suffix: '', email: '', phone: '',
+  first_name: '', last_name: '', middle_name: '', suffix: '', email: '', confirm_email: '', phone: '',
 }
 
 const inputBase =
@@ -108,6 +111,8 @@ export default function ItAdminTransitionModal({
     // Reuses the same schema the create form uses, so a successor is held to
     // exactly the standard any other IT Admin account is.
     const found = validateForm('it-admins', false, payload())
+    const confirmError = confirmEmailError(form.email, form.confirm_email)
+    if (confirmError) found.confirm_email = confirmError
     setErrors(found)
     if (Object.keys(found).length > 0) return
     setConfirming(true)
@@ -208,6 +213,11 @@ export default function ItAdminTransitionModal({
                     hint="the temporary password goes here">
                     <input className={inputBase} type="email" value={form.email}
                       onChange={(e) => set('email', e.target.value)} placeholder="name@company.com" />
+                  </Field>
+                  <Field label="Confirm Email" required error={errors.confirm_email}>
+                    <input className={inputBase} type="email" value={form.confirm_email} autoComplete="off"
+                      onChange={(e) => set('confirm_email', e.target.value)} onPaste={blockPaste} onDrop={blockPaste}
+                      placeholder="Type the email again" />
                   </Field>
                   <Field label="Mobile" required error={errors.phone}>
                     <PhoneInputRow value={form.phone} onChange={(digits) => set('phone', digits)}

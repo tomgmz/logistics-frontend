@@ -2,8 +2,7 @@
 
 import Pagination from '@/components/ui/Pagination'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Users, UserPlus, UserRoundPlus, MoreVertical, ChevronDown,
@@ -29,21 +28,25 @@ import UserFormModal, { type DriverSource } from './UserFormModal'
 import AccountTypePicker, { type AccountTypeOption } from '@/components/admin/AccountTypePicker'
 import { useRecordLocks } from '@/lib/hooks/useRecordLock'
 import { RecordLockBadge } from '@/components/ui/RecordLockBanner'
-import PasswordResetQueue from '@/components/admin/PasswordResetQueue'
 import { licenseExpiryState, needsLicenseUpdate } from '@/lib/license-expiry'
-import ModuleSectionTabs, { type ModuleSection } from '@/components/admin/ModuleSectionTabs'
-import { passwordResetService } from '@/lib/services/admin/password-reset.service'
+import ModuleSectionTabs from '@/components/admin/ModuleSectionTabs'
 import { externalDriverService, type VendorDriverUser } from '@/lib/services/admin/external-driver.service'
-import { useModuleAccess } from '@/components/layout/ModuleAccess'
+import { useModuleAccess, writeAccess } from '@/components/layout/ModuleAccess'
 
 import RefreshButton from '@/components/ui/RefreshButton'
 import FilterBar, {
   allowedValues, matchesFilter, optionsFrom, type FilterField, type FilterValues,
 } from '@/components/ui/FilterBar'
 type UserMgmtTab = Extract<UserTab, 'clients' | 'drivers' | 'it-admins'>
-// The dropdown below filters the directory by role. Password resets are a queue
-// you act on, not a slice of the directory, so they are a top-level section
-// instead — see ModuleSectionTabs.
+
+/**
+ * Who is looking. The Company Administrator adds and edits clients and drivers;
+ * since 2026-10-24 the IT Administrator owns their account status (Set Active,
+ * Deactivate, Archive, Restore), vendor drivers' passkey access, and every
+ * password reset. The IT Administrator's "Clients & Drivers" tab is this same
+ * table in 'it-admin' mode: status and access actions only, no add or edit.
+ */
+export type UserManagementMode = 'company-admin' | 'it-admin'
 //
 // Drivers split into two tabs under the one dropdown entry. Vendor drivers are
 // role='driver' too, but they are passkey-only subcontractors — no password, not
@@ -56,9 +59,6 @@ const DRIVER_TABS: { key: 'drivers' | 'vendor-drivers'; label: string }[] = [
   { key: 'drivers',        label: 'Company Drivers' },
   { key: 'vendor-drivers', label: 'Vendor Drivers'  },
 ]
-
-// Kept for the ?tab=password-resets deep-link a reset notification sends.
-const RESETS_DEEPLINK = 'password-resets'
 
 const TABS: { key: TabValue; label: string }[] = [
   { key: 'all',        label: 'All Users' },
@@ -237,6 +237,7 @@ function StatusBadge({ status }: { status: UserStatus }) {
 interface RowMenuProps {
   user: AnyUser
   tab: TabValue
+  mode: UserManagementMode
   onView: () => void
   onEdit: () => void
   onStatusChange: (s: UserStatus) => void
@@ -244,8 +245,9 @@ interface RowMenuProps {
   lockedBy?: string
 }
 
-function RowMenu({ user, tab, onView, onEdit, onStatusChange, lockedBy }: RowMenuProps) {
+function RowMenu({ user, tab, mode, onView, onEdit, onStatusChange, lockedBy }: RowMenuProps) {
   const access = useModuleAccess()
+  const itMode = mode === 'it-admin'
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -257,16 +259,21 @@ function RowMenu({ user, tab, onView, onEdit, onStatusChange, lockedBy }: RowMen
     return () => document.removeEventListener('mousedown', handle)
   }, [])
 
-  const statusActions = ([
-    { label: 'Set Active', status: 'active'      as UserStatus, icon: <ShieldCheck size={13} /> },
-    { label: 'Deactivate', status: 'deactivated' as UserStatus, icon: <ShieldOff size={13} />   },
-    { label: 'Archive',    status: 'archived'    as UserStatus, icon: <Archive size={13} />     },
-  ]).filter((a) => a.status !== user.status)
-    // Activate/deactivate is an edit; archiving goes through DELETE, so it
-    // needs the delete permission (the module's "All" tier).
-    .filter((a) => (a.status === 'archived' ? access.canDelete : access.canEdit))
+  // A client's or driver's account status is the IT Administrator's to change.
+  // The Company Administrator keeps it only on the IT Administrator tab.
+  const ownsStatus = itMode || user.role === 'it_admin'
+  const statusActions = ownsStatus
+    ? ([
+        { label: 'Set Active', status: 'active'      as UserStatus, icon: <ShieldCheck size={13} /> },
+        { label: 'Deactivate', status: 'deactivated' as UserStatus, icon: <ShieldOff size={13} />   },
+        { label: 'Archive',    status: 'archived'    as UserStatus, icon: <Archive size={13} />     },
+      ]).filter((a) => a.status !== user.status)
+    : []
+  // Activate/deactivate is an edit; archiving goes through DELETE, so it needs
+  // Manage All. The IT Administrator is never limited by a tier.
+  const statusAllowed = (s: UserStatus) => itMode || (s === 'archived' ? access.canDelete : access.canEdit)
 
-  const canEdit = tab !== 'all' && access.canEdit
+  const showEdit = !itMode && tab !== 'all'
 
   // Viewing is read-only, so it stays available while someone else is editing.
   if (lockedBy) {
@@ -308,10 +315,11 @@ function RowMenu({ user, tab, onView, onEdit, onStatusChange, lockedBy }: RowMen
             >
               <Eye size={13} /> View Details
             </button>
-            {canEdit && (
+            {showEdit && (
               <button
                 onClick={() => { setOpen(false); onEdit() }}
-                className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white"
+                {...writeAccess(access.canEdit)}
+                className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
               >
                 <Pencil size={13} /> Edit
               </button>
@@ -323,7 +331,8 @@ function RowMenu({ user, tab, onView, onEdit, onStatusChange, lockedBy }: RowMen
                   <button
                     key={a.status}
                     onClick={() => { setOpen(false); onStatusChange(a.status) }}
-                    className={`flex w-full items-center gap-2.5 px-3.5 py-2 text-sm transition ${
+                    {...writeAccess(statusAllowed(a.status))}
+                    className={`flex w-full items-center gap-2.5 px-3.5 py-2 text-sm transition disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent ${
                       a.status === 'archived'
                         ? 'text-yellow-400 hover:bg-yellow-500/10'
                         : a.status === 'deactivated'
@@ -368,7 +377,7 @@ function AccessBadge({ access }: { access: VendorDriverUser['access'] | undefine
 /**
  * The flag on a vendor account whose access was revoked: automatically once the
  * booking they drove was completed, or by hand. Says when and why, so whoever
- * picks a vendor crew next knows to restore access first.
+ * picks a vendor crew next knows to ask the IT Administrator to restore access.
  */
 function RevokedFlag({ user }: { user: VendorDriverUser }) {
   if (!user.access || user.access.account_active) return null
@@ -388,13 +397,18 @@ function RevokedFlag({ user }: { user: VendorDriverUser }) {
 }
 
 /** The archived view's row menu: look at the account, or bring it back. */
-function ArchivedRowMenu({ onView, onRestore, lockedBy }: {
+function ArchivedRowMenu({ user, mode, onView, onRestore, lockedBy }: {
+  user:      AnyUser
+  mode:      UserManagementMode
   onView:    () => void
   onRestore: () => void
   lockedBy?: string
 }) {
   // Restoring undoes an archive, so it needs the same "All" tier archiving does.
+  // Like archiving, a client or driver is restored by the IT Administrator.
   const { canDelete } = useModuleAccess()
+  const itMode     = mode === 'it-admin'
+  const ownsStatus = itMode || user.role === 'it_admin'
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -439,10 +453,10 @@ function ArchivedRowMenu({ onView, onRestore, lockedBy }: {
             <button onClick={() => { setOpen(false); onView() }} className={`${item} text-[#818181] hover:bg-[#2a2a2a] hover:text-white`}>
               <Eye size={13} /> View Details
             </button>
-            {canDelete && (
+            {ownsStatus && (
               <>
                 <div className="my-1 border-t border-[#424242]" />
-                <button onClick={() => { setOpen(false); onRestore() }} className={`${item} text-[#4df9ed] hover:bg-[#4df9ed]/10`}>
+                <button onClick={() => { setOpen(false); onRestore() }} {...writeAccess(itMode || canDelete)} className={`${item} text-[#4df9ed] hover:bg-[#4df9ed]/10 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent`}>
                   <ArchiveRestore size={13} /> Restore
                 </button>
               </>
@@ -458,14 +472,18 @@ function ArchivedRowMenu({ onView, onRestore, lockedBy }: {
  * Actions for a vendor driver: the shared view/edit form, plus the access actions
  * a passkey-only account needs instead of a password reset.
  */
-function VendorRowMenu({ user, onDone, onView, onEdit, lockedBy }: {
+function VendorRowMenu({ user, mode, onDone, onView, onEdit, lockedBy }: {
   user:      VendorDriverUser
+  mode:      UserManagementMode
   onDone:    () => Promise<void> | void
   onView:    () => void
   onEdit:    () => void
   lockedBy?: string
 }) {
   const { canEdit } = useModuleAccess()
+  // Passkey access (re-invite, revoke, restore) and the account status are the
+  // IT Administrator's; editing the driver's details stays with the Company Administrator.
+  const itMode = mode === 'it-admin'
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -542,13 +560,13 @@ function VendorRowMenu({ user, onDone, onView, onEdit, lockedBy }: {
             <button onClick={() => { setOpen(false); onView() }} className={`${item} text-[#818181] hover:bg-[#2a2a2a] hover:text-white`}>
               <Eye size={13} /> View Details
             </button>
-            {canEdit && (
-              <button onClick={() => { setOpen(false); onEdit() }} className={`${item} text-[#818181] hover:bg-[#2a2a2a] hover:text-white`}>
+            {!itMode && (
+              <button onClick={() => { setOpen(false); onEdit() }} {...writeAccess(canEdit)} className={`${item} text-[#818181] hover:bg-[#2a2a2a] hover:text-white disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent`}>
                 <Pencil size={13} /> Edit Details
               </button>
             )}
-            {canEdit && <div className="my-1 border-t border-[#424242]" />}
-            {!canEdit || !user.access ? null : user.access.account_active ? (
+            {itMode && user.access && <div className="my-1 border-t border-[#424242]" />}
+            {!itMode || !user.access ? null : user.access.account_active ? (
               <>
                 <button onClick={resend} className={`${item} text-[#818181] hover:bg-[#2a2a2a] hover:text-white`}>
                   <Send size={13} /> Resend Setup Link
@@ -592,7 +610,7 @@ function TableSkeleton({ cols }: { cols: number }) {
   )
 }
 
-function EmptyState({ tab, onAdd, canAdd, archived = false }: { tab: TabValue; onAdd: () => void; canAdd: boolean; archived?: boolean }) {
+function EmptyState({ tab, onAdd, showAdd, canAdd, archived = false }: { tab: TabValue; onAdd: () => void; showAdd: boolean; canAdd: boolean; archived?: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center py-24 text-center">
       <div className="mb-4 rounded-full border border-[#424242] bg-[#1b1b1b] p-4">
@@ -606,10 +624,11 @@ function EmptyState({ tab, onAdd, canAdd, archived = false }: { tab: TabValue; o
           ? 'No vendor drivers yet. Add one here, then pick them in Booking Management for a vendor-supplied delivery.'
           : `No ${tab === 'all' ? 'users' : tab} match your current filters.`}
       </p>
-      {tab !== 'all' && canAdd && !archived && (
+      {tab !== 'all' && showAdd && !archived && (
         <button
           onClick={onAdd}
-          className="mt-6 flex items-center gap-2 rounded-lg bg-[#4df9ed] px-4 py-2 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5]"
+          {...writeAccess(canAdd)}
+          className="mt-6 flex items-center gap-2 rounded-lg bg-[#4df9ed] px-4 py-2 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-[#4df9ed]"
         >
           <UserPlus size={14} /> Add First User
         </button>
@@ -854,17 +873,16 @@ function matchesFilters(u: AnyUser, tab: DirectoryTab, f: FilterValues): boolean
   return true
 }
 
-export default function UserManagementClient() {
-  const searchParams = useSearchParams()
-  // A password-reset notification deep-links here as ?tab=password-resets&request=…
-  const deepLinkTab     = searchParams.get('tab')
-  const focusRequestId  = searchParams.get('request')
+export default function UserManagementClient({ mode = 'company-admin', sectionTabs }: {
+  mode?:        UserManagementMode
+  /** The IT Admin page's own section tabs, drawn where this page's would be. */
+  sectionTabs?: ReactNode
+}) {
+  const itMode = mode === 'it-admin'
+  // The IT Administrator's staff live on their own tab of their page.
+  const tabs = itMode ? TABS.filter((t) => t.key !== 'it-admins') : TABS
 
-  const [section,          setSection]          = useState<ModuleSection>(
-    deepLinkTab === RESETS_DEEPLINK ? 'password-resets' : 'directory',
-  )
   const [activeTab,        setActiveTab]        = useState<TabValue>('clients')
-  const [resetCount,       setResetCount]       = useState(0)
   const [allRows,          setAllRows]          = useState<AnyUser[]>([])
   const [loading,          setLoading]          = useState(true)
   const [fetching,         setFetching]         = useState(false)
@@ -894,10 +912,9 @@ export default function UserManagementClient() {
   // Only archived accounts on screen: the old "Archived view" wording and rules.
   const showArchived = archivedMode === 'only'
 
-  // This module's tier for a managed role: Read-only hides every write control.
+  // This module's tier for a managed role: Read Only disables every write control.
   const access = useModuleAccess()
 
-  const isResetsTab    = section === 'password-resets'
   // Both driver tabs sit under the one "Drivers" entry in the role dropdown.
   const isDriverTab    = activeTab === 'drivers' || activeTab === 'vendor-drivers'
   const dropdownTab: TabValue = isDriverTab ? 'drivers' : activeTab
@@ -923,19 +940,6 @@ export default function UserManagementClient() {
     setActiveTab(tab)
   }, [activeTab])
 
-
-  // Seeded once on mount so the tab can show a badge before anyone opens it —
-  // the panel itself only fetches when it is mounted, which is too late to tell
-  // someone there is work waiting. Best effort: a failure just means no badge.
-  const loadResetCount = useCallback(() => {
-    passwordResetService.list()
-      .then((rows) => setResetCount(rows.filter((r) => r.status === 'pending' || r.status === 'expired').length))
-      .catch(() => {})
-  }, [])
-
-  useEffect(() => { loadResetCount() }, [loadResetCount])
-
-  useLiveTable(['live:password_resets'], loadResetCount)
 
   // Debounce search
   useEffect(() => {
@@ -1011,7 +1015,6 @@ export default function UserManagementClient() {
 
   // Someone else (or the driver app) changed an account: re-read the open tab.
   useLiveTable(['live:users'], () => {
-    if (isResetsTab) return
     if (activeTab === 'all') void fetchAllUsers(search, false, true)
     else void fetchTabUsers(activeTab, true)
   })
@@ -1025,27 +1028,24 @@ export default function UserManagementClient() {
     setPage(1)
     setSearch('')
     setSearchInput('')
-    // The resets panel loads its own data and has no user list to fetch.
-    if (isResetsTab) { setLoading(false); return }
     if (activeTab === 'all') fetchAllUsers('', true)
     else fetchTabUsers(activeTab)
-  }, [activeTab, isResetsTab, tabArchivedKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeTab, tabArchivedKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // The All tab re-reads from the server when its filters change.
   const allTabFilterKey = activeTab === 'all' ? JSON.stringify(filters) : ''
 
   useEffect(() => {
-    if (isResetsTab || activeTab !== 'all') return
+    if (activeTab !== 'all') return
     if (isInitialAllFetch.current) { isInitialAllFetch.current = false; return }
     fetchAllUsers(search, false)
-  }, [search, allTabFilterKey, activeTab, isResetsTab, fetchAllUsers])
+  }, [search, allTabFilterKey, activeTab, fetchAllUsers])
 
-  /** Reload whichever user list is showing. A no-op on the resets panel, which owns its own data. */
+  /** Reload whichever user list is showing. */
   const refetchCurrentTab = useCallback(async () => {
-    if (isResetsTab) return
     if (activeTab === 'all') await fetchAllUsers(search, false)
     else await fetchTabUsers(activeTab)
-  }, [isResetsTab, activeTab, search, fetchAllUsers, fetchTabUsers])
+  }, [activeTab, search, fetchAllUsers, fetchTabUsers])
 
   // Counted over the whole roster, not the current page or search, so the notice
   // never undercounts.
@@ -1053,7 +1053,7 @@ export default function UserManagementClient() {
     ? allRows.filter((u) => needsLicenseUpdate((u as DriverUser).drivers?.license_expiry)).length
     : 0
 
-  const filterDefs = isResetsTab ? [] : filterFields(activeTab, allRows, showArchived)
+  const filterDefs = filterFields(activeTab, allRows, showArchived)
   const licenseOnly = matchesFilter(filters, 'license', 'attention') && !matchesFilter(filters, 'license', 'ok')
 
   const applyFilters = (next: FilterValues) => {
@@ -1061,7 +1061,7 @@ export default function UserManagementClient() {
     setPage(1)
   }
 
-  const filtered = activeTab === 'all' || isResetsTab
+  const filtered = activeTab === 'all'
     ? allRows
     : allRows.filter((u) => {
         if (!matchesFilters(u, activeTab, filters)) return false
@@ -1149,7 +1149,7 @@ export default function UserManagementClient() {
   // Only one IT Administrator may hold the role, and the seat is only known while
   // its tab is open: offer it there when it is empty. A filled seat is handed
   // over by the IT Administrator themselves, from their own portal.
-  const newAccountTypes = NEW_ACCOUNT_TYPES.filter(
+  const newAccountTypes = itMode ? [] : NEW_ACCOUNT_TYPES.filter(
     (t) => t.key !== 'it-admins' || (isITAdminTab && !showArchived && !loading && !activeITAdmin),
   )
 
@@ -1157,7 +1157,7 @@ export default function UserManagementClient() {
     void refetchCurrentTab()
   }
 
-  const colCount = isResetsTab ? 1 : HEADERS[activeTab].length + 1
+  const colCount = HEADERS[activeTab].length + 1
 
   return (
     <ThemeProvider theme={muiTheme}>
@@ -1165,8 +1165,8 @@ export default function UserManagementClient() {
         <div className="flex flex-col lg:flex-1 lg:min-h-0 px-3 py-3 sm:px-4 lg:px-5 3xl:px-6 lg:pt-3 lg:pb-4 3xl:pb-5 gap-3 3xl:gap-4 lg:overflow-hidden">
 
           {/* Header */}
-          {/* As tall as the Add User button even when it is hidden (Password Reset tab),
-              so switching tabs doesn't shift the page. */}
+          {/* As tall as the Add User button even when there is none (IT Administrator,
+              or a filled IT Administrator seat), so switching doesn't shift the page. */}
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 lg:min-h-8 3xl:min-h-9 shrink-0">
             <h1 className="font-[family-name:var(--font-alegreya-sc)] text-[17px] 3xl:text-[20px] font-bold text-white">User Management</h1>
             {/*
@@ -1174,15 +1174,14 @@ export default function UserManagementClient() {
               the IT Administrator hands the role over from their own portal. If it
               is somehow empty, creating one is exactly right.
             */}
-            {!isResetsTab && (
-              isITAdminTab && (activeITAdmin || showArchived) ? null : access.canCreate && (
-                <button
-                  onClick={openCreate}
-                  className={HEADER_BTN}
-                >
-                  Add User <UserRoundPlus className={HEADER_ICON} />
-                </button>
-              )
+            {itMode || (isITAdminTab && (activeITAdmin || showArchived)) ? null : (
+              <button
+                onClick={openCreate}
+                {...writeAccess(access.canCreate)}
+                className={`${HEADER_BTN} disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-[#4df9ed]/[0.19] disabled:active:scale-100`}
+              >
+                Add User <UserRoundPlus className={HEADER_ICON} />
+              </button>
             )}
           </div>
 
@@ -1203,20 +1202,21 @@ export default function UserManagementClient() {
           {/* Table card */}
           <div className="flex flex-col lg:flex-1 lg:min-h-0 rounded-[10px] border-[0.5px] border-[#424242] bg-[#1b1b1b] shadow-[0_4px_4px_rgba(0,0,0,0.25)] lg:overflow-hidden">
 
-            {/* Directory vs. queue — two different jobs, so two top-level tabs. */}
-            <ModuleSectionTabs
-              value={section}
-              onChange={setSection}
-              directoryLabel="Users"
-              resetsLabel="Password Reset"
-              pendingCount={resetCount}
-              variant="large"
-            />
+            {/* Password resets moved to the IT Administrator (2026-10-24), so the
+                Company Administrator's page keeps just the Users tab. */}
+            {sectionTabs ?? (
+              <ModuleSectionTabs
+                value="directory"
+                onChange={() => {}}
+                directoryLabel="Users"
+                showResets={false}
+                variant="large"
+              />
+            )}
 
             {/* The shared filter bar: the role dropdown (which picks the table),
                 search, Filters (Archived is a status there), refresh and the count, on one row as
-                the Figma lays them out. The Password Reset queue has its own. */}
-            {!isResetsTab && (
+                the Figma lays them out. */}
             <FilterBar
               search={{ value: searchInput, onChange: setSearchInput, placeholder: 'Search name or email...' }}
               fields={filterDefs}
@@ -1256,7 +1256,7 @@ export default function UserManagementClient() {
                     [FIGMA_MQ]: { height: '38px', fontSize: '15px', '& .MuiSelect-select': { paddingLeft: '14px' } },
                   }}
                   renderValue={(value) => {
-                    const tab = TABS.find((t) => t.key === value)!
+                    const tab = tabs.find((t) => t.key === value)!
                     return (
                       <span className="flex items-center gap-2 text-[13px] 3xl:text-[15px] text-[#4df9ed]">
                         <Users className="size-4 3xl:size-[18px]" /> {tab.label}
@@ -1264,7 +1264,7 @@ export default function UserManagementClient() {
                     )
                   }}
                 >
-                  {TABS.map((t) => (
+                  {tabs.map((t) => (
                     <MenuItem
                       key={t.key} value={t.key}
                       sx={{
@@ -1296,9 +1296,8 @@ export default function UserManagementClient() {
               </FormControl>
               }
             />
-            )}
 
-            {!isResetsTab && isDriverTab && (
+            {isDriverTab && (
               <div className="flex gap-1 border-b border-[#424242] px-3 sm:px-4 3xl:px-5 shrink-0">
                 {DRIVER_TABS.map((t) => (
                   <button
@@ -1317,14 +1316,6 @@ export default function UserManagementClient() {
               </div>
             )}
 
-            {isResetsTab ? (
-              <PasswordResetQueue
-                focusRequestId={focusRequestId}
-                onPendingCountChange={setResetCount}
-                regularData
-              />
-            ) : (
-            <>
             {isDriverTab && !showArchived && licenseFlagCount > 0 && (
               <div className="flex items-center gap-3 border-b border-amber-500/20 bg-amber-500/10 px-5 py-3 text-sm text-amber-400 shrink-0">
                 <AlertTriangle size={14} className="shrink-0" />
@@ -1375,7 +1366,7 @@ export default function UserManagementClient() {
                   ) : users.length === 0 ? (
                     <tr>
                       <td colSpan={colCount}>
-                        <EmptyState tab={activeTab} onAdd={openCreate} canAdd={access.canCreate} archived={showArchived} />
+                        <EmptyState tab={activeTab} onAdd={openCreate} showAdd={!itMode} canAdd={access.canCreate} archived={showArchived} />
                       </td>
                     </tr>
                   ) : (
@@ -1393,6 +1384,8 @@ export default function UserManagementClient() {
                           <td className="px-4 3xl:px-5 py-2 3xl:py-2.5 text-right">
                             {user.status === 'archived' ? (
                               <ArchivedRowMenu
+                                user={user}
+                                mode={mode}
                                 onView={() => openEdit(user, true)}
                                 onRestore={() => handleRestore(user)}
                                 lockedBy={userLocks.get(user.user_id)}
@@ -1400,6 +1393,7 @@ export default function UserManagementClient() {
                             ) : activeTab === 'vendor-drivers' ? (
                               <VendorRowMenu
                                 user={user as VendorDriverUser}
+                                mode={mode}
                                 onDone={refetchCurrentTab}
                                 onView={() => openEdit(user, true)}
                                 onEdit={() => openEdit(user)}
@@ -1409,6 +1403,7 @@ export default function UserManagementClient() {
                               <RowMenu
                                 user={user}
                                 tab={activeTab}
+                                mode={mode}
                                 onView={() => openEdit(user, true)}
                                 onEdit={() => openEdit(user)}
                                 onStatusChange={(s) => handleStatusChange(user, s)}
@@ -1428,8 +1423,6 @@ export default function UserManagementClient() {
             {!loading && total > 0 && (
               <Pagination page={safePage} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPageChange={setPage} disabled={fetching} />
             )}
-            </>
-            )}
           </div>
         </div>
       </div>
@@ -1440,8 +1433,10 @@ export default function UserManagementClient() {
           user={editUser}
           driverSource={formDriverSource}
           startInView={formViewOnly}
-          // Same rule as the row menu: the combined list can't open the edit form.
-          canEdit={activeTab !== 'all' && editUser?.status !== 'archived' && access.canEdit}
+          // Same rule as the row menu: the combined list can't open the edit form,
+          // the IT Administrator views only, and Read Only sees it disabled.
+          canEdit={!itMode && activeTab !== 'all' && editUser?.status !== 'archived'}
+          editDisabled={!access.canEdit}
           lockedBy={editUser ? userLocks.get(editUser.user_id) : undefined}
           onClose={() => setShowForm(false)}
           onSaved={async () => {

@@ -32,6 +32,10 @@ export interface BookingPause {
   resumed_at:  string | null
   resumed_via: 'driver' | 'staff' | 'auto' | null
   resume_note: string | null
+  /** Set by the office while paused: the day it should continue (YYYY-MM-DD). */
+  expected_resume_date:      string | null
+  /** The driver's call time for that day (HH:MM[:SS]). */
+  expected_resume_call_time: string | null
   pauser:      PersonName | null
   resumer:     PersonName | null
 }
@@ -48,6 +52,16 @@ export const pauseService = {
   pause: async (bookingId: string, reason: PauseReason, note: string) => {
     await initCsrf()
     const { data } = await proxyApi.patch<ApiResponse<unknown>>(`${B}/${bookingId}/pause`, { reason, note })
+    return data.data
+  },
+
+  /**
+   * While paused: when the delivery continues. The client is told the date,
+   * the driver the date and the call time.
+   */
+  setContinuation: async (bookingId: string, date: string, callTime: string) => {
+    await initCsrf()
+    const { data } = await proxyApi.patch<ApiResponse<unknown>>(`${B}/${bookingId}/pause/continuation`, { date, call_time: callTime })
     return data.data
   },
 

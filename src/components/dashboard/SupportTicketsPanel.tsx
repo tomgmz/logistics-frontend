@@ -1,9 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { CheckCircle2, ExternalLink, Mail, Ticket } from 'lucide-react'
 
 import { RemarksModal } from '@/components/layout/ReusableModal'
+import { READ_ONLY_HINT, writeAccess } from '@/components/layout/ModuleAccess'
+import { useAuthStore } from '@/lib/store/auth.store'
+import { moduleFlags } from '@/lib/permissions'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { formatDateTime } from '@/app/utils/timeFormat'
@@ -31,6 +34,31 @@ export function gmailComposeUrl(inbox: string, to: string, subject: string): str
   const q = new URLSearchParams({ authuser: inbox, view: 'cm', fs: '1', to, su: subject })
   return `https://mail.google.com/mail/?${q.toString()}`
 }
+/**
+ * A Gmail action (Reply all / New email). A link can't be disabled, so a Read
+ * Only Tickets tier gets a look-alike that does nothing, with the hint.
+ */
+export function MailAction({ href, title, allowed, children }: {
+  href:     string
+  title:    string
+  allowed:  boolean
+  children: ReactNode
+}) {
+  const cls = 'inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-2.5 py-1.5 text-[11px] font-semibold text-white/80 hover:bg-white/5'
+  if (!allowed) {
+    return (
+      <span role="link" aria-disabled="true" title={READ_ONLY_HINT} className={`${cls} cursor-not-allowed opacity-40 hover:bg-transparent`}>
+        {children}
+      </span>
+    )
+  }
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer" title={title} className={cls}>
+      {children}
+    </a>
+  )
+}
+
 export default function SupportTicketsPanel({
   count, items, inbox, onChanged,
 }: {
@@ -42,6 +70,9 @@ export default function SupportTicketsPanel({
 }) {
   const [resolving, setResolving] = useState<DashboardTicket | null>(null)
   const [busy,      setBusy]      = useState(false)
+  // The dashboard is not the Tickets module's own page, so read its tier directly.
+  const user    = useAuthStore((s) => s.user)
+  const allowed = moduleFlags(user, 'support-tickets').can_edit
 
   async function resolve(note: string) {
     if (!resolving) return
@@ -92,30 +123,23 @@ export default function SupportTicketsPanel({
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
-                  <a
+                  <MailAction
                     href={gmailThreadUrl(inbox, t.reference)}
-                    target="_blank"
-                    rel="noopener noreferrer"
                     title={`Opens the ${t.reference} thread in ${inbox}. Use Reply all so your answer reaches the client in the same thread.`}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-2.5 py-1.5 text-[11px] font-semibold text-white/80 hover:bg-white/5"
+                    allowed={allowed}
                   >
                     <ExternalLink size={12} /> Reply all in Gmail
-                  </a>
+                  </MailAction>
                   {compose && (
-                    <a
-                      href={compose}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title={`New email to ${t.email}`}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-2.5 py-1.5 text-[11px] font-semibold text-white/80 hover:bg-white/5"
-                    >
+                    <MailAction href={compose} title={`New email to ${t.email}`} allowed={allowed}>
                       <Mail size={12} /> New email
-                    </a>
+                    </MailAction>
                   )}
                   <button
                     type="button"
                     onClick={() => setResolving(t)}
-                    className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-bold text-[#0a0a0a]"
+                    {...writeAccess(allowed)}
+                    className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-bold text-[#0a0a0a] disabled:cursor-not-allowed disabled:opacity-40"
                     style={{ background: 'var(--color-cyan)' }}
                   >
                     <CheckCircle2 size={12} /> Mark resolved

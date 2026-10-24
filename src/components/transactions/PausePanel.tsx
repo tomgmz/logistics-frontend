@@ -2,13 +2,16 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ChevronDown, ChevronRight, PauseCircle, Play } from 'lucide-react'
+import { CalendarClock, ChevronDown, ChevronRight, PauseCircle, Play } from 'lucide-react'
 
 import { pauseService, pauseReasonLabel, PAUSE_REASON_LABEL, type BookingPause, type PauseReason } from '@/lib/services/admin/pause.service'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { appToast } from '@/lib/toast'
 import { RemarksModal } from '@/components/layout/ReusableModal'
+import { writeAccess } from '@/components/layout/ModuleAccess'
+import { formatCallClock } from '@/app/admin/booking-management/DriverCallTime'
+import { phDay } from '@/lib/ph-date'
 import { formatDateTime } from './transaction-format'
 import { AMBER, BORDER_C, GREEN, MUTED } from './transaction-theme'
 
@@ -55,14 +58,24 @@ const ENDED_BY: Record<string, string> = {
   auto:   'Ended when the driver confirmed a stop',
 }
 
-export default function PausePanel({ bookingId, pausedAt, inTransit, canControl, onUpdated }: {
+/** "Oct 26, 2026" from YYYY-MM-DD, as a calendar day (no timezone shift). */
+function dayLabel(ymd: string): string {
+  const [y, m, d] = ymd.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-US', {
+    timeZone: 'UTC', month: 'short', day: 'numeric', year: 'numeric',
+  })
+}
+
+export default function PausePanel({ bookingId, pausedAt, inTransit, canControl, allowed = true, onUpdated }: {
   bookingId:  string
   /** The booking's own `paused_at` — a change re-reads the history. */
   pausedAt:   string | null | undefined
   /** Only a delivery in transit can be paused. */
   inTransit:  boolean
-  /** The view allows it: booking edit rights, not read-only. The role is checked here too. */
+  /** The view shows the controls: nobody else is editing. The role is checked here too. */
   canControl: boolean
+  /** The Booking Management tier allows it. Read Only sees the controls disabled. */
+  allowed?:   boolean
   onUpdated:  () => void
 }) {
   const role = useAuthStore((s) => s.user?.role ?? '')
@@ -72,6 +85,10 @@ export default function PausePanel({ bookingId, pausedAt, inTransit, canControl,
   const [pausing, setPausing] = useState(false)
   const [reason, setReason]   = useState<PauseReason | ''>('')
   const [busy, setBusy]       = useState(false)
+  // The expected continuation, while it is being set.
+  const [planning, setPlanning] = useState(false)
+  const [planDate, setPlanDate] = useState('')
+  const [planTime, setPlanTime] = useState('')
   const canAct = canControl && PAUSE_ROLES.includes(role)
 
   const load = useCallback(async () => {
@@ -114,6 +131,31 @@ export default function PausePanel({ bookingId, pausedAt, inTransit, canControl,
     }
   }
 
+  function beginPlan() {
+    setPlanDate(open?.expected_resume_date ?? '')
+    setPlanTime(open?.expected_resume_call_time?.slice(0, 5) ?? '')
+    setPlanning(true)
+  }
+
+  async function savePlan() {
+    if (!planDate || !planTime) {
+      appToast.error('Pick the date and the driver\'s call time.')
+      return
+    }
+    setBusy(true)
+    try {
+      await pauseService.setContinuation(bookingId, planDate, planTime)
+      appToast.success('Continuation set. The client was told the date; the driver the date and call time.')
+      setPlanning(false)
+      await load()
+      onUpdated()
+    } catch (err) {
+      appToast.error(getApiErrorMessage(err, 'Could not set the continuation date.'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function resume(note: string) {
     setBusy(true)
     try {
@@ -137,8 +179,8 @@ export default function PausePanel({ bookingId, pausedAt, inTransit, canControl,
           <span className="text-[12px] min-w-0 flex-1" style={{ color: MUTED }}>
             Something stopping the truck (weather, a breakdown, a closed stop)? Pause the delivery; only the office can resume it.
           </span>
-          <button type="button" disabled={busy} onClick={() => setPausing(true)}
-            className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold disabled:opacity-40 cursor-pointer"
+          <button type="button" disabled={busy} onClick={() => setPausing(true)} {...writeAccess(allowed)}
+            className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
             style={{ background: AMBER, color: '#000' }}>
             <PauseCircle size={13} />
             Pause delivery
@@ -169,10 +211,62 @@ export default function PausePanel({ bookingId, pausedAt, inTransit, canControl,
               Breakdown report filed — open it in Reports
             </Link>
           )}
+          {/* When it continues: a date for the client, plus a call time for the driver. */}
+          <div className="flex flex-col gap-2 rounded-lg border px-3 py-2.5" style={{ borderColor: BORDER_C }}>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-white/85 min-w-0">
+                <CalendarClock size={13} style={{ color: AMBER }} className="shrink-0" />
+                {open.expected_resume_date
+                  ? <>Continues {dayLabel(open.expected_resume_date)}
+                      {open.expected_resume_call_time ? ` · driver call time ${formatCallClock(open.expected_resume_call_time)}` : ''}</>
+                  : 'No continuation date set yet'}
+              </span>
+              {canAct && !planning && (
+                <button type="button" disabled={busy} onClick={beginPlan} {...writeAccess(allowed)}
+                  className="text-[11px] font-bold px-2.5 py-1 rounded-lg border border-white/10 text-white/60 hover:text-white
+                             hover:border-white/25 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0">
+                  {open.expected_resume_date ? 'Change date' : 'Set continuation date'}
+                </button>
+              )}
+            </div>
+            {planning && (
+              <div className="flex flex-col gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <label className="flex flex-col gap-1 text-[11px] font-bold uppercase tracking-wider text-white/50">
+                    Continuation date
+                    <input type="date" value={planDate} min={phDay(Date.now())} disabled={busy}
+                      onChange={(e) => setPlanDate(e.target.value)}
+                      className="w-full min-w-0 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base sm:text-sm font-normal normal-case tracking-normal text-white/85 outline-none [color-scheme:dark]" />
+                  </label>
+                  <label className="flex flex-col gap-1 text-[11px] font-bold uppercase tracking-wider text-white/50">
+                    Driver call time
+                    <input type="time" value={planTime} step={300} disabled={busy}
+                      onChange={(e) => setPlanTime(e.target.value)}
+                      className="w-full min-w-0 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base sm:text-sm font-normal normal-case tracking-normal text-white/85 outline-none [color-scheme:dark]" />
+                  </label>
+                </div>
+                <p className="text-[11px]" style={{ color: MUTED }}>
+                  The client is told the date. The driver is told the date and the call time.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" disabled={busy} onClick={() => setPlanning(false)}
+                    className="flex-1 min-w-[90px] py-2 rounded-lg border border-white/10 text-[12px] font-bold text-white/50 hover:text-white transition-colors disabled:opacity-40">
+                    Cancel
+                  </button>
+                  <button type="button" disabled={busy || !planDate || !planTime} onClick={() => void savePlan()}
+                    className="flex-1 min-w-[90px] py-2 rounded-lg text-[12px] font-bold transition-colors disabled:opacity-40"
+                    style={{ background: `${AMBER}26`, color: AMBER }}>
+                    {busy ? 'Saving…' : 'Save and notify'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
           {canAct && (
             <div>
-              <button type="button" disabled={busy} onClick={() => setAsking(true)}
-                className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold disabled:opacity-40 cursor-pointer"
+              <button type="button" disabled={busy} onClick={() => setAsking(true)} {...writeAccess(allowed)}
+                className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                 style={{ background: GREEN, color: '#000' }}>
                 <Play size={13} fill="#000" />
                 {busy ? 'Saving…' : 'End pause'}

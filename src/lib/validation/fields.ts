@@ -100,6 +100,22 @@ export const emailField = z
   .transform(v => v.toLowerCase())
 
 /** Blank is allowed and means "none given". */
+/**
+ * "Confirm email" on every account creation: the address typed a second time
+ * must match, so a typo can't send the account's sign-in email to a stranger.
+ * Compared trimmed and case-insensitively, the way the address is stored.
+ */
+export function confirmEmailError(email: string, confirm: string): string | undefined {
+  if (!confirm.trim()) return 'Type the email again to confirm it'
+  if (confirm.trim().toLowerCase() !== email.trim().toLowerCase()) return 'The two emails do not match'
+  return undefined
+}
+
+/** No pasting into "Confirm email": the point is to type it a second time. */
+export function blockPaste(e: { preventDefault: () => void }): void {
+  e.preventDefault()
+}
+
 export const optionalEmailField = z.preprocess(
   v => (typeof v === 'string' && v.trim() === '' ? undefined : v),
   emailField.optional(),

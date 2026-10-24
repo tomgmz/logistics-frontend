@@ -25,7 +25,7 @@ import {
 import DriverReportDetailModal, { ReportStatusBadge, UrgentBadge } from '@/components/reports/DriverReportDetailModal'
 import ClassifyReportModal from '@/components/reports/ClassifyReportModal'
 import ReusableModal, { RemarksModal } from '@/components/layout/ReusableModal'
-import { useModuleAccess } from '@/components/layout/ModuleAccess'
+import { useModuleAccess, writeAccess } from '@/components/layout/ModuleAccess'
 import { useRecordLock, useRecordLocks } from '@/lib/hooks/useRecordLock'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import RecordLockBanner, { RecordLockBadge } from '@/components/ui/RecordLockBanner'
@@ -101,11 +101,11 @@ export default function ReportsView() {
   const [classifyAs,  setClassifyAs]  = useState<IncidentType | ''>('')
   const [busy,        setBusy]        = useState(false)
 
-  // Reports tier: Read-only viewers see the queue but cannot answer it.
+  // Reports tier: Read Only viewers see the buttons, disabled.
   const { canEdit } = useModuleAccess()
   // The fleet manager sees vehicle reports only and never classifies.
   const isFleet     = useAuthStore((s) => s.user?.role) === 'fleet_manager'
-  const canClassify = canEdit && !isFleet
+  const canClassify = !isFleet
   const typeOptions = isFleet ? VEHICLE_INCIDENTS : (Object.keys(INCIDENT_LABELS) as IncidentType[])
 
   const load = useCallback(async (quiet = false) => {
@@ -245,14 +245,15 @@ export default function ReportsView() {
     setClassifyOf(r)
   }
 
-  const detailActions = viewReport && canEdit && (viewReport.status !== 'resolved' || (canClassify && !viewReport.incident_type)) ? (
+  const detailActions = viewReport && (viewReport.status !== 'resolved' || (canClassify && !viewReport.incident_type)) ? (
     <>
       {canClassify && !viewReport.incident_type && (
         <button
           type="button"
           disabled={reportLock.readOnly}
           onClick={() => openClassify(viewReport)}
-          className="px-4 py-2 rounded-lg border border-[var(--color-cyan)]/40 text-sm font-semibold text-[var(--color-cyan)] hover:bg-[rgba(77,249,237,0.08)] disabled:opacity-40"
+          {...writeAccess(canEdit)}
+          className="px-4 py-2 rounded-lg border border-[var(--color-cyan)]/40 text-sm font-semibold text-[var(--color-cyan)] hover:bg-[rgba(77,249,237,0.08)] disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Classify
         </button>
@@ -263,6 +264,7 @@ export default function ReportsView() {
           type="button"
           disabled={reportLock.readOnly}
           onClick={() => setConfirmAck(viewReport)}
+          {...writeAccess(canEdit)}
           className="px-4 py-2 rounded-lg border border-white/15 text-sm font-semibold text-white/85 hover:bg-white/5 disabled:opacity-40"
         >
           Acknowledge
@@ -272,6 +274,7 @@ export default function ReportsView() {
         type="button"
         disabled={reportLock.readOnly}
         onClick={() => setResolveOf(viewReport)}
+        {...writeAccess(canEdit)}
         className="px-4 py-2 rounded-lg text-sm font-bold text-black disabled:opacity-40"
         style={{ background: 'var(--color-cyan)' }}
       >

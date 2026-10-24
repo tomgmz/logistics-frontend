@@ -7,6 +7,7 @@ import {
   ModuleFlags,
   ModuleKey,
   MODULE_LABELS,
+  VIEW_ONLY_MODULES,
   flagsToLevel,
   levelToFlags,
 } from '@/constants/modules'
@@ -54,6 +55,10 @@ export default function ModulePermissionMatrix({
                 <td className="px-4 py-3 font-medium text-white whitespace-nowrap">{MODULE_LABELS[m]}</td>
                 {ACCESS_LEVELS.map((l) => (
                   <td key={l.key} className="px-3 py-3 text-center">
+                    {/* Nothing to change in a view-only module, so only Read Only is offered. */}
+                    {l.key === 'all' && VIEW_ONLY_MODULES.includes(m) ? (
+                      <span className="text-[#424242]" title="This module has nothing to change">—</span>
+                    ) : (
                     <input
                       type="checkbox"
                       checked={current === l.key}
@@ -62,6 +67,7 @@ export default function ModulePermissionMatrix({
                       className={cb}
                       aria-label={`${MODULE_LABELS[m]} ${l.label}`}
                     />
+                    )}
                   </td>
                 ))}
               </tr>

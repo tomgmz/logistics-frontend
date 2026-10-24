@@ -34,7 +34,7 @@ import { appToast } from '@/lib/toast'
 import { extractApiError } from '@/lib/api-error'
 import LandlineInputRow, { toLocalLandlineDigits } from './LandLineInputRow'
 import PhoneInputRow, { attachCountryCode, toLocalDigits } from '@/components/ui/PhoneInputRow'
-import { normalizePhMobile, PH_MOBILE_REGEX } from '@/lib/validation/fields'
+import { normalizePhMobile, PH_MOBILE_REGEX, blockPaste, confirmEmailError } from '@/lib/validation/fields'
 import BillingAddressField from './BillingAddressField'
 import { ScanLine, CheckCircle } from 'lucide-react'
 import proxyApi from '@/lib/api/auth.api'
@@ -43,6 +43,7 @@ import { permissionsService } from '@/lib/services/admin/permissions.service'
 import ModulePermissionMatrix from '@/app/it_admin/administrator-management/ModulePermissionMatrix'
 import { useRecordLock } from '@/lib/hooks/useRecordLock'
 import RecordLockBanner, { RecordLockBadge } from '@/components/ui/RecordLockBanner'
+import { writeAccess } from '@/components/layout/ModuleAccess'
 
 interface UserFormModalProps {
   tab: UserTab
@@ -56,6 +57,8 @@ interface UserFormModalProps {
   startInView?: boolean
   // Hide "Edit Details" where this view can't edit (e.g. the combined lists).
   canEdit?: boolean
+  // Show "Edit Details" but disabled: a Read Only tier sees it, can't use it.
+  editDisabled?: boolean
   // Someone else is editing this account (from the list's lock state).
   lockedBy?: string
   // Drivers only, on create: which kind of driver the form starts on. Opened
@@ -271,7 +274,7 @@ function Select({
 
 export default function UserFormModal({
   tab, user, onClose, onSaved, enablePermissions = false,
-  startInView = false, canEdit = true, lockedBy, driverSource = 'company',
+  startInView = false, canEdit = true, editDisabled = false, lockedBy, driverSource = 'company',
 }: UserFormModalProps) {
   const isEdit = Boolean(user)
   const [viewing, setViewing] = useState(isEdit && startInView)
@@ -408,6 +411,12 @@ export default function UserFormModal({
     return () => document.removeEventListener('keydown', onKey)
   }, [licenseFull])
 
+  // "Confirm email": kept out of the form so it is never sent or counted as a
+  // change. Asked on every new account, and on an edit that changes the email.
+  const [confirmEmail, setConfirmEmail] = useState('')
+  const emailChanged = String(form.email ?? '').trim().toLowerCase() !== String(initialState.email ?? '').trim().toLowerCase()
+  const needsEmailConfirm = !isEdit || emailChanged
+
   const isDirty = useMemo(() => {
     const formDirty = Object.keys(initialState).some(key => form[key] !== initialState[key])
     if (tab === 'drivers') return formDirty || licenseFile !== null
@@ -416,6 +425,7 @@ export default function UserFormModal({
 
   useEffect(() => {
     setForm(initialState)
+    setConfirmEmail('')
     setPerms({})
     setGlobalError(null)
     setFieldErrors({})
@@ -477,6 +487,8 @@ export default function UserFormModal({
 
     const payload = buildValidationPayload(form)
     const errors  = validateForm(tab, isEdit, payload)
+    const confirmError = needsEmailConfirm ? confirmEmailError(String(form.email ?? ''), confirmEmail) : undefined
+    if (confirmError) errors.confirm_email = confirmError
     if (Object.keys(errors).length > 0) { setFieldErrors(errors); return }
     setConfirmSave(true)
   }
@@ -533,6 +545,7 @@ export default function UserFormModal({
   // (changes reverted) instead of closing the panel.
   function leaveEdit() {
     setForm(initialState)
+    setConfirmEmail('')
     setFieldErrors({})
     setGlobalError(null)
     setLicenseFile(null)
@@ -903,6 +916,31 @@ export default function UserFormModal({
                   error={fe.email}
                 />
               </Field>
+              {needsEmailConfirm && !viewing && (
+                <Field label="Confirm Email" required error={fe.confirm_email}>
+                  <Input
+                    type="email"
+                    value={confirmEmail}
+                    onChange={e => {
+                      const next = e.target.value
+                      setConfirmEmail(next)
+                      // Checked as they type once something is there; required only on save.
+                      setFieldErrors(prev => {
+                        const n = { ...prev }
+                        const err = next.trim() ? confirmEmailError(String(form.email ?? ''), next) : undefined
+                        if (err) n.confirm_email = err
+                        else delete n.confirm_email
+                        return n
+                      })
+                    }}
+                    onPaste={blockPaste}
+                    onDrop={blockPaste}
+                    autoComplete="off"
+                    placeholder="Type the email again"
+                    error={fe.confirm_email}
+                  />
+                </Field>
+              )}
             </div>
 
             <Field label="Mobile" required error={fe.phone}>
@@ -1033,7 +1071,8 @@ export default function UserFormModal({
                 <button
                   type="button"
                   onClick={() => setViewing(false)}
-                  className="flex items-center gap-2 rounded-lg bg-[#4df9ed] px-5 py-2.5 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5]"
+                  {...writeAccess(!editDisabled)}
+                  className="flex items-center gap-2 rounded-lg bg-[#4df9ed] px-5 py-2.5 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[#4df9ed]"
                 >
                   <Pencil size={14} /> Edit Details
                 </button>

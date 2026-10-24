@@ -78,6 +78,7 @@ export const MODULE_KEYS = [
   'system-maintenance',
   'audit-logs',
   'reports',
+  'support-tickets',
 ] as const
 export type ModuleKey = (typeof MODULE_KEYS)[number]
 
@@ -96,7 +97,13 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   'audit-logs':           'Audit Logs (Company Administrator)',
   // Incidents drivers raise from the road (the driver app's Reports tab).
   'reports':              'Reports',
+  // Client support tickets: the Tickets page and the dashboard queue.
+  'support-tickets':      'Tickets',
 }
+
+// Modules with nothing to change: the matrix only offers Read Only for them
+// (mirror of the backend VIEW_ONLY_MODULES, which also clamps what is saved).
+export const VIEW_ONLY_MODULES: readonly ModuleKey[] = ['transit-tracking', 'transaction-history', 'audit-logs']
 
 // Assignable modules per managed role (matches the role's dashboard nav).
 export const MODULES_BY_ROLE: Record<ManagedRole, ModuleKey[]> = {
@@ -110,6 +117,7 @@ export const MODULES_BY_ROLE: Record<ManagedRole, ModuleKey[]> = {
     'system-maintenance',
     'audit-logs',
     'reports',
+    'support-tickets',
   ],
   general_manager: [
     'vehicle-management',
@@ -117,7 +125,7 @@ export const MODULES_BY_ROLE: Record<ManagedRole, ModuleKey[]> = {
     'document-management',
   ],
   fleet_manager: ['booking-management', 'vehicle-management', 'transit-tracking', 'reports'],
-  operations_manager: ['booking-management', 'vehicle-management', 'document-management', 'transit-tracking', 'reports'],
+  operations_manager: ['booking-management', 'vehicle-management', 'document-management', 'transit-tracking', 'reports', 'support-tickets'],
 }
 
 // Default access tier per role per module — mirror of the backend
@@ -131,10 +139,11 @@ export const ROLE_MODULE_DEFAULTS: Record<ManagedRole, Partial<Record<ModuleKey,
     'vehicle-management':  'all',
     'document-management': 'all',
     'system-maintenance':  'all',
-    'transit-tracking':    'all',
+    'transit-tracking':    'read',
     'transaction-history': 'read',
     'audit-logs':          'read',
     'reports':             'all',
+    'support-tickets':     'all',
   },
   general_manager: {
     'booking-management':  'all',
@@ -146,7 +155,7 @@ export const ROLE_MODULE_DEFAULTS: Record<ManagedRole, Partial<Record<ModuleKey,
     // readiness check (fleet-stage actions are role-gated, not can_edit-gated).
     'booking-management': 'read',
     'vehicle-management': 'all',
-    'transit-tracking':   'all',
+    'transit-tracking':   'read',
     // Vehicle-related reports only — scoped by the server, not this tier.
     'reports':            'all',
   },
@@ -154,8 +163,9 @@ export const ROLE_MODULE_DEFAULTS: Record<ManagedRole, Partial<Record<ModuleKey,
     'booking-management':  'all',
     'vehicle-management':  'read',
     'document-management': 'all',
-    'transit-tracking':    'all',
+    'transit-tracking':    'read',
     'reports':             'all',
+    'support-tickets':     'all',
   },
 }
 

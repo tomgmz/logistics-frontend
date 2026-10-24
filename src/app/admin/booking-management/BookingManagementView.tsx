@@ -21,6 +21,7 @@ import {
   Boxes,
   History,
   CalendarRange,
+  Pencil,
 } from 'lucide-react'
 
 import { supabase } from '@/lib/supabase'
@@ -29,7 +30,7 @@ import { codingFlagFor, type CodingFlag } from '@/lib/number-coding'
 import { formatPhDateTime, submittedAfterCloseToday } from '@/lib/office-hours'
 import { licenseExpiryState } from '@/lib/license-expiry'
 import { statusColor } from '@/components/map/status.colors'
-import { useModuleAccess } from '@/components/layout/ModuleAccess'
+import { useModuleAccess, writeAccess } from '@/components/layout/ModuleAccess'
 import type { BookingDetail } from '@/app/types/maps/routemap.types'
 import {
   bookingService,
@@ -427,9 +428,8 @@ function licenseNote(expiry: string | null | undefined): string {
  * passkeys stay dead. The vendor snapshot on the delivery is untouched by all
  * of them, because that is the record of who drove.
  */
-function ExternalDriverAccessRow({ userId, canEdit }: { userId: string; canEdit: boolean }) {
+function ExternalDriverAccessRow({ userId }: { userId: string }) {
   const [access, setAccess] = useState<ExternalDriverAccess | null>(null)
-  const [busy,   setBusy]   = useState(false)
 
   const load = useCallback(() => {
     externalDriverService.getAccess(userId)
@@ -438,53 +438,6 @@ function ExternalDriverAccessRow({ userId, canEdit }: { userId: string; canEdit:
   }, [userId])
 
   useEffect(() => { load() }, [load])
-
-  const resend = async () => {
-    setBusy(true)
-    try {
-      await externalDriverService.reinvite(userId)
-      appToast.success('Setup link sent to the driver.')
-      load()
-    } catch (err) {
-      appToast.error(getApiErrorMessage(err, 'Could not send the setup link.'))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const revoke = async () => {
-    // Deliberately a confirm: this signs the driver out mid-run if they are on
-    // the road, and the only way back is a fresh enrolment.
-    if (!window.confirm(
-      'Revoke this driver\'s app access?\n\n' +
-      'Their passkeys stop working immediately and they are signed out. ' +
-      'The delivery record is kept.'
-    )) return
-
-    setBusy(true)
-    try {
-      const res = await externalDriverService.revoke(userId)
-      appToast.success(`Access revoked (${res.credentialsRevoked} passkey(s)).`)
-      load()
-    } catch (err) {
-      appToast.error(getApiErrorMessage(err, 'Could not revoke access.'))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const restore = async () => {
-    setBusy(true)
-    try {
-      await externalDriverService.restore(userId)
-      appToast.success('Access restored. A new setup link was sent to the driver.')
-      load()
-    } catch (err) {
-      appToast.error(getApiErrorMessage(err, 'Could not restore access.'))
-    } finally {
-      setBusy(false)
-    }
-  }
 
   const revoked = access !== null && !access.account_active
 
@@ -505,42 +458,8 @@ function ExternalDriverAccessRow({ userId, canEdit }: { userId: string; canEdit:
         <KeyRound size={11} className="text-white/30 shrink-0" />
         <span>{status}</span>
       </div>
-      {canEdit && (
-      <div className="flex gap-1.5">
-        {revoked ? (
-          <button
-            type="button"
-            onClick={restore}
-            disabled={busy}
-            className="text-[10px] font-bold px-2 py-1 rounded-md border border-white/10
-                       text-white/50 hover:text-white hover:border-white/25 transition-colors disabled:opacity-40"
-          >
-            Restore access
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={resend}
-            disabled={busy}
-            className="text-[10px] font-bold px-2 py-1 rounded-md border border-white/10
-                       text-white/50 hover:text-white hover:border-white/25 transition-colors disabled:opacity-40"
-          >
-            Resend setup link
-          </button>
-        )}
-        {access?.enrolled && !revoked && (
-          <button
-            type="button"
-            onClick={revoke}
-            disabled={busy}
-            className="text-[10px] font-bold px-2 py-1 rounded-md border transition-colors disabled:opacity-40"
-            style={{ color: '#f62626', borderColor: 'rgba(246,38,38,0.3)' }}
-          >
-            Revoke access
-          </button>
-        )}
-      </div>
-      )}
+      {/* Re-inviting, revoking and restoring moved to the IT Administrator (2026-10-24). */}
+      <p className="text-[10px] text-white/35">App access is managed by the IT Administrator.</p>
     </div>
   )
 }
@@ -613,9 +532,17 @@ function AssignmentPanel({
   onOpenPicker:    () => void
   /** Closes without saving and puts back what is on the booking. */
   onClosePicker:   () => void
-  /** Booking Management tier allows edits; Read-only shows the crew without the picker. */
+  /** Booking Management tier allows edits; Read Only sees the buttons disabled. */
   canEdit:         boolean
 }) {
+  // On an assigned booking "Edit" unlocks "Change vehicle and driver" first, so
+  // a crew is never changed by accident. Keyed to the booking and the pop-up, so
+  // it locks again on another booking and whenever the pop-up opens or closes.
+  const editKey = `${detail.booking_id}:${pickerOpen ? 'open' : 'closed'}`
+  const [editState, setEditState] = useState({ key: editKey, on: false })
+  const editing = editState.key === editKey && editState.on
+  const toggleEditing = () => setEditState({ key: editKey, on: !editing })
+
   // Vendor vehicles are never registered, so their type is picked from System
   // Maintenance → Vehicle Types. One typed in before that list existed is kept.
   const vehicleTypes = useVehicleTypeOptions(vendorForm.vendor_vehicle_type, vendorMode)
@@ -716,9 +643,27 @@ function AssignmentPanel({
 
   return (
     <div className={`${CARD_CLASS} px-3.5 pt-2 pb-3.5 space-y-2.5`}>
-      <div className="flex items-center gap-[5px]">
-        <AssetIcon name="steering-wheel" />
-        <h3 className="text-sm font-bold text-[#818181]">Driver and Vehicle Assignment</h3>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-[5px] min-w-0">
+          <AssetIcon name="steering-wheel" />
+          <h3 className="text-sm font-bold text-[#818181]">Driver and Vehicle Assignment</h3>
+        </div>
+        {isAssigned && (
+          <button
+            type="button"
+            disabled={assignBusy}
+            onClick={toggleEditing}
+            aria-pressed={editing}
+            {...writeAccess(canEdit)}
+            className="inline-flex items-center gap-1 shrink-0 rounded-lg border px-2.5 py-1 text-[11px] font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            style={editing
+              ? { borderColor: 'rgba(77,249,237,0.45)', color: 'var(--color-cyan)', background: 'rgba(77,249,237,0.10)' }
+              : { borderColor: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.6)' }}
+          >
+            <Pencil size={11} />
+            {editing ? 'Done' : 'Edit'}
+          </button>
+        )}
       </div>
 
       {isAssigned ? (
@@ -748,7 +693,7 @@ function AssignmentPanel({
             <div className="text-xs font-normal">Vendor: {vendorLabel}</div>
           )}
           {vendorMode && externalDriverUserId && (
-            <ExternalDriverAccessRow userId={externalDriverUserId} canEdit={canEdit} />
+            <ExternalDriverAccessRow userId={externalDriverUserId} />
           )}
           {selectedCoding && !pickerOpen && <CodingNotice flag={selectedCoding} plate={selectedPlate!} />}
         </div>
@@ -756,12 +701,13 @@ function AssignmentPanel({
         <p className="text-xs text-white/45">No vehicle or driver assigned yet.</p>
       )}
 
-      {canEdit && <button
+      <button
         type="button"
-        disabled={assignBusy}
+        disabled={assignBusy || (isAssigned && !editing)}
         onClick={onOpenPicker}
         aria-haspopup="dialog"
-        className="w-full py-2 rounded-lg text-sm font-bold transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
+        {...writeAccess(canEdit)}
+        className="w-full py-2 rounded-lg text-sm font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         style={{
           background: 'rgba(77,249,237,0.12)',
           border:     '1px solid rgba(77,249,237,0.30)',
@@ -770,7 +716,7 @@ function AssignmentPanel({
       >
         <Truck size={14} />
         {title}
-      </button>}
+      </button>
 
       <CrewPickerDialog
         open={pickerOpen && canEdit}
@@ -1297,7 +1243,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
   } | null>(null)
 
   // Booking-management tier for this user (full access in the admin shell unless
-  // restricted). Write controls below are hidden when the user can't edit.
+  // restricted). Write controls below are shown DISABLED when the user can't edit.
   const { canEdit } = useModuleAccess()
 
   const [search, setSearch]               = useState('')
@@ -1973,8 +1919,8 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
   // Approve/reject is shown to whoever holds the GM authority on a booking that
   // is still awaiting a decision, and to admins on the top-level status control.
   const showStageActions = !!detail && (
-    (roleView === 'admin' && canEdit && normalizeBookingStatus(detail.status) === 'pending') ||
-    (actsAsGm && canEdit && d?.gm_status === 'pending')
+    (roleView === 'admin' && normalizeBookingStatus(detail.status) === 'pending') ||
+    (actsAsGm && d?.gm_status === 'pending')
   )
   const showAssignment = !!detail &&
     (roleView === 'admin' || roleView === 'operations_manager') &&
@@ -2027,6 +1973,8 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     },
   })
   const bookingReadOnly = bookingLock.readOnly
+  // The crew record on the open booking (vendor snapshot, helper), for the replacement pop-up.
+  const currentAssignment = detail ? allAssignments.find((a) => a.booking_id === detail.booking_id) : undefined
   // Badges are informational, so read-only viewers see them too.
   const bookingLocks    = useRecordLocks('booking')
   const clockNow        = useMinuteClock()
@@ -2442,7 +2390,8 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                               type="button"
                               disabled={pendingStatus || pendingReject}
                               onClick={() => setRejectModalOpen(true)}
-                              className="flex-1 min-h-[46px] px-3 py-2 rounded-[10px] border text-base font-bold transition-colors disabled:opacity-40"
+                              {...writeAccess(canEdit)}
+                              className="flex-1 min-h-[46px] px-3 py-2 rounded-[10px] border text-base font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                               style={{ background: 'rgba(246,38,38,0.10)', borderColor: PALETTE.red, color: PALETTE.red }}
                             >
                               {pendingReject ? 'Rejecting…' : 'Reject'}
@@ -2451,7 +2400,8 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                               type="button"
                               disabled={pendingStatus || pendingReject}
                               onClick={() => setApproveModalOpen(true)}
-                              className="flex-1 min-h-[46px] px-3 py-2 rounded-[10px] border text-base font-bold transition-colors disabled:opacity-40"
+                              {...writeAccess(canEdit)}
+                              className="flex-1 min-h-[46px] px-3 py-2 rounded-[10px] border text-base font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                               style={{ background: 'rgba(77,249,237,0.19)', borderColor: PALETTE.cyan, color: PALETTE.cyan }}
                             >
                               {pendingStatus ? 'Approving…' : 'Approve'}
@@ -2501,7 +2451,8 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                           bookingId={detail.booking_id}
                           pausedAt={(detail as { paused_at?: string | null }).paused_at}
                           inTransit={normalizeBookingStatus(detail.status) === 'in_transit'}
-                          canControl={(roleView === 'admin' || roleView === 'operations_manager') && canEdit && !bookingReadOnly}
+                          canControl={(roleView === 'admin' || roleView === 'operations_manager') && !bookingReadOnly}
+                          allowed={canEdit}
                           onUpdated={() => { void refreshDetail(detail.booking_id); void loadPage(true) }}
                         />
 
@@ -2513,12 +2464,18 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                           reference={detail.reference_number ?? null}
                           inTransit={normalizeBookingStatus(detail.status) === 'in_transit'}
                           paused={!!(detail as { paused_at?: string | null }).paused_at}
-                          canReplace={(roleView === 'admin' || roleView === 'operations_manager') && canEdit && !bookingReadOnly}
+                          canReplace={(roleView === 'admin' || roleView === 'operations_manager') && !bookingReadOnly}
+                          allowed={canEdit}
                           drivers={drivers}
                           trucks={trucks}
                           currentDriverId={committedAssignment.driverId || null}
                           currentSecondDriverId={committedAssignment.secondDriverId || null}
                           currentTruckId={committedAssignment.truckId || null}
+                          currentHelperName={currentAssignment?.helper_name ?? null}
+                          currentIsVendor={!!currentAssignment?.is_vendor_supplied}
+                          currentVendorDriverUserId={currentAssignment?.vendor_driver_user_id ?? null}
+                          currentVendorPlate={currentAssignment?.vendor_vehicle_plate ?? null}
+                          currentVendorType={currentAssignment?.vendor_vehicle_type ?? null}
                           onReplaced={() => {
                             void refreshDetail(detail.booking_id)
                             void loadPage(true)
@@ -2532,7 +2489,8 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                         <StopTimesPanel
                           bookingId={detail.booking_id}
                           staff
-                          canEdit={(roleView === 'admin' || roleView === 'operations_manager') && canEdit && !bookingReadOnly}
+                          canEdit={(roleView === 'admin' || roleView === 'operations_manager') && !bookingReadOnly}
+                          allowed={canEdit}
                         />
 
                         {/* Driver / vehicle assignment */}
@@ -2612,7 +2570,8 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                         <TripPlanner
                           key={`${detail.booking_id}:${plannerTick}`}
                           detail={detail}
-                          canEdit={canEdit && !bookingReadOnly}
+                          canEdit={!bookingReadOnly}
+                          allowed={canEdit}
                           capacity={plannerCapacity}
                         />
                       )}

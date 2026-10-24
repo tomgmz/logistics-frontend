@@ -170,12 +170,18 @@ export interface CapacityWarning {
 }
 
 /** Replacing the crew of a delivery already on the road (it must be paused). */
+/** The new crew: the 8338 fleet (driver_id + truck_id) or a vendor (vendor driver + typed vehicle). */
 export interface ReplaceCrewPayload {
-  driver_id:         string
-  truck_id:          string
+  driver_id?:        string
+  truck_id?:         string
   second_driver_id?: string | null
   helper_name?:      string | null
   reason_note:       string
+  is_vendor_supplied?:           boolean
+  vendor_driver_user_id?:        string
+  second_vendor_driver_user_id?: string | null
+  vendor_vehicle_plate?:         string
+  vendor_vehicle_type?:          string | null
 }
 
 type PersonRef = { driver_id: string; users: { first_name: string | null; last_name: string | null } | null } | null
@@ -191,6 +197,8 @@ export interface CrewReplacement {
   transfer_confirmed_at: string | null
   transfer_photo_url:    string | null
   old_vehicle_plate:     string | null
+  /** A vendor's typed-in vehicle, when the new crew came from a vendor. */
+  new_vehicle_plate:     string | null
   old_driver:            PersonRef
   new_driver:            PersonRef
   old_second_driver:     PersonRef

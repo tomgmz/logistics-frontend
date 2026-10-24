@@ -26,6 +26,7 @@ import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { isManagedRole } from '@/constants/modules'
 import UserFormModal from '@/app/admin/user-management/UserFormModal'
+import UserManagementClient from '@/app/admin/user-management/UserManagementClient'
 import { useRecordLocks } from '@/lib/hooks/useRecordLock'
 import { RecordLockBadge } from '@/components/ui/RecordLockBanner'
 import PermissionsModal from './PermissionsModal'
@@ -512,6 +513,9 @@ export default function AdminManagementClient() {
   const isInitialAllFetch = useRef(true)
 
   const isResetsTab = section === 'password-resets'
+  // Clients & Drivers: the Company Admin's directory in IT Administrator mode
+  // (status, restore and vendor passkey access; no add or edit).
+  const isPeopleTab = section === 'people'
 
   // Seeded once on mount so the tab can show a badge before anyone opens it -
   // the panel itself only fetches when mounted, which is too late to tell someone
@@ -585,7 +589,7 @@ export default function AdminManagementClient() {
 
   // Someone else (or the driver app) changed an account: re-read the open tab.
   useLiveTable(['live:users'], () => {
-    if (isResetsTab) return
+    if (isResetsTab || isPeopleTab) return
     if (activeTab === 'all') void fetchAllUsers(search, false, true)
     else void fetchTabUsers(activeTab, true)
   })
@@ -595,11 +599,11 @@ export default function AdminManagementClient() {
     setPage(1)
     setSearch('')
     setSearchInput('')
-    // The resets panel loads its own data and has no user list to fetch.
-    if (isResetsTab) { setLoading(false); return }
+    // The resets panel and Clients & Drivers load their own data.
+    if (isResetsTab || isPeopleTab) { setLoading(false); return }
     if (activeTab === 'all') fetchAllUsers('', true)
     else fetchTabUsers(activeTab)
-  }, [activeTab, isResetsTab, showArchived]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeTab, isResetsTab, isPeopleTab, showArchived]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (isResetsTab || activeTab !== 'all') return
@@ -700,6 +704,21 @@ export default function AdminManagementClient() {
 
   const colCount = isResetsTab ? 1 : HEADERS[activeTab].length + 1
 
+  // Staff, then clients and drivers, then the one reset queue for everybody.
+  const sectionTabs = (
+    <ModuleSectionTabs
+      value={section}
+      onChange={setSection}
+      directoryLabel="Administrators"
+      peopleLabel="Clients & Drivers"
+      resetsLabel="Password Reset"
+      pendingCount={resetCount}
+      variant="large"
+    />
+  )
+
+  if (isPeopleTab) return <UserManagementClient mode="it-admin" sectionTabs={sectionTabs} />
+
   return (
     <ThemeProvider theme={muiTheme}>
       <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-y-auto overflow-x-hidden lg:overflow-hidden bg-[#0a0a0a] text-white">
@@ -709,7 +728,7 @@ export default function AdminManagementClient() {
           {/* As tall as the button even when it is hidden (Password Reset tab),
               so switching tabs doesn't shift the page. */}
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 lg:min-h-8 3xl:min-h-9 shrink-0">
-            <h1 className="font-[family-name:var(--font-alegreya-sc)] text-[17px] 3xl:text-[20px] font-bold text-white">Administrator Management</h1>
+            <h1 className="font-[family-name:var(--font-alegreya-sc)] text-[17px] 3xl:text-[20px] font-bold text-white">User Management</h1>
             {!isResetsTab && (
               <button onClick={openCreate} className={HEADER_BTN}>
                 Create Administrator <UserRoundPlus className={HEADER_ICON} />
@@ -734,15 +753,8 @@ export default function AdminManagementClient() {
           {/* Table card */}
           <div className="flex flex-col lg:flex-1 lg:min-h-0 rounded-[10px] border-[0.5px] border-[#424242] bg-[#1b1b1b] shadow-[0_4px_4px_rgba(0,0,0,0.25)] lg:overflow-hidden">
 
-            {/* Directory vs. queue - two different jobs, so two top-level tabs. */}
-            <ModuleSectionTabs
-              value={section}
-              onChange={setSection}
-              directoryLabel="Administrators"
-              resetsLabel="Password Reset"
-              pendingCount={resetCount}
-              variant="large"
-            />
+            {/* Staff, clients and drivers, and the reset queue: three top-level tabs. */}
+            {sectionTabs}
 
             {/* Role filter, search, refresh and the count on one row, as on User
                 Management. The role filter belongs to the directory only: there

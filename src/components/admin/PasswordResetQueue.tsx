@@ -19,13 +19,10 @@ import {
 } from '@/lib/services/admin/password-reset.service'
 
 /**
- * The pending-reset queue, shared by the Company Admin's User Management page and
- * the IT Admin's Administrator Management page.
- *
- * It takes no "which queue" prop: the API derives that from the caller's role, so
- * each admin sees only the requests they are allowed to act on (drivers and
- * clients for the Company Admin, staff for the IT Admin) and there is no way to
- * ask for the other one.
+ * The pending-reset queue on the IT Admin's User Management page. Since
+ * 2026-10-24 the IT Admin handles every reset (staff, clients and drivers); the
+ * API derives the queue from the caller's role, so nobody else gets one.
+ * First in, first out: the API returns the longest-waiting request first.
  */
 
 const ROLE_LABELS: Record<string, string> = {

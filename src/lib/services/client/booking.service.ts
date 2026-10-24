@@ -311,9 +311,10 @@ export const bookingService = {
 
   // Company Administrator / Operations Manager: the client's reported problem is
   // dealt with. The booking stays delivered and the client gets a fresh 3 days.
-  resolveDeliveryIssue: async (bookingId: string): Promise<BookingWithRelations> => {
+  // Staff only. `note` says what was done about it; it is sent to the client.
+  resolveDeliveryIssue: async (bookingId: string, note: string): Promise<BookingWithRelations> => {
     await initCsrf()
-    return post<BookingWithRelations>(`/booking/${bookingId}/resolve-issue`)
+    return post<BookingWithRelations>(`/booking/${bookingId}/resolve-issue`, { note })
   },
 
   // The client says the delivery is not right; holds auto-completion.

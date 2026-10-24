@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { CheckCircle2, ChevronDown, ExternalLink, Mail, Search, Ticket } from 'lucide-react'
 
 import { RemarksModal } from '@/components/layout/ReusableModal'
-import { gmailComposeUrl, gmailThreadUrl } from '@/components/dashboard/SupportTicketsPanel'
+import { MailAction, gmailComposeUrl, gmailThreadUrl } from '@/components/dashboard/SupportTicketsPanel'
+import { useModuleAccess, writeAccess } from '@/components/layout/ModuleAccess'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
@@ -55,6 +56,8 @@ function StatusBadge({ status }: { status: SupportTicket['status'] }) {
 }
 
 export default function SupportTicketsView() {
+  // Tickets tier: Read Only sees the reply and resolve actions, disabled.
+  const { canEdit } = useModuleAccess()
   const [tickets, setTickets] = useState<SupportTicket[]>([])
   const [inbox,   setInbox]   = useState('')
   const [loading, setLoading] = useState(true)
@@ -285,33 +288,27 @@ export default function SupportTicketsView() {
                         )}
 
                         <div className="flex flex-wrap items-center gap-2">
+                          {/* Replying is a write; reading a resolved thread is not. */}
                           {inbox && (
-                            <a
+                            <MailAction
                               href={gmailThreadUrl(inbox, t.reference)}
-                              target="_blank"
-                              rel="noopener noreferrer"
                               title={`Opens the ${t.reference} thread in ${inbox}. Use Reply all so your answer reaches the client in the same thread.`}
-                              className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-2.5 py-1.5 text-[11px] font-semibold text-white/80 hover:bg-white/5"
+                              allowed={canEdit || t.status !== 'open'}
                             >
                               <ExternalLink size={12} /> {t.status === 'open' ? 'Reply all in Gmail' : 'Open thread in Gmail'}
-                            </a>
+                            </MailAction>
                           )}
                           {compose && t.status === 'open' && (
-                            <a
-                              href={compose}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              title={`New email to ${t.opener?.email}`}
-                              className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-2.5 py-1.5 text-[11px] font-semibold text-white/80 hover:bg-white/5"
-                            >
+                            <MailAction href={compose} title={`New email to ${t.opener?.email}`} allowed={canEdit}>
                               <Mail size={12} /> New email
-                            </a>
+                            </MailAction>
                           )}
                           {t.status === 'open' && (
                             <button
                               type="button"
                               onClick={() => setResolving(t)}
-                              className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-bold text-[#0a0a0a]"
+                              {...writeAccess(canEdit)}
+                              className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-bold text-[#0a0a0a] disabled:cursor-not-allowed disabled:opacity-40"
                               style={{ background: 'var(--color-cyan)' }}
                             >
                               <CheckCircle2 size={12} /> Mark resolved

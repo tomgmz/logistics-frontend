@@ -7,7 +7,8 @@ import type { BookingWithRelations } from '@/lib/store/slice/routeMap.slice'
 import { bookingService } from '@/lib/services/client/booking.service'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { appToast } from '@/lib/toast'
-import ReusableModal from '@/components/layout/ReusableModal'
+import ReusableModal, { RemarksModal } from '@/components/layout/ReusableModal'
+import { writeAccess } from '@/components/layout/ModuleAccess'
 import { formatDateTime } from './transaction-format'
 import { AMBER, BORDER_C, CYAN, ERROR, MUTED } from './transaction-theme'
 
@@ -29,7 +30,7 @@ export default function CompletionPanel({ booking, mode, onUpdated, canAct = tru
   booking:   BookingWithRelations
   mode:      'client' | 'staff'
   onUpdated: (next: BookingWithRelations) => void
-  /** Staff only: false on a Read-only Booking Management tier hides "Mark problem resolved". */
+  /** Staff only: false on a Read Only Booking Management tier disables "Mark problem resolved". */
   canAct?:   boolean
 }) {
   const [busy, setBusy]         = useState(false)
@@ -37,6 +38,8 @@ export default function CompletionPanel({ booking, mode, onUpdated, canAct = tru
   const [note, setNote]         = useState('')
   // Confirming is final — it closes the booking and ends the chance to report a problem.
   const [askConfirm, setAskConfirm] = useState(false)
+  // Staff: the remarks pop-up for resolving a reported problem.
+  const [askResolve, setAskResolve] = useState(false)
 
   if (String(booking.status ?? '').toLowerCase() !== 'delivered') return null
 
@@ -45,6 +48,7 @@ export default function CompletionPanel({ booking, mode, onUpdated, canAct = tru
   const issueNote   = booking.client_issue_note as string | null | undefined
   const issueAt     = booking.client_issue_reported_at as string | null | undefined
   const resolvedAt  = booking.client_issue_resolved_at as string | null | undefined
+  const resolution  = booking.client_issue_resolution_note as string | null | undefined
   const openIssue   = !!issueNote && !resolvedAt
   // The 3 days run from delivery, and restart when a reported problem is resolved.
   const clockFrom   = resolvedAt ?? deliveredAt
@@ -71,11 +75,18 @@ export default function CompletionPanel({ booking, mode, onUpdated, canAct = tru
     'Could not confirm the booking.',
   )
 
-  const resolve = () => run(
-    () => bookingService.resolveDeliveryIssue(bookingId),
-    `Marked resolved. The client has ${AUTO_COMPLETE_DAYS} days to confirm.`,
-    'Could not mark the problem resolved.',
-  )
+  const resolve = async (note: string) => {
+    if (note.length < 5) {
+      appToast.error('Write what was done about the problem (at least 5 characters).')
+      return
+    }
+    setAskResolve(false)
+    await run(
+      () => bookingService.resolveDeliveryIssue(bookingId, note),
+      `Marked resolved. The client was sent your remarks and has ${AUTO_COMPLETE_DAYS} days to confirm.`,
+      'Could not mark the problem resolved.',
+    )
+  }
 
   async function report() {
     if (note.trim().length < 5) {
@@ -138,18 +149,35 @@ export default function CompletionPanel({ booking, mode, onUpdated, canAct = tru
               Reported problem: {issueNote}
             </span>
           )}
+          {resolvedAt && resolution && (
+            <span className="text-[11px] whitespace-pre-wrap" style={{ color: MUTED }}>
+              What was done: {resolution}
+            </span>
+          )}
         </div>
       )}
 
       {mode === 'staff' ? (
-        openIssue && canAct && (
+        openIssue && (
           <div className="flex flex-wrap gap-2">
-            <button type="button" disabled={busy} onClick={() => void resolve()}
-              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold disabled:opacity-40 cursor-pointer"
+            <button type="button" disabled={busy} onClick={() => setAskResolve(true)} {...writeAccess(canAct)}
+              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               style={{ background: CYAN, color: '#000' }}>
               <CheckCircle2 size={14} />
               {busy ? 'Saving…' : 'Mark problem resolved'}
             </button>
+            <RemarksModal
+              open={askResolve}
+              tone="approve"
+              title="Mark the problem resolved?"
+              description={`Your remarks are sent to the client with the notice. They then have ${AUTO_COMPLETE_DAYS} days to confirm the booking or report again.`}
+              remarksLabel="What was done about it"
+              remarksPlaceholder="e.g. The 2 missing cases were delivered this morning and received by the warehouse."
+              confirmLabel="Mark resolved"
+              busy={busy}
+              onConfirm={(note) => void resolve(note)}
+              onCancel={() => setAskResolve(false)}
+            />
           </div>
         )
       ) : reporting ? (

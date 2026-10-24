@@ -26,6 +26,7 @@ import { formatArrivalClock, formatArrivalWindow } from '@/lib/arrival-window'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { STOWAGE_FACTOR } from '@/lib/cargo/capacity'
 import DriverCallTime from './DriverCallTime'
+import { writeAccess } from '@/components/layout/ModuleAccess'
 
 /**
  * How many runs the assigned vehicle makes, which drop-offs each serves, and
@@ -59,7 +60,10 @@ export interface TripCapacity {
 interface Props {
   detail: BookingDetail
   /** Whether this viewer may change the plan at all (RBAC edit right). */
+  /** Operations Manager / Company Administrator, and nobody else is editing the booking. */
   canEdit: boolean
+  /** The Booking Management tier allows it. Read Only sees the buttons disabled. */
+  allowed?: boolean
   capacity?: TripCapacity | null
 }
 
@@ -128,7 +132,7 @@ function loadOf(lines: Line[], qty: (itemId: string) => number) {
   return { weightKg, volumeCbm }
 }
 
-export default function TripPlanner({ detail, canEdit, capacity }: Props) {
+export default function TripPlanner({ detail, canEdit, allowed = true, capacity }: Props) {
   const bookingId = detail.booking_id
 
   const [trips, setTrips]     = useState<Trip[]>([])
@@ -378,8 +382,10 @@ export default function TripPlanner({ detail, canEdit, capacity }: Props) {
           <button
             type="button"
             onClick={beginEdit}
+            {...writeAccess(allowed)}
             className="text-[11px] font-bold px-2.5 py-1 rounded-lg border border-white/10
-                       text-white/50 hover:text-white hover:border-white/25 transition-colors shrink-0"
+                       text-white/50 hover:text-white hover:border-white/25 transition-colors shrink-0
+                       disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {active.length > 1 ? 'Edit plan' : 'Split into trips'}
           </button>
@@ -396,6 +402,7 @@ export default function TripPlanner({ detail, canEdit, capacity }: Props) {
         clientCallTime={detail.call_time}
         driverCallTime={detail.driver_call_time}
         canEdit={canEdit}
+        allowed={allowed}
         editable={(detail.status ?? '').toLowerCase() === 'assigned'}
       />
 

@@ -19,6 +19,7 @@ import { SectionHeader } from './TransactionDetail'
 import { formatDateTime } from './transaction-format'
 import { PALETTE } from '@/lib/palette'
 import { BORDER_C, CYAN, MUTED } from './transaction-theme'
+import { writeAccess } from '@/components/layout/ModuleAccess'
 
 const ORANGE = PALETTE.orange
 
@@ -69,12 +70,14 @@ interface Editing {
   current:    StepTime | null
 }
 
-export default function StopTimesPanel({ bookingId, staff = false, canEdit = false }: {
+export default function StopTimesPanel({ bookingId, staff = false, canEdit = false, allowed = true }: {
   bookingId: string
   /** Staff read (with correction notes) from the admin route. */
   staff?:    boolean
-  /** Operations Manager / Company Administrator with booking edit rights. */
+  /** Operations Manager / Company Administrator, and nobody else is editing the booking. */
   canEdit?:  boolean
+  /** The Booking Management tier allows it. Read Only sees the edit buttons disabled. */
+  allowed?:  boolean
 }) {
   const [trips, setTrips] = useState<TimelineTrip[]>([])
   const [editing, setEditing] = useState<Editing | null>(null)
@@ -122,6 +125,7 @@ export default function StopTimesPanel({ bookingId, staff = false, canEdit = fal
             steps={LOADING_STEPS}
             times={t.loading}
             canEdit={canEdit}
+            allowed={allowed}
             onEdit={(stage, label) => setEditing({
               tripId: t.trip_id, tripStopId: null, stage, label, where: `Loading${many ? `, trip ${t.trip_number}` : ''}`,
               current: t.loading[stage],
@@ -136,6 +140,7 @@ export default function StopTimesPanel({ bookingId, staff = false, canEdit = fal
               steps={UNLOADING_STEPS}
               times={s}
               canEdit={canEdit}
+              allowed={allowed}
               onEdit={(stage, label) => setEditing({
                 tripId: t.trip_id, tripStopId: s.trip_stop_id, stage, label,
                 where: `Drop-off ${s.stop_number ?? i + 1}${many ? `, trip ${t.trip_number}` : ''}`,
@@ -158,12 +163,13 @@ export default function StopTimesPanel({ bookingId, staff = false, canEdit = fal
   )
 }
 
-function StopBlock({ title, subtitle, steps, times, canEdit, onEdit }: {
+function StopBlock({ title, subtitle, steps, times, canEdit, allowed, onEdit }: {
   title:    string
   subtitle?: string | null
   steps:    Array<[Step, string]>
   times:    StopTimes
   canEdit:  boolean
+  allowed:  boolean
   onEdit:   (stage: TimelineStage, label: string) => void
 }) {
   return (
@@ -198,7 +204,8 @@ function StopBlock({ title, subtitle, steps, times, canEdit, onEdit }: {
                 {editable && (
                   <button type="button" onClick={() => onEdit(key as TimelineStage, label)}
                     aria-label={`${v ? 'Correct' : 'Fill in'} ${label.toLowerCase()}`}
-                    className="p-1 -m-1 rounded text-white/40 cursor-pointer bg-transparent border-none [@media(hover:hover)]:hover:text-white">
+                    {...writeAccess(allowed)}
+                    className="p-1 -m-1 rounded text-white/40 cursor-pointer bg-transparent border-none [@media(hover:hover)]:hover:text-white disabled:opacity-40 disabled:cursor-not-allowed">
                     <Pencil size={12} />
                   </button>
                 )}

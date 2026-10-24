@@ -6,6 +6,7 @@ import { AlarmClock } from 'lucide-react'
 import { tripService } from '@/lib/services/admin/trip.service'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
+import { writeAccess } from '@/components/layout/ModuleAccess'
 
 /**
  * The driver's call time: when operations wants the driver at the pickup point.
@@ -24,6 +25,8 @@ interface Props {
   driverCallTime:  string | null | undefined
   /** RBAC edit right and the booking lock. */
   canEdit:         boolean
+  /** The Booking Management tier allows it. Read Only sees the button disabled. */
+  allowed?:        boolean
   /** Only an assigned booking — once started a call time has nothing left to say. */
   editable:        boolean
 }
@@ -55,7 +58,7 @@ const selectClass =
   'rounded-lg border border-white/10 bg-[#1a1a1a] text-sm text-white px-2 py-2 outline-none ' +
   'focus:border-[var(--color-cyan)]/50 disabled:opacity-50'
 
-export default function DriverCallTime({ bookingId, clientCallTime, driverCallTime, canEdit, editable }: Props) {
+export default function DriverCallTime({ bookingId, clientCallTime, driverCallTime, canEdit, allowed = true, editable }: Props) {
   const [saved, setSaved]     = useState<string | null>(driverCallTime ? driverCallTime.slice(0, 5) : null)
   const [editing, setEditing] = useState(false)
   const [saving, setSaving]   = useState(false)
@@ -106,8 +109,10 @@ export default function DriverCallTime({ bookingId, clientCallTime, driverCallTi
           <button
             type="button"
             onClick={begin}
+            {...writeAccess(allowed)}
             className="text-[11px] font-bold px-2.5 py-1 rounded-lg border border-white/10
-                       text-white/50 hover:text-white hover:border-white/25 transition-colors shrink-0"
+                       text-white/50 hover:text-white hover:border-white/25 transition-colors shrink-0
+                       disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {saved ? 'Change' : 'Set call time'}
           </button>

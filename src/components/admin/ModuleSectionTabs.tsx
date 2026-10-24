@@ -15,13 +15,15 @@ import { KeyRound, Users } from 'lucide-react'
  * keeps the role dropdown for what it is good at — filtering the directory — and
  * gives the queue a permanent, visible home.
  */
-export type ModuleSection = 'directory' | 'password-resets'
+export type ModuleSection = 'directory' | 'people' | 'password-resets'
 
 export default function ModuleSectionTabs({
   value,
   onChange,
   directoryLabel = 'Directory',
   resetsLabel = 'Password Resets',
+  peopleLabel,
+  showResets = true,
   pendingCount,
   variant = 'compact',
 }: {
@@ -30,6 +32,10 @@ export default function ModuleSectionTabs({
   /** What this module's list is called — "Users" here, "Administrators" there. */
   directoryLabel?: string
   resetsLabel?:    string
+  /** A second directory between the two: the IT Admin's "Clients & Drivers". */
+  peopleLabel?:    string
+  /** False where this page has no reset queue (the Company Admin's, since 2026-10-24). */
+  showResets?:     boolean
   /** Unactioned requests, surfaced on the tab so the queue announces itself. */
   pendingCount?:   number
   /** 'large' is the User Management look: bigger small-caps labels on #424242 rules. */
@@ -40,7 +46,8 @@ export default function ModuleSectionTabs({
   const iconCls = large ? 'size-4 3xl:size-[18px]' : 'size-[14px]'
   const tabs: { key: ModuleSection; label: string; icon: React.ReactNode }[] = [
     { key: 'directory',       label: directoryLabel, icon: <Users className={iconCls} />     },
-    { key: 'password-resets', label: resetsLabel,    icon: <KeyRound className={iconCls} /> },
+    ...(peopleLabel ? [{ key: 'people' as const, label: peopleLabel, icon: <Users className={iconCls} /> }] : []),
+    ...(showResets ? [{ key: 'password-resets' as const, label: resetsLabel, icon: <KeyRound className={iconCls} /> }] : []),
   ]
 
   return (
