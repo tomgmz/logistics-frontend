@@ -2,6 +2,7 @@
 
 import Pagination from '@/components/ui/Pagination'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
+import { useIsMobile } from '@/lib/hooks/useIsMobile'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -78,7 +79,9 @@ const muiTheme = createTheme({
   },
 })
 
-const PAGE_SIZE = 10
+// Rows per page: 10 on a phone, 20 on anything wider (the user's call, 2026-10-25).
+const PAGE_SIZE_PHONE   = 10
+const PAGE_SIZE_DESKTOP = 20
 
 async function fetchByTab(tab: AdminMgmtTab): Promise<AnyUser[]> {
   switch (tab) {
@@ -328,10 +331,10 @@ function RowMenu({ user, tab, onView, onEdit, onManageAccess, onStatusChange, lo
   )
 }
 
-function TableSkeleton({ cols }: { cols: number }) {
+function TableSkeleton({ cols, rows }: { cols: number; rows: number }) {
   return (
     <>
-      {Array.from({ length: PAGE_SIZE }).map((_, i) => (
+      {Array.from({ length: rows }).map((_, i) => (
         <tr key={i} className="border-b border-[#424242]">
           {Array.from({ length: cols }).map((_, j) => (
             <td key={j} className="px-4 3xl:px-5 py-2 3xl:py-2.5">
@@ -486,9 +489,8 @@ export default function AdminManagementClient() {
   const [searchInput,      setSearchInput]      = useState('')
   const [search,           setSearch]           = useState('')
   const [page,             setPage]             = useState(1)
+  const pageSize = useIsMobile() ? PAGE_SIZE_PHONE : PAGE_SIZE_DESKTOP
   const [stats,            setStats]            = useState({ total: 0, active: 0, archived: 0 })
-  const [serverTotal,      setServerTotal]      = useState(0)
-  const [serverTotalPages, setServerTotalPages] = useState(1)
   const [showForm,         setShowForm]         = useState(false)
   const [editUser,         setEditUser]         = useState<AnyUser | null>(null)
   const [formViewOnly,     setFormViewOnly]     = useState(false)
@@ -549,8 +551,6 @@ export default function AdminManagementClient() {
       ])
       if (currentTabRef.current !== 'all' || statusRef.current !== pick) return
       setAllRows(result.data)
-      setServerTotal(result.total)
-      setServerTotalPages(Math.ceil(result.total / PAGE_SIZE))
       setStats({ total: statsResult.total, active: statsResult.active, archived: statsResult.archived })
     } catch {
       if (!quiet) setError('Failed to load accounts. Check your connection or permissions.')
@@ -632,12 +632,12 @@ export default function AdminManagementClient() {
         )
       })
 
-  const total      = activeTab === 'all' ? serverTotal      : filtered.length
-  const totalPages = activeTab === 'all' ? serverTotalPages : Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  // The API returns the whole list on every tab (All included), so every view
+  // is cut into pages here. All used to show the full list on every page.
+  const total      = filtered.length
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const safePage   = Math.min(page, totalPages)
-  const users      = activeTab === 'all'
-    ? allRows
-    : filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+  const users      = filtered.slice((safePage - 1) * pageSize, safePage * pageSize)
 
   function handleStatusChange(user: AnyUser, status: UserStatus) {
     const serviceTab = activeTab === 'all'
@@ -886,7 +886,7 @@ export default function AdminManagementClient() {
                 </thead>
                 <tbody className="ff-regular max-lg:whitespace-nowrap">
                   {(loading || fetching) ? (
-                    <TableSkeleton cols={colCount} />
+                    <TableSkeleton cols={colCount} rows={pageSize} />
                   ) : users.length === 0 ? (
                     <tr>
                       <td colSpan={colCount}>
@@ -934,7 +934,7 @@ export default function AdminManagementClient() {
 
             {/* Pagination */}
             {!loading && total > 0 && (
-              <Pagination page={safePage} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPageChange={setPage} disabled={fetching} />
+              <Pagination page={safePage} totalPages={totalPages} total={total} pageSize={pageSize} onPageChange={setPage} disabled={fetching} />
             )}
             </>
             )}

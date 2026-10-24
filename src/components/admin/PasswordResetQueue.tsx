@@ -1,6 +1,7 @@
 'use client'
 
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
+import { useIsMobile } from '@/lib/hooks/useIsMobile'
 import { useCallback, useEffect, useState } from 'react'
 import { AlertTriangle, MailCheck } from 'lucide-react'
 import Pagination from '@/components/ui/Pagination'
@@ -51,7 +52,9 @@ const SENDABLE: ResetRequestStatus[] = ['pending', 'expired']
 // decision stands (the API refuses too), so Reject stays disabled from then on.
 const CANCELLABLE: ResetRequestStatus[] = ['pending']
 
-const PAGE_SIZE = 10
+// Rows per page: 10 on a phone, 20 on anything wider (the user's call, 2026-10-25).
+const PAGE_SIZE_PHONE   = 10
+const PAGE_SIZE_DESKTOP = 20
 
 const STATUS_OPTIONS = (Object.keys(STATUS_CFG) as ResetRequestStatus[])
   .map((s) => ({ value: s, label: STATUS_CFG[s].label }))
@@ -122,6 +125,7 @@ export default function PasswordResetQueue({
   // The whole history is listed; decided rows keep their buttons, greyed out.
   const includeClosed = true
   const [page,          setPage]          = useState(1)
+  const pageSize = useIsMobile() ? PAGE_SIZE_PHONE : PAGE_SIZE_DESKTOP
   const [pending,       setPending]       = useState<PendingAction | null>(null)
   const [search,        setSearch]        = useState('')
   const [filters,       setFilters]       = useState<FilterValues>([])
@@ -206,9 +210,9 @@ export default function PasswordResetQueue({
     (!q || fullName(r).toLowerCase().includes(q) || r.email.toLowerCase().includes(q)),
   )
 
-  const totalPages = Math.max(1, Math.ceil(shown.length / PAGE_SIZE))
+  const totalPages = Math.max(1, Math.ceil(shown.length / pageSize))
   const safePage   = Math.min(page, totalPages)
-  const pageRows   = shown.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+  const pageRows   = shown.slice((safePage - 1) * pageSize, safePage * pageSize)
 
   useEffect(() => {
     // Only meaningful once a load has finished — reporting 0 from the empty
@@ -376,7 +380,7 @@ export default function PasswordResetQueue({
           </table>
         </div>
         {!loading && shown.length > 0 && (
-          <Pagination page={safePage} totalPages={totalPages} total={shown.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
+          <Pagination page={safePage} totalPages={totalPages} total={shown.length} pageSize={pageSize} onPageChange={setPage} />
         )}
       </div>
 
