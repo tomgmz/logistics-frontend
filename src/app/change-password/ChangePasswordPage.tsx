@@ -86,7 +86,8 @@ export default function ChangePasswordPage() {
       setDone(true)
       setTimeout(() => router.replace(destination()), 1800)
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to update password. Please try again.'
+      const apiMsg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+      const msg = apiMsg ?? (err instanceof Error ? err.message : 'Failed to update password. Please try again.')
       setError(msg)
     } finally {
       setLoading(false)

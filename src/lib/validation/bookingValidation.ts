@@ -88,13 +88,62 @@ export function validateSchedule(date: string, time: string): ScheduleErrors {
   return errors
 }
 
-export function validateRoute(pickup: string, dropoffs: string[]): RouteErrors {
+export interface LatLng {
+  lat: number | null
+  lng: number | null
+}
+
+export interface RouteCoords {
+  pickup:   LatLng
+  dropoffs: LatLng[]
+}
+
+// Two pins this close are the same place picked twice: a booking cannot drop
+// off where it picks up. Kept in step with SAME_LOCATION_METERS in the
+// backend's booking schema, which refuses the same thing.
+export const SAME_LOCATION_METERS = 20
+// Closer than this is allowed but unusual for a truck delivery, so the client
+// is asked to confirm the pins before going on.
+export const NEAR_DROPOFF_METERS = 1000
+
+const normalizeAddress = (a: string) => a.trim().toLowerCase().replace(/\s+/g, ' ')
+
+/** Straight-line distance in metres, or null when either pin is missing. */
+export function distanceMeters(a: LatLng, b: LatLng): number | null {
+  if (a.lat == null || a.lng == null || b.lat == null || b.lng == null) return null
+  const rad = (d: number) => (d * Math.PI) / 180
+  const dLat = rad(b.lat - a.lat)
+  const dLng = rad(b.lng - a.lng)
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2
+  return 2 * 6_371_000 * Math.asin(Math.sqrt(h))
+}
+
+function isSameAsPickup(pickup: string, dropoff: string, coords: RouteCoords | undefined, i: number): boolean {
+  if (normalizeAddress(pickup) === normalizeAddress(dropoff)) return true
+  const meters = coords ? distanceMeters(coords.pickup, coords.dropoffs[i] ?? { lat: null, lng: null }) : null
+  return meters != null && meters < SAME_LOCATION_METERS
+}
+
+export function validateRoute(pickup: string, dropoffs: string[], coords?: RouteCoords): RouteErrors {
   const errors: RouteErrors = { dropoffs: {} }
   if (!pickup.trim()) errors.pickup = 'Pickup location is required'
   dropoffs.forEach((d, i) => {
     if (!d.trim()) errors.dropoffs[i] = `Drop-off ${i + 1} location is required`
+    else if (pickup.trim() && isSameAsPickup(pickup, d, coords, i)) {
+      errors.dropoffs[i] = `Drop-off ${i + 1} cannot be the same as the pickup location`
+    }
   })
   return errors
+}
+
+/** Drop-offs that are not the pickup but are suspiciously close to it. */
+export function dropoffsNearPickup(coords: RouteCoords): { index: number; meters: number }[] {
+  return coords.dropoffs.flatMap((d, index) => {
+    const meters = distanceMeters(coords.pickup, d)
+    return meters != null && meters >= SAME_LOCATION_METERS && meters < NEAR_DROPOFF_METERS
+      ? [{ index, meters }]
+      : []
+  })
 }
 
 export function validateGroup(group: ItemGroup, mode: CargoMode): GroupErrors {
@@ -154,10 +203,11 @@ export function validateBooking(
   sections:     DropoffSection[],
   mode:         CargoMode,
   fileCount:    number,
+  coords?:      RouteCoords,
 ): Omit<BookingErrors, 'touched'> {
   const errors: Omit<BookingErrors, 'touched'> = {
     schedule: validateSchedule(date, time),
-    route:    validateRoute(pickup, dropoffs),
+    route:    validateRoute(pickup, dropoffs, coords),
     sections: validateSections(sections, mode),
   }
 

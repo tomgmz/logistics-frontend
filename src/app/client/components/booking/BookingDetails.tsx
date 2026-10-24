@@ -48,8 +48,11 @@ import {
   validateBooking,
   hasAnyErrors,
   getGroupErrors,
+  dropoffsNearPickup,
   type GroupErrors,
+  type RouteCoords,
 } from '@/lib/validation/bookingValidation'
+import ReusableModal from '@/components/layout/ReusableModal'
 
 import type { ResolvedPlace } from '@/lib/hooks/usePlacesAutoComplete'
 import { nowDate } from '@/app/utils/serverTime'
@@ -726,6 +729,8 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
   const [isDragging, setIsDragging] = useState(false)
   const [docError,   setDocError]   = useState<string | null>(null)
   const [infoOpen,   setInfoOpen]   = useState(false)
+  // Drop-offs close to the pickup, waiting on the client to confirm the pins.
+  const [nearDropoffs, setNearDropoffs] = useState<{ index: number; meters: number }[]>([])
 
   // iOS Safari never focuses a tapped button, so blur alone would not close it.
   useEffect(() => {
@@ -778,7 +783,11 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
 
   const summary = useAppSelector(selectCargoSummary)
 
-  const rawErrors = validateBooking(date, time, pickup, dropoffs, sections, mode, docCount)
+  const routeCoords: RouteCoords = {
+    pickup:   { lat: pickupLat, lng: pickupLng },
+    dropoffs: dropoffCoords,
+  }
+  const rawErrors = validateBooking(date, time, pickup, dropoffs, sections, mode, docCount, routeCoords)
   const errors = {
     schedule: {
       date: shown('date') ? rawErrors.schedule.date : undefined,
@@ -803,8 +812,20 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
   const handleNext = () => {
     setTouched(true)
     if (hasAnyErrors(rawErrors)) return
+    const near = dropoffsNearPickup(routeCoords)
+    if (near.length > 0) {
+      setNearDropoffs(near)
+      return
+    }
     onNext()
   }
+
+  const nearDescription = (() => {
+    const fmt = (m: number) => (m < 100 ? `${Math.round(m)} m` : `${Math.round(m / 10) * 10} m`)
+    const parts = nearDropoffs.map((n) => `Drop-off ${n.index + 1} is only ${fmt(n.meters)}`)
+    const list = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}` : parts[0]
+    return `${list} away from the pickup location. Please check that the pickup and drop-off locations are correct.`
+  })()
 
   const handleAddDropoff = () => dispatch(addDropoff())
 
@@ -909,6 +930,16 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
         </AnimatePresence>,
         document.body,
       )}
+
+      <ReusableModal
+        open={nearDropoffs.length > 0}
+        title={nearDropoffs.length > 1 ? 'Drop-offs Very Close to Pickup' : 'Drop-off Very Close to Pickup'}
+        description={nearDescription}
+        cancelLabel="Edit"
+        confirmLabel="Correct"
+        onCancel={() => setNearDropoffs([])}
+        onConfirm={() => { setNearDropoffs([]); onNext() }}
+      />
 
       <div className="flex-1 overflow-auto p-4 lg:p-6 flex flex-col gap-3 sm:gap-6">
 
