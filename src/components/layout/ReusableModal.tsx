@@ -28,6 +28,8 @@ export interface ReusableModalProps {
   onConfirm?: () => void;
   onCancel?: () => void;
   disableBackdropClose?: boolean;
+  /** Stacking layer; raise it when opening over a pop-up that sits above z-[70]. */
+  zClassName?: string;
 }
 
 const backdropVariants = {
@@ -89,6 +91,7 @@ export default function ReusableModal({
   onConfirm,
   onCancel,
   disableBackdropClose = false,
+  zClassName = "z-[70]",
 }: ReusableModalProps) {
   useEffect(() => {
     if (!open) return;
@@ -125,7 +128,7 @@ export default function ReusableModal({
           aria-describedby={
             description ? "modal-description" : undefined
           }
-          className="fixed inset-0 z-[70] flex items-end justify-center sm:items-center sm:p-4"
+          className={`fixed inset-0 ${zClassName} flex items-end justify-center sm:items-center sm:p-4`}
           style={{
             backgroundColor: "rgba(0,0,0,0.55)",
             backdropFilter: "",

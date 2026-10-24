@@ -3,13 +3,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { X, ShieldCheck, Loader2 } from 'lucide-react'
-import { EMPTY_FLAGS, ModuleFlags, ModuleKey, defaultFlagsForRole } from '@/constants/modules'
+import { EMPTY_FLAGS, ModuleFlags, ModuleKey, defaultFlagsForRole, flagsToLevel } from '@/constants/modules'
 import { permissionsService } from '@/lib/services/admin/permissions.service'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import ModulePermissionMatrix from './ModulePermissionMatrix'
 import { useRecordLock } from '@/lib/hooks/useRecordLock'
 import RecordLockBanner from '@/components/ui/RecordLockBanner'
+import ReusableModal from '@/components/layout/ReusableModal'
 
 interface PermissionsModalProps {
   userId:   string
@@ -36,6 +37,8 @@ export default function PermissionsModal({ userId, userName, onClose, onSaved }:
   const [error,       setError]       = useState<string | null>(null)
   const [modules,     setModules]     = useState<ModuleKey[]>([])
   const [flags,       setFlags]       = useState<Record<string, ModuleFlags>>({})
+  // What the matrix opened with: Save stays off until something differs from it.
+  const [loaded,      setLoaded]      = useState<Record<string, ModuleFlags>>({})
 
   useEffect(() => {
     let active = true
@@ -58,6 +61,7 @@ export default function PermissionsModal({ userId, userName, onClose, onSaved }:
         }
         setModules(res.modules)
         setFlags(map)
+        setLoaded(map)
       } catch (e) {
         if (active) setError(getApiErrorMessage(e, 'Failed to load permissions.'))
       } finally {
@@ -71,6 +75,19 @@ export default function PermissionsModal({ userId, userName, onClose, onSaved }:
     () => Object.values(flags).filter((f) => f.can_view).length,
     [flags],
   )
+
+  // Compared by level, not raw flags: a row with leftover partial flags that the
+  // matrix shows as Manage All has not been changed until its level is.
+  const changed = useMemo(
+    () => modules.some((m) =>
+      flagsToLevel(flags[m] ?? EMPTY_FLAGS) !== flagsToLevel(loaded[m] ?? EMPTY_FLAGS)),
+    [modules, flags, loaded],
+  )
+
+  const [confirmDiscard, setConfirmDiscard] = useState(false)
+  // Cancel, the X, and the backdrop all leave through here: straight out when
+  // nothing changed, otherwise ask before throwing the changes away.
+  const requestClose = () => (changed ? setConfirmDiscard(true) : onClose())
 
   async function handleSave() {
     setSaving(true)
@@ -97,7 +114,7 @@ export default function PermissionsModal({ userId, userName, onClose, onSaved }:
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="absolute inset-0 bg-black/70" onClick={onClose}
+        className="absolute inset-0 bg-black/70" onClick={requestClose}
       />
       <motion.div
         initial={{ opacity: 0, scale: 0.96, y: 8 }}
@@ -116,7 +133,7 @@ export default function PermissionsModal({ userId, userName, onClose, onSaved }:
               <p className="text-xs text-[#818181]">{userName}</p>
             </div>
           </div>
-          <button onClick={onClose} className="rounded-md p-1.5 text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white">
+          <button onClick={requestClose} className="rounded-md p-1.5 text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white">
             <X size={18} />
           </button>
         </div>
@@ -137,7 +154,7 @@ export default function PermissionsModal({ userId, userName, onClose, onSaved }:
           ) : (
             <>
               <p className="mb-4 text-xs text-[#818181]">
-                Pick one access level per module: <b>View</b> (view only) or
+                Pick one access level per module: <b>Read Only</b> (view only) or
                 <b> Manage All</b> (view, create, edit, export &amp; delete).
                 These start from the role&apos;s defaults — leaving a module unchecked removes the
                 user&apos;s access to it.
@@ -157,14 +174,14 @@ export default function PermissionsModal({ userId, userName, onClose, onSaved }:
           <span className="text-xs text-[#818181]">{grantedCount} module{grantedCount !== 1 ? 's' : ''} granted</span>
           <div className="flex items-center gap-2">
             <button
-              onClick={onClose}
+              onClick={requestClose}
               className="rounded-lg border border-[#424242] px-4 py-2 text-sm text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white"
             >
               Cancel
             </button>
             <button
               onClick={handleSave}
-              disabled={loading || saving || !!error || lock.readOnly}
+              disabled={loading || saving || !!error || lock.readOnly || !changed}
               className="flex items-center gap-2 rounded-lg bg-[#4df9ed] px-5 py-2 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5] disabled:opacity-40"
             >
               {saving && <Loader2 size={14} className="animate-spin" />} Save Access
@@ -172,6 +189,17 @@ export default function PermissionsModal({ userId, userName, onClose, onSaved }:
           </div>
         </div>
       </motion.div>
+
+      <ReusableModal
+        open={confirmDiscard}
+        title="Discard changes?"
+        description="The access changes you made will be lost. Are you sure you want to close?"
+        confirmLabel="Discard"
+        cancelLabel="Keep editing"
+        zClassName="z-[110]"
+        onConfirm={() => { setConfirmDiscard(false); onClose() }}
+        onCancel={() => setConfirmDiscard(false)}
+      />
     </div>
   )
 }
