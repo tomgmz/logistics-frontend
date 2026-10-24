@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Users, UserPlus, UserRoundPlus, Search, MoreVertical, ChevronDown,
+  Users, UserPlus, UserRoundPlus, MoreVertical, ChevronDown,
   Pencil, Eye, ShieldCheck, ShieldOff, Archive,
   AlertTriangle,
   KeyRound, Send, RotateCcw, Flag, ArchiveRestore,
@@ -37,6 +37,9 @@ import { externalDriverService, type VendorDriverUser } from '@/lib/services/adm
 import { useModuleAccess } from '@/components/layout/ModuleAccess'
 
 import RefreshButton from '@/components/ui/RefreshButton'
+import FilterBar, {
+  allowedValues, matchesFilter, optionsFrom, type FilterField, type FilterValues,
+} from '@/components/ui/FilterBar'
 type UserMgmtTab = Extract<UserTab, 'clients' | 'drivers' | 'it-admins'>
 // The dropdown below filters the directory by role. Password resets are a queue
 // you act on, not a slice of the directory, so they are a top-level section
@@ -106,6 +109,29 @@ async function fetchArchivedByTab(tab: DirectoryTab): Promise<AnyUser[]> {
   if (tab === 'drivers')        return data.filter((u) => !(u as DriverUser).drivers?.is_external)
   if (tab === 'vendor-drivers') return data.filter((u) =>  (u as DriverUser).drivers?.is_external)
   return data
+}
+
+// "Archived" is one of the Status filter's options. Archived accounts come from
+// their own list, so the Status filter decides which lists to read:
+//   none: current accounts only (no Status filter, or Archived not in it)
+//   only: Archived is the one status picked
+//   both: Archived plus some current status, both lists merged
+type ArchivedMode = 'none' | 'only' | 'both'
+
+// What an unfiltered list holds. "Status is not Active" means the other current
+// statuses: archived accounts only show when Archived is picked by name.
+const CURRENT_STATUSES: UserStatus[] = ['active', 'inactive', 'deactivated', 'permanently_locked']
+
+function archivedModeOf(f: FilterValues): ArchivedMode {
+  const status = allowedValues(f, 'status', CURRENT_STATUSES)
+  if (!status?.includes('archived')) return 'none'
+  return status.length === 1 ? 'only' : 'both'
+}
+
+async function loadTabRows(tab: DirectoryTab, mode: ArchivedMode): Promise<AnyUser[]> {
+  if (mode === 'only') return fetchArchivedByTab(tab)
+  if (mode === 'both') return (await Promise.all([fetchByTab(tab), fetchArchivedByTab(tab)])).flat()
+  return fetchByTab(tab)
 }
 
 function displayName(u: AnyUser): string {
@@ -425,23 +451,6 @@ function ArchivedRowMenu({ onView, onRestore, lockedBy }: {
         )}
       </AnimatePresence>
     </div>
-  )
-}
-
-/** Shows the archived accounts instead of the current ones. */
-function ArchivedToggle({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
-  return (
-    <button
-      type="button"
-      onClick={() => onChange(!on)}
-      aria-pressed={on}
-      title={on ? 'Back to the current accounts' : 'Show archived accounts'}
-      className={`flex h-[34px] 3xl:h-[38px] items-center gap-1.5 whitespace-nowrap rounded-[10px] border px-3 text-[13px] 3xl:text-[15px] transition ${
-        on ? 'border-[#ffea00] bg-[#ffea00]/[0.15] text-[#ffea00]' : 'border-[#818181] bg-[#424242] text-[#818181] hover:text-white'
-      }`}
-    >
-      <Archive className="size-4" /> Archived
-    </button>
   )
 }
 
@@ -773,6 +782,78 @@ const HEADERS: Record<TabValue, string[]> = {
   'it-admins': ['Name', 'Email', 'Phone', 'Status', 'Last Login'],
 }
 
+// The Filters panel. Archived is a status like the rest (see ArchivedMode).
+const STATUS_OPTIONS = ([...CURRENT_STATUSES, 'archived'] as UserStatus[])
+  .map((s) => ({ value: s, label: STATUS_CFG[s].label }))
+
+const LICENSE_OPTIONS = [
+  { value: 'attention', label: 'Expiring or expired' },
+  { value: 'ok',        label: 'In date' },
+]
+
+const ACCESS_OPTIONS = [
+  { value: 'enrolled',   label: 'Passkey set up' },
+  { value: 'invited',    label: 'Setup link sent' },
+  { value: 'not_set_up', label: 'Not set up' },
+  { value: 'revoked',    label: 'Revoked' },
+]
+
+/** The same states AccessBadge draws, as filter values. */
+function accessState(access: VendorDriverUser['access'] | undefined): string | null {
+  if (!access) return null
+  if (!access.account_active) return 'revoked'
+  if (access.enrolled)        return 'enrolled'
+  return access.invite_pending ? 'invited' : 'not_set_up'
+}
+
+/** "on_trip" → "On Trip". */
+function humanize(v: string): string {
+  return v.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+/** Company, vendor and driver-status choices come from the accounts loaded. */
+function filterFields(tab: TabValue, rows: AnyUser[], archivedOnly: boolean): FilterField[] {
+  const status: FilterField[] = [{ key: 'status', label: 'Account Status', options: STATUS_OPTIONS }]
+  const license: FilterField = { key: 'license', label: 'License', options: LICENSE_OPTIONS }
+  switch (tab) {
+    case 'all':
+      return [
+        { key: 'role', label: 'Role', options: [{ value: 'client', label: 'Client' }, { value: 'driver', label: 'Driver' }] },
+        ...status,
+      ]
+    case 'clients':
+      return [...status, { key: 'company', label: 'Company', options: optionsFrom(rows.map((u) => (u as ClientUser).clients?.company_name)) }]
+    case 'drivers':
+      return [
+        ...status,
+        { key: 'driver_status', label: 'Driver Status', options: optionsFrom(rows.map((u) => (u as DriverUser).drivers?.status), humanize) },
+        license,
+      ]
+    case 'vendor-drivers':
+      return [
+        ...status,
+        { key: 'vendor', label: 'Vendor', options: optionsFrom(rows.map((u) => (u as VendorDriverUser).drivers?.vendor_name)) },
+        ...(archivedOnly ? [] : [{ key: 'access', label: 'App Access', options: ACCESS_OPTIONS }]),
+        license,
+      ]
+    case 'it-admins':
+      return status
+  }
+}
+
+/** The client-side half of the filters. The All tab filters on the server instead. */
+function matchesFilters(u: AnyUser, tab: DirectoryTab, f: FilterValues): boolean {
+  if (!matchesFilter(f, 'status', u.status)) return false
+  if (tab === 'clients') return matchesFilter(f, 'company', (u as ClientUser).clients?.company_name)
+  if (tab === 'drivers' || tab === 'vendor-drivers') {
+    const d = (u as VendorDriverUser).drivers
+    if (!matchesFilter(f, 'license', needsLicenseUpdate(d?.license_expiry) ? 'attention' : 'ok')) return false
+    if (tab === 'drivers') return matchesFilter(f, 'driver_status', d?.status)
+    return matchesFilter(f, 'vendor', d?.vendor_name) && matchesFilter(f, 'access', accessState((u as VendorDriverUser).access))
+  }
+  return true
+}
+
 export default function UserManagementClient() {
   const searchParams = useSearchParams()
   // A password-reset notification deep-links here as ?tab=password-resets&request=…
@@ -791,8 +872,11 @@ export default function UserManagementClient() {
   const [searchInput,      setSearchInput]      = useState('')
   const [search,           setSearch]           = useState('')
   const [page,             setPage]             = useState(1)
-  // Drivers tab: narrow the list to licenses that are expiring or expired.
-  const [licenseOnly,      setLicenseOnly]      = useState(false)
+  // The Filters panel's applied values. They belong to the tab (and view) they
+  // were set on, so switching either clears them.
+  const [filters,          setFilters]          = useState<FilterValues>([])
+  const filtersRef = useRef(filters)
+  filtersRef.current = filters
   const [stats,            setStats]            = useState({ total: 0, active: 0, archived: 0 })
   const [serverTotal,      setServerTotal]      = useState(0)
   const [serverTotalPages, setServerTotalPages] = useState(1)
@@ -803,10 +887,12 @@ export default function UserManagementClient() {
   const [formTab,          setFormTab]          = useState<UserMgmtTab>('clients')
   const [formDriverSource, setFormDriverSource] = useState<DriverSource>('company')
   const [showTypePicker,   setShowTypePicker]   = useState(false)
-  // Archived view: the same tabs, listing archived accounts with a Restore action.
-  const [showArchived,     setShowArchived]     = useState(false)
-  const archivedRef = useRef(showArchived)
-  archivedRef.current = showArchived
+  // Archived accounts are picked in the Status filter; their rows get a Restore action.
+  const archivedMode = archivedModeOf(filters)
+  const archivedRef = useRef(archivedMode)
+  archivedRef.current = archivedMode
+  // Only archived accounts on screen: the old "Archived view" wording and rules.
+  const showArchived = archivedMode === 'only'
 
   // This module's tier for a managed role: Read-only hides every write control.
   const access = useModuleAccess()
@@ -833,8 +919,10 @@ export default function UserManagementClient() {
     if (tab === activeTab) return
     setAllRows([])
     setLoading(true)
+    setFilters([])
     setActiveTab(tab)
   }, [activeTab])
+
 
   // Seeded once on mount so the tab can show a badge before anyone opens it —
   // the panel itself only fetches when it is mounted, which is too late to tell
@@ -863,9 +951,17 @@ export default function UserManagementClient() {
       setError(null)
     }
     const archived = archivedRef.current
+    // This list is paged on the server, so its filters go there too.
+    const role   = allowedValues(filtersRef.current, 'role', ['client', 'driver'])
+    const status = allowedValues(filtersRef.current, 'status', CURRENT_STATUSES)
     try {
       const [result, statsResult] = await Promise.all([
-        userService.getAll({ search: searchQuery || undefined, role: 'client,driver', status: archived ? 'archived' : undefined }),
+        userService.getAll({
+          search: searchQuery || undefined,
+          role:   role?.length ? role.join(',') : 'client,driver',
+          // The API takes Archived in the same comma list.
+          status: status?.length ? status.join(',') : undefined,
+        }),
         userService.getStats('client,driver'),
       ])
       // Left the All tab (or switched archived view) while this was in flight: its rows don't belong here.
@@ -900,7 +996,7 @@ export default function UserManagementClient() {
     const archived = archivedRef.current
     try {
       const [rows, statsResult] = await Promise.all([
-        archived ? fetchArchivedByTab(tab) : fetchByTab(tab),
+        loadTabRows(tab, archived),
         userService.getStats('client,driver')
       ])
       if (currentTabRef.current !== tab || archivedRef.current !== archived) return
@@ -920,23 +1016,29 @@ export default function UserManagementClient() {
     else void fetchTabUsers(activeTab, true)
   })
 
+  // Picking or dropping Archived changes which lists a tab reads. The All tab
+  // re-reads on any filter change already (allTabFilterKey).
+  const tabArchivedKey = activeTab === 'all' ? '' : archivedMode
+
   useEffect(() => {
     isInitialAllFetch.current = true
     setPage(1)
-    setLicenseOnly(false)
     setSearch('')
     setSearchInput('')
     // The resets panel loads its own data and has no user list to fetch.
     if (isResetsTab) { setLoading(false); return }
     if (activeTab === 'all') fetchAllUsers('', true)
     else fetchTabUsers(activeTab)
-  }, [activeTab, isResetsTab, showArchived]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeTab, isResetsTab, tabArchivedKey]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The All tab re-reads from the server when its filters change.
+  const allTabFilterKey = activeTab === 'all' ? JSON.stringify(filters) : ''
 
   useEffect(() => {
     if (isResetsTab || activeTab !== 'all') return
     if (isInitialAllFetch.current) { isInitialAllFetch.current = false; return }
     fetchAllUsers(search, false)
-  }, [search, activeTab, isResetsTab, fetchAllUsers])
+  }, [search, allTabFilterKey, activeTab, isResetsTab, fetchAllUsers])
 
   /** Reload whichever user list is showing. A no-op on the resets panel, which owns its own data. */
   const refetchCurrentTab = useCallback(async () => {
@@ -951,12 +1053,18 @@ export default function UserManagementClient() {
     ? allRows.filter((u) => needsLicenseUpdate((u as DriverUser).drivers?.license_expiry)).length
     : 0
 
+  const filterDefs = isResetsTab ? [] : filterFields(activeTab, allRows, showArchived)
+  const licenseOnly = matchesFilter(filters, 'license', 'attention') && !matchesFilter(filters, 'license', 'ok')
+
+  const applyFilters = (next: FilterValues) => {
+    setFilters(next)
+    setPage(1)
+  }
+
   const filtered = activeTab === 'all' || isResetsTab
     ? allRows
     : allRows.filter((u) => {
-        // Ignored once nothing is flagged, so updating the last driver can't strand
-        // the admin on an empty list with the notice (and its toggle) gone.
-        if (licenseOnly && licenseFlagCount > 0 && isDriverTab && !needsLicenseUpdate((u as DriverUser).drivers?.license_expiry)) return false
+        if (!matchesFilters(u, activeTab, filters)) return false
         if (!search) return true
         const q = search.toLowerCase()
         return (
@@ -1105,11 +1213,22 @@ export default function UserManagementClient() {
               variant="large"
             />
 
-            {/* Role filter, search, refresh and the count, on one row as the
-                Figma lays them out. The role filter belongs to the directory
-                only: there is nothing to filter by role in a queue. */}
+            {/* The shared filter bar: the role dropdown (which picks the table),
+                search, Filters (Archived is a status there), refresh and the count, on one row as
+                the Figma lays them out. The Password Reset queue has its own. */}
             {!isResetsTab && (
-            <div className="flex flex-wrap items-center gap-3 3xl:gap-4 border-b border-[#424242] px-3 sm:px-4 3xl:px-5 py-2 3xl:py-2.5 shrink-0">
+            <FilterBar
+              search={{ value: searchInput, onChange: setSearchInput, placeholder: 'Search name or email...' }}
+              fields={filterDefs}
+              values={filters}
+              onChange={applyFilters}
+              actions={<RefreshButton iconOnly onClick={handleRefresh} loading={(loading || fetching)} disabled={loading || fetching} />}
+              summary={
+                <span className={showArchived ? 'text-[#ffea00]' : 'text-[#4df9ed]'}>
+                  {total} {showArchived ? 'Archived ' : ''}{ACCOUNT_NOUN[activeTab]} Account{total !== 1 ? 's' : ''}
+                </span>
+              }
+              leading={
               <FormControl size="small" sx={{ width: { xs: '100%', sm: 200 }, [FIGMA_MQ]: { width: 220 } }}>
                 <Select
                   value={dropdownTab}
@@ -1175,22 +1294,8 @@ export default function UserManagementClient() {
                   ))}
                 </Select>
               </FormControl>
-
-              <div className="relative min-w-0 flex-1 sm:max-w-[360px] 3xl:max-w-[400px]">
-                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 3xl:size-[18px] -translate-y-1/2 text-[#818181]" />
-                <input
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  placeholder="Search name or email..."
-                  className="h-[34px] 3xl:h-[38px] w-full rounded-[10px] border border-[#818181] bg-[#424242] pl-9 3xl:pl-10 pr-4 text-[13px] 3xl:text-[15px] text-white placeholder-[#818181] outline-none transition focus:border-[#4df9ed]"
-                />
-              </div>
-              <RefreshButton iconOnly onClick={handleRefresh} loading={(loading || fetching)} disabled={loading || fetching} />
-              <ArchivedToggle on={showArchived} onChange={setShowArchived} />
-              <span className={`basis-full text-right sm:basis-auto sm:ml-auto text-[10px] 3xl:text-[11px] font-bold whitespace-nowrap ${showArchived ? 'text-[#ffea00]' : 'text-[#4df9ed]'}`}>
-                {total} {showArchived ? 'Archived ' : ''}{ACCOUNT_NOUN[activeTab]} Account{total !== 1 ? 's' : ''}
-              </span>
-            </div>
+              }
+            />
             )}
 
             {!isResetsTab && isDriverTab && (
@@ -1227,8 +1332,12 @@ export default function UserManagementClient() {
                   {licenseFlagCount === 1 ? '1 driver has' : `${licenseFlagCount} drivers have`} a license that expires
                   within a month or has expired. Update their license details once it is renewed.
                 </span>
+                {/* Sets the same License filter the Filters panel does. */}
                 <button
-                  onClick={() => { setLicenseOnly((v) => !v); setPage(1) }}
+                  onClick={() => {
+                    const rest = filters.filter((r) => r.field !== 'license')
+                    applyFilters(licenseOnly ? rest : [...rest, { field: 'license', op: 'is', value: 'attention' }])
+                  }}
                   className="ml-auto shrink-0 rounded-lg border border-amber-500/40 px-3 py-1.5 text-xs font-semibold text-amber-300 transition hover:bg-amber-500/15"
                 >
                   {licenseOnly ? 'Show all drivers' : 'Show only these'}
@@ -1282,7 +1391,7 @@ export default function UserManagementClient() {
                           {renderCells(user, activeTab)}
                           {/* The row menu sits at the far right of the table. */}
                           <td className="px-4 3xl:px-5 py-2 3xl:py-2.5 text-right">
-                            {showArchived ? (
+                            {user.status === 'archived' ? (
                               <ArchivedRowMenu
                                 onView={() => openEdit(user, true)}
                                 onRestore={() => handleRestore(user)}
@@ -1332,7 +1441,7 @@ export default function UserManagementClient() {
           driverSource={formDriverSource}
           startInView={formViewOnly}
           // Same rule as the row menu: the combined list can't open the edit form.
-          canEdit={activeTab !== 'all' && !showArchived && access.canEdit}
+          canEdit={activeTab !== 'all' && editUser?.status !== 'archived' && access.canEdit}
           lockedBy={editUser ? userLocks.get(editUser.user_id) : undefined}
           onClose={() => setShowForm(false)}
           onSaved={async () => {

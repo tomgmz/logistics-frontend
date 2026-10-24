@@ -4,6 +4,8 @@ import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { useCallback, useEffect, useState } from 'react'
 import { AlertTriangle, MailCheck } from 'lucide-react'
 import Pagination from '@/components/ui/Pagination'
+import RefreshButton from '@/components/ui/RefreshButton'
+import FilterBar, { matchesFilter, optionsFrom, type FilterValues } from '@/components/ui/FilterBar'
 import ReusableModal from '@/components/layout/ReusableModal'
 import { useModuleAccess } from '@/components/layout/ModuleAccess'
 import { appToast } from '@/lib/toast'
@@ -53,6 +55,17 @@ const SENDABLE: ResetRequestStatus[] = ['pending', 'expired']
 const CANCELLABLE: ResetRequestStatus[] = ['pending']
 
 const PAGE_SIZE = 10
+
+const STATUS_OPTIONS = (Object.keys(STATUS_CFG) as ResetRequestStatus[])
+  .map((s) => ({ value: s, label: STATUS_CFG[s].label }))
+
+// "Requested" is one window at a time, counted back from now.
+const REQUESTED_WINDOWS: Record<string, number> = { '1d': 1, '7d': 7, '30d': 30 }
+const REQUESTED_OPTIONS = [
+  { value: '1d',  label: 'Last 24 hours' },
+  { value: '7d',  label: 'Last 7 days' },
+  { value: '30d', label: 'Last 30 days' },
+]
 
 // Action buttons: live, or greyed out once the request has been decided.
 const BTN_BASE =
@@ -107,6 +120,8 @@ export default function PasswordResetQueue({
   const includeClosed = true
   const [page,          setPage]          = useState(1)
   const [pending,       setPending]       = useState<PendingAction | null>(null)
+  const [search,        setSearch]        = useState('')
+  const [filters,       setFilters]       = useState<FilterValues>([])
 
   // `quiet` re-reads in place (a live signal): no spinner, and a failed re-read
   // keeps the rows already on screen instead of replacing them with an error.
@@ -177,9 +192,20 @@ export default function PasswordResetQueue({
   // Anything an admin still has to act on, not just untouched requests.
   const pendingCount = rows.filter((r) => SENDABLE.includes(r.status)).length
 
-  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE))
+  const q      = search.trim().toLowerCase()
+  const requested = filters.find((r) => r.field === 'requested')?.value
+  const days   = requested ? REQUESTED_WINDOWS[requested] : null
+  const since  = days ? Date.now() - days * 86_400_000 : null
+  const shown  = rows.filter((r) =>
+    matchesFilter(filters, 'status', r.status) &&
+    matchesFilter(filters, 'role', r.requested_role) &&
+    (since === null || new Date(r.created_at).getTime() >= since) &&
+    (!q || fullName(r).toLowerCase().includes(q) || r.email.toLowerCase().includes(q)),
+  )
+
+  const totalPages = Math.max(1, Math.ceil(shown.length / PAGE_SIZE))
   const safePage   = Math.min(page, totalPages)
-  const pageRows   = rows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+  const pageRows   = shown.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
   useEffect(() => {
     // Only meaningful once a load has finished — reporting 0 from the empty
@@ -190,6 +216,19 @@ export default function PasswordResetQueue({
   return (
     <>
       <div className="flex flex-col flex-1 min-h-0">
+        <FilterBar
+          search={{ value: search, onChange: (v) => { setSearch(v); setPage(1) }, placeholder: 'Search name or email...' }}
+          fields={[
+            { key: 'status',    label: 'Status',    options: STATUS_OPTIONS },
+            { key: 'role',      label: 'Role',      options: optionsFrom(rows.map((r) => r.requested_role), (v) => ROLE_LABELS[v] ?? v.replace(/_/g, ' ')) },
+            { key: 'requested', label: 'Requested', options: REQUESTED_OPTIONS, single: true },
+          ]}
+          values={filters}
+          onChange={(v) => { setFilters(v); setPage(1) }}
+          actions={<RefreshButton iconOnly onClick={() => void load(includeClosed)} loading={loading} disabled={loading} />}
+          summary={<span className="text-[#4df9ed]">{shown.length} Request{shown.length !== 1 ? 's' : ''}</span>}
+          className={regularData ? 'ff-regular' : ''}
+        />
         {error && (
           <div className="flex items-center gap-3 border-b border-red-500/20 bg-red-500/10 px-5 py-3 text-sm text-red-400 shrink-0">
             <AlertTriangle size={14} /> {error}
@@ -223,15 +262,17 @@ export default function PasswordResetQueue({
                     <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-t-[#4df9ed]" />
                   </td>
                 </tr>
-              ) : rows.length === 0 ? (
+              ) : shown.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-20 text-center">
                     <div className="mb-4 inline-flex rounded-full border border-[#2a2a2a] bg-[#1b1b1b] p-4">
                       <MailCheck size={26} className="text-[#818181]" />
                     </div>
-                    <p className="text-base font-semibold text-white">Nothing to action</p>
+                    <p className="text-base font-semibold text-white">{rows.length > 0 ? 'No records found' : 'Nothing to action'}</p>
                     <p className="mt-1 text-sm text-[#818181]">
-                      {includeClosed
+                      {rows.length > 0
+                        ? 'No requests match your search or filters.'
+                        : includeClosed
                         ? 'No password reset requests on record.'
                         : 'No one is waiting on a password reset right now.'}
                     </p>
@@ -329,8 +370,8 @@ export default function PasswordResetQueue({
             </tbody>
           </table>
         </div>
-        {!loading && rows.length > 0 && (
-          <Pagination page={safePage} totalPages={totalPages} total={rows.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
+        {!loading && shown.length > 0 && (
+          <Pagination page={safePage} totalPages={totalPages} total={shown.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
         )}
       </div>
 
