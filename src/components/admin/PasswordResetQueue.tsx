@@ -198,8 +198,9 @@ export default function PasswordResetQueue({
 
         {/* Table */}
         <div className="flex-1 overflow-auto min-h-0">
-          {/* Sized like the Users table. Desktop (lg+): six equal columns (fixed
-              layout); phones and tablets: at least 960px wide, scrolling sideways. */}
+          {/* Sized like the Users table. Desktop (lg+): fixed layout, a fixed-width
+              actions column and five equal ones; phones and tablets: at least 960px
+              wide, scrolling sideways. */}
           <table className="w-full max-lg:min-w-[960px] lg:min-w-[1080px] lg:table-fixed">
             <thead className={`sticky top-0 z-10 bg-[#1b1b1b] ${regularData ? 'font-[family-name:var(--font-alegreya-sc)]' : ''}`}>
               <tr className="border-b border-[#424242]">
@@ -207,7 +208,7 @@ export default function PasswordResetQueue({
                   <th
                     key={i}
                     className={`px-4 3xl:px-5 py-2 3xl:py-2.5 text-[11px] 3xl:text-[13px] font-bold lowercase text-[#818181] whitespace-nowrap ${
-                      i === 5 ? 'text-right' : 'text-left'
+                      i === 5 ? 'text-right lg:w-[300px] 3xl:w-[340px]' : 'text-left'
                     }`}
                   >
                     {h}
@@ -277,9 +278,9 @@ export default function PasswordResetQueue({
                         </div>
                       </td>
                       <td className="pl-2 max-lg:pl-4 pr-4 3xl:pr-5 py-2 3xl:py-2.5">
-                        {/* A sixth of the width like every other column; if that is too narrow for
-                            both buttons they wrap onto two lines instead of overflowing. */}
-                        <div className="flex flex-wrap max-lg:flex-nowrap items-center justify-end gap-1.5">
+                        {/* Desktop gives this column a fixed width (set on its header) so both
+                            buttons sit on one line; the other five share the rest equally. */}
+                        <div className="flex flex-nowrap items-center justify-end gap-1.5">
                           <RecordLockBadge holder={lockedBy} />
                           {canCreate && (() => {
                             const live  = SENDABLE.includes(r.status) && !busy
