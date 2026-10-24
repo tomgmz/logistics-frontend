@@ -137,8 +137,8 @@ export default function PermissionsModal({ userId, userName, onClose, onSaved }:
           ) : (
             <>
               <p className="mb-4 text-xs text-[#818181]">
-                Pick one access level per module: <b>Read-only</b> (view only),
-                <b> Manage</b> (view, create, edit &amp; export), or <b>All</b> (Manage plus delete).
+                Pick one access level per module: <b>View</b> (view only) or
+                <b> Manage All</b> (view, create, edit, export &amp; delete).
                 These start from the role&apos;s defaults — leaving a module unchecked removes the
                 user&apos;s access to it.
               </p>
