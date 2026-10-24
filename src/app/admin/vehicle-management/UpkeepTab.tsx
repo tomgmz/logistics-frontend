@@ -87,12 +87,22 @@ const NEEDS: Record<MaintenanceReason, { group: NeedGroup; blocking: boolean; ty
   service_schedule_missing: { group: 'vehicle_maintenance', blocking: false, type: 'service'    },
 }
 
-const GROUP_FILTERS: { key: 'all' | NeedGroup; label: string }[] = [
+/** 'odometer' narrows Vehicle Maintenance to the after-delivery odometer readings. */
+type GroupFilter = 'all' | NeedGroup | 'odometer'
+
+const GROUP_FILTERS: { key: GroupFilter; label: string }[] = [
   { key: 'all',                 label: 'All' },
   { key: 'blowbagets',          label: 'Blowbagets Re-check' },
   { key: 'vehicle_maintenance', label: 'Vehicle Maintenance' },
+  { key: 'odometer',            label: 'Odometer' },
   { key: 'driver_report',       label: 'Driver Report' },
 ]
+
+function matchesFilter(p: Problem, f: GroupFilter): boolean {
+  if (f === 'all') return true
+  if (f === 'odometer') return p.type === 'odometer'
+  return p.group === f
+}
 
 const PAGE_SIZE = 15
 
@@ -214,7 +224,7 @@ export default function UpkeepTab({
   /** The vehicle's own actions (view, update, odometer, service, archive), added to each row's menu. */
   vehicleActions?: (t: Truck) => RowAction[]
 }) {
-  const [groupFilter, setGroupFilter] = useState<'all' | NeedGroup>('all')
+  const [groupFilter, setGroupFilter] = useState<GroupFilter>('all')
   const [page,       setPage]       = useState(1)
 
   const [inspectTruck, setInspectTruck] = useState<MaintenanceTruck | null>(null)
@@ -240,7 +250,7 @@ export default function UpkeepTab({
   const visible  = useMemo(() => {
     const q = search.trim().toLowerCase()
     return problems.filter((p) =>
-      (groupFilter === 'all' || p.group === groupFilter) &&
+      matchesFilter(p, groupFilter) &&
       (!q || [p.truck.plate_number, p.truck.truck_model?.name, p.truck.truck_model?.vehicle_type, assignedDriverName(p.truck)]
         .some((v) => v?.toLowerCase().includes(q))))
   }, [problems, search, groupFilter])
@@ -346,12 +356,12 @@ export default function UpkeepTab({
             <select
               id="maintenance-needs-filter"
               value={groupFilter}
-              onChange={(e) => { setGroupFilter(e.target.value as 'all' | NeedGroup); setPage(1) }}
+              onChange={(e) => { setGroupFilter(e.target.value as GroupFilter); setPage(1) }}
               className="appearance-none h-8 3xl:h-[38px] min-w-[150px] rounded-[10px] border-[0.5px] border-[#818181] bg-[#2a2828] pl-3 3xl:pl-[15px] pr-8 text-[13px] 3xl:text-[16px] font-bold text-[#4df9ed] outline-none focus:border-[#4df9ed] cursor-pointer [&>option]:bg-[#2a2828] [&>option]:text-white"
             >
               {GROUP_FILTERS.map((f) => (
                 <option key={f.key} value={f.key}>
-                  {f.label} ({f.key === 'all' ? problems.length : problems.filter((p) => p.group === f.key).length})
+                  {f.label} ({problems.filter((p) => matchesFilter(p, f.key)).length})
                 </option>
               ))}
             </select>
