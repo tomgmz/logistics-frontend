@@ -28,12 +28,12 @@ export const ALL_FLAGS: ModuleFlags = {
 // Tiered access model shown in the Administrator Management matrix. The 5 granular
 // flags above remain the source of truth in the DB + backend guard; these two
 // mutually-exclusive levels are just how an IT Admin assigns them:
-//   View       -> view only
+//   Read Only  -> view only
 //   Manage All -> view + create + edit + export + delete
 export type AccessLevel = 'none' | 'read' | 'all'
 
 export const ACCESS_LEVELS: { key: Exclude<AccessLevel, 'none'>; label: string }[] = [
-  { key: 'read', label: 'View'       },
+  { key: 'read', label: 'Read Only'  },
   { key: 'all',  label: 'Manage All' },
 ]
 
