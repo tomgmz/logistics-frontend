@@ -6,7 +6,7 @@ import { useIsMobile } from '@/lib/hooks/useIsMobile'
 import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Users, UserPlus, UserRoundPlus, MoreVertical, ChevronDown,
+  Users, UserPlus, UserRoundPlus, ChevronDown,
   Pencil, Eye, ShieldCheck, ShieldOff, Archive,
   AlertTriangle,
   KeyRound, Send, RotateCcw, Flag, ArchiveRestore,
@@ -31,8 +31,9 @@ import { useRecordLocks } from '@/lib/hooks/useRecordLock'
 import { RecordLockBadge } from '@/components/ui/RecordLockBanner'
 import { licenseExpiryState, needsLicenseUpdate } from '@/lib/license-expiry'
 import { externalDriverService, type VendorDriverUser } from '@/lib/services/admin/external-driver.service'
-import { useModuleAccess, writeAccess } from '@/components/layout/ModuleAccess'
-import AccountActionConfirm, { statusConfirmCopy, type AccountConfirm } from '@/components/admin/AccountActionConfirm'
+import { READ_ONLY_HINT, useModuleAccess, writeAccess } from '@/components/layout/ModuleAccess'
+import RowActionMenu, { type RowAction } from '@/components/ui/RowActionMenu'
+import AccountActionConfirm, { restoreConfirmDescription, statusConfirmCopy, type AccountConfirm, type AccountKind } from '@/components/admin/AccountActionConfirm'
 
 import RefreshButton from '@/components/ui/RefreshButton'
 import FilterBar, {
@@ -135,6 +136,12 @@ async function loadTabRows(tab: DirectoryTab, mode: ArchivedMode): Promise<AnyUs
   return fetchByTab(tab)
 }
 
+/** Company driver, vendor driver or anyone else: what the pop-ups say about passkeys. */
+function accountKind(u: AnyUser): AccountKind {
+  if (u.role !== 'driver') return 'other'
+  return (u as DriverUser).drivers?.is_external ? 'vendor-driver' : 'company-driver'
+}
+
 function displayName(u: AnyUser): string {
   return [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email
 }
@@ -226,6 +233,34 @@ function StatusBadge({ status }: { status: UserStatus }) {
   )
 }
 
+/** Someone else is editing the account: their name, and View (read-only) still works. */
+function LockedRow({ holder, onView }: { holder: string; onView: () => void }) {
+  return (
+    <div className="flex items-center justify-end gap-1.5">
+      <RecordLockBadge holder={holder} />
+      <button
+        onClick={onView}
+        title="View Details"
+        aria-label="View Details"
+        className="rounded-md p-1.5 text-[#818181] transition [@media(hover:hover)]:hover:bg-[#2a2a2a] [@media(hover:hover)]:hover:text-white"
+      >
+        <Eye size={15} />
+      </button>
+    </div>
+  )
+}
+
+/** Read Only tier: the action shows, disabled, with the hint. */
+function gated(allowed: boolean): Pick<RowAction, 'disabled' | 'title'> {
+  return allowed ? {} : { disabled: true, title: READ_ONLY_HINT }
+}
+
+const STATUS_ACTIONS: { status: UserStatus; label: string; icon: React.ReactNode; tone: RowAction['tone']; description: string }[] = [
+  { status: 'active',      label: 'Activate',   icon: <ShieldCheck size={15} />, tone: 'default', description: 'Let them sign in again' },
+  { status: 'deactivated', label: 'Deactivate', icon: <ShieldOff size={15} />,   tone: 'caution', description: 'Sign them out and block sign-in' },
+  { status: 'archived',    label: 'Archive',    icon: <Archive size={15} />,     tone: 'warning', description: 'Remove from the list; can be restored' },
+]
+
 interface RowMenuProps {
   user: AnyUser
   tab: TabValue
@@ -240,107 +275,26 @@ interface RowMenuProps {
 function RowMenu({ user, tab, mode, onView, onEdit, onStatusChange, lockedBy }: RowMenuProps) {
   const access = useModuleAccess()
   const itMode = mode === 'it-admin'
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    function handle(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handle)
-    return () => document.removeEventListener('mousedown', handle)
-  }, [])
+  if (lockedBy) return <LockedRow holder={lockedBy} onView={onView} />
 
   // A client's or driver's account status is the IT Administrator's to change.
-  const ownsStatus = itMode
-  const statusActions = ownsStatus
-    ? ([
-        { label: 'Activate',   status: 'active'      as UserStatus, icon: <ShieldCheck size={13} /> },
-        { label: 'Deactivate', status: 'deactivated' as UserStatus, icon: <ShieldOff size={13} />   },
-        { label: 'Archive',    status: 'archived'    as UserStatus, icon: <Archive size={13} />     },
-      ]).filter((a) => a.status !== user.status)
-    : []
-  // Activate/deactivate is an edit; archiving goes through DELETE, so it needs
-  // Manage All. The IT Administrator is never limited by a tier.
+  // Activate/deactivate is an edit, archive needs Manage All; the IT Administrator
+  // is never limited by a tier.
   const statusAllowed = (s: UserStatus) => itMode || (s === 'archived' ? access.canDelete : access.canEdit)
 
-  const showEdit = !itMode && tab !== 'all'
-
-  // Viewing is read-only, so it stays available while someone else is editing.
-  if (lockedBy) {
-    return (
-      <div className="flex items-center justify-end gap-1.5">
-        <RecordLockBadge holder={lockedBy} />
-        <button
-          onClick={onView}
-          title="View Details"
-          className="rounded-md p-1.5 text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white"
-        >
-          <Eye size={15} />
-        </button>
-      </div>
-    )
-  }
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        onClick={(e) => { e.stopPropagation(); setOpen(!open) }}
-        className="rounded-md p-1.5 text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white"
-      >
-        <MoreVertical size={18} />
-      </button>
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: -4 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: -4 }}
-            transition={{ duration: 0.12 }}
-            className="absolute right-0 top-8 z-50 w-48 rounded-xl border border-[#424242] bg-[#1b1b1b] py-1 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              onClick={() => { setOpen(false); onView() }}
-              className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white"
-            >
-              <Eye size={13} /> View Details
-            </button>
-            {showEdit && (
-              <button
-                onClick={() => { setOpen(false); onEdit() }}
-                {...writeAccess(access.canEdit)}
-                className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
-              >
-                <Pencil size={13} /> Edit
-              </button>
-            )}
-            {statusActions.length > 0 && (
-              <>
-                <div className="my-1 border-t border-[#424242]" />
-                {statusActions.map((a) => (
-                  <button
-                    key={a.status}
-                    onClick={() => { setOpen(false); onStatusChange(a.status) }}
-                    {...writeAccess(statusAllowed(a.status))}
-                    className={`flex w-full items-center gap-2.5 px-3.5 py-2 text-sm transition disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent ${
-                      a.status === 'archived'
-                        ? 'text-yellow-400 hover:bg-yellow-500/10'
-                        : a.status === 'deactivated'
-                        ? 'text-orange-400 hover:bg-orange-500/10'
-                        : 'text-[#818181] hover:bg-[#2a2a2a] hover:text-white'
-                    }`}
-                  >
-                    {a.icon} {a.label}
-                  </button>
-                ))}
-              </>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  )
+  const actions: RowAction[] = [
+    { label: 'View Details', icon: <Eye size={15} />, onSelect: onView, section: 'Details', description: 'Open the account read-only' },
+    ...(!itMode && tab !== 'all'
+      ? [{ label: 'Edit', icon: <Pencil size={15} />, onSelect: onEdit, section: 'Details', description: 'Change their details', ...gated(access.canEdit) }]
+      : []),
+    ...(itMode
+      ? STATUS_ACTIONS.filter((a) => a.status !== user.status).map((a) => ({
+          label: a.label, icon: a.icon, tone: a.tone, section: 'Account', description: a.description,
+          onSelect: () => onStatusChange(a.status), ...gated(statusAllowed(a.status)),
+        }))
+      : []),
+  ]
+  return <RowActionMenu actions={actions} heading={displayName(user)} subheading={user.email} iconSize={18} />
 }
 
 /** Where a vendor driver's passkey sign-in stands, in one badge. */
@@ -388,7 +342,8 @@ function RevokedFlag({ user }: { user: VendorDriverUser }) {
 }
 
 /** The archived view's row menu: look at the account, or bring it back. */
-function ArchivedRowMenu({ mode, onView, onRestore, lockedBy }: {
+function ArchivedRowMenu({ user, mode, onView, onRestore, lockedBy }: {
+  user:      AnyUser
   mode:      UserManagementMode
   onView:    () => void
   onRestore: () => void
@@ -397,65 +352,17 @@ function ArchivedRowMenu({ mode, onView, onRestore, lockedBy }: {
   // Restoring undoes an archive, so it needs the same "All" tier archiving does.
   // Like archiving, a client or driver is restored by the IT Administrator.
   const { canDelete } = useModuleAccess()
-  const itMode     = mode === 'it-admin'
-  const ownsStatus = itMode
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
+  const itMode = mode === 'it-admin'
+  if (lockedBy) return <LockedRow holder={lockedBy} onView={onView} />
 
-  useEffect(() => {
-    function handle(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handle)
-    return () => document.removeEventListener('mousedown', handle)
-  }, [])
-
-  if (lockedBy) {
-    return (
-      <div className="flex items-center justify-end gap-1.5">
-        <RecordLockBadge holder={lockedBy} />
-        <button onClick={onView} title="View Details" className="rounded-md p-1.5 text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white">
-          <Eye size={15} />
-        </button>
-      </div>
-    )
-  }
-
-  const item = 'flex w-full items-center gap-2.5 px-3.5 py-2 text-sm transition'
-  return (
-    <div ref={ref} className="relative">
-      <button
-        onClick={(e) => { e.stopPropagation(); setOpen(!open) }}
-        className="rounded-md p-1.5 text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white"
-      >
-        <MoreVertical size={18} />
-      </button>
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: -4 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: -4 }}
-            transition={{ duration: 0.12 }}
-            className="absolute right-0 top-8 z-50 w-48 rounded-xl border border-[#424242] bg-[#1b1b1b] py-1 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button onClick={() => { setOpen(false); onView() }} className={`${item} text-[#818181] hover:bg-[#2a2a2a] hover:text-white`}>
-              <Eye size={13} /> View Details
-            </button>
-            {ownsStatus && (
-              <>
-                <div className="my-1 border-t border-[#424242]" />
-                <button onClick={() => { setOpen(false); onRestore() }} {...writeAccess(itMode || canDelete)} className={`${item} text-[#4df9ed] hover:bg-[#4df9ed]/10 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent`}>
-                  <ArchiveRestore size={13} /> Restore
-                </button>
-              </>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  )
+  const actions: RowAction[] = [
+    { label: 'View Details', icon: <Eye size={15} />, onSelect: onView, section: 'Details', description: 'Open the account read-only' },
+    ...(itMode
+      ? [{ label: 'Restore', icon: <ArchiveRestore size={15} />, tone: 'accent' as const, onSelect: onRestore,
+           section: 'Account', description: 'Bring the account back as Active', ...gated(itMode || canDelete) }]
+      : []),
+  ]
+  return <RowActionMenu actions={actions} heading={displayName(user)} subheading={user.email} iconSize={18} />
 }
 
 /**
@@ -473,30 +380,12 @@ function VendorRowMenu({ user, mode, onDone, onView, onEdit, confirm, lockedBy }
   lockedBy?: string
 }) {
   const { canEdit } = useModuleAccess()
-  // Passkey access (re-invite, revoke, restore) and the account status are the
-  // IT Administrator's; editing the driver's details stays with the Company Administrator.
+  // Passkey access (re-invite, revoke, restore) is the IT Administrator's;
+  // editing the driver's details stays with the Company Administrator.
   const itMode = mode === 'it-admin'
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    function handle(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handle)
-    return () => document.removeEventListener('mousedown', handle)
-  }, [])
-
-  if (lockedBy) {
-    return (
-      <div className="flex items-center justify-end">
-        <RecordLockBadge holder={lockedBy} />
-      </div>
-    )
-  }
+  if (lockedBy) return <LockedRow holder={lockedBy} onView={onView} />
 
   const run = async (work: Promise<unknown>, loading: string, success: string, fallback: string) => {
-    setOpen(false)
     try {
       await appToast.promise(
         work,
@@ -512,82 +401,44 @@ function VendorRowMenu({ user, mode, onDone, onView, onEdit, confirm, lockedBy }
     'Sending setup link…', 'Setup link sent to the driver.', 'Could not send the setup link.',
   )
 
-  const revoke = () => {
-    setOpen(false)
-    confirm({
-      title:        `Revoke ${displayName(user)}'s app access?`,
-      description:  'Their passkeys stop working immediately and they are signed out. ' +
-                    'You can restore access later; they will need to set up sign-in again.',
-      confirmLabel: 'Revoke Access',
-      run: () => run(
-        externalDriverService.revoke(user.user_id),
-        'Revoking access…', 'Access revoked.', 'Could not revoke access.',
-      ),
-    })
-  }
+  const revoke = () => confirm({
+    title:        `Revoke ${displayName(user)}'s app access?`,
+    description:  'Their passkeys stop working immediately and they are signed out. ' +
+                  'You can restore access later; they will need to set up sign-in again.',
+    confirmLabel: 'Revoke Access',
+    run: () => run(
+      externalDriverService.revoke(user.user_id),
+      'Revoking access…', 'Access revoked.', 'Could not revoke access.',
+    ),
+  })
 
-  const restore = () => {
-    setOpen(false)
-    confirm({
-      title:        `Restore ${displayName(user)}'s app access?`,
-      description:  'Their account is turned back on and a new setup link is emailed to them.',
-      confirmLabel: 'Restore Access',
-      run: () => run(
-        externalDriverService.restore(user.user_id),
-        'Restoring access…', 'Access restored. A new setup link was sent.', 'Could not restore access.',
-      ),
-    })
-  }
+  const restore = () => confirm({
+    title:        `Restore ${displayName(user)}'s app access?`,
+    description:  'Their account is turned back on and a new setup link is emailed to them.',
+    confirmLabel: 'Restore Access',
+    run: () => run(
+      externalDriverService.restore(user.user_id),
+      'Restoring access…', 'Access restored. A new setup link was sent.', 'Could not restore access.',
+    ),
+  })
 
-  const item = 'flex w-full items-center gap-2.5 px-3.5 py-2 text-sm transition'
+  const accessActions: RowAction[] = !itMode || !user.access ? [] : user.access.account_active
+    ? [
+        { label: 'Resend Setup Link', icon: <Send size={15} />, onSelect: () => void resend(), section: 'App access', description: 'Email a new passkey setup link' },
+        { label: 'Revoke Access', icon: <ShieldOff size={15} />, tone: 'danger', onSelect: revoke, section: 'App access', description: 'End their passkeys and sign them out' },
+      ]
+    : [
+        { label: 'Restore Access', icon: <RotateCcw size={15} />, tone: 'accent', onSelect: restore, section: 'App access', description: 'Turn access back on with a new setup link' },
+      ]
 
-  return (
-    <div ref={ref} className="relative">
-      <button
-        onClick={(e) => { e.stopPropagation(); setOpen(!open) }}
-        className="rounded-md p-1.5 text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white"
-      >
-        <MoreVertical size={18} />
-      </button>
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: -4 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: -4 }}
-            transition={{ duration: 0.12 }}
-            className="absolute right-0 top-8 z-50 w-52 rounded-xl border border-[#424242] bg-[#1b1b1b] py-1 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button onClick={() => { setOpen(false); onView() }} className={`${item} text-[#818181] hover:bg-[#2a2a2a] hover:text-white`}>
-              <Eye size={13} /> View Details
-            </button>
-            {!itMode && (
-              <button onClick={() => { setOpen(false); onEdit() }} {...writeAccess(canEdit)} className={`${item} text-[#818181] hover:bg-[#2a2a2a] hover:text-white disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent`}>
-                <Pencil size={13} /> Edit Details
-              </button>
-            )}
-            {itMode && user.access && <div className="my-1 border-t border-[#424242]" />}
-            {!itMode || !user.access ? null : user.access.account_active ? (
-              <>
-                <button onClick={resend} className={`${item} text-[#818181] hover:bg-[#2a2a2a] hover:text-white`}>
-                  <Send size={13} /> Resend Setup Link
-                </button>
-                <div className="my-1 border-t border-[#424242]" />
-                <button onClick={revoke} className={`${item} text-red-400 hover:bg-red-500/10`}>
-                  <ShieldOff size={13} /> Revoke Access
-                </button>
-              </>
-            ) : (
-              <button onClick={restore} className={`${item} text-[#818181] hover:bg-[#2a2a2a] hover:text-white`}>
-                <RotateCcw size={13} /> Restore Access
-              </button>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  )
+  const actions: RowAction[] = [
+    { label: 'View Details', icon: <Eye size={15} />, onSelect: onView, section: 'Details', description: 'Open the driver read-only' },
+    ...(!itMode
+      ? [{ label: 'Edit Details', icon: <Pencil size={15} />, onSelect: onEdit, section: 'Details', description: 'Change their details', ...gated(canEdit) }]
+      : []),
+    ...accessActions,
+  ]
+  return <RowActionMenu actions={actions} heading={displayName(user)} subheading={user.drivers?.vendor_name || user.email} iconSize={18} />
 }
 
 function TableSkeleton({ cols, rows }: { cols: number; rows: number }) {
@@ -1069,7 +920,7 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
       : tabFromRole(user.role)
     // Every status change is confirmed in a pop-up first.
     setConfirmAction({
-      ...statusConfirmCopy(displayName(user), status),
+      ...statusConfirmCopy(displayName(user), status, accountKind(user)),
       run: async () => {
         try {
           await appToast.promise(
@@ -1091,9 +942,7 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
     const vendor = !!(user as DriverUser).drivers?.is_external
     setConfirmAction({
       title:        `Restore ${displayName(user)}?`,
-      description:  vendor
-        ? 'The account comes back as Active. Send them a new setup link from Vendor Drivers so they can sign in.'
-        : 'The account comes back as Active and they can sign in again.',
+      description:  restoreConfirmDescription(accountKind(user)),
       confirmLabel: 'Restore',
       run: async () => {
         try {
@@ -1365,6 +1214,7 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
                           <td className="px-4 3xl:px-5 py-2 3xl:py-2.5 text-right">
                             {user.status === 'archived' ? (
                               <ArchivedRowMenu
+                                user={user}
                                 mode={mode}
                                 onView={() => openEdit(user, true)}
                                 onRestore={() => handleRestore(user)}

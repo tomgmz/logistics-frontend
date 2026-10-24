@@ -494,7 +494,7 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
                       <td className="px-3 py-2.5">
                         <div className="flex items-center justify-end gap-1.5">
                           <RecordLockBadge holder={modelLocks.get(m.model_id)} />
-                          <RowActionMenu brightText label={`Actions for ${m.name}`} actions={rowActions(m)} />
+                          <RowActionMenu brightText label={`Actions for ${m.name}`} heading={m.name} actions={rowActions(m)} />
                         </div>
                       </td>
                     </tr>

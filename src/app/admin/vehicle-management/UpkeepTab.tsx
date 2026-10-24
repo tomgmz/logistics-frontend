@@ -432,7 +432,7 @@ export default function UpkeepTab({
                       <td>
                         <div className="flex items-center justify-end gap-1.5">
                           <RecordLockBadge holder={truckLocks.get(focusTruck.truck_id)} />
-                          <RowActionMenu brightText label={`Actions for ${focusTruck.plate_number}`} actions={vehicleActions?.(focusTruck) ?? []} />
+                          <RowActionMenu brightText label={`Actions for ${focusTruck.plate_number}`} heading={focusTruck.plate_number} actions={vehicleActions?.(focusTruck) ?? []} />
                         </div>
                       </td>
                     </tr>
@@ -478,7 +478,7 @@ export default function UpkeepTab({
                             {(() => {
                               const actions = rowActions(p)
                               return actions.length > 0 && (
-                                <RowActionMenu brightText label={`Actions for ${t.plate_number}`} actions={actions} />
+                                <RowActionMenu brightText label={`Actions for ${t.plate_number}`} heading={t.plate_number} actions={actions} />
                               )
                             })()}
                           </div>

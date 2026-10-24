@@ -569,7 +569,7 @@ export default function DocumentManagementView() {
                       <div className="flex items-start justify-between gap-1">
                         <DocumentTypeBadge type={d.doc_type} />
                         <div onClick={(e) => e.stopPropagation()}>
-                          <RowActionMenu label={`Actions for ${d.file_name}`} actions={rowActions(d)} />
+                          <RowActionMenu label={`Actions for ${d.file_name}`} heading={d.file_name} actions={rowActions(d)} />
                         </div>
                       </div>
                       <p className="text-xs text-white/80 truncate" title={d.file_name}>{d.file_name}</p>
@@ -645,7 +645,7 @@ export default function DocumentManagementView() {
                       <td className="px-3 py-2"><ReviewStatusBadge doc={d} /></td>
                       <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                         <div className="flex justify-end">
-                          <RowActionMenu label={`Actions for ${d.file_name}`} actions={rowActions(d)} />
+                          <RowActionMenu label={`Actions for ${d.file_name}`} heading={d.file_name} actions={rowActions(d)} />
                         </div>
                       </td>
                     </tr>

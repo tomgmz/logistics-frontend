@@ -147,6 +147,9 @@ function buildInitialState(tab: UserTab, user: AnyUser | null, driverSource: Dri
   return base
 }
 
+/** Optional fields an edit can empty: sent as null so the server clears them. */
+const CLEARABLE_FIELDS = ['middle_name', 'suffix', 'landline'] as const
+
 // Returns the affected user's id (the new account's id on create, editId on edit).
 async function submitForm(
   tab: UserTab,
@@ -160,6 +163,17 @@ async function submitForm(
       value !== undefined && (value !== null ? (value !== '' ? true : key === 'suffix') : key === 'suffix'),
     ),
   )
+  // On an edit, an optional field that had a value and was emptied is sent as
+  // null so the server clears it (a cleared middle name used to be dropped above
+  // and never saved). Only the fields whose schemas take null for "none".
+  if (editId && initial) {
+    for (const key of CLEARABLE_FIELDS) {
+      const before = initial[key], now = form[key]
+      const hadValue = typeof before === 'string' && before !== ''
+      const isEmpty  = now === null || now === undefined || now === ''
+      if (hadValue && isEmpty) clean[key] = null
+    }
+  }
   if (clean.phone)    clean.phone    = attachCountryCode(String(clean.phone))
   if (clean.landline) clean.landline = attachCountryCode(String(clean.landline))
   if (clean.vendor_contact) clean.vendor_contact = attachCountryCode(String(clean.vendor_contact))

@@ -7,7 +7,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  ShieldCheck as ShieldCheckIcon, UserPlus, UserRoundPlus, MoreVertical, ChevronDown,
+  ShieldCheck as ShieldCheckIcon, UserPlus, UserRoundPlus, ChevronDown,
   Pencil, Eye, ShieldCheck, ShieldOff, Archive, ArchiveRestore, SlidersHorizontal,
   AlertTriangle,
 } from 'lucide-react'
@@ -38,6 +38,7 @@ import { passwordResetService } from '@/lib/services/admin/password-reset.servic
 
 import RefreshButton from '@/components/ui/RefreshButton'
 import FilterBar, { type FilterValues } from '@/components/ui/FilterBar'
+import RowActionMenu, { type RowAction } from '@/components/ui/RowActionMenu'
 import AccountActionConfirm, { statusConfirmCopy, type AccountConfirm } from '@/components/admin/AccountActionConfirm'
 type AdminMgmtTab = Extract<
   UserTab,
@@ -227,108 +228,45 @@ interface RowMenuProps {
   lockedBy?: string
 }
 
-function RowMenu({ user, tab, onView, onEdit, onManageAccess, onStatusChange, lockedBy }: RowMenuProps) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    function handle(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handle)
-    return () => document.removeEventListener('mousedown', handle)
-  }, [])
-
-  const statusActions = ([
-    { label: 'Activate',   status: 'active'      as UserStatus, icon: <ShieldCheck size={13} /> },
-    { label: 'Deactivate', status: 'deactivated' as UserStatus, icon: <ShieldOff size={13} />   },
-    { label: 'Archive',    status: 'archived'    as UserStatus, icon: <Archive size={13} />     },
-  ]).filter((a) => a.status !== user.status)
-
-  const canEdit = tab !== 'all'
-  const canManageAccess = isManagedRole(user.role)
-
-  // Viewing is read-only, so it stays available while someone else is editing.
-  if (lockedBy) {
-    return (
-      <div className="flex items-center justify-end gap-1.5">
-        <RecordLockBadge holder={lockedBy} />
-        <button
-          onClick={onView}
-          title="View Details"
-          className="rounded-md p-1.5 text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white"
-        >
-          <Eye size={15} />
-        </button>
-      </div>
-    )
-  }
-
+/** Someone else is editing the account: their name, and View (read-only) still works. */
+function LockedRow({ holder, onView }: { holder: string; onView: () => void }) {
   return (
-    <div ref={ref} className="relative">
-      <button
-        onClick={(e) => { e.stopPropagation(); setOpen(!open) }}
-        className="rounded-md p-1.5 text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white"
-      >
-        <MoreVertical size={18} />
+    <div className="flex items-center justify-end gap-1.5">
+      <RecordLockBadge holder={holder} />
+      <button onClick={onView} title="View Details" aria-label="View Details"
+        className="rounded-md p-1.5 text-[#818181] transition [@media(hover:hover)]:hover:bg-[#2a2a2a] [@media(hover:hover)]:hover:text-white">
+        <Eye size={15} />
       </button>
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: -4 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: -4 }}
-            transition={{ duration: 0.12 }}
-            className="absolute right-0 top-8 z-50 w-48 rounded-xl border border-[#424242] bg-[#1b1b1b] py-1 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              onClick={() => { setOpen(false); onView() }}
-              className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white"
-            >
-              <Eye size={13} /> View Details
-            </button>
-            {canEdit && (
-              <button
-                onClick={() => { setOpen(false); onEdit() }}
-                className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white"
-              >
-                <Pencil size={13} /> Edit
-              </button>
-            )}
-            {canManageAccess && (
-              <button
-                onClick={() => { setOpen(false); onManageAccess() }}
-                className="flex w-full items-center gap-2.5 px-3.5 py-2 text-sm text-[#4df9ed] transition hover:bg-[#4df9ed]/10"
-              >
-                <SlidersHorizontal size={13} /> Manage Access
-              </button>
-            )}
-            {statusActions.length > 0 && (
-              <>
-                <div className="my-1 border-t border-[#424242]" />
-                {statusActions.map((a) => (
-                  <button
-                    key={a.status}
-                    onClick={() => { setOpen(false); onStatusChange(a.status) }}
-                    className={`flex w-full items-center gap-2.5 px-3.5 py-2 text-sm transition ${
-                      a.status === 'archived'
-                        ? 'text-yellow-400 hover:bg-yellow-500/10'
-                        : a.status === 'deactivated'
-                        ? 'text-orange-400 hover:bg-orange-500/10'
-                        : 'text-[#818181] hover:bg-[#2a2a2a] hover:text-white'
-                    }`}
-                  >
-                    {a.icon} {a.label}
-                  </button>
-                ))}
-              </>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   )
+}
+
+function staffName(u: AnyUser): string {
+  return [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email
+}
+
+function RowMenu({ user, tab, onView, onEdit, onManageAccess, onStatusChange, lockedBy }: RowMenuProps) {
+  if (lockedBy) return <LockedRow holder={lockedBy} onView={onView} />
+
+  const status: RowAction[] = ([
+    { status: 'active'      as UserStatus, label: 'Activate',   icon: <ShieldCheck size={15} />, tone: 'default' as const, description: 'Let them sign in again' },
+    { status: 'deactivated' as UserStatus, label: 'Deactivate', icon: <ShieldOff size={15} />,   tone: 'caution' as const, description: 'Sign them out and block sign-in' },
+    { status: 'archived'    as UserStatus, label: 'Archive',    icon: <Archive size={15} />,     tone: 'warning' as const, description: 'Remove from the list; can be restored' },
+  ]).filter((a) => a.status !== user.status).map((a) => ({
+    label: a.label, icon: a.icon, tone: a.tone, section: 'Account', description: a.description,
+    onSelect: () => onStatusChange(a.status),
+  }))
+
+  const actions: RowAction[] = [
+    { label: 'View Details', icon: <Eye size={15} />, onSelect: onView, section: 'Details', description: 'Open the account read-only' },
+    ...(tab !== 'all' ? [{ label: 'Edit', icon: <Pencil size={15} />, onSelect: onEdit, section: 'Details', description: 'Change their details' }] : []),
+    ...(isManagedRole(user.role)
+      ? [{ label: 'Manage Access', icon: <SlidersHorizontal size={15} />, tone: 'accent' as const, onSelect: onManageAccess,
+           section: 'Details', description: 'Read Only or Manage All per module' }]
+      : []),
+    ...status,
+  ]
+  return <RowActionMenu actions={actions} heading={staffName(user)} subheading={user.email} iconSize={18} />
 }
 
 function TableSkeleton({ cols, rows }: { cols: number; rows: number }) {
@@ -354,64 +292,18 @@ function TableSkeleton({ cols, rows }: { cols: number; rows: number }) {
 }
 
 /** The archived view's row menu: look at the account, or bring it back. */
-function ArchivedRowMenu({ onView, onRestore, lockedBy }: {
+function ArchivedRowMenu({ user, onView, onRestore, lockedBy }: {
+  user:      AnyUser
   onView:    () => void
   onRestore: () => void
   lockedBy?: string
 }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    function handle(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handle)
-    return () => document.removeEventListener('mousedown', handle)
-  }, [])
-
-  if (lockedBy) {
-    return (
-      <div className="flex items-center justify-end gap-1.5">
-        <RecordLockBadge holder={lockedBy} />
-        <button onClick={onView} title="View Details" className="rounded-md p-1.5 text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white">
-          <Eye size={15} />
-        </button>
-      </div>
-    )
-  }
-
-  const item = 'flex w-full items-center gap-2.5 px-3.5 py-2 text-sm transition'
-  return (
-    <div ref={ref} className="relative">
-      <button
-        onClick={(e) => { e.stopPropagation(); setOpen(!open) }}
-        className="rounded-md p-1.5 text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white"
-      >
-        <MoreVertical size={18} />
-      </button>
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: -4 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: -4 }}
-            transition={{ duration: 0.12 }}
-            className="absolute right-0 top-8 z-50 w-48 rounded-xl border border-[#424242] bg-[#1b1b1b] py-1 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button onClick={() => { setOpen(false); onView() }} className={`${item} text-[#818181] hover:bg-[#2a2a2a] hover:text-white`}>
-              <Eye size={13} /> View Details
-            </button>
-            <div className="my-1 border-t border-[#424242]" />
-            <button onClick={() => { setOpen(false); onRestore() }} className={`${item} text-[#4df9ed] hover:bg-[#4df9ed]/10`}>
-              <ArchiveRestore size={13} /> Restore
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  )
+  if (lockedBy) return <LockedRow holder={lockedBy} onView={onView} />
+  const actions: RowAction[] = [
+    { label: 'View Details', icon: <Eye size={15} />, onSelect: onView, section: 'Details', description: 'Open the account read-only' },
+    { label: 'Restore', icon: <ArchiveRestore size={15} />, tone: 'accent', onSelect: onRestore, section: 'Account', description: 'Bring the account back as Active' },
+  ]
+  return <RowActionMenu actions={actions} heading={staffName(user)} subheading={user.email} iconSize={18} />
 }
 
 function EmptyState({ tab, onAdd, archived = false }: { tab: TabValue; onAdd: () => void; archived?: boolean }) {
@@ -908,6 +800,7 @@ export default function AdminManagementClient() {
                           <td className="px-4 3xl:px-5 py-2 3xl:py-2.5 text-right">
                             {user.status === 'archived' ? (
                               <ArchivedRowMenu
+                                user={user}
                                 onView={() => openEdit(user, true)}
                                 onRestore={() => handleRestore(user)}
                                 lockedBy={userLocks.get(user.user_id)}
