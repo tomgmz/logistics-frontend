@@ -54,6 +54,7 @@ const ACTIONABLE_TYPES = new Set([
   "booking.trip_resumed",
   "booking.trip_resumed_staff",
   "booking.trip_resumed_by_staff",
+  "booking.driver_call_reminder",
   "driver.emergency",
   "driver.report",
   "auth.password_reset_requested",
@@ -129,6 +130,7 @@ const VALUE_LABELS: Record<string, Record<string, string>> = {
     trip_resumed:          "Delivery moving again",
     trip_resumed_staff:    "Delivery resumed",
     trip_resumed_by_staff: "Delivery resumed by the office",
+    driver_call_reminder:  "Call time in 1 hour",
   },
   window: {
     day_before: "Day before dispatch",

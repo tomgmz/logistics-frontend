@@ -156,8 +156,9 @@ export interface DecisionActor {
 }
 
 export interface TransactionApprovals {
-  /** Approve/reject: the General Manager, or the Company Administrator in their place. */
-  review:     (DecisionActor & { outcome: string | null }) | null
+  /** Approve/reject: the General Manager, or the Company Administrator in their place.
+   *  `remarks` are the approval remarks, or the rejection remarks on a rejection. */
+  review:     (DecisionActor & { outcome: string | null; remarks: string | null }) | null
   /** Who assigned the driver and vehicle. */
   assignment: DecisionActor | null
   /** A cancellation or Company Administrator rejection. */

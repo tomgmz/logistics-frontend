@@ -25,6 +25,7 @@ import { appToast } from '@/lib/toast'
 import { formatArrivalClock, formatArrivalWindow } from '@/lib/arrival-window'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { STOWAGE_FACTOR } from '@/lib/cargo/capacity'
+import DriverCallTime from './DriverCallTime'
 
 /**
  * How many runs the assigned vehicle makes, which drop-offs each serves, and
@@ -389,6 +390,14 @@ export default function TripPlanner({ detail, canEdit, capacity }: Props) {
         One vehicle, one or more runs. When the load is bigger than the body the same truck returns
         to the pickup point and goes out again with the rest — it is never crewed with a second vehicle.
       </p>
+
+      <DriverCallTime
+        bookingId={bookingId}
+        clientCallTime={detail.call_time}
+        driverCallTime={detail.driver_call_time}
+        canEdit={canEdit}
+        editable={(detail.status ?? '').toLowerCase() === 'assigned'}
+      />
 
       {loading ? (
         <p className="text-sm text-white/40">Loading the trip plan…</p>

@@ -35,6 +35,8 @@ export interface BookingDetail {
 
   schedule_date:  string
   call_time:      string
+  // When operations wants the driver at the pickup point; null = call_time.
+  driver_call_time?: string | null
   status:         string
 
   // Set while the driver has the delivery paused. The reason category is the

@@ -22,6 +22,8 @@ import TransactionRecord from '@/components/transactions/TransactionRecord'
 import { getStatusMeta } from '@/components/transactions/TransactionStatus'
 import { PANEL_BG, Tag } from '@/app/admin/booking-management/BookingDetailParts'
 import ProblemReportedBadge, { hasOpenClientIssue } from '@/components/transactions/ProblemReportedBadge'
+import ResubmittedBadge, { resubmissionsOf } from '@/components/transactions/ResubmittedBadge'
+import ResubmissionChanges from '@/components/transactions/ResubmissionChanges'
 import {
   formatDate, formatPeso, formatPesoExact, getCompanyName, getDropoffs,
 } from '@/components/transactions/transaction-format'
@@ -465,6 +467,7 @@ export default function TransactionHistoryView() {
                               {hasOpenClientIssue(b) && (
                                 <ProblemReportedBadge note={b.client_issue_note as string | null | undefined} />
                               )}
+                              <ResubmittedBadge count={resubmissionsOf(b)} />
                             </td>
                             <td className="whitespace-nowrap px-3 py-2.5 text-right font-semibold tabular-nums text-white/90">
                               {formatPeso(b.total_cost as number | null | undefined)}
@@ -509,6 +512,7 @@ export default function TransactionHistoryView() {
                     {hasOpenClientIssue(selected) && (
                       <ProblemReportedBadge className="" note={selected.client_issue_note as string | null | undefined} />
                     )}
+                    <ResubmittedBadge className="" count={resubmissionsOf(selected)} />
                     <Tag color={getStatusMeta(selected.status).color} size="md">
                       {getStatusMeta(selected.status).label}
                     </Tag>
@@ -520,6 +524,8 @@ export default function TransactionHistoryView() {
                 </div>
                 <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 pt-[18px] pb-6 space-y-[18px]">
                   <StaffTransactionDetail booking={selected} />
+                  <ResubmissionChanges key={`rev-${selected.booking_id as string}`} bookingId={selected.booking_id as string}
+                    resubmissionCount={resubmissionsOf(selected)} />
                   {/* Staff-only: crew, vehicle, proof photos, inspections, reports. */}
                   <TransactionRecord key={selected.booking_id as string} booking={selected} />
                   <StopTimesPanel key={`times-${selected.booking_id as string}`} bookingId={selected.booking_id as string} staff />

@@ -275,11 +275,14 @@ export const bookingService = {
     bookingId: string,
     status: AdminBookingLifecycleStatus,
     rejectionReason?: string,
+    // Required by the backend when this call approves a pending booking.
+    approvalRemarks?: string,
   ) => {
     await initCsrf()
     return patch<unknown>(`/booking/${bookingId}/status`, {
       status,
       ...(rejectionReason?.trim() && { rejection_reason: rejectionReason.trim() }),
+      ...(approvalRemarks?.trim() && { approval_remarks: approvalRemarks.trim() }),
     })
   },
 
@@ -289,11 +292,11 @@ export const bookingService = {
   },
 
   // --- approval workflow ---------------------------------------------------
-  // The general manager's decision is the only approval gate. A rejection must
-  // carry remarks, which the client sees on the booking.
+  // The general manager's decision is the only approval gate. Both decisions
+  // carry remarks, which the client sees in their transaction history.
   gmReview: async (
     bookingId: string,
-    payload: { gm_status: 'approved' | 'rejected'; rejection_reason?: string },
+    payload: { gm_status: 'approved' | 'rejected'; rejection_reason?: string; approval_remarks?: string },
   ) => {
     await initCsrf()
     return patch<unknown>(`/booking/${bookingId}/gm-review`, payload)
@@ -327,6 +330,10 @@ export const bookingService = {
   fetchBookingDocuments: (bookingId: string) =>
     get<ClientBookingDocument[]>(`/booking/${bookingId}/documents`),
 
+  // Both sides of every resubmission of a rejected booking, oldest first.
+  fetchBookingRevisions: (bookingId: string) =>
+    get<BookingRevision[]>(`/booking/${bookingId}/revisions`),
+
   // The times at each stop (arrival, docking, start, finish, departure) and the
   // total loaded per run. Correction notes are staff-only (admin route).
   fetchBookingTimeline: (bookingId: string) =>
@@ -338,4 +345,36 @@ export const bookingService = {
     )
     return data?.data ?? []
   },
+}
+/**
+ * One booking as the server's booking_snapshot() captured it: the request
+ * fields, drop-offs in order and cargo lines with catalogue names resolved. The
+ * "before" side also carries the rejection it received.
+ */
+export interface BookingSnapshot {
+  origin?:                 string | null
+  schedule_date?:          string | null
+  call_time?:              string | null
+  truck_type_needed?:      string | null
+  required_volume_cbm?:    number | null
+  required_weight_kg?:     number | null
+  required_length_cm?:     number | null
+  required_net_weight_kg?: number | null
+  stackable_required?:     boolean | null
+  non_stackable_cargo?:    boolean | null
+  transaction_documents?:  string[] | null
+  gm_status?:              string | null
+  rejection_reason?:       string | null
+  rejected_role?:          string | null
+  rejected_at?:            string | null
+  destinations?:           Record<string, unknown>[]
+  cargo_items?:            Record<string, unknown>[]
+}
+
+/** One resubmission: the booking before the client's corrections and as resubmitted. */
+export interface BookingRevision {
+  revision_number: number
+  before_snapshot: BookingSnapshot
+  after_snapshot:  BookingSnapshot
+  created_at:      string
 }

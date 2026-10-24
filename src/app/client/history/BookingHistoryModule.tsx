@@ -32,6 +32,8 @@ import CompletionPanel from '@/components/transactions/CompletionPanel'
 import BookingDocuments from '@/components/transactions/BookingDocuments'
 import { StatusBadge, getStatusMeta } from '@/components/transactions/TransactionStatus'
 import ProblemReportedBadge, { hasOpenClientIssue } from '@/components/transactions/ProblemReportedBadge'
+import ResubmittedBadge, { resubmissionsOf } from '@/components/transactions/ResubmittedBadge'
+import ResubmissionChanges from '@/components/transactions/ResubmissionChanges'
 import {
   formatDate, getDropoffs,
 } from '@/components/transactions/transaction-format'
@@ -213,6 +215,7 @@ function BookingCard({ booking, onSelect }: {
           {hasOpenClientIssue(booking) && (
             <ProblemReportedBadge className="" note={booking.client_issue_note as string | null | undefined} />
           )}
+          <ResubmittedBadge className="" count={resubmissionsOf(booking)} />
         </div>
         <StatusTag status={booking.status} />
       </div>
@@ -396,6 +399,7 @@ export default function BookingHistoryModule() {
             {hasOpenClientIssue(selected) && (
               <ProblemReportedBadge className="" note={selected.client_issue_note as string | null | undefined} />
             )}
+            <ResubmittedBadge className="" count={resubmissionsOf(selected)} />
             <StatusBadge status={selected.status} />
           </div>
         )}
@@ -664,6 +668,8 @@ export default function BookingHistoryModule() {
                 setBookings((prev) => prev.map((b) => (b.booking_id === next.booking_id ? next : b)))
               }} />
               <TransactionDetail booking={selected} showDocuments={false} />
+              <ResubmissionChanges key={`rev-${selected.booking_id as string}`} bookingId={selected.booking_id as string}
+                resubmissionCount={resubmissionsOf(selected)} />
               <StopTimesPanel key={`times-${selected.booking_id as string}`} bookingId={selected.booking_id as string} />
               <BookingDocuments key={selected.booking_id as string} bookingId={selected.booking_id as string} />
             </div>

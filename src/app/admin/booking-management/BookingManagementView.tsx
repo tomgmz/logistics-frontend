@@ -66,6 +66,8 @@ import VehiclePicker, { cargoSummaryFromBooking } from './VehiclePicker'
 import CompletionPanel from '@/components/transactions/CompletionPanel'
 import { formatPlateNumber, plateError } from '@/lib/validation/plate'
 import ProblemReportedBadge, { hasOpenClientIssue } from '@/components/transactions/ProblemReportedBadge'
+import ResubmittedBadge, { resubmissionsOf } from '@/components/transactions/ResubmittedBadge'
+import ResubmissionChanges from '@/components/transactions/ResubmissionChanges'
 import ReplaceCrewPanel from '@/components/transactions/ReplaceCrewPanel'
 import StopTimesPanel from '@/components/transactions/StopTimesPanel'
 import PausePanel from '@/components/transactions/PausePanel'
@@ -287,6 +289,8 @@ interface ListRow {
   /** True while the client's reported problem is unresolved. */
   issue_open: boolean
   issue_note: string | null
+  /** Times the client resubmitted it after a rejection. */
+  resubmissions: number
 }
 
 function toRows(raw: Record<string, unknown>[]): ListRow[] {
@@ -307,6 +311,7 @@ function toRows(raw: Record<string, unknown>[]): ListRow[] {
       pause_reason:      b.paused_at && typeof b.pause_reason === 'string' ? b.pause_reason : null,
       issue_open:        hasOpenClientIssue(b),
       issue_note:        typeof b.client_issue_note === 'string' ? b.client_issue_note : null,
+      resubmissions:     resubmissionsOf(b),
     }
   })
 }
@@ -1861,12 +1866,12 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     }
   }
 
-  const handleApprove = async () => {
+  const handleApprove = async (remarks: string) => {
     if (!selectedId || !detail) return
     setApproveModalOpen(false)
     setPendingStatus(true)
     try {
-      await bookingService.updateBookingStatusAdmin(selectedId, 'approved')
+      await bookingService.updateBookingStatusAdmin(selectedId, 'approved', undefined, remarks)
       setDetail({ ...detail, status: 'approved' })
       mergeListRow(selectedId, { status: 'approved' })
       appToast.success('Booking approved.', { action: 'booking-status', entityId: selectedId })
@@ -1903,11 +1908,13 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
 
   // The GM decision — the single approval gate. Approving routes the booking to
   // operations; rejecting cancels it and sends the remarks to the client. The
-  const handleGmReview = async (decision: 'approved' | 'rejected', remarks?: string) => {
+  const handleGmReview = async (decision: 'approved' | 'rejected', remarks: string) => {
     if (!selectedId) return
     if (decision === 'approved') setPendingStatus(true); else setPendingReject(true)
     try {
-      await bookingService.gmReview(selectedId, { gm_status: decision, rejection_reason: remarks })
+      await bookingService.gmReview(selectedId, decision === 'approved'
+        ? { gm_status: decision, approval_remarks: remarks }
+        : { gm_status: decision, rejection_reason: remarks })
       await refreshAfterAction()
       appToast.success(decision === 'approved' ? 'Approved — sent to the Operations Manager.' : 'Booking rejected.', { action: 'gm-review', entityId: selectedId })
     } catch (e) {
@@ -1919,10 +1926,10 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
 
   // Dispatch the generic Approve/Reject modals to the right stage. Both run from
   // a click, so `decidesGmStage` below is already initialised by then.
-  const confirmApprove = () => {
+  const confirmApprove = (remarks: string) => {
     setApproveModalOpen(false)
-    if (decidesGmStage) return void handleGmReview('approved')
-    return void handleApprove()
+    if (decidesGmStage) return void handleGmReview('approved', remarks)
+    return void handleApprove(remarks)
   }
   const confirmReject = (remarks: string) => {
     setRejectModalOpen(false)
@@ -2034,7 +2041,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
         <BookingDeepLink onFocus={openDetail} />
       </Suspense>
 
-      <ReusableModal
+      <RemarksModal
         open={approveModalOpen}
         title="Approve this booking?"
         description={
@@ -2045,11 +2052,17 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
             ? ' The Operations Manager will then be asked to select a vehicle and driver. This cannot be undone.'
             : ' Approving cannot be undone.')
         }
+        // Required on both paths (General Manager and Company Administrator).
+        // The client sees these in their transaction history, and staff see
+        // them on the Approvals card of the admin transaction history.
+        remarksLabel="Remarks"
+        remarksPlaceholder="e.g. Documents complete, schedule confirmed with the client…"
         confirmLabel="Approve"
         cancelLabel="Go back"
         onConfirm={confirmApprove}
         onCancel={() => setApproveModalOpen(false)}
         disableBackdropClose={pendingStatus}
+        busy={pendingStatus}
       />
 
       <RemarksModal
@@ -2200,6 +2213,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                               </span>
                               {r.pause_reason && <PausedBadge reason={r.pause_reason} />}
                               {r.issue_open && <ProblemReportedBadge note={r.issue_note} />}
+                              <ResubmittedBadge count={r.resubmissions} />
                             </td>
                             <td className="whitespace-nowrap text-white">{r.schedule_date ?? '—'}</td>
                             <td className="max-w-[180px] 3xl:max-w-[260px] truncate hidden md:table-cell text-white">{r.company ?? '—'}</td>
@@ -2243,7 +2257,10 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                   <span className="text-base font-bold uppercase text-[#818181]">Booking</span>
                   <div className="flex items-center gap-1.5 min-w-0">
                     {detail && !detailLoading && (
-                      <Tag color={statusColor(detail.status)} size="md">{fmtStatus(detail.status)}</Tag>
+                      <>
+                        <ResubmittedBadge className="" count={resubmissionsOf(detail)} />
+                        <Tag color={statusColor(detail.status)} size="md">{fmtStatus(detail.status)}</Tag>
+                      </>
                     )}
                     <button type="button" onClick={closeDetail} className="p-2 rounded-lg hover:bg-white/5 text-[#818181] hover:text-white transition-colors" aria-label="Close">
                       <X size={19} strokeWidth={2} />
@@ -2403,6 +2420,11 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
 
                       {/* Transaction documents */}
                       <TransactionDocs docs={d?.transaction_documents ?? []} />
+
+                      {/* What the client changed when resubmitting after a rejection,
+                          so the approver sees the old values next to the new. */}
+                      <ResubmissionChanges key={`rev-${detail.booking_id}`} bookingId={detail.booking_id}
+                        resubmissionCount={resubmissionsOf(detail)} />
 
                       {/* Booking status */}
                       <section className="space-y-3">

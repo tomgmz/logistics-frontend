@@ -3,7 +3,7 @@
 import { motion, Variants } from 'framer-motion'
 import {
   History, MapPin, Truck, Package, Calendar, Hash,
-  AlertCircle, Download, FileText,
+  AlertCircle, Download, FileText, MessageSquare,
 } from 'lucide-react'
 
 import type { BookingWithRelations } from '@/lib/store/slice/routeMap.slice'
@@ -228,6 +228,18 @@ export default function TransactionDetail({ booking, animated = true, showCrew =
         <SectionHeader icon={<History size={15} />} title="Booking Timeline" />
         <StatusTimeline booking={booking} />
       </div>
+
+      {/* The approver's remarks (General Manager or Company Administrator),
+          required on every approval since 2026-10-24; older bookings have none. */}
+      {typeof booking.approval_remarks === 'string' && booking.approval_remarks.trim() && (
+        <div className="rounded-xl border p-4 flex flex-col gap-3"
+          style={{ background: BG_PANEL, borderColor: BORDER }}>
+          <SectionHeader icon={<MessageSquare size={15} />} title="Approval Remarks" />
+          <p className="text-sm text-white/80 whitespace-pre-wrap break-words">
+            {booking.approval_remarks.trim()}
+          </p>
+        </div>
+      )}
 
       {/* Transaction documents (Cloudinary URLs) */}
       {showDocuments && docs.length > 0 && (

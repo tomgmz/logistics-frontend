@@ -411,12 +411,13 @@ function CargoLinesSection({ booking }: { booking: Booking }) {
   )
 }
 
-function DecisionCard({ stage, verb, actor, pendingLabel, note }: {
+function DecisionCard({ stage, verb, actor, pendingLabel, note, remarks }: {
   stage:        string
   verb:         string
   actor:        DecisionActor | null
   pendingLabel: string
   note?:        string | null
+  remarks?:     string | null
 }) {
   return (
     <Card>
@@ -431,6 +432,11 @@ function DecisionCard({ stage, verb, actor, pendingLabel, note }: {
             {actor.at ? ` · ${formatDateTime(actor.at)}` : ''}
           </span>
           {note && <span className="text-[11px]" style={{ color: AMBER }}>{note}</span>}
+          {remarks && (
+            <span className="text-[12px] text-white/80 whitespace-pre-wrap break-words">
+              <span className="font-semibold">Remarks:</span> {remarks}
+            </span>
+          )}
         </>
       ) : (
         <span className="text-[12px]" style={{ color: 'rgba(255,255,255,0.45)' }}>{pendingLabel}</span>
@@ -469,7 +475,7 @@ function ApprovalsSection({ approvals, booking }: { approvals: TransactionApprov
       {/* Turned down before any approval: the cancellation card says it all. */}
       {!(showCancel && !review && gmStatus !== 'approved') && (
         <DecisionCard stage="Approval" verb={rejected ? 'Rejected' : 'Approved'}
-          actor={review} pendingLabel={reviewPending} note={proxyNote} />
+          actor={review} pendingLabel={reviewPending} note={proxyNote} remarks={review?.remarks} />
       )}
       {!rejected && !(showCancel && !approvals.assignment) && (
         <DecisionCard stage="Operations Manager" verb="Driver and vehicle assigned"

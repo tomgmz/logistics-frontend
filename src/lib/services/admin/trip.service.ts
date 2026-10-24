@@ -109,6 +109,19 @@ export const tripService = {
     const { data } = await proxyApi.put<ApiResponse<Trip[]>>(`${B}/${bookingId}/trips`, { trips })
     return data.data
   },
+
+  /**
+   * When the driver should be at the pickup point (`HH:MM`, PH time), or null
+   * to follow the client's call time. Only before the delivery starts. The
+   * driver is reminded an hour ahead and may still start earlier.
+   */
+  setDriverCallTime: async (bookingId: string, driverCallTime: string | null) => {
+    await initCsrf()
+    const { data } = await proxyApi.put<ApiResponse<{ driver_call_time: string | null }>>(
+      `${B}/${bookingId}/driver-call-time`, { driver_call_time: driverCallTime },
+    )
+    return data.data.driver_call_time
+  },
 }
 
 /* ── Reading a plan ───────────────────────────────────────────────────────── */
