@@ -20,6 +20,7 @@ import type {
 } from '@/app/types/messaging/messaging.types'
 import { toMessage, PHOTO_PLACEHOLDER } from '@/app/types/messaging/messaging.types'
 import { roleLabel, nameWithRole } from '@/lib/roles'
+import ChatCallButton from '@/components/calls/ChatCallButton'
 
 interface ReplyTo { messageId: string; content: string; senderName: string }
 
@@ -253,6 +254,12 @@ export default function ChatWindow({ conversation, draftUser, currentUserId, isP
             )}
           </AnimatePresence>
         </div>
+        <ChatCallButton
+          conversationId={convId}
+          peerName={`${participant.first_name ?? ''} ${participant.last_name ?? ''}`.trim()}
+          peerRole={participant.role}
+          size={17}
+        />
       </div>
 
       {/* Messages */}

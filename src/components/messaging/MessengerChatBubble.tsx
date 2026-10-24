@@ -23,6 +23,7 @@ import { QuickReactBar } from './EmojiPicker'
 import MessageInput from './MessageInput'
 import MessageBubble from './MessageBubble'
 import { roleLabel, nameWithRole } from '@/lib/roles'
+import ChatCallButton from '@/components/calls/ChatCallButton'
 
 const BUBBLE_W   = 338
 const BUBBLE_GAP = 10
@@ -221,6 +222,14 @@ export default function MessengerChatBubble({ conversationId, index }: Props) {
         </div>
 
         <div className="flex items-center gap-0.5 shrink-0">
+          {participant && (
+            <ChatCallButton
+              conversationId={conversationId}
+              peerName={`${participant.first_name ?? ''} ${participant.last_name ?? ''}`.trim()}
+              peerRole={participant.role}
+              size={13}
+            />
+          )}
           <button type="button" onClick={() => minimizeChat(conversationId)} className="p-1.5 rounded-lg hover:bg-white/5 text-white/30 hover:text-white/60 transition-colors" aria-label="Minimize"><Minus size={12} /></button>
           <button type="button" onClick={() => closeChat(conversationId)} className="p-1.5 rounded-lg hover:bg-white/5 text-white/30 hover:text-red-400 transition-colors" aria-label="Close"><X size={12} /></button>
         </div>
