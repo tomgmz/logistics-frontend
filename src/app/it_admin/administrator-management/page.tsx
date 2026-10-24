@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  ShieldCheck as ShieldCheckIcon, UserPlus, UserRoundPlus, Search, MoreVertical, ChevronDown,
+  ShieldCheck as ShieldCheckIcon, UserPlus, UserRoundPlus, MoreVertical, ChevronDown,
   Pencil, Eye, ShieldCheck, ShieldOff, Archive, ArchiveRestore, SlidersHorizontal,
   AlertTriangle,
 } from 'lucide-react'
@@ -36,6 +36,8 @@ import ModuleSectionTabs, { type ModuleSection } from '@/components/admin/Module
 import { passwordResetService } from '@/lib/services/admin/password-reset.service'
 
 import RefreshButton from '@/components/ui/RefreshButton'
+import FilterBar, { type FilterValues } from '@/components/ui/FilterBar'
+import AccountActionConfirm, { statusConfirmCopy, type AccountConfirm } from '@/components/admin/AccountActionConfirm'
 type AdminMgmtTab = Extract<
   UserTab,
   'admins' | 'general-managers' | 'fleet-admins' | 'operations-admins'
@@ -111,8 +113,11 @@ const SERVICE_FOR_TAB = {
   'operations-admins': operationsAdminService,
 } as const
 
-// The archived view reads /admin/users?status=archived (the per-role lists hide
-// archived accounts).
+// Archived accounts come from /admin/users?status=archived (the per-role lists
+// hide them).
+
+// "Status: All" means every status, archived included.
+const ALL_STATUSES = 'active,inactive,deactivated,permanently_locked,archived'
 const ARCHIVED_ROLE: Record<AdminMgmtTab, string> = {
   admins:              'admin',
   'general-managers':  'general_manager',
@@ -160,11 +165,17 @@ function EmailText({ value }: { value: string | null | undefined }) {
 
 const STATUS_CFG: Record<UserStatus, { label: string; cls: string }> = {
   active:             { label: 'Active',      cls: 'bg-[#4df9ed]/[0.24] text-[#4df9ed] border-[#4df9ed]' },
-  inactive:           { label: 'Inactive',    cls: 'bg-[#818181]/20 text-[#818181] border-[#818181]'     },
+  inactive:           { label: 'Revoked',     cls: 'bg-[#818181]/20 text-[#818181] border-[#818181]'     },
   deactivated:        { label: 'Deactivated', cls: 'bg-[#ff7a30]/20 text-[#ff7a30] border-[#ff7a30]'     },
   archived:           { label: 'Archived',    cls: 'bg-[#ffea00]/20 text-[#ffea00] border-[#ffea00]'     },
   permanently_locked: { label: 'Locked',      cls: 'bg-[#f62626]/20 text-[#f62626] border-[#f62626]'     },
 }
+
+// The Status dropdown's choices, in the badge order. No Revoked (status 'inactive'): only a vendor
+// driver whose app access was revoked is ever Inactive, never a staff account.
+const STATUS_OPTIONS = (Object.keys(STATUS_CFG) as UserStatus[])
+  .filter((s) => s !== 'inactive')
+  .map((s) => ({ value: s, label: STATUS_CFG[s].label }))
 
 // Same Figma badge as the status column, in the fixed palette.
 const ROLE_COLORS: Record<string, string> = {
@@ -226,7 +237,7 @@ function RowMenu({ user, tab, onView, onEdit, onManageAccess, onStatusChange, lo
   }, [])
 
   const statusActions = ([
-    { label: 'Set Active', status: 'active'      as UserStatus, icon: <ShieldCheck size={13} /> },
+    { label: 'Activate',   status: 'active'      as UserStatus, icon: <ShieldCheck size={13} /> },
     { label: 'Deactivate', status: 'deactivated' as UserStatus, icon: <ShieldOff size={13} />   },
     { label: 'Archive',    status: 'archived'    as UserStatus, icon: <Archive size={13} />     },
   ]).filter((a) => a.status !== user.status)
@@ -400,23 +411,6 @@ function ArchivedRowMenu({ onView, onRestore, lockedBy }: {
   )
 }
 
-/** Shows the archived accounts instead of the current ones. */
-function ArchivedToggle({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
-  return (
-    <button
-      type="button"
-      onClick={() => onChange(!on)}
-      aria-pressed={on}
-      title={on ? 'Back to the current accounts' : 'Show archived accounts'}
-      className={`flex h-[34px] 3xl:h-[38px] items-center gap-1.5 whitespace-nowrap rounded-[10px] border px-3 text-[13px] 3xl:text-[15px] transition ${
-        on ? 'border-[#ffea00] bg-[#ffea00]/[0.15] text-[#ffea00]' : 'border-[#818181] bg-[#424242] text-[#818181] hover:text-white'
-      }`}
-    >
-      <Archive className="size-4" /> Archived
-    </button>
-  )
-}
-
 function EmptyState({ tab, onAdd, archived = false }: { tab: TabValue; onAdd: () => void; archived?: boolean }) {
   const label = tab === 'all' ? 'staff accounts' : TABS.find(t => t.key === tab)?.label.toLowerCase() ?? tab
   return (
@@ -500,12 +494,17 @@ export default function AdminManagementClient() {
   const [formViewOnly,     setFormViewOnly]     = useState(false)
   const [formTab,          setFormTab]          = useState<AdminMgmtTab>('admins')
   const [showTypePicker,   setShowTypePicker]   = useState(false)
+  // The confirm pop-up in front of Activate / Deactivate / Archive / Restore.
+  const [confirmAction,    setConfirmAction]    = useState<AccountConfirm | null>(null)
   const [permUser,         setPermUser]         = useState<AnyUser | null>(null)
   const userLocks = useRecordLocks('user')
-  // Archived view: the same tabs, listing archived accounts with a Restore action.
-  const [showArchived,     setShowArchived]     = useState(false)
-  const archivedRef = useRef(showArchived)
-  archivedRef.current = showArchived
+  // The Status dropdown: one status at a time; none picked is "Status: All", every
+  // status including archived. Archived rows get a Restore action.
+  const [statusFilter,     setStatusFilter]     = useState<FilterValues>([])
+  const statusPick   = statusFilter.find((r) => r.field === 'status')?.value ?? null
+  const showArchived = statusPick === 'archived'
+  const statusRef = useRef(statusPick)
+  statusRef.current = statusPick
   // The tab whose rows may land: a response for a tab (or view) already left is dropped.
   const currentTabRef = useRef<TabValue>(activeTab)
   currentTabRef.current = activeTab
@@ -542,13 +541,13 @@ export default function AdminManagementClient() {
       if (hard) setLoading(true); else setFetching(true)
       setError(null)
     }
-    const archived = archivedRef.current
+    const pick = statusRef.current
     try {
       const [result, statsResult] = await Promise.all([
-        userService.getAll({ search: searchQuery || undefined, role: ADMIN_ROLE_FILTER, status: archived ? 'archived' : undefined }),
+        userService.getAll({ search: searchQuery || undefined, role: ADMIN_ROLE_FILTER, status: pick ?? ALL_STATUSES }),
         userService.getStats(ADMIN_ROLE_FILTER)
       ])
-      if (currentTabRef.current !== 'all' || archivedRef.current !== archived) return
+      if (currentTabRef.current !== 'all' || statusRef.current !== pick) return
       setAllRows(result.data)
       setServerTotal(result.total)
       setServerTotalPages(Math.ceil(result.total / PAGE_SIZE))
@@ -569,15 +568,18 @@ export default function AdminManagementClient() {
       setError(null)
       setAllRows([])
     }
-    const archived = archivedRef.current
+    const pick = statusRef.current
+    const archivedRows = () => userService.getAll({ role: ARCHIVED_ROLE[tab], status: 'archived' }).then((r) => r.data)
     try {
       const [rows, statsResult] = await Promise.all([
-        archived
-          ? userService.getAll({ role: ARCHIVED_ROLE[tab], status: 'archived' }).then((r) => r.data)
-          : fetchByTab(tab),
+        pick === 'archived' ? archivedRows()
+          // One current status: the role's list (archived accounts are not in it), narrowed.
+          : pick ? fetchByTab(tab).then((list) => list.filter((u) => u.status === pick))
+          // All: current and archived together.
+          : Promise.all([fetchByTab(tab), archivedRows()]).then((lists) => lists.flat()),
         userService.getStats(ADMIN_ROLE_FILTER)
       ])
-      if (currentTabRef.current !== tab || archivedRef.current !== archived) return
+      if (currentTabRef.current !== tab || statusRef.current !== pick) return
       setAllRows(rows)
       setStats({ total: statsResult.total, active: statsResult.active, archived: statsResult.archived })
     } catch {
@@ -603,7 +605,7 @@ export default function AdminManagementClient() {
     if (isResetsTab || isPeopleTab) { setLoading(false); return }
     if (activeTab === 'all') fetchAllUsers('', true)
     else fetchTabUsers(activeTab)
-  }, [activeTab, isResetsTab, isPeopleTab, showArchived]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeTab, isResetsTab, isPeopleTab, statusPick]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (isResetsTab || activeTab !== 'all') return
@@ -637,42 +639,50 @@ export default function AdminManagementClient() {
     ? allRows
     : filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
-  async function handleStatusChange(user: AnyUser, status: UserStatus) {
+  function handleStatusChange(user: AnyUser, status: UserStatus) {
     const serviceTab = activeTab === 'all'
       ? tabFromRole(user.role)
       : activeTab
-    if (status === 'archived' && !window.confirm(
-      `Archive ${displayName(user)}?\n\n` +
-      'They are signed out everywhere and can no longer sign in. ' +
-      'Their records are kept, and you can restore the account from the Archived view.'
-    )) return
-    try {
-      await appToast.promise(
-        updateStatus(serviceTab, user.user_id, status),
-        {
-          loading: 'Updating account…',
-          success: `Status updated → ${STATUS_CFG[status].label}`,
-          error:   (e) => getApiErrorMessage(e, 'Failed to update account.'),
-        },
-        { action: 'update-status', entityId: user.user_id },
-      )
-      await refetchCurrentTab()
-    } catch { /* handled by toast */ }
+    // Every status change is confirmed in a pop-up first.
+    setConfirmAction({
+      ...statusConfirmCopy(displayName(user), status),
+      run: async () => {
+        try {
+          await appToast.promise(
+            updateStatus(serviceTab, user.user_id, status),
+            {
+              loading: 'Updating account…',
+              success: `Status updated → ${STATUS_CFG[status].label}`,
+              error:   (e) => getApiErrorMessage(e, 'Failed to update account.'),
+            },
+            { action: 'update-status', entityId: user.user_id },
+          )
+          await refetchCurrentTab()
+        } catch { /* handled by toast */ }
+      },
+    })
   }
 
-  async function handleRestore(user: AnyUser) {
-    try {
-      await appToast.promise(
-        SERVICE_FOR_TAB[tabFromRole(user.role)].restore(user.user_id),
-        {
-          loading: 'Restoring account…',
-          success: `${displayName(user)} restored and can sign in again.`,
-          error:   (e) => getApiErrorMessage(e, 'Failed to restore the account.'),
-        },
-        { action: 'restore-user', entityId: user.user_id },
-      )
-      await refetchCurrentTab()
-    } catch { /* handled by toast */ }
+  function handleRestore(user: AnyUser) {
+    setConfirmAction({
+      title:        `Restore ${displayName(user)}?`,
+      description:  'The account comes back as Active and they can sign in again.',
+      confirmLabel: 'Restore',
+      run: async () => {
+        try {
+          await appToast.promise(
+            SERVICE_FOR_TAB[tabFromRole(user.role)].restore(user.user_id),
+            {
+              loading: 'Restoring account…',
+              success: `${displayName(user)} restored and can sign in again.`,
+              error:   (e) => getApiErrorMessage(e, 'Failed to restore the account.'),
+            },
+            { action: 'restore-user', entityId: user.user_id },
+          )
+          await refetchCurrentTab()
+        } catch { /* handled by toast */ }
+      },
+    })
   }
 
   function openEdit(user: AnyUser, viewOnly = false) {
@@ -760,7 +770,8 @@ export default function AdminManagementClient() {
                 Management. The role filter belongs to the directory only: there
                 is nothing to filter by role in a queue. */}
             {!isResetsTab && (
-            <div className="flex flex-wrap items-center gap-3 3xl:gap-4 border-b border-[#424242] px-3 sm:px-4 3xl:px-5 py-2 3xl:py-2.5 shrink-0">
+            <FilterBar
+              leading={
               <FormControl size="small" sx={{ width: { xs: '100%', sm: 240 }, [FIGMA_MQ]: { width: 260 } }}>
                 <Select
                   value={activeTab}
@@ -826,22 +837,20 @@ export default function AdminManagementClient() {
                   ))}
                 </Select>
               </FormControl>
-
-              <div className="relative min-w-0 flex-1 sm:max-w-[360px] 3xl:max-w-[400px]">
-                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 3xl:size-[18px] -translate-y-1/2 text-[#818181]" />
-                <input
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  placeholder="Search name or email..."
-                  className="h-[34px] 3xl:h-[38px] w-full rounded-[10px] border border-[#818181] bg-[#424242] pl-9 3xl:pl-10 pr-4 text-[13px] 3xl:text-[15px] text-white placeholder-[#818181] outline-none transition focus:border-[#4df9ed]"
-                />
-              </div>
-              <RefreshButton iconOnly onClick={handleRefresh} loading={(loading || fetching)} disabled={loading || fetching} />
-              <ArchivedToggle on={showArchived} onChange={setShowArchived} />
-              <span className={`basis-full text-right sm:basis-auto sm:ml-auto text-[10px] 3xl:text-[11px] font-bold whitespace-nowrap ${showArchived ? 'text-[#ffea00]' : 'text-[#4df9ed]'}`}>
-                {total} {showArchived ? 'Archived ' : ''}{ACCOUNT_NOUN[activeTab]} Account{total !== 1 ? 's' : ''}
-              </span>
-            </div>
+              }
+              search={{ value: searchInput, onChange: setSearchInput, placeholder: 'Search name or email...' }}
+              // Same dropdown as Clients & Drivers: one status at a time, "Status: All" by default.
+              variant="dropdowns"
+              fields={[{ key: 'status', label: 'Status', single: true, options: STATUS_OPTIONS }]}
+              values={statusFilter}
+              onChange={setStatusFilter}
+              actions={<RefreshButton iconOnly onClick={handleRefresh} loading={(loading || fetching)} disabled={loading || fetching} />}
+              summary={
+                <span className={showArchived ? 'text-[#ffea00]' : 'text-[#4df9ed]'}>
+                  {total} {showArchived ? 'Archived ' : ''}{ACCOUNT_NOUN[activeTab]} Account{total !== 1 ? 's' : ''}
+                </span>
+              }
+            />
             )}
 
             {isResetsTab ? (
@@ -897,7 +906,7 @@ export default function AdminManagementClient() {
                           {renderCells(user)}
                           {/* The row menu sits at the far right of the table. */}
                           <td className="px-4 3xl:px-5 py-2 3xl:py-2.5 text-right">
-                            {showArchived ? (
+                            {user.status === 'archived' ? (
                               <ArchivedRowMenu
                                 onView={() => openEdit(user, true)}
                                 onRestore={() => handleRestore(user)}
@@ -939,7 +948,7 @@ export default function AdminManagementClient() {
           user={editUser}
           startInView={formViewOnly}
           // Same rule as the row menu: the combined list can't open the edit form.
-          canEdit={activeTab !== 'all' && !showArchived}
+          canEdit={activeTab !== 'all' && editUser?.status !== 'archived'}
           lockedBy={editUser ? userLocks.get(editUser.user_id) : undefined}
           enablePermissions
           onClose={() => setShowForm(false)}
@@ -949,6 +958,8 @@ export default function AdminManagementClient() {
           }}
         />
       )}
+
+      <AccountActionConfirm pending={confirmAction} onClose={() => setConfirmAction(null)} />
 
       <AccountTypePicker
         open={showTypePicker}

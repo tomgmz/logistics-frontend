@@ -453,7 +453,7 @@ function AccountsCard({ data, now }: { data: ItDashboardSummary['accounts']; now
             <tr className="bg-[#2a2a2a]/40 text-[10px] uppercase tracking-wider text-[#818181]">
               <th className="px-3 py-2 text-left font-semibold">Role</th>
               <th className="px-2 py-2 text-right font-semibold">Active</th>
-              <th className="px-2 py-2 text-right font-semibold">Inactive</th>
+              <th className="px-2 py-2 text-right font-semibold">Revoked</th>
               <th className="px-2 py-2 text-right font-semibold">Locked</th>
               <th className="px-3 py-2 text-right font-semibold">Archived</th>
             </tr>
@@ -514,7 +514,7 @@ function AccountsCard({ data, now }: { data: ItDashboardSummary['accounts']; now
                 <p className="truncate text-[#818181]">{a.email}</p>
               </div>
               <div className="shrink-0 text-right">
-                {a.status !== 'active' && <Pill label={a.status === 'inactive' ? 'Inactive' : 'Locked'} color={COLOR.amber} />}
+                {a.status !== 'active' && <Pill label={a.status === 'inactive' ? 'Revoked' : 'Locked'} color={COLOR.amber} />}
                 <p className={a.last_login_at ? 'text-[#818181]' : 'text-[#ffea00]'}
                    title={a.last_login_at ? formatDateTime(a.last_login_at) : undefined}>
                   {a.last_login_at ? ago(a.last_login_at, now) : 'Never signed in'}

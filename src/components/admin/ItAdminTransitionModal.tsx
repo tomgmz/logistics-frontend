@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Loader2, ShieldAlert, X } from 'lucide-react'
-import { RemarksModal } from '@/components/layout/ReusableModal'
-import { itAdminService, type ITAdminTransitionResult } from '@/lib/services/admin/user-management.service'
+import ReusableModal, { RemarksModal } from '@/components/layout/ReusableModal'
+import { itAdminService } from '@/lib/services/admin/user-management.service'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { validateForm } from '@/lib/validation/user-management.validation'
@@ -14,17 +14,18 @@ import PhoneInputRow, { attachCountryCode } from '@/components/ui/PhoneInputRow'
 import { blockPaste, confirmEmailError } from '@/lib/validation/fields'
 
 /**
- * The signed-in IT Admin hands their role to a successor.
+ * The IT Admin's handover form, two modes (2026-10-25):
  *
- * Deliberately not an "add user" form. The system permits exactly one IT Admin
- * holding the role, so the only way to change who holds it is a handover: the
- * successor's account is created and takes the role at once, and the outgoing
- * IT Admin (the person filling this in) stays active for a 30-day render period,
- * after which their account is deactivated automatically.
+ *   start — begin the 30-day render. The replacement's details are optional:
+ *           "I already have my replacement" adds them in the same step.
+ *   add   — add the replacement later, once one is found.
  *
- * Two steps on purpose. The first collects the successor's details; the second
- * makes the consequence unmissable — the role leaves you now and your account
- * closes in 30 days — and requires a reason that goes on the audit record.
+ * The replacement gets an emailed temporary password; the handover ends, and
+ * the outgoing account is archived, when they sign in and set their own. Until
+ * then the person filling this in stays the IT Administrator, even past 30 days.
+ *
+ * Every submit goes through a confirm pop-up first; starting also asks for a
+ * reason that goes on the audit record.
  */
 
 interface FormState {
@@ -65,15 +66,17 @@ function Field({
 
 export default function ItAdminTransitionModal({
   open,
+  mode,
   renderDays = 30,
   onClose,
   onDone,
 }: {
   open:        boolean
-  /** How long the outgoing account stays active, from the API. */
+  mode:        'start' | 'add'
+  /** The render target in days, from the API. */
   renderDays?: number
   onClose:     () => void
-  onDone:      (result: ITAdminTransitionResult) => void | Promise<void>
+  onDone:      () => void | Promise<void>
 }) {
   const me = useAuthStore((s) => s.user)
   const [form,       setForm]       = useState<FormState>(EMPTY)
@@ -81,11 +84,14 @@ export default function ItAdminTransitionModal({
   const [apiError,   setApiError]   = useState('')
   const [confirming, setConfirming] = useState(false)
   const [busy,       setBusy]       = useState(false)
+  // Start mode only: the replacement is already known, so add them now.
+  const [withSuccessor, setWithSuccessor] = useState(false)
+  const needsSuccessor = mode === 'add' || withSuccessor
 
   useBodyScrollLock(open || confirming)
 
   useEffect(() => {
-    if (!open) { setForm(EMPTY); setErrors({}); setApiError(''); setConfirming(false); setBusy(false) }
+    if (!open) { setForm(EMPTY); setErrors({}); setApiError(''); setConfirming(false); setBusy(false); setWithSuccessor(false) }
   }, [open])
 
   const set = (key: keyof FormState, value: string) => {
@@ -106,45 +112,55 @@ export default function ItAdminTransitionModal({
     phone:       form.phone ? attachCountryCode(form.phone) : '',
   })
 
-  /** Validate the successor's details, then move to the consequence. */
+  /** Validate the replacement's details (when given), then ask for confirmation. */
   const handleReview = () => {
-    // Reuses the same schema the create form uses, so a successor is held to
-    // exactly the standard any other IT Admin account is.
-    const found = validateForm('it-admins', false, payload())
-    const confirmError = confirmEmailError(form.email, form.confirm_email)
-    if (confirmError) found.confirm_email = confirmError
-    setErrors(found)
-    if (Object.keys(found).length > 0) return
+    if (needsSuccessor) {
+      // Same schema as any IT Admin account.
+      const found = validateForm('it-admins', false, payload())
+      const confirmError = confirmEmailError(form.email, form.confirm_email)
+      if (confirmError) found.confirm_email = confirmError
+      setErrors(found)
+      if (Object.keys(found).length > 0) return
+    }
     setConfirming(true)
   }
 
-  const handleConfirm = async (reason: string) => {
+  const submit = async (reason?: string) => {
+    if (mode === 'start' && (reason ?? '').trim().length < 10) {
+      appToast.error('Give a reason of at least 10 characters. It goes on the audit record.')
+      return
+    }
     setBusy(true); setApiError('')
     try {
-      const result = await appToast.promise(
-        itAdminService.transition({ ...payload(), reason }),
+      await appToast.promise(
+        mode === 'start'
+          ? itAdminService.startHandover({ reason: reason!.trim(), successor: needsSuccessor ? payload() : null })
+          : itAdminService.addSuccessor(payload()),
         {
-          loading: 'Handing over the IT Administrator role…',
-          success: `Role handed over. Your account stays active for ${renderDays} days.`,
-          error:   (e) => extractApiError(e).message || 'Handover failed.',
+          loading: mode === 'start' ? 'Starting the handover…' : 'Adding your replacement…',
+          success: mode === 'start' ? 'Handover started. Your render time has begun.' : 'Replacement added.',
+          error:   (e) => extractApiError(e).message || 'Something went wrong.',
         },
-        { action: 'it-admin-transition', entityId: me?.user_id },
+        { action: 'it-admin-handover', entityId: me?.user_id },
       )
       setConfirming(false)
-      await onDone(result)
+      await onDone()
       onClose()
-      // Said separately from the toast: the successor cannot sign in until they
-      // deal with this, and it is the one part nobody else can do for them.
-      appToast.info(
-        `${result.incoming.email} has been emailed a temporary password and must change it on first sign-in.`,
-      )
+      if (needsSuccessor) {
+        // Said separately: the replacement must act on this, and it is what ends the handover.
+        appToast.info(
+          `${payload().email} was emailed a temporary password. The handover ends when they sign in and set their own.`,
+        )
+      }
     } catch (err) {
       setConfirming(false)
-      setApiError(extractApiError(err).message || 'Handover failed.')
+      setApiError(extractApiError(err).message || 'Something went wrong.')
     } finally {
       setBusy(false)
     }
   }
+
+  const successorName = `${form.first_name.trim()} ${form.last_name.trim()}`.trim()
 
   return (
     <>
@@ -166,9 +182,13 @@ export default function ItAdminTransitionModal({
               {/* Header */}
               <div className="flex items-start justify-between gap-4 border-b border-[#2a2a2a] px-6 py-4">
                 <div>
-                  <h2 className="text-lg font-bold text-white">Hand Over IT Administrator Role</h2>
+                  <h2 className="text-lg font-bold text-white">
+                    {mode === 'start' ? 'Start the Handover' : 'Add Your Replacement'}
+                  </h2>
                   <p className="mt-0.5 text-[13px] text-[#818181]">
-                    Create the account of the person taking over from you.
+                    {mode === 'start'
+                      ? 'Begin your render time. Add your replacement now or once you have one.'
+                      : 'Create the account of the person taking over from you.'}
                   </p>
                 </div>
                 <button
@@ -185,13 +205,22 @@ export default function ItAdminTransitionModal({
                 <div className="flex gap-3 rounded-xl border border-yellow-500/25 bg-yellow-500/[0.07] px-4 py-3">
                   <ShieldAlert size={16} className="mt-0.5 shrink-0 text-yellow-400" />
                   <div className="text-[13px] leading-relaxed text-yellow-200/80">
-                    Your successor becomes the IT Administrator straight away. You keep your
-                    access for a <span className="font-semibold">{renderDays}-day render period</span> to
-                    hand over the work; after that your account is deactivated and signed out
-                    automatically. This cannot be started again once done.
+                    Your <span className="font-semibold">{renderDays}-day render time</span> starts
+                    {mode === 'start' ? ' now' : ' (already running)'}. You stay the IT Administrator until your
+                    replacement signs in and sets their own password; then your account is archived and
+                    signed out. With no replacement yet, you stay on past {renderDays} days.
                   </div>
                 </div>
 
+                {mode === 'start' && (
+                  <label className="flex cursor-pointer items-center gap-2.5 text-[13px] text-white">
+                    <input type="checkbox" checked={withSuccessor} onChange={(e) => setWithSuccessor(e.target.checked)}
+                      className="h-4 w-4 accent-[#4df9ed]" />
+                    I already have my replacement
+                  </label>
+                )}
+
+                {needsSuccessor && (
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <Field label="First Name" required error={errors.first_name}>
                     <input className={inputBase} value={form.first_name}
@@ -224,6 +253,7 @@ export default function ItAdminTransitionModal({
                       error={errors.phone} />
                   </Field>
                 </div>
+                )}
 
                 {apiError && (
                   <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[13px] text-red-300">
@@ -254,21 +284,33 @@ export default function ItAdminTransitionModal({
         )}
       </AnimatePresence>
 
-      {/* Step two: the consequence, and a reason for the record. */}
+      {/* Confirm first. Starting asks for a reason for the record. */}
       <RemarksModal
-        open={confirming}
-        title="Confirm the handover"
+        open={confirming && mode === 'start'}
+        title="Start the handover?"
         description={
-          `${form.first_name} ${form.last_name} (${form.email.trim().toLowerCase()}) becomes the IT Administrator now. ` +
-          `Your account stays active for ${renderDays} days, then it is deactivated and signed out automatically.`
+          `Your ${renderDays}-day render time starts now. ` +
+          (needsSuccessor
+            ? `${successorName} (${form.email.trim().toLowerCase()}) is emailed a temporary password; when they sign in and set their own, your account is archived.`
+            : 'Add your replacement when you have one; you stay the IT Administrator until they sign in and set their password.')
         }
         remarksLabel="Reason for the handover"
-        remarksPlaceholder="e.g. Resignation effective 30 November; successor onboarded."
-        confirmLabel="Hand Over Role"
+        remarksPlaceholder="e.g. Resignation effective 30 November."
+        confirmLabel="Start Handover"
         cancelLabel="Back"
         busy={busy}
         disableBackdropClose
-        onConfirm={handleConfirm}
+        onConfirm={(reason) => void submit(reason)}
+        onCancel={() => setConfirming(false)}
+      />
+      <ReusableModal
+        open={confirming && mode === 'add'}
+        title={`Add ${successorName || 'this person'} as your replacement?`}
+        description={`${form.email.trim().toLowerCase()} is emailed a temporary password. When they sign in and set their own, the handover ends and your account is archived.`}
+        confirmLabel={busy ? 'Adding…' : 'Add Replacement'}
+        cancelLabel="Back"
+        disableBackdropClose
+        onConfirm={() => void submit()}
         onCancel={() => setConfirming(false)}
       />
     </>

@@ -34,7 +34,11 @@ export interface FilterField {
   options: FilterOption[]
   /** One value at a time (date windows and the like): no "Is not". */
   single?: boolean
-  /** Dropdowns variant, single fields: the "nothing picked" entry ("Any time"). */
+  /**
+   * Dropdowns variant: the "nothing picked" entry at the top of every menu, and
+   * what the button reads after the label until something is picked
+   * ("Status: All", "Requested: Any time"). Default "All".
+   */
   anyLabel?: string
 }
 
@@ -187,7 +191,9 @@ function FieldDropdown({ field, values, onChange }: {
   }
 
   const firstLabel = field.options.find((o) => o.value === picked[0])?.label ?? picked[0]
-  const shownLabel = picked.length === 0 ? field.label
+  // Always "Label: value", so every dropdown reads the same way.
+  const anyLabel   = field.anyLabel ?? 'All'
+  const shownLabel = picked.length === 0 ? `${field.label}: ${anyLabel}`
     : picked.length === 1 ? `${field.label}: ${firstLabel}`
     : `${field.label}: ${picked.length} selected`
 
@@ -216,18 +222,17 @@ function FieldDropdown({ field, values, onChange }: {
         className="ff-regular w-[min(240px,calc(100vw-32px))] gap-0 rounded-xl border border-[#424242] bg-[#1b1b1b] p-1 text-white shadow-[0_20px_40px_rgba(0,0,0,0.6)] ring-0"
       >
         <div role="menu" aria-label={field.label} className="flex max-h-[min(50dvh,var(--radix-popover-content-available-height))] flex-col overflow-y-auto overscroll-contain">
-          {field.single && (
-            <button
-              type="button"
-              role="menuitemradio"
-              aria-checked={picked.length === 0}
-              onClick={() => { onChange(others); setOpen(false) }}
-              className={`${item} ${picked.length === 0 ? 'text-[#4df9ed]' : 'text-white'}`}
-            >
-              <Check className={`size-4 shrink-0 ${picked.length === 0 ? 'opacity-100' : 'opacity-0'}`} />
-              {field.anyLabel ?? 'Any'}
-            </button>
-          )}
+          {/* "All" (or "Any time"): nothing picked, the field doesn't narrow the list. */}
+          <button
+            type="button"
+            role="menuitemradio"
+            aria-checked={picked.length === 0}
+            onClick={() => { onChange(others); setOpen(false) }}
+            className={`${item} ${picked.length === 0 ? 'text-[#4df9ed]' : 'text-white'}`}
+          >
+            <Check className={`size-4 shrink-0 ${picked.length === 0 ? 'opacity-100' : 'opacity-0'}`} />
+            {anyLabel}
+          </button>
           {field.options.map((o) => {
             const on = picked.includes(o.value)
             return (

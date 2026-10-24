@@ -202,7 +202,10 @@ async function submitForm(
     case 'general-managers':  return editId ? generalManagerService.update(editId, clean as never).then(() => editId)   : generalManagerService.create(clean as never).then(newId)
     case 'fleet-admins':      return editId ? fleetAdminService.update(editId, clean as never).then(() => editId)       : fleetAdminService.create(clean as never).then(newId)
     case 'operations-admins': return editId ? operationsAdminService.update(editId, clean as never).then(() => editId)  : operationsAdminService.create(clean as never).then(newId)
-    case 'it-admins':         return editId ? itAdminService.update(editId, clean as never).then(() => editId)          : itAdminService.create(clean as never).then(newId)
+    // A new IT Admin only ever comes from the handover, never this form.
+    case 'it-admins':
+      if (!editId) throw new Error('A new IT Administrator is added through the handover on the IT Administrator dashboard.')
+      return itAdminService.update(editId, clean as never).then(() => editId)
   }
 }
 
@@ -1032,9 +1035,9 @@ export default function UserFormModal({
               <div className="rounded-xl border border-[#2a2a2a] bg-[#0f0f0f]/60 p-4">
                 <p className="text-[10px] font-bold tracking-[0.12em] uppercase text-[#4df9ed]">Module Access</p>
                 <p className="mt-1 mb-3 text-[11px] leading-snug text-[#818181]">
-                  Choose what this account can access on creation. The <b>Access</b> column makes a
-                  module visible (view-only); the rest add Create / Edit / Delete / Export. Leave all
-                  unchecked to keep default role access — you can change this later via Manage Access.
+                  Choose what this account can access on creation: <b>Read Only</b> (view &amp; export)
+                  or <b>Manage All</b> (view, create, edit, export &amp; archive). Leave all unchecked to
+                  keep default role access — you can change this later via Manage Access.
                 </p>
                 <ModulePermissionMatrix
                   modules={roleModules}

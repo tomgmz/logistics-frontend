@@ -1,9 +1,11 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { ArrowLeftRight, Clock } from 'lucide-react'
+import { ArrowLeftRight, Clock, Mail, UserPlus, UserX, XCircle } from 'lucide-react'
 import ItAdminTransitionModal from '@/components/admin/ItAdminTransitionModal'
+import ReusableModal from '@/components/layout/ReusableModal'
 import { itAdminService, type ITAdminHandoverStatus } from '@/lib/services/admin/user-management.service'
+import { extractApiError } from '@/lib/api-error'
 import { appToast } from '@/lib/toast'
 
 /** A moment as a Manila date, e.g. "Nov 23, 2026, 3:15 PM". */
@@ -14,20 +16,37 @@ function formatPh(iso: string) {
   })
 }
 
-function daysLeft(iso: string) {
-  return Math.max(0, Math.ceil((new Date(iso).getTime() - Date.now()) / 86_400_000))
+function daysBetween(fromMs: number, iso: string) {
+  return Math.ceil((new Date(iso).getTime() - fromMs) / 86_400_000)
 }
 
+interface PendingStep {
+  title:        string
+  description:  string
+  confirmLabel: string
+  run:          () => Promise<unknown>
+  success:      string
+}
+
+const BTN =
+  'flex w-full shrink-0 items-center justify-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium ' +
+  'transition-colors active:scale-[0.98] sm:w-auto disabled:opacity-40'
+
 /**
- * The IT Admin's handover, on their dashboard.
+ * The IT Admin's handover, on their dashboard (2026-10-25), one state at a time:
  *
- * While they hold the role: a way to hand it to a successor (resignation). Once
- * they have: how long their render period has left before the account closes.
- * Draws nothing until the status has loaded, and nothing if it cannot be read.
+ *   holding the role   → Start handover (the replacement now, or later)
+ *   rendering, no one  → render target / overdue, Add your replacement, Cancel
+ *   replacement added  → waiting for them to set a password, Resend, Replace, Cancel
+ *
+ * When the replacement sets their password the handover ends and this account
+ * is archived and signed out, so there is no "done" state to draw.
  */
 export default function ItAdminHandoverPanel() {
-  const [status, setStatus] = useState<ITAdminHandoverStatus | null>(null)
-  const [open,   setOpen]   = useState(false)
+  const [status,  setStatus]  = useState<ITAdminHandoverStatus | null>(null)
+  const [form,    setForm]    = useState<'start' | 'add' | null>(null)
+  const [pending, setPending] = useState<PendingStep | null>(null)
+  const [busy,    setBusy]    = useState(false)
 
   const load = useCallback(() => {
     itAdminService.handoverStatus().then(setStatus).catch(() => {})
@@ -35,61 +54,149 @@ export default function ItAdminHandoverPanel() {
 
   useEffect(() => { load() }, [load])
 
-  if (!status) return null
+  async function runStep(step: PendingStep) {
+    setPending(null)
+    setBusy(true)
+    try {
+      await step.run()
+      appToast.success(step.success)
+      load()
+    } catch (err) {
+      appToast.error(extractApiError(err).message || 'Something went wrong.')
+    } finally {
+      setBusy(false)
+    }
+  }
 
-  if (status.render_ends_at) {
-    const left = daysLeft(status.render_ends_at)
-    const successor = status.others.find((o) => !o.render_ends_at)
-    const successorName = successor
-      ? [successor.first_name, successor.last_name].filter(Boolean).join(' ') || successor.email
-      : null
+  if (!status) return null
+  const h = status.handover
+
+  const modals = (
+    <>
+      <ItAdminTransitionModal
+        open={form !== null}
+        mode={form ?? 'start'}
+        renderDays={status.render_days}
+        onClose={() => setForm(null)}
+        onDone={load}
+      />
+      <ReusableModal
+        open={!!pending}
+        title={pending?.title ?? ''}
+        description={pending?.description}
+        confirmLabel={pending?.confirmLabel ?? 'Confirm'}
+        cancelLabel="Back"
+        onCancel={() => setPending(null)}
+        onConfirm={() => { if (pending) void runStep(pending) }}
+      />
+    </>
+  )
+
+  // Holding the role, no handover.
+  if (!h) {
     return (
-      <div
-        role="status"
-        className="flex items-start gap-3 rounded-[10px] border border-[#ffea00]/40 bg-[#ffea00]/[0.07] px-4 py-3"
-      >
-        <Clock size={16} className="mt-0.5 shrink-0 text-[#ffea00]" />
-        <div className="min-w-0 text-[13px] leading-relaxed text-white/80">
-          <p className="font-semibold text-[#ffea00]">
-            Render period: {left === 0 ? 'ends today' : `${left} day${left === 1 ? '' : 's'} left`}
-          </p>
-          <p>
-            {successorName ? <>You handed the IT Administrator role to <span className="text-white">{successorName}</span>. </> : null}
-            Your account is deactivated and signed out on {formatPh(status.render_ends_at)}.
-          </p>
+      <>
+        <div className="flex flex-col gap-3 rounded-[10px] border border-[#424242] bg-[#1b1b1b] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0 text-[13px] leading-relaxed">
+            <p className="font-semibold text-white">Leaving the role?</p>
+            <p className="text-[#818181]">
+              Start the handover to begin your {status.render_days}-day render time. Add your replacement
+              now or once you have one; you stay the IT Administrator until they set their password.
+            </p>
+          </div>
+          <button type="button" onClick={() => setForm('start')}
+            className={`${BTN} border-[#4df9ed] text-[#4df9ed] [@media(hover:hover)]:hover:bg-[#4df9ed]/10`}>
+            Start Handover <ArrowLeftRight size={15} />
+          </button>
         </div>
-      </div>
+        {modals}
+      </>
     )
   }
 
+  const now      = Date.now()
+  const left     = daysBetween(now, h.render_due_at)
+  const s        = h.successor
+  const sName    = s ? [s.first_name, s.last_name].filter(Boolean).join(' ') || s.email : null
+  const tempLeft = s?.temp_password_expires_at ? daysBetween(now, s.temp_password_expires_at) : null
+
+  const cancel = () => setPending({
+    title:        'Cancel the handover?',
+    description:  s
+      ? `${sName}'s account is archived and you remain the IT Administrator. Your render time stops.`
+      : 'You remain the IT Administrator. Your render time stops.',
+    confirmLabel: 'Cancel Handover',
+    run:          () => itAdminService.cancelHandover(),
+    success:      'Handover cancelled. You remain the IT Administrator.',
+  })
+
   return (
     <>
-      <div className="flex flex-col gap-3 rounded-[10px] border border-[#424242] bg-[#1b1b1b] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0 text-[13px] leading-relaxed">
-          <p className="font-semibold text-white">Leaving the role?</p>
-          <p className="text-[#818181]">
-            Create your successor&apos;s account. They take over at once, and you stay active
-            for a {status.render_days}-day render period.
-          </p>
+      <div role="status"
+        className={`flex flex-col gap-3 rounded-[10px] border px-4 py-3 ${
+          h.overdue ? 'border-[#ff7a30]/50 bg-[#ff7a30]/[0.07]' : 'border-[#ffea00]/40 bg-[#ffea00]/[0.07]'
+        }`}>
+        <div className="flex items-start gap-3">
+          <Clock size={16} className={`mt-0.5 shrink-0 ${h.overdue ? 'text-[#ff7a30]' : 'text-[#ffea00]'}`} />
+          <div className="min-w-0 text-[13px] leading-relaxed text-white/80">
+            <p className={`font-semibold ${h.overdue ? 'text-[#ff7a30]' : 'text-[#ffea00]'}`}>
+              {h.overdue
+                ? `Render time overdue since ${formatPh(h.render_due_at)}`
+                : `Render time: ${left <= 0 ? 'ends today' : `${left} day${left === 1 ? '' : 's'} left`} (target ${formatPh(h.render_due_at)})`}
+            </p>
+            {s ? (
+              <p>
+                Waiting for <span className="text-white">{sName}</span> ({s.email}) to sign in and set a password.
+                {tempLeft !== null && (tempLeft > 0
+                  ? ` Their temporary password expires in ${tempLeft} day${tempLeft === 1 ? '' : 's'}.`
+                  : ' Their temporary password has expired: resend the sign-in email.')}
+                {' '}When they do, your account is archived and signed out.
+              </p>
+            ) : (
+              <p>No replacement yet. You stay the IT Administrator until one is added and sets their password.</p>
+            )}
+          </div>
         </div>
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="flex w-full shrink-0 items-center justify-center gap-2 rounded-lg border border-[#4df9ed] px-4 py-2 text-sm font-medium text-[#4df9ed] transition-colors active:scale-[0.98] sm:w-auto [@media(hover:hover)]:hover:bg-[#4df9ed]/10"
-        >
-          Hand Over IT Administrator Role <ArrowLeftRight size={15} />
-        </button>
-      </div>
 
-      <ItAdminTransitionModal
-        open={open}
-        renderDays={status.render_days}
-        onClose={() => setOpen(false)}
-        onDone={(result) => {
-          appToast.info(`Your account stays active until ${formatPh(result.outgoing.render_ends_at)}.`)
-          load()
-        }}
-      />
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+          {s ? (
+            <>
+              <button type="button" disabled={busy}
+                onClick={() => setPending({
+                  title:        `Resend ${sName}'s sign-in email?`,
+                  description:  'A new temporary password is emailed to them (valid 7 days). The old one stops working.',
+                  confirmLabel: 'Resend Email',
+                  run:          () => itAdminService.resendSuccessor(),
+                  success:      `A new sign-in email was sent to ${s.email}.`,
+                })}
+                className={`${BTN} border-[#4df9ed] text-[#4df9ed] [@media(hover:hover)]:hover:bg-[#4df9ed]/10`}>
+                <Mail size={15} /> Resend Sign-in Email
+              </button>
+              <button type="button" disabled={busy}
+                onClick={() => setPending({
+                  title:        `Replace ${sName}?`,
+                  description:  'Their account is archived before they confirm, so you can add a different replacement. Your render time keeps running.',
+                  confirmLabel: 'Replace',
+                  run:          () => itAdminService.replaceSuccessor(),
+                  success:      'Replacement removed. Add a different one when ready.',
+                })}
+                className={`${BTN} border-[#818181] text-[#818181] [@media(hover:hover)]:hover:text-white`}>
+                <UserX size={15} /> Replace
+              </button>
+            </>
+          ) : (
+            <button type="button" disabled={busy} onClick={() => setForm('add')}
+              className={`${BTN} border-[#4df9ed] text-[#4df9ed] [@media(hover:hover)]:hover:bg-[#4df9ed]/10`}>
+              <UserPlus size={15} /> Add Your Replacement
+            </button>
+          )}
+          <button type="button" disabled={busy} onClick={cancel}
+            className={`${BTN} border-[#f62626]/60 text-[#f62626] [@media(hover:hover)]:hover:bg-[#f62626]/10`}>
+            <XCircle size={15} /> Cancel Handover
+          </button>
+        </div>
+      </div>
+      {modals}
     </>
   )
 }

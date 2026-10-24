@@ -16,11 +16,11 @@ import FormControl from '@mui/material/FormControl'
 import { createTheme, ThemeProvider } from '@mui/material/styles'
 import type {
   UserTab, AnyUser, UserStatus,
-  ClientUser, DriverUser, AdminUser,
+  ClientUser, DriverUser,
 } from '@/app/types/admin/user-management.types'
 import {
   userService,
-  clientService, driverService, itAdminService,
+  clientService, driverService,
 } from '@/lib/services/admin/user-management.service'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
@@ -29,19 +29,21 @@ import AccountTypePicker, { type AccountTypeOption } from '@/components/admin/Ac
 import { useRecordLocks } from '@/lib/hooks/useRecordLock'
 import { RecordLockBadge } from '@/components/ui/RecordLockBanner'
 import { licenseExpiryState, needsLicenseUpdate } from '@/lib/license-expiry'
-import ModuleSectionTabs from '@/components/admin/ModuleSectionTabs'
 import { externalDriverService, type VendorDriverUser } from '@/lib/services/admin/external-driver.service'
 import { useModuleAccess, writeAccess } from '@/components/layout/ModuleAccess'
+import AccountActionConfirm, { statusConfirmCopy, type AccountConfirm } from '@/components/admin/AccountActionConfirm'
 
 import RefreshButton from '@/components/ui/RefreshButton'
 import FilterBar, {
   allowedValues, matchesFilter, optionsFrom, type FilterField, type FilterValues,
 } from '@/components/ui/FilterBar'
-type UserMgmtTab = Extract<UserTab, 'clients' | 'drivers' | 'it-admins'>
+// No IT Administrator tab: IT Administrators are the IT Administrator's own
+// business, and a new one is only made through their handover (2026-10-25).
+type UserMgmtTab = Extract<UserTab, 'clients' | 'drivers'>
 
 /**
  * Who is looking. The Company Administrator adds and edits clients and drivers;
- * since 2026-10-24 the IT Administrator owns their account status (Set Active,
+ * since 2026-10-24 the IT Administrator owns their account status (Activate,
  * Deactivate, Archive, Restore), vendor drivers' passkey access, and every
  * password reset. The IT Administrator's "Clients & Drivers" tab is this same
  * table in 'it-admin' mode: status and access actions only, no add or edit.
@@ -64,16 +66,14 @@ const TABS: { key: TabValue; label: string }[] = [
   { key: 'all',        label: 'All Users' },
   { key: 'clients',    label: 'Clients'   },
   { key: 'drivers',    label: 'Drivers'   },
-  { key: 'it-admins',  label: 'IT Administrator'  },
 ]
 
-type NewAccountType = 'clients' | 'company-driver' | 'vendor-driver' | 'it-admins'
+type NewAccountType = 'clients' | 'company-driver' | 'vendor-driver'
 
 const NEW_ACCOUNT_TYPES: AccountTypeOption<NewAccountType>[] = [
   { key: 'clients',        label: 'Client',                  hint: 'A company that books deliveries.' },
   { key: 'company-driver', label: 'Company Driver',          hint: '8338 Logistics driver. Signs in with a password.' },
   { key: 'vendor-driver',  label: 'Vendor Driver',           hint: 'Supplied by a vendor. Signs in with a passkey.' },
-  { key: 'it-admins',      label: 'IT Administrator',        hint: 'Runs the system. Only one can be active.' },
 ]
 
 const muiTheme = createTheme({
@@ -91,7 +91,6 @@ async function fetchByTab(tab: DirectoryTab): Promise<AnyUser[]> {
     case 'clients':   return clientService.getAll() as Promise<AnyUser[]>
     case 'drivers':   return driverService.getAll() as Promise<AnyUser[]>
     case 'vendor-drivers': return externalDriverService.list() as Promise<AnyUser[]>
-    case 'it-admins': return itAdminService.getAll() as unknown as Promise<AnyUser[]>
   }
 }
 
@@ -101,7 +100,6 @@ const ARCHIVED_ROLE: Record<DirectoryTab, string> = {
   clients:          'client',
   drivers:          'driver',
   'vendor-drivers': 'driver',
-  'it-admins':      'it_admin',
 }
 
 async function fetchArchivedByTab(tab: DirectoryTab): Promise<AnyUser[]> {
@@ -140,7 +138,6 @@ function displayName(u: AnyUser): string {
 
 function serviceForTab(tab: UserMgmtTab) {
   if (tab === 'clients')   return clientService
-  if (tab === 'it-admins') return itAdminService
   return driverService
 }
 
@@ -156,7 +153,6 @@ async function updateStatus(tab: UserMgmtTab, id: string, status: UserStatus): P
 
 function tabFromRole(role: string): UserMgmtTab {
   if (role === 'driver')   return 'drivers'
-  if (role === 'it_admin') return 'it-admins'
   return 'clients'
 }
 
@@ -212,17 +208,10 @@ function LastLogin({ iso }: { iso: string | null }) {
 
 const STATUS_CFG: Record<UserStatus, { label: string; cls: string }> = {
   active:             { label: 'Active',      cls: 'bg-[#4df9ed]/[0.24] text-[#4df9ed] border-[#4df9ed]' },
-  inactive:           { label: 'Inactive',    cls: 'bg-[#818181]/20 text-[#818181] border-[#818181]'     },
+  inactive:           { label: 'Revoked',     cls: 'bg-[#818181]/20 text-[#818181] border-[#818181]'     },
   deactivated:        { label: 'Deactivated', cls: 'bg-[#ff7a30]/20 text-[#ff7a30] border-[#ff7a30]'     },
   archived:           { label: 'Archived',    cls: 'bg-[#ffea00]/20 text-[#ffea00] border-[#ffea00]'     },
   permanently_locked: { label: 'Locked',      cls: 'bg-[#f62626]/20 text-[#f62626] border-[#f62626]'     },
-}
-
-/** When an outgoing IT Admin's render period ends, in Manila time. */
-function formatRenderEnd(iso: string) {
-  return new Date(iso).toLocaleDateString('en-US', {
-    timeZone: 'Asia/Manila', month: 'short', day: 'numeric', year: 'numeric',
-  })
 }
 
 function StatusBadge({ status }: { status: UserStatus }) {
@@ -260,11 +249,10 @@ function RowMenu({ user, tab, mode, onView, onEdit, onStatusChange, lockedBy }: 
   }, [])
 
   // A client's or driver's account status is the IT Administrator's to change.
-  // The Company Administrator keeps it only on the IT Administrator tab.
-  const ownsStatus = itMode || user.role === 'it_admin'
+  const ownsStatus = itMode
   const statusActions = ownsStatus
     ? ([
-        { label: 'Set Active', status: 'active'      as UserStatus, icon: <ShieldCheck size={13} /> },
+        { label: 'Activate',   status: 'active'      as UserStatus, icon: <ShieldCheck size={13} /> },
         { label: 'Deactivate', status: 'deactivated' as UserStatus, icon: <ShieldOff size={13} />   },
         { label: 'Archive',    status: 'archived'    as UserStatus, icon: <Archive size={13} />     },
       ]).filter((a) => a.status !== user.status)
@@ -397,8 +385,7 @@ function RevokedFlag({ user }: { user: VendorDriverUser }) {
 }
 
 /** The archived view's row menu: look at the account, or bring it back. */
-function ArchivedRowMenu({ user, mode, onView, onRestore, lockedBy }: {
-  user:      AnyUser
+function ArchivedRowMenu({ mode, onView, onRestore, lockedBy }: {
   mode:      UserManagementMode
   onView:    () => void
   onRestore: () => void
@@ -408,7 +395,7 @@ function ArchivedRowMenu({ user, mode, onView, onRestore, lockedBy }: {
   // Like archiving, a client or driver is restored by the IT Administrator.
   const { canDelete } = useModuleAccess()
   const itMode     = mode === 'it-admin'
-  const ownsStatus = itMode || user.role === 'it_admin'
+  const ownsStatus = itMode
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -472,9 +459,11 @@ function ArchivedRowMenu({ user, mode, onView, onRestore, lockedBy }: {
  * Actions for a vendor driver: the shared view/edit form, plus the access actions
  * a passkey-only account needs instead of a password reset.
  */
-function VendorRowMenu({ user, mode, onDone, onView, onEdit, lockedBy }: {
+function VendorRowMenu({ user, mode, onDone, onView, onEdit, confirm, lockedBy }: {
   user:      VendorDriverUser
   mode:      UserManagementMode
+  /** Opens the page's confirm pop-up; the action runs only once it is confirmed. */
+  confirm:   (action: AccountConfirm) => void
   onDone:    () => Promise<void> | void
   onView:    () => void
   onEdit:    () => void
@@ -521,21 +510,31 @@ function VendorRowMenu({ user, mode, onDone, onView, onEdit, lockedBy }: {
   )
 
   const revoke = () => {
-    if (!window.confirm(
-      `Revoke ${user.email}'s app access?\n\n` +
-      'Their passkeys stop working immediately and they are signed out. ' +
-      'You can restore access later; they will need to set up sign-in again.'
-    )) return
-    void run(
-      externalDriverService.revoke(user.user_id),
-      'Revoking access…', 'Access revoked.', 'Could not revoke access.',
-    )
+    setOpen(false)
+    confirm({
+      title:        `Revoke ${displayName(user)}'s app access?`,
+      description:  'Their passkeys stop working immediately and they are signed out. ' +
+                    'You can restore access later; they will need to set up sign-in again.',
+      confirmLabel: 'Revoke Access',
+      run: () => run(
+        externalDriverService.revoke(user.user_id),
+        'Revoking access…', 'Access revoked.', 'Could not revoke access.',
+      ),
+    })
   }
 
-  const restore = () => run(
-    externalDriverService.restore(user.user_id),
-    'Restoring access…', 'Access restored. A new setup link was sent.', 'Could not restore access.',
-  )
+  const restore = () => {
+    setOpen(false)
+    confirm({
+      title:        `Restore ${displayName(user)}'s app access?`,
+      description:  'Their account is turned back on and a new setup link is emailed to them.',
+      confirmLabel: 'Restore Access',
+      run: () => run(
+        externalDriverService.restore(user.user_id),
+        'Restoring access…', 'Access restored. A new setup link was sent.', 'Could not restore access.',
+      ),
+    })
+  }
 
   const item = 'flex w-full items-center gap-2.5 px-3.5 py-2 text-sm transition'
 
@@ -760,26 +759,6 @@ function renderCells(user: AnyUser, tab: TabValue) {
         </>
       )
     }
-    case 'it-admins': {
-      const name = [user.first_name, user.middle_name, user.last_name, user.suffix].filter(Boolean).join(' ') || '—'
-      return (
-        <>
-          <td className={TD_NAME}>{name}</td>
-          <td className={TD_MUTED}><EmailText value={user.email} /></td>
-          <td className={TD_MUTED}>{user.phone ?? '—'}</td>
-          <td className="px-4 3xl:px-5 py-2 3xl:py-2.5">
-            <StatusBadge status={user.status} />
-            {/* Handed the role over: still active until the render period ends. */}
-            {user.status === 'active' && (user as AdminUser).render_ends_at && (
-              <p className="mt-1 text-[11px] text-[#818181] whitespace-nowrap">
-                Leaving {formatRenderEnd((user as AdminUser).render_ends_at!)}
-              </p>
-            )}
-          </td>
-          <td className={TD_MUTED}><LastLogin iso={user.last_login_at ?? null} /></td>
-        </>
-      )
-    }
   }
 }
 
@@ -789,7 +768,6 @@ const ACCOUNT_NOUN: Record<TabValue, string> = {
   clients:          'Client',
   drivers:          'Company Driver',
   'vendor-drivers': 'Vendor Driver',
-  'it-admins':      'IT Administrator',
 }
 
 // The resets panel brings its own table, so only the directory tabs are here.
@@ -798,7 +776,6 @@ const HEADERS: Record<TabValue, string[]> = {
   clients:     ['Name', 'Email', 'Company', 'Status', 'Last Login'],
   drivers:     ['Name', 'License #', 'Expiry', 'Driver Status', 'Acct. Status'],
   'vendor-drivers': ['Name', 'Vendor', 'Email', 'Expiry', 'App Access', 'Acct. Status'],
-  'it-admins': ['Name', 'Email', 'Phone', 'Status', 'Last Login'],
 }
 
 // The Filters panel. Archived is a status like the rest (see ArchivedMode).
@@ -832,7 +809,12 @@ function humanize(v: string): string {
 
 /** Company, vendor and driver-status choices come from the accounts loaded. */
 function filterFields(tab: TabValue, rows: AnyUser[], archivedOnly: boolean): FilterField[] {
-  const status: FilterField[] = [{ key: 'status', label: 'Account Status', options: STATUS_OPTIONS }]
+  // Only a vendor driver whose app access was revoked is ever Inactive (shown as Revoked), so the
+  // option is offered only where vendor drivers are listed.
+  const statusOptions = tab === 'vendor-drivers' || tab === 'all'
+    ? STATUS_OPTIONS
+    : STATUS_OPTIONS.filter((o) => o.value !== 'inactive')
+  const status: FilterField[] = [{ key: 'status', label: 'Account Status', options: statusOptions }]
   const license: FilterField = { key: 'license', label: 'License', options: LICENSE_OPTIONS }
   switch (tab) {
     case 'all':
@@ -855,8 +837,6 @@ function filterFields(tab: TabValue, rows: AnyUser[], archivedOnly: boolean): Fi
         ...(archivedOnly ? [] : [{ key: 'access', label: 'App Access', options: ACCESS_OPTIONS }]),
         license,
       ]
-    case 'it-admins':
-      return status
   }
 }
 
@@ -880,7 +860,7 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
 }) {
   const itMode = mode === 'it-admin'
   // The IT Administrator's staff live on their own tab of their page.
-  const tabs = itMode ? TABS.filter((t) => t.key !== 'it-admins') : TABS
+  const tabs = TABS
 
   const [activeTab,        setActiveTab]        = useState<TabValue>('clients')
   const [allRows,          setAllRows]          = useState<AnyUser[]>([])
@@ -905,8 +885,11 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
   const [formTab,          setFormTab]          = useState<UserMgmtTab>('clients')
   const [formDriverSource, setFormDriverSource] = useState<DriverSource>('company')
   const [showTypePicker,   setShowTypePicker]   = useState(false)
+  // The confirm pop-up in front of Activate / Deactivate / Archive / Restore / Revoke.
+  const [confirmAction,    setConfirmAction]    = useState<AccountConfirm | null>(null)
   // Archived accounts are picked in the Status filter; their rows get a Restore action.
-  const archivedMode = archivedModeOf(filters)
+  // "Status: All" means every status, archived included.
+  const archivedMode: ArchivedMode = !filters.some((r) => r.field === 'status') ? 'both' : archivedModeOf(filters)
   const archivedRef = useRef(archivedMode)
   archivedRef.current = archivedMode
   // Only archived accounts on screen: the old "Archived view" wording and rules.
@@ -918,13 +901,6 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
   // Both driver tabs sit under the one "Drivers" entry in the role dropdown.
   const isDriverTab    = activeTab === 'drivers' || activeTab === 'vendor-drivers'
   const dropdownTab: TabValue = isDriverTab ? 'drivers' : activeTab
-  const isITAdminTab   = activeTab === 'it-admins'
-  // The system allows exactly one IT Admin holding the role (active, not in a
-  // render period), so that is the row that matters on this tab — the rest are
-  // predecessors, rendering or kept as records.
-  const activeITAdmin  = isITAdminTab
-    ? (allRows.find((u) => u.status === 'active' && !(u as AdminUser).render_ends_at) ?? null)
-    : null
 
   const isInitialAllFetch = useRef(true)
 
@@ -958,6 +934,7 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
     // This list is paged on the server, so its filters go there too.
     const role   = allowedValues(filtersRef.current, 'role', ['client', 'driver'])
     const status = allowedValues(filtersRef.current, 'status', CURRENT_STATUSES)
+      ?? [...CURRENT_STATUSES, 'archived']
     try {
       const [result, statsResult] = await Promise.all([
         userService.getAll({
@@ -1053,7 +1030,12 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
     ? allRows.filter((u) => needsLicenseUpdate((u as DriverUser).drivers?.license_expiry)).length
     : 0
 
+  // Both pages filter by account status only, in Untitled UI's dropdowns filter
+  // bar (the user's call, 2026-10-25). One status at a time, read "Status:
+  // Active"; "All" means every status, archived included.
   const filterDefs = filterFields(activeTab, allRows, showArchived)
+    .filter((f) => f.key === 'status')
+    .map((f) => ({ ...f, label: 'Status', single: true }))
   const licenseOnly = matchesFilter(filters, 'license', 'attention') && !matchesFilter(filters, 'license', 'ok')
 
   const applyFilters = (next: FilterValues) => {
@@ -1081,45 +1063,55 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
     ? allRows
     : filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
-  async function handleStatusChange(user: AnyUser, status: UserStatus) {
+  function handleStatusChange(user: AnyUser, status: UserStatus) {
     const serviceTab = activeTab === 'clients' || activeTab === 'drivers'
       ? activeTab
       : tabFromRole(user.role)
-    if (status === 'archived' && !window.confirm(
-      `Archive ${displayName(user)}?\n\n` +
-      'They are signed out everywhere and can no longer sign in. ' +
-      'Their records are kept, and you can restore the account from the Archived view.'
-    )) return
-    try {
-      await appToast.promise(
-        updateStatus(serviceTab, user.user_id, status),
-        {
-          loading: 'Updating account…',
-          success: `Status updated → ${STATUS_CFG[status].label}`,
-          error:   (e) => getApiErrorMessage(e, 'Failed to update account.'),
-        },
-        { action: 'update-status', entityId: user.user_id },
-      )
-      await refetchCurrentTab()
-    } catch { /* handled by toast */ }
+    // Every status change is confirmed in a pop-up first.
+    setConfirmAction({
+      ...statusConfirmCopy(displayName(user), status),
+      run: async () => {
+        try {
+          await appToast.promise(
+            updateStatus(serviceTab, user.user_id, status),
+            {
+              loading: 'Updating account…',
+              success: `Status updated → ${STATUS_CFG[status].label}`,
+              error:   (e) => getApiErrorMessage(e, 'Failed to update account.'),
+            },
+            { action: 'update-status', entityId: user.user_id },
+          )
+          await refetchCurrentTab()
+        } catch { /* handled by toast */ }
+      },
+    })
   }
 
-  async function handleRestore(user: AnyUser) {
+  function handleRestore(user: AnyUser) {
     const vendor = !!(user as DriverUser).drivers?.is_external
-    try {
-      await appToast.promise(
-        Promise.resolve<unknown>(serviceForTab(tabFromRole(user.role)).restore(user.user_id)),
-        {
-          loading: 'Restoring account…',
-          success: vendor
-            ? `${displayName(user)} restored. Send a new setup link from Vendor Drivers so they can sign in.`
-            : `${displayName(user)} restored and can sign in again.`,
-          error:   (e) => getApiErrorMessage(e, 'Failed to restore the account.'),
-        },
-        { action: 'restore-user', entityId: user.user_id },
-      )
-      await refetchCurrentTab()
-    } catch { /* handled by toast */ }
+    setConfirmAction({
+      title:        `Restore ${displayName(user)}?`,
+      description:  vendor
+        ? 'The account comes back as Active. Send them a new setup link from Vendor Drivers so they can sign in.'
+        : 'The account comes back as Active and they can sign in again.',
+      confirmLabel: 'Restore',
+      run: async () => {
+        try {
+          await appToast.promise(
+            Promise.resolve<unknown>(serviceForTab(tabFromRole(user.role)).restore(user.user_id)),
+            {
+              loading: 'Restoring account…',
+              success: vendor
+                ? `${displayName(user)} restored. Send a new setup link from Vendor Drivers so they can sign in.`
+                : `${displayName(user)} restored and can sign in again.`,
+              error:   (e) => getApiErrorMessage(e, 'Failed to restore the account.'),
+            },
+            { action: 'restore-user', entityId: user.user_id },
+          )
+          await refetchCurrentTab()
+        } catch { /* handled by toast */ }
+      },
+    })
   }
 
   function openEdit(user: AnyUser, viewOnly = false) {
@@ -1146,12 +1138,7 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
     setShowForm(true)
   }
 
-  // Only one IT Administrator may hold the role, and the seat is only known while
-  // its tab is open: offer it there when it is empty. A filled seat is handed
-  // over by the IT Administrator themselves, from their own portal.
-  const newAccountTypes = itMode ? [] : NEW_ACCOUNT_TYPES.filter(
-    (t) => t.key !== 'it-admins' || (isITAdminTab && !showArchived && !loading && !activeITAdmin),
-  )
+  const newAccountTypes = itMode ? [] : NEW_ACCOUNT_TYPES
 
   function handleRefresh() {
     void refetchCurrentTab()
@@ -1165,8 +1152,8 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
         <div className="flex flex-col lg:flex-1 lg:min-h-0 px-3 py-3 sm:px-4 lg:px-5 3xl:px-6 lg:pt-3 lg:pb-4 3xl:pb-5 gap-3 3xl:gap-4 lg:overflow-hidden">
 
           {/* Header */}
-          {/* As tall as the Add User button even when there is none (IT Administrator,
-              or a filled IT Administrator seat), so switching doesn't shift the page. */}
+          {/* As tall as the Add User button even when there is none (the IT
+              Administrator's view), so the page lines up the same way. */}
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 lg:min-h-8 3xl:min-h-9 shrink-0">
             <h1 className="font-[family-name:var(--font-alegreya-sc)] text-[17px] 3xl:text-[20px] font-bold text-white">User Management</h1>
             {/*
@@ -1174,7 +1161,7 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
               the IT Administrator hands the role over from their own portal. If it
               is somehow empty, creating one is exactly right.
             */}
-            {itMode || (isITAdminTab && (activeITAdmin || showArchived)) ? null : (
+            {itMode ? null : (
               <button
                 onClick={openCreate}
                 {...writeAccess(access.canCreate)}
@@ -1202,17 +1189,10 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
           {/* Table card */}
           <div className="flex flex-col lg:flex-1 lg:min-h-0 rounded-[10px] border-[0.5px] border-[#424242] bg-[#1b1b1b] shadow-[0_4px_4px_rgba(0,0,0,0.25)] lg:overflow-hidden">
 
-            {/* Password resets moved to the IT Administrator (2026-10-24), so the
-                Company Administrator's page keeps just the Users tab. */}
-            {sectionTabs ?? (
-              <ModuleSectionTabs
-                value="directory"
-                onChange={() => {}}
-                directoryLabel="Users"
-                showResets={false}
-                variant="large"
-              />
-            )}
+            {/* The IT Administrator's page passes its section tabs. The Company
+                Administrator's has no other section since password resets moved
+                to the IT Administrator (2026-10-24), so no tab row at all. */}
+            {sectionTabs}
 
             {/* The shared filter bar: the role dropdown (which picks the table),
                 search, Filters (Archived is a status there), refresh and the count, on one row as
@@ -1220,6 +1200,7 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
             <FilterBar
               search={{ value: searchInput, onChange: setSearchInput, placeholder: 'Search name or email...' }}
               fields={filterDefs}
+              variant="dropdowns"
               values={filters}
               onChange={applyFilters}
               actions={<RefreshButton iconOnly onClick={handleRefresh} loading={(loading || fetching)} disabled={loading || fetching} />}
@@ -1384,7 +1365,6 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
                           <td className="px-4 3xl:px-5 py-2 3xl:py-2.5 text-right">
                             {user.status === 'archived' ? (
                               <ArchivedRowMenu
-                                user={user}
                                 mode={mode}
                                 onView={() => openEdit(user, true)}
                                 onRestore={() => handleRestore(user)}
@@ -1394,6 +1374,7 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
                               <VendorRowMenu
                                 user={user as VendorDriverUser}
                                 mode={mode}
+                                confirm={setConfirmAction}
                                 onDone={refetchCurrentTab}
                                 onView={() => openEdit(user, true)}
                                 onEdit={() => openEdit(user)}
@@ -1445,6 +1426,8 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
           }}
         />
       )}
+
+      <AccountActionConfirm pending={confirmAction} onClose={() => setConfirmAction(null)} />
 
       <AccountTypePicker
         open={showTypePicker}

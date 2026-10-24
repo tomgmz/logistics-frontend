@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { AlertTriangle, MailCheck } from 'lucide-react'
 import Pagination from '@/components/ui/Pagination'
 import RefreshButton from '@/components/ui/RefreshButton'
-import FilterBar, { matchesFilter, optionsFrom, type FilterValues } from '@/components/ui/FilterBar'
+import FilterBar, { matchesFilter, type FilterValues } from '@/components/ui/FilterBar'
 import ReusableModal from '@/components/layout/ReusableModal'
 import { useModuleAccess } from '@/components/layout/ModuleAccess'
 import { appToast } from '@/lib/toast'
@@ -55,6 +55,12 @@ const PAGE_SIZE = 10
 
 const STATUS_OPTIONS = (Object.keys(STATUS_CFG) as ResetRequestStatus[])
   .map((s) => ({ value: s, label: STATUS_CFG[s].label }))
+
+// Every role that can ask for a reset, listed even before any of them has. Company
+// drivers reset by email link; vendor drivers have no password (passkey only), and
+// the IT Administrator resets their own by emailed code, so neither is here.
+const ROLE_OPTIONS = ['client', 'driver', 'admin', 'general_manager', 'operations_manager', 'fleet_manager']
+  .map((r) => ({ value: r, label: ROLE_LABELS[r] }))
 
 // "Requested" is one window at a time, counted back from now.
 const REQUESTED_WINDOWS: Record<string, number> = { '1d': 1, '7d': 7, '30d': 30 }
@@ -217,7 +223,7 @@ export default function PasswordResetQueue({
           search={{ value: search, onChange: (v) => { setSearch(v); setPage(1) }, placeholder: 'Search name or email...' }}
           fields={[
             { key: 'status',    label: 'Status',    options: STATUS_OPTIONS },
-            { key: 'role',      label: 'Role',      options: optionsFrom(rows.map((r) => r.requested_role), (v) => ROLE_LABELS[v] ?? v.replace(/_/g, ' ')) },
+            { key: 'role',      label: 'Role',      options: ROLE_OPTIONS },
             { key: 'requested', label: 'Requested', options: REQUESTED_OPTIONS, single: true, anyLabel: 'Any time' },
           ]}
           values={filters}

@@ -14,7 +14,7 @@ export const PERMISSION_ACTIONS: { key: keyof ModuleFlags; label: string }[] = [
   { key: 'can_view',   label: 'View'   },
   { key: 'can_create', label: 'Create' },
   { key: 'can_edit',   label: 'Edit'   },
-  { key: 'can_delete', label: 'Delete' },
+  { key: 'can_delete', label: 'Archive' },  // the flag behind every archive
   { key: 'can_export', label: 'Export' },
 ]
 

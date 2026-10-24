@@ -168,40 +168,51 @@ export const operationsAdminService = {
   restore:    (id: string) => post<AdminUser>(`${B}/operations-admins/${id}/restore`, {}),
 }
 
+// IT Administrators are the IT Administrator's own business. A new one is never
+// created directly: only through the handover below (2026-10-25).
 export const itAdminService = {
   getAll: () => get<AdminUser[]>(`${B}/it-admins`),
   getOne: (id: string) => get<AdminUser>(`${B}/it-admins/${id}`),
-  create: (p: CreateITAdminPayload) => post<AdminUser>(`${B}/it-admins`, p),
   update: (id: string, p: UpdateITAdminPayload) => patch<AdminUser>(`${B}/it-admins/${id}`, p),
   remove: (id: string) => del(`${B}/it-admins/${id}`),
   activate:   (id: string) => patch<AdminUser>(`${B}/it-admins/${id}/activate`),
   deactivate: (id: string) => patch<AdminUser>(`${B}/it-admins/${id}/deactivate`),
   restore:    (id: string) => post<AdminUser>(`${B}/it-admins/${id}/restore`, {}),
-  // The signed-in IT Admin hands their role to a successor created here. The
-  // outgoing account is the caller; it stays active for a 30-day render period.
-  // IT Admin only.
-  transition: (p: TransitionITAdminPayload) =>
-    post<ITAdminTransitionResult>(`${B}/it-admins/transition`, p),
+
   /** The signed-in IT Admin's place in a handover. */
   handoverStatus: () => get<ITAdminHandoverStatus>(`${B}/it-admins/handover`),
+  /** Start the 30-day render; with `successor`, also add them now. */
+  startHandover: (p: { reason: string; successor?: ITAdminSuccessorPayload | null }) =>
+    post<unknown>(`${B}/it-admins/handover/start`, p),
+  /** Add the replacement later (an account with an emailed temporary password). */
+  addSuccessor: (p: ITAdminSuccessorPayload) => post<AdminUser>(`${B}/it-admins/handover/successor`, p),
+  /** A new temporary password for the replacement, emailed again. */
+  resendSuccessor: () => post<unknown>(`${B}/it-admins/handover/successor/resend`, {}),
+  /** Archive the unconfirmed replacement so a different one can be added. */
+  replaceSuccessor: () => del(`${B}/it-admins/handover/successor`),
+  /** Stop the handover before anyone confirmed; the caller keeps the role. */
+  cancelHandover: () => post<unknown>(`${B}/it-admins/handover/cancel`, {}),
 }
 
-export interface TransitionITAdminPayload extends CreateITAdminPayload {
-  /** Why the handover is happening. Goes on the audit record. */
-  reason: string
-}
-
-export interface ITAdminTransitionResult {
-  outgoing: { user_id: string; email: string; status: string; render_ends_at: string }
-  incoming: AdminUser
-}
+/** The replacement IT Administrator's details. */
+export type ITAdminSuccessorPayload = Omit<CreateITAdminPayload, 'created_by'>
 
 export interface ITAdminHandoverStatus {
-  render_days:    number
-  /** Set once the caller has handed over: their account is deactivated then. */
-  render_ends_at: string | null
-  /** The other active IT Admins (the successor, or a predecessor rendering). */
-  others: { user_id: string; email: string; first_name: string | null; last_name: string | null; render_ends_at: string | null }[]
+  render_days: number
+  /** The caller's handover in progress, or null while they simply hold the role. */
+  handover: {
+    handover_id:   string
+    reason:        string
+    started_at:    string
+    /** The 30-day target. Past it the render is overdue; nothing closes on its own. */
+    render_due_at: string
+    overdue:       boolean
+    /** Added and waiting to set their password; null until one is added. */
+    successor: {
+      user_id: string; email: string; first_name: string | null; last_name: string | null
+      temp_password_expires_at: string | null
+    } | null
+  } | null
 }
 
 export interface VehicleEligibility {
