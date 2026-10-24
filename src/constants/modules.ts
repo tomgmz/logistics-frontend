@@ -28,7 +28,7 @@ export const ALL_FLAGS: ModuleFlags = {
 // Tiered access model shown in the Administrator Management matrix. The 5 granular
 // flags above remain the source of truth in the DB + backend guard; these two
 // mutually-exclusive levels are just how an IT Admin assigns them:
-//   Read Only  -> view only
+//   Read Only  -> view + export
 //   Manage All -> view + create + edit + export + delete
 export type AccessLevel = 'none' | 'read' | 'all'
 
@@ -40,17 +40,18 @@ export const ACCESS_LEVELS: { key: Exclude<AccessLevel, 'none'>; label: string }
 // Expand a level into the concrete flag set persisted to module_permissions.
 export function levelToFlags(level: AccessLevel): ModuleFlags {
   switch (level) {
-    case 'read':   return { can_view: true, can_create: false, can_edit: false, can_delete: false, can_export: false }
+    case 'read':   return { can_view: true, can_create: false, can_edit: false, can_delete: false, can_export: true }
     case 'all':    return { ...ALL_FLAGS }
     default:       return { ...EMPTY_FLAGS }
   }
 }
 
 // Collapse an arbitrary flag set back into a level. Tolerant of older rows saved
-// under the retired "Manage" tier (no delete): any write/export flag => Manage All.
+// under the retired "Manage" tier (no delete): any write flag => Manage All.
+// Export alone is Read Only, which includes it.
 export function flagsToLevel(f: ModuleFlags): AccessLevel {
   if (!f.can_view) return 'none'
-  if (f.can_create || f.can_edit || f.can_delete || f.can_export) return 'all'
+  if (f.can_create || f.can_edit || f.can_delete) return 'all'
   return 'read'
 }
 
