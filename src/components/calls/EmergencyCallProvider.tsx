@@ -3,30 +3,27 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Room, RoomEvent, Track, type RemoteTrack } from 'livekit-client'
-import { APIProvider, Map, AdvancedMarker } from '@vis.gl/react-google-maps'
-import { Phone, PhoneOff, Mic, MicOff, Minimize2, Maximize2, MapPin, Gauge, Truck } from 'lucide-react'
+import { AlertCircle, Phone, PhoneOff, Mic, MicOff } from 'lucide-react'
 
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/lib/store/auth.store'
-import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 import { emergencyCallService, type IncomingCall } from '@/lib/services/emergencyCall.service'
 import { useRingtone, useTitleFlash, useElapsed } from './callHooks'
+import { CallAlert, CallCircleButton } from './CallAlert'
 
 /**
  * The driver's in-app emergency call, on the staff side.
  *
  * Mounted once in the dashboard shell for Operations Managers and Company
- * Administrators. When a driver calls, every rung browser shows a full-screen
- * ringer with the driver's position on a map, so whoever answers already knows
- * where the truck is. The first to press Answer gets the call; the others are
- * told by the server and their ringers close.
+ * Administrators. When a driver calls, every rung browser shows a red floating
+ * alert (CallAlert) with the incident, where the truck is and a Google Maps
+ * link, so whoever answers already knows where it is. The first to press
+ * Answer gets the call; the others are told by the server and their ringers
+ * close.
  *
  * Decline only silences this browser. The other managers keep ringing, and the
  * driver's phone falls back to a normal call if nobody answers.
  */
-
-const GOOGLE_MAPS_KEY    = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!
-const GOOGLE_MAPS_MAP_ID = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID!
 
 /** A ringer older than this is dropped even if no close event arrived. */
 const RING_MAX_MS = 90_000
@@ -62,7 +59,6 @@ export default function EmergencyCallProvider() {
   const [active,    setActive]    = useState<ActiveCall | null>(null)
   const [answering, setAnswering] = useState<string | null>(null)
   const [ringError, setRingError] = useState<string | null>(null)
-  const [minimised, setMinimised] = useState(false)
 
   const roomRef     = useRef<Room | null>(null)
   const audioHost   = useRef<HTMLDivElement | null>(null)
@@ -129,7 +125,6 @@ export default function EmergencyCallProvider() {
     try {
       const { url, token, call: fresh } = await emergencyCallService.answer(call.call_id)
       dropRinging(call.call_id)
-      setMinimised(false)
       setActive({ call: fresh ?? call, phase: 'connecting', muted: false, startedAt: null, note: null })
 
       const room = new Room({ adaptiveStream: false, dynacast: false })
@@ -189,10 +184,9 @@ export default function EmergencyCallProvider() {
     } catch {}
   }, [active])
 
-  const ringingNow  = !active ? ringing[0] ?? null : null
-  const panelOpen   = !!ringingNow || (!!active && !minimised)
+  const ringingNow = !active ? ringing[0] ?? null : null
+  const elapsed    = useElapsed(active?.phase === 'live' ? active.startedAt : null)
 
-  useBodyScrollLock(panelOpen)
   useRingtone(!!ringingNow)
   useTitleFlash(ringingNow ? 'EMERGENCY CALL' : null)
 
@@ -204,84 +198,78 @@ export default function EmergencyCallProvider() {
       <div ref={audioHost} className="hidden" aria-hidden="true" />
 
       {ringingNow && (
-        <CallSheet
-          call={ringingNow}
-          heading="Incoming emergency call"
-          extraCount={ringing.length - 1}
-          error={ringError}
-          footer={(
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => decline(ringingNow)}
-                disabled={!!answering}
-                className="flex items-center justify-center gap-2 rounded-xl border border-white/15 py-3 text-sm font-bold text-white/70 disabled:opacity-50"
-              >
-                <PhoneOff size={16} /> Decline
-              </button>
-              <button
-                type="button"
+        <CallAlert
+          color="error"
+          icon={AlertCircle}
+          priority
+          pulse
+          label={`Emergency call from ${ringingNow.driver_name}`}
+          title={`Emergency call · ${ringingNow.driver_name}`}
+          description={(
+            <>
+              <CallDetails call={ringingNow} />
+              {ringing.length > 1 && (
+                <p className="text-[#ffea00]">
+                  {ringing.length - 1} more emergency {ringing.length === 2 ? 'call is' : 'calls are'} waiting.
+                </p>
+              )}
+              {ringError && <p className="text-[#ff7a30]">{ringError}</p>}
+            </>
+          )}
+          links={<CallLinks call={ringingNow} />}
+          actions={(
+            <>
+              <CallCircleButton
+                kind="answer"
+                icon={Phone}
+                label={answering === ringingNow.call_id ? 'Connecting…' : 'Answer'}
                 onClick={() => void answer(ringingNow)}
                 disabled={!!answering}
-                className="flex items-center justify-center gap-2 rounded-xl border border-[#3af626] bg-[#3af626]/20 py-3 text-sm font-bold text-[#3af626] disabled:opacity-60"
-              >
-                <Phone size={16} /> {answering === ringingNow.call_id ? 'Connecting…' : 'Answer'}
-              </button>
-            </div>
+                busy={answering === ringingNow.call_id}
+              />
+              <CallCircleButton
+                kind="decline"
+                icon={PhoneOff}
+                label="Decline"
+                onClick={() => decline(ringingNow)}
+                disabled={!!answering}
+              />
+            </>
           )}
         />
       )}
 
-      {active && !minimised && (
-        <CallSheet
-          call={active.call}
-          heading={
+      {active && (
+        <CallAlert
+          color="error"
+          icon={AlertCircle}
+          priority
+          label={`Emergency call with ${active.call.driver_name}`}
+          title={`${
             active.phase === 'connecting' ? 'Connecting…'
-            : active.phase === 'live'     ? 'On call'
+            : active.phase === 'live'     ? `On call · ${elapsed}`
             : 'Call ended'
-          }
-          timer={active.phase === 'live' ? active.startedAt : null}
-          error={active.note}
-          reportHref={reportHref(user?.role, active.call.report_id)}
-          onMinimise={active.phase !== 'ended' ? () => setMinimised(true) : undefined}
-          footer={active.phase === 'ended' ? (
-            <button
-              type="button"
-              onClick={() => setActive(null)}
-              className="w-full rounded-xl border border-white/15 py-3 text-sm font-bold text-white/80"
-            >
-              Close
-            </button>
-          ) : (
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
+          } · ${active.call.driver_name}`}
+          description={(
+            <>
+              <CallDetails call={active.call} />
+              {active.note && <p className="text-[#ff7a30]">{active.note}</p>}
+            </>
+          )}
+          links={<CallLinks call={active.call} reportHref={reportHref(user?.role, active.call.report_id)} />}
+          onClose={active.phase === 'ended' ? () => setActive(null) : undefined}
+          actions={active.phase === 'ended' ? undefined : (
+            <>
+              <CallCircleButton
+                kind="plain"
+                icon={active.muted ? MicOff : Mic}
+                label={active.muted ? 'Unmute' : 'Mute'}
                 onClick={() => void toggleMute()}
                 disabled={active.phase !== 'live'}
-                className="flex items-center justify-center gap-2 rounded-xl border border-white/15 py-3 text-sm font-bold text-white/80 disabled:opacity-50"
-              >
-                {active.muted ? <><MicOff size={16} /> Unmute</> : <><Mic size={16} /> Mute</>}
-              </button>
-              <button
-                type="button"
-                onClick={hangUp}
-                className="flex items-center justify-center gap-2 rounded-xl border border-[#f62626] bg-[#f62626]/20 py-3 text-sm font-bold text-[#f62626]"
-              >
-                <PhoneOff size={16} /> Hang up
-              </button>
-            </div>
+              />
+              <CallCircleButton kind="decline" icon={PhoneOff} label="Hang up" onClick={hangUp} />
+            </>
           )}
-        />
-      )}
-
-      {active && minimised && active.phase !== 'ended' && (
-        <MiniCallBar
-          name={active.call.driver_name}
-          startedAt={active.startedAt}
-          muted={active.muted}
-          onExpand={() => setMinimised(false)}
-          onMute={() => void toggleMute()}
-          onHangUp={hangUp}
         />
       )}
     </>
@@ -290,144 +278,36 @@ export default function EmergencyCallProvider() {
 
 /* ── Pieces ──────────────────────────────────────────────────────────────── */
 
-function CallSheet({
-  call, heading, extraCount = 0, timer = null, error, reportHref, onMinimise, footer,
-}: {
-  call:        IncomingCall
-  heading:     string
-  extraCount?: number
-  timer?:      number | null
-  error?:      string | null
-  reportHref?: string | null
-  onMinimise?: () => void
-  footer:      React.ReactNode
-}) {
-  const elapsed = useElapsed(timer)
-  const hasFix  = call.latitude != null && call.longitude != null
-  const where   = hasFix ? { lat: call.latitude!, lng: call.longitude! } : null
-
+function CallDetails({ call }: { call: IncomingCall }) {
+  const facts = [
+    call.plate_number,
+    call.speed_kmh != null ? `${Math.round(call.speed_kmh)} km/h` : null,
+  ].filter(Boolean).join(' · ')
   return (
-    <div
-      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/75 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label={heading}
-    >
-      <div className="flex w-full max-w-md max-h-[90dvh] flex-col overflow-hidden rounded-2xl border border-[#f62626]/50 bg-[var(--color-surface)] shadow-2xl">
-        <div className="flex items-start justify-between gap-3 border-b border-white/[0.07] px-4 py-3">
-          <div className="min-w-0">
-            <p className="text-[11px] font-bold uppercase tracking-widest text-[#f62626]">
-              {heading}{timer ? ` · ${elapsed}` : ''}
-            </p>
-            <h2 className="truncate text-lg font-bold text-white">{call.driver_name}</h2>
-            <p className="truncate text-xs text-white/50">
-              {call.incident}{call.booking_ref ? ` · ${call.booking_ref}` : ''}
-            </p>
-          </div>
-          {onMinimise && (
-            <button
-              type="button"
-              onClick={onMinimise}
-              className="shrink-0 rounded-lg p-2 text-white/50"
-              aria-label="Minimise the call"
-            >
-              <Minimize2 size={16} />
-            </button>
-          )}
-        </div>
-
-        <div className="min-h-0 space-y-3 overflow-y-auto p-4">
-          <div className="h-44 overflow-hidden rounded-xl border border-white/10 bg-black/30 sm:h-52">
-            {where ? (
-              <APIProvider apiKey={GOOGLE_MAPS_KEY}>
-                <Map
-                  mapId={GOOGLE_MAPS_MAP_ID}
-                  defaultCenter={where}
-                  defaultZoom={15}
-                  gestureHandling="cooperative"
-                  disableDefaultUI
-                  colorScheme="DARK"
-                  style={{ width: '100%', height: '100%' }}
-                >
-                  <AdvancedMarker position={where} />
-                </Map>
-              </APIProvider>
-            ) : (
-              <div className="flex h-full items-center justify-center px-4 text-center text-xs text-white/40">
-                The phone sent no position with this alert.
-              </div>
-            )}
-          </div>
-
-          <ul className="space-y-1.5 text-sm text-white/80">
-            {call.address && (
-              <li className="flex gap-2"><MapPin size={15} className="mt-0.5 shrink-0 text-white/40" /><span className="min-w-0 break-words">{call.address}</span></li>
-            )}
-            {call.plate_number && (
-              <li className="flex gap-2"><Truck size={15} className="mt-0.5 shrink-0 text-white/40" />{call.plate_number}</li>
-            )}
-            {call.speed_kmh != null && (
-              <li className="flex gap-2"><Gauge size={15} className="mt-0.5 shrink-0 text-white/40" />{Math.round(call.speed_kmh)} km/h when the alert was sent</li>
-            )}
-            {where && (
-              <li>
-                <a
-                  href={`https://www.google.com/maps/search/?api=1&query=${where.lat},${where.lng}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-xs text-[var(--color-cyan)]"
-                >
-                  Open in Google Maps
-                </a>
-              </li>
-            )}
-            {reportHref && (
-              <li>
-                <Link href={reportHref} className="text-xs text-[var(--color-cyan)]">Open the report</Link>
-              </li>
-            )}
-          </ul>
-
-          {extraCount > 0 && (
-            <p className="text-xs text-[#ffea00]">
-              {extraCount} more emergency {extraCount === 1 ? 'call is' : 'calls are'} waiting.
-            </p>
-          )}
-          {error && <p className="text-xs text-[#ff7a30]">{error}</p>}
-        </div>
-
-        <div className="border-t border-white/[0.07] p-4">{footer}</div>
-      </div>
-    </div>
+    <>
+      <p>{call.incident}{call.booking_ref ? ` · ${call.booking_ref}` : ''}</p>
+      {call.address && <p className="break-words">{call.address}</p>}
+      {facts && <p>{facts}</p>}
+    </>
   )
 }
 
-function MiniCallBar({
-  name, startedAt, muted, onExpand, onMute, onHangUp,
-}: {
-  name:      string
-  startedAt: number | null
-  muted:     boolean
-  onExpand:  () => void
-  onMute:    () => void
-  onHangUp:  () => void
-}) {
-  const elapsed = useElapsed(startedAt)
+function CallLinks({ call, reportHref }: { call: IncomingCall; reportHref?: string | null }) {
+  const hasFix = call.latitude != null && call.longitude != null
+  if (!hasFix && !reportHref) return null
   return (
-    <div className="fixed bottom-4 left-4 right-4 z-[80] flex items-center gap-2 rounded-2xl border border-[#f62626]/50 bg-[var(--color-surface)] px-3 py-2 shadow-2xl sm:left-auto sm:w-96">
-      <button type="button" onClick={onExpand} className="flex min-w-0 flex-1 items-center gap-2 text-left" aria-label="Show the call">
-        <Maximize2 size={15} className="shrink-0 text-white/50" />
-        <span className="min-w-0">
-          <span className="block truncate text-sm font-bold text-white">{name}</span>
-          <span className="block text-[11px] text-[#f62626]">On call · {elapsed}</span>
-        </span>
-      </button>
-      <button type="button" onClick={onMute} className="rounded-lg border border-white/15 p-2 text-white/80" aria-label={muted ? 'Unmute' : 'Mute'}>
-        {muted ? <MicOff size={16} /> : <Mic size={16} />}
-      </button>
-      <button type="button" onClick={onHangUp} className="rounded-lg border border-[#f62626] bg-[#f62626]/20 p-2 text-[#f62626]" aria-label="Hang up">
-        <PhoneOff size={16} />
-      </button>
-    </div>
+    <>
+      {hasFix && (
+        <a
+          href={`https://www.google.com/maps/search/?api=1&query=${call.latitude},${call.longitude}`}
+          target="_blank"
+          rel="noreferrer"
+          className="text-[#f62626]"
+        >
+          Open in Google Maps
+        </a>
+      )}
+      {reportHref && <Link href={reportHref} className="text-white/80">Open the report</Link>}
+    </>
   )
 }

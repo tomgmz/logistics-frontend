@@ -2,15 +2,16 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Room, RoomEvent, Track, type RemoteTrack } from 'livekit-client'
-import { Phone, PhoneOff, Mic, MicOff, Minimize2, Maximize2 } from 'lucide-react'
+import { Phone, PhoneIncoming, PhoneOff, Mic, MicOff } from 'lucide-react'
 
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { useChatCallStore, type CallRequest } from '@/lib/store/chatCall.store'
-import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 import { chatCallService, type ChatCallView } from '@/lib/services/chatCall.service'
 import { roleLabel } from '@/lib/roles'
+import { appToast } from '@/lib/toast'
 import { useRingtone, useTitleFlash, useElapsed } from './callHooks'
+import { CallAlert, CallCircleButton } from './CallAlert'
 
 /**
  * Voice calls from Messages, one person to one person.
@@ -18,11 +19,12 @@ import { useRingtone, useTitleFlash, useElapsed } from './callHooks'
  * Mounted once per page tree (the dashboard shell and the /messages layout) for
  * everyone except clients. It places calls for the chat headers' call button
  * (through useChatCallStore), rings this browser when someone calls, and runs
- * the call itself: mute, hang up, minimise to a bar.
+ * the call itself: mute, hang up. All of it shows as a floating alert
+ * (CallAlert), never a pop-up over the page.
  *
  * The caller joins the LiveKit room as soon as the call is placed; the call is
  * live when the other person joins it. The caller's ring timer decides "no
- * answer". The emergency ringer (EmergencyCallProvider) is separate and draws
+ * answer". The emergency ringer (EmergencyCallProvider) is separate and stacks
  * above this one.
  */
 
@@ -35,6 +37,7 @@ type Phase = 'placing' | 'ringing' | 'connecting' | 'live' | 'ended'
 
 interface ActiveCall {
   direction: 'out' | 'in'
+  conversationId: string
   peerName:  string
   peerRole:  string
   phase:     Phase
@@ -49,11 +52,6 @@ function errorMessage(e: unknown, fallback: string): string {
   return err?.response?.data?.message ?? err?.message ?? fallback
 }
 
-function initialsOf(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean)
-  return ((parts[0]?.[0] ?? '?') + (parts[1]?.[0] ?? '')).toUpperCase()
-}
-
 export default function ChatCallProvider() {
   const user    = useAuthStore((s) => s.user)
   const userId  = user?.user_id
@@ -65,7 +63,6 @@ export default function ChatCallProvider() {
   const [ringing,   setRinging]   = useState<ChatCallView[]>([])
   const [active,    setActive]    = useState<ActiveCall | null>(null)
   const [answering, setAnswering] = useState<string | null>(null)
-  const [minimised, setMinimised] = useState(false)
 
   const roomRef    = useRef<Room | null>(null)
   const audioHost  = useRef<HTMLDivElement | null>(null)
@@ -76,7 +73,10 @@ export default function ChatCallProvider() {
   // so an await that finishes afterwards knows its call is no longer wanted.
   const attemptRef = useRef(0)
 
+  const ringingRef = useRef<ChatCallView[]>([])
+
   useEffect(() => { activeRef.current = active }, [active])
+  useEffect(() => { ringingRef.current = ringing }, [ringing])
 
   const dropRinging = useCallback((callId: string) => {
     setRinging((list) => list.filter((c) => c.call_id !== callId))
@@ -145,16 +145,22 @@ export default function ChatCallProvider() {
   /* ── Calling out ───────────────────────────────────────────────────────── */
 
   const placeCall = useCallback(async ({ conversationId, peerName, peerRole }: CallRequest) => {
-    if (activeRef.current && activeRef.current.phase !== 'ended') return
+    const current = activeRef.current && activeRef.current.phase !== 'ended' ? activeRef.current : null
+    const ringIn  = ringingRef.current
+    // Already on a call with them (or they are ringing us): never a second call.
+    if (current?.conversationId === conversationId || ringIn.some((c) => c.conversation_id === conversationId)) return
+    if (current || ringIn.length > 0) {
+      appToast.error(`You can't call ${peerName} because you are currently on a call.`, { action: 'chat-call-busy' })
+      return
+    }
     const attempt = ++attemptRef.current
     callIdRef.current = null
     const draft: ActiveCall = {
-      direction: 'out', peerName, peerRole, phase: 'placing',
+      direction: 'out', conversationId, peerName, peerRole, phase: 'placing',
       muted: false, startedAt: null, ringLeft: null, note: null,
     }
     activeRef.current = draft
     setActive(draft)
-    setMinimised(false)
 
     let callId: string | null = null
     try {
@@ -179,9 +185,17 @@ export default function ChatCallProvider() {
     } catch (e) {
       if (attempt !== attemptRef.current) return
       if (callId) void chatCallService.end(callId, 'failed', errorMessage(e, 'connect failed')).catch(() => {})
+      // Busy (either end already on a call): say so and drop the alert.
+      if (!callId && (e as { response?: { status?: number } } | null)?.response?.status === 409) {
+        attemptRef.current += 1
+        teardownRoom()
+        setActive(null)
+        appToast.error(errorMessage(e, `${peerName} is currently on a call with someone else.`), { action: 'chat-call-busy' })
+        return
+      }
       finishLocal(errorMessage(e, 'The call could not be placed.'))
     }
-  }, [joinRoom, finishLocal])
+  }, [joinRoom, finishLocal, teardownRoom])
 
   // Ring countdown → no answer.
   useEffect(() => {
@@ -209,9 +223,8 @@ export default function ChatCallProvider() {
       joined = true
       dropRinging(call.call_id)
       callIdRef.current = call.call_id
-      setMinimised(false)
       setActive({
-        direction: 'in', peerName: fresh?.caller_name ?? call.caller_name, peerRole: fresh?.caller_role ?? call.caller_role,
+        direction: 'in', conversationId: call.conversation_id, peerName: fresh?.caller_name ?? call.caller_name, peerRole: fresh?.caller_role ?? call.caller_role,
         phase: 'connecting', muted: false, startedAt: null, ringLeft: null, note: null,
       })
 
@@ -225,7 +238,7 @@ export default function ChatCallProvider() {
       attemptRef.current += 1
       teardownRoom()
       setActive({
-        direction: 'in', peerName: call.caller_name, peerRole: call.caller_role,
+        direction: 'in', conversationId: call.conversation_id, peerName: call.caller_name, peerRole: call.caller_role,
         phase: 'ended', muted: false, startedAt: null, ringLeft: null,
         note: errorMessage(e, 'The call could not be answered.'),
       })
@@ -263,7 +276,6 @@ export default function ChatCallProvider() {
   const closeSheet = useCallback(() => {
     callIdRef.current = null
     setActive(null)
-    setMinimised(false)
   }, [])
 
   // "Call ended" closes by itself after a moment.
@@ -326,12 +338,12 @@ export default function ChatCallProvider() {
   }, [allowed, placeCall, setPlaceCall])
 
   const busy = !!active && active.phase !== 'ended'
-  useEffect(() => { setInCall(busy || ringing.length > 0) }, [busy, ringing.length, setInCall])
+  const callConversationId = busy ? active.conversationId : ringing[0]?.conversation_id ?? null
+  useEffect(() => { setInCall(busy || ringing.length > 0, callConversationId) }, [busy, ringing.length, callConversationId, setInCall])
 
   const ringingNow = !busy ? ringing[0] ?? null : null
-  const sheetOpen  = !!ringingNow || (!!active && !minimised)
+  const elapsed    = useElapsed(active?.phase === 'live' ? active.startedAt : null)
 
-  useBodyScrollLock(sheetOpen)
   useRingtone(!!ringingNow)
   useTitleFlash(ringingNow ? `Call from ${ringingNow.caller_name}` : null)
 
@@ -343,176 +355,75 @@ export default function ChatCallProvider() {
       <div ref={audioHost} className="hidden" aria-hidden="true" />
 
       {ringingNow && (
-        <CallSheet
-          name={ringingNow.caller_name}
-          role={ringingNow.caller_role}
-          status="Incoming call"
+        <CallAlert
+          color="brand"
+          icon={PhoneIncoming}
+          label={`Incoming call from ${ringingNow.caller_name}`}
+          title={ringingNow.caller_name}
+          description={<p>Incoming call{ringingNow.caller_role ? ` · ${roleLabel(ringingNow.caller_role)}` : ''}</p>}
           pulse
-          footer={(
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => decline(ringingNow)}
-                disabled={!!answering}
-                className="flex items-center justify-center gap-2 rounded-xl border border-[#f62626] bg-[#f62626]/20 py-3 text-sm font-bold text-[#f62626] disabled:opacity-50"
-              >
-                <PhoneOff size={16} /> Decline
-              </button>
-              <button
-                type="button"
+          actions={(
+            <>
+              <CallCircleButton
+                kind="answer"
+                icon={Phone}
+                label={answering === ringingNow.call_id ? 'Connecting…' : 'Answer'}
                 onClick={() => void answer(ringingNow)}
                 disabled={!!answering}
-                className="flex items-center justify-center gap-2 rounded-xl border border-[#3af626] bg-[#3af626]/20 py-3 text-sm font-bold text-[#3af626] disabled:opacity-60"
-              >
-                <Phone size={16} /> {answering === ringingNow.call_id ? 'Connecting…' : 'Answer'}
-              </button>
-            </div>
+                busy={answering === ringingNow.call_id}
+              />
+              <CallCircleButton
+                kind="decline"
+                icon={PhoneOff}
+                label="Decline"
+                onClick={() => decline(ringingNow)}
+                disabled={!!answering}
+              />
+            </>
           )}
         />
       )}
 
-      {active && !minimised && (
-        <CallSheet
-          name={active.peerName}
-          role={active.peerRole}
-          status={
-            active.phase === 'placing'    ? 'Calling…'
-            : active.phase === 'ringing'  ? `Ringing…${active.ringLeft != null ? ` ${active.ringLeft}s` : ''}`
-            : active.phase === 'connecting' ? 'Connecting…'
-            : active.phase === 'live'     ? null
-            : 'Call ended'
-          }
-          timer={active.phase === 'live' ? active.startedAt : null}
+      {active && (
+        <CallAlert
+          color="brand"
+          icon={Phone}
+          label={`Call with ${active.peerName}`}
+          title={active.peerName}
           pulse={active.phase === 'placing' || active.phase === 'ringing'}
-          note={active.note}
-          onMinimise={active.phase === 'live' ? () => setMinimised(true) : undefined}
-          footer={active.phase === 'ended' ? (
-            <button
-              type="button"
-              onClick={closeSheet}
-              className="w-full rounded-xl border border-white/15 py-3 text-sm font-bold text-white/80"
-            >
-              Close
-            </button>
-          ) : (
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
+          description={(
+            <>
+              <p>
+                {active.phase === 'placing'      ? 'Calling…'
+                : active.phase === 'ringing'     ? `Ringing…${active.ringLeft != null ? ` ${active.ringLeft}s` : ''}`
+                : active.phase === 'connecting'  ? 'Connecting…'
+                : active.phase === 'live'        ? `On call · ${elapsed}`
+                : 'Call ended'}
+                {active.peerRole ? ` · ${roleLabel(active.peerRole)}` : ''}
+              </p>
+              {active.note && <p className="text-[#ff7a30]">{active.note}</p>}
+            </>
+          )}
+          onClose={active.phase === 'ended' ? closeSheet : undefined}
+          actions={active.phase === 'ended' ? undefined : (
+            <>
+              <CallCircleButton
+                kind="plain"
+                icon={active.muted ? MicOff : Mic}
+                label={active.muted ? 'Unmute' : 'Mute'}
                 onClick={() => void toggleMute()}
                 disabled={!roomRef.current}
-                className="flex items-center justify-center gap-2 rounded-xl border border-white/15 py-3 text-sm font-bold text-white/80 disabled:opacity-50"
-              >
-                {active.muted ? <><MicOff size={16} /> Unmute</> : <><Mic size={16} /> Mute</>}
-              </button>
-              <button
-                type="button"
+              />
+              <CallCircleButton
+                kind="decline"
+                icon={PhoneOff}
+                label={active.phase === 'live' ? 'Hang up' : 'Cancel'}
                 onClick={hangUp}
-                className="flex items-center justify-center gap-2 rounded-xl border border-[#f62626] bg-[#f62626]/20 py-3 text-sm font-bold text-[#f62626]"
-              >
-                <PhoneOff size={16} /> {active.phase === 'live' ? 'Hang up' : 'Cancel'}
-              </button>
-            </div>
+              />
+            </>
           )}
-        />
-      )}
-
-      {active && minimised && active.phase === 'live' && (
-        <MiniCallBar
-          name={active.peerName}
-          startedAt={active.startedAt}
-          muted={active.muted}
-          onExpand={() => setMinimised(false)}
-          onMute={() => void toggleMute()}
-          onHangUp={hangUp}
         />
       )}
     </>
-  )
-}
-
-/* ── Pieces ──────────────────────────────────────────────────────────────── */
-
-function CallSheet({
-  name, role, status, timer = null, pulse = false, note, onMinimise, footer,
-}: {
-  name:        string
-  role:        string
-  status:      string | null
-  timer?:      number | null
-  pulse?:      boolean
-  note?:       string | null
-  onMinimise?: () => void
-  footer:      React.ReactNode
-}) {
-  const elapsed = useElapsed(timer)
-
-  return (
-    <div
-      className="fixed inset-0 z-[75] flex items-center justify-center bg-black/75 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label={`Call with ${name}`}
-    >
-      <div className="flex w-full max-w-sm max-h-[90dvh] flex-col overflow-hidden rounded-2xl border border-[var(--color-cyan)]/40 bg-[var(--color-surface)] shadow-2xl">
-        <div className="flex justify-end px-3 pt-3">
-          {onMinimise ? (
-            <button
-              type="button"
-              onClick={onMinimise}
-              className="rounded-lg p-2 text-white/50"
-              aria-label="Minimise the call"
-            >
-              <Minimize2 size={16} />
-            </button>
-          ) : <span className="h-8" />}
-        </div>
-
-        <div className="flex min-h-0 flex-col items-center gap-2 overflow-y-auto px-5 pb-5 text-center">
-          <div className="relative">
-            {pulse && <span className="absolute inset-0 animate-ping rounded-full bg-[var(--color-cyan)]/20" />}
-            <div className="relative flex h-20 w-20 items-center justify-center rounded-full border border-white/10 bg-[var(--color-surface-dark)]">
-              <span className="font-card text-xl text-white/80">{initialsOf(name)}</span>
-            </div>
-          </div>
-          <h2 className="ff-body mt-2 max-w-full break-words text-lg font-bold text-white">{name}</h2>
-          {role && <p className="ff-body text-xs text-[var(--color-muted)]">{roleLabel(role)}</p>}
-          <p className="ff-body text-sm text-[var(--color-cyan)]">{timer ? elapsed : status}</p>
-          {note && <p className="ff-body text-xs text-[#ff7a30]">{note}</p>}
-        </div>
-
-        <div className="border-t border-white/[0.07] p-4">{footer}</div>
-      </div>
-    </div>
-  )
-}
-
-function MiniCallBar({
-  name, startedAt, muted, onExpand, onMute, onHangUp,
-}: {
-  name:      string
-  startedAt: number | null
-  muted:     boolean
-  onExpand:  () => void
-  onMute:    () => void
-  onHangUp:  () => void
-}) {
-  const elapsed = useElapsed(startedAt)
-  return (
-    // Top of the screen, so it never covers the chat bubbles or the message box.
-    <div className="fixed left-4 right-4 top-[max(0.75rem,env(safe-area-inset-top))] z-[75] flex items-center gap-2 rounded-2xl border border-[var(--color-cyan)]/40 bg-[var(--color-surface)] px-3 py-2 shadow-2xl sm:left-1/2 sm:right-auto sm:w-96 sm:-translate-x-1/2">
-      <button type="button" onClick={onExpand} className="flex min-w-0 flex-1 items-center gap-2 text-left" aria-label="Show the call">
-        <Maximize2 size={15} className="shrink-0 text-white/50" />
-        <span className="min-w-0">
-          <span className="block truncate text-sm font-bold text-white">{name}</span>
-          <span className="block text-[11px] text-[var(--color-cyan)]">On call · {elapsed}</span>
-        </span>
-      </button>
-      <button type="button" onClick={onMute} className="rounded-lg border border-white/15 p-2 text-white/80" aria-label={muted ? 'Unmute' : 'Mute'}>
-        {muted ? <MicOff size={16} /> : <Mic size={16} />}
-      </button>
-      <button type="button" onClick={onHangUp} className="rounded-lg border border-[#f62626] bg-[#f62626]/20 p-2 text-[#f62626]" aria-label="Hang up">
-        <PhoneOff size={16} />
-      </button>
-    </div>
   )
 }
