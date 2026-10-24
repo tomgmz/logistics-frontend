@@ -276,3 +276,22 @@ export interface ReadReceiptPayload      { conversation_id: string; reader_id: s
 export interface GroupReadReceiptPayload { group_id: string; user_id: string; read_at: string }
 export interface GroupInvitePayload      { group_id: string; group_name: string }
 export interface ReactionTogglePayload   { message_id: string; user_id: string; emoji: string; action: 'added' | 'removed'; group_id?: string }
+/** A booking offered in the "@" mention list. */
+export interface MentionableBooking {
+  booking_id:       string
+  reference_number: string
+  status:           string
+  company_name:     string | null
+  schedule_date:    string | null
+}
+
+/** The details card shown under a message that mentions a booking. */
+export interface BookingMentionDetails extends MentionableBooking {
+  call_time: string | null
+  origin:    string | null
+  drop_offs: string[]
+  vehicle:   string | null
+  drivers:   string[]
+  /** A driver's short card for a booking they aren't on: number, status, schedule only. */
+  limited?:  boolean
+}

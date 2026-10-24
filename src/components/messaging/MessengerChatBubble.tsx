@@ -3,7 +3,7 @@
 import { useStickToBottom } from '@/lib/hooks/useStickToBottom'
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Loader2, Minus, CornerUpLeft } from 'lucide-react'
+import { X, Loader2, Minus } from 'lucide-react'
 import { useMessengerStore } from '@/lib/store/messenger.store'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { messagingService } from '@/lib/services/messaging.service'
@@ -19,11 +19,10 @@ import type {
 import { useMessagingRealtime } from '@/lib/hooks/useMessagingRealtime'
 import { useGlobalPresence } from '@/lib/hooks/useGlobalPresence'
 import { useIsMobile } from '@/lib/hooks/useIsMobile'
-import { QuickReactBar } from './EmojiPicker'
 import MessageInput from './MessageInput'
 import MessageBubble from './MessageBubble'
+import { MessageDateDivider, TypingMessage } from './MessageItem'
 import { roleLabel, nameWithRole } from '@/lib/roles'
-import ChatCallButton from '@/components/calls/ChatCallButton'
 
 const BUBBLE_W   = 338
 const BUBBLE_GAP = 10
@@ -62,6 +61,8 @@ export default function MessengerChatBubble({ conversationId, index }: Props) {
   const [messages, setMessages]       = useState<Message[]>([])
   const [loadingConv, setLConv]       = useState(true)
   const [loadingMsgs, setLMsgs]       = useState(true)
+  // Yours, as the chat opened (undefined until the conversation has loaded).
+  const [myLastReadAt, setMyLastReadAt] = useState<string | null | undefined>(undefined)
   const [sending, setSending]         = useState(false)
   const [isTyping, setIsTyping]       = useState(false)
   const [otherLastReadAt, setOtherLastReadAt] = useState<string | null>(null)
@@ -83,10 +84,15 @@ export default function MessengerChatBubble({ conversationId, index }: Props) {
           setConv(toConversation(f))
           const myId = currentUserId
           setOtherLastReadAt(f.participant_a_id === myId ? f.participant_b_last_read_at : f.participant_a_last_read_at)
-        }
+          setMyLastReadAt(f.participant_a_id === myId ? f.participant_a_last_read_at : f.participant_b_last_read_at)
+        } else setMyLastReadAt(null)
       })
-      .catch(() => {})
-      .finally(() => setLConv(false))
+      .catch(() => setMyLastReadAt(null))
+      .finally(() => {
+        setLConv(false)
+        // Only now, so your last read (where the unread starts) was read first.
+        messagingService.markAsRead(conversationId).catch(() => {})
+      })
   }, [conversationId, currentUserId])
 
   const fetchMessages = useCallback(async () => {
@@ -98,8 +104,10 @@ export default function MessengerChatBubble({ conversationId, index }: Props) {
   }, [conversationId])
 
   useEffect(() => { fetchMessages() }, [fetchMessages])
-  useEffect(() => { messagingService.markAsRead(conversationId).catch(() => {}) }, [conversationId])
-  useStickToBottom(bottomRef, conversationId, [messages, isTyping])
+  // Opens on your first unread message; after that follows only while you're at the bottom.
+  const { scrollToLatest, atLatest } = useStickToBottom(bottomRef, conversationId, [messages, isTyping], {
+    ready: !loadingMsgs && myLastReadAt !== undefined, messages, currentUserId, lastReadAt: myLastReadAt,
+  })
 
   const participant = conv?.participants[0]
   // Online status from the app-wide presence channel (not the per-conversation one).
@@ -133,6 +141,7 @@ export default function MessengerChatBubble({ conversationId, index }: Props) {
   })
 
   const handleSend = async (text: string, replyToMessageId?: string, attachmentUrl?: string) => {
+    scrollToLatest()
     const body = attachmentUrl && !text ? PHOTO_PLACEHOLDER : text
     const oid = `optimistic-${Date.now()}`
     pendingIds.current.add(oid)
@@ -222,14 +231,6 @@ export default function MessengerChatBubble({ conversationId, index }: Props) {
         </div>
 
         <div className="flex items-center gap-0.5 shrink-0">
-          {participant && (
-            <ChatCallButton
-              conversationId={conversationId}
-              peerName={`${participant.first_name ?? ''} ${participant.last_name ?? ''}`.trim()}
-              peerRole={participant.role}
-              size={13}
-            />
-          )}
           <button type="button" onClick={() => minimizeChat(conversationId)} className="p-1.5 rounded-lg hover:bg-white/5 text-white/30 hover:text-white/60 transition-colors" aria-label="Minimize"><Minus size={12} /></button>
           <button type="button" onClick={() => closeChat(conversationId)} className="p-1.5 rounded-lg hover:bg-white/5 text-white/30 hover:text-red-400 transition-colors" aria-label="Close"><X size={12} /></button>
         </div>
@@ -237,7 +238,7 @@ export default function MessengerChatBubble({ conversationId, index }: Props) {
 
       {/* Messages */}
       <div className="flex flex-col flex-1 overflow-hidden bg-[var(--color-surface)] min-h-0">
-        <div className="flex-1 overflow-y-auto px-2.5 py-3 space-y-1 min-h-0 [&::-webkit-scrollbar]:w-[3px] [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full">
+        <div className="flex-1 overflow-y-auto px-3 py-3 min-h-0 [&::-webkit-scrollbar]:w-[3px] [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full">
           {loadingMsgs && (
             <div className="flex items-center justify-center h-full">
               <Loader2 size={16} className="animate-spin text-[var(--color-cyan)]/30" />
@@ -245,41 +246,41 @@ export default function MessengerChatBubble({ conversationId, index }: Props) {
           )}
 
           {!loadingMsgs && dateGroups.map(({ date, messages: msgs }) => (
-            <div key={date} className="space-y-1">
-              <p className="ff-body text-[9px] text-white/20 text-center uppercase tracking-widest py-1">{date}</p>
-              {msgs.map((msg, i) => {
-                const isMine    = msg.sender_id === currentUserId
-                const prev      = msgs[i - 1]
-                const showAvatar= !isMine && (msgs[i + 1]?.sender_id !== msg.sender_id || i === msgs.length - 1)
-                const showName  = !isMine && prev?.sender_id !== msg.sender_id
-                return (
-                  <MessageBubble
-                    key={msg.id}
-                    message={msg}
-                    isMine={isMine}
-                    currentUserId={currentUserId}
-                    sender={isMine ? undefined : { ...participant!, is_online: isOnline }}
-                    showSenderName={showName}
-                    showAvatar={showAvatar}
-                    showSeen={isSeen(msg)}
-                    onReply={m => setReplyTo({ messageId: m.id, content: m.body, senderName: m.sender_id === currentUserId ? 'You' : participant?.first_name ?? 'Them' })}
-                    onReact={handleReact}
-                    onDelete={handleDelete}
-                    replyToSenderName={msg.reply_to ? (msg.reply_to.sender_id === currentUserId ? 'You' : participant?.first_name ?? 'Them') : undefined}
-                  />
-                )
-              })}
+            <div key={date}>
+              <MessageDateDivider label={date} />
+              <ul className="flex flex-col gap-2">
+                {msgs.map((msg, i) => {
+                  const isMine    = msg.sender_id === currentUserId
+                  return (
+                    <MessageBubble
+                      key={msg.id}
+                      message={msg}
+                      isMine={isMine}
+                      currentUserId={currentUserId}
+                      sender={isMine ? undefined : { ...participant!, is_online: isOnline }}
+                      showSenderName={msgs[i + 1]?.sender_id !== msg.sender_id}
+                      showSeen={isSeen(msg)}
+                      onReply={m => setReplyTo({ messageId: m.id, content: m.body, senderName: m.sender_id === currentUserId ? 'You' : participant?.first_name ?? 'Them' })}
+                      onReact={handleReact}
+                      onDelete={handleDelete}
+                      replyToSenderName={msg.reply_to ? (msg.reply_to.sender_id === currentUserId ? 'You' : participant?.first_name ?? 'Them') : undefined}
+                      compact
+                    />
+                  )
+                })}
+              </ul>
             </div>
           ))}
 
           <AnimatePresence>
             {isTyping && (
-              <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="flex items-end gap-1.5">
-                <div className="w-5 h-5 rounded-full bg-[var(--color-surface-dark)] border border-white/10 flex items-center justify-center shrink-0">
-                  <span className="font-card text-[0.4rem] text-white/70">{initials}</span>
-                </div>
-                <div className="glass-surface border border-white/[0.06] rounded-2xl rounded-bl-sm px-3 py-2"><TypingDots /></div>
-              </motion.div>
+              <div className="mt-3">
+                <TypingMessage
+                  name={participant ? nameWithRole(participant.first_name, participant.last_name, participant.role) : undefined}
+                  initials={initials}
+                  compact
+                />
+              </div>
             )}
           </AnimatePresence>
           <div ref={bottomRef} />
@@ -292,7 +293,7 @@ export default function MessengerChatBubble({ conversationId, index }: Props) {
           replyTo={replyTo}
           onCancelReply={() => setReplyTo(null)}
           compact
-        />
+        showJumpToLatest={!atLatest} onJumpToLatest={scrollToLatest} />
       </div>
     </motion.div>
   )

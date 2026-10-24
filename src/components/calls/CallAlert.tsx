@@ -12,14 +12,13 @@ import { X, type LucideIcon } from 'lucide-react'
  *                    Description
  *                    Link · Link
  *
- * `error` (red) is the driver's emergency call, `brand` (cyan) a call from
- * Messages. The round buttons on the right are the call's actions (Answer /
+ * `error` (red) is the driver's emergency call (quick alert); `brand` (cyan)
+ * is spare, since Messages no longer places calls. The round buttons on the right are the call's actions (Answer /
  * Decline, Mute / Hang up). It floats over the page instead of covering it, so
  * nothing locks the scroll.
  *
- * Both call providers render into one shared stack at the top centre, 85% of
- * the screen wide, so an emergency and a chat call never overlap; `priority`
- * puts the emergency first.
+ * Alerts render into one shared stack at the top centre, 85% of the screen
+ * wide, so two never overlap; `priority` puts the emergency first.
  */
 
 export type CallAlertColor = 'brand' | 'error'

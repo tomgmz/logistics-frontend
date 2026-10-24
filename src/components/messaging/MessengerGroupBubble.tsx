@@ -5,12 +5,12 @@ import { nameWithRole } from '@/lib/roles'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Loader2, Minus, Users, CornerUpLeft, Check } from 'lucide-react'
+import { X, Loader2, Minus, Users, Check } from 'lucide-react'
 import { useMessengerStore } from '@/lib/store/messenger.store'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { messagingService } from '@/lib/services/messaging.service'
 import { useIsMobile } from '@/lib/hooks/useIsMobile'
-import { groupMessagesByDate, formatMessageTime, groupEventText, isReadBy, latestSeenPositions } from '@/app/utils/messaging.utils'
+import { groupMessagesByDate, groupEventText, isReadBy, latestSeenPositions } from '@/app/utils/messaging.utils'
 import { toGroup, toGroupMessage, PHOTO_PLACEHOLDER } from '@/app/types/messaging/messaging.types'
 import type {
   Group,
@@ -21,13 +21,9 @@ import type {
   ReactionTogglePayload,
 } from '@/app/types/messaging/messaging.types'
 import { useMessagingRealtime } from '@/lib/hooks/useMessagingRealtime'
-import { QuickReactBar } from './EmojiPicker'
-import MessagePhoto from './MessagePhoto'
+import MessageItem, { MessageDateDivider, TypingMessage } from './MessageItem'
 import MessageInput from './MessageInput'
-import { Reply as ReplyIcon, Trash2 } from 'lucide-react'
-import ConfirmDeleteDialog, { type DeleteScope } from './ConfirmDeleteDialog'
-import ReadTicks from './ReadTicks'
-import { useLongPress } from '@/lib/hooks/useLongPress'
+import type { DeleteScope } from './ConfirmDeleteDialog'
 
 const BUBBLE_W   = 338
 const BUBBLE_GAP = 10
@@ -59,17 +55,6 @@ function SeenByAvatars({ seenBy }: { seenBy: GroupMember[] }) {
       {overflow > 0 && <span className="ff-body text-[8px] text-white/30">+{overflow}</span>}
     </div>
   )
-}
-
-interface ReactionGroup { emoji: string; count: number; reacted: boolean }
-
-function groupReactions(reactions: MessageReaction[], userId: string): ReactionGroup[] {
-  const map = new Map<string, { count: number; reacted: boolean }>()
-  for (const r of reactions) {
-    const cur = map.get(r.emoji) ?? { count: 0, reacted: false }
-    map.set(r.emoji, { count: cur.count + 1, reacted: cur.reacted || r.user_id === userId })
-  }
-  return [...map.entries()].map(([emoji, v]) => ({ emoji, ...v }))
 }
 
 function applyReactionToggle(msgs: GroupMessage[], payload: ReactionTogglePayload): GroupMessage[] {
@@ -108,15 +93,9 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
   const [inviteLoading, setInviteLoading] = useState<'accept' | 'decline' | null>(null)
   const [typingUsers, setTyping]  = useState<Record<string, string>>({})
   const [onlineIds, setOnline]    = useState<string[]>([])
-  const [hoveredId, setHovered]   = useState<string | null>(null)
-  // Touch: a long press stands in for hover (reply / react / remove).
-  const longPress = useLongPress()
   const [replyTo, setReplyTo]     = useState<{ messageId: string; content: string; senderName: string } | null>(null)
-  // The message waiting on "Delete this message?" — deleted for you only.
-  const [deleteId, setDeleteId] = useState<string | null>(null)
 
   const bottomRef      = useRef<HTMLDivElement>(null)
-  const hoverTimeout   = useRef<ReturnType<typeof setTimeout> | null>(null)
   const typingTimeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const pendingIds     = useRef<Set<string>>(new Set())
 
@@ -157,7 +136,11 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
     } catch { /* silent */ }
     finally { setInviteLoading(null) }
   }
-  useStickToBottom(bottomRef, groupId, [messages, typingUsers])
+  // Opens on your first unread message; after that follows only while you're at the bottom.
+  const { scrollToLatest, atLatest } = useStickToBottom(bottomRef, groupId, [messages, typingUsers], {
+    ready: !loadingMsgs && !loadingGroup, messages, currentUserId,
+    lastReadAt: loadingGroup ? undefined : members.find(m => m.user_id === currentUserId)?.last_read_at ?? null,
+  })
 
   const memberMap = Object.fromEntries(members.map(m => [m.user_id, m]))
   const nameOf    = (id: string) => memberMap[id] ? `${memberMap[id].first_name} ${memberMap[id].last_name}`.trim() : undefined
@@ -196,6 +179,7 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
   })
 
   const handleSend = async (text: string, replyToMessageId?: string, attachmentUrl?: string) => {
+    scrollToLatest()
     const body = attachmentUrl && !text ? PHOTO_PLACEHOLDER : text
     const oid = `optimistic-${Date.now()}`
     pendingIds.current.add(oid)
@@ -217,10 +201,7 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
     finally { setSending(false) }
   }
 
-  const confirmDelete = async (scope: DeleteScope) => {
-    const id = deleteId
-    setDeleteId(null)
-    if (!id) return
+  const confirmDelete = async (id: string, scope: DeleteScope) => {
     setMessages(prev => prev.filter(m => m.id !== id))
     try { await messagingService.hideGroupMessage(groupId, id, scope) }
     catch { fetchMessages() }
@@ -263,7 +244,6 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
       className={`fixed z-50 flex flex-col overflow-hidden shadow-2xl ${isMobile ? 'inset-0 rounded-none border-0' : 'bottom-0 rounded-t-2xl border border-b-0 border-white/[0.09]'}`}
     >
       {/* Rendered into a portal; placed here so the bubble stays a direct motion child. */}
-      <ConfirmDeleteDialog open={deleteId !== null} canUnsend={messages.some(m => m.id === deleteId && m.sender_id === currentUserId)} onCancel={() => setDeleteId(null)} onConfirm={(scope) => void confirmDelete(scope)} />
       {/* Header */}
       <div className="w-full flex items-center gap-2.5 px-3 py-2.5 shrink-0 bg-[var(--color-bg)] border-b border-white/[0.06]">
         <div className="w-8 h-8 rounded-full bg-[var(--color-surface-dark)] border border-white/10 flex items-center justify-center shrink-0">
@@ -324,138 +304,74 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
       ) : (
       /* Messages */
       <div className="flex flex-col flex-1 overflow-hidden bg-[var(--color-surface)] min-h-0">
-        <div className="flex-1 overflow-y-auto px-2.5 py-3 space-y-1.5 min-h-0 [&::-webkit-scrollbar]:w-[3px] [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full">
+        <div className="flex-1 overflow-y-auto px-3 py-3 min-h-0 [&::-webkit-scrollbar]:w-[3px] [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full">
           {loadingMsgs && (
             <div className="flex items-center justify-center h-full"><Loader2 size={16} className="animate-spin text-[var(--color-cyan)]/30" /></div>
           )}
 
           {!loadingMsgs && dateGroups.map(({ date, messages: msgs }) => (
-            <div key={date} className="space-y-1.5">
-              <p className="ff-body text-[9px] text-white/20 text-center uppercase tracking-widest">{date}</p>
-              {msgs.map((msg, i) => {
-                if (msg.kind === 'system') {
-                  return (
-                    <p key={msg.id} className="text-center ff-body text-[10px] text-white/45 py-1.5 px-6 leading-snug">
-                      {groupEventText(msg, currentUserId, nameOf)}
-                    </p>
-                  )
-                }
-                const isMine       = msg.sender_id === currentUserId
-                const sender       = memberMap[msg.sender_id]
-                const prev         = msgs[i - 1]
-                const showName     = !isMine && (prev?.sender_id !== msg.sender_id || prev?.kind === 'system')
-                const isOptimistic = msg.id.startsWith('optimistic-')
-                const grouped      = groupReactions(msg.reactions, currentUserId)
-                const seenBy       = (!isOptimistic && isMine) ? getSeenBy(members, msg.created_at, msg.sender_id, currentUserId) : []
-                const replyName    = msg.reply_to ? (msg.reply_to.sender_id === currentUserId ? 'You' : memberMap[msg.reply_to.sender_id]?.first_name ?? 'Someone') : undefined
-                const senderInitials = sender ? `${sender.first_name?.[0] ?? '?'}${sender.last_name?.[0] ?? '?'}`.toUpperCase() : '?'
-                const showAvatar   = !isMine && (msgs[i + 1]?.sender_id !== msg.sender_id || msgs[i + 1]?.kind === 'system' || i === msgs.length - 1)
+              <div key={date}>
+                <MessageDateDivider label={date} />
+                <ul className="flex flex-col gap-2">
+                  {msgs.map((msg, i) => {
+                    if (msg.kind === 'system') {
+                      return (
+                        <li key={msg.id} className="list-none text-center ff-body text-xs text-white/45 py-0.5 px-6 leading-snug">
+                          {groupEventText(msg, currentUserId, nameOf)}
+                        </li>
+                      )
+                    }
+                    const isMine        = msg.sender_id === currentUserId
+                    const sender        = memberMap[msg.sender_id]
+                    const next          = msgs[i + 1]
+                    // An event line breaks a run of messages, like a change of sender.
+                    const showName      = next?.sender_id !== msg.sender_id || next?.kind === 'system'
+                    const isOptimistic  = msg.id.startsWith('optimistic-')
+                    const seenBy        = (!isOptimistic && isMine) ? getSeenBy(members, msg.created_at, msg.sender_id, currentUserId) : []
+                    const replyName     = msg.reply_to ? (msg.reply_to.sender_id === currentUserId ? 'You' : memberMap[msg.reply_to.sender_id]?.first_name ?? 'Someone') : undefined
+                    const seenHere      = seenAt[msg.id] ?? []
+                    return (
+                      <MessageItem
+                        key={msg.id}
+                        messageId={msg.id}
+                        isMine={isMine}
+                        currentUserId={currentUserId}
+                        senderName={sender ? nameWithRole(sender.first_name, sender.last_name, sender.role) : 'Someone'}
+                        showName={showName}
+                        initials={sender ? `${sender.first_name?.[0] ?? '?'}${sender.last_name?.[0] ?? '?'}`.toUpperCase() : '?'}
+                        online={onlineIds.includes(msg.sender_id)}
+                        createdAt={msg.created_at}
+                        body={msg.body}
+                        attachmentUrl={msg.attachment_url}
+                        stamped={msg.attachment_stamped}
+                        seen={isMine ? othersInGroup > 0 && seenBy.length >= othersInGroup : undefined}
+                        pending={isOptimistic}
+                        replyTo={msg.reply_to ? { name: replyName, content: msg.reply_to.content } : null}
+                        reactions={msg.reactions}
+                        onReact={emoji => handleReact(msg.id, emoji)}
+                        onReply={() => setReplyTo({ messageId: msg.id, content: msg.body, senderName: isMine ? 'You' : sender?.first_name ?? 'Someone' })}
+                        onDelete={scope => void confirmDelete(msg.id, scope)}
+                        footer={seenHere.length > 0 ? <SeenByAvatars seenBy={seenHere} /> : undefined}
+                        compact
+                      />
+                    )
+                  })}
+                </ul>
+              </div>
+            ))}
 
-                return (
-                  <div key={msg.id}>
-                  <div
-                    className={`flex gap-1.5 ${isMine ? 'justify-end' : 'justify-start'} pointer-coarse:select-none [-webkit-touch-callout:none]`}
-                    onPointerEnter={(e) => { if (e.pointerType !== 'mouse') return; if (hoverTimeout.current) clearTimeout(hoverTimeout.current); hoverTimeout.current = setTimeout(() => setHovered(msg.id), 60) }}
-                    onPointerLeave={(e) => { if (e.pointerType !== 'mouse') return; if (hoverTimeout.current) clearTimeout(hoverTimeout.current); setHovered(null) }}
-                    {...longPress(() => setHovered(msg.id), () => setHovered(null))}
-                  >
-                    {!isMine && (
-                      <div className="shrink-0 self-end mb-0.5">
-                        {showAvatar ? (
-                          <div className="relative">
-                            <div className="w-5 h-5 rounded-full bg-[var(--color-surface-dark)] border border-white/10 flex items-center justify-center">
-                              <span className="font-card text-[0.4rem] text-white/75">{senderInitials}</span>
-                            </div>
-                            {onlineIds.includes(msg.sender_id) && <span className="absolute bottom-0 right-0 w-1.5 h-1.5 rounded-full bg-[var(--color-green)] border border-[var(--color-bg)]" />}
-                          </div>
-                        ) : <div className="w-5" />}
-                      </div>
-                    )}
-
-                    <div className={`relative flex flex-col gap-0.5 max-w-[85%] ${isMine ? 'items-end' : 'items-start'}`}>
-                      <AnimatePresence>
-                        {hoveredId === msg.id && (
-                          <QuickReactBar isMine={isMine}
-                            currentUserReaction={grouped.find(r => r.reacted)?.emoji ?? null}
-                            onReact={emoji => { handleReact(msg.id, emoji); setHovered(null) }}
-                          />
-                        )}
-                      </AnimatePresence>
-
-                      {showName && sender && <span className="ff-body text-[9px] text-white/30 px-0.5">{nameWithRole(sender.first_name, sender.last_name, sender.role)}</span>}
-
-                      {msg.reply_to && (
-                        <div className={`flex items-start gap-1 px-2 py-1 rounded-lg mb-0.5 max-w-full border-l-2 ${isMine ? 'bg-white/[0.06] border-white/20' : 'bg-white/[0.04] border-[var(--color-cyan)]/40'}`}>
-                          <CornerUpLeft size={9} className="text-white/30 shrink-0 mt-0.5" />
-                          <div className="min-w-0">
-                            {replyName && <p className="ff-body text-[9px] text-[var(--color-cyan)]/70 truncate">{replyName}</p>}
-                            <p className="ff-body text-[10px] text-white/40 truncate">{msg.reply_to.content}</p>
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="flex items-center gap-0.5">
-                        {isMine && hoveredId === msg.id && (<>
-                          <motion.button initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} type="button"
-                            onClick={() => setReplyTo({ messageId: msg.id, content: msg.body, senderName: 'You' })}
-                            className="p-1 rounded-lg hover:bg-white/5 text-white/25 hover:text-white/60 transition-colors"
-                          ><ReplyIcon size={11} /></motion.button>
-                            {!isOptimistic && <motion.button initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} type="button" title="Remove message"
-                              onClick={() => setDeleteId(msg.id)}
-                              className="p-1 rounded-lg hover:bg-white/5 text-white/25 hover:text-red-400 transition-colors"
-                            ><Trash2 size={11} /></motion.button>}
-                        </>)}
-                        <div className={`px-2.5 py-1.5 rounded-2xl ff-body text-[11.5px] leading-relaxed break-words ${isMine ? 'bg-[var(--color-cyan)] text-[var(--color-bg)] rounded-br-sm' : 'glass-surface text-white border border-white/[0.06] rounded-bl-sm'} ${isOptimistic ? 'opacity-60' : ''}`}>
-                          <MessagePhoto body={msg.body} attachmentUrl={msg.attachment_url} stamped={msg.attachment_stamped} />
-                        </div>
-                        {!isMine && hoveredId === msg.id && (<>
-                          <motion.button initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} type="button"
-                            onClick={() => setReplyTo({ messageId: msg.id, content: msg.body, senderName: sender?.first_name ?? 'Someone' })}
-                            className="p-1 rounded-lg hover:bg-white/5 text-white/25 hover:text-white/60 transition-colors"
-                          ><ReplyIcon size={11} /></motion.button>
-                            {!isOptimistic && <motion.button initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} type="button" title="Remove message"
-                              onClick={() => setDeleteId(msg.id)}
-                              className="p-1 rounded-lg hover:bg-white/5 text-white/25 hover:text-red-400 transition-colors"
-                            ><Trash2 size={11} /></motion.button>}
-                        </>)}
-                      </div>
-
-                      <div className={`flex items-center gap-0.5 px-0.5 ${isMine ? 'flex-row-reverse' : ''}`}>
-                        <span className="ff-body text-[8px] text-white/20">{formatMessageTime(msg.created_at)}</span>
-                        {isMine && <ReadTicks seen={!isOptimistic && othersInGroup > 0 && seenBy.length >= othersInGroup} size={9} />}
-                      </div>
-
-                      {grouped.length > 0 && (
-                        <div className={`flex flex-wrap gap-0.5 ${isMine ? 'justify-end' : ''}`}>
-                          {grouped.map(r => (
-                            <button key={r.emoji} type="button" onClick={() => handleReact(msg.id, r.emoji)}
-                              className={`flex items-center gap-0.5 px-1 py-0.5 rounded-full border transition-all ${r.reacted ? 'bg-[var(--color-cyan)]/15 border-[var(--color-cyan)]/30' : 'bg-white/[0.05] border-white/10 hover:bg-white/10'}`}>
-                              <span className="text-[11px] leading-none">{r.emoji}</span>
-                              {r.count > 1 && <span className="ff-body text-[8px] text-white/50">{r.count}</span>}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-
-                    </div>
-                  </div>
-                  {/* Seen avatars always sit at the right edge, whoever sent the message. */}
-                  <SeenByAvatars seenBy={seenAt[msg.id] ?? []} />
-                  </div>
-                )
-              })}
-            </div>
-          ))}
-
-          <AnimatePresence>
-            {typingLabel && (
-              <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="flex items-end gap-1.5">
-                <div className="w-5 h-5 rounded-full bg-[var(--color-surface-dark)] border border-white/10 flex items-center justify-center shrink-0"><Users size={9} className="text-white/50" /></div>
-                <div className="glass-surface border border-white/[0.06] rounded-2xl rounded-bl-sm px-2.5 py-1.5"><TypingDots /></div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-          <div ref={bottomRef} />
+            <AnimatePresence>
+              {typingLabel && (
+                <div className="mt-3">
+                  <TypingMessage
+                    name={typingLabel}
+                    avatar={<div className="size-6 shrink-0 rounded-full bg-[var(--color-surface-dark)] outline-[0.5px] -outline-offset-[0.5px] outline-white/15 flex items-center justify-center"><Users size={10} className="text-white/55" /></div>}
+                    compact
+                  />
+                </div>
+              )}
+            </AnimatePresence>
+            <div ref={bottomRef} />
         </div>
 
         <MessageInput
@@ -465,7 +381,7 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
           replyTo={replyTo}
           onCancelReply={() => setReplyTo(null)}
           compact
-        />
+        showJumpToLatest={!atLatest} onJumpToLatest={scrollToLatest} />
       </div>
       )}
     </motion.div>

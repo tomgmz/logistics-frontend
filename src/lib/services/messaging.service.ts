@@ -5,6 +5,8 @@ import type {
   MessagableUser,
   GroupRaw,
   GroupMessageRaw,
+  MentionableBooking,
+  BookingMentionDetails,
 } from '@/app/types/messaging/messaging.types'
 
 interface ApiResponse<T> { success: boolean; data: T; message?: string }
@@ -101,6 +103,14 @@ export const messagingService = {
 
   getMessagableUsers: () =>
     get<MessagableUser[]>(`${B}/users`),
+
+  /** Bookings offered after typing "@" (only those the user may see). */
+  searchMentionableBookings: (q: string) =>
+    get<MentionableBooking[]>(`${B}/booking-mentions`, { q }),
+
+  /** Details cards for mentioned booking numbers; ones the user can't see are left out. */
+  getBookingMentionDetails: (refs: string[]) =>
+    get<BookingMentionDetails[]>(`${B}/booking-mentions/details`, { refs: refs.join(',') }),
 
   getGroups: () =>
     get<GroupRaw[]>(`${B}/groups`),

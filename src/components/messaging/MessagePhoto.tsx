@@ -2,6 +2,7 @@
 
 import { MapPin } from 'lucide-react'
 import { PHOTO_PLACEHOLDER } from '@/app/types/messaging/messaging.types'
+import { MentionText } from './BookingMention'
 
 /**
  * The inside of a chat bubble: the photo (if the message has one) above its
@@ -13,12 +14,12 @@ export default function MessagePhoto({ body, attachmentUrl, stamped }: {
   attachmentUrl?: string | null
   stamped?:       boolean
 }) {
-  if (!attachmentUrl) return <>{body}</>
+  if (!attachmentUrl) return <MentionText text={body} />
   const caption = body && body !== PHOTO_PLACEHOLDER ? body : null
 
   return (
-    <div className="flex flex-col gap-1.5 -mx-1.5 -mt-1">
-      <a href={attachmentUrl} target="_blank" rel="noopener noreferrer" className="relative block rounded-xl overflow-hidden" title="Open the full photo">
+    <figure className="flex flex-col gap-1.5">
+      <a href={attachmentUrl} target="_blank" rel="noopener noreferrer" className="relative block overflow-hidden rounded-md outline-1 -outline-offset-[0.5px] outline-white/10" title="Open the full photo">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={attachmentUrl} alt={caption ?? 'Photo'} loading="lazy" className="block max-w-full w-[240px] max-h-[320px] object-cover bg-black/20" />
         {stamped && (
@@ -27,7 +28,7 @@ export default function MessagePhoto({ body, attachmentUrl, stamped }: {
           </span>
         )}
       </a>
-      {caption && <span className="px-1.5">{caption}</span>}
-    </div>
+      {caption && <figcaption className="px-1.5 pb-0.5"><MentionText text={caption} /></figcaption>}
+    </figure>
   )
 }

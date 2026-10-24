@@ -8,6 +8,7 @@ import { messagingService } from '@/lib/services/messaging.service'
 import type { MessageRow } from '@/lib/services/messaging.service'
 import { useMessagingRealtime } from '@/lib/hooks/useMessagingRealtime'
 import MessageBubble from './MessageBubble'
+import { MessageDateDivider, TypingMessage } from './MessageItem'
 import MessageInput from './MessageInput'
 import { groupMessagesByDate, isReadBy } from '@/app/utils/messaging.utils'
 import type {
@@ -20,7 +21,6 @@ import type {
 } from '@/app/types/messaging/messaging.types'
 import { toMessage, PHOTO_PLACEHOLDER } from '@/app/types/messaging/messaging.types'
 import { roleLabel, nameWithRole } from '@/lib/roles'
-import ChatCallButton from '@/components/calls/ChatCallButton'
 
 interface ReplyTo { messageId: string; content: string; senderName: string }
 
@@ -120,7 +120,13 @@ export default function ChatWindow({ conversation, draftUser, currentUserId, isP
 
   useEffect(() => { fetchMessages() }, [fetchMessages])
   useEffect(() => { if (convId) messagingService.markAsRead(convId).catch(() => {}) }, [convId])
-  useStickToBottom(bottomRef, realtimeConvId, [messages, isOtherTyping])
+  // Opens on your first unread message; after that follows only while you're at the bottom.
+  const myLastReadAt = conversation
+    ? (conversation.participant_a_id === currentUserId ? conversation.participant_a_last_read_at : conversation.participant_b_last_read_at)
+    : null
+  const { scrollToLatest, atLatest } = useStickToBottom(bottomRef, realtimeConvId, [messages, isOtherTyping], {
+    ready: !loading, messages, currentUserId, lastReadAt: myLastReadAt,
+  })
 
   const { broadcastTyping } = useMessagingRealtime({
     currentUserId,
@@ -152,6 +158,7 @@ export default function ChatWindow({ conversation, draftUser, currentUserId, isP
   })
 
   const handleSend = async (text: string, replyToMessageId?: string, attachmentUrl?: string) => {
+    scrollToLatest()
     // A photo without a caption is stored with the placeholder text; matching
     // it here lets the live echo replace the optimistic bubble.
     const body = attachmentUrl && !text ? PHOTO_PLACEHOLDER : text
@@ -254,16 +261,10 @@ export default function ChatWindow({ conversation, draftUser, currentUserId, isP
             )}
           </AnimatePresence>
         </div>
-        <ChatCallButton
-          conversationId={convId}
-          peerName={`${participant.first_name ?? ''} ${participant.last_name ?? ''}`.trim()}
-          peerRole={participant.role}
-          size={17}
-        />
       </div>
 
       {/* Messages */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-4 py-5 space-y-1 [&::-webkit-scrollbar]:w-[3px] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-white/20 bg-[var(--color-surface)]">
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 py-5 [&::-webkit-scrollbar]:w-[3px] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-white/20 bg-[var(--color-surface)]">
         {loading && <div className="flex items-center justify-center h-full"><Loader2 size={18} className="animate-spin text-[var(--color-cyan)]/40" /></div>}
         {!loading && error && (
           <div className="flex flex-col items-center justify-center h-full gap-2">
@@ -280,50 +281,42 @@ export default function ChatWindow({ conversation, draftUser, currentUserId, isP
           </div>
         )}
         {!loading && !error && dateGroups.map(({ date, messages: msgs }) => (
-            <div key={date} className="space-y-2.5">
-              <div className="flex items-center gap-3 py-2">
-                <div className="flex-1 h-px bg-white/[0.04]" />
-                <span className="ff-body text-[10px] text-white/20 uppercase tracking-widest shrink-0">{date}</span>
-                <div className="flex-1 h-px bg-white/[0.04]" />
-              </div>
-              {msgs.map((msg, i) => {
-                const isMine    = msg.sender_id === currentUserId
-                const prev      = msgs[i - 1]
-                const showAvatar= !isMine && (msgs[i + 1]?.sender_id !== msg.sender_id || i === msgs.length - 1)
-                const showName  = !isMine && prev?.sender_id !== msg.sender_id
-                return (
-                  <MessageBubble
-                    key={msg.id}
-                    message={msg}
-                    isMine={isMine}
-                    currentUserId={currentUserId}
-                    sender={isMine ? undefined : { ...participant, is_online: isOnline }}
-                    showSenderName={showName}
-                    showAvatar={showAvatar}
-                    showSeen={isSeen(msg)}
-                    onReply={handleReply}
-                    onReact={handleReact}
-                    onDelete={handleDelete}
-                    replyToSenderName={msg.reply_to
-                      ? (msg.reply_to.sender_id === currentUserId ? 'You' : participant.first_name)
-                      : undefined}
-                  />
-                )
-              })}
+            <div key={date}>
+              <MessageDateDivider label={date} />
+              <ul className="flex flex-col gap-3">
+                {msgs.map((msg, i) => {
+                  const isMine    = msg.sender_id === currentUserId
+                  return (
+                    <MessageBubble
+                      key={msg.id}
+                      message={msg}
+                      isMine={isMine}
+                      currentUserId={currentUserId}
+                      sender={isMine ? undefined : { ...participant, is_online: isOnline }}
+                      showSenderName={msgs[i + 1]?.sender_id !== msg.sender_id}
+                      showSeen={isSeen(msg)}
+                      onReply={handleReply}
+                      onReact={handleReact}
+                      onDelete={handleDelete}
+                      replyToSenderName={msg.reply_to
+                        ? (msg.reply_to.sender_id === currentUserId ? 'You' : participant.first_name)
+                        : undefined}
+                    />
+                  )
+                })}
+              </ul>
             </div>
           ))}
 
         {/* Typing bubble */}
         <AnimatePresence>
           {isOtherTyping && (
-            <motion.div initial={{ opacity: 0, y: 8, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 4, scale: 0.95 }} transition={{ duration: 0.18 }} className="flex items-end gap-2 max-w-[72%] mr-auto">
-              <div className="w-7 h-7 rounded-full bg-[var(--color-surface-dark)] border border-white/10 flex items-center justify-center shrink-0 mb-1">
-                <span className="font-card text-[0.55rem] text-white/70">{initials}</span>
-              </div>
-              <div className="glass-surface border border-white/[0.06] rounded-2xl rounded-bl-sm px-4 py-3">
-                <TypingDots />
-              </div>
-            </motion.div>
+            <div className="mt-4">
+              <TypingMessage
+                name={nameWithRole(participant.first_name, participant.last_name, participant.role)}
+                initials={initials}
+              />
+            </div>
           )}
         </AnimatePresence>
         <div ref={bottomRef} className="h-1" />
@@ -335,7 +328,7 @@ export default function ChatWindow({ conversation, draftUser, currentUserId, isP
         disabled={sending}
         replyTo={replyTo}
         onCancelReply={() => setReplyTo(null)}
-      />
+      showJumpToLatest={!atLatest} onJumpToLatest={scrollToLatest} />
     </div>
   )
 }

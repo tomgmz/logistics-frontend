@@ -5,8 +5,8 @@ import { useAuthStore } from '@/lib/store/auth.store'
 import { goHomeSignedOut } from '@/lib/auth-redirect'
 import { clientMessagesHref } from '@/lib/services/support.service'
 import ReusableHeader from '@/components/layout/ReusableHeader'
+import EmergencyCallProvider from '@/components/calls/EmergencyCallProvider'
 import { MessagingChromeContext } from '@/components/messaging/MessagingChromeContext'
-import ChatCallProvider from '@/components/calls/ChatCallProvider'
 import { useState } from 'react'
 
 export default function MessagingLayout({ children }: { children: ReactNode }) {
@@ -43,8 +43,9 @@ export default function MessagingLayout({ children }: { children: ReactNode }) {
           {children}
         </MessagingChromeContext.Provider>
       </main>
-      {/* This page is outside the dashboard shell, so it rings for calls itself. */}
-      <ChatCallProvider />
+      {/* This page is outside the dashboard shell, so it rings for a driver's
+          quick alert (SOS) itself, for the same roles as the shell. */}
+      {(user.role === 'operations_manager' || user.role === 'admin') && <EmergencyCallProvider />}
     </div>
   )
 }

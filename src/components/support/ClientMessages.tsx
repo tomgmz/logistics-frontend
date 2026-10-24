@@ -10,10 +10,12 @@ import { useMessengerStore } from '@/lib/store/messenger.store'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { roleLabel } from '@/lib/roles'
 import { bookingRef } from '@/lib/booking'
-import { formatConversationTime, formatMessageTime } from '@/app/utils/messaging.utils'
+import { formatConversationTime } from '@/app/utils/messaging.utils'
 import type { ConversationWithDetails, MessageRow, MessagableUser } from '@/app/types/messaging/messaging.types'
 import PhotoSendDialog, { MAX_PHOTO_BYTES } from '@/components/messaging/PhotoSendDialog'
-import MessagePhoto from '@/components/messaging/MessagePhoto'
+import MessageItem from '@/components/messaging/MessageItem'
+import { BookingMentionMenu, useBookingMentionPicker } from '@/components/messaging/BookingMention'
+import JumpToLatest from '@/components/messaging/JumpToLatest'
 
 /**
  * The client's messages, inside the help assistant rather than the staff
@@ -191,9 +193,25 @@ export function ClientMessagesPanel({ state, userId, onAskAssistant }: {
   const [photoError, setPhotoError] = useState<string | null>(null)
   const scroller = useRef<HTMLDivElement>(null)
   const fileRef  = useRef<HTMLInputElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  // "@" opens the client's own bookings; picking one writes its number in.
+  const mention  = useBookingMentionPicker(input, setInput, inputRef)
 
   const bottomRef = useRef<HTMLDivElement>(null)
-  useStickToBottom(bottomRef, thread?.kind === 'conversation' ? thread.id : thread ? 'draft' : null, [messages, thread])
+  // Opens on your first unread message; after that follows only while you're at the bottom.
+  const openConv = thread?.kind === 'conversation' ? conversations.find((c) => c.conversation_id === thread.id) : null
+  const chatMessages = useMemo(
+    () => messages.map((m) => ({ id: m.message_id, sender_id: m.sender_id, created_at: m.sent_at })),
+    [messages],
+  )
+  const { scrollToLatest, atLatest } = useStickToBottom(bottomRef, thread?.kind === 'conversation' ? thread.id : thread ? 'draft' : null, [messages, thread], {
+    ready: !threadLoading,
+    messages: chatMessages,
+    currentUserId: userId,
+    lastReadAt: openConv
+      ? (openConv.participant_a_id === userId ? openConv.participant_a_last_read_at : openConv.participant_b_last_read_at)
+      : null,
+  })
 
   const driverIds = useMemo(() => new Set(drivers.map((d) => d.user_id)), [drivers])
 
@@ -292,6 +310,7 @@ export function ClientMessagesPanel({ state, userId, onAskAssistant }: {
 
   const submit = async () => {
     if (!input.trim() || sending) return
+    scrollToLatest()
     setSending(true)
     const ok = await state.send(input)
     setSending(false)
@@ -309,6 +328,7 @@ export function ClientMessagesPanel({ state, userId, onAskAssistant }: {
   }
 
   const sendPhoto = async (attachmentUrl: string, caption: string) => {
+    scrollToLatest()
     setPhoto(null)
     setSending(true)
     await state.send(caption, attachmentUrl)
@@ -332,7 +352,7 @@ export function ClientMessagesPanel({ state, userId, onAskAssistant }: {
         </div>
       </div>
 
-      <div ref={scroller} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
+      <div ref={scroller} className="flex-1 overflow-y-auto px-4 py-4">
         {threadLoading ? (
           <p className="flex items-center gap-2 text-xs text-white/45"><Loader2 size={13} className="animate-spin" /> Loading messages…</p>
         ) : messages.length === 0 ? (
@@ -340,23 +360,27 @@ export function ClientMessagesPanel({ state, userId, onAskAssistant }: {
             {thread.kind === 'draft' ? 'Say hello to your driver.' : 'No messages yet.'}
           </p>
         ) : (
-          messages.map((m) => {
-            const mine = m.sender_id === userId
-            return (
-              <div key={m.message_id} className={`flex ${mine ? 'justify-end' : 'justify-start'} gap-2`}>
-                {!mine && other && <Avatar role={other.role} small />}
-                <div className={`max-w-[85%] space-y-1 ${mine ? 'text-right' : ''}`}>
-                  <div
-                    className={`whitespace-pre-line break-words rounded-2xl px-3.5 py-2.5 text-left text-[13px] leading-relaxed ${
-                      mine ? 'rounded-br-md bg-[var(--color-cyan)] text-[#0a0a0a]' : 'rounded-bl-md bg-white/[0.06] text-white/90'}`}
-                  >
-                    <MessagePhoto body={m.content} attachmentUrl={m.attachment_url} stamped={m.attachment_stamped} />
-                  </div>
-                  <p className="px-1 text-[10px] text-white/30">{formatMessageTime(m.sent_at)}</p>
-                </div>
-              </div>
-            )
-          })
+          <ul className="flex flex-col gap-3">
+            {messages.map((m, i) => {
+              const mine = m.sender_id === userId
+              const name = other ? fullName(other) : 'Unknown'
+              return (
+                <MessageItem
+                  key={m.message_id}
+                  messageId={m.message_id}
+                  isMine={mine}
+                  currentUserId={userId}
+                  senderName={name}
+                  showName={messages[i + 1]?.sender_id !== m.sender_id}
+                  initials={name.split(' ').map(w => w[0] ?? '').join('').slice(0, 2).toUpperCase() || '?'}
+                  createdAt={m.sent_at}
+                  body={m.content}
+                  attachmentUrl={m.attachment_url}
+                  stamped={m.attachment_stamped}
+                />
+              )
+            })}
+          </ul>
         )}
         <div ref={bottomRef} />
       </div>
@@ -364,28 +388,38 @@ export function ClientMessagesPanel({ state, userId, onAskAssistant }: {
       {canSend ? (
         <form
           onSubmit={(e) => { e.preventDefault(); void submit() }}
-          className="border-t border-white/[0.07] px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+          className="relative border-t border-white/[0.07] px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
         >
+          <JumpToLatest show={!atLatest && !mention.open} onClick={scrollToLatest} />
           {sendError && <p className="mb-2 text-[11px] text-red-400">{sendError}</p>}
           {photoError && <p className="mb-2 text-[11px] text-red-400">{photoError}</p>}
           <PhotoSendDialog file={photo} onCancel={() => setPhoto(null)} onSend={(url, caption) => void sendPhoto(url, caption)} />
+          {/* Untitled UI's minimal message composer, with our photo button. */}
           <div className="flex items-center gap-2">
-            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={pickPhoto} />
-            <button type="button" onClick={() => fileRef.current?.click()} disabled={sending}
-              title="Send a photo (up to 10 MB)" aria-label="Send a photo"
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 text-white/60 hover:text-white disabled:opacity-30">
-              <ImagePlus size={16} />
-            </button>
-            <input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Message your driver…"
-              maxLength={5000}
-              className="flex-1 rounded-xl border border-white/10 bg-[#111] px-3 py-2.5 text-[13px] text-white outline-none placeholder:text-white/30 focus:border-[var(--color-cyan)]/50"
-            />
+            <div className="relative flex min-w-0 flex-1 items-center rounded-lg bg-white/[0.03] shadow-xs ring-1 ring-white/10 ring-inset transition-shadow duration-100 focus-within:ring-[var(--color-cyan)]/40">
+              <BookingMentionMenu picker={mention} />
+              <input
+                ref={inputRef}
+                value={input}
+                onChange={(e) => { setInput(e.target.value); mention.sync() }}
+                onKeyDown={(e) => { mention.onKeyDown(e) }}
+                onSelect={mention.sync}
+                onBlur={() => setTimeout(mention.close, 150)}
+                placeholder="Message your driver…"
+                aria-label="Message"
+                maxLength={5000}
+                className="w-full min-w-0 bg-transparent px-3.5 py-2.5 text-[15px] text-white outline-none placeholder:text-white/30"
+              />
+              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={pickPhoto} />
+              <button type="button" onClick={() => fileRef.current?.click()} disabled={sending}
+                title="Send a photo (up to 10 MB)" aria-label="Send a photo"
+                className="mr-1.5 shrink-0 rounded-md p-1.5 text-white/40 transition-colors hover:bg-white/5 hover:text-white/75 disabled:opacity-30">
+                <ImagePlus size={16} />
+              </button>
+            </div>
             <button type="submit" disabled={!input.trim() || sending} aria-label="Send"
-              className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-cyan)] text-[#0a0a0a] disabled:opacity-30">
-              {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+              className="flex shrink-0 items-center justify-center rounded-lg bg-[var(--color-cyan)] p-3 text-[#0a0a0a] shadow-xs transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:bg-white/[0.05] disabled:text-white/25">
+              {sending ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
             </button>
           </div>
         </form>

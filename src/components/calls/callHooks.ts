@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 
-/** Shared by the emergency ringer and chat calls. */
+/** Used by the emergency ringer. */
 
 /* ── Ringtone ────────────────────────────────────────────────────────────── */
 

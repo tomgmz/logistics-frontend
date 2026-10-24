@@ -170,7 +170,7 @@ export default function EmojiPicker({ onSelect, onClose, position = 'top' }: Emo
       exit={{ opacity: 0, scale: 0.92, y: position === 'top' ? 8 : -8 }}
       transition={{ duration: 0.15 }}
       className={`
-        absolute z-50 w-[300px]
+        absolute right-0 z-50 w-[300px] max-w-[calc(100vw-2rem)]
         bg-[var(--color-bg)] border border-white/[0.10]
         rounded-2xl shadow-2xl overflow-hidden
         ${position === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'}
@@ -354,45 +354,6 @@ export default function EmojiPicker({ onSelect, onClose, position = 'top' }: Emo
           </>
         )}
       </AnimatePresence>
-    </motion.div>
-  )
-}
-
-interface QuickReactBarProps {
-  onReact: (emoji: string) => void
-  currentUserReaction?: string | null
-  isMine: boolean
-}
-
-export function QuickReactBar({ onReact, currentUserReaction, isMine }: QuickReactBarProps) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.85, y: 4 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.85, y: 4 }}
-      transition={{ duration: 0.12 }}
-      className={`
-        absolute -top-9 ${isMine ? 'right-0' : 'left-0'}
-        flex items-center gap-0.5
-        bg-[var(--color-bg)] border border-white/10
-        rounded-full px-1.5 py-1 shadow-lg z-10
-      `}
-    >
-      {QUICK_REACTIONS.map(emoji => (
-        <button
-          key={emoji}
-          type="button"
-          onClick={() => onReact(emoji)}
-          className={`
-            w-7 h-7 flex items-center justify-center rounded-full
-            hover:scale-125 active:scale-90
-            transition-[transform,background-color] duration-75
-            ${currentUserReaction === emoji ? 'bg-[var(--color-cyan)]/20' : 'hover:bg-white/10'}
-          `}
-        >
-          <span className="text-[18px] leading-none select-none">{emoji}</span>
-        </button>
-      ))}
     </motion.div>
   )
 }
