@@ -33,6 +33,8 @@ import ReusableModal from '@/components/layout/ReusableModal'
 import { appToast } from '@/lib/toast'
 import { extractApiError } from '@/lib/api-error'
 import LandlineInputRow, { toLocalLandlineDigits } from './LandLineInputRow'
+import PhoneInputRow, { attachCountryCode, toLocalDigits } from '@/components/ui/PhoneInputRow'
+import { normalizePhMobile, PH_MOBILE_REGEX } from '@/lib/validation/fields'
 import BillingAddressField from './BillingAddressField'
 import { ScanLine, CheckCircle } from 'lucide-react'
 import proxyApi from '@/lib/api/auth.api'
@@ -90,22 +92,13 @@ interface ScanEligibilityState {
   vehicle_eligibility: VehicleEligibility
 }
 
-function toLocalDigits(raw: string): string {
-  const digits = raw.replace(/\D/g, '')
-  if (digits.startsWith('63')) return digits.slice(2)
-  if (digits.startsWith('0'))  return digits.slice(1)
-  return digits
-}
-
-function attachCountryCode(local: string): string {
-  return `+63${local.replace(/\D/g, '')}`
-}
-
-function formatPhone(digits: string): string {
-  const d = digits.replace(/\D/g, '')
-  if (d.length <= 3) return d
-  if (d.length <= 7) return `${d.slice(0, 3)}-${d.slice(3)}`
-  return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7, 10)}`
+// An older vendor contact may be free text (a person's name). Only a real PH
+// mobile is loaded into the number box; anything else starts blank and is left
+// alone on save unless someone types a number.
+function vendorContactDigits(raw: string | null | undefined): string {
+  if (!raw) return ''
+  const mobile = normalizePhMobile(raw)
+  return PH_MOBILE_REGEX.test(mobile) ? toLocalDigits(mobile) : ''
 }
 
 // Name fields auto-capitalize the first letter of each word as the user types / from OCR autofill.
@@ -144,7 +137,7 @@ function buildInitialState(tab: UserTab, user: AnyUser | null, driverSource: Dri
       // Fixed once the driver exists: a driver never moves between 8338 and a vendor.
       is_external:      user ? d?.is_external === true : driverSource === 'vendor',
       vendor_name:      d?.vendor_name    ?? '',
-      vendor_contact:   d?.vendor_contact ?? '',
+      vendor_contact:   vendorContactDigits(d?.vendor_contact),
     }
   }
 
@@ -157,6 +150,7 @@ async function submitForm(
   form: FormState,
   licenseFile: File | null,
   editId?: string,
+  initial?: FormState,
 ): Promise<string | undefined> {
   const clean = Object.fromEntries(
     Object.entries(form).filter(([key, value]) =>
@@ -165,11 +159,16 @@ async function submitForm(
   )
   if (clean.phone)    clean.phone    = attachCountryCode(String(clean.phone))
   if (clean.landline) clean.landline = attachCountryCode(String(clean.landline))
+  if (clean.vendor_contact) clean.vendor_contact = attachCountryCode(String(clean.vendor_contact))
 
   if (tab === 'drivers') {
     if (form.is_external === true) {
-      // Sent even when blank on an edit, so clearing the contact actually clears it.
-      if (editId) clean.vendor_contact = String(form.vendor_contact ?? '')
+      if (editId) {
+        // Only sent when changed, so an older free-text contact the box could not
+        // show is not wiped; sent blank when cleared, so clearing really clears it.
+        if (form.vendor_contact === initial?.vendor_contact) delete clean.vendor_contact
+        else if (!clean.vendor_contact) clean.vendor_contact = ''
+      }
     } else {
       delete clean.vendor_name
       delete clean.vendor_contact
@@ -267,40 +266,6 @@ function Select({
     >
       {children}
     </select>
-  )
-}
-
-function PhoneInputRow({
-  value,
-  onChange,
-  placeholder,
-  maxLength,
-  error,
-}: {
-  value: string
-  onChange: (digits: string) => void
-  placeholder: string
-  maxLength: number
-  error?: string
-}) {
-  return (
-    <div className="flex">
-      <span className="flex items-center rounded-l-[10px] border border-r-0 border-[#424242] bg-[#232323] px-3 text-[13px] font-medium text-[#818181] select-none">
-        +63
-      </span>
-      <Input
-        type="tel"
-        value={value}
-        onChange={e => {
-          const digits = e.target.value.replace(/\D/g, '').slice(0, maxLength)
-          onChange(digits)
-        }}
-        placeholder={placeholder}
-        maxLength={maxLength + Math.floor(maxLength / 3)}
-        error={error}
-        className="rounded-l-none"
-      />
-    </div>
   )
 }
 
@@ -472,6 +437,8 @@ export default function UserFormModal({
     if (payload.phone)    payload.phone    = attachCountryCode(String(payload.phone))
     if (payload.landline) payload.landline = attachCountryCode(String(payload.landline))
     else                  delete payload.landline
+    if (payload.vendor_contact) payload.vendor_contact = attachCountryCode(String(payload.vendor_contact))
+    else                        delete payload.vendor_contact
     return payload
   }
 
@@ -520,7 +487,7 @@ export default function UserFormModal({
     setGlobalError(null)
     setFieldErrors({})
     try {
-      const newUserId = await submitForm(tab, form, licenseFile, isEdit ? user!.user_id : undefined)
+      const newUserId = await submitForm(tab, form, licenseFile, isEdit ? user!.user_id : undefined, initialState)
 
       // Persist the module-access matrix for newly created accounts. Only sent
       // when at least one module is granted — otherwise the account keeps its
@@ -940,13 +907,8 @@ export default function UserFormModal({
 
             <Field label="Mobile" required error={fe.phone}>
               <PhoneInputRow
-                value={formatPhone(form.phone as string)}
-                onChange={digits => {
-                  if (digits.length > 0 && (digits.startsWith('0') || digits.startsWith('1'))) return
-                  set('phone', digits)
-                }}
-                placeholder="929-2143-537"
-                maxLength={10}
+                value={form.phone as string}
+                onChange={digits => set('phone', digits)}
                 error={fe.phone}
               />
             </Field>
@@ -995,11 +957,9 @@ export default function UserFormModal({
                     />
                   </Field>
                   <Field label="Vendor Contact" hint="Optional" error={fe.vendor_contact}>
-                    <Input
+                    <PhoneInputRow
                       value={form.vendor_contact as string}
-                      onChange={e => set('vendor_contact', e.target.value)}
-                      placeholder="Contact person or number"
-                      maxLength={120}
+                      onChange={digits => set('vendor_contact', digits)}
                       error={fe.vendor_contact}
                     />
                   </Field>

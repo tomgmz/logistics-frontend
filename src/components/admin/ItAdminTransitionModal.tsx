@@ -10,6 +10,7 @@ import { useAuthStore } from '@/lib/store/auth.store'
 import { validateForm } from '@/lib/validation/user-management.validation'
 import { extractApiError } from '@/lib/api-error'
 import { appToast } from '@/lib/toast'
+import PhoneInputRow, { attachCountryCode } from '@/components/ui/PhoneInputRow'
 
 /**
  * The signed-in IT Admin hands their role to a successor.
@@ -99,7 +100,7 @@ export default function ItAdminTransitionModal({
     middle_name: form.middle_name.trim() || undefined,
     suffix:      form.suffix.trim() || undefined,
     email:       form.email.trim().toLowerCase(),
-    phone:       form.phone.trim(),
+    phone:       form.phone ? attachCountryCode(form.phone) : '',
   })
 
   /** Validate the successor's details, then move to the consequence. */
@@ -208,9 +209,9 @@ export default function ItAdminTransitionModal({
                     <input className={inputBase} type="email" value={form.email}
                       onChange={(e) => set('email', e.target.value)} placeholder="name@company.com" />
                   </Field>
-                  <Field label="Phone" required error={errors.phone} hint="+639XXXXXXXXX">
-                    <input className={inputBase} value={form.phone}
-                      onChange={(e) => set('phone', e.target.value)} placeholder="+639171234567" />
+                  <Field label="Mobile" required error={errors.phone}>
+                    <PhoneInputRow value={form.phone} onChange={(digits) => set('phone', digits)}
+                      error={errors.phone} />
                   </Field>
                 </div>
 

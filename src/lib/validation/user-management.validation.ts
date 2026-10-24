@@ -7,6 +7,7 @@ import {
   middleNameField,
   mobileField,
   optionalLandlineField,
+  optionalMobileField,
   suffixField,
 } from './fields'
 
@@ -78,7 +79,8 @@ export const updateClientSchema = z.object({
 // A vendor driver also names the vendor they come from; Booking Management
 // copies it onto the delivery. Mirrors the backend createDriverSchema.
 const vendorName    = z.string().trim().max(120, 'Company name is too long')
-const vendorContact = z.string().trim().max(120, 'Vendor contact is too long')
+// Same PH mobile rule as an account's phone; blank means none given.
+const vendorContact = optionalMobileField
 
 function requireVendorName(data: { is_external?: unknown; vendor_name?: unknown }, ctx: z.RefinementCtx) {
   if (data.is_external === true && !String(data.vendor_name ?? '').trim()) {
@@ -93,7 +95,7 @@ export const createDriverSchema = z
     license_expiry:   licenseExpiry,
     is_external:      z.boolean().optional(),
     vendor_name:      vendorName.optional(),
-    vendor_contact:   vendorContact.optional(),
+    vendor_contact:   vendorContact,
   })
   .superRefine(requireVendorName)
 
@@ -102,7 +104,7 @@ export const updateDriverSchema = z
     ...baseUpdateFields,
     is_external:    z.boolean().optional(),
     vendor_name:    vendorName.optional(),
-    vendor_contact: vendorContact.optional(),
+    vendor_contact: vendorContact,
     license_number: licenseNumber.optional(),
     license_expiry: z
       .string()
