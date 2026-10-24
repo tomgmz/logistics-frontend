@@ -14,10 +14,10 @@ import {
   type DecisionActor, type RecordInspection, type RecordReport, type RecordTrip,
   type TransactionApprovals, type TransactionRecord as RecordData,
 } from '@/lib/services/admin/transaction-history.service'
-import { SectionHeader, InfoTile } from './TransactionDetail'
 import { formatDate, formatDateTime } from './transaction-format'
 import { formatArrivalWindow } from '@/lib/arrival-window'
-import { BG_PANEL, BG_CARD, BORDER, BORDER_C, CYAN, MUTED, ERROR, AMBER, GREEN } from './transaction-theme'
+import { CARD_CLASS, SectionHeading, Tag } from '@/app/admin/booking-management/BookingDetailParts'
+import { BORDER_C, CYAN, MUTED, ERROR, AMBER, GREEN } from './transaction-theme'
 
 /**
  * The staff-only half of a transaction: everything attached to the booking that
@@ -31,23 +31,47 @@ import { BG_PANEL, BG_CARD, BORDER, BORDER_C, CYAN, MUTED, ERROR, AMBER, GREEN }
 
 type Booking = BookingWithRelations
 
-function Panel({ children }: { children: React.ReactNode }) {
+// Drawn like the Booking Management side panel: a grey heading over dark cards.
+function Panel({ icon, title, right, children }: {
+  icon: React.ReactNode; title: string; right?: React.ReactNode; children: React.ReactNode
+}) {
   return (
-    <div className="rounded-xl border p-4 flex flex-col gap-3"
-      style={{ background: BG_PANEL, borderColor: BORDER }}>
-      {children}
-    </div>
+    <section>
+      <SectionHeading icon={icon} right={right}>{title}</SectionHeading>
+      <div className="flex flex-col gap-3">{children}</div>
+    </section>
   )
 }
 
 function Card({ children }: { children: React.ReactNode }) {
+  return <div className={`${CARD_CLASS} px-3.5 py-3 flex flex-col gap-2.5`}>{children}</div>
+}
+
+function InfoTile({ label, value, accent, mono }: {
+  label: string; value: string; accent?: boolean; mono?: boolean
+}) {
   return (
-    <div className="rounded-lg border p-3 flex flex-col gap-2"
-      style={{ background: BG_CARD, borderColor: BORDER_C }}>
-      {children}
+    <div className="flex flex-col gap-0.5 min-w-0">
+      <span className="text-xs font-bold text-[#818181]">{label}</span>
+      <span className={`text-sm font-bold break-words ${mono ? 'font-mono' : ''}`}
+        style={{ color: accent ? CYAN : '#fff' }}>
+        {value}
+      </span>
     </div>
   )
 }
+
+/** Sub-heading inside a card ("Driver", "Vehicle", "Proof of Loading"). */
+function SubLabel({ icon, children, divided }: { icon?: React.ReactNode; children: React.ReactNode; divided?: boolean }) {
+  return (
+    <div className={`flex items-center gap-1.5 text-xs font-bold uppercase text-[#818181] ${
+      divided ? 'pt-2.5 border-t-[0.5px] border-[#818181]' : ''}`}>
+      {icon}{children}
+    </div>
+  )
+}
+
+const ICON = { size: 18, strokeWidth: 2 }
 
 function fullName(u?: { first_name?: string; last_name?: string } | null): string | null {
   if (!u) return null
@@ -87,7 +111,7 @@ function ProofMeta({ at, distance, override }: {
 }
 
 function NoPhoto({ label }: { label: string }) {
-  return <p className="text-[11px]" style={{ color: 'rgba(255,255,255,0.3)' }}>{label}</p>
+  return <p className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>{label}</p>
 }
 
 // ─── Sections ────────────────────────────────────────────────────────────────
@@ -109,9 +133,8 @@ function CrewSection({ record, booking }: { record: RecordData; booking: Booking
 
   if (!d && !fallbackDriver && !fallbackPlate) {
     return (
-      <Panel>
-        <SectionHeader icon={<Truck size={15} />} title="Driver & Vehicle" />
-        <NoPhoto label="No driver or vehicle was ever assigned to this booking." />
+      <Panel icon={<Truck {...ICON} />} title="Driver & Vehicle">
+        <Card><NoPhoto label="No driver or vehicle was ever assigned to this booking." /></Card>
       </Panel>
     )
   }
@@ -126,20 +149,10 @@ function CrewSection({ record, booking }: { record: RecordData; booking: Booking
   const vType      = vendor ? d?.vendor_vehicle_type   : d?.trucks?.truck_models?.vehicle_type
 
   return (
-    <Panel>
-      <div className="flex items-center justify-between gap-2">
-        <SectionHeader icon={<Truck size={15} />} title="Driver & Vehicle" />
-        <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border"
-          style={vendor
-            ? { color: AMBER, borderColor: `${AMBER}55`, background: `${AMBER}14` }
-            : { color: CYAN,  borderColor: `${CYAN}55`,  background: `${CYAN}10` }}>
-          {vendor ? 'Vendor-supplied' : 'Company fleet'}
-        </span>
-      </div>
-
-      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest" style={{ color: MUTED }}>
-        <User size={11} /> Driver
-      </div>
+    <Panel icon={<Truck {...ICON} />} title="Driver & Vehicle"
+      right={<Tag color={vendor ? AMBER : CYAN}>{vendor ? 'Vendor-supplied' : 'Company fleet'}</Tag>}>
+      <Card>
+      <SubLabel icon={<User size={12} />}>Driver</SubLabel>
       <div className="grid grid-cols-2 gap-3">
         <InfoTile label="Name"    value={driverName || '—'} />
         <InfoTile label="License" value={license || '—'} mono />
@@ -151,10 +164,7 @@ function CrewSection({ record, booking }: { record: RecordData; booking: Booking
         {secondDriver && <InfoTile label="Second Driver" value={secondDriver} />}
       </div>
 
-      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest pt-2 border-t"
-        style={{ color: MUTED, borderColor: BORDER }}>
-        <Truck size={11} /> Vehicle
-      </div>
+      <SubLabel icon={<Truck size={12} />} divided>Vehicle</SubLabel>
       <div className="grid grid-cols-2 gap-3">
         <InfoTile label="Plate Number" value={plate || '—'} mono />
         {model && <InfoTile label="Model" value={model} />}
@@ -162,20 +172,21 @@ function CrewSection({ record, booking }: { record: RecordData; booking: Booking
       </div>
 
       {vendor && (
-        <div className="grid grid-cols-2 gap-3 pt-2 border-t" style={{ borderColor: BORDER }}>
+        <div className="grid grid-cols-2 gap-3 pt-2.5 border-t-[0.5px] border-[#818181]">
           <InfoTile label="Vendor"         value={d?.vendor_name    || '—'} />
           <InfoTile label="Vendor Contact" value={d?.vendor_contact || '—'} />
         </div>
       )}
 
       {d && (
-        <div className="grid grid-cols-2 gap-3 pt-2 border-t" style={{ borderColor: BORDER }}>
+        <div className="grid grid-cols-2 gap-3 pt-2.5 border-t-[0.5px] border-[#818181]">
           <InfoTile label="Assigned"        value={formatDateTime(d.created_at)} />
           <InfoTile label="Delivery Status" value={humanize(d.status)} />
           {d.pickup_time   && <InfoTile label="Picked Up" value={formatDateTime(d.pickup_time)} />}
           {d.delivery_time && <InfoTile label="Delivered" value={formatDateTime(d.delivery_time)} />}
         </div>
       )}
+      </Card>
     </Panel>
   )
 }
@@ -196,10 +207,9 @@ function TripsSection({ trips, booking }: { trips: RecordTrip[]; booking: Bookin
     if (!anyProof && !fleetReturn) return null
 
     return (
-      <Panel>
-        <SectionHeader icon={<Camera size={15} />} title="Proof Photos" />
+      <Panel icon={<Camera {...ICON} />} title="Proof Photos">
         <Card>
-          <span className="text-xs font-bold text-white/80">Pick Up</span>
+          <span className="text-sm font-bold text-white">Pick Up</span>
           {pickupUrl ? (
             <div className="flex gap-3">
               <Photo url={pickupUrl} />
@@ -211,7 +221,7 @@ function TripsSection({ trips, booking }: { trips: RecordTrip[]; booking: Bookin
         </Card>
         {dests.map((d, i) => (
           <Card key={d.destination_id}>
-            <span className="text-xs font-bold text-white/80">Drop Off {dests.length > 1 ? i + 1 : ''} · {d.address}</span>
+            <span className="text-sm font-bold text-white">Drop Off {dests.length > 1 ? i + 1 : ''} · {d.address}</span>
             {d.proof_photo_url ? (
               <div className="flex gap-3">
                 <Photo url={d.proof_photo_url} />
@@ -220,25 +230,22 @@ function TripsSection({ trips, booking }: { trips: RecordTrip[]; booking: Bookin
             ) : <NoPhoto label="No proof of delivery on file." />}
           </Card>
         ))}
-        {fleetReturn && <InfoTile label="Vehicle Returned to Base" value={formatDateTime(fleetReturn)} />}
+        {fleetReturn && <Card><InfoTile label="Vehicle Returned to Base" value={formatDateTime(fleetReturn)} /></Card>}
       </Panel>
     )
   }
 
   return (
-    <Panel>
-      <SectionHeader icon={<RouteIcon size={15} />} title={`Trips & Proof Photos (${trips.length})`} />
+    <Panel icon={<RouteIcon {...ICON} />} title={`Trips & Proof Photos (${trips.length})`}>
       {trips.map((trip) => (
         <Card key={trip.trip_id}>
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-white">Trip {trip.trip_number}</span>
-            <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: MUTED }}>
-              {humanize(trip.status)}
-            </span>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm font-bold" style={{ color: CYAN }}>Trip {trip.trip_number}</span>
+            <Tag color={null}>{humanize(trip.status)}</Tag>
           </div>
-          {trip.notes && <p className="text-[11px] text-white/60">{trip.notes}</p>}
+          {trip.notes && <p className="text-xs text-white/60">{trip.notes}</p>}
 
-          <span className="text-[10px] uppercase tracking-widest" style={{ color: MUTED }}>Proof of Loading</span>
+          <SubLabel>Proof of Loading</SubLabel>
           {trip.pickup_proof_photo_url ? (
             <div className="flex gap-3">
               <Photo url={trip.pickup_proof_photo_url} />
@@ -248,14 +255,15 @@ function TripsSection({ trips, booking }: { trips: RecordTrip[]; booking: Bookin
           ) : <NoPhoto label="No proof of loading on file." />}
 
           {trip.booking_trip_stops.map((stop) => (
-            <div key={stop.trip_stop_id} className="flex flex-col gap-1.5 pt-2 border-t" style={{ borderColor: BORDER }}>
+            <div key={stop.trip_stop_id} className="flex flex-col gap-1.5 pt-2.5 border-t-[0.5px] border-[#818181]">
               <div className="flex items-start justify-between gap-2">
-                <span className="text-[11px] text-white/75">
+                <span className="text-sm font-bold text-[#818181] break-words min-w-0">
                   {stop.booking_destinations?.address ?? `Stop ${stop.sequence_order}`}
                 </span>
-                <span className="text-[10px] font-bold uppercase tracking-wider shrink-0"
-                  style={{ color: stop.status === 'delivered' ? CYAN : stop.status === 'failed' ? ERROR : MUTED }}>
-                  {humanize(stop.status)}
+                <span className="shrink-0">
+                  <Tag color={stop.status === 'delivered' ? GREEN : stop.status === 'failed' ? ERROR : AMBER}>
+                    {humanize(stop.status)}
+                  </Tag>
                 </span>
               </div>
               {stop.proof_photo_url ? (
@@ -269,7 +277,7 @@ function TripsSection({ trips, booking }: { trips: RecordTrip[]; booking: Bookin
           ))}
         </Card>
       ))}
-      {fleetReturn && <InfoTile label="Vehicle Returned to Base" value={formatDateTime(fleetReturn)} />}
+      {fleetReturn && <Card><InfoTile label="Vehicle Returned to Base" value={formatDateTime(fleetReturn)} /></Card>}
     </Panel>
   )
 }
@@ -281,11 +289,12 @@ function TripsSection({ trips, booking }: { trips: RecordTrip[]; booking: Bookin
  */
 function InspectionSection({ inspection }: { inspection: RecordInspection | null }) {
   return (
-    <Panel>
-      <SectionHeader icon={<ShieldCheck size={15} />} title="Vehicle Inspection (BLOWBAGETS)" />
-      {inspection
-        ? <InfoTile label="Passed Inspection" value={formatDateTime(inspection.inspected_at)} />
-        : <NoPhoto label="No passed inspection on file before this assignment." />}
+    <Panel icon={<ShieldCheck {...ICON} />} title="Vehicle Inspection (BLOWBAGETS)">
+      <Card>
+        {inspection
+          ? <InfoTile label="Passed Inspection" value={formatDateTime(inspection.inspected_at)} />
+          : <NoPhoto label="No passed inspection on file before this assignment." />}
+      </Card>
     </Panel>
   )
 }
@@ -293,18 +302,15 @@ function InspectionSection({ inspection }: { inspection: RecordInspection | null
 function ReportsSection({ reports }: { reports: RecordReport[] }) {
   if (reports.length === 0) return null
   return (
-    <Panel>
-      <SectionHeader icon={<AlertTriangle size={15} />} title={`Driver Reports (${reports.length})`} />
+    <Panel icon={<AlertTriangle {...ICON} />} title={`Driver Reports (${reports.length})`}>
       {reports.map((r) => (
         <Card key={r.report_id}>
           <div className="flex items-center justify-between gap-2">
-            <span className="text-xs font-bold text-white">
+            <span className="text-sm font-bold text-white">
               {r.incident_type ? humanize(r.incident_type) : 'Unspecified Emergency'}
               {r.sub_type ? ` · ${r.sub_type}` : ''}
             </span>
-            <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: MUTED }}>
-              {humanize(r.status)}
-            </span>
+            <span className="shrink-0"><Tag color={null}>{humanize(r.status)}</Tag></span>
           </div>
           <span className="text-[11px]" style={{ color: MUTED }}>
             {r.source === 'quick' ? 'Quick alert' : 'Detailed report'} · {formatDateTime(r.created_at)}
@@ -352,15 +358,16 @@ function CustomerSection({ booking }: { booking: Booking }) {
   } | null | undefined
   if (!c) return null
   return (
-    <Panel>
-      <SectionHeader icon={<Building2 size={15} />} title="Customer" />
-      <div className="grid grid-cols-2 gap-3">
-        <InfoTile label="Company"         value={c.company_name || '—'} />
-        <InfoTile label="Contact Person"  value={fullName(c.users) || '—'} />
-        <InfoTile label="Email"           value={c.users?.email || '—'} />
-        <InfoTile label="Phone"           value={c.users?.phone || '—'} />
-      </div>
-      {c.billing_address && <InfoTile label="Billing Address" value={c.billing_address} />}
+    <Panel icon={<Building2 {...ICON} />} title="Customer">
+      <Card>
+        <div className="grid grid-cols-2 gap-3">
+          <InfoTile label="Company"         value={c.company_name || '—'} />
+          <InfoTile label="Contact Person"  value={fullName(c.users) || '—'} />
+          <InfoTile label="Email"           value={c.users?.email || '—'} />
+          <InfoTile label="Phone"           value={c.users?.phone || '—'} />
+        </div>
+        {c.billing_address && <InfoTile label="Billing Address" value={c.billing_address} />}
+      </Card>
     </Panel>
   )
 }
@@ -380,8 +387,7 @@ function CargoLinesSection({ booking }: { booking: Booking }) {
   if (items.length === 0) return null
 
   return (
-    <Panel>
-      <SectionHeader icon={<Package size={15} />} title={`Cargo Lines (${items.length})`} />
+    <Panel icon={<Package {...ICON} />} title={`Cargo Lines (${items.length})`}>
       {items.map((it) => {
         const name = it.products?.name ?? it.product_text ?? it.commodities?.name ?? it.commodity_text ?? 'Item'
         const dims = [it.length_cm, it.width_cm, it.height_cm].every((n) => n != null)
@@ -389,15 +395,15 @@ function CargoLinesSection({ booking }: { booking: Booking }) {
         const handling = [it.shc?.code, it.ashc?.code].filter(Boolean).join(', ')
         return (
           <Card key={it.item_id}>
-            <span className="text-xs font-bold text-white">{name}</span>
-            <div className="grid grid-cols-3 gap-2">
+            <span className="text-sm font-bold" style={{ color: CYAN }}>{name}</span>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {it.quantity   != null && <InfoTile label="Quantity" value={`${it.quantity}${it.products?.unit ? ` ${it.products.unit}` : ''}`} />}
               {it.weight_kg  != null && <InfoTile label="Weight"   value={`${it.weight_kg} KG`} />}
               {it.volume_cbm != null && <InfoTile label="Volume"   value={`${Number(it.volume_cbm).toFixed(2)} CBM`} />}
               {dims && <InfoTile label="Dimensions" value={dims} />}
               {handling && <InfoTile label="Handling" value={handling} />}
             </div>
-            {it.notes && <p className="text-[11px] text-white/60">{it.notes}</p>}
+            {it.notes && <p className="text-xs text-white/60">{it.notes}</p>}
           </Card>
         )
       })}
@@ -414,7 +420,7 @@ function DecisionCard({ stage, verb, actor, pendingLabel, note }: {
 }) {
   return (
     <Card>
-      <span className="text-[10px] uppercase tracking-widest" style={{ color: MUTED }}>{stage}</span>
+      <span className="text-xs font-bold uppercase text-[#818181]">{stage}</span>
       {actor ? (
         <>
           <span className="text-sm font-bold text-white">
@@ -459,8 +465,7 @@ function ApprovalsSection({ approvals, booking }: { approvals: TransactionApprov
   const showCancel = cancelled && !rejected
 
   return (
-    <Panel>
-      <SectionHeader icon={<ClipboardCheck size={15} />} title="Approvals" />
+    <Panel icon={<ClipboardCheck {...ICON} />} title="Approvals">
       {/* Turned down before any approval: the cancellation card says it all. */}
       {!(showCancel && !review && gmStatus !== 'approved') && (
         <DecisionCard stage="Approval" verb={rejected ? 'Rejected' : 'Approved'}
@@ -483,12 +488,12 @@ function ApprovalsSection({ approvals, booking }: { approvals: TransactionApprov
       )}
       {approvals.issue && (
         <Card>
-          <span className="text-[10px] uppercase tracking-widest" style={{ color: ERROR }}>Problem Reported by the Client</span>
+          <span className="text-xs font-bold uppercase" style={{ color: ERROR }}>Problem Reported by the Client</span>
           <span className="text-[12px] text-white/80 whitespace-pre-wrap">{approvals.issue.note}</span>
           {approvals.issue.at && <span className="text-[11px]" style={{ color: MUTED }}>{formatDateTime(approvals.issue.at)}</span>}
         </Card>
       )}
-      {eta && <InfoTile label="Planned Arrival" value={formatArrivalWindow(eta) ?? formatDateTime(eta)} />}
+      {eta && <Card><InfoTile label="Planned Arrival" value={formatArrivalWindow(eta) ?? formatDateTime(eta)} /></Card>}
     </Panel>
   )
 }
@@ -513,7 +518,7 @@ export default function TransactionRecord({ booking }: { booking: Booking }) {
   }, [bookingId])
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-[18px]">
       {loading ? (
         <div className="flex items-center gap-2 text-xs" style={{ color: MUTED }}>
           <div className="h-4 w-4 animate-spin rounded-full border-2 border-t-transparent"

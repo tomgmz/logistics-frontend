@@ -24,6 +24,7 @@ import GroupChatWindow   from './GroupChatWindow'
 import NewConversationModal from './NewConversationModal'
 import NewGroupModal     from './NewGroupModal'
 import SiteFooter        from '@/components/layout/SiteFooter'
+import { useSetMessagingChatOpen } from './MessagingChromeContext'
 
 export default function MessagingShell() {
   const { user }        = useAuthStore()
@@ -186,6 +187,12 @@ export default function MessagingShell() {
 
   const selectedConv   = conversations.find(c => c.id === selectedConvId) ?? null
   const hasActiveChat  = !!selectedConvId || !!selectedGroup || !!draftUser
+
+  const setChatOpen = useSetMessagingChatOpen()
+  useEffect(() => {
+    setChatOpen(hasActiveChat)
+    return () => setChatOpen(false)
+  }, [hasActiveChat, setChatOpen])
 
   if (loading) {
     return (

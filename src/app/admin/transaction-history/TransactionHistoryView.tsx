@@ -17,9 +17,10 @@ import { getApiErrorMessage } from '@/lib/api-error'
 import { appToast } from '@/lib/toast'
 
 import CompanyFilter from '@/components/transactions/CompanyFilter'
-import TransactionDetail from '@/components/transactions/TransactionDetail'
+import StaffTransactionDetail from '@/components/transactions/StaffTransactionDetail'
 import TransactionRecord from '@/components/transactions/TransactionRecord'
-import { StatusBadge, getStatusMeta } from '@/components/transactions/TransactionStatus'
+import { getStatusMeta } from '@/components/transactions/TransactionStatus'
+import { PANEL_BG, Tag } from '@/app/admin/booking-management/BookingDetailParts'
 import ProblemReportedBadge, { hasOpenClientIssue } from '@/components/transactions/ProblemReportedBadge'
 import {
   formatDate, formatPeso, formatPesoExact, getCompanyName, getDropoffs,
@@ -486,42 +487,42 @@ export default function TransactionHistoryView() {
         <AnimatePresence>
           {selected && (
             <>
-              <motion.div
+              <motion.button
+                type="button"
+                aria-label="Close panel"
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                 onClick={() => setSelected(null)}
-                className="fixed inset-0 z-20 bg-black/60 xl:hidden"
+                className="fixed inset-0 z-[40] bg-black/60 lg:hidden"
               />
+              {/* Same frame as the Booking Management side panel. */}
               <motion.aside
                 initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
-                transition={{ type: 'tween', duration: 0.25 }}
-                className="fixed right-0 top-0 z-30 flex h-full w-full max-w-[460px] flex-col
-                           border-l bg-[var(--color-bg)] xl:relative xl:z-0 xl:h-auto xl:max-w-[420px]"
-                style={{ borderColor: BORDER }}
+                transition={{ type: 'spring', damping: 28, stiffness: 260 }}
+                className="fixed lg:relative z-[50] inset-y-0 right-0 w-full max-w-[455px] shrink-0
+                           border-l border-[#424242] flex flex-col shadow-2xl lg:shadow-none"
+                style={{ background: PANEL_BG }}
               >
-                <div className="flex shrink-0 items-center gap-2 border-b px-4 py-3"
-                  style={{ borderColor: BORDER }}>
-                  <button type="button" onClick={() => setSelected(null)}
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border
-                               transition-colors hover:border-white/30 hover:text-white cursor-pointer"
-                    style={{ borderColor: 'rgba(255,255,255,0.12)', color: MUTED }}>
-                    <X size={16} />
-                  </button>
-                  <span className="font-mono text-sm font-bold text-white">{bookingRef(selected)}</span>
-                  <div className="ml-auto flex items-center gap-2">
+                <div className="shrink-0 flex items-center justify-between gap-3 pl-4 sm:pl-[26px] pr-2 sm:pr-3
+                                min-h-[59px] border-b border-[#424242]">
+                  <span className="text-base font-bold uppercase text-[#818181]">Transaction</span>
+                  <div className="flex items-center gap-1.5 min-w-0">
                     {hasOpenClientIssue(selected) && (
                       <ProblemReportedBadge className="" note={selected.client_issue_note as string | null | undefined} />
                     )}
-                    <StatusBadge status={selected.status} />
+                    <Tag color={getStatusMeta(selected.status).color} size="md">
+                      {getStatusMeta(selected.status).label}
+                    </Tag>
+                    <button type="button" onClick={() => setSelected(null)} aria-label="Close"
+                      className="p-2 rounded-lg hover:bg-white/5 text-[#818181] hover:text-white transition-colors cursor-pointer">
+                      <X size={19} strokeWidth={2} />
+                    </button>
                   </div>
                 </div>
-                <div className="min-h-0 flex-1 overflow-auto p-4">
-                  {/* The drawer already slides, so the body must not slide too. */}
-                  <TransactionDetail booking={selected} animated={false} showCrew={false} />
+                <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 pt-[18px] pb-6 space-y-[18px]">
+                  <StaffTransactionDetail booking={selected} />
                   {/* Staff-only: crew, vehicle, proof photos, inspections, reports. */}
                   <TransactionRecord key={selected.booking_id as string} booking={selected} />
-                  <div className="mt-4">
-                    <StopTimesPanel key={`times-${selected.booking_id as string}`} bookingId={selected.booking_id as string} staff />
-                  </div>
+                  <StopTimesPanel key={`times-${selected.booking_id as string}`} bookingId={selected.booking_id as string} staff />
                 </div>
               </motion.aside>
             </>

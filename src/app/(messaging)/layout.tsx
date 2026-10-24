@@ -5,12 +5,14 @@ import { useAuthStore } from '@/lib/store/auth.store'
 import { goHomeSignedOut } from '@/lib/auth-redirect'
 import { clientMessagesHref } from '@/lib/services/support.service'
 import ReusableHeader from '@/components/layout/ReusableHeader'
+import { MessagingChromeContext } from '@/components/messaging/MessagingChromeContext'
 import { useState } from 'react'
 
 export default function MessagingLayout({ children }: { children: ReactNode }) {
   const user = useAuthStore(s => s.user)
   const hasHydrated = useAuthStore(s => s.hasHydrated)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [chatOpen, setChatOpen] = useState(false)
 
   useEffect(() => {
     if (!hasHydrated) return
@@ -28,12 +30,17 @@ export default function MessagingLayout({ children }: { children: ReactNode }) {
       className="flex flex-col bg-[var(--color-bg)] overflow-hidden"
       style={{ height: '100dvh' }}
     >
-      <ReusableHeader
-        sidebarOpen={sidebarOpen}
-        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
-      />
+      {/* Below lg an open chat shows its own header (with Back), so the site bar would double up. */}
+      <div className={chatOpen ? 'hidden lg:block' : undefined}>
+        <ReusableHeader
+          sidebarOpen={sidebarOpen}
+          onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+        />
+      </div>
       <main className="flex flex-1 min-h-0 overflow-hidden">
-        {children}
+        <MessagingChromeContext.Provider value={setChatOpen}>
+          {children}
+        </MessagingChromeContext.Provider>
       </main>
     </div>
   )
