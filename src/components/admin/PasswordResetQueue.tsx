@@ -218,10 +218,12 @@ export default function PasswordResetQueue({
           fields={[
             { key: 'status',    label: 'Status',    options: STATUS_OPTIONS },
             { key: 'role',      label: 'Role',      options: optionsFrom(rows.map((r) => r.requested_role), (v) => ROLE_LABELS[v] ?? v.replace(/_/g, ' ')) },
-            { key: 'requested', label: 'Requested', options: REQUESTED_OPTIONS, single: true },
+            { key: 'requested', label: 'Requested', options: REQUESTED_OPTIONS, single: true, anyLabel: 'Any time' },
           ]}
           values={filters}
           onChange={(v) => { setFilters(v); setPage(1) }}
+          // Untitled UI's "Dropdowns" filter bar: Status, Role and Requested each their own dropdown.
+          variant="dropdowns"
           actions={<RefreshButton iconOnly onClick={() => void load(includeClosed)} loading={loading} disabled={loading} />}
           summary={<span className="text-[#4df9ed]">{shown.length} Request{shown.length !== 1 ? 's' : ''}</span>}
           className={regularData ? 'ff-regular' : ''}

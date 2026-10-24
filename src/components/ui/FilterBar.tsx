@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
-import { Search, ListFilter, Plus, X, ChevronDown } from 'lucide-react'
+import { Search, ListFilter, Plus, X, ChevronDown, Check } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
 /**
@@ -17,6 +17,12 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
  * under the bar (the user's call): the count on the button says the list is
  * narrowed.
  *
+ * `variant="dropdowns"` is Untitled UI's "Dropdowns" filter bar instead: one
+ * button per field ([Status ▾] [Role ▾] [Requested ▾]), each opening a menu of
+ * ticked options that applies at once, the choice shown on the button, and
+ * Clear when anything is picked. Same FilterRule values ("is" rules only), so
+ * matchesFilter and allowedValues work unchanged.
+ *
  * It owns no data: the page keeps the rules and decides what they filter.
  */
 
@@ -28,6 +34,8 @@ export interface FilterField {
   options: FilterOption[]
   /** One value at a time (date windows and the like): no "Is not". */
   single?: boolean
+  /** Dropdowns variant, single fields: the "nothing picked" entry ("Any time"). */
+  anyLabel?: string
 }
 
 export type FilterOp = 'is' | 'is_not'
@@ -80,6 +88,7 @@ export default function FilterBar({
   leading,
   actions,
   summary,
+  variant = 'advanced',
   className = '',
 }: {
   search?: {
@@ -93,6 +102,8 @@ export default function FilterBar({
   leading?:  ReactNode
   actions?:  ReactNode
   summary?:  ReactNode
+  /** 'advanced': the one Filters button and rule panel. 'dropdowns': a dropdown per field. */
+  variant?:  'advanced' | 'dropdowns'
   className?: string
 }) {
   // A field with nothing to pick (no companies loaded yet) is left out.
@@ -117,8 +128,25 @@ export default function FilterBar({
           </div>
         )}
 
-        {shown.length > 0 && onChange && (
+        {shown.length > 0 && onChange && variant === 'advanced' && (
           <FiltersButton fields={shown} values={values} onApply={onChange} />
+        )}
+
+        {shown.length > 0 && onChange && variant === 'dropdowns' && (
+          <>
+            {shown.map((f) => (
+              <FieldDropdown key={f.key} field={f} values={values} onChange={onChange} />
+            ))}
+            {values.some((r) => shown.some((f) => f.key === r.field)) && (
+              <button
+                type="button"
+                onClick={() => onChange(values.filter((r) => !shown.some((f) => f.key === r.field)))}
+                className={`${CONTROL_H} ${CONTROL_TEXT} shrink-0 rounded-[10px] px-2 font-bold text-[#818181] transition hover:text-white`}
+              >
+                Clear
+              </button>
+            )}
+          </>
         )}
 
         {actions}
@@ -130,6 +158,95 @@ export default function FilterBar({
         )}
       </div>
     </div>
+  )
+}
+
+/**
+ * One field's dropdown: [Label ▾] → a menu of options with a tick on the picked
+ * ones. Picking applies straight away. A `single` field holds one value (picking
+ * another replaces it) and offers "Any" to clear; the others are multi-select.
+ */
+function FieldDropdown({ field, values, onChange }: {
+  field:    FilterField
+  values:   FilterValues
+  onChange: (values: FilterValues) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const picked = values.filter((r) => r.field === field.key && r.op === 'is').map((r) => r.value)
+  const others = values.filter((r) => r.field !== field.key)
+
+  const toggle = (value: string) => {
+    if (field.single) {
+      onChange(picked.includes(value) ? others : [...others, { field: field.key, op: 'is', value }])
+      setOpen(false)
+      return
+    }
+    onChange(picked.includes(value)
+      ? values.filter((r) => !(r.field === field.key && r.value === value))
+      : [...values, { field: field.key, op: 'is', value }])
+  }
+
+  const firstLabel = field.options.find((o) => o.value === picked[0])?.label ?? picked[0]
+  const shownLabel = picked.length === 0 ? field.label
+    : picked.length === 1 ? `${field.label}: ${firstLabel}`
+    : `${field.label}: ${picked.length} selected`
+
+  const item = 'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] transition hover:bg-[#2a2a2a]'
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label={picked.length ? `${field.label}, ${picked.length} selected` : field.label}
+          className={`${CONTROL_H} ${CONTROL_TEXT} flex max-w-full shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[10px] border px-3 transition ${
+            picked.length || open
+              ? 'border-[#4df9ed] bg-[#4df9ed]/[0.12] text-[#4df9ed]'
+              : 'border-[#818181] bg-[#424242] text-[#818181] hover:text-white'
+          }`}
+        >
+          <span className="truncate">{shownLabel}</span>
+          <ChevronDown className={`size-4 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        sideOffset={6}
+        collisionPadding={16}
+        className="ff-regular w-[min(240px,calc(100vw-32px))] gap-0 rounded-xl border border-[#424242] bg-[#1b1b1b] p-1 text-white shadow-[0_20px_40px_rgba(0,0,0,0.6)] ring-0"
+      >
+        <div role="menu" aria-label={field.label} className="flex max-h-[min(50dvh,var(--radix-popover-content-available-height))] flex-col overflow-y-auto overscroll-contain">
+          {field.single && (
+            <button
+              type="button"
+              role="menuitemradio"
+              aria-checked={picked.length === 0}
+              onClick={() => { onChange(others); setOpen(false) }}
+              className={`${item} ${picked.length === 0 ? 'text-[#4df9ed]' : 'text-white'}`}
+            >
+              <Check className={`size-4 shrink-0 ${picked.length === 0 ? 'opacity-100' : 'opacity-0'}`} />
+              {field.anyLabel ?? 'Any'}
+            </button>
+          )}
+          {field.options.map((o) => {
+            const on = picked.includes(o.value)
+            return (
+              <button
+                key={o.value}
+                type="button"
+                role={field.single ? 'menuitemradio' : 'menuitemcheckbox'}
+                aria-checked={on}
+                onClick={() => toggle(o.value)}
+                className={`${item} ${on ? 'text-[#4df9ed]' : 'text-white'}`}
+              >
+                <Check className={`size-4 shrink-0 ${on ? 'opacity-100' : 'opacity-0'}`} />
+                <span className="min-w-0 truncate">{o.label}</span>
+              </button>
+            )
+          })}
+        </div>
+      </PopoverContent>
+    </Popover>
   )
 }
 
