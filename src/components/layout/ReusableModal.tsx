@@ -242,7 +242,15 @@ export interface RemarksModalProps {
   children?: ReactNode;
   /** Keeps Confirm disabled until those extra fields are filled in. */
   confirmDisabled?: boolean;
+  /** 'danger' (red, the default) for reject/cancel; 'approve' (blue) for approvals. */
+  tone?: "danger" | "approve";
 }
+
+// Confirm button and focus colours per tone, from the fixed palette.
+const REMARKS_TONE = {
+  danger:  { rgb: "246,38,38",  solid: "#f62626", focus: "focus:border-red-400/50" },
+  approve: { rgb: "77,249,237", solid: "#4df9ed", focus: "focus:border-[#4df9ed]/50" },
+} as const;
 
 export function RemarksModal({
   open,
@@ -258,7 +266,9 @@ export function RemarksModal({
   busy = false,
   children,
   confirmDisabled = false,
+  tone = "danger",
 }: RemarksModalProps) {
+  const toneStyle = REMARKS_TONE[tone];
   const [remarks, setRemarks] = useState("");
 
   const handleCancel = () => {
@@ -379,9 +389,9 @@ export function RemarksModal({
                   placeholder={remarksPlaceholder}
                   rows={3}
                   disabled={busy}
-                  className="w-full rounded-lg border border-white/10 bg-black/30 text-sm text-white/85
+                  className={`w-full rounded-lg border border-white/10 bg-black/30 text-sm text-white/85
                              px-3 py-2 outline-none resize-none placeholder:text-white/30
-                             focus:border-red-400/50 disabled:opacity-50 transition-colors"
+                             ${toneStyle.focus} disabled:opacity-50 transition-colors`}
                 />
               </div>
             </div>
@@ -411,7 +421,7 @@ export function RemarksModal({
                     ? {
                         scale: 1.03,
                         backgroundColor:
-                          "rgba(246,38,38,0.25)",
+                          `rgba(${toneStyle.rgb},0.25)`,
                       }
                     : {}
                 }
@@ -426,14 +436,14 @@ export function RemarksModal({
                            select-none w-full h-[44px] sm:w-[88px] sm:h-[40px] disabled:opacity-40
                            disabled:cursor-not-allowed transition-colors"
                 style={{
-                  backgroundColor: "rgba(246,38,38,0.15)",
+                  backgroundColor: `rgba(${toneStyle.rgb},0.15)`,
                   border:
-                    "1px solid rgba(246,38,38,0.35)",
+                    `1px solid rgba(${toneStyle.rgb},0.35)`,
                   fontFamily:
                     "'Alegreya Sans SC', sans-serif",
                   fontWeight: 400,
                   fontSize: "clamp(13px, 2.5vw, 15px)",
-                  color: "#f62626",
+                  color: toneStyle.solid,
                 }}
               >
                 {busy ? "Submitting…" : confirmLabel}

@@ -2057,6 +2057,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
         // them on the Approvals card of the admin transaction history.
         remarksLabel="Remarks"
         remarksPlaceholder="e.g. Documents complete, schedule confirmed with the client…"
+        tone="approve"
         confirmLabel="Approve"
         cancelLabel="Go back"
         onConfirm={confirmApprove}
