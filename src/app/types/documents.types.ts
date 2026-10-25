@@ -102,6 +102,8 @@ export interface DocumentFilters {
   group?:         'booking' | 'fleet'
   review_status?: ReviewStatus
   booking_id?:    string
+  /** A vehicle's folder. */
+  truck_id?:      string
   date_from?:     string
   date_to?:       string
   archived?:      'hide' | 'only'
@@ -115,6 +117,22 @@ export interface DocumentPage {
   limit:  number
   counts: DocumentCounts
 }
+
+/** A folder row: a client, one of its bookings, or a vehicle (see backend findFolders). */
+export interface DocumentFolder {
+  id:             string | null
+  name:           string | null
+  client_id:      string | null
+  company_name:   string | null
+  booking_status: string | null
+  schedule_date:  string | null
+  booking_count:  number
+  file_count:     number
+  pending_review: number
+  last_upload:    string | null
+}
+
+export type DocumentFolderLevel = 'clients' | 'bookings' | 'vehicles'
 
 export interface BookingOption {
   booking_id:       string

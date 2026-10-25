@@ -105,6 +105,8 @@ export default function FilterBar({
     value:        string
     onChange:     (value: string) => void
     placeholder?: string
+    /** Split layout: Enter in the search box. */
+    onEnter?:     () => void
   }
   fields?:   FilterField[]
   values?:   FilterValues

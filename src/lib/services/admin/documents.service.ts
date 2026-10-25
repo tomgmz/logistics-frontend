@@ -7,6 +7,8 @@ import {
   REVIEW_STATUS_LABELS,
   type BookingOption,
   type DocumentFilters,
+  type DocumentFolder,
+  type DocumentFolderLevel,
   type DocumentPage,
   type LibraryDocument,
   type StaffDocumentType,
@@ -30,6 +32,7 @@ function toParams(f: DocumentFilters): Record<string, string> {
   if (f.group)                p.group         = f.group
   if (f.review_status)        p.review_status = f.review_status
   if (f.booking_id)           p.booking_id    = f.booking_id
+  if (f.truck_id)             p.truck_id      = f.truck_id
   if (f.date_from)            p.date_from     = f.date_from
   if (f.date_to)              p.date_to       = f.date_to
   if (f.archived === 'only')  p.archived      = 'only'
@@ -42,6 +45,20 @@ export async function fetchDocuments(f: DocumentFilters, page: number, limit: nu
     params: { ...toParams(f), page, limit },
   })
   return data
+}
+
+/** One level of folders: clients, a client's bookings (or every client's, with a search), or vehicles. */
+export async function fetchFolders(level: DocumentFolderLevel, q: {
+  client_id?:  string
+  booking_id?: string
+  search?:     string
+} = {}): Promise<DocumentFolder[]> {
+  const params: Record<string, string> = { level }
+  if (q.client_id)       params.client_id  = q.client_id
+  if (q.booking_id)      params.booking_id = q.booking_id
+  if (q.search?.trim())  params.search     = q.search.trim()
+  const { data } = await proxyApi.get<{ data: DocumentFolder[] }>(`${B}/folders`, { params })
+  return data?.data ?? []
 }
 
 export async function searchBookingsForUpload(search: string): Promise<BookingOption[]> {

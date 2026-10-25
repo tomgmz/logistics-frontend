@@ -2,7 +2,7 @@
 
 import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
 import Pagination from '@/components/ui/Pagination'
-import { useLiveTable, useLivePending } from '@/lib/hooks/useLiveTable'
+import { useLivePending } from '@/lib/hooks/useLiveTable'
 import NewEntriesBar from '@/components/ui/NewEntriesBar'
 import { useEffect, useState, useCallback } from 'react'
 import {
@@ -10,7 +10,6 @@ import {
   exportAuditLogsXlsx,
   AUDIT_EXPORT_ROW_CAP,
   type AuditLog as SystemLog,
-  type LogStats,
   type LogType,
 } from '@/lib/services/admin/audit-logs.service'
 import { formatDate, formatTime, formatDateTime } from '@/app/utils/timeFormat'
@@ -19,6 +18,8 @@ import ExportLogsButton from '@/components/admin/ExportLogsButton'
 import { expandCode, roleLabel } from '@/lib/roles'
 
 import RefreshButton from '@/components/ui/RefreshButton'
+import FilterBar, { type FilterOption, type FilterValues } from '@/components/ui/FilterBar'
+import { TableCard } from '@/components/ui/untitled/table-card'
 import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
 const BADGE_STYLES: Record<LogType, string> = {
   auth:              'bg-[rgba(138,56,245,0.12)] text-[#8a38f5] border border-[rgba(138,56,245,0.25)]',
@@ -34,27 +35,32 @@ const BADGE_STYLES: Record<LogType, string> = {
   system_error:      'bg-[rgba(246,38,38,0.10)] text-[#f62626] border border-[rgba(246,38,38,0.25)]',
 }
 
-const STAT_COLORS: Record<string, string> = {
-  total:             '#ffffff',
-  auth:              '#8a38f5',
-  user_management:   '#4df9ed',
-  access_control:    '#f62626',
-  document_activity: '#4df9ed',
-  data_export:       '#8a38f5',
-  admin_activity:    '#ff7a30',
-  vehicle_activity:  '#3af626',
-  booking:           '#ffea00',
-  driver_activity:   '#3af626',
-  user_activity:     '#9a9a9a',
-  system_error:      '#f62626',
-}
 
+const AUDIT_TYPE_OPTIONS: FilterOption[] = [
+  { value: 'auth',              label: 'Sign-in & Credentials' },
+  { value: 'user_management',   label: 'User Management' },
+  { value: 'access_control',    label: 'Access Control' },
+  { value: 'document_activity', label: 'Documents' },
+  { value: 'data_export',       label: 'Data Exports' },
+  { value: 'admin_activity',    label: 'Administrator Activity' },
+  { value: 'vehicle_activity',  label: 'Vehicle Activity' },
+  { value: 'driver_activity',   label: 'Driver Activity' },
+  { value: 'booking',           label: 'Booking' },
+]
+
+// Newest first unless the Filters panel says otherwise.
+const SORT_OPTIONS: FilterOption[] = [
+  { value: 'desc', label: 'Newest first' },
+  { value: 'asc',  label: 'Oldest first' },
+]
+
+/** The value a Filters-panel rule picked for `field` ("is" rules only). */
+const pick = (v: FilterValues, field: string) => v.find((r) => r.field === field && r.op === 'is')?.value
 
 export default function AuditLogsPage() {
   // 10 rows on phones, 20 from tablet up (lib/hooks/useTablePageSize).
   const PAGE_SIZE = useTablePageSize()
   const [logs, setLogs]                       = useState<SystemLog[]>([])
-  const [stats, setStats]                     = useState<LogStats | null>(null)
   const [total, setTotal]                     = useState(0)
   const [page, setPage]                       = useState(1)
   const [loading, setLoading]                 = useState(true)
@@ -102,20 +108,8 @@ export default function AuditLogsPage() {
     }
   }, [sort, logType, debouncedSearch, clearPending])
 
-  const fetchStats = useCallback(async () => {
-    try {
-      const data = await systemLogService.getStats()
-      setStats(data)
-    } catch {
-      // non-critical fail silently
-    }
-  }, [])
-
   useEffect(() => { fetchLogs() }, [fetchLogs])
-  useEffect(() => { fetchStats() }, [fetchStats])
 
-  // The stat cards stay live; only the list waits for the bar.
-  useLiveTable(['live:audit_logs'], () => { void fetchStats() })
 
   const totalPages = Math.ceil(total / PAGE_SIZE)
   const safePage = Math.min(page, totalPages)
@@ -136,66 +130,21 @@ export default function AuditLogsPage() {
           <div>
             <h1 className="mt-1 font-[family-name:var(--font-alegreya-sc)] text-[17px] 3xl:text-[20px] font-bold text-white">Audit Logs</h1>
           </div>
-
-          {stats && (
-            <div className="flex flex-wrap gap-3">
-              {(
-                [
-                  ['Total',    stats.total,              'total'],
-                  ['Sign-ins', stats.auth,               'auth'],
-                  ['Accounts', stats.user_management,    'user_management'],
-                  ['Access',   stats.access_control,     'access_control'],
-                  ['Vehicles', stats.vehicle_activity,   'vehicle_activity'],
-                  ['Bookings', stats.booking,            'booking'],
-                ] as [string, number, string][]
-              ).map(([label, val, key]) => (
-                <div key={key} className="rounded-xl border border-[#2a2a2a] bg-[#1b1b1b] px-4 py-2 text-center min-w-[72px]">
-                  <p className="text-2xl font-bold font-mono" style={{ color: STAT_COLORS[key] }}>{val}</p>
-                  <p className="text-[9px] uppercase tracking-widest text-[#818181] mt-0.5">{label}</p>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
 
-        <div className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0 rounded-2xl border border-[#2a2a2a] bg-[#1b1b1b] overflow-hidden">
+        {/* Untitled UI's table card, as on the IT Administrator's Logs: the header
+            (title, count, Export), then the filter row with search, Filters and
+            Refresh. */}
+        <TableCard.Root className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0">
 
-          <div className="shrink-0 border-b border-[#2a2a2a] px-4 py-3 flex flex-wrap gap-2 items-center">
-            <input
-              type="text"
-              placeholder="Search actions or descriptions…"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="flex-1 min-w-[180px] bg-[#2a2a2a]/60 border border-[#424242] rounded-lg px-3 py-2 text-sm text-white placeholder-[#818181] outline-none focus:border-[#4df9ed] focus:ring-1 focus:ring-[#4df9ed]/20 transition-colors ff-sc"
-            />
-            <select
-              value={logType}
-              onChange={e => setLogType(e.target.value as LogType | '')}
-              className="bg-[#2a2a2a]/60 border border-[#424242] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-[#4df9ed] cursor-pointer ff-sc"
-            >
-              <option value="">All Types</option>
-              <option value="auth">Sign-in &amp; Credentials</option>
-              <option value="user_management">User Management</option>
-              <option value="access_control">Access Control</option>
-              <option value="document_activity">Documents</option>
-              <option value="data_export">Data Exports</option>
-              <option value="admin_activity">Administrator Activity</option>
-              <option value="vehicle_activity">Vehicle Activity</option>
-              <option value="driver_activity">Driver Activity</option>
-              <option value="booking">Booking</option>
-            </select>
-            <select
-              value={sort}
-              onChange={e => setSort(e.target.value as 'asc' | 'desc')}
-              className="bg-[#2a2a2a]/60 border border-[#424242] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-[#4df9ed] cursor-pointer ff-sc"
-            >
-              <option value="desc">Newest First</option>
-              <option value="asc">Oldest First</option>
-            </select>
-            <RefreshButton onClick={() => { fetchLogs(); fetchStats() }} loading={loading} disabled={loading} />
-            {/* Gated on can_export, the tier the IT Admin sets for this module. */}
-            {canExport && (
+          <TableCard.Header
+            className="shrink-0"
+            title="Audit Logs"
+            badge={`${total.toLocaleString()} ${total === 1 ? 'record' : 'records'}`}
+            contentTrailing={canExport && (
+              // Gated on can_export, the tier the IT Admin sets for this module.
               <ExportLogsButton
+                untitled
                 noun="audit logs"
                 cap={AUDIT_EXPORT_ROW_CAP}
                 disabled={loading}
@@ -206,10 +155,24 @@ export default function AuditLogsPage() {
                 })}
               />
             )}
-            <span className="ml-auto text-xs text-[#818181]">
-              {total} records
-            </span>
-          </div>
+          />
+          <FilterBar
+            layout="split"
+            search={{ value: search, onChange: setSearch, placeholder: 'Search' }}
+            fields={[
+              { key: 'type', label: 'Type',  single: true, options: AUDIT_TYPE_OPTIONS },
+              { key: 'sort', label: 'Order', single: true, options: SORT_OPTIONS },
+            ]}
+            values={[
+              ...(logType ? [{ field: 'type', op: 'is' as const, value: logType }] : []),
+              ...(sort !== 'desc' ? [{ field: 'sort', op: 'is' as const, value: sort }] : []),
+            ]}
+            onChange={(v) => {
+              setLogType((pick(v, 'type') ?? '') as LogType | '')
+              setSort(pick(v, 'sort') === 'asc' ? 'asc' : 'desc')
+            }}
+            actions={<RefreshButton iconOnly onClick={() => { fetchLogs() }} loading={loading} disabled={loading} />}
+          />
 
           {selected && (
             <div className="shrink-0 border-b border-[#2a2a2a] bg-[#131313] px-5 py-4 text-sm">
@@ -250,10 +213,10 @@ export default function AuditLogsPage() {
           <div className="flex-[1_0_auto] lg:flex-1 overflow-x-auto lg:overflow-auto lg:min-h-0">
             {loading && (
               <table className="w-full text-sm">
-                <thead className="sticky top-0 z-10 bg-[#1b1b1b]">
-                  <tr className="border-b border-[#2a2a2a]">
+                <thead className="sticky top-0 z-10 bg-[#222222] font-[family-name:var(--font-alegreya-sc)]">
+                  <tr className="h-11 border-b border-[#424242]">
                     {['Timestamp', 'Type', 'Action', 'Description', 'User'].map(h => (
-                      <th key={h} className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#818181]">
+                      <th key={h} className="px-4 md:px-6 py-2 text-left text-xs font-semibold whitespace-nowrap text-[#818181]">
                         {h}
                       </th>
                     ))}
@@ -261,25 +224,25 @@ export default function AuditLogsPage() {
                 </thead>
                 <tbody>
                   {Array.from({ length: PAGE_SIZE }).map((_, i) => (
-                    <tr key={i} className="border-b border-[#2a2a2a]/60">
-                      <td className="px-4 py-3.5">
+                    <tr key={i} className="border-b border-[#424242]">
+                      <td className="px-4 md:px-6 py-4">
                         <div className="h-2.5 w-16 animate-pulse rounded bg-[#2a2a2a]" style={{ animationDelay: `${i * 40}ms` }} />
                         <div className="mt-1.5 h-2.5 w-20 animate-pulse rounded bg-[#2a2a2a]" style={{ animationDelay: `${i * 40 + 20}ms` }} />
                       </td>
-                      <td className="px-4 py-3.5">
+                      <td className="px-4 md:px-6 py-4">
                         <div className="h-4 w-20 animate-pulse rounded-full bg-[#2a2a2a]" style={{ animationDelay: `${i * 40}ms` }} />
                       </td>
-                      <td className="px-4 py-3.5">
+                      <td className="px-4 md:px-6 py-4">
                         <div className="h-4 w-28 animate-pulse rounded bg-[#2a2a2a]" style={{ animationDelay: `${i * 40}ms` }} />
                       </td>
-                      <td className="px-4 py-3.5">
+                      <td className="px-4 md:px-6 py-4">
                         <div className="h-3 w-48 animate-pulse rounded bg-[#2a2a2a]" style={{ animationDelay: `${i * 40}ms` }} />
                       </td>
-                      <td className="px-4 py-3.5">
+                      <td className="px-4 md:px-6 py-4">
                         <div className="h-3 w-24 animate-pulse rounded bg-[#2a2a2a]" style={{ animationDelay: `${i * 40}ms` }} />
                         <div className="mt-1.5 h-2 w-14 animate-pulse rounded bg-[#2a2a2a]" style={{ animationDelay: `${i * 40 + 20}ms` }} />
                       </td>
-                      <td className="px-4 py-3.5">
+                      <td className="px-4 md:px-6 py-4">
                         <div className="h-2.5 w-24 animate-pulse rounded bg-[#2a2a2a]" style={{ animationDelay: `${i * 40}ms` }} />
                       </td>
                     </tr>
@@ -297,10 +260,10 @@ export default function AuditLogsPage() {
 
             {!loading && logs.length > 0 && (
               <table className="w-full text-sm">
-                <thead className="sticky top-0 z-10 bg-[#1b1b1b]">
-                  <tr className="border-b border-[#2a2a2a]">
+                <thead className="sticky top-0 z-10 bg-[#222222] font-[family-name:var(--font-alegreya-sc)]">
+                  <tr className="h-11 border-b border-[#424242]">
                     {['Timestamp', 'Type', 'Action', 'Description', 'User'].map(h => (
-                      <th key={h} className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#818181]">
+                      <th key={h} className="px-4 md:px-6 py-2 text-left text-xs font-semibold whitespace-nowrap text-[#818181]">
                         {h}
                       </th>
                     ))}
@@ -311,33 +274,33 @@ export default function AuditLogsPage() {
                     <tr
                       key={log.log_id}
                       onClick={() => setSelected(prev => prev?.log_id === log.log_id ? null : log)}
-                      className={`border-b border-[#2a2a2a]/60 transition-colors cursor-pointer ${
+                      className={`border-b border-[#424242] last:border-b-0 transition-colors cursor-pointer ${
                         selected?.log_id === log.log_id
                           ? 'bg-[rgba(77,249,237,0.06)] border-l-2 border-l-[#4df9ed]'
-                          : 'hover:bg-[#2a2a2a]/40'
+                          : '[@media(hover:hover)]:hover:bg-[#222222]'
                       }`}
                     >
-                      <td className="px-4 py-3.5 whitespace-nowrap">
-                        <div className="text-[#818181] text-[10px]">{formatDate(log.timestamp)}</div>
-                        <div className="text-[#c0c0c0] text-[11px] font-mono">{formatTime(log.timestamp)}</div>
+                      <td className="px-4 md:px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-white">{formatDate(log.timestamp)}</div>
+                        <div className="text-sm text-[#818181]">{formatTime(log.timestamp)}</div>
                       </td>
-                      <td className="px-4 py-3.5">
-                        <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-[0.1em] whitespace-nowrap ${BADGE_STYLES[log.log_type]}`}>
+                      <td className="px-4 md:px-6 py-4">
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap whitespace-nowrap ${BADGE_STYLES[log.log_type]}`}>
                           {expandCode(log.log_type).replace(/_/g, ' ')}
                         </span>
                       </td>
-                      <td className="px-4 py-3.5">
-                        <span className="font-mono text-[10px] text-[#b0b0b0] bg-[#2a2a2a] rounded px-1.5 py-0.5">
+                      <td className="px-4 md:px-6 py-4">
+                        <span className="inline-flex whitespace-nowrap rounded-md bg-[#1b1b1b] px-1.5 py-0.5 font-mono text-xs font-medium text-[#c4c4c4] ring-1 ring-inset ring-[#424242]">
                           {expandCode(log.action)}
                         </span>
                       </td>
-                      <td className="px-4 py-3.5 text-sm text-[#e0e0e0] max-w-xs truncate">
+                      <td className="px-4 md:px-6 py-4 text-sm text-[#c4c4c4] max-w-xs truncate">
                         {log.description ?? '—'}
                       </td>
-                      <td className="px-4 py-3.5 text-xs text-[#c0c0c0]">
+                      <td className="px-4 md:px-6 py-4 text-sm">
                         <p className="font-medium text-white">{displayName(log)}</p>
                         {log.users?.role && (
-                          <p className="text-[#818181] text-[9px] uppercase tracking-wide">{log.users.role}</p>
+                          <p className="text-[#818181]">{roleLabel(log.users.role)}</p>
                         )}
                       </td>
                     </tr>
@@ -351,7 +314,7 @@ export default function AuditLogsPage() {
             <Pagination page={safePage} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPageChange={setPage} />
           )}
 
-        </div>
+        </TableCard.Root>
       </div>
     </div>
   )

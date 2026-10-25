@@ -4,20 +4,18 @@ import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
 import Pagination from '@/components/ui/Pagination'
 import { useLivePending } from '@/lib/hooks/useLiveTable'
 import NewEntriesBar from '@/components/ui/NewEntriesBar'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { AnimatePresence, motion } from 'framer-motion'
-import {
-  AlertCircle, 
-  Download, History, RefreshCw, Search, X,
-} from 'lucide-react'
+import { AlertCircle, Download, History, X } from 'lucide-react'
 
 import type { BookingWithRelations } from '@/lib/store/slice/routeMap.slice'
 import { bookingRef } from '@/lib/booking'
+import { bookingService } from '@/lib/services/client/booking.service'
 import { useModuleAccess } from '@/components/layout/ModuleAccess'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { appToast } from '@/lib/toast'
 
-import CompanyFilter from '@/components/transactions/CompanyFilter'
 import StaffTransactionDetail from '@/components/transactions/StaffTransactionDetail'
 import TransactionRecord from '@/components/transactions/TransactionRecord'
 import { getStatusMeta } from '@/components/transactions/TransactionStatus'
@@ -26,19 +24,21 @@ import ProblemReportedBadge, { hasOpenClientIssue } from '@/components/transacti
 import ResubmittedBadge, { resubmissionsOf } from '@/components/transactions/ResubmittedBadge'
 import ResubmissionChanges from '@/components/transactions/ResubmissionChanges'
 import {
-  formatDate, formatPeso, formatPesoExact, getCompanyName, getDropoffs,
+  formatDate, formatPeso, getCompanyName, getDropoffs,
 } from '@/components/transactions/transaction-format'
-import {
-  DATE_PRESETS, resolvePreset, type DatePreset,
-} from '@/components/transactions/date-presets'
 import {
   transactionHistoryService, downloadDispatchXlsx,
   type CompanyOption, type DateBasis, type SortKey,
-  type TransactionFilters, type TransactionListMeta, type TransactionSummary,
+  type TransactionFilters, type TransactionListMeta,
 } from '@/lib/services/admin/transaction-history.service'
 import StopTimesPanel from '@/components/transactions/StopTimesPanel'
 
 import RefreshButton from '@/components/ui/RefreshButton'
+import FilterBar, { allowedValues } from '@/components/ui/FilterBar'
+import { TableCard } from '@/components/ui/untitled/table-card'
+import { TabsMinimal } from '@/components/ui/untitled/tabs'
+import { Button } from '@/components/ui/untitled/button'
+import type { DateRange } from '@/components/ui/untitled/date-range-picker'
 import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
 /**
  * Transaction history for staff — the client's own history widened across every
@@ -85,9 +85,13 @@ const SORTS: { key: SortKey; label: string }[] = [
   { key: 'amount_asc',  label: 'Amount — Lowest First' },
 ]
 
-const selectClass =
-  'rounded-lg border border-white/10 bg-[#1a1a1a] px-3 py-2 text-xs font-bold text-white/80 ' +
-  'outline-none focus:border-[var(--color-cyan)]/50 cursor-pointer'
+// The cards above the table: one count per status, in that status's colour.
+const STATUS_CARDS: { key: string; label: string }[] = [
+  { key: 'pending',   label: 'Pending' },
+  { key: 'approved',  label: 'Approved' },
+  { key: 'delivered', label: 'Delivered' },
+  { key: 'completed', label: 'Completed' },
+]
 
 function KpiTile({ label, value, accent, sub }: {
   label: string; value: string; accent?: string; sub?: string
@@ -103,7 +107,17 @@ function KpiTile({ label, value, accent, sub }: {
   )
 }
 
+// Reports ?booking=<id>. Isolated so useSearchParams sits under its own
+// Suspense boundary.
+function BookingDeepLink({ onBooking }: { onBooking: (id: string | null) => void }) {
+  const id = useSearchParams()?.get('booking') ?? null
+  useEffect(() => { onBooking(id) }, [id, onBooking])
+  return null
+}
+
 export default function TransactionHistoryView() {
+  const router   = useRouter()
+  const pathname = usePathname()
   // 10 rows on phones, 20 from tablet up (lib/hooks/useTablePageSize).
   const PAGE_SIZE = useTablePageSize()
   const { canExport } = useModuleAccess()
@@ -113,19 +127,16 @@ export default function TransactionHistoryView() {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [statusFilter, setStatusFilter]     = useState('all')
   const [clientIds, setClientIds]           = useState<string[]>([])
-  const [preset, setPreset]                 = useState<DatePreset>('all')
+  // Untitled UI's "Select dates"; the Filters panel says which date it reads.
+  const [dateRange, setDateRange]           = useState<DateRange | null>(null)
   const [dateBasis, setDateBasis]           = useState<DateBasis>('scheduled')
-  const [customFrom, setCustomFrom]         = useState('')
-  const [customTo, setCustomTo]             = useState('')
   const [sort, setSort]                     = useState<SortKey>('date_desc')
   const [page, setPage]                     = useState(0)
 
   // --- data ----------------------------------------------------------------
   const [rows, setRows]           = useState<BookingWithRelations[]>([])
   const [meta, setMeta]           = useState<TransactionListMeta | null>(null)
-  const [summary, setSummary]     = useState<TransactionSummary | null>(null)
   const [companies, setCompanies] = useState<CompanyOption[]>([])
-  const [companiesLoading, setCompaniesLoading] = useState(true)
   const [loading, setLoading]     = useState(true)
   const [error, setError]         = useState<string | null>(null)
   const [exporting, setExporting] = useState(false)
@@ -136,12 +147,8 @@ export default function TransactionHistoryView() {
     return () => clearTimeout(t)
   }, [search])
 
-  // A preset resolves to a concrete range; only 'custom' reads the two inputs.
-  const { dateFrom, dateTo } = useMemo(() => {
-    if (preset === 'custom') return { dateFrom: customFrom, dateTo: customTo }
-    const r = resolvePreset(preset)
-    return { dateFrom: r.from ?? '', dateTo: r.to ?? '' }
-  }, [preset, customFrom, customTo])
+  const dateFrom = dateRange?.from ?? ''
+  const dateTo   = dateRange?.to ?? ''
 
   const filters: TransactionFilters = useMemo(() => ({
     status:    statusFilter,
@@ -166,15 +173,11 @@ export default function TransactionHistoryView() {
       setError(null)
     }
     try {
-      // Rows and totals go out together under one filter object, so the strip
-      // above the table can never describe a different query than the table.
-      const [list, sum] = await Promise.all([
-        transactionHistoryService.list({ ...filters, page: page + 1, limit: PAGE_SIZE }),
-        transactionHistoryService.summary(filters),
-      ])
+      // The cards above the table read the same response's status counts, so
+      // they can never describe a different query than the table.
+      const list = await transactionHistoryService.list({ ...filters, page: page + 1, limit: PAGE_SIZE })
       setRows(list.rows)
       setMeta(list.meta)
-      setSummary(sum)
       if (list.meta.totalPages >= 1 && page > list.meta.totalPages - 1) {
         setPage(list.meta.totalPages - 1)
       }
@@ -187,6 +190,26 @@ export default function TransactionHistoryView() {
 
   useEffect(() => { void load() }, [load])
 
+  // ?booking=<id> (Open Booking in Document Management) opens that booking's
+  // panel. Read through useSearchParams (BookingDeepLink below), not
+  // window.location: on an in-app navigation the address only changes after
+  // this page starts rendering. Each id opens once; the address is then tidied
+  // so a refresh starts clean.
+  const openedDeepLink = useRef<string | null>(null)
+  const openDeepLink = useCallback((id: string | null) => {
+    if (!id || openedDeepLink.current === id) return
+    openedDeepLink.current = id
+    bookingService.getBookingById(id)
+      .then((b) => {
+        if (b) setSelected(b as BookingWithRelations)
+        router.replace(pathname ?? '/')
+      })
+      .catch((e) => {
+        openedDeepLink.current = null
+        appToast.error(getApiErrorMessage(e, 'Could not open that booking.'))
+      })
+  }, [router, pathname])
+
   useEffect(() => {
     let cancelled = false
     ;(async () => {
@@ -197,8 +220,6 @@ export default function TransactionHistoryView() {
         // A failed company list only costs the filter its options; the page
         // itself still works, so this stays quiet.
         if (!cancelled) setCompanies([])
-      } finally {
-        if (!cancelled) setCompaniesLoading(false)
       }
     })()
     return () => { cancelled = true }
@@ -211,11 +232,11 @@ export default function TransactionHistoryView() {
 
   const hasActiveFilters =
     !!debouncedSearch || statusFilter !== 'all' || clientIds.length > 0 ||
-    preset !== 'all' || sort !== 'date_desc' || dateBasis !== 'scheduled'
+    !!dateRange || sort !== 'date_desc' || dateBasis !== 'scheduled'
 
   function clearFilters() {
     setSearch(''); setDebouncedSearch(''); setStatusFilter('all'); setClientIds([])
-    setPreset('all'); setDateBasis('scheduled'); setCustomFrom(''); setCustomTo('')
+    setDateRange(null); setDateBasis('scheduled')
     setSort('date_desc'); setPage(0)
   }
 
@@ -243,141 +264,76 @@ export default function TransactionHistoryView() {
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-y-auto overflow-x-hidden lg:overflow-hidden bg-[var(--color-bg)] text-white">
+      <Suspense fallback={null}>
+        <BookingDeepLink onBooking={openDeepLink} />
+      </Suspense>
 
       {/* Header */}
-      <header className="flex shrink-0 flex-col justify-between gap-3 border-b px-3 py-3
-                         sm:flex-row sm:items-end lg:px-4"
+      <header className="flex shrink-0 items-center gap-2 border-b px-3 py-3 lg:px-4"
         style={{ borderColor: BORDER }}>
-        <div className="flex items-center gap-2">
-          <History size={18} style={{ color: CYAN }} />
-          <h1 className="font-[family-name:var(--font-alegreya-sc)] text-[17px] 3xl:text-[20px] font-bold text-white">Transaction History</h1>
-        </div>
-        <div className="flex items-center gap-2 self-start">
-          <RefreshButton onClick={() => void load()} />
-          {/* Gated on can_export, the tier the IT Admin sets for this module. */}
-          {canExport && (
-            <button type="button" onClick={() => void handleExport()} disabled={exporting || loading}
-              className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold
-                         transition-colors disabled:opacity-40 cursor-pointer"
-              style={{ borderColor: `${CYAN}55`, background: `${CYAN}10`, color: CYAN }}>
-              <Download size={14} />{exporting ? 'Exporting…' : 'Export Excel'}
-            </button>
-          )}
-        </div>
+        <History size={18} style={{ color: CYAN }} />
+        <h1 className="font-[family-name:var(--font-alegreya-sc)] text-[17px] 3xl:text-[20px] font-bold text-white">Transaction History</h1>
       </header>
 
       <div className="flex lg:min-h-0 flex-[1_0_auto] lg:flex-1 lg:overflow-hidden">
         <div className="flex lg:min-h-0 min-w-0 flex-1 flex-col gap-3 p-3 lg:p-4">
 
-          {/* Filters */}
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
-            <div className="flex min-w-[220px] flex-1 items-center gap-2 rounded-[10px] px-3 py-2"
-              style={{ background: '#2a2828' }}>
-              <Search size={16} className="shrink-0 text-white/40" />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search reference, company, pickup, truck type…"
-                className="flex-1 border-none bg-transparent text-sm text-white/80 outline-none
-                           placeholder:text-white/35"
-              />
-              {search && (
-                <button type="button" onClick={() => setSearch('')}
-                  className="shrink-0 text-white/40 hover:text-white cursor-pointer">
-                  <X size={14} />
-                </button>
-              )}
-            </div>
-
-            <CompanyFilter
-              options={companies}
-              selected={clientIds}
-              loading={companiesLoading}
-              onChange={(next) => { setClientIds(next); setPage(0) }}
-            />
-
-            {/* A booking carries three meaningful dates, so the range has to say
-                which one it applies to. */}
-            <select aria-label="Date basis" value={dateBasis} className={selectClass}
-              onChange={(e) => { setDateBasis(e.target.value as DateBasis); setPage(0) }}>
-              {DATE_BASES.map((b) => <option key={b.key} value={b.key}>{b.label}</option>)}
-            </select>
-
-            <select aria-label="Date range" value={preset} className={selectClass}
-              onChange={(e) => { setPreset(e.target.value as DatePreset); setPage(0) }}>
-              {DATE_PRESETS.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
-            </select>
-
-            {preset === 'custom' && (
-              <>
-                <input type="date" aria-label="From" value={customFrom}
-                  onChange={(e) => { setCustomFrom(e.target.value); setPage(0) }}
-                  className={selectClass} style={{ colorScheme: 'dark' }} />
-                <input type="date" aria-label="To" value={customTo}
-                  onChange={(e) => { setCustomTo(e.target.value); setPage(0) }}
-                  className={selectClass} style={{ colorScheme: 'dark' }} />
-              </>
-            )}
-
-            <select aria-label="Sort by" value={sort} className={selectClass}
-              onChange={(e) => { setSort(e.target.value as SortKey); setPage(0) }}>
-              {SORTS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
-            </select>
-
-            {hasActiveFilters && (
-              <button type="button" onClick={clearFilters}
-                className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider
-                           transition-opacity hover:opacity-70 cursor-pointer"
-                style={{ color: ERROR }}>
-                <RefreshCw size={12} />Clear
-              </button>
-            )}
-          </div>
-
-          {/* Totals for the current filter */}
-          <div className="grid shrink-0 grid-cols-2 gap-2 lg:grid-cols-5">
-            <KpiTile label="Transactions" value={summary ? summary.total.toLocaleString() : '—'} />
-            <KpiTile label="Gross Value"  value={summary ? formatPesoExact(summary.grossValue) : '—'} accent={CYAN}
-              sub={summary && summary.unpriced > 0 ? `${summary.unpriced} unpriced` : undefined} />
-            <KpiTile label="Average Value" value={summary ? formatPesoExact(summary.averageValue) : '—'} />
-            <KpiTile label="Completed" value={summary ? summary.completed.toLocaleString() : '—'}
-              sub={summary && summary.total > 0
-                ? `${((summary.completed / summary.total) * 100).toFixed(1)}% of total`
-                : undefined} />
-            <KpiTile label="Cancellation Rate"
-              value={summary ? `${(summary.cancellationRate * 100).toFixed(1)}%` : '—'}
-              accent={summary && summary.cancellationRate > 0.1 ? ERROR : undefined}
-              sub={summary ? `${summary.cancelled.toLocaleString()} cancelled` : undefined} />
-          </div>
-
-          {/* Status tabs */}
-          <div className="scrollbar-none flex shrink-0 items-center gap-0 overflow-x-auto border-b"
-            style={{ borderColor: BORDER }}>
-            {TABS.map((t) => (
-              <button key={t.key} type="button"
-                onClick={() => { setStatusFilter(t.key); setPage(0) }}
-                className="flex cursor-pointer items-center gap-1.5 whitespace-nowrap px-3 pb-2 text-xs
-                           font-bold uppercase tracking-wider transition-colors"
-                style={
-                  statusFilter === t.key
-                    ? { color: '#fff', borderBottom: `2px solid ${CYAN}`, marginBottom: -1 }
-                    : { color: MUTED }
-                }>
-                {t.label}
-                <span className="rounded-sm px-1.5 py-0.5 text-[10px] tabular-nums"
-                  style={{
-                    background: statusFilter === t.key ? `${CYAN}22` : 'rgba(255,255,255,0.06)',
-                    color:      statusFilter === t.key ? CYAN : MUTED,
-                  }}>
-                  {statusCounts[t.key] ?? 0}
-                </span>
-              </button>
+          {/* Four status counts under the current search and filters (the status
+              tab itself never narrows them). */}
+          <div className="grid shrink-0 grid-cols-2 gap-2 lg:grid-cols-4">
+            {STATUS_CARDS.map((c) => (
+              <KpiTile key={c.key} label={c.label} accent={getStatusMeta(c.key).color}
+                value={meta ? (statusCounts[c.key] ?? 0).toLocaleString() : '—'} />
             ))}
           </div>
 
-          {/* Table */}
-          <div className="flex lg:min-h-0 flex-[1_0_auto] lg:flex-1 flex-col overflow-hidden rounded-xl border
-                          border-white/[0.08] bg-[#0f0f0f]">
+          {/* Untitled UI's table card, as on Booking Management: the header (title,
+              count, Export), then the filter row with the status tabs on the left
+              and search, Select dates, Filters and Refresh on the right. */}
+          <TableCard.Root className="flex lg:min-h-0 flex-[1_0_auto] lg:flex-1 flex-col">
+            <TableCard.Header
+              className="shrink-0"
+              title="Transactions"
+              badge={`${totalRows.toLocaleString()} ${totalRows === 1 ? 'transaction' : 'transactions'}`}
+              contentTrailing={canExport && (
+                // Gated on can_export, the tier the IT Admin sets for this module.
+                <Button color="secondary" iconLeading={Download} onClick={() => void handleExport()}
+                  disabled={exporting || loading} className="max-md:w-full">
+                  {exporting ? 'Exporting…' : 'Export'}
+                </Button>
+              )}
+            />
+            <FilterBar
+              layout="split"
+              leading={
+                <TabsMinimal
+                  label="Status"
+                  items={TABS.map((t) => ({ id: t.key, label: `${t.label} (${statusCounts[t.key] ?? 0})` }))}
+                  selectedKey={statusFilter}
+                  onSelectionChange={(k) => { setStatusFilter(k); setPage(0) }}
+                />
+              }
+              search={{ value: search, onChange: setSearch, placeholder: 'Search' }}
+              dateRange={{ value: dateRange, onChange: (r) => { setDateRange(r); setPage(0) } }}
+              fields={[
+                { key: 'company', label: 'Company', options: companies.map((c) => ({ value: c.clientId, label: c.companyName })) },
+                // A booking carries three meaningful dates, so "Select dates" has to say which.
+                { key: 'basis',   label: 'Date',    single: true, options: DATE_BASES.map((d) => ({ value: d.key, label: d.label })) },
+                { key: 'sort',    label: 'Sort',    single: true, options: SORTS.map((o) => ({ value: o.key, label: o.label })) },
+              ]}
+              values={[
+                ...clientIds.map((id) => ({ field: 'company', op: 'is' as const, value: id })),
+                ...(dateBasis !== 'scheduled' ? [{ field: 'basis', op: 'is' as const, value: dateBasis }] : []),
+                ...(sort !== 'date_desc' ? [{ field: 'sort', op: 'is' as const, value: sort }] : []),
+              ]}
+              onChange={(v) => {
+                setClientIds(allowedValues(v, 'company', companies.map((c) => c.clientId)) ?? [])
+                setDateBasis((v.find((r) => r.field === 'basis')?.value ?? 'scheduled') as DateBasis)
+                setSort((v.find((r) => r.field === 'sort')?.value ?? 'date_desc') as SortKey)
+                setPage(0)
+              }}
+              actions={<RefreshButton iconOnly onClick={() => void load()} loading={loading} disabled={loading} />}
+            />
             <NewEntriesBar count={pending} singular="new update" plural="new updates"
               onRefresh={() => void load(true)} />
             {loading ? (
@@ -404,19 +360,19 @@ export default function TransactionHistoryView() {
               <>
                 <div className="lg:min-h-0 flex-[1_0_auto] lg:flex-1 overflow-x-auto lg:overflow-auto">
                   <table className="w-full border-collapse text-left text-sm">
-                    <thead className="sticky top-0 z-[1] border-b bg-[#141414]"
-                      style={{ borderColor: BORDER }}>
-                      <tr className="text-[11px] uppercase tracking-wider text-white/40">
-                        <th className="px-3 py-2.5 font-bold">Reference</th>
-                        <th className="px-3 py-2.5 font-bold">Company</th>
-                        <th className="hidden px-3 py-2.5 font-bold lg:table-cell">Booked</th>
-                        <th className="px-3 py-2.5 font-bold">Scheduled</th>
-                        <th className="hidden px-3 py-2.5 font-bold md:table-cell">Route</th>
-                        <th className="px-3 py-2.5 font-bold">Status</th>
-                        <th className="px-3 py-2.5 text-right font-bold">Amount</th>
+                    {/* Untitled UI's header row: tinted, small caps, sentence case. */}
+                    <thead className="sticky top-0 z-[1] bg-[#222222] font-[family-name:var(--font-alegreya-sc)]">
+                      <tr className="h-11 border-b border-[#424242] text-xs text-[#818181] [&>th]:px-4 md:[&>th]:px-6 [&>th]:py-2 [&>th]:font-semibold [&>th]:whitespace-nowrap">
+                        <th>Reference</th>
+                        <th>Company</th>
+                        <th className="hidden lg:table-cell">Booked</th>
+                        <th>Scheduled</th>
+                        <th className="hidden md:table-cell">Route</th>
+                        <th>Status</th>
+                        <th className="text-right">Amount</th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="ff-regular">
                       {rows.map((b) => {
                         const id     = b.booking_id as string
                         const active = (selected?.booking_id as string | undefined) === id
@@ -430,35 +386,32 @@ export default function TransactionHistoryView() {
                             onKeyDown={(e) => {
                               if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelected(b) }
                             }}
-                            className="cursor-pointer border-b border-white/[0.05] transition-colors
-                                       hover:bg-white/[0.04]"
-                            style={{ background: active ? 'rgba(77,249,237,0.06)' : undefined }}>
-                            <td className="px-3 py-2.5 font-mono text-white/85">{bookingRef(b)}</td>
-                            <td className="max-w-[200px] truncate px-3 py-2.5 text-white/70">
+                            className={`cursor-pointer border-b border-[#424242] last:border-b-0 transition-colors [&>td]:px-4 md:[&>td]:px-6 [&>td]:py-4 ${
+                              active ? 'bg-[#4df9ed]/[0.06]' : '[@media(hover:hover)]:hover:bg-[#222222]'
+                            }`}>
+                            <td className="whitespace-nowrap font-medium text-[#4df9ed]">{bookingRef(b)}</td>
+                            <td className="max-w-[200px] truncate text-white">
                               {getCompanyName(b)}
                             </td>
-                            <td className="hidden whitespace-nowrap px-3 py-2.5 text-white/60 lg:table-cell">
+                            <td className="hidden whitespace-nowrap text-[#c4c4c4] lg:table-cell">
                               {formatDate(b.created_at as string | undefined)}
                             </td>
-                            <td className="whitespace-nowrap px-3 py-2.5 text-white/75">
+                            <td className="whitespace-nowrap text-[#c4c4c4]">
                               {formatDate(b.schedule_date as string | undefined)}
                             </td>
-                            <td className="hidden max-w-[260px] truncate px-3 py-2.5 text-white/70 md:table-cell">
+                            <td className="hidden max-w-[260px] truncate text-[#c4c4c4] md:table-cell">
                               {route || '—'}
                               {drops.length > 1 && (
-                                <span className="ml-1 text-[11px]" style={{ color: MUTED }}>
+                                <span className="ml-1 text-xs" style={{ color: MUTED }}>
                                   +{drops.length - 1}
                                 </span>
                               )}
                             </td>
-                            <td className="px-3 py-2.5">
-                              <span className="inline-flex rounded-md border px-2 py-0.5 text-[10px]
-                                               font-bold uppercase tracking-wide"
-                                style={{
-                                  color:       meta.color,
-                                  borderColor: `${meta.color}55`,
-                                  background:  `${meta.color}14`,
-                                }}>
+                            <td>
+                              {/* Untitled UI's pill with a dot, in the status colour. */}
+                              <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset"
+                                style={{ color: meta.color, background: `${meta.color}1a`, ['--tw-ring-color' as string]: `${meta.color}4d` }}>
+                                <span aria-hidden className="size-1.5 rounded-full" style={{ background: meta.color }} />
                                 {meta.label}
                               </span>
                               {hasOpenClientIssue(b) && (
@@ -466,7 +419,7 @@ export default function TransactionHistoryView() {
                               )}
                               <ResubmittedBadge count={resubmissionsOf(b)} />
                             </td>
-                            <td className="whitespace-nowrap px-3 py-2.5 text-right font-semibold tabular-nums text-white/90">
+                            <td className="whitespace-nowrap text-right font-semibold tabular-nums text-white">
                               {formatPeso(b.total_cost as number | null | undefined)}
                             </td>
                           </tr>
@@ -479,7 +432,7 @@ export default function TransactionHistoryView() {
                 <Pagination page={pageSafe + 1} totalPages={pageCount} total={totalRows} pageSize={PAGE_SIZE} onPageChange={(p) => setPage(p - 1)} />
               </>
             )}
-          </div>
+          </TableCard.Root>
         </div>
 
         {/* Detail panel — the client's view of the transaction, then the full

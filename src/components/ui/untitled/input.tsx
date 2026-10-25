@@ -11,9 +11,11 @@ const noSubscribe = () => () => {}
  * a Mac) focuses it. Palette: bg-primary → #1b1b1b, ring-primary → #424242,
  * ring-brand → #4df9ed, fg-quaternary / text-placeholder → #818181.
  */
-export function InputShortcut({ value, onChange, placeholder = 'Search', icon: Icon, className }: {
+export function InputShortcut({ value, onChange, onEnter, placeholder = 'Search', icon: Icon, className }: {
   value: string
   onChange: (value: string) => void
+  /** Enter in the box (e.g. open the first match). */
+  onEnter?: () => void
   placeholder?: string
   icon?: FC<{ className?: string }>
   className?: string
@@ -46,6 +48,7 @@ export function InputShortcut({ value, onChange, placeholder = 'Search', icon: I
         type="search"
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onKeyDown={onEnter ? (e) => { if (e.key === 'Enter') { e.preventDefault(); onEnter() } } : undefined}
         placeholder={placeholder}
         aria-label={placeholder}
         aria-keyshortcuts={mac ? 'Meta+K' : 'Control+K'}

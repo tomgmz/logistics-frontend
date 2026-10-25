@@ -12,6 +12,17 @@ import {
   levelToFlags,
 } from '@/constants/modules'
 
+/** The levels a module offers: a view-only module has nothing to change, so only Read Only. */
+export function levelsFor(m: ModuleKey) {
+  return ACCESS_LEVELS.filter((l) => !(l.key === 'all' && VIEW_ONLY_MODULES.includes(m)))
+}
+
+/** A module with one box has it ticked and locked: the access it gives can't be taken away here. */
+export function lockedLevelFor(m: ModuleKey): Exclude<AccessLevel, 'none'> | null {
+  const levels = levelsFor(m)
+  return levels.length === 1 ? levels[0].key : null
+}
+
 interface ModulePermissionMatrixProps {
   modules:   ModuleKey[]
   value:     Record<string, ModuleFlags>
@@ -28,6 +39,7 @@ export default function ModulePermissionMatrix({
   // Mutually exclusive: picking a level replaces the row; clicking the level it
   // already has clears it back to no access (keeps the user on their role default).
   const selectLevel = (m: ModuleKey, level: Exclude<AccessLevel, 'none'>) => {
+    if (lockedLevelFor(m)) return
     const next = levelFor(m) === level ? EMPTY_FLAGS : levelToFlags(level)
     onChange(m, { ...next })
   }
@@ -50,6 +62,7 @@ export default function ModulePermissionMatrix({
         <tbody>
           {modules.map((m) => {
             const current = levelFor(m)
+            const locked  = lockedLevelFor(m)
             return (
               <tr key={m} className="border-b border-[#2a2a2a]/60 last:border-0 hover:bg-[#2a2a2a]/30">
                 <td className="px-4 py-3 font-medium text-white whitespace-nowrap">{MODULE_LABELS[m]}</td>
@@ -61,10 +74,12 @@ export default function ModulePermissionMatrix({
                     ) : (
                     <input
                       type="checkbox"
-                      checked={current === l.key}
-                      disabled={disabled}
+                      // Its only box: always ticked, and locked so it can't be unticked.
+                      checked={locked ? true : current === l.key}
+                      disabled={disabled || !!locked}
                       onChange={() => selectLevel(m, l.key)}
-                      className={cb}
+                      className={`${cb} ${locked ? 'disabled:opacity-60' : ''}`}
+                      title={locked ? 'This module only has Read Only, so it is always granted' : undefined}
                       aria-label={`${MODULE_LABELS[m]} ${l.label}`}
                     />
                     )}

@@ -38,9 +38,9 @@ import { normalizePhMobile, PH_MOBILE_REGEX, blockPaste, confirmEmailError } fro
 import BillingAddressField from './BillingAddressField'
 import { ScanLine, CheckCircle } from 'lucide-react'
 import proxyApi from '@/lib/api/auth.api'
-import { EMPTY_FLAGS, MODULES_BY_ROLE, type ManagedRole, type ModuleFlags } from '@/constants/modules'
+import { EMPTY_FLAGS, MODULES_BY_ROLE, levelToFlags, type ManagedRole, type ModuleFlags } from '@/constants/modules'
 import { permissionsService } from '@/lib/services/admin/permissions.service'
-import ModulePermissionMatrix from '@/app/it_admin/administrator-management/ModulePermissionMatrix'
+import ModulePermissionMatrix, { lockedLevelFor } from '@/app/it_admin/administrator-management/ModulePermissionMatrix'
 import { useRecordLock } from '@/lib/hooks/useRecordLock'
 import RecordLockBanner, { RecordLockBadge } from '@/components/ui/RecordLockBanner'
 import { writeAccess } from '@/components/layout/ModuleAccess'
@@ -539,7 +539,11 @@ export default function UserFormModal({
           try {
             await permissionsService.save(
               newUserId,
-              roleModules.map((m) => ({ module_name: m, ...(perms[m] ?? EMPTY_FLAGS) })),
+              // A module with one box is saved with it ticked, as the matrix shows it.
+              roleModules.map((m) => {
+                const locked = lockedLevelFor(m)
+                return { module_name: m, ...(locked ? levelToFlags(locked) : perms[m] ?? EMPTY_FLAGS) }
+              }),
             )
           } catch {
             appToast.error('Account created, but saving module access failed. Set it via Manage Access.', { action: 'user-form-error' })

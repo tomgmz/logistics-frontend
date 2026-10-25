@@ -32,6 +32,7 @@ export const NAV_ITEMS_BY_ROLE: Record<string, { href: string; label: string; ic
     { href: '/general_manager/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={17} /> },
     { href: '/general_manager/booking-management', label: 'Booking Management', icon: <CalendarCheck size={17} /> },
     { href: '/general_manager/vehicle-management', label: 'Vehicle Management', icon: <Truck size={17} /> },
+    { href: '/general_manager/transaction-history', label: 'Transaction History', icon: <History size={17} /> },
     { href: '/general_manager/document-management', label: 'Document Management', icon: <FileSearch size={17} /> },
   ],
   it_admin: [

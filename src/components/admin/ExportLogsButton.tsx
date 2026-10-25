@@ -4,9 +4,10 @@ import { useState } from 'react'
 import { FileSpreadsheet } from 'lucide-react'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
+import { Button } from '@/components/ui/untitled/button'
 
 /**
- * "Export Logs" for the logs toolbars. `run` fetches the filtered rows and
+ * "Export" for the logs toolbars. `run` fetches the filtered rows and
  * downloads the .xlsx; this only owns the busy state and the feedback.
  */
 export default function ExportLogsButton({
@@ -14,12 +15,15 @@ export default function ExportLogsButton({
   noun,
   cap,
   disabled,
+  untitled = false,
 }: {
   run:       () => Promise<{ count: number; truncated: boolean }>
   /** Plural, e.g. "audit logs". */
   noun:      string
   cap:       number
   disabled?: boolean
+  /** Untitled UI's secondary button, for a table-card header. */
+  untitled?: boolean
 }) {
   const [exporting, setExporting] = useState(false)
 
@@ -42,6 +46,21 @@ export default function ExportLogsButton({
     }
   }
 
+  if (untitled) {
+    return (
+      <Button
+        color="secondary"
+        iconLeading={FileSpreadsheet}
+        onClick={() => void handleClick()}
+        disabled={exporting || disabled}
+        title="Download every row matching the current filters as an Excel file"
+        className="max-md:w-full"
+      >
+        {exporting ? 'Exporting…' : 'Export'}
+      </Button>
+    )
+  }
+
   return (
     <button
       type="button"
@@ -50,7 +69,7 @@ export default function ExportLogsButton({
       title="Download every row matching the current filters as an Excel file"
       className="flex items-center gap-1.5 rounded-lg border border-[#424242] px-3 py-2 text-sm text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white disabled:opacity-40"
     >
-      <FileSpreadsheet size={13} /> {exporting ? 'Exporting…' : 'Export Logs'}
+      <FileSpreadsheet size={13} /> {exporting ? 'Exporting…' : 'Export'}
     </button>
   )
 }

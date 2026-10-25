@@ -3,11 +3,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { X, ShieldCheck, Loader2 } from 'lucide-react'
-import { EMPTY_FLAGS, ModuleFlags, ModuleKey, defaultFlagsForRole, flagsToLevel } from '@/constants/modules'
+import { EMPTY_FLAGS, ModuleFlags, ModuleKey, defaultFlagsForRole, flagsToLevel, levelToFlags } from '@/constants/modules'
 import { permissionsService } from '@/lib/services/admin/permissions.service'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
-import ModulePermissionMatrix from './ModulePermissionMatrix'
+import ModulePermissionMatrix, { lockedLevelFor } from './ModulePermissionMatrix'
 import { useRecordLock } from '@/lib/hooks/useRecordLock'
 import RecordLockBanner from '@/components/ui/RecordLockBanner'
 import ReusableModal from '@/components/layout/ReusableModal'
@@ -59,8 +59,16 @@ export default function PermissionsModal({ userId, userName, onClose, onSaved }:
             can_delete: p.can_delete, can_export: p.can_export,
           }
         }
+        // A module with one box always has it (the matrix locks it ticked). When
+        // the saved row says otherwise, the matrix shows it ticked and Save
+        // turns on, so the stored access can be brought in line.
+        const shown: Record<string, ModuleFlags> = { ...map }
+        for (const m of res.modules) {
+          const locked = lockedLevelFor(m)
+          if (locked) shown[m] = levelToFlags(locked)
+        }
         setModules(res.modules)
-        setFlags(map)
+        setFlags(shown)
         setLoaded(map)
       } catch (e) {
         if (active) setError(getApiErrorMessage(e, 'Failed to load permissions.'))
