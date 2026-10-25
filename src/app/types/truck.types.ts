@@ -1,6 +1,7 @@
 import { TruckModel } from "./truck-model"
 import type { BlowbagetsItems } from "@/lib/services/client/booking.service"
 import type { DriverReport } from "./driver-report.types"
+import { registrationExpiredBy, type RegistrationStatus } from "@/lib/registration-expiry"
 
 /**
  * One BLOWBAGETS inspection of a vehicle, recorded by the fleet manager. The
@@ -61,6 +62,10 @@ export interface Truck {
   service_status?:           ServiceStatus
   /** Back from a delivery and the after-delivery odometer isn't recorded yet. */
   return_odometer_due?:      boolean
+  /** `YYYY-MM-DD`, the last day the registration is valid. Null on older vehicles. */
+  registration_expiry?:      string | null
+  /** Worked out by the server (lib/registration-expiry); expired blocks assignment. */
+  registration_status?:      RegistrationStatus
   created_at:   string
   updated_at:   string
 }
@@ -82,14 +87,21 @@ export interface ServiceStatus {
   days_left: number | null
 }
 
-/** Cleared for the Operations Manager to pick: BLOWBAGETS current and service not overdue. */
+/**
+ * Cleared for the Operations Manager to pick: BLOWBAGETS current, service not
+ * overdue, and the registration still valid on `onDay` (the delivery day; today
+ * when not given) — the same gates as the server's assertTruckAssignable.
+ */
 export function isAssignable(
-  truck: Pick<Truck, 'latest_inspection' | 'last_fleet_return_at' | 'service_status' | 'return_odometer_due'> & { status?: Truck['status'] },
+  truck: Pick<Truck, 'latest_inspection' | 'last_fleet_return_at' | 'service_status' | 'return_odometer_due' | 'registration_expiry'> & { status?: Truck['status'] },
+  onDay?: string | null,
 ): boolean {
   // Taken out of service by a person — the server refuses these too.
   if (truck.status === 'under_maintenance' || truck.status === 'inactive' || truck.status === 'archived') return false
   // Back from a job without its return odometer: every job is metered.
   if (truck.return_odometer_due) return false
+  // Not road-legal on the delivery day. No date yet (older vehicle) is not blocked.
+  if (registrationExpiredBy(truck.registration_expiry, onDay)) return false
   return isRoadworthy(truck) && truck.service_status?.state !== 'overdue'
 }
 
@@ -163,6 +175,7 @@ export function needsReinspection(
  *   failed_inspection   — its latest BLOWBAGETS failed
  *   driver_report       — a driver has an unresolved breakdown/accident open on it
  *   service_*           — routine service overdue / due soon / not set up
+ *   registration_*      — registration expired / expiring within a month / no date yet
  */
 export type MaintenanceReason =
   | 'return_odometer_due'
@@ -174,6 +187,9 @@ export type MaintenanceReason =
   | 'service_overdue'
   | 'service_due_soon'
   | 'service_schedule_missing'
+  | 'registration_expired'
+  | 'registration_expiring'
+  | 'registration_missing'
 
 export interface MaintenanceTruck extends Truck {
   maintenance_reasons: MaintenanceReason[]
@@ -192,6 +208,8 @@ export interface CreateTruckInput extends TruckScheduleInput {
   model_id?:    string | null
   odometer_km:  number
   odometer_photo_url?: string | null
+  /** `YYYY-MM-DD`, last day the registration is valid. Required for a new vehicle. */
+  registration_expiry: string
   created_by?:  string | null
   /** The vehicle's regular driver, when paired at creation. */
   assigned_driver_id?: string | null
@@ -200,6 +218,8 @@ export interface CreateTruckInput extends TruckScheduleInput {
 export interface UpdateTruckInput extends TruckScheduleInput {
   /** Only while the vehicle has no reading yet (setting up an older truck). */
   odometer_km?:  number
+  /** `YYYY-MM-DD` — the renewed registration's last valid day. */
+  registration_expiry?: string
   plate_number?: string
   model_id?:     string | null
   status?:       'available' | 'recheck_due' | 'in_use' | 'under_maintenance' | 'inactive' | 'archived'

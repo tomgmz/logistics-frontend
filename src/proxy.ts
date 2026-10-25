@@ -11,8 +11,7 @@ import { openToken } from './lib/server/token-cookies'
 // only credential involved. '/.well-known' must be reachable unauthenticated too
 // — Android fetches assetlinks.json itself to verify the app may use passkeys
 // for this domain, and it sends no cookies.
-// '/download' is the driver app's APK page, opened before anyone has an account on the phone.
-const PUBLIC_PATHS = ['/', '/favicon.ico', '/_next', '/api', '/change-password', '/reset-password', '/driver-setup', '/.well-known', '/messages', '/download']
+const PUBLIC_PATHS = ['/', '/favicon.ico', '/_next', '/api', '/change-password', '/reset-password', '/driver-setup', '/.well-known', '/messages']
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'))

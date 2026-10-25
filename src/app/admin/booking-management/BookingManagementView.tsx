@@ -1,6 +1,11 @@
 'use client'
 
 import Pagination from '@/components/ui/Pagination'
+import FilterBar from '@/components/ui/FilterBar'
+import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
+import { TableCard } from '@/components/ui/untitled/table-card'
+import { TabsMinimal } from '@/components/ui/untitled/tabs'
+import type { DateRange } from '@/components/ui/untitled/date-range-picker'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -93,7 +98,7 @@ import {
 } from './BookingDetailParts'
 
 import RefreshButton from '@/components/ui/RefreshButton'
-const PAGE_SIZE = 12
+import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
 
 const BOOKING_STATUSES: AdminBookingLifecycleStatus[] = [
   'pending',
@@ -1229,6 +1234,8 @@ function BookingDeepLink({ onFocus }: { onFocus: (id: string) => void }) {
 }
 
 export default function BookingManagementView({ roleView = 'admin' }: BookingManagementViewProps = {}) {
+  // 10 rows on phones, 20 from tablet up (lib/hooks/useTablePageSize).
+  const PAGE_SIZE = useTablePageSize()
   const forcedStatus = ROLE_FORCED_STATUS[roleView]
   const hidePending  = !!ROLE_HIDE_PENDING[roleView]
 
@@ -1399,6 +1406,8 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     return () => window.clearTimeout(t)
   }, [search])
 
+  const [dateRange, setDateRange] = useState<DateRange | null>(null)
+
   const loadPage = useCallback(async (quiet = false) => {
     try {
       if (!quiet) setListLoading(true)
@@ -1408,6 +1417,8 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
         limit:  PAGE_SIZE,
         status: forcedStatus ?? statusFilter,
         search: debouncedSearch,
+        dateFrom: dateRange?.from,
+        dateTo:   dateRange?.to,
       })
       setRawBookings(res.rows)
       setListMeta({
@@ -1423,7 +1434,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     } finally {
       if (!quiet) setListLoading(false)
     }
-  }, [page, statusFilter, debouncedSearch])
+  }, [page, statusFilter, debouncedSearch, dateRange, PAGE_SIZE])
 
   useEffect(() => { void loadPage() }, [loadPage])
 
@@ -1538,11 +1549,12 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
         if (isOutOfServiceStatus(t.status)) return false
         if (t.truck_id === assignTruckId) return true
         if (busyTruckIds.has(t.truck_id)) return false
-        // BLOWBAGETS current, routine service not overdue and no return odometer
-        // owed — the same gates the server's assertTruckAssignable applies.
-        return isAssignable(t)
+        // BLOWBAGETS current, routine service not overdue, no return odometer
+        // owed and registration valid on the delivery day — the same gates the
+        // server's assertTruckAssignable applies.
+        return isAssignable(t, scheduleDay)
       }),
-    [trucks, busyTruckIds, assignTruckId],
+    [trucks, busyTruckIds, assignTruckId, scheduleDay],
   )
 
   /**
@@ -1982,7 +1994,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     normalizeBookingStatus(status ?? '') === 'pending' && submittedAfterCloseToday(createdAt, clockNow)
 
   return (
-    <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-hidden ff-sc bg-[var(--color-bg)]">
+    <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-y-auto overflow-x-hidden lg:overflow-hidden ff-sc bg-[var(--color-bg)]">
 
       {/* Notification deep-link: opens the booking named in ?booking=<id>. */}
       <Suspense fallback={null}>
@@ -2048,53 +2060,41 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
 
       <header className="shrink-0 px-3 py-3 lg:px-4 border-b border-white/[0.07] flex flex-col sm:flex-row sm:items-end justify-between gap-3">
         <h1 className="font-[family-name:var(--font-alegreya-sc)] text-[17px] 3xl:text-[20px] font-bold text-white">{ROLE_TITLE[roleView]}</h1>
-        <RefreshButton onClick={() => void loadPage()} className="self-start" />
       </header>
 
-      <div className="flex flex-1 min-h-0 overflow-hidden">
-        <div className="flex-1 flex flex-col min-w-0 min-h-0 p-3 lg:p-4 3xl:p-[34px] 3xl:pl-9 gap-3 3xl:gap-[14px] bg-[#0a0a0a]">
+      <div className="flex flex-[1_0_auto] lg:flex-1 lg:min-h-0 lg:overflow-hidden">
+        <div className="flex-1 flex flex-col min-w-0 lg:min-h-0 p-3 lg:p-4 3xl:p-[34px] 3xl:pl-9 gap-3 3xl:gap-[14px] bg-[#0a0a0a]">
 
-          {/* Filters */}
-          <div className="flex flex-col lg:flex-row gap-2 lg:items-center lg:justify-between shrink-0">
-            <div className="relative min-w-0 flex-1 lg:max-w-[360px] 3xl:max-w-[466px]">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/icons/booking-management/search.svg" alt="" width={22} height={22} draggable={false}
-                className="pointer-events-none absolute left-3 3xl:left-[18px] top-1/2 size-4 3xl:size-[22px] -translate-y-1/2" />
-              <input
-                value={search}
-                onChange={(e) => { setSearch(e.target.value); setPage(0) }}
-                placeholder="Search ID, client, origin, truck type..."
-                aria-label="Search bookings"
-                className="h-9 3xl:h-[46px] w-full rounded-[10px] border border-[#818181] bg-[#424242] pl-9 3xl:pl-[49px] pr-4 text-[14px] 3xl:text-[18px] text-white placeholder:text-[#818181] outline-none transition focus:border-[#4df9ed]"
-              />
-            </div>
-            {!forcedStatus && (
-              <div className="flex items-center gap-2 shrink-0">
-                <label htmlFor="booking-status-filter" className="text-[13px] 3xl:text-[16px] font-bold text-[#818181]">
-                  status
-                </label>
-                <select
-                  id="booking-status-filter"
-                  value={statusFilter}
-                  onChange={(e) => { setStatusFilter(e.target.value); setPage(0) }}
-                  className="appearance-none h-8 3xl:h-[38px] min-w-[120px] 3xl:min-w-[141px] rounded-[10px] border-[0.5px] border-[#818181] bg-[#2a2828] px-3 3xl:px-[15px] text-[13px] 3xl:text-[16px] font-bold text-white outline-none focus:border-[#4df9ed] cursor-pointer [&>option]:bg-[#2a2828]"
-                >
-                  {(['all', ...BOOKING_STATUSES.filter((s) => !hidePending || s !== 'pending')]).map((key) => {
-                    const label = key === 'all' ? (hidePending ? 'All (active)' : 'All') : fmtStatus(key)
-                    const count = key === 'all' ? statusCounts.all : statusCounts[key] ?? 0
-                    return (
-                      <option key={key} value={key}>
-                        {label} ({count})
-                      </option>
-                    )
-                  })}
-                </select>
-              </div>
-            )}
-          </div>
+          {/* Untitled UI's table card from the "No vendors found" table, as in User
+              Management: the header (title + count), then its filter row with the
+              status tabs on the left (a dropdown on phones) and search + Refresh
+              on the right. The General Manager and Fleet Manager views have one
+              fixed status, so no tabs. */}
+          <TableCard.Root className="flex-[1_0_auto] lg:flex-1 lg:min-h-0 flex flex-col">
+            <TableCard.Header
+              className="shrink-0"
+              title="Bookings"
+              badge={`${totalRows} ${totalRows === 1 ? 'booking' : 'bookings'}`}
+            />
+            <FilterBar
+              layout="split"
+              search={{ value: search, onChange: (v) => { setSearch(v); setPage(0) }, placeholder: 'Search' }}
+              // Untitled UI's "Select dates": the schedule-date window, filtered on the server.
+              dateRange={{ value: dateRange, onChange: (r) => { setDateRange(r); setPage(0) } }}
+              actions={<RefreshButton iconOnly onClick={() => void loadPage()} />}
+              leading={!forcedStatus && (
+                <TabsMinimal
+                  label="Booking status"
+                  items={(['all', ...BOOKING_STATUSES.filter((s) => !hidePending || s !== 'pending')]).map((key) => ({
+                    id: key,
+                    label: `${key === 'all' ? (hidePending ? 'All (active)' : 'All') : fmtStatus(key)} (${key === 'all' ? statusCounts.all : statusCounts[key] ?? 0})`,
+                  }))}
+                  selectedKey={statusFilter}
+                  onSelectionChange={(key) => { setStatusFilter(key); setPage(0) }}
+                />
+              )}
+            />
 
-          {/* Table */}
-          <div className="flex-1 min-h-0 rounded-[10px] border-[0.5px] border-[#424242] overflow-hidden flex flex-col bg-[#1b1b1b] shadow-[0_4px_4px_rgba(0,0,0,0.25)]">
             {listLoading ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-3 py-16">
                 <div className="w-9 h-9 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--color-cyan)' }} />
@@ -2106,12 +2106,16 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                 <button type="button" onClick={() => void loadPage()} className="text-[var(--color-cyan)] text-sm font-semibold">Try again</button>
               </div>
             ) : listRows.length === 0 ? (
-              <div className="flex-1 flex items-center justify-center text-sm text-white/45 py-12">
+              <div className="flex-1 flex flex-col items-center justify-center text-sm text-white/45 py-12">
                 No bookings match your filters.
+                <ClearFiltersLink
+                  show={!!search || statusFilter !== 'all' || !!dateRange}
+                  onClear={() => { setSearch(''); setStatusFilter('all'); setDateRange(null); setPage(0) }}
+                />
               </div>
             ) : (
               <>
-                <div className="overflow-auto flex-1 min-h-0">
+                <div className="overflow-x-auto lg:overflow-auto flex-[1_0_auto] lg:flex-1 lg:min-h-0">
                   <table className="w-full text-left border-collapse">
                     {/* Headers keep the small caps face; the data rows are regular Alegreya Sans. */}
                     <thead className="sticky top-0 z-[1] bg-[#181717]">
@@ -2178,7 +2182,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                 <Pagination page={pageSafe + 1} totalPages={pageCount} total={totalRows} pageSize={PAGE_SIZE} onPageChange={(p) => setPage(p - 1)} />
               </>
             )}
-          </div>
+          </TableCard.Root>
         </div>
 
         {/* Detail panel */}

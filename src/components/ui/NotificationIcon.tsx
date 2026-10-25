@@ -62,6 +62,7 @@ const ACTIONABLE_TYPES = new Set([
   "auth.password_reset_requested",
   "support.ticket_opened",
   "support.ticket_resolved",
+  "vehicle.registration_expiring",
 ]);
 
 // The filter dropdown lists only the groups a role can actually receive, so
@@ -74,13 +75,14 @@ const BOOKINGS: FilterOption = { value: "booking", label: "Bookings" };
 const REPORTS: FilterOption  = { value: "driver", label: "Driver reports" };
 const RESETS: FilterOption   = { value: "auth", label: "Password resets" };
 const TICKETS: FilterOption  = { value: "support", label: "Support tickets" };
+const VEHICLES: FilterOption = { value: "vehicle", label: "Vehicles" };
 
 const FILTERS_BY_ROLE: Record<string, FilterOption[]> = {
-  admin:              [ALL, UNREAD, BOOKINGS, REPORTS, RESETS, TICKETS],
+  admin:              [ALL, UNREAD, BOOKINGS, REPORTS, VEHICLES, RESETS, TICKETS],
   it_admin:           [ALL, UNREAD, RESETS],
   general_manager:    [ALL, UNREAD, BOOKINGS],
   operations_manager: [ALL, UNREAD, BOOKINGS, REPORTS],
-  fleet_manager:      [ALL, UNREAD, BOOKINGS, REPORTS],
+  fleet_manager:      [ALL, UNREAD, BOOKINGS, REPORTS, VEHICLES],
   client:             [ALL, UNREAD, BOOKINGS, TICKETS],
   driver:             [ALL, UNREAD, BOOKINGS, { value: "driver", label: "License" }],
 };
@@ -106,6 +108,7 @@ const FIELD_LABELS: Record<string, string> = {
   trip_can_continue: "Trip can continue",
   requested_role:    "Requested role",
   window:            "Window",
+  registration_expiry: "Registration valid until",
 };
 // Readable values for coded payload fields, so nothing shows abbreviated
 // (e.g. "ops_pending"). Unknown codes fall back to expandCode() + humanize.

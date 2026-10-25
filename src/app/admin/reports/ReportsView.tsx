@@ -1,5 +1,6 @@
 'use client'
 
+import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Search, Siren, ChevronRight } from 'lucide-react'
@@ -35,8 +36,8 @@ import { useAuthStore } from '@/lib/store/auth.store'
 
 import RefreshButton from '@/components/ui/RefreshButton'
 import Pagination from '@/components/ui/Pagination'
+import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
 
-const PAGE_SIZE = 15
 /**
  * The Reports module — the staff side of the driver app's Reports tab.
  *
@@ -85,6 +86,8 @@ function ReportDeepLink({ onFocus }: { onFocus: (id: string) => void }) {
 }
 
 export default function ReportsView() {
+  // 10 rows on phones, 20 from tablet up (lib/hooks/useTablePageSize).
+  const PAGE_SIZE = useTablePageSize()
   const [reports, setReports] = useState<DriverReport[]>([])
   const [loading, setLoading] = useState(true)
   const [error,   setError]   = useState<string | null>(null)
@@ -285,7 +288,7 @@ export default function ReportsView() {
   ) : null
 
   return (
-    <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-hidden ff-sc bg-[var(--color-bg)]">
+    <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-y-auto overflow-x-hidden lg:overflow-hidden ff-sc bg-[var(--color-bg)]">
       <Suspense fallback={null}>
         <ReportDeepLink onFocus={focusReport} />
       </Suspense>
@@ -304,7 +307,7 @@ export default function ReportsView() {
         <RefreshButton onClick={() => void load()} className="self-start sm:self-auto" />
       </header>
 
-      <div className="flex flex-1 min-h-0 flex-col p-3 lg:p-4 gap-3 overflow-hidden">
+      <div className="flex flex-[1_0_auto] lg:flex-1 lg:min-h-0 flex-col p-3 lg:p-4 gap-3 lg:overflow-hidden">
         <div className="flex flex-col xl:flex-row gap-2 xl:items-center shrink-0">
           <div className="flex items-center gap-2 rounded-[10px] px-3 py-2 flex-1 max-w-md" style={{ background: '#2a2828' }}>
             <Search size={16} className="text-white/40 shrink-0" />
@@ -352,7 +355,7 @@ export default function ReportsView() {
           </select>
         </div>
 
-        <div className="flex-1 min-h-0 rounded-xl border border-white/[0.08] overflow-hidden flex flex-col bg-[#0f0f0f]">
+        <div className="flex-[1_0_auto] lg:flex-1 lg:min-h-0 rounded-xl border border-white/[0.08] overflow-hidden flex flex-col bg-[#0f0f0f]">
           {loading ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-3 py-16">
               <div className="w-9 h-9 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--color-cyan)' }} />
@@ -373,10 +376,16 @@ export default function ReportsView() {
                   ? (isFleet ? 'No vehicle-related reports yet.' : 'No driver has raised a report yet.')
                   : 'No reports match your filters.'}
               </p>
+              {/* Clearing shows every report, resolved ones too. */}
+              <ClearFiltersLink
+                show={reports.length > 0}
+                onClear={() => { setSearch(''); setStatusFilter('all'); setTypeFilter('all'); setPage(1) }}
+                className="mt-0"
+              />
             </div>
           ) : (
             <>
-            <div className="overflow-auto flex-1 min-h-0">
+            <div className="overflow-x-auto lg:overflow-auto flex-[1_0_auto] lg:flex-1 lg:min-h-0">
               <table className="w-full text-left text-sm border-collapse min-w-[760px]">
                 <thead className="sticky top-0 z-[1] bg-[#141414] border-b border-white/[0.07]">
                   <tr className="text-[11px] uppercase tracking-wider text-white/40">

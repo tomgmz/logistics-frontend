@@ -20,7 +20,6 @@ const EXPLORE = [
   { label: 'Services', href: '/#services' },
   { label: 'FAQ',      href: '/#faq' },
   { label: 'Contact',  href: '/#contact' },
-  { label: 'Driver App', href: '/download' },
 ]
 
 export default function SiteFooter({ variant = 'full' }: { variant?: 'full' | 'compact' }) {

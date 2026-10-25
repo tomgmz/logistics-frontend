@@ -1,5 +1,6 @@
 'use client'
 
+import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { CheckCircle2, ChevronDown, ExternalLink, Mail, Search, Ticket } from 'lucide-react'
 
@@ -16,6 +17,7 @@ import {
 
 import RefreshButton from '@/components/ui/RefreshButton'
 import Pagination from '@/components/ui/Pagination'
+import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
 /**
  * Tickets — the Company Administrator's full view of client support tickets.
  *
@@ -28,7 +30,6 @@ import Pagination from '@/components/ui/Pagination'
 
 type StatusFilter = 'open' | 'resolved' | 'all'
 
-const PAGE_SIZE = 15
 
 const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
   { key: 'open',     label: 'Open' },
@@ -56,6 +57,8 @@ function StatusBadge({ status }: { status: SupportTicket['status'] }) {
 }
 
 export default function SupportTicketsView() {
+  // 10 rows on phones, 20 from tablet up (lib/hooks/useTablePageSize).
+  const PAGE_SIZE = useTablePageSize()
   // Tickets tier: Read Only sees the reply and resolve actions, disabled.
   const { canEdit } = useModuleAccess()
   const [tickets, setTickets] = useState<SupportTicket[]>([])
@@ -143,7 +146,7 @@ export default function SupportTicketsView() {
   }
 
   return (
-    <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-hidden ff-sc bg-[var(--color-bg)]">
+    <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-y-auto overflow-x-hidden lg:overflow-hidden ff-sc bg-[var(--color-bg)]">
       <header className="shrink-0 px-3 py-3 lg:px-4 border-b border-white/[0.07] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="font-[family-name:var(--font-alegreya-sc)] text-[17px] 3xl:text-[20px] font-bold text-white">Tickets</h1>
@@ -154,7 +157,7 @@ export default function SupportTicketsView() {
         <RefreshButton onClick={() => void load()} className="self-start sm:self-auto" />
       </header>
 
-      <div className="flex flex-1 min-h-0 flex-col p-3 lg:p-4 gap-3 overflow-hidden">
+      <div className="flex flex-[1_0_auto] lg:flex-1 lg:min-h-0 flex-col p-3 lg:p-4 gap-3 lg:overflow-hidden">
         <div className="flex flex-col xl:flex-row gap-2 xl:items-center shrink-0">
           <div className="flex items-center gap-2 rounded-[10px] px-3 py-2 flex-1 max-w-md" style={{ background: '#2a2828' }}>
             <Search size={16} className="text-white/40 shrink-0" />
@@ -189,7 +192,7 @@ export default function SupportTicketsView() {
           </div>
         </div>
 
-        <div className="flex-1 min-h-0 rounded-xl border border-white/[0.08] overflow-hidden flex flex-col bg-[#0f0f0f]">
+        <div className="flex-[1_0_auto] lg:flex-1 lg:min-h-0 rounded-xl border border-white/[0.08] overflow-hidden flex flex-col bg-[#0f0f0f]">
           {loading ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-3 py-16">
               <div className="w-9 h-9 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--color-cyan)' }} />
@@ -212,10 +215,16 @@ export default function SupportTicketsView() {
                     ? 'No open tickets.'
                     : 'No tickets match your filters.'}
               </p>
+              {/* Clearing shows every ticket, resolved ones too. */}
+              <ClearFiltersLink
+                show={tickets.length > 0}
+                onClear={() => { setSearch(''); setStatusFilter('all'); setPage(1) }}
+                className="mt-0"
+              />
             </div>
           ) : (
             <>
-            <ul className="overflow-auto flex-1 min-h-0 divide-y divide-white/[0.05]">
+            <ul className="overflow-x-auto lg:overflow-auto flex-[1_0_auto] lg:flex-1 lg:min-h-0 divide-y divide-white/[0.05]">
               {pageRows.map((t) => {
                 const isOpen   = expanded === t.ticket_id
                 const opener   = personName(t.opener)

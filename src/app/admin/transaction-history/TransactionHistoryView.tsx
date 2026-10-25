@@ -1,5 +1,6 @@
 'use client'
 
+import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
 import Pagination from '@/components/ui/Pagination'
 import { useLivePending } from '@/lib/hooks/useLiveTable'
 import NewEntriesBar from '@/components/ui/NewEntriesBar'
@@ -38,6 +39,7 @@ import {
 import StopTimesPanel from '@/components/transactions/StopTimesPanel'
 
 import RefreshButton from '@/components/ui/RefreshButton'
+import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
 /**
  * Transaction history for staff — the client's own history widened across every
  * company.
@@ -53,7 +55,6 @@ import RefreshButton from '@/components/ui/RefreshButton'
  * only `canExport`, which decides whether the export control exists.
  */
 
-const PAGE_SIZE = 20
 
 const BORDER = 'rgba(255,255,255,0.07)'
 const CYAN   = '#4DF9ED'
@@ -103,6 +104,8 @@ function KpiTile({ label, value, accent, sub }: {
 }
 
 export default function TransactionHistoryView() {
+  // 10 rows on phones, 20 from tablet up (lib/hooks/useTablePageSize).
+  const PAGE_SIZE = useTablePageSize()
   const { canExport } = useModuleAccess()
 
   // --- filters -------------------------------------------------------------
@@ -180,7 +183,7 @@ export default function TransactionHistoryView() {
     } finally {
       if (!quiet) setLoading(false)
     }
-  }, [filters, page, clearPending])
+  }, [filters, page, clearPending, PAGE_SIZE])
 
   useEffect(() => { void load() }, [load])
 
@@ -239,7 +242,7 @@ export default function TransactionHistoryView() {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--color-bg)] text-white">
+    <div className="flex h-full min-h-0 flex-col overflow-y-auto overflow-x-hidden lg:overflow-hidden bg-[var(--color-bg)] text-white">
 
       {/* Header */}
       <header className="flex shrink-0 flex-col justify-between gap-3 border-b px-3 py-3
@@ -263,8 +266,8 @@ export default function TransactionHistoryView() {
         </div>
       </header>
 
-      <div className="flex min-h-0 flex-1 overflow-hidden">
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 p-3 lg:p-4">
+      <div className="flex lg:min-h-0 flex-[1_0_auto] lg:flex-1 lg:overflow-hidden">
+        <div className="flex lg:min-h-0 min-w-0 flex-1 flex-col gap-3 p-3 lg:p-4">
 
           {/* Filters */}
           <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -373,7 +376,7 @@ export default function TransactionHistoryView() {
           </div>
 
           {/* Table */}
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border
+          <div className="flex lg:min-h-0 flex-[1_0_auto] lg:flex-1 flex-col overflow-hidden rounded-xl border
                           border-white/[0.08] bg-[#0f0f0f]">
             <NewEntriesBar count={pending} singular="new update" plural="new updates"
               onRefresh={() => void load(true)} />
@@ -395,17 +398,11 @@ export default function TransactionHistoryView() {
             ) : rows.length === 0 ? (
               <div className="flex flex-1 flex-col items-center justify-center gap-3 py-12">
                 <p className="text-sm text-white/45">No transactions match your filters.</p>
-                {hasActiveFilters && (
-                  <button type="button" onClick={clearFilters}
-                    className="text-xs underline underline-offset-2 cursor-pointer hover:opacity-80"
-                    style={{ color: CYAN }}>
-                    Clear all filters
-                  </button>
-                )}
+                <ClearFiltersLink show={hasActiveFilters} onClear={clearFilters} className="mt-0" />
               </div>
             ) : (
               <>
-                <div className="min-h-0 flex-1 overflow-auto">
+                <div className="lg:min-h-0 flex-[1_0_auto] lg:flex-1 overflow-x-auto lg:overflow-auto">
                   <table className="w-full border-collapse text-left text-sm">
                     <thead className="sticky top-0 z-[1] border-b bg-[#141414]"
                       style={{ borderColor: BORDER }}>

@@ -1,5 +1,6 @@
 'use client'
 
+import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
 import Pagination from '@/components/ui/Pagination'
 import { useLiveTable, useLivePending } from '@/lib/hooks/useLiveTable'
 import NewEntriesBar from '@/components/ui/NewEntriesBar'
@@ -18,6 +19,7 @@ import ExportLogsButton from '@/components/admin/ExportLogsButton'
 import { expandCode, roleLabel } from '@/lib/roles'
 
 import RefreshButton from '@/components/ui/RefreshButton'
+import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
 const BADGE_STYLES: Record<LogType, string> = {
   auth:              'bg-[rgba(138,56,245,0.12)] text-[#8a38f5] border border-[rgba(138,56,245,0.25)]',
   user_management:   'bg-[rgba(77,249,237,0.12)] text-[#4df9ed] border border-[rgba(77,249,237,0.25)]',
@@ -47,9 +49,10 @@ const STAT_COLORS: Record<string, string> = {
   system_error:      '#f62626',
 }
 
-const PAGE_SIZE = 15
 
 export default function AuditLogsPage() {
+  // 10 rows on phones, 20 from tablet up (lib/hooks/useTablePageSize).
+  const PAGE_SIZE = useTablePageSize()
   const [logs, setLogs]                       = useState<SystemLog[]>([])
   const [stats, setStats]                     = useState<LogStats | null>(null)
   const [total, setTotal]                     = useState(0)
@@ -126,8 +129,8 @@ export default function AuditLogsPage() {
   }
 
   return (
-    <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-hidden bg-[#0a0a0a] text-white">
-      <div className="flex flex-col flex-1 min-h-0 px-3 py-3 lg:px-4 gap-6 overflow-hidden">
+    <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-y-auto overflow-x-hidden lg:overflow-hidden bg-[#0a0a0a] text-white">
+      <div className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0 px-3 py-3 lg:px-4 gap-6 lg:overflow-hidden">
 
         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 shrink-0">
           <div>
@@ -155,7 +158,7 @@ export default function AuditLogsPage() {
           )}
         </div>
 
-        <div className="flex flex-col flex-1 min-h-0 rounded-2xl border border-[#2a2a2a] bg-[#1b1b1b] overflow-hidden">
+        <div className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0 rounded-2xl border border-[#2a2a2a] bg-[#1b1b1b] overflow-hidden">
 
           <div className="shrink-0 border-b border-[#2a2a2a] px-4 py-3 flex flex-wrap gap-2 items-center">
             <input
@@ -244,7 +247,7 @@ export default function AuditLogsPage() {
 
           <NewEntriesBar count={pending} onRefresh={() => void fetchLogs()} />
 
-          <div className="flex-1 overflow-auto min-h-0">
+          <div className="flex-[1_0_auto] lg:flex-1 overflow-x-auto lg:overflow-auto lg:min-h-0">
             {loading && (
               <table className="w-full text-sm">
                 <thead className="sticky top-0 z-10 bg-[#1b1b1b]">
@@ -286,8 +289,9 @@ export default function AuditLogsPage() {
             )}
 
             {!loading && !error && logs.length === 0 && (
-              <div className="text-center py-16 text-[#424242] text-sm tracking-wide">
+              <div className="flex flex-col items-center py-16 text-[#424242] text-sm tracking-wide">
                 No logs match your filters.
+                <ClearFiltersLink show={!!search || !!logType} onClear={() => { setSearch(''); setLogType(''); setPage(1) }} />
               </div>
             )}
 

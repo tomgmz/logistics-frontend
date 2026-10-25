@@ -1,8 +1,12 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
+import { FilterLines, SearchLg } from '@untitledui/icons'
 import { Search, ListFilter, Plus, X, ChevronDown, Check } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Button } from '@/components/ui/untitled/button'
+import { InputShortcut } from '@/components/ui/untitled/input'
+import { DateRangePicker, type DateRange } from '@/components/ui/untitled/date-range-picker'
 
 /**
  * The one filter bar, after Untitled UI's filter bars
@@ -93,6 +97,8 @@ export default function FilterBar({
   actions,
   summary,
   variant = 'advanced',
+  layout = 'inline',
+  dateRange,
   className = '',
 }: {
   search?: {
@@ -108,10 +114,41 @@ export default function FilterBar({
   summary?:  ReactNode
   /** 'advanced': the one Filters button and rule panel. 'dropdowns': a dropdown per field. */
   variant?:  'advanced' | 'dropdowns'
+  /**
+   * 'inline': everything in one row from the left. 'split': Untitled UI's table
+   * filter row (the "No vendors found" table), built from the ported Untitled UI
+   * parts in components/ui/untitled: `leading` (tabs) on the left; the shortcut
+   * search, Filters and `actions` on the right. Phones stack the two and Filters
+   * drops to its icon.
+   */
+  layout?:   'inline' | 'split'
+  /**
+   * Split layout: Untitled UI's "Select dates" range picker before Filters, as
+   * in their "No users found" table. The page decides which date it filters.
+   */
+  dateRange?: { value: DateRange | null; onChange: (range: DateRange | null) => void; label?: string }
   className?: string
 }) {
   // A field with nothing to pick (no companies loaded yet) is left out.
   const shown = fields.filter((f) => f.options.length > 0)
+
+  if (layout === 'split') {
+    return (
+      <div className={`flex shrink-0 flex-wrap gap-3 border-b border-[#424242] px-4 py-3 max-md:flex-col md:px-6 ${className}`}>
+        <div className="flex min-w-0 flex-1 flex-wrap gap-3">{leading}</div>
+        <div className="flex shrink-0 items-center gap-3 max-md:w-full max-md:flex-wrap">
+          {search && <InputShortcut {...search} icon={SearchLg} className="min-w-0 max-md:flex-1 md:w-70" />}
+          {/* Phones: the dates get their own full-width line under search. */}
+          {dateRange && <DateRangePicker {...dateRange} className="shrink-0 max-md:order-last max-md:w-full" />}
+          {shown.length > 0 && onChange && (
+            <FiltersButton fields={shown} values={values} onApply={onChange} compact />
+          )}
+          {actions}
+        </div>
+        {summary}
+      </div>
+    )
+  }
 
   return (
     <div className={`border-b border-[#424242] px-3 sm:px-4 3xl:px-5 py-2 3xl:py-2.5 shrink-0 ${className}`}>
@@ -298,10 +335,12 @@ const OPS: FilterOption[] = [
 ]
 
 /** The Filters button and its rule panel. Edits a draft; Apply filter hands it over. */
-function FiltersButton({ fields, values, onApply }: {
+function FiltersButton({ fields, values, onApply, compact = false }: {
   fields:  FilterField[]
   values:  FilterValues
   onApply: (values: FilterValues) => void
+  /** Phones show only the icon (the split layout). */
+  compact?: boolean
 }) {
   const [open,  setOpen]  = useState(false)
   const [draft, setDraft] = useState<DraftRule[]>([])
@@ -340,6 +379,22 @@ function FiltersButton({ fields, values, onApply }: {
   return (
     <Popover open={open} onOpenChange={openChange}>
       <PopoverTrigger asChild>
+        {compact ? (
+          // Untitled UI's secondary sm button with FilterLines; icon only on phones.
+          <Button
+            color="secondary"
+            iconLeading={FilterLines}
+            aria-label={applied ? `Filters, ${applied} applied` : 'Filters'}
+            className={applied || open ? 'ring-[#4df9ed] text-[#4df9ed]' : undefined}
+          >
+            <span className="max-md:hidden">Filters</span>
+            {applied > 0 && (
+              <span className="ml-1.5 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#4df9ed] px-1 text-[11px] font-bold leading-none text-black">
+                {applied}
+              </span>
+            )}
+          </Button>
+        ) : (
         <button
           type="button"
           aria-label={applied ? `Filters, ${applied} applied` : 'Filters'}
@@ -357,6 +412,7 @@ function FiltersButton({ fields, values, onApply }: {
             </span>
           )}
         </button>
+        )}
       </PopoverTrigger>
       <PopoverContent
         align="end"

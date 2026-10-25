@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Camera, X } from 'lucide-react'
 import type { ServiceStatus } from '@/app/types/truck.types'
+import type { RegistrationStatus } from '@/lib/registration-expiry'
 
 /** Shared bits for odometer readings and routine service. */
 
@@ -148,6 +149,39 @@ export function PhotoField({
       {error && <p className="text-[11px] text-red-400 mt-1">{error}</p>}
     </div>
   )
+}
+
+/** Registration validity: Expired / Expires soon / Valid / Not set. */
+export function RegistrationBadge({ status }: { status: RegistrationStatus | undefined }) {
+  if (!status) return null
+  const tone = {
+    expired:  { label: 'Expired',      color: '#f62626', border: 'rgba(246,38,38,0.40)', bg: 'rgba(246,38,38,0.12)' },
+    expiring: { label: 'Expires soon', color: '#ffea00', border: 'rgba(255,234,0,0.35)',  bg: 'rgba(255,234,0,0.10)' },
+    missing:  { label: 'Not set',      color: 'rgba(255,255,255,0.5)', border: 'rgba(255,255,255,0.15)', bg: 'transparent' },
+    ok:       { label: 'Valid',        color: '#3af626', border: 'rgba(58,246,38,0.30)',   bg: 'rgba(58,246,38,0.08)' },
+  }[status.state]
+
+  return (
+    <span className="flex flex-col gap-0.5 items-start">
+      <span
+        className="inline-flex text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border"
+        style={{ color: tone.color, borderColor: tone.border, background: tone.bg }}
+      >
+        {tone.label}
+      </span>
+      {status.days_left != null && status.state !== 'ok' && (
+        <span className="text-[10px] text-white/35 tabular-nums">{registrationDaysPhrase(status.days_left)}</span>
+      )}
+    </span>
+  )
+}
+
+/** "expires today" / "in 12 days" / "3 days ago". */
+export function registrationDaysPhrase(daysLeft: number): string {
+  if (daysLeft === 0) return 'expires today'
+  if (daysLeft > 0)   return daysLeft === 1 ? 'in 1 day' : `in ${daysLeft} days`
+  const ago = -daysLeft
+  return ago === 1 ? 'expired 1 day ago' : `expired ${ago} days ago`
 }
 
 export function ServiceStatusBadge({ status }: { status: ServiceStatus | undefined }) {

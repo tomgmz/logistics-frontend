@@ -250,7 +250,11 @@ export default function DriverReportDetailModal({
               )}
             </div>
 
-            <div className="flex justify-end gap-2 px-4 py-3 border-t border-white/[0.07] shrink-0">
+            {/* Phones: a two-column grid of full-width buttons (an odd last one
+                spans both), so up to four actions fit inside the modal. From sm
+                up they sit in one right-aligned row. */}
+            <div className="grid grid-cols-2 gap-2 px-4 py-3 border-t border-white/[0.07] shrink-0 [&>*]:w-full [&>*]:min-w-0 [&>*]:px-2 [&>*:last-child:nth-child(odd)]:col-span-2 sm:flex sm:justify-end sm:[&>*]:w-auto sm:[&>*]:px-4">
+
               {replaceClose ?? (
                 <button
                   type="button"

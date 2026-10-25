@@ -5,17 +5,15 @@ import { motion, Variants, AnimatePresence } from 'framer-motion'
 import { Suspense, useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import {
-  ChevronRight, ChevronLeft, Package, Calendar,
-  X, AlertCircle, RefreshCw,
+  ChevronRight, ChevronLeft, Package,
+  AlertCircle, RefreshCw,
 } from 'lucide-react'
 import RefreshButton from '@/components/ui/RefreshButton'
+import FilterBar from '@/components/ui/FilterBar'
+import { TableCard } from '@/components/ui/untitled/table-card'
+import { TabsMinimal } from '@/components/ui/untitled/tabs'
 import Pagination from '@/components/ui/Pagination'
 
-import TextField from '@mui/material/TextField'
-import Select, { SelectChangeEvent } from '@mui/material/Select'
-import MenuItem from '@mui/material/MenuItem'
-import InputAdornment from '@mui/material/InputAdornment'
-import { SxProps, Theme } from '@mui/material/styles'
 
 import { bookingService } from '@/lib/services/client/booking.service'
 import { useAuthStore }    from '@/lib/store/auth.store'
@@ -38,67 +36,10 @@ import {
   formatDate, getDropoffs,
 } from '@/components/transactions/transaction-format'
 import {
-  BG_PAGE, BG_PANEL, BG_CARD, BORDER, BORDER_C, CYAN, MUTED, ERROR, RADIUS,
+  BG_PAGE, BG_PANEL, BG_CARD, BORDER, BORDER_C, CYAN, MUTED, ERROR,
 } from '@/components/transactions/transaction-theme'
 import StopTimesPanel from '@/components/transactions/StopTimesPanel'
 
-
-/* showPicker() is missing on iOS Safari before 16.4 (and throws if the input
-   cannot open a picker); focusing the field opens the native wheel there. */
-function openDatePicker(input: HTMLInputElement | null) {
-  if (!input) return
-  try { input.showPicker() } catch { input.focus() }
-}
-function fieldSx(bg: string, border: string): SxProps<Theme> {
-  return {
-    '& .MuiInputBase-root': {
-      height: 36, borderRadius: RADIUS, backgroundColor: bg,
-      color: '#fff', fontSize: '0.875rem', fontFamily: 'inherit',
-    },
-    '& .MuiInputBase-input': {
-      padding: '0 12px', height: 36, boxSizing: 'border-box',
-      '&::placeholder': { color: 'rgba(255,255,255,0.2)', opacity: 1 },
-    },
-    '& .MuiOutlinedInput-notchedOutline': { borderColor: border, borderRadius: RADIUS },
-    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: `${CYAN}66` },
-    '& .Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: `${CYAN}66`, borderWidth: 1 },
-    '& .MuiInputLabel-root': { display: 'none' },
-    '& legend': { display: 'none' },
-    '& fieldset': { top: 0 },
-  }
-}
-
-function selectSx(bg: string, border: string): SxProps<Theme> {
-  return {
-    height: 36, borderRadius: RADIUS, backgroundColor: bg,
-    color: '#fff', fontSize: '0.875rem', fontFamily: 'inherit',
-    '& .MuiSelect-select': {
-      padding: '0 32px 0 10px !important', height: '36px !important',
-      display: 'flex', alignItems: 'center',
-    },
-    '& .MuiOutlinedInput-notchedOutline': { borderColor: border, borderRadius: RADIUS },
-    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: `${CYAN}66` },
-    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: `${CYAN}66`, borderWidth: 1 },
-    '& .MuiSvgIcon-root': { color: 'rgba(255,255,255,0.5)' },
-    '& legend': { display: 'none' },
-    '& fieldset': { top: 0 },
-  }
-}
-
-const MENU_PROPS = {
-  PaperProps: {
-    sx: {
-      bgcolor: '#2A2828', color: '#fff',
-      border: `1px solid ${BORDER_C}`, borderRadius: RADIUS,
-      '& .MuiMenuItem-root': {
-        fontSize: '0.875rem', fontFamily: 'inherit',
-        '&:hover':              { bgcolor: 'rgba(77,249,237,0.08)' },
-        '&.Mui-selected':       { bgcolor: 'rgba(77,249,237,0.14)' },
-        '&.Mui-selected:hover': { bgcolor: 'rgba(77,249,237,0.20)' },
-      },
-    },
-  },
-}
 
 /** An icon exported from the Figma Transaction History (public/icons/transaction-history). */
 function HistoryIcon({ name, size, className = '' }: { name: string; size: number; className?: string }) {
@@ -108,10 +49,6 @@ function HistoryIcon({ name, size, className = '' }: { name: string; size: numbe
       className={`shrink-0 ${className}`} draggable={false} />
   )
 }
-
-// Figma lines and chips.
-const LINE      = '#424242'
-const CHIP_IDLE = '#343434'
 
 // Twelve cards a page: whole rows in the 1-, 2- and 3-column layouts.
 const PAGE_SIZE = 12
@@ -265,13 +202,9 @@ export default function BookingHistoryModule() {
   const [selected,    setSelected]    = useState<BookingWithRelations | null>(null)
   const [search,      setSearch]      = useState('')
   const [activeTab,   setActiveTab]   = useState<BookingStatus | 'all'>('all')
-  const [sortBy,      setSortBy]      = useState<'date_desc' | 'date_asc' | 'amount_desc' | 'amount_asc'>('date_desc')
   const [dateFrom,    setDateFrom]    = useState('')
   const [dateTo,      setDateTo]      = useState('')
-  const [showFilters, setShowFilters] = useState(false)
   const [page,        setPage]        = useState(1)
-  const dateFromRef = useRef<HTMLInputElement>(null)
-  const dateToRef   = useRef<HTMLInputElement>(null)
 
   // `quiet` re-reads in place (a live signal): no spinner, and a failed re-read
   // keeps the bookings already on screen instead of replacing them with an error.
@@ -330,20 +263,11 @@ export default function BookingHistoryModule() {
       const matchTo     = !dateTo   || schedDate <= dateTo
       return matchTab && matchSearch && matchFrom && matchTo
     })
-    .sort((a, b) => {
-      const aDate = (a.schedule_date as string | undefined) ?? ''
-      const bDate = (b.schedule_date as string | undefined) ?? ''
-      const aCost = (a.total_cost as number | null | undefined) ?? 0
-      const bCost = (b.total_cost as number | null | undefined) ?? 0
-      if (sortBy === 'date_desc')   return bDate.localeCompare(aDate)
-      if (sortBy === 'date_asc')    return aDate.localeCompare(bDate)
-      if (sortBy === 'amount_desc') return bCost - aCost
-      if (sortBy === 'amount_asc')  return aCost - bCost
-      return 0
-    })
+    // Newest scheduled first.
+    .sort((a, b) => ((b.schedule_date as string | undefined) ?? '').localeCompare((a.schedule_date as string | undefined) ?? ''))
 
-  // A new search, tab, sort or date range starts again from the first page.
-  useEffect(() => { setPage(1) }, [search, activeTab, sortBy, dateFrom, dateTo])
+  // A new search, tab or date range starts again from the first page.
+  useEffect(() => { setPage(1) }, [search, activeTab, dateFrom, dateTo])
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const safePage   = Math.min(page, totalPages)
   const pageCards  = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
@@ -356,11 +280,11 @@ export default function BookingHistoryModule() {
   }, {})
 
   const hasActiveFilters =
-    !!dateFrom || !!dateTo || sortBy !== 'date_desc' || !!search || activeTab !== 'all'
+    !!dateFrom || !!dateTo || !!search || activeTab !== 'all'
 
   function clearFilters() {
     setDateFrom(''); setDateTo('')
-    setSortBy('date_desc'); setSearch(''); setActiveTab('all')
+    setSearch(''); setActiveTab('all')
   }
 
   return (
@@ -384,16 +308,6 @@ export default function BookingHistoryModule() {
         <h1 className="font-[family-name:var(--font-alegreya-sc)] text-[17px] 3xl:text-[20px] font-bold text-white truncate">
           {view === 'list' ? 'Transaction History' : bookingRef(selected)}
         </h1>
-        {view === 'list' && !loading && (
-          <div className="ml-auto flex items-center gap-3 shrink-0">
-            <span className="ff-sc font-bold !text-[11px] uppercase whitespace-nowrap px-4 h-[30px] inline-flex items-center
-                             rounded-full border"
-              style={{ background: 'rgba(77,249,237,0.11)', borderColor: CYAN, color: CYAN }}>
-              {bookings.length} booking{bookings.length !== 1 ? 's' : ''}
-            </span>
-            <RefreshButton onClick={() => void loadBookings()} />
-          </div>
-        )}
         {view === 'detail' && selected && (
           <div className="ml-auto flex items-center gap-2">
             {hasOpenClientIssue(selected) && (
@@ -419,178 +333,46 @@ export default function BookingHistoryModule() {
       )}
 
       {/* Body */}
-      <div className="flex-1 overflow-auto p-4 lg:p-6">
+      <div className="flex flex-1 flex-col overflow-auto p-4 lg:p-6">
         <AnimatePresence mode="wait">
 
           {view === 'list' && (
             <motion.div key="list" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="flex flex-col gap-4">
+              className="flex flex-[1_0_auto] flex-col gap-4">
 
-              {/* Search + filter toggle */}
-              <div className="ff-sc flex gap-2">
-                <div className="flex-1 min-w-0">
-                  <TextField
-                    fullWidth
-                    placeholder="Search by booking reference or location…"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    variant="outlined"
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <HistoryIcon name="search.svg" size={20} />
-                        </InputAdornment>
-                      ),
-                      endAdornment: search ? (
-                        <InputAdornment position="end">
-                          <button onClick={() => setSearch('')}
-                            className="cursor-pointer hover:text-white transition-colors"
-                            style={{ color: MUTED }}>
-                            <X size={14} />
-                          </button>
-                        </InputAdornment>
-                      ) : null,
-                    }}
-                    sx={{
-                      ...fieldSx(BG_PANEL, MUTED),
-                      '& .MuiInputBase-root': {
-                        height: 44, borderRadius: '15px', backgroundColor: BG_PANEL, paddingLeft: '14px',
-                        color: '#fff', fontSize: '0.95rem', fontFamily: 'inherit',
-                      },
-                      '& .MuiOutlinedInput-notchedOutline': { borderColor: MUTED, borderRadius: '15px' },
-                      '& .MuiInputBase-input': {
-                        padding: '0 8px', height: 44, boxSizing: 'border-box',
-                        '&::placeholder': { color: MUTED, opacity: 1 },
-                      },
-                    }}
+              {/* Untitled UI's table card, as on the staff tables: the header (title +
+                  count), then its filter row with the status tabs on the left (a
+                  dropdown on phones) and search, Filters and Refresh on the right.
+                  The booking cards stay as they are, inside the card. */}
+              {/* Reaches the bottom of the screen even with only a few cards. */}
+              <TableCard.Root className="flex flex-[1_0_auto] flex-col">
+              <TableCard.Header title="Bookings" badge={`${bookings.length} ${bookings.length === 1 ? 'booking' : 'bookings'}`} />
+              <FilterBar
+                layout="split"
+                leading={
+                  <TabsMinimal
+                    label="Booking status"
+                    items={TABS.map((t) => ({ id: t.key, label: `${t.label} (${counts[t.key] ?? 0})` }))}
+                    selectedKey={activeTab}
+                    onSelectionChange={setActiveTab}
                   />
-                </div>
-                <button
-                  onClick={() => setShowFilters((v) => !v)}
-                  aria-expanded={showFilters}
-                  aria-label="Filters"
-                  className="ff-sc flex items-center gap-2 px-4 sm:px-6 h-11 rounded-[15px] border text-base font-bold
-                             uppercase transition-all cursor-pointer shrink-0"
-                  style={{
-                    borderColor: showFilters ? CYAN : MUTED,
-                    background:  showFilters ? `${CYAN}10` : 'transparent',
-                    color:       showFilters ? CYAN : MUTED,
-                  }}>
-                  <HistoryIcon name="filter.svg" size={18} />
-                  <span className="hidden sm:inline">Filters</span>
-                  {hasActiveFilters && (
-                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: CYAN }} />
-                  )}
-                </button>
-              </div>
+                }
+                search={{ value: search, onChange: setSearch, placeholder: 'Search' }}
+                // Untitled UI's "Select dates": the scheduled-date window.
+                dateRange={{
+                  value: dateFrom || dateTo ? { from: dateFrom || dateTo, to: dateTo || dateFrom } : null,
+                  onChange: (r) => { setDateFrom(r?.from ?? ''); setDateTo(r?.to ?? '') },
+                }}
+                actions={<RefreshButton iconOnly onClick={() => void loadBookings()} loading={loading} disabled={loading} />}
+              />
 
-              {/* Expanded filters */}
-              <AnimatePresence>
-                {showFilters && (
-                  <motion.div key="filters"
-                    initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-                    <div className="rounded-xl border p-4 flex flex-col gap-3"
-                      style={{ background: BG_PANEL, borderColor: BORDER }}>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div className="flex flex-col gap-1">
-                          <label className="text-xs" style={{ color: MUTED }}>Scheduled From</label>
-                          <TextField
-                            fullWidth type="date" value={dateFrom}
-                            onChange={(e) => setDateFrom(e.target.value)}
-                            variant="outlined" inputRef={dateFromRef}
-                            InputProps={{
-                              endAdornment: (
-                                <InputAdornment position="end">
-                                  <Calendar size={14} className="cursor-pointer hover:text-white transition-colors"
-                                    style={{ color: MUTED }} onClick={() => openDatePicker(dateFromRef.current)} />
-                                </InputAdornment>
-                              ),
-                            }}
-                            sx={{
-                              ...fieldSx(BG_CARD, BORDER_C),
-                              '& input[type="date"]::-webkit-calendar-picker-indicator': { display: 'none' },
-                              '& .MuiInputBase-input': { padding: '0 0 0 12px', height: 36, boxSizing: 'border-box', colorScheme: 'dark' },
-                            }}
-                          />
-                        </div>
-                        <div className="flex flex-col gap-1">
-                          <label className="text-xs" style={{ color: MUTED }}>Scheduled To</label>
-                          <TextField
-                            fullWidth type="date" value={dateTo}
-                            onChange={(e) => setDateTo(e.target.value)}
-                            variant="outlined" inputRef={dateToRef}
-                            InputProps={{
-                              endAdornment: (
-                                <InputAdornment position="end">
-                                  <Calendar size={14} className="cursor-pointer hover:text-white transition-colors"
-                                    style={{ color: MUTED }} onClick={() => openDatePicker(dateToRef.current)} />
-                                </InputAdornment>
-                              ),
-                            }}
-                            sx={{
-                              ...fieldSx(BG_CARD, BORDER_C),
-                              '& input[type="date"]::-webkit-calendar-picker-indicator': { display: 'none' },
-                              '& .MuiInputBase-input': { padding: '0 0 0 12px', height: 36, boxSizing: 'border-box', colorScheme: 'dark' },
-                            }}
-                          />
-                        </div>
-                        <div className="flex flex-col gap-1">
-                          <label className="text-xs" style={{ color: MUTED }}>Sort By</label>
-                          <Select value={sortBy}
-                            onChange={(e: SelectChangeEvent) => setSortBy(e.target.value as typeof sortBy)}
-                            sx={{ ...selectSx(BG_CARD, BORDER_C), width: '100%' }} MenuProps={MENU_PROPS}>
-                            <MenuItem value="date_desc">Date — Newest First</MenuItem>
-                            <MenuItem value="date_asc">Date — Oldest First</MenuItem>
-                            <MenuItem value="amount_desc">Amount — Highest First</MenuItem>
-                            <MenuItem value="amount_asc">Amount — Lowest First</MenuItem>
-                          </Select>
-                        </div>
-                      </div>
-                      {hasActiveFilters && (
-                        <div className="flex justify-end">
-                          <button onClick={clearFilters}
-                            className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider
-                                       transition-opacity hover:opacity-70 cursor-pointer"
-                            style={{ color: ERROR }}>
-                            <RefreshCw size={12} /> Clear Filters
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {/* Tab bar + legend */}
-              <div className="ff-sc flex flex-col-reverse gap-2 lg:flex-row lg:items-end border-b"
-                style={{ borderColor: LINE }}>
-                <div className="flex items-end gap-1 overflow-x-auto scrollbar-none -mb-px">
-                  {TABS.map((t) => {
-                    const active = activeTab === t.key
-                    return (
-                      <button key={t.key} onClick={() => setActiveTab(t.key)}
-                        className="flex items-center gap-2 pb-2 px-3 text-sm lg:text-base font-bold
-                                   transition-colors whitespace-nowrap cursor-pointer border-b-[1.5px]"
-                        style={{ color: active ? '#fff' : MUTED, borderColor: active ? CYAN : 'transparent' }}>
-                        {t.label}
-                        <span className="min-w-5 h-5 px-1 inline-flex items-center justify-center rounded-[3px] text-sm"
-                          style={{
-                            background: active ? 'rgba(77,249,237,0.23)' : CHIP_IDLE,
-                            color:      active ? CYAN : MUTED,
-                          }}>
-                          {counts[t.key] ?? 0}
-                        </span>
-                      </button>
-                    )
-                  })}
-                </div>
-                <div className="lg:ml-auto flex flex-wrap items-center gap-x-3 gap-y-1 pb-2 text-sm lg:text-base font-bold"
-                  style={{ color: MUTED }}>
-                  <span>Legend:</span>
-                  <span className="flex items-center gap-1"><HistoryIcon name="pin-pickup.svg" size={17} />Pick Up Point</span>
-                  <span className="flex items-center gap-1"><HistoryIcon name="pin-dropoff.svg" size={17} />Drop Off Point</span>
-                </div>
+              <div className="flex flex-[1_0_auto] flex-col gap-4 p-4 md:p-6">
+              {/* Legend */}
+              <div className="ff-sc flex flex-wrap items-center gap-x-3 gap-y-1 text-sm lg:text-base font-bold"
+                style={{ color: MUTED }}>
+                <span>Legend:</span>
+                <span className="flex items-center gap-1"><HistoryIcon name="pin-pickup.svg" size={17} />Pick Up Point</span>
+                <span className="flex items-center gap-1"><HistoryIcon name="pin-dropoff.svg" size={17} />Drop Off Point</span>
               </div>
 
               {/* Results count */}
@@ -648,9 +430,11 @@ export default function BookingHistoryModule() {
                       onSelect={() => { setSelected(b); setView('detail') }} />
                   ))}
                 </motion.div>
-                <Pagination page={safePage} totalPages={totalPages} total={filtered.length} pageSize={PAGE_SIZE} onPageChange={setPage} className="mt-3 rounded-[10px]" />
+                <Pagination page={safePage} totalPages={totalPages} total={filtered.length} pageSize={PAGE_SIZE} onPageChange={setPage} className="mt-auto rounded-[10px]" />
                 </>
               )}
+              </div>
+              </TableCard.Root>
             </motion.div>
           )}
 

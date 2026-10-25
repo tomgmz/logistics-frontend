@@ -1,7 +1,8 @@
 'use client'
 
+import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowUpRight, Ban, ClipboardCheck, FileWarning, Gauge, Settings2, Wrench } from 'lucide-react'
+import { ArrowUpRight, Ban, CalendarClock, ClipboardCheck, FileWarning, Gauge, Settings2, Wrench } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { canViewModule } from '@/lib/permissions'
@@ -25,6 +26,7 @@ import Pagination from '@/components/ui/Pagination'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { ModelThumb, TABLE_TAG, resolveModelImageUrl } from './vehicle-ui'
+import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
 
 /**
  * Vehicle Management → Maintenance: everything a vehicle owes before it can go out,
@@ -37,7 +39,7 @@ import { ModelThumb, TABLE_TAG, resolveModelImageUrl } from './vehicle-ui'
  * lives on the Vehicles tab; this tab is only the work list.
  */
 
-type ProblemType = 'inspection' | 'service' | 'report' | 'odometer'
+type ProblemType = 'inspection' | 'service' | 'report' | 'odometer' | 'registration'
 
 /**
  * The three "needs" the finalized Figma shows (3158:1059 Maintenance, 3158:613
@@ -85,6 +87,9 @@ const NEEDS: Record<MaintenanceReason, { group: NeedGroup; blocking: boolean; ty
   service_overdue:          { group: 'vehicle_maintenance', blocking: true,  type: 'service'    },
   service_due_soon:         { group: 'vehicle_maintenance', blocking: false, type: 'service'    },
   service_schedule_missing: { group: 'vehicle_maintenance', blocking: false, type: 'service'    },
+  registration_expired:     { group: 'vehicle_maintenance', blocking: true,  type: 'registration' },
+  registration_expiring:    { group: 'vehicle_maintenance', blocking: false, type: 'registration' },
+  registration_missing:     { group: 'vehicle_maintenance', blocking: false, type: 'registration' },
 }
 
 /** 'odometer' narrows Vehicle Maintenance to the after-delivery odometer readings. */
@@ -104,7 +109,6 @@ function matchesFilter(p: Problem, f: GroupFilter): boolean {
   return p.group === f
 }
 
-const PAGE_SIZE = 15
 
 /** The highlighted rows of the vehicle clicked on the Vehicles tab. */
 const FOCUS_ROW = 'bg-[#4df9ed]/10 shadow-[inset_3px_0_0_#4df9ed]'
@@ -180,6 +184,19 @@ export function toProblems(trucks: MaintenanceTruck[]): Problem[] {
             : t.last_service_at == null ? 'Enter the last service' : 'Enter the current odometer'
           since   = t.created_at ?? null
           break
+        case 'registration_expired':
+          details = t.registration_expiry
+            ? `Registration expired ${fmtDay(t.registration_expiry)} — renew it and enter the new date`
+            : 'Registration expired'
+          since   = t.registration_expiry ? `${t.registration_expiry}T00:00:00+08:00` : null
+          break
+        case 'registration_expiring':
+          details = t.registration_expiry ? `Registration expires ${fmtDay(t.registration_expiry)} — renew it` : 'Registration expires soon'
+          break
+        case 'registration_missing':
+          details = 'Enter the registration expiry date'
+          since   = t.created_at ?? null
+          break
       }
       out.push({ ...base, key: `${t.truck_id}:${reason}`, details, since })
     }
@@ -215,7 +232,7 @@ export default function UpkeepTab({
   /** Controlled, so the Vehicles tab's maintenance tags can open this tab filtered to one plate. */
   search:         string
   onSearchChange: (s: string) => void
-  /** Opens the vehicle's edit form, where the service schedule is entered. */
+  /** Opens the vehicle's edit form, where the service schedule and registration are entered. */
   onSetUpSchedule?:  (t: MaintenanceTruck) => void
   /** Opens the odometer form for the after-delivery reading. */
   onRecordOdometer?: (t: MaintenanceTruck) => void
@@ -224,6 +241,8 @@ export default function UpkeepTab({
   /** The vehicle's own actions (view, update, odometer, service, archive), added to each row's menu. */
   vehicleActions?: (t: Truck) => RowAction[]
 }) {
+  // 10 rows on phones, 20 from tablet up (lib/hooks/useTablePageSize).
+  const PAGE_SIZE = useTablePageSize()
   const [groupFilter, setGroupFilter] = useState<GroupFilter>('all')
   const [page,       setPage]       = useState(1)
 
@@ -327,6 +346,9 @@ export default function UpkeepTab({
         onSelect: () => setInspectTruck(t), disabled: !!lockedBy || onTrip,
         title: locked ?? (onTrip ? 'Out on a booking — inspect it once it is back in the yard' : 'Record a BLOWBAGETS inspection; a pass clears it'),
       })
+    } else if (p.type === 'registration') {
+      // Renewal is entered on the vehicle's edit form.
+      actions.push({ label: 'Update Registration', icon: <CalendarClock size={13} />, tone: 'accent', onSelect: () => onSetUpSchedule?.(t), disabled: !!lockedBy, title: locked })
     } else if (p.reason === 'service_schedule_missing') {
       actions.push({ label: 'Set Up Schedule', icon: <Settings2 size={13} />, tone: 'accent', onSelect: () => onSetUpSchedule?.(t), disabled: !!lockedBy, title: locked })
     } else {
@@ -336,7 +358,7 @@ export default function UpkeepTab({
   }
 
   return (
-    <div className="flex flex-1 min-h-0 flex-col p-3 lg:p-4 3xl:p-[34px] 3xl:pl-9 gap-3 3xl:gap-[14px] overflow-hidden bg-[#0a0a0a]">
+    <div className="flex flex-[1_0_auto] lg:flex-1 lg:min-h-0 flex-col p-3 lg:p-4 3xl:p-[34px] 3xl:pl-9 gap-3 3xl:gap-[14px] lg:overflow-hidden bg-[#0a0a0a]">
       <div className="flex flex-col xl:flex-row gap-2 xl:items-center shrink-0">
         <div className="relative min-w-0 flex-1 xl:max-w-[360px] 3xl:max-w-[466px]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -372,7 +394,7 @@ export default function UpkeepTab({
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 rounded-[10px] border-[0.5px] border-[#424242] overflow-hidden flex flex-col bg-[#1b1b1b] shadow-[0_4px_4px_rgba(0,0,0,0.25)]">
+      <div className="flex-[1_0_auto] lg:flex-1 lg:min-h-0 rounded-[10px] border-[0.5px] border-[#424242] overflow-hidden flex flex-col bg-[#1b1b1b] shadow-[0_4px_4px_rgba(0,0,0,0.25)]">
         {loading ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-3 py-16">
             <div className="w-9 h-9 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--color-cyan)' }} />
@@ -389,10 +411,15 @@ export default function UpkeepTab({
             <p className="text-sm text-white/45">
               {problems.length === 0 ? 'Every vehicle is ready. Nothing to do.' : 'Nothing matches your search.'}
             </p>
+            <ClearFiltersLink
+              show={problems.length > 0}
+              onClear={() => { onSearchChange(''); setGroupFilter('all'); setPage(1) }}
+              className="mt-0"
+            />
           </div>
         ) : (
           <>
-            <div className="overflow-auto flex-1 min-h-0">
+            <div className="overflow-x-auto lg:overflow-auto flex-[1_0_auto] lg:flex-1 lg:min-h-0">
               <table className="w-full text-left border-collapse min-w-[860px]">
                 {/* Headers keep the small caps face; the data rows are regular Alegreya Sans. */}
                 <thead className="sticky top-0 z-[1] bg-[#181717]">

@@ -1,5 +1,6 @@
 'use client'
 
+import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
 import Pagination from '@/components/ui/Pagination'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
@@ -44,6 +45,7 @@ import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 
 import RefreshButton from '@/components/ui/RefreshButton'
+import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
 /**
  * Document Management — one library over every file the system keeps, shared
  * by the Company Administrator, General Manager and Operations Manager portals.
@@ -57,7 +59,9 @@ import RefreshButton from '@/components/ui/RefreshButton'
  * document-management tier — upload needs Manage, review Manage, archive All.
  */
 
-const PAGE_SIZE = 24
+// The grid's 24 tiles fill its 2/3/4/6 columns evenly; the table follows the
+// app-wide 10 rows on phones / 20 from tablet up.
+const GRID_PAGE_SIZE = 24
 const POLL_MS   = 60_000
 const VIEW_KEY  = 'documents.view'
 
@@ -127,6 +131,8 @@ export default function DocumentManagementView() {
   const [bookingId,   setBookingId]   = useState<string | null>(null)
   const [page,        setPage]        = useState(1)
   const [view,        setView]        = useState<ViewMode>('table')
+  const tablePageSize = useTablePageSize()
+  const PAGE_SIZE     = view === 'grid' ? GRID_PAGE_SIZE : tablePageSize
 
   const [previewKey,  setPreviewKey]  = useState<string | null>(null)
   const [uploadOpen,  setUploadOpen]  = useState(false)
@@ -145,6 +151,8 @@ export default function DocumentManagementView() {
   }, [])
   function changeView(v: ViewMode) {
     setView(v)
+    // The page size changes with the view, so the current page number would point elsewhere.
+    setPage(1)
     try { window.localStorage.setItem(VIEW_KEY, v) } catch { /* no storage */ }
   }
 
@@ -197,7 +205,7 @@ export default function DocumentManagementView() {
     } finally {
       if (id === reqId.current && !quiet) setLoading(false)
     }
-  }, [filters, page, clearPending])
+  }, [filters, page, clearPending, PAGE_SIZE])
 
   useEffect(() => { void load() }, [load])
 
@@ -367,7 +375,7 @@ export default function DocumentManagementView() {
     .filter((t) => (counts.by_type[t] ?? 0) > 0 || types.includes(t))
 
   return (
-    <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-hidden ff-sc bg-[var(--color-bg)]">
+    <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-y-auto overflow-x-hidden lg:overflow-hidden ff-sc bg-[var(--color-bg)]">
       <Suspense fallback={null}>
         <BookingDeepLink onBooking={setBookingId} />
       </Suspense>
@@ -410,7 +418,7 @@ export default function DocumentManagementView() {
         </div>
       </header>
 
-      <div className="flex flex-1 min-h-0 flex-col p-3 lg:p-4 gap-3 overflow-hidden">
+      <div className="flex flex-[1_0_auto] lg:flex-1 lg:min-h-0 flex-col p-3 lg:p-4 gap-3 lg:overflow-hidden">
         {/* Filters */}
         <div className="flex flex-col gap-2 shrink-0">
           <div className="flex flex-col xl:flex-row gap-2 xl:items-center">
@@ -532,7 +540,7 @@ export default function DocumentManagementView() {
         </div>
 
         {/* Results */}
-        <div className="flex-1 min-h-0 rounded-xl border border-white/[0.08] overflow-hidden flex flex-col bg-[#0f0f0f]">
+        <div className="flex-[1_0_auto] lg:flex-1 lg:min-h-0 rounded-xl border border-white/[0.08] overflow-hidden flex flex-col bg-[#0f0f0f]">
           <NewEntriesBar count={pending} singular="new update" plural="new updates"
             onRefresh={() => void load(true)} />
           {loading ? (
@@ -551,12 +559,10 @@ export default function DocumentManagementView() {
               <p className="text-sm text-white/45">
                 {hasFilters ? 'No documents match your filters.' : archived ? 'Nothing has been archived.' : 'No documents have been recorded yet.'}
               </p>
-              {hasFilters && (
-                <button type="button" onClick={resetFilters} className="text-[var(--color-cyan)] text-sm font-semibold">Clear filters</button>
-              )}
+              <ClearFiltersLink show={hasFilters} onClear={resetFilters} className="mt-0" />
             </div>
           ) : view === 'grid' ? (
-            <div className="overflow-auto flex-1 min-h-0 p-3">
+            <div className="overflow-x-auto lg:overflow-auto flex-[1_0_auto] lg:flex-1 lg:min-h-0 p-3">
               <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6">
                 {docs.map((d) => (
                   <div
@@ -587,7 +593,7 @@ export default function DocumentManagementView() {
               </div>
             </div>
           ) : (
-            <div className="overflow-auto flex-1 min-h-0">
+            <div className="overflow-x-auto lg:overflow-auto flex-[1_0_auto] lg:flex-1 lg:min-h-0">
               <table className="w-full text-left text-sm border-collapse min-w-[900px]">
                 <thead className="sticky top-0 z-[1] bg-[#141414] border-b border-white/[0.07]">
                   <tr className="text-[11px] uppercase tracking-wider text-white/40">

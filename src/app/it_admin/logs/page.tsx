@@ -1,5 +1,6 @@
 'use client'
 
+import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
 import Pagination from '@/components/ui/Pagination'
 import { useLiveTable, useLivePending } from '@/lib/hooks/useLiveTable'
 import NewEntriesBar from '@/components/ui/NewEntriesBar'
@@ -29,6 +30,7 @@ import { formatDate, formatTime, formatDateTime } from '@/app/utils/timeFormat'
 import { expandCode, roleLabel } from '@/lib/roles'
 
 import RefreshButton from '@/components/ui/RefreshButton'
+import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
 // Types now come from the service — see system-logs.service.ts. They used to be
 // declared here because there was no system-logs endpoint to type against.
 export type { SystemLogLevel, SystemLogEventType, SystemLogStats }
@@ -66,11 +68,12 @@ const EVENT_BADGE: Record<SystemLogEventType, string> = {
 const EVENT_LABEL = SYSTEM_LOG_EVENT_LABEL
 const LEVEL_LABEL = SYSTEM_LOG_LEVEL_LABEL
 
-const PAGE_SIZE = 15
 
 type ActiveTab = 'audit' | 'system'
 
 function AuditLogsTab() {
+  // 10 rows on phones, 20 from tablet up (lib/hooks/useTablePageSize).
+  const PAGE_SIZE = useTablePageSize()
   const [logs, setLogs]                       = useState<AuditLog[]>([])
   const [total, setTotal]                     = useState(0)
   const [page, setPage]                       = useState(1)
@@ -134,8 +137,8 @@ function AuditLogsTab() {
   }
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 gap-3 overflow-hidden">
-      <div className="flex flex-col flex-1 min-h-0 rounded-2xl border border-[#2a2a2a] bg-[#1b1b1b] overflow-hidden">
+    <div className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0 gap-3 lg:overflow-hidden">
+      <div className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0 rounded-2xl border border-[#2a2a2a] bg-[#1b1b1b] overflow-hidden">
 
         {/* Toolbar */}
         <div className="shrink-0 border-b border-[#2a2a2a] px-4 py-3 flex flex-wrap gap-2 items-center">
@@ -219,7 +222,7 @@ function AuditLogsTab() {
         <NewEntriesBar count={pending} onRefresh={() => setRefreshKey(k => k + 1)} />
 
         {/* Table */}
-        <div className="flex-1 overflow-auto min-h-0">
+        <div className="flex-[1_0_auto] lg:flex-1 overflow-x-auto lg:overflow-auto lg:min-h-0">
           {loading && (
             <table className="w-full text-sm">
               <thead className="sticky top-0 z-10 bg-[#1b1b1b]">
@@ -250,7 +253,10 @@ function AuditLogsTab() {
           )}
 
           {!loading && !error && logs.length === 0 && (
-            <div className="text-center py-16 text-[#424242] text-sm tracking-wide">No logs match your filters.</div>
+            <div className="flex flex-col items-center py-16 text-[#424242] text-sm tracking-wide">
+              No logs match your filters.
+              <ClearFiltersLink show={!!search || !!logType} onClear={() => { setSearch(''); setLogType(''); setPage(1) }} />
+            </div>
           )}
 
           {!loading && logs.length > 0 && (
@@ -333,6 +339,8 @@ function systemFiltersFromUrl() {
 }
 
 function SystemLogsTab() {
+  // 10 rows on phones, 20 from tablet up (lib/hooks/useTablePageSize).
+  const PAGE_SIZE = useTablePageSize()
   const [initial]                             = useState(systemFiltersFromUrl)
   const [logs, setLogs]                       = useState<AppSystemLog[]>([])
   const [total, setTotal]                     = useState(0)
@@ -396,15 +404,15 @@ function SystemLogsTab() {
     }
     run()
     return () => { cancelled = true }
-  }, [sort, eventType, level, resolved, debouncedSearch, refreshKey, page, clearPending])
+  }, [sort, eventType, level, resolved, debouncedSearch, refreshKey, page, clearPending, PAGE_SIZE])
 
   const totalPages    = Math.ceil(total / PAGE_SIZE)
   const safePage      = Math.min(page, Math.max(1, totalPages))
   const displayedLogs = logs.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 gap-3 overflow-hidden">
-      <div className="flex flex-col flex-1 min-h-0 rounded-2xl border border-[#2a2a2a] bg-[#1b1b1b] overflow-hidden">
+    <div className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0 gap-3 lg:overflow-hidden">
+      <div className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0 rounded-2xl border border-[#2a2a2a] bg-[#1b1b1b] overflow-hidden">
 
         {/* Toolbar */}
         <div className="shrink-0 border-b border-[#2a2a2a] px-4 py-3 flex flex-wrap gap-2 items-center">
@@ -507,7 +515,7 @@ function SystemLogsTab() {
         <NewEntriesBar count={pending} onRefresh={() => setRefreshKey(k => k + 1)} />
 
         {/* Table */}
-        <div className="flex-1 overflow-auto min-h-0">
+        <div className="flex-[1_0_auto] lg:flex-1 overflow-x-auto lg:overflow-auto lg:min-h-0">
           {loading && (
             <table className="w-full text-sm">
               <thead className="sticky top-0 z-10 bg-[#1b1b1b]">
@@ -536,7 +544,13 @@ function SystemLogsTab() {
           )}
 
           {!loading && !error && logs.length === 0 && (
-            <div className="text-center py-16 text-[#424242] text-sm tracking-wide">No system logs match your filters.</div>
+            <div className="flex flex-col items-center py-16 text-[#424242] text-sm tracking-wide">
+              No system logs match your filters.
+              <ClearFiltersLink
+                show={!!search || !!eventType || !!level || !!resolved}
+                onClear={() => { setSearch(''); setEventType(''); setLevel(''); setResolved(''); setPage(1) }}
+              />
+            </div>
           )}
 
           {!loading && logs.length > 0 && (
@@ -624,8 +638,8 @@ export default function LogsPage() {
   useLiveTable(['live:audit_logs'], loadAuditStats)
 
   return (
-    <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-hidden bg-[#0a0a0a] text-white">
-      <div className="flex flex-col flex-1 min-h-0 px-3 py-3 lg:px-4 gap-4 overflow-hidden">
+    <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-y-auto overflow-x-hidden lg:overflow-hidden bg-[#0a0a0a] text-white">
+      <div className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0 px-3 py-3 lg:px-4 gap-4 lg:overflow-hidden">
 
         {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 shrink-0">

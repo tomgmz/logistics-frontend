@@ -1,12 +1,14 @@
 'use client'
 
+import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
-import { useIsMobile } from '@/lib/hooks/useIsMobile'
 import { useCallback, useEffect, useState } from 'react'
 import { AlertTriangle, MailCheck } from 'lucide-react'
 import Pagination from '@/components/ui/Pagination'
 import RefreshButton from '@/components/ui/RefreshButton'
 import FilterBar, { matchesFilter, type FilterValues } from '@/components/ui/FilterBar'
+import { TableCard } from '@/components/ui/untitled/table-card'
+import type { DateRange } from '@/components/ui/untitled/date-range-picker'
 import ReusableModal from '@/components/layout/ReusableModal'
 import { useModuleAccess } from '@/components/layout/ModuleAccess'
 import { appToast } from '@/lib/toast'
@@ -18,6 +20,7 @@ import {
   type PasswordResetRequest,
   type ResetRequestStatus,
 } from '@/lib/services/admin/password-reset.service'
+import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
 
 /**
  * The pending-reset queue on the IT Admin's User Management page. Since
@@ -53,8 +56,6 @@ const SENDABLE: ResetRequestStatus[] = ['pending', 'expired']
 const CANCELLABLE: ResetRequestStatus[] = ['pending']
 
 // Rows per page: 10 on a phone, 20 on anything wider (the user's call, 2026-10-25).
-const PAGE_SIZE_PHONE   = 10
-const PAGE_SIZE_DESKTOP = 20
 
 const STATUS_OPTIONS = (Object.keys(STATUS_CFG) as ResetRequestStatus[])
   .map((s) => ({ value: s, label: STATUS_CFG[s].label }))
@@ -66,6 +67,13 @@ const ROLE_OPTIONS = ['client', 'driver', 'admin', 'general_manager', 'operation
   .map((r) => ({ value: r, label: ROLE_LABELS[r] }))
 
 // "Requested" is one window at a time, counted back from now.
+/** The request's day on this device's calendar, inside the picked range (inclusive). */
+function inRange(iso: string, r: DateRange): boolean {
+  const d = new Date(iso)
+  const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  return day >= r.from && day <= r.to
+}
+
 const REQUESTED_WINDOWS: Record<string, number> = { '1d': 1, '7d': 7, '30d': 30 }
 const REQUESTED_OPTIONS = [
   { value: '1d',  label: 'Last 24 hours' },
@@ -104,6 +112,7 @@ export default function PasswordResetQueue({
   focusRequestId,
   onPendingCountChange,
   regularData = false,
+  cardHeader = false,
 }: {
   // Set from ?request= on a notification deep-link, so the row the admin was
   // notified about is highlighted instead of lost in the list.
@@ -115,6 +124,9 @@ export default function PasswordResetQueue({
   onPendingCountChange?: (count: number) => void
   // Small-caps headers over regular Alegreya Sans cells (User Management's look).
   regularData?: boolean
+  // Untitled UI's table-card header (title + count) and its split filter row:
+  // search, Filters (Status, Role, Requested) and Refresh on the right.
+  cardHeader?: boolean
 }) {
   // Sending a link is a create, dismissing a request an edit (user-management tier).
   const { canCreate, canEdit } = useModuleAccess()
@@ -125,10 +137,12 @@ export default function PasswordResetQueue({
   // The whole history is listed; decided rows keep their buttons, greyed out.
   const includeClosed = true
   const [page,          setPage]          = useState(1)
-  const pageSize = useIsMobile() ? PAGE_SIZE_PHONE : PAGE_SIZE_DESKTOP
+  const pageSize = useTablePageSize()
   const [pending,       setPending]       = useState<PendingAction | null>(null)
   const [search,        setSearch]        = useState('')
   const [filters,       setFilters]       = useState<FilterValues>([])
+  // The card layout's "Select dates": the day the request came in.
+  const [dateRange,     setDateRange]     = useState<DateRange | null>(null)
 
   // `quiet` re-reads in place (a live signal): no spinner, and a failed re-read
   // keeps the rows already on screen instead of replacing them with an error.
@@ -207,6 +221,7 @@ export default function PasswordResetQueue({
     matchesFilter(filters, 'status', r.status) &&
     matchesFilter(filters, 'role', r.requested_role) &&
     (since === null || new Date(r.created_at).getTime() >= since) &&
+    (!dateRange || inRange(r.created_at, dateRange)) &&
     (!q || fullName(r).toLowerCase().includes(q) || r.email.toLowerCase().includes(q)),
   )
 
@@ -222,20 +237,30 @@ export default function PasswordResetQueue({
 
   return (
     <>
-      <div className="flex flex-col flex-1 min-h-0">
+      <div className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0">
+        {cardHeader && (
+          <TableCard.Header
+            className="shrink-0"
+            title="Password Reset Requests"
+            badge={`${shown.length} ${shown.length === 1 ? 'request' : 'requests'}`}
+          />
+        )}
         <FilterBar
-          search={{ value: search, onChange: (v) => { setSearch(v); setPage(1) }, placeholder: 'Search name or email...' }}
+          layout={cardHeader ? 'split' : 'inline'}
+          search={{ value: search, onChange: (v) => { setSearch(v); setPage(1) }, placeholder: cardHeader ? 'Search' : 'Search name or email...' }}
           fields={[
             { key: 'status',    label: 'Status',    options: STATUS_OPTIONS },
             { key: 'role',      label: 'Role',      options: ROLE_OPTIONS },
-            { key: 'requested', label: 'Requested', options: REQUESTED_OPTIONS, single: true, anyLabel: 'Any time' },
+            // The card layout picks dates with "Select dates" instead.
+            ...(cardHeader ? [] : [{ key: 'requested', label: 'Requested', options: REQUESTED_OPTIONS, single: true, anyLabel: 'Any time' }]),
           ]}
+          dateRange={cardHeader ? { value: dateRange, onChange: (r) => { setDateRange(r); setPage(1) } } : undefined}
           values={filters}
           onChange={(v) => { setFilters(v); setPage(1) }}
           // Untitled UI's "Dropdowns" filter bar: Status, Role and Requested each their own dropdown.
           variant="dropdowns"
           actions={<RefreshButton iconOnly onClick={() => void load(includeClosed)} loading={loading} disabled={loading} />}
-          summary={<span className="text-[#4df9ed]">{shown.length} Request{shown.length !== 1 ? 's' : ''}</span>}
+          summary={!cardHeader && <span className="text-[#4df9ed]">{shown.length} Request{shown.length !== 1 ? 's' : ''}</span>}
           className={regularData ? 'ff-regular' : ''}
         />
         {error && (
@@ -245,7 +270,7 @@ export default function PasswordResetQueue({
         )}
 
         {/* Table */}
-        <div className="flex-1 overflow-auto min-h-0">
+        <div className="flex-[1_0_auto] lg:flex-1 overflow-auto lg:min-h-0">
           {/* Sized like the Users table. Desktop (lg+): fixed layout, a fixed-width
               actions column and five equal ones; phones and tablets: at least 960px
               wide, scrolling sideways. */}
@@ -285,6 +310,11 @@ export default function PasswordResetQueue({
                         ? 'No password reset requests on record.'
                         : 'No one is waiting on a password reset right now.'}
                     </p>
+                    <ClearFiltersLink
+                      show={rows.length > 0}
+                      onClear={() => { setSearch(''); setFilters([]); setDateRange(null); setPage(1) }}
+                      className="mt-4"
+                    />
                   </td>
                 </tr>
               ) : (

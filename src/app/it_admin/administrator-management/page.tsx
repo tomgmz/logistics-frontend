@@ -1,19 +1,16 @@
 'use client'
 
+import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
 import Pagination from '@/components/ui/Pagination'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
-import { useIsMobile } from '@/lib/hooks/useIsMobile'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  ShieldCheck as ShieldCheckIcon, UserPlus, UserRoundPlus, ChevronDown,
+  ShieldCheck as ShieldCheckIcon, UserPlus,
   Pencil, Eye, ShieldCheck, ShieldOff, Archive, ArchiveRestore, SlidersHorizontal,
   AlertTriangle,
 } from 'lucide-react'
-import Select, { SelectChangeEvent } from '@mui/material/Select'
-import MenuItem from '@mui/material/MenuItem'
-import FormControl from '@mui/material/FormControl'
 import { createTheme, ThemeProvider } from '@mui/material/styles'
 import type {
   UserTab, AnyUser, UserStatus, AdminUser,
@@ -38,8 +35,13 @@ import { passwordResetService } from '@/lib/services/admin/password-reset.servic
 
 import RefreshButton from '@/components/ui/RefreshButton'
 import FilterBar, { type FilterValues } from '@/components/ui/FilterBar'
+import { TableCard, BadgeModern } from '@/components/ui/untitled/table-card'
+import { Button } from '@/components/ui/untitled/button'
+import { TabsMinimal } from '@/components/ui/untitled/tabs'
+import { Plus } from '@untitledui/icons'
 import RowActionMenu, { type RowAction } from '@/components/ui/RowActionMenu'
 import AccountActionConfirm, { statusConfirmCopy, type AccountConfirm } from '@/components/admin/AccountActionConfirm'
+import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
 type AdminMgmtTab = Extract<
   UserTab,
   'admins' | 'general-managers' | 'fleet-admins' | 'operations-admins'
@@ -81,8 +83,6 @@ const muiTheme = createTheme({
 })
 
 // Rows per page: 10 on a phone, 20 on anything wider (the user's call, 2026-10-25).
-const PAGE_SIZE_PHONE   = 10
-const PAGE_SIZE_DESKTOP = 20
 
 async function fetchByTab(tab: AdminMgmtTab): Promise<AnyUser[]> {
   switch (tab) {
@@ -145,20 +145,11 @@ function tabFromRole(role: string): AdminMgmtTab {
 
 // Same look as User Management (Figma 3156:400): names in regular Alegreya Sans
 // bold cyan, the rest bold white, headers grey small caps.
-// MUI sx has no 3xl; this is the same 1920px step.
-const FIGMA_MQ = '@media (min-width: 1920px)'
-const REGULAR_FONT = "var(--font-alegreya), 'Alegreya Sans', sans-serif"
 const NAME_TEXT = 'ff-regular text-[13px] 3xl:text-[15px] font-bold text-[#4df9ed]'
 const TD_NAME   = `px-4 3xl:px-5 py-2 3xl:py-2.5 ${NAME_TEXT}`
 const TD_MUTED  = 'ff-regular px-4 3xl:px-5 py-2 3xl:py-2.5 text-[12px] 3xl:text-[14px] font-bold text-white'
 const TD_BADGE  = 'px-4 3xl:px-5 py-2 3xl:py-2.5'
 
-// The page-header action: cyan outline. The Figma's exact sizes apply from 3xl
-// (1920px) up; below that everything is compact.
-const HEADER_BTN =
-  'flex h-8 3xl:h-9 shrink-0 items-center gap-2 whitespace-nowrap max-sm:w-full max-sm:justify-center rounded-[10px] border border-[#4df9ed] bg-[#4df9ed]/[0.19] ' +
-  'px-3 3xl:px-4 text-[13px] 3xl:text-[15px] text-[#4df9ed] transition hover:bg-[#4df9ed]/30 active:scale-95'
-const HEADER_ICON = 'size-4 3xl:size-[18px]'
 
 
 
@@ -306,8 +297,8 @@ function ArchivedRowMenu({ user, onView, onRestore, lockedBy }: {
   return <RowActionMenu actions={actions} heading={staffName(user)} subheading={user.email} iconSize={18} />
 }
 
-function EmptyState({ tab, onAdd, archived = false }: { tab: TabValue; onAdd: () => void; archived?: boolean }) {
-  const label = tab === 'all' ? 'staff accounts' : TABS.find(t => t.key === tab)?.label.toLowerCase() ?? tab
+function EmptyState({ tab, onAdd, archived = false, filtered, onClear }: { tab: TabValue; onAdd: () => void; archived?: boolean; filtered: boolean; onClear: () => void }) {
+  const label = tab === 'all' ? 'administrator accounts' : TABS.find(t => t.key === tab)?.label.toLowerCase() ?? tab
   return (
     <div className="flex flex-col items-center justify-center py-24 text-center">
       <div className="mb-4 rounded-full border border-[#424242] bg-[#1b1b1b] p-4">
@@ -317,6 +308,7 @@ function EmptyState({ tab, onAdd, archived = false }: { tab: TabValue; onAdd: ()
       <p className="mt-1 text-sm text-[#818181]">
         {archived ? `No archived ${label}.` : `No ${label} match your current filters.`}
       </p>
+      <ClearFiltersLink show={filtered} onClear={onClear} className="mt-4" />
       {tab !== 'all' && !archived && (
         <button
           onClick={onAdd}
@@ -381,7 +373,7 @@ export default function AdminManagementClient() {
   const [searchInput,      setSearchInput]      = useState('')
   const [search,           setSearch]           = useState('')
   const [page,             setPage]             = useState(1)
-  const pageSize = useIsMobile() ? PAGE_SIZE_PHONE : PAGE_SIZE_DESKTOP
+  const pageSize = useTablePageSize()
   const [stats,            setStats]            = useState({ total: 0, active: 0, archived: 0 })
   const [showForm,         setShowForm]         = useState(false)
   const [editUser,         setEditUser]         = useState<AnyUser | null>(null)
@@ -624,24 +616,17 @@ export default function AdminManagementClient() {
   return (
     <ThemeProvider theme={muiTheme}>
       <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-y-auto overflow-x-hidden lg:overflow-hidden bg-[#0a0a0a] text-white">
-        <div className="flex flex-col lg:flex-1 lg:min-h-0 px-3 py-3 sm:px-4 lg:px-5 3xl:px-6 lg:pt-3 lg:pb-4 3xl:pb-5 gap-3 3xl:gap-4 lg:overflow-hidden">
+        <div className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0 px-3 py-3 sm:px-4 lg:px-5 3xl:px-6 lg:pt-3 lg:pb-4 3xl:pb-5 gap-3 3xl:gap-4 lg:overflow-hidden">
 
           {/* Header */}
-          {/* As tall as the button even when it is hidden (Password Reset tab),
-              so switching tabs doesn't shift the page. */}
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 lg:min-h-8 3xl:min-h-9 shrink-0">
             <h1 className="font-[family-name:var(--font-alegreya-sc)] text-[17px] 3xl:text-[20px] font-bold text-white">User Management</h1>
-            {!isResetsTab && (
-              <button onClick={openCreate} className={HEADER_BTN}>
-                Create Administrator <UserRoundPlus className={HEADER_ICON} />
-              </button>
-            )}
           </div>
 
           {/* Stats */}
           <div className="grid grid-cols-3 gap-2.5 sm:gap-3 3xl:gap-4 shrink-0">
             {[
-              { label: 'Total Staff',  value: stats.total,    color: 'text-white'     },
+              { label: 'Total Administrators', value: stats.total,    color: 'text-white'     },
               { label: 'Active',       value: stats.active,   color: 'text-[#4df9ed]' },
               { label: 'Archived',     value: stats.archived, color: 'text-[#ffea00]' },
             ].map((s) => (
@@ -653,96 +638,49 @@ export default function AdminManagementClient() {
           </div>
 
           {/* Table card */}
-          <div className="flex flex-col lg:flex-1 lg:min-h-0 rounded-[10px] border-[0.5px] border-[#424242] bg-[#1b1b1b] shadow-[0_4px_4px_rgba(0,0,0,0.25)] lg:overflow-hidden">
+          <TableCard.Root className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0">
 
             {/* Staff, clients and drivers, and the reset queue: three top-level tabs. */}
             {sectionTabs}
 
-            {/* Role filter, search, refresh and the count on one row, as on User
-                Management. The role filter belongs to the directory only: there
-                is nothing to filter by role in a queue. */}
+            {/* Untitled UI's table card, as on User Management: the header (title,
+                count, Create Administrator), then the filter row with the role tabs
+                on the left (a dropdown on phones) and search, Filters (Status) and
+                Refresh on the right. The reset queue brings its own header and row. */}
             {!isResetsTab && (
-            <FilterBar
-              leading={
-              <FormControl size="small" sx={{ width: { xs: '100%', sm: 240 }, [FIGMA_MQ]: { width: 260 } }}>
-                <Select
-                  value={activeTab}
-                  onChange={(e: SelectChangeEvent) => setActiveTab(e.target.value as TabValue)}
-                  IconComponent={(props) => <ChevronDown size={18} {...props} />}
-                  MenuProps={{
-                    PaperProps: {
-                      sx: {
-                        bgcolor: '#1b1b1b', border: '1px solid #424242',
-                        borderRadius: '10px', boxShadow: '0 20px 40px rgba(0,0,0,0.6)',
-                        mt: '6px', '& .MuiList-root': { p: '4px' },
-                        // Portaled to <body>, so it sets the regular face itself.
-                        fontFamily: REGULAR_FONT,
-                      },
-                    },
-                  }}
-                  sx={{
-                    height: '34px', borderRadius: '10px', fontFamily: REGULAR_FONT, fontSize: '13px',
-                    color: '#4df9ed', bgcolor: '#424242',
-                    '& .MuiOutlinedInput-notchedOutline': { borderColor: '#818181' },
-                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#4df9ed80' },
-                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#4df9ed', borderWidth: '1px' },
-                    '& .MuiSelect-icon': { color: '#818181', right: '10px', top: 'calc(50% - 9px)' },
-                    '& .MuiSelect-select': { display: 'flex', alignItems: 'center', paddingLeft: '12px' },
-                    [FIGMA_MQ]: { height: '38px', fontSize: '15px', '& .MuiSelect-select': { paddingLeft: '14px' } },
-                  }}
-                  renderValue={(value) => {
-                    const tab = TABS.find((t) => t.key === value)!
-                    return (
-                      <span className="flex items-center gap-2 text-[13px] 3xl:text-[15px] text-[#4df9ed]">
-                        <ShieldCheckIcon className="size-4 3xl:size-[18px]" /> {tab.label}
-                      </span>
-                    )
-                  }}
-                >
-                  {TABS.map((t) => (
-                    <MenuItem
-                      key={t.key} value={t.key}
-                      sx={{
-                        borderRadius: '8px', mb: '2px', fontFamily: REGULAR_FONT, fontSize: '13px', [FIGMA_MQ]: { fontSize: '14px' },
-                        fontWeight: t.key === 'all' ? 700 : 400,
-                        color: activeTab === t.key ? '#4df9ed' : '#818181',
-                        bgcolor: activeTab === t.key ? '#4df9ed0d' : 'transparent',
-                        display: 'flex', alignItems: 'center', gap: '10px',
-                        borderTop: t.key === 'admins' ? '1px solid #424242' : 'none',
-                        marginTop: t.key === 'admins' ? '4px' : '0',
-                        paddingTop: t.key === 'admins' ? '8px' : undefined,
-                        '&:hover': {
-                          bgcolor: activeTab === t.key ? '#4df9ed1a' : '#2a2a2a',
-                          color: activeTab === t.key ? '#4df9ed' : '#ffffff',
-                        },
-                        '&.Mui-selected': { bgcolor: '#4df9ed0d', '&:hover': { bgcolor: '#4df9ed1a' } },
-                      }}
-                    >
-                      <span style={{ color: activeTab === t.key ? '#4df9ed' : '#818181', display: 'flex' }}>
-                        <ShieldCheckIcon size={16} />
-                      </span>
-                      {t.label}
-                      {activeTab === t.key && (
-                        <span style={{ marginLeft: 'auto', height: '6px', width: '6px', borderRadius: '50%', backgroundColor: '#4df9ed', flexShrink: 0 }} />
-                      )}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+            <>
+            <TableCard.Header
+              className="shrink-0"
+              title={`${ACCOUNT_NOUN[activeTab]}s`}
+              badge={
+                <BadgeModern className={showArchived ? 'text-[#ffea00]' : undefined}>
+                  {total} {showArchived ? 'archived' : total === 1 ? 'account' : 'accounts'}
+                </BadgeModern>
               }
-              search={{ value: searchInput, onChange: setSearchInput, placeholder: 'Search name or email...' }}
-              // Same dropdown as Clients & Drivers: one status at a time, "Status: All" by default.
-              variant="dropdowns"
+              contentTrailing={
+                <Button size="sm" iconLeading={Plus} onClick={openCreate} className="max-md:w-full">
+                  Create Administrator
+                </Button>
+              }
+            />
+            <FilterBar
+              layout="split"
+              leading={
+                <TabsMinimal
+                  label="Administrator role"
+                  items={TABS.map((t) => ({ id: t.key, label: t.label }))}
+                  selectedKey={activeTab}
+                  onSelectionChange={setActiveTab}
+                />
+              }
+              search={{ value: searchInput, onChange: setSearchInput, placeholder: 'Search' }}
+              // One status at a time, as before; now inside the Filters panel.
               fields={[{ key: 'status', label: 'Status', single: true, options: STATUS_OPTIONS }]}
               values={statusFilter}
               onChange={setStatusFilter}
               actions={<RefreshButton iconOnly onClick={handleRefresh} loading={(loading || fetching)} disabled={loading || fetching} />}
-              summary={
-                <span className={showArchived ? 'text-[#ffea00]' : 'text-[#4df9ed]'}>
-                  {total} {showArchived ? 'Archived ' : ''}{ACCOUNT_NOUN[activeTab]} Account{total !== 1 ? 's' : ''}
-                </span>
-              }
             />
+            </>
             )}
 
             {isResetsTab ? (
@@ -750,6 +688,7 @@ export default function AdminManagementClient() {
                 focusRequestId={focusRequestId}
                 onPendingCountChange={setResetCount}
                 regularData
+                cardHeader
               />
             ) : (
             <>
@@ -760,7 +699,7 @@ export default function AdminManagementClient() {
             )}
 
             {/* Table */}
-            <div className="overflow-x-auto lg:flex-1 lg:overflow-auto lg:min-h-0">
+            <div className="overflow-x-auto flex-[1_0_auto] lg:flex-1 lg:overflow-auto lg:min-h-0">
               {/* Fixed layout: every column, Actions included, gets the same width. */}
               <table className="w-full max-lg:min-w-[900px] lg:table-fixed">
                 {/* Headers in the small-caps face, every cell below in regular Alegreya Sans. */}
@@ -782,7 +721,11 @@ export default function AdminManagementClient() {
                   ) : users.length === 0 ? (
                     <tr>
                       <td colSpan={colCount}>
-                        <EmptyState tab={activeTab} onAdd={openCreate} archived={showArchived} />
+                        <EmptyState
+                          tab={activeTab} onAdd={openCreate} archived={showArchived}
+                          filtered={!!search || statusFilter.length > 0}
+                          onClear={() => { setSearchInput(''); setSearch(''); setStatusFilter([]) }}
+                        />
                       </td>
                     </tr>
                   ) : (
@@ -831,7 +774,7 @@ export default function AdminManagementClient() {
             )}
             </>
             )}
-          </div>
+          </TableCard.Root>
         </div>
       </div>
 

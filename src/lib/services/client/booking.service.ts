@@ -227,6 +227,9 @@ export const bookingService = {
     limit:  number
     status: string
     search: string
+    /** Schedule-date window, inclusive, YYYY-MM-DD. */
+    dateFrom?: string
+    dateTo?:   string
   }): Promise<{
     rows: Record<string, unknown>[]
     meta: {
@@ -253,6 +256,8 @@ export const bookingService = {
         limit:  params.limit,
         status: params.status,
         search: params.search || undefined,
+        date_from: params.dateFrom || undefined,
+        date_to:   params.dateTo   || undefined,
       },
     })
     return {

@@ -1,5 +1,6 @@
 'use client'
 
+import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
 import Pagination from '@/components/ui/Pagination'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -52,6 +53,8 @@ import {
   OdometerInput,
   PhotoField,
   ServiceStatusBadge,
+  RegistrationBadge,
+  registrationDaysPhrase,
   parseKm,
   fmtKm,
   fmtDay,
@@ -65,10 +68,11 @@ import { type RowAction } from '@/components/ui/RowActionMenu'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { formatPlateNumber, plateError } from '@/lib/validation/plate'
+import { registrationStatus } from '@/lib/registration-expiry'
 
 import RefreshButton from '@/components/ui/RefreshButton'
 import { useVehicleTypeOptions } from '@/lib/hooks/useVehicleTypes'
-const PAGE_SIZE = 10
+import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
 
 type FormMode    = 'create' | 'edit' | null
 type ConfirmKind = 'save' | 'archive' | null
@@ -85,6 +89,8 @@ interface TruckFormState {
   service_interval_months:  string
   last_service_at:          string
   last_service_odometer_km: string
+  /** `YYYY-MM-DD`, last day the registration is valid. */
+  registration_expiry:      string
 }
 
 function emptyForm(): TruckFormState {
@@ -98,6 +104,7 @@ function emptyForm(): TruckFormState {
     service_interval_months:  '',
     last_service_at:          '',
     last_service_odometer_km: '',
+    registration_expiry:      '',
   }
 }
 
@@ -114,6 +121,7 @@ function truckToForm(t: Truck): TruckFormState {
     service_interval_months:  numStr(t.service_interval_months),
     last_service_at:          t.last_service_at ?? '',
     last_service_odometer_km: numStr(t.last_service_odometer_km),
+    registration_expiry:      t.registration_expiry ?? '',
   }
 }
 
@@ -171,16 +179,18 @@ function VehicleDetailsModal({
             role="dialog"
             aria-modal="true"
             aria-label={`Details for ${truck.plate_number}`}
-            className="w-full max-w-lg max-h-[90dvh] overflow-y-auto rounded-2xl border border-white/10 bg-[var(--color-surface)] shadow-2xl"
+            className="w-full max-w-lg max-h-[90dvh] flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-[var(--color-surface)] shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.07]">
+            {/* Header stays put; only the body below it scrolls. */}
+            <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-white/[0.07]">
               <h2 className="text-sm font-bold text-white uppercase tracking-widest">Vehicle details</h2>
               <button type="button" onClick={onClose} className="p-2 rounded-lg hover:bg-white/5 text-white/50" aria-label="Close">
                 <X size={18} />
               </button>
             </div>
 
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain scrollbar-none [-webkit-overflow-scrolling:touch]">
             <div className="p-4 space-y-4">
               <div className="flex gap-3 items-center">
                 <ModelThumb
@@ -252,6 +262,12 @@ function VehicleDetailsModal({
                     </span>
                   )}
                 </DetailRow>
+                <DetailRow label="Registration">
+                  <span className="inline-flex justify-end"><RegistrationBadge status={truck.registration_status} /></span>
+                  {truck.registration_expiry && (
+                    <span className="block text-[10px] text-white/35">Valid until {fmtDay(truck.registration_expiry)}</span>
+                  )}
+                </DetailRow>
                 <DetailRow label="Added">{fmtDate(truck.created_at)}</DetailRow>
                 <DetailRow label="Last updated">{fmtDate(truck.updated_at)}</DetailRow>
               </div>
@@ -277,6 +293,7 @@ function VehicleDetailsModal({
                   Update Details
                 </button>
               )}
+            </div>
             </div>
           </motion.div>
         </motion.div>
@@ -318,6 +335,8 @@ function TabDeepLink({ onTab }: { onTab: (t: VehicleTab) => void }) {
 }
 
 export default function VehicleManagementView() {
+  // 10 rows on phones, 20 from tablet up (lib/hooks/useTablePageSize).
+  const PAGE_SIZE = useTablePageSize()
   const [tab, setTab] = useState<VehicleTab>('vehicles')
   // The maintenance queue lives here, not in the tab: the tab badge and the
   // Vehicles rows' maintenance tags read the same list.
@@ -416,7 +435,7 @@ export default function VehicleManagementView() {
     } finally {
       if (!quiet) setListLoading(false)
     }
-  }, [page, statusFilter, debouncedSearch])
+  }, [page, statusFilter, debouncedSearch, PAGE_SIZE])
 
   useEffect(() => {
     if (tab === 'vehicles') void loadModels()
@@ -617,6 +636,17 @@ export default function VehicleManagementView() {
     const everyMonths   = parseMonths(form.service_interval_months)
     const lastKm        = parseKm(form.last_service_odometer_km)
 
+    // Registration: required for a new vehicle; on an older one it is asked for
+    // (Upkeep flags it) but saving other changes is not held up by it.
+    if (isCreate && !form.registration_expiry) {
+      setFormError('Enter the date the registration is valid until.'); return false
+    }
+    if (form.registration_expiry && !/^\d{4}-\d{2}-\d{2}$/.test(form.registration_expiry)) {
+      setFormError('Enter a valid registration expiry date.'); return false
+    }
+    if (!isCreate && editingTruck?.registration_expiry && !form.registration_expiry) {
+      setFormError('The registration expiry date cannot be cleared — enter the renewed date instead.'); return false
+    }
     if (isCreate && pairOnCreate && !form.assigned_driver_id) {
       setFormError('Choose the regular driver, or turn off "Assign a regular driver".'); return false
     }
@@ -669,6 +699,7 @@ export default function VehicleManagementView() {
           service_interval_months:  parseMonths(form.service_interval_months)!,
           last_service_at:          form.last_service_at,
           last_service_odometer_km: parseKm(form.last_service_odometer_km)!,
+          registration_expiry:      form.registration_expiry,
           assigned_driver_id:       pairOnCreate ? form.assigned_driver_id || null : null,
         }
         await adminCreateTruck(body)
@@ -695,6 +726,10 @@ export default function VehicleManagementView() {
         }
         if (editingTruck?.odometer_km == null && parseKm(form.odometer_km) != null) {
           body.odometer_km = parseKm(form.odometer_km)!
+        }
+        // Only when it changed, so an unrelated edit is not logged as a renewal.
+        if (form.registration_expiry && form.registration_expiry !== (editingTruck?.registration_expiry ?? '')) {
+          body.registration_expiry = form.registration_expiry
         }
         const saved   = await adminUpdateTruck(editingId, body)
         const flagged = flaggedBookingNotice(saved?.plate_number ?? 'The vehicle', saved?.flagged_booking)
@@ -804,7 +839,7 @@ export default function VehicleManagementView() {
   }, [confirmKind, modalMode, form.plate_number, actionBusy, archiveTarget])
 
   return (
-    <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-hidden ff-sc bg-[var(--color-bg)]">
+    <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-y-auto overflow-x-hidden lg:overflow-hidden ff-sc bg-[var(--color-bg)]">
 
       <Suspense fallback={null}>
         <TabDeepLink onTab={(t) => (t === 'models' ? setModelsOpen(true) : setTab(t))} />
@@ -917,7 +952,7 @@ export default function VehicleManagementView() {
       )}
 
       {tab === 'vehicles' && (
-      <div className="flex flex-1 min-h-0 flex-col p-3 lg:p-4 3xl:p-[34px] 3xl:pl-9 gap-3 3xl:gap-[14px] overflow-hidden bg-[#0a0a0a]">
+      <div className="flex flex-[1_0_auto] lg:flex-1 lg:min-h-0 flex-col p-3 lg:p-4 3xl:p-[34px] 3xl:pl-9 gap-3 3xl:gap-[14px] lg:overflow-hidden bg-[#0a0a0a]">
 
         {/* Filters */}
         <div className="flex flex-col xl:flex-row gap-2 xl:items-center shrink-0">
@@ -961,7 +996,7 @@ export default function VehicleManagementView() {
         </div>
 
         {/* Table */}
-        <div className="flex-1 min-h-0 rounded-[10px] border-[0.5px] border-[#424242] overflow-hidden flex flex-col bg-[#1b1b1b] shadow-[0_4px_4px_rgba(0,0,0,0.25)]">
+        <div className="flex-[1_0_auto] lg:flex-1 lg:min-h-0 rounded-[10px] border-[0.5px] border-[#424242] overflow-hidden flex flex-col bg-[#1b1b1b] shadow-[0_4px_4px_rgba(0,0,0,0.25)]">
           {listLoading ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-3 py-16">
               <div
@@ -985,6 +1020,11 @@ export default function VehicleManagementView() {
               <p className="text-sm text-white/45">
                 {debouncedSearch || statusFilter !== 'all' ? 'No vehicles match your filters.' : 'No vehicles yet.'}
               </p>
+              <ClearFiltersLink
+                show={!!debouncedSearch || statusFilter !== 'all'}
+                onClear={() => { setSearch(''); setStatusFilter('all'); setPage(0) }}
+                className="mt-0"
+              />
               {canCreate && !debouncedSearch && statusFilter === 'all' && (
                 <button type="button" onClick={openCreate} className="text-[var(--color-cyan)] text-sm font-bold">
                   Add your first vehicle
@@ -993,7 +1033,7 @@ export default function VehicleManagementView() {
             </div>
           ) : (
             <>
-              <div className="overflow-auto flex-1 min-h-0">
+              <div className="overflow-x-auto lg:overflow-auto flex-[1_0_auto] lg:flex-1 lg:min-h-0">
                 <table className="w-full text-left border-collapse min-w-[900px]">
                   {/* Headers keep the small caps face; the data rows are regular Alegreya Sans. */}
                   <thead className="sticky top-0 z-[1] bg-[#181717]">
@@ -1031,7 +1071,16 @@ export default function VehicleManagementView() {
                           <td className="align-middle">
                             <ModelThumb imageUrl={thumbUrl} label={modelLabel} size={40} />
                           </td>
-                          <td className="font-bold text-[#4df9ed] whitespace-nowrap">{t.plate_number}</td>
+                          <td className="font-bold text-[#4df9ed] whitespace-nowrap">
+                            {t.plate_number}
+                            {(t.registration_status?.state === 'expired' || t.registration_status?.state === 'expiring') && (
+                              <span
+                                className={`block text-[11px] font-normal ${t.registration_status.state === 'expired' ? 'text-[#f62626]' : 'text-[#ffea00]'}`}
+                              >
+                                {t.registration_status.state === 'expired' ? 'Registration expired' : 'Registration expires soon'}
+                              </span>
+                            )}
+                          </td>
                           <td>
                             {t.truck_model?.vehicle_type ?? '—'}
                           </td>
@@ -1163,10 +1212,11 @@ export default function VehicleManagementView() {
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: 12, opacity: 0 }}
               transition={{ type: 'spring', damping: 26, stiffness: 280 }}
-              className="w-full max-w-lg max-h-[90dvh] overflow-y-auto rounded-2xl border border-white/10 bg-[var(--color-surface)] shadow-2xl"
+              className="w-full max-w-lg max-h-[90dvh] flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-[var(--color-surface)] shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.07]">
+              {/* Header stays put; only the body below it scrolls. */}
+              <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-white/[0.07]">
                 <h2 className="text-sm font-bold text-white uppercase tracking-widest">
                   {modalMode === 'create' ? 'New vehicle' : 'Edit vehicle'}
                 </h2>
@@ -1180,6 +1230,7 @@ export default function VehicleManagementView() {
                 </button>
               </div>
 
+              <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain scrollbar-none [-webkit-overflow-scrolling:touch]">
               <RecordLockBanner lock={truckLock} noun="vehicle" className="mx-4 mt-4" />
               <fieldset disabled={truckLock.readOnly} className="p-4 space-y-3 min-w-0 border-0 m-0">
 
@@ -1318,6 +1369,49 @@ export default function VehicleManagementView() {
                       </>
                     )}
                   </div>
+                </div>
+
+                {/* Registration validity. Required for a new vehicle; changed here on
+                    renewal. A month before it lapses the Fleet Managers and Company
+                    Administrators are reminded; once lapsed it cannot be assigned. */}
+                <div className="rounded-xl border border-white/[0.08] bg-black/20 p-3 space-y-2">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-white/50">Registration</p>
+                  <label className="block">
+                    <span className="text-[11px] font-bold uppercase text-white/40">
+                      Valid until {modalMode === 'create' && <span className="text-red-400">*</span>}
+                    </span>
+                    <input
+                      type="date"
+                      value={form.registration_expiry}
+                      onChange={(e) => setForm((f) => ({ ...f, registration_expiry: e.target.value }))}
+                      className={`${inputCls} min-w-0 appearance-none`}
+                    />
+                  </label>
+                  {(() => {
+                    const st = registrationStatus(form.registration_expiry || null)
+                    if (st.state === 'expired') {
+                      return (
+                        <p className="text-[11px] text-red-400 leading-snug">
+                          This date has passed ({registrationDaysPhrase(st.days_left!)}). The vehicle cannot be assigned
+                          to a booking until the renewed date is entered.
+                        </p>
+                      )
+                    }
+                    if (st.state === 'expiring') {
+                      return (
+                        <p className="text-[11px] text-amber-300 leading-snug">
+                          Expires {registrationDaysPhrase(st.days_left!)} — renew it soon.
+                        </p>
+                      )
+                    }
+                    return (
+                      <p className="text-[10px] text-white/25 leading-snug">
+                        {modalMode === 'edit' && !editingTruck?.registration_expiry
+                          ? 'Not set yet. Enter it from the registration certificate.'
+                          : 'The last day on the registration. A reminder goes out one month before; once expired the vehicle cannot be assigned.'}
+                      </p>
+                    )
+                  })()}
                 </div>
 
                 {/* Odometer + routine service schedule. Required for a new vehicle;
@@ -1528,6 +1622,7 @@ export default function VehicleManagementView() {
                     {modalMode === 'create' ? 'Create' : 'Save'}
                   </button>
                 </div>
+              </div>
               </div>
             </motion.div>
           </motion.div>

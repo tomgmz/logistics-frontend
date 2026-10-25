@@ -26,7 +26,7 @@ interface ApiResponse<T> {
 }
 
 /** The bell's filter: unread only, or one group of types (booking.*, driver.*, ...). */
-export type NotificationFilter = 'unread' | 'booking' | 'driver' | 'auth' | 'support'
+export type NotificationFilter = 'unread' | 'booking' | 'driver' | 'auth' | 'support' | 'vehicle'
 
 /** Whether a notification belongs on a filtered list (used for live arrivals). */
 export function matchesNotificationFilter(n: AppNotification, filter: NotificationFilter | null): boolean {

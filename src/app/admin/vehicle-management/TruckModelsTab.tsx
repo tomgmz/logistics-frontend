@@ -1,5 +1,6 @@
 'use client'
 
+import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Upload, Truck as TruckIcon, Pencil, Archive, Eye, Plus, Search } from 'lucide-react'
@@ -25,8 +26,8 @@ import { ModelThumb, fmtDimensions, kgToTons } from './vehicle-ui'
 import RefreshButton from '@/components/ui/RefreshButton'
 import Pagination from '@/components/ui/Pagination'
 import { useVehicleTypeOptions } from '@/lib/hooks/useVehicleTypes'
+import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
 
-const PAGE_SIZE = 15
 
 interface ModelFormState {
   name:               string
@@ -92,6 +93,8 @@ type FieldErrors = Partial<Record<keyof ModelFormState | 'image', string>>
  * never deleted, so past bookings keep their details.
  */
 export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props) {
+  // 10 rows on phones, 20 from tablet up (lib/hooks/useTablePageSize).
+  const PAGE_SIZE = useTablePageSize()
   const [models,      setModels]      = useState<TruckModel[]>([])
   const [listLoading, setListLoading] = useState(true)
   const [listError,   setListError]   = useState<string | null>(null)
@@ -395,7 +398,7 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
 
   return (
     <>
-      <div className="flex flex-1 min-h-0 flex-col p-3 lg:p-4 gap-3 overflow-hidden">
+      <div className="flex flex-1 min-h-0 flex-col p-3 lg:p-4 gap-3 overflow-y-auto overflow-x-hidden lg:overflow-hidden">
         <div className="flex flex-col sm:flex-row gap-2 sm:items-center shrink-0">
           <div
             className="flex items-center gap-2 rounded-[10px] px-3 py-2 flex-1 max-w-md"
@@ -425,7 +428,7 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
           </div>
         </div>
 
-        <div className="flex-1 min-h-0 rounded-xl border border-white/[0.08] overflow-hidden flex flex-col bg-[#0f0f0f]">
+        <div className="flex-[1_0_auto] lg:flex-1 lg:min-h-0 rounded-xl border border-white/[0.08] overflow-hidden flex flex-col bg-[#0f0f0f]">
           {listLoading ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-3 py-16">
               <div
@@ -447,6 +450,7 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
               <p className="text-sm text-white/45">
                 {models.length === 0 ? 'No truck models yet.' : 'No models match your search.'}
               </p>
+              <ClearFiltersLink show={models.length > 0} onClear={() => setSearch('')} className="mt-0" />
               {models.length === 0 && canCreate && (
                 <button type="button" onClick={openCreate} className="text-[var(--color-cyan)] text-sm font-bold">
                   Add the first model
@@ -455,7 +459,7 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
             </div>
           ) : (
             <>
-            <div className="overflow-auto flex-1 min-h-0">
+            <div className="overflow-x-auto lg:overflow-auto flex-[1_0_auto] lg:flex-1 lg:min-h-0">
               <table className="w-full text-left text-sm border-collapse min-w-[700px]">
                 <thead className="sticky top-0 z-[1] bg-[#141414] border-b border-white/[0.07]">
                   <tr className="text-[11px] uppercase tracking-wider text-white/40">
@@ -523,11 +527,11 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: 12, opacity: 0 }}
               transition={{ type: 'spring', damping: 26, stiffness: 280 }}
-              className="w-full max-w-lg max-h-[90dvh] overflow-y-auto rounded-2xl border border-white/10 bg-[var(--color-surface)] shadow-2xl"
+              className="w-full max-w-lg max-h-[90dvh] flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-[var(--color-surface)] shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >
-              {/* Header */}
-              <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.07]">
+              {/* Header stays put; only the body below it scrolls. */}
+              <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-white/[0.07]">
                 <h2 className="text-sm font-bold text-white uppercase tracking-widest">
                   {formMode === 'create' ? 'New truck model' : 'Edit truck model'}
                 </h2>
@@ -536,6 +540,7 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
                 </button>
               </div>
 
+              <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain scrollbar-none [-webkit-overflow-scrolling:touch]">
               <RecordLockBanner lock={modelLock} noun="truck model" className="mx-4 mt-4" />
               <fieldset
                 disabled={modelLock.readOnly}
@@ -778,6 +783,7 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
                   </button>
                 </div>
               </div>
+              </div>
             </motion.div>
           </motion.div>
         )}
@@ -801,16 +807,18 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
               role="dialog"
               aria-modal="true"
               aria-label={`Details for ${viewModel.name}`}
-              className="w-full max-w-lg max-h-[90dvh] overflow-y-auto rounded-2xl border border-white/10 bg-[var(--color-surface)] shadow-2xl"
+              className="w-full max-w-lg max-h-[90dvh] flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-[var(--color-surface)] shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.07]">
+              {/* Header stays put; only the body below it scrolls. */}
+              <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-white/[0.07]">
                 <h2 className="text-sm font-bold text-white uppercase tracking-widest">Truck model details</h2>
                 <button type="button" onClick={() => setViewModel(null)} className="p-2 rounded-lg hover:bg-white/5 text-white/50" aria-label="Close">
                   <X size={18} />
                 </button>
               </div>
 
+              <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain scrollbar-none [-webkit-overflow-scrolling:touch]">
               <div className="p-4 space-y-4">
                 {viewModel.image_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -871,6 +879,7 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
                   Update Details
                 </button>
                 )}
+              </div>
               </div>
             </motion.div>
           </motion.div>

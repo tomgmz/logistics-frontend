@@ -1,5 +1,6 @@
 'use client'
 
+import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -29,8 +30,8 @@ import type {
 
 import RefreshButton from '@/components/ui/RefreshButton'
 import Pagination from '@/components/ui/Pagination'
+import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
 
-const PAGE_SIZE = 15
 
 const TABS = [
   { key: 'handling',      label: 'Handling Codes',    singular: 'Handling Code',   icon: Tag },
@@ -81,6 +82,8 @@ type ConfirmTarget =
   | { kind: 'vehicle_type'; item: VehicleType }
 
 export default function SystemMaintenanceView() {
+  // 10 rows on phones, 20 from tablet up (lib/hooks/useTablePageSize).
+  const PAGE_SIZE = useTablePageSize()
   // System-maintenance tier: hide the create/edit form and per-row write actions.
   const { canCreate, canEdit, canDelete } = useModuleAccess()
 
@@ -775,6 +778,7 @@ export default function SystemMaintenanceView() {
         canAdd={canCreate}
         noun={activeTab.singular.toLowerCase()}
         onAdd={openCreate}
+        onClear={() => setSearch('')}
       />
     )
 
@@ -932,7 +936,7 @@ export default function SystemMaintenanceView() {
   if (deleting) confirmLabel = 'Working…'
 
   return (
-    <div className="flex flex-col min-h-0 h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-hidden bg-[var(--color-bg,#0d0d0d)]">
+    <div className="flex flex-col min-h-0 h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-y-auto overflow-x-hidden lg:overflow-hidden bg-[var(--color-bg,#0d0d0d)]">
 
       {/* header */}
       <header className="shrink-0 border-b border-white/[0.07] px-4 py-3 flex items-center justify-between gap-3">
@@ -982,7 +986,7 @@ export default function SystemMaintenanceView() {
       </div>
 
       {/* body */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      <div className="flex flex-[1_0_auto] lg:flex-1 lg:min-h-0 lg:overflow-hidden">
 
         {/* form panel (lg and up) — only for users who can create/edit this module */}
         {showFormPanel && (
@@ -1044,7 +1048,7 @@ export default function SystemMaintenanceView() {
               )}
             </div>
           </div>
-          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3 sm:p-4">
+          <div className="flex-[1_0_auto] lg:flex-1 lg:min-h-0 overflow-x-auto lg:overflow-y-auto lg:overscroll-contain p-3 sm:p-4">
             {renderList()}
           </div>
           {!loading && tabList.length > 0 && (
@@ -1210,10 +1214,11 @@ function ActiveBadge({ active }: { active: boolean }) {
   )
 }
 
-function EmptyState({ filtered, canAdd, noun, onAdd }: { filtered: boolean; canAdd: boolean; noun: string; onAdd: () => void }) {
+function EmptyState({ filtered, canAdd, noun, onAdd, onClear }: { filtered: boolean; canAdd: boolean; noun: string; onAdd: () => void; onClear: () => void }) {
   return (
     <div className="flex flex-col items-center gap-3 py-10 text-center">
       <p className="text-sm text-white/30">{filtered ? 'Nothing matches your search.' : 'No entries yet.'}</p>
+      <ClearFiltersLink show={filtered} onClear={onClear} className="mt-0" />
       {!filtered && canAdd && (
         <button type="button" onClick={onAdd} className="lg:hidden text-sm font-bold text-[#4DF9ED]">
           Add the first {noun}

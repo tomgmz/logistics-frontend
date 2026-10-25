@@ -89,6 +89,18 @@ const TAB_TO_ROLE: Partial<Record<UserTab, ManagedRole>> = {
 
 type FormState = Record<string, string | boolean | number | null>
 
+/** The license-derived fields (the ones a scan fills). */
+const LICENSE_FIELDS = ['first_name', 'last_name', 'middle_name', 'license_number', 'license_expiry'] as const
+
+/**
+ * Editing an existing driver: the license-derived fields that hold a value open
+ * locked, each with its own Edit button, the same as after a scan.
+ */
+function savedLicenseLocks(tab: UserTab, state: FormState, isEdit: boolean): Set<string> {
+  if (!isEdit || tab !== 'drivers') return new Set()
+  return new Set(LICENSE_FIELDS.filter(k => String(state[k] ?? '').trim() !== ''))
+}
+
 interface ScanEligibilityState {
   dl_codes:            string[]
   restriction_codes:   string[]
@@ -341,8 +353,9 @@ export default function UserFormModal({
   // holds that guess until the admin confirms it.
   const [nameCheck, setNameCheck] = useState<{ first: string; middle: string } | null>(null)
   // Fields the scan filled stay read-only until the admin presses their Edit, so
-  // the license's values aren't changed by a stray keystroke.
-  const [scanLocked, setScanLocked] = useState<Set<string>>(() => new Set())
+  // the license's values aren't changed by a stray keystroke. An existing
+  // driver's license details open the same way (savedLicenseLocks).
+  const [scanLocked, setScanLocked] = useState<Set<string>>(() => savedLicenseLocks(tab, initialState, isEdit))
   // Words where the scan may have read an Ñ as a plain N.
   const [nChecks, setNChecks] = useState<NonNullable<LicenseOCRResult['name_n_checks']>>([])
 
@@ -388,8 +401,7 @@ export default function UserFormModal({
         ...(result.license_expiry && { license_expiry: result.license_expiry }),
       }))
       setScanLocked(new Set(
-        (['first_name', 'last_name', 'middle_name', 'license_number', 'license_expiry'] as const)
-          .filter(k => result[k]),
+        LICENSE_FIELDS.filter(k => result[k]),
       ))
       if (result.vehicle_eligibility) {
         setEligibility({
@@ -453,7 +465,7 @@ export default function UserFormModal({
     setEligibility(null)
     setNameCheck(null)
     setNChecks([])
-    setScanLocked(new Set())
+    setScanLocked(savedLicenseLocks(tab, initialState, isEdit))
     setShowCustomSuffix(
       !!initialState.suffix && !USER_SUFFIXES.includes(initialState.suffix as never),
     )
@@ -568,6 +580,7 @@ export default function UserFormModal({
     setLicenseFile(null)
     setLicensePreview(null)
     setLicenseActions(false)
+    setScanLocked(savedLicenseLocks(tab, initialState, isEdit))
     setViewing(true)
   }
 
@@ -598,13 +611,14 @@ export default function UserFormModal({
       input: {
         id: `user-form-${key}`,
         readOnly: locked,
-        ...(locked && { title: 'Filled from the license scan. Press Edit to change it.' }),
+        ...(locked && { title: isEdit ? "From the driver's license. Press Edit to change it." : 'Filled from the license scan. Press Edit to change it.' }),
       },
       // No cyan hover/focus border or caret while locked: it must not look typeable.
       lockedClass: locked
         ? 'opacity-70 cursor-default caret-transparent hover:border-[#424242]! focus:border-[#424242]!'
         : '',
-      action: locked ? (
+      // Viewing: the whole form is read-only already, so no Edit buttons.
+      action: locked && !viewing ? (
         <button
           type="button"
           onClick={() => unlockScanned(key)}

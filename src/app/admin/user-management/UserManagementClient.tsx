@@ -1,19 +1,16 @@
 'use client'
 
+import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
 import Pagination from '@/components/ui/Pagination'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
-import { useIsMobile } from '@/lib/hooks/useIsMobile'
 import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Users, UserPlus, UserRoundPlus, ChevronDown,
+  Users, UserPlus,
   Pencil, Eye, ShieldCheck, ShieldOff, Archive,
   AlertTriangle,
   KeyRound, Send, RotateCcw, Flag, ArchiveRestore,
 } from 'lucide-react'
-import Select, { SelectChangeEvent } from '@mui/material/Select'
-import MenuItem from '@mui/material/MenuItem'
-import FormControl from '@mui/material/FormControl'
 import { createTheme, ThemeProvider } from '@mui/material/styles'
 import type {
   UserTab, AnyUser, UserStatus,
@@ -36,9 +33,14 @@ import RowActionMenu, { type RowAction } from '@/components/ui/RowActionMenu'
 import AccountActionConfirm, { restoreConfirmDescription, statusConfirmCopy, type AccountConfirm, type AccountKind } from '@/components/admin/AccountActionConfirm'
 
 import RefreshButton from '@/components/ui/RefreshButton'
+import { TableCard, BadgeModern } from '@/components/ui/untitled/table-card'
+import { Button } from '@/components/ui/untitled/button'
+import { TabsMinimal } from '@/components/ui/untitled/tabs'
+import { Plus } from '@untitledui/icons'
 import FilterBar, {
   allowedValues, matchesFilter, optionsFrom, type FilterField, type FilterValues,
 } from '@/components/ui/FilterBar'
+import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
 // No IT Administrator tab: IT Administrators are the IT Administrator's own
 // business, and a new one is only made through their handover (2026-10-25).
 type UserMgmtTab = Extract<UserTab, 'clients' | 'drivers'>
@@ -87,8 +89,6 @@ const muiTheme = createTheme({
 })
 
 // Rows per page: 10 on a phone, 20 on anything wider (the user's call, 2026-10-25).
-const PAGE_SIZE_PHONE   = 10
-const PAGE_SIZE_DESKTOP = 20
 
 async function fetchByTab(tab: DirectoryTab): Promise<AnyUser[]> {
   switch (tab) {
@@ -181,21 +181,10 @@ function formatDateTime(iso: string | null): string {
 
 // Table text, per the Figma (3156:400): names in regular Alegreya Sans bold cyan,
 // the rest bold white. Headers stay grey small caps.
-// MUI sx has no 3xl; this is the same 1920px step.
-const FIGMA_MQ = '@media (min-width: 1920px)'
-const REGULAR_FONT = "var(--font-alegreya), 'Alegreya Sans', sans-serif"
 const NAME_TEXT = 'ff-regular text-[13px] 3xl:text-[15px] font-bold text-[#4df9ed]'
 const TD_NAME   = `px-4 3xl:px-5 py-2 3xl:py-2.5 ${NAME_TEXT}`
 const TD_MUTED  = 'ff-regular px-4 3xl:px-5 py-2 3xl:py-2.5 text-[12px] 3xl:text-[14px] font-bold text-white'
 
-// The page-header action (Add User / Transition IT Administrator): cyan outline.
-// The Figma is drawn at 1920px; its exact sizes apply only from 3xl (1920px) up.
-// Below that everything is compact, so laptops (1366x768, or 1920 at 125%
-// scaling = 1536x864) still show a useful number of rows.
-const HEADER_BTN =
-  'flex h-8 3xl:h-9 shrink-0 items-center gap-2 whitespace-nowrap max-sm:w-full max-sm:justify-center rounded-[10px] border border-[#4df9ed] bg-[#4df9ed]/[0.19] ' +
-  'px-3 3xl:px-4 text-[13px] 3xl:text-[15px] text-[#4df9ed] transition hover:bg-[#4df9ed]/30 active:scale-95'
-const HEADER_ICON = 'size-4 3xl:size-[18px]'
 
 
 
@@ -263,7 +252,6 @@ const STATUS_ACTIONS: { status: UserStatus; label: string; icon: React.ReactNode
 
 interface RowMenuProps {
   user: AnyUser
-  tab: TabValue
   mode: UserManagementMode
   onView: () => void
   onEdit: () => void
@@ -272,7 +260,7 @@ interface RowMenuProps {
   lockedBy?: string
 }
 
-function RowMenu({ user, tab, mode, onView, onEdit, onStatusChange, lockedBy }: RowMenuProps) {
+function RowMenu({ user, mode, onView, onEdit, onStatusChange, lockedBy }: RowMenuProps) {
   const access = useModuleAccess()
   const itMode = mode === 'it-admin'
   if (lockedBy) return <LockedRow holder={lockedBy} onView={onView} />
@@ -284,7 +272,7 @@ function RowMenu({ user, tab, mode, onView, onEdit, onStatusChange, lockedBy }: 
 
   const actions: RowAction[] = [
     { label: 'View Details', icon: <Eye size={15} />, onSelect: onView, section: 'Details', description: 'Open the account read-only' },
-    ...(!itMode && tab !== 'all'
+    ...(!itMode
       ? [{ label: 'Edit', icon: <Pencil size={15} />, onSelect: onEdit, section: 'Details', description: 'Change their details', ...gated(access.canEdit) }]
       : []),
     ...(itMode
@@ -463,7 +451,7 @@ function TableSkeleton({ cols, rows }: { cols: number; rows: number }) {
   )
 }
 
-function EmptyState({ tab, onAdd, showAdd, canAdd, archived = false }: { tab: TabValue; onAdd: () => void; showAdd: boolean; canAdd: boolean; archived?: boolean }) {
+function EmptyState({ tab, onAdd, showAdd, canAdd, archived = false, filtered, onClear }: { tab: TabValue; onAdd: () => void; showAdd: boolean; canAdd: boolean; archived?: boolean; filtered: boolean; onClear: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-24 text-center">
       <div className="mb-4 rounded-full border border-[#424242] bg-[#1b1b1b] p-4">
@@ -477,6 +465,7 @@ function EmptyState({ tab, onAdd, showAdd, canAdd, archived = false }: { tab: Ta
           ? 'No vendor drivers yet. Add one here, then pick them in Booking Management for a vendor-supplied delivery.'
           : `No ${tab === 'all' ? 'users' : tab} match your current filters.`}
       </p>
+      <ClearFiltersLink show={filtered} onClear={onClear} className="mt-4" />
       {tab !== 'all' && showAdd && !archived && (
         <button
           onClick={onAdd}
@@ -724,7 +713,7 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
   const [searchInput,      setSearchInput]      = useState('')
   const [search,           setSearch]           = useState('')
   const [page,             setPage]             = useState(1)
-  const pageSize = useIsMobile() ? PAGE_SIZE_PHONE : PAGE_SIZE_DESKTOP
+  const pageSize = useTablePageSize()
   // The Filters panel's applied values. They belong to the tab (and view) they
   // were set on, so switching either clears them.
   const [filters,          setFilters]          = useState<FilterValues>([])
@@ -963,12 +952,24 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
     })
   }
 
-  function openEdit(user: AnyUser, viewOnly = false) {
+  async function openEdit(user: AnyUser, viewOnly = false) {
     const tab = activeTab === 'clients' || activeTab === 'drivers'
       ? activeTab
       : tabFromRole(user.role)
+    // The All Users rows are bare accounts, without the client's company or the
+    // driver's license and vendor details the form is filled from. Editing one
+    // as is would save those fields blank, so read the full record first.
+    let record = user
+    if (activeTab === 'all' && !viewOnly) {
+      try {
+        record = tab === 'drivers' ? await driverService.getOne(user.user_id) : await clientService.getOne(user.user_id)
+      } catch (e) {
+        appToast.error(getApiErrorMessage(e, 'Could not open this account for editing.'))
+        return
+      }
+    }
     setFormTab(tab)
-    setEditUser(user)
+    setEditUser(record)
     setFormViewOnly(viewOnly)
     setShowForm(true)
   }
@@ -998,27 +999,11 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
   return (
     <ThemeProvider theme={muiTheme}>
       <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-y-auto overflow-x-hidden lg:overflow-hidden bg-[#0a0a0a] text-white">
-        <div className="flex flex-col lg:flex-1 lg:min-h-0 px-3 py-3 sm:px-4 lg:px-5 3xl:px-6 lg:pt-3 lg:pb-4 3xl:pb-5 gap-3 3xl:gap-4 lg:overflow-hidden">
+        <div className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0 px-3 py-3 sm:px-4 lg:px-5 3xl:px-6 lg:pt-3 lg:pb-4 3xl:pb-5 gap-3 3xl:gap-4 lg:overflow-hidden">
 
           {/* Header */}
-          {/* As tall as the Add User button even when there is none (the IT
-              Administrator's view), so the page lines up the same way. */}
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 lg:min-h-8 3xl:min-h-9 shrink-0">
             <h1 className="font-[family-name:var(--font-alegreya-sc)] text-[17px] 3xl:text-[20px] font-bold text-white">User Management</h1>
-            {/*
-              On the IT Admin tab, while the seat is filled there is nothing to add:
-              the IT Administrator hands the role over from their own portal. If it
-              is somehow empty, creating one is exactly right.
-            */}
-            {itMode ? null : (
-              <button
-                onClick={openCreate}
-                {...writeAccess(access.canCreate)}
-                className={`${HEADER_BTN} disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-[#4df9ed]/[0.19] disabled:active:scale-100`}
-              >
-                Add User <UserRoundPlus className={HEADER_ICON} />
-              </button>
-            )}
           </div>
 
           {/* Stats */}
@@ -1036,94 +1021,49 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
           </div>
 
           {/* Table card */}
-          <div className="flex flex-col lg:flex-1 lg:min-h-0 rounded-[10px] border-[0.5px] border-[#424242] bg-[#1b1b1b] shadow-[0_4px_4px_rgba(0,0,0,0.25)] lg:overflow-hidden">
+          <TableCard.Root className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0">
 
             {/* The IT Administrator's page passes its section tabs. The Company
                 Administrator's has no other section since password resets moved
                 to the IT Administrator (2026-10-24), so no tab row at all. */}
             {sectionTabs}
 
-            {/* The shared filter bar: the role dropdown (which picks the table),
-                search, Filters (Archived is a status there), refresh and the count, on one row as
-                the Figma lays them out. */}
+            {/* Untitled UI's TableCard.Header from the "No vendors found" table
+                (components/ui/untitled): title and count badge, the add
+                button on the right. On the IT Admin tab there is nothing to add:
+                the IT Administrator hands the role over from their own portal. */}
+            <TableCard.Header
+              className="shrink-0"
+              title={`${ACCOUNT_NOUN[activeTab]}s`}
+              badge={
+                <BadgeModern className={showArchived ? 'text-[#ffea00]' : undefined}>
+                  {total} {showArchived ? 'archived' : total === 1 ? 'account' : 'accounts'}
+                </BadgeModern>
+              }
+              contentTrailing={!itMode && (
+                <Button size="sm" iconLeading={Plus} onClick={openCreate} {...writeAccess(access.canCreate)} className="max-md:w-full">
+                  Add User
+                </Button>
+              )}
+            />
+
+            {/* Untitled UI's filter row from the same table: tabs on the left
+                (which list), search with Ctrl/⌘ K, Filters (Archived is a status
+                there) and Refresh on the right. */}
             <FilterBar
-              search={{ value: searchInput, onChange: setSearchInput, placeholder: 'Search name or email...' }}
+              layout="split"
+              search={{ value: searchInput, onChange: setSearchInput, placeholder: 'Search' }}
               fields={filterDefs}
-              variant="dropdowns"
               values={filters}
               onChange={applyFilters}
               actions={<RefreshButton iconOnly onClick={handleRefresh} loading={(loading || fetching)} disabled={loading || fetching} />}
-              summary={
-                <span className={showArchived ? 'text-[#ffea00]' : 'text-[#4df9ed]'}>
-                  {total} {showArchived ? 'Archived ' : ''}{ACCOUNT_NOUN[activeTab]} Account{total !== 1 ? 's' : ''}
-                </span>
-              }
               leading={
-              <FormControl size="small" sx={{ width: { xs: '100%', sm: 200 }, [FIGMA_MQ]: { width: 220 } }}>
-                <Select
-                  value={dropdownTab}
-                  onChange={(e: SelectChangeEvent) => switchTab(e.target.value as TabValue)}
-                  IconComponent={(props) => <ChevronDown size={18} {...props} />}
-                  MenuProps={{
-                    PaperProps: {
-                      sx: {
-                        bgcolor: '#1b1b1b', border: '1px solid #424242',
-                        borderRadius: '10px', boxShadow: '0 20px 40px rgba(0,0,0,0.6)',
-                        mt: '6px', '& .MuiList-root': { p: '4px' },
-                        // Portaled to <body>, so it sets the regular face itself.
-                        fontFamily: REGULAR_FONT,
-                      },
-                    },
-                  }}
-                  sx={{
-                    height: '34px', borderRadius: '10px', fontFamily: REGULAR_FONT, fontSize: '13px',
-                    color: '#4df9ed', bgcolor: '#424242',
-                    '& .MuiOutlinedInput-notchedOutline': { borderColor: '#818181' },
-                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#4df9ed80' },
-                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#4df9ed', borderWidth: '1px' },
-                    '& .MuiSelect-icon': { color: '#818181', right: '10px', top: 'calc(50% - 9px)' },
-                    '& .MuiSelect-select': { display: 'flex', alignItems: 'center', paddingLeft: '12px' },
-                    [FIGMA_MQ]: { height: '38px', fontSize: '15px', '& .MuiSelect-select': { paddingLeft: '14px' } },
-                  }}
-                  renderValue={(value) => {
-                    const tab = tabs.find((t) => t.key === value)!
-                    return (
-                      <span className="flex items-center gap-2 text-[13px] 3xl:text-[15px] text-[#4df9ed]">
-                        <Users className="size-4 3xl:size-[18px]" /> {tab.label}
-                      </span>
-                    )
-                  }}
-                >
-                  {tabs.map((t) => (
-                    <MenuItem
-                      key={t.key} value={t.key}
-                      sx={{
-                        borderRadius: '8px', mb: '2px', fontFamily: REGULAR_FONT, fontSize: '13px', [FIGMA_MQ]: { fontSize: '14px' },
-                        fontWeight: t.key === 'all' ? 700 : 400,
-                        color: dropdownTab === t.key ? '#4df9ed' : '#818181',
-                        bgcolor: dropdownTab === t.key ? '#4df9ed0d' : 'transparent',
-                        display: 'flex', alignItems: 'center', gap: '10px',
-                        borderTop: t.key === 'clients' ? '1px solid #424242' : 'none',
-                        marginTop: t.key === 'clients' ? '4px' : '0',
-                        paddingTop: t.key === 'clients' ? '8px' : undefined,
-                        '&:hover': {
-                          bgcolor: dropdownTab === t.key ? '#4df9ed1a' : '#2a2a2a',
-                          color: dropdownTab === t.key ? '#4df9ed' : '#ffffff',
-                        },
-                        '&.Mui-selected': { bgcolor: '#4df9ed0d', '&:hover': { bgcolor: '#4df9ed1a' } },
-                      }}
-                    >
-                      <span style={{ color: dropdownTab === t.key ? '#4df9ed' : '#818181', display: 'flex' }}>
-                        <Users size={16} />
-                      </span>
-                      {t.label}
-                      {dropdownTab === t.key && (
-                        <span style={{ marginLeft: 'auto', height: '6px', width: '6px', borderRadius: '50%', backgroundColor: '#4df9ed', flexShrink: 0 }} />
-                      )}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+                <TabsMinimal
+                  label="Accounts"
+                  items={tabs.map((t) => ({ id: t.key, label: t.label }))}
+                  selectedKey={dropdownTab}
+                  onSelectionChange={switchTab}
+                />
               }
             />
 
@@ -1173,7 +1113,7 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
             )}
 
             {/* Table */}
-            <div className="overflow-x-auto lg:flex-1 lg:overflow-auto lg:min-h-0">
+            <div className="overflow-x-auto flex-[1_0_auto] lg:flex-1 lg:overflow-auto lg:min-h-0">
               {/* Fixed layout: every column, Actions included, gets the same width.
                   Content starts at the left of its column; the row menu sits right. */}
               <table className="w-full max-lg:min-w-[900px] lg:table-fixed">
@@ -1196,7 +1136,12 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
                   ) : users.length === 0 ? (
                     <tr>
                       <td colSpan={colCount}>
-                        <EmptyState tab={activeTab} onAdd={openCreate} showAdd={!itMode} canAdd={access.canCreate} archived={showArchived} />
+                        <EmptyState
+                          tab={activeTab} onAdd={openCreate} showAdd={!itMode} canAdd={access.canCreate} archived={showArchived}
+                          // The tab picks which list (and its columns), so it stays.
+                          filtered={!!search || filters.length > 0}
+                          onClear={() => { setSearchInput(''); setSearch(''); applyFilters([]) }}
+                        />
                       </td>
                     </tr>
                   ) : (
@@ -1233,7 +1178,6 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
                             ) : (
                               <RowMenu
                                 user={user}
-                                tab={activeTab}
                                 mode={mode}
                                 onView={() => openEdit(user, true)}
                                 onEdit={() => openEdit(user)}
@@ -1254,7 +1198,7 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
             {!loading && total > 0 && (
               <Pagination page={safePage} totalPages={totalPages} total={total} pageSize={pageSize} onPageChange={setPage} disabled={fetching} />
             )}
-          </div>
+          </TableCard.Root>
         </div>
       </div>
 
@@ -1264,9 +1208,10 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
           user={editUser}
           driverSource={formDriverSource}
           startInView={formViewOnly}
-          // Same rule as the row menu: the combined list can't open the edit form,
-          // the IT Administrator views only, and Read Only sees it disabled.
-          canEdit={!itMode && activeTab !== 'all' && editUser?.status !== 'archived'}
+          // Same rule as the row menu: the IT Administrator views only, and Read
+          // Only sees it disabled. From All Users, only a record opened with Edit
+          // (read in full by openEdit) can switch to editing; View has the bare row.
+          canEdit={!itMode && (activeTab !== 'all' || !formViewOnly) && editUser?.status !== 'archived'}
           editDisabled={!access.canEdit}
           lockedBy={editUser ? userLocks.get(editUser.user_id) : undefined}
           onClose={() => setShowForm(false)}
