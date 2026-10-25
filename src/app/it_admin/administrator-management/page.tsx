@@ -580,8 +580,14 @@ export default function AdminManagementClient() {
   }
 
   // "Create Administrator" asks for the account type first; the form opens once one is picked.
+  // Only one General Manager that isn't archived (backend users_one_general_manager):
+  // the picker greys the option out while one exists. Read fresh on every opening.
+  const [hasGeneralManager, setHasGeneralManager] = useState(false)
   function openCreate() {
     setShowTypePicker(true)
+    generalManagerService.getAll()
+      .then((list) => setHasGeneralManager(list.some((u) => u.status !== 'archived')))
+      .catch(() => setHasGeneralManager(false))
   }
 
   function createAccount(type: AdminMgmtTab) {
@@ -799,7 +805,9 @@ export default function AdminManagementClient() {
 
       <AccountTypePicker
         open={showTypePicker}
-        options={NEW_ACCOUNT_TYPES}
+        options={NEW_ACCOUNT_TYPES.map((t) => t.key === 'general-managers' && hasGeneralManager
+          ? { ...t, disabledReason: 'There is already a General Manager. Archive the current one first.' }
+          : t)}
         onPick={createAccount}
         onClose={() => setShowTypePicker(false)}
       />

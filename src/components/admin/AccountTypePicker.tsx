@@ -8,6 +8,8 @@ export interface AccountTypeOption<K extends string> {
   key:   K
   label: string
   hint:  string
+  /** Shown instead of the hint when this type can't be created right now. */
+  disabledReason?: string
 }
 
 interface AccountTypePickerProps<K extends string> {
@@ -69,13 +71,16 @@ export default function AccountTypePicker<K extends string>({
                   key={opt.key}
                   type="button"
                   onClick={() => onPick(opt.key)}
-                  className="group flex items-center justify-between gap-3 rounded-xl border border-[#424242] px-4 py-3 text-left transition hover:border-[#4df9ed] hover:bg-[#4df9ed]/10"
+                  disabled={!!opt.disabledReason}
+                  className="group flex items-center justify-between gap-3 rounded-xl border border-[#424242] px-4 py-3 text-left transition disabled:cursor-not-allowed disabled:opacity-50 [@media(hover:hover)]:enabled:hover:border-[#4df9ed] [@media(hover:hover)]:enabled:hover:bg-[#4df9ed]/10"
                 >
                   <div>
-                    <p className="text-sm font-semibold text-white group-hover:text-[#4df9ed]">{opt.label}</p>
-                    <p className="mt-0.5 text-[11px] leading-snug text-[#818181]">{opt.hint}</p>
+                    <p className="text-sm font-semibold text-white [@media(hover:hover)]:group-enabled:group-hover:text-[#4df9ed]">{opt.label}</p>
+                    <p className={`mt-0.5 text-[11px] leading-snug ${opt.disabledReason ? 'text-[#ffea00]' : 'text-[#818181]'}`}>
+                      {opt.disabledReason ?? opt.hint}
+                    </p>
                   </div>
-                  <ChevronRight size={16} className="shrink-0 text-[#555] group-hover:text-[#4df9ed]" />
+                  <ChevronRight size={16} className="shrink-0 text-[#555] [@media(hover:hover)]:group-enabled:group-hover:text-[#4df9ed]" />
                 </button>
               ))}
             </div>
