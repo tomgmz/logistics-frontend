@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import {
-  AlertOctagon, CheckCircle2, Clock, ExternalLink, Loader2,
-  Mail, MapPin, Bell, ScanLine, Cloud, ShieldAlert, Users, Plug,
+  AlertOctagon, CheckCircle2, ExternalLink, Loader2,
+  Mail, MapPin, Bell, ScanLine, Cloud, ShieldAlert, Plug,
 } from 'lucide-react'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { systemLogService, type SystemLogEventType, type SystemLogLevel } from '@/lib/services/admin/system-logs.service'
@@ -22,6 +22,8 @@ import { roleLabel } from '@/lib/roles'
 
 import RefreshButton from '@/components/ui/RefreshButton'
 import ItAdminHandoverPanel from '@/components/admin/ItAdminHandoverPanel'
+import { TableCard } from '@/components/ui/untitled/table-card'
+import { TabsMinimal } from '@/components/ui/untitled/tabs'
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Scheduler staleness is a function of time, not of any row changing. */
@@ -110,33 +112,19 @@ function logsHref(params: { level?: SystemLogLevel; event_type?: SystemLogEventT
 }
 
 // ── Building blocks ──────────────────────────────────────────────────────────
+//
+// Laid out as Untitled UI's dashboard-04 (header, metric row, a card with a
+// time-range tab list, then table cards), in our palette: bg-primary →
+// #1b1b1b, ring-secondary → #424242, text-tertiary → #818181.
 
-function Card({ title, subtitle, icon, action, children, className = '' }: {
-  title: string; subtitle?: string; icon: ReactNode; action?: ReactNode; children: ReactNode; className?: string
-}) {
-  return (
-    <section className={`flex flex-col rounded-2xl border border-[#2a2a2a] bg-[#1b1b1b] min-w-0 ${className}`}>
-      <header className="flex items-start justify-between gap-3 border-b border-[#2a2a2a] px-4 py-3">
-        <div className="flex items-start gap-2.5 min-w-0">
-          <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#4df9ed]/10 text-[#4df9ed]">
-            {icon}
-          </span>
-          <div className="min-w-0">
-            <h2 className="text-sm font-semibold text-white">{title}</h2>
-            {subtitle && <p className="text-xs text-[#818181] mt-0.5">{subtitle}</p>}
-          </div>
-        </div>
-        {action}
-      </header>
-      <div className="flex-1 p-4">{children}</div>
-    </section>
-  )
-}
+const SC = 'font-[family-name:var(--font-alegreya-sc)]'
+const TH = 'px-4 md:px-6 py-2 text-left text-xs font-semibold whitespace-nowrap text-[#818181]'
+const TD = 'px-4 md:px-6 py-4 align-top'
 
 function Pill({ label, color }: { label: string; color: string }) {
   return (
     <span
-      className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold"
+      className={`${SC} inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold`}
       style={{ color, background: `${color}14`, border: `1px solid ${color}40` }}
     >
       <span className="h-1.5 w-1.5 rounded-full" style={{ background: color }} />
@@ -145,192 +133,241 @@ function Pill({ label, color }: { label: string; color: string }) {
   )
 }
 
+/** Untitled UI's secondary button, size sm, as a link. */
 function CardLink({ href, children }: { href: string; children: ReactNode }) {
   return (
     <Link
       href={href}
-      className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-[#424242] px-2.5 py-1 text-xs text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white"
+      className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-[#1b1b1b] px-3 py-2 text-sm font-semibold text-[#e5e5e5] shadow-[0_1px_2px_rgba(0,0,0,0.3)] ring-1 ring-[#424242] ring-inset transition [@media(hover:hover)]:hover:bg-[#262626] [@media(hover:hover)]:hover:text-white"
     >
-      {children} <ExternalLink size={11} />
+      {children} <ExternalLink size={14} className="text-[#818181]" />
     </Link>
   )
 }
 
+/** A table that keeps its columns on phones and slides sideways. */
+function Table({ head, minWidth, children }: { head: string[]; minWidth: string; children: ReactNode }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className={`w-full text-sm ${minWidth}`}>
+        <thead className={`bg-[#222222] ${SC}`}>
+          <tr>{head.map((h, i) => <th key={i} className={TH}>{h}</th>)}</tr>
+        </thead>
+        <tbody className="ff-regular divide-y divide-[#2a2a2a]">{children}</tbody>
+      </table>
+    </div>
+  )
+}
+
+function EmptyRow({ cols, children }: { cols: number; children: ReactNode }) {
+  return (
+    <tr>
+      <td colSpan={cols} className="px-4 md:px-6 py-6 text-sm text-[#818181]">{children}</td>
+    </tr>
+  )
+}
+
+function Footnote({ children }: { children: ReactNode }) {
+  return <p className="border-t border-[#2a2a2a] px-4 md:px-6 py-3 text-xs text-[#818181] leading-snug">{children}</p>
+}
+
+/** Untitled UI's simple metric card: label, big number, link in the footer. */
+function MetricCard({ label, value, color, href, linkLabel }: {
+  label: string; value: number; color: string; href: string; linkLabel: string
+}) {
+  return (
+    <div className="flex flex-col rounded-xl bg-[#1b1b1b] shadow-[0_1px_2px_rgba(0,0,0,0.3)] ring-1 ring-[#424242] min-w-0">
+      <div className="flex flex-col gap-2 px-4 py-5 md:px-5">
+        <p className="text-sm font-medium text-[#818181]">{label}</p>
+        <p className="text-3xl font-semibold leading-none font-mono" style={{ color: value > 0 ? color : COLOR.muted }}>
+          {value.toLocaleString()}
+        </p>
+      </div>
+      <div className="flex justify-end border-t border-[#2a2a2a] px-4 py-3 md:px-5">
+        <Link href={href} className="inline-flex items-center gap-1 text-sm font-semibold text-[#e5e5e5] [@media(hover:hover)]:hover:text-white">
+          {linkLabel} <ExternalLink size={13} className="text-[#818181]" />
+        </Link>
+      </div>
+    </div>
+  )
+}
+
+/** A small number inside a card, for the sign-in and account counts. */
 function Stat({ label, value, color, href, hint }: {
   label: string; value: number; color: string; href?: string; hint?: string
 }) {
   const body = (
     <>
-      <p className="text-2xl font-bold font-mono leading-none" style={{ color: value > 0 ? color : COLOR.muted }}>
+      <p className="text-sm font-medium text-[#818181] leading-snug">{label}</p>
+      <p className="mt-2 text-2xl font-semibold font-mono leading-none" style={{ color: value > 0 ? color : COLOR.muted }}>
         {value.toLocaleString()}
       </p>
-      <p className="mt-1.5 text-[11px] text-[#818181] leading-snug">{label}</p>
     </>
   )
-  const cls = 'block rounded-xl border border-[#2a2a2a] bg-[#0a0a0a]/40 px-3 py-2.5 min-w-0'
+  const cls = 'block rounded-xl bg-[#141414] ring-1 ring-[#2a2a2a] ring-inset px-4 py-3 min-w-0'
   return href
-    ? <Link href={href} title={hint} className={`${cls} transition hover:border-[#424242] hover:bg-[#2a2a2a]/40`}>{body}</Link>
+    ? <Link href={href} title={hint} className={`${cls} transition [@media(hover:hover)]:hover:ring-[#424242]`}>{body}</Link>
     : <div title={hint} className={cls}>{body}</div>
 }
 
 // ── A · Problems waiting ─────────────────────────────────────────────────────
 
+function ProblemMetrics({ data }: { data: ItDashboardSummary['problems'] }) {
+  const { critical, error, warn } = data.unresolved
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-5">
+      <MetricCard label="Unresolved critical" value={critical} color={COLOR.critical}
+                  href={logsHref({ level: 'critical', resolved: false })} linkLabel="View critical" />
+      <MetricCard label="Unresolved errors" value={error} color={COLOR.red}
+                  href={logsHref({ level: 'error', resolved: false })} linkLabel="View errors" />
+      <MetricCard label="Unresolved warnings" value={warn} color={COLOR.amber}
+                  href={logsHref({ level: 'warn', resolved: false })} linkLabel="View warnings" />
+    </div>
+  )
+}
+
 function ProblemsCard({ data, now, onResolve, resolving }: {
   data: ItDashboardSummary['problems']; now: number
   onResolve: (id: string) => void; resolving: Set<string>
 }) {
-  const { critical, error, warn } = data.unresolved
   return (
-    <Card
-      title="Problems waiting"
-      subtitle="Unresolved system log entries"
-      icon={<AlertOctagon size={15} />}
-      action={<CardLink href={logsHref({ resolved: false })}>All unresolved</CardLink>}
-      className="lg:col-span-2"
-    >
-      <div className="grid grid-cols-3 gap-2">
-        <Stat label="Critical" value={critical} color={COLOR.critical} href={logsHref({ level: 'critical', resolved: false })} />
-        <Stat label="Errors"   value={error}    color={COLOR.red}      href={logsHref({ level: 'error', resolved: false })} />
-        <Stat label="Warnings" value={warn}     color={COLOR.amber}    href={logsHref({ level: 'warn', resolved: false })} />
-      </div>
-
-      <div className="mt-4">
-        <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-[#818181]">
-          Newest critical and error entries
-        </p>
+    <TableCard.Root>
+      <TableCard.Header
+        title="Problems waiting"
+        badge={data.latest.length ? String(data.latest.length) : undefined}
+        description="Newest critical and error entries"
+        contentTrailing={<CardLink href={logsHref({ resolved: false })}>All unresolved</CardLink>}
+      />
+      <Table head={['Level', 'Type', 'Message', 'When', '']} minWidth="min-w-[760px]">
         {data.latest.length === 0 ? (
-          <div className="flex items-center gap-2 rounded-xl border border-dashed border-[#2a2a2a] px-3 py-4 text-sm text-[#818181]">
-            <CheckCircle2 size={15} className="text-[#3af626]" /> Nothing critical or failing is waiting.
-          </div>
-        ) : (
-          <ul className="divide-y divide-[#2a2a2a] rounded-xl border border-[#2a2a2a]">
-            {data.latest.map((row) => (
-              <li key={row.log_id} className="flex items-start gap-3 px-3 py-2.5">
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Pill label={LEVEL_LABEL[row.log_level]} color={LEVEL_COLOR[row.log_level]} />
-                    <span className="text-[11px] text-[#818181]">{EVENT_LABEL[row.event_type] ?? row.event_type}</span>
-                    <span className="font-mono text-[11px] text-[#818181] truncate">{row.source}</span>
-                  </div>
-                  <p className="mt-1 text-sm text-white break-words">{row.message}</p>
-                  <p className="mt-0.5 text-[11px] text-[#818181]" title={formatDateTime(row.timestamp)}>
-                    {ago(row.timestamp, now)}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => onResolve(row.log_id)}
-                  disabled={resolving.has(row.log_id)}
-                  className="shrink-0 inline-flex items-center gap-1 rounded-lg border border-[#3af626]/30 bg-[#3af626]/10 px-2.5 py-1 text-xs font-medium text-[#3af626] transition hover:bg-[#3af626]/20 disabled:opacity-50"
-                >
-                  {resolving.has(row.log_id) ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
-                  Resolve
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </Card>
+          <EmptyRow cols={5}>
+            <span className="inline-flex items-center gap-2">
+              <CheckCircle2 size={15} className="text-[#3af626]" /> Nothing critical or failing is waiting.
+            </span>
+          </EmptyRow>
+        ) : data.latest.map((row) => (
+          <tr key={row.log_id}>
+            <td className={`${TD} whitespace-nowrap`}><Pill label={LEVEL_LABEL[row.log_level]} color={LEVEL_COLOR[row.log_level]} /></td>
+            <td className={TD}>
+              <p className="whitespace-nowrap text-white">{EVENT_LABEL[row.event_type] ?? row.event_type}</p>
+              <p className="font-mono text-xs text-[#818181] break-all">{row.source}</p>
+            </td>
+            <td className={`${TD} text-white break-words`}>{row.message}</td>
+            <td className={`${TD} whitespace-nowrap text-[#c4c4c4]`} title={formatDateTime(row.timestamp)}>
+              {ago(row.timestamp, now)}
+            </td>
+            <td className={`${TD} text-right`}>
+              <button
+                type="button"
+                onClick={() => onResolve(row.log_id)}
+                disabled={resolving.has(row.log_id)}
+                className="inline-flex items-center gap-1 rounded-lg border border-[#3af626]/30 bg-[#3af626]/10 px-2.5 py-1 text-xs font-medium text-[#3af626] transition [@media(hover:hover)]:hover:bg-[#3af626]/20 disabled:opacity-50"
+              >
+                {resolving.has(row.log_id) ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
+                Resolve
+              </button>
+            </td>
+          </tr>
+        ))}
+      </Table>
+    </TableCard.Root>
   )
 }
 
 // ── B · Scheduled jobs ───────────────────────────────────────────────────────
 
-function SchedulerRow({ s, now }: { s: SchedulerHealth; now: number }) {
-  const st = SCHEDULER_STATUS[s.status]
-  return (
-    <li className="px-3 py-2.5">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-sm font-medium text-white">{s.label}</p>
-          <p className="text-[11px] text-[#818181]">{every(s.interval_minutes)} · {s.description}</p>
-        </div>
-        <Pill label={st.label} color={st.color} />
-      </div>
-      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
-        <span className="text-[#818181]" title={s.last_success_at ? formatDateTime(s.last_success_at) : undefined}>
-          Last run: <span className="text-white">{ago(s.last_success_at, now)}</span>
-        </span>
-        {s.errors_24h > 0 && (
-          <Link href={logsHref({ event_type: 'cron_job', search: s.source })} className="text-[#f62626] hover:underline">
-            {s.errors_24h} error{s.errors_24h === 1 ? '' : 's'} today
-          </Link>
-        )}
-      </div>
-      {s.status === 'failing' && s.last_error_message && (
-        <p className="mt-1 text-[11px] text-[#f62626] break-words">{s.last_error_message}</p>
-      )}
-    </li>
-  )
-}
-
 function SchedulersCard({ data, now }: { data: SchedulerHealth[]; now: number }) {
   return (
-    <Card
-      title="Scheduled jobs"
-      subtitle="Background jobs, checked by their heartbeat"
-      icon={<Clock size={15} />}
-      action={<CardLink href={logsHref({ event_type: 'cron_job' })}>Job logs</CardLink>}
-    >
-      <ul className="divide-y divide-[#2a2a2a] rounded-xl border border-[#2a2a2a]">
-        {data.map((s) => <SchedulerRow key={s.source} s={s} now={now} />)}
-      </ul>
-      <p className="mt-2 text-[11px] text-[#818181] leading-snug">
+    <TableCard.Root>
+      <TableCard.Header
+        title="Scheduled jobs"
+        badge={String(data.length)}
+        description="Background jobs, checked by their heartbeat"
+        contentTrailing={<CardLink href={logsHref({ event_type: 'cron_job' })}>Job logs</CardLink>}
+      />
+      <Table head={['Job', 'Runs', 'Status', 'Last run', 'Errors today']} minWidth="min-w-[820px]">
+        {data.map((s) => {
+          const st = SCHEDULER_STATUS[s.status]
+          return (
+            <tr key={s.source}>
+              <td className={TD}>
+                <p className="font-medium text-white">{s.label}</p>
+                <p className="text-xs text-[#818181]">{s.description}</p>
+                {s.status === 'failing' && s.last_error_message && (
+                  <p className="mt-1 text-xs text-[#f62626] break-words">{s.last_error_message}</p>
+                )}
+              </td>
+              <td className={`${TD} whitespace-nowrap text-[#c4c4c4]`}>{every(s.interval_minutes)}</td>
+              <td className={TD}><Pill label={st.label} color={st.color} /></td>
+              <td className={`${TD} whitespace-nowrap text-[#c4c4c4]`} title={s.last_success_at ? formatDateTime(s.last_success_at) : undefined}>
+                {ago(s.last_success_at, now)}
+              </td>
+              <td className={`${TD} whitespace-nowrap`}>
+                {s.errors_24h > 0 ? (
+                  <Link href={logsHref({ event_type: 'cron_job', search: s.source })} className="font-mono text-[#f62626] hover:underline">
+                    {s.errors_24h}
+                  </Link>
+                ) : <span className="font-mono text-[#818181]">0</span>}
+              </td>
+            </tr>
+          )
+        })}
+      </Table>
+      <Footnote>
         A job is Late after two missed runs and Stopped after four. That usually means the backend
         server restarted or went to sleep.
-      </p>
-    </Card>
+      </Footnote>
+    </TableCard.Root>
   )
 }
 
 // ── C · External services ────────────────────────────────────────────────────
 
-function ServiceTile({ s, now }: { s: ServiceHealth; now: number }) {
-  const st = SERVICE_STATUS[s.status]
-  return (
-    <div className="flex flex-col rounded-xl border border-[#2a2a2a] bg-[#0a0a0a]/40 p-3 min-w-0">
-      <div className="flex items-center gap-2">
-        <span className="text-[#818181]">{SERVICE_ICON[s.key] ?? <Plug size={15} />}</span>
-        <p className="text-sm font-medium text-white truncate">{s.label}</p>
-      </div>
-      <p className="mt-1 text-[11px] text-[#818181] leading-snug">{s.description}</p>
-      <div className="mt-2"><Pill label={st.label} color={st.color} /></div>
-      <div className="mt-2 grid grid-cols-3 gap-1 text-center">
-        {([['Hour', s.failures_1h], ['24 hours', s.failures_24h], ['7 days', s.failures_7d]] as const).map(([label, n]) => (
-          <div key={label} className="rounded-lg bg-[#2a2a2a]/40 py-1">
-            <p className="font-mono text-sm font-bold" style={{ color: n > 0 ? COLOR.red : COLOR.muted }}>{n}</p>
-            <p className="text-[9px] uppercase tracking-wider text-[#818181]">{label}</p>
-          </div>
-        ))}
-      </div>
-      {s.last_failure_at && (
-        <p className="mt-2 text-[11px] text-[#818181] break-words" title={formatDateTime(s.last_failure_at)}>
-          Last failure {ago(s.last_failure_at, now).toLowerCase()}
-          {s.last_failure_message && <>: <span className="text-[#f62626]">{s.last_failure_message}</span></>}
-        </p>
-      )}
-    </div>
-  )
-}
-
 function ServicesCard({ data, now }: { data: ServiceHealth[]; now: number }) {
+  const count = (n: number) => (
+    <span className="font-mono" style={{ color: n > 0 ? COLOR.red : COLOR.muted }}>{n}</span>
+  )
   return (
-    <Card
-      title="External services"
-      subtitle="Failures recorded when the system called an outside provider"
-      icon={<Plug size={15} />}
-      action={<CardLink href={logsHref({ event_type: 'external_api' })}>Service logs</CardLink>}
-      className="lg:col-span-3"
-    >
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-2">
-        {data.map((s) => <ServiceTile key={s.key} s={s} now={now} />)}
-      </div>
-      <p className="mt-2 text-[11px] text-[#818181] leading-snug">
+    <TableCard.Root>
+      <TableCard.Header
+        title="External services"
+        badge={String(data.length)}
+        description="Failures recorded when the system called an outside provider"
+        contentTrailing={<CardLink href={logsHref({ event_type: 'external_api' })}>Service logs</CardLink>}
+      />
+      <Table head={['Service', 'Status', 'Last hour', '24 hours', '7 days', 'Last failure']} minWidth="min-w-[900px]">
+        {data.map((s) => {
+          const st = SERVICE_STATUS[s.status]
+          return (
+            <tr key={s.key}>
+              <td className={TD}>
+                <div className="flex items-center gap-2">
+                  <span className="text-[#818181]">{SERVICE_ICON[s.key] ?? <Plug size={15} />}</span>
+                  <p className="font-medium text-white whitespace-nowrap">{s.label}</p>
+                </div>
+                <p className="mt-0.5 text-xs text-[#818181]">{s.description}</p>
+              </td>
+              <td className={TD}><Pill label={st.label} color={st.color} /></td>
+              <td className={TD}>{count(s.failures_1h)}</td>
+              <td className={TD}>{count(s.failures_24h)}</td>
+              <td className={TD}>{count(s.failures_7d)}</td>
+              <td className={`${TD} text-xs`}>
+                {s.last_failure_at ? (
+                  <>
+                    <p className="whitespace-nowrap text-[#c4c4c4]" title={formatDateTime(s.last_failure_at)}>{ago(s.last_failure_at, now)}</p>
+                    {s.last_failure_message && <p className="mt-0.5 text-[#f62626] break-words">{s.last_failure_message}</p>}
+                  </>
+                ) : <span className="text-[#818181]">None</span>}
+              </td>
+            </tr>
+          )
+        })}
+      </Table>
+      <Footnote>
         Only failures are recorded, so &ldquo;No failures recorded&rdquo; means nothing has gone wrong. It does not
         prove the provider was called.
-      </p>
-    </Card>
+      </Footnote>
+    </TableCard.Root>
   )
 }
 
@@ -341,90 +378,81 @@ function SecurityCard({ data }: { data: ItDashboardSummary['security'] }) {
   const w: SecurityWindow = range === '24h' ? data.last_24h : data.last_7d
 
   return (
-    <Card
-      title="Sign-in security"
-      subtitle="Counts and accounts only. IP addresses are never recorded."
-      icon={<ShieldAlert size={15} />}
-      className="lg:col-span-2"
-      action={
-        <div className="flex items-center gap-1 rounded-lg border border-[#2a2a2a] bg-[#0a0a0a]/40 p-0.5">
-          {(['24h', '7d'] as const).map((r) => (
-            <button
-              key={r}
-              type="button"
-              onClick={() => setRange(r)}
-              className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
-                range === r ? 'bg-[#4df9ed] text-[#0a0a0a]' : 'text-[#818181] hover:text-white'
-              }`}
-            >
-              {r === '24h' ? '24 hours' : '7 days'}
-            </button>
-          ))}
+    <section className="rounded-xl bg-[#1b1b1b] shadow-[0_1px_2px_rgba(0,0,0,0.3)] ring-1 ring-[#424242] min-w-0">
+      <div className="flex flex-col gap-4 border-b border-[#424242] px-4 py-5 md:flex-row md:items-start md:px-6">
+        <div className="flex flex-1 items-start gap-3 min-w-0">
+          <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#4df9ed]/10 text-[#4df9ed]">
+            <ShieldAlert size={16} />
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-base font-semibold text-white">Sign-in security</h2>
+            <p className="text-sm text-[#818181]">Counts and accounts only. IP addresses are never recorded.</p>
+          </div>
         </div>
-      }
-    >
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <Stat label="Failed sign-ins" value={w.failed_sign_ins} color={COLOR.amber}
-              hint="Wrong password, or a locked or inactive account" />
-        <Stat label="Account lockouts" value={w.lockouts} color={COLOR.red} />
-        <Stat label="Rate limit hits" value={w.rate_limit_trips} color={COLOR.amber}
-              href={logsHref({ event_type: 'auth_event', search: 'rate-limit' })}
-              hint="Too many requests to sign-in or reset endpoints" />
-        <Stat label="Critical sign-in alerts" value={w.critical_auth_alerts} color={COLOR.critical}
-              href={logsHref({ event_type: 'auth_event', level: 'critical' })}
-              hint="Permanent lockouts and reuse of an already-replaced session token" />
-        <Stat label="Passkey failures" value={w.passkey_failures} color={COLOR.amber}
-              href={logsHref({ search: 'webauthn.service' })} />
-        <Stat label="Password reset requests" value={w.reset_requests} color={COLOR.cyan} />
-        <Stat label="Passkeys enrolled" value={w.passkeys_enrolled} color={COLOR.cyan} />
-        <Stat label="Sessions ended by the system" value={w.sessions_revoked} color={COLOR.cyan}
-              hint="Signed in elsewhere, password reset, deactivation or revoked passkey. Sign-outs are not counted." />
+        <TabsMinimal
+          label="Time range"
+          items={[{ id: '24h', label: '24 hours' }, { id: '7d', label: '7 days' }]}
+          selectedKey={range}
+          onSelectionChange={setRange}
+        />
       </div>
 
-      <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div>
-          <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-[#818181]">
-            Most failed sign-ins · 24 hours
-          </p>
-          {data.most_failed_accounts.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-[#2a2a2a] px-3 py-3 text-xs text-[#818181]">No failed sign-ins.</p>
-          ) : (
-            <ul className="divide-y divide-[#2a2a2a] rounded-xl border border-[#2a2a2a]">
-              {data.most_failed_accounts.map((a) => (
-                <li key={a.email} className="flex items-center justify-between gap-2 px-3 py-2 text-xs">
-                  <span className="truncate text-white">{a.email}</span>
-                  <span className="font-mono font-bold text-[#ffea00]">{a.count}</span>
-                </li>
-              ))}
-            </ul>
-          )}
+      <div className="p-4 md:p-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <Stat label="Failed sign-ins" value={w.failed_sign_ins} color={COLOR.amber}
+                hint="Wrong password, or a locked or inactive account" />
+          <Stat label="Account lockouts" value={w.lockouts} color={COLOR.red} />
+          <Stat label="Rate limit hits" value={w.rate_limit_trips} color={COLOR.amber}
+                href={logsHref({ event_type: 'auth_event', search: 'rate-limit' })}
+                hint="Too many requests to sign-in or reset endpoints" />
+          <Stat label="Critical sign-in alerts" value={w.critical_auth_alerts} color={COLOR.critical}
+                href={logsHref({ event_type: 'auth_event', level: 'critical' })}
+                hint="Permanent lockouts and reuse of an already-replaced session token" />
+          <Stat label="Passkey failures" value={w.passkey_failures} color={COLOR.amber}
+                href={logsHref({ search: 'webauthn.service' })} />
+          <Stat label="Password reset requests" value={w.reset_requests} color={COLOR.cyan} />
+          <Stat label="Passkeys enrolled" value={w.passkeys_enrolled} color={COLOR.cyan} />
+          <Stat label="Sessions ended by the system" value={w.sessions_revoked} color={COLOR.cyan}
+                hint="Signed in elsewhere, password reset, deactivation or revoked passkey. Sign-outs are not counted." />
         </div>
-        <div>
-          <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-[#818181]">
-            Locked accounts right now
-          </p>
-          {data.locked_accounts.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-[#2a2a2a] px-3 py-3 text-xs text-[#818181]">No accounts are locked.</p>
-          ) : (
-            <ul className="divide-y divide-[#2a2a2a] rounded-xl border border-[#2a2a2a]">
-              {data.locked_accounts.map((a) => (
-                <li key={a.user_id} className="px-3 py-2 text-xs">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="truncate text-white">{a.name}</span>
+
+        <div className="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="overflow-hidden rounded-xl ring-1 ring-[#2a2a2a] ring-inset">
+            <Table head={['Most failed sign-ins · 24 hours', 'Count']} minWidth="min-w-[320px]">
+              {data.most_failed_accounts.length === 0 ? (
+                <EmptyRow cols={2}>No failed sign-ins.</EmptyRow>
+              ) : data.most_failed_accounts.map((a) => (
+                <tr key={a.email}>
+                  <td className="px-4 md:px-6 py-3 text-white break-all">{a.email}</td>
+                  <td className="px-4 md:px-6 py-3 font-mono font-semibold text-[#ffea00]">{a.count}</td>
+                </tr>
+              ))}
+            </Table>
+          </div>
+          <div className="overflow-hidden rounded-xl ring-1 ring-[#2a2a2a] ring-inset">
+            <Table head={['Locked accounts right now', 'Lock']} minWidth="min-w-[420px]">
+              {data.locked_accounts.length === 0 ? (
+                <EmptyRow cols={2}>No accounts are locked.</EmptyRow>
+              ) : data.locked_accounts.map((a) => (
+                <tr key={a.user_id}>
+                  <td className="px-4 md:px-6 py-3">
+                    <p className="text-white">{a.name}</p>
+                    <p className="text-xs text-[#818181] break-all">
+                      {roleLabel(a.role)} · {a.email}
+                      {!a.permanent && a.locked_until && <> · until {formatDateTime(a.locked_until)}</>}
+                    </p>
+                  </td>
+                  <td className="px-4 md:px-6 py-3">
                     <Pill label={a.permanent ? 'Permanently locked' : 'Temporarily locked'} color={a.permanent ? COLOR.critical : COLOR.amber} />
-                  </div>
-                  <p className="mt-0.5 text-[#818181] truncate">
-                    {roleLabel(a.role)} · {a.email}
-                    {!a.permanent && a.locked_until && <> · until {formatDateTime(a.locked_until)}</>}
-                  </p>
-                </li>
+                  </td>
+                </tr>
               ))}
-            </ul>
-          )}
+            </Table>
+          </div>
         </div>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[#818181]">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-1 border-t border-[#2a2a2a] px-4 md:px-6 py-3 text-sm text-[#818181]">
         <span>Signed-in sessions now: <span className="font-mono text-white">{data.active_sessions}</span></span>
         <span>
           Open password reset requests:{' '}
@@ -433,98 +461,87 @@ function SecurityCard({ data }: { data: ItDashboardSummary['security'] }) {
           </Link>
         </span>
       </div>
-    </Card>
+    </section>
   )
 }
 
 // ── E · Accounts ─────────────────────────────────────────────────────────────
 
-function AccountsCard({ data, now }: { data: ItDashboardSummary['accounts']; now: number }) {
+function AccountsCard({ data }: { data: ItDashboardSummary['accounts'] }) {
   return (
-    <Card
-      title="Accounts"
-      subtitle={`${data.total_active} active accounts`}
-      icon={<Users size={15} />}
-      action={<CardLink href="/it_admin/administrator-management">Manage</CardLink>}
-    >
-      <div className="overflow-x-auto rounded-xl border border-[#2a2a2a]">
-        <table className="w-full text-xs">
-          <thead>
-            <tr className="bg-[#2a2a2a]/40 text-[10px] uppercase tracking-wider text-[#818181]">
-              <th className="px-3 py-2 text-left font-semibold">Role</th>
-              <th className="px-2 py-2 text-right font-semibold">Active</th>
-              <th className="px-2 py-2 text-right font-semibold">Revoked</th>
-              <th className="px-2 py-2 text-right font-semibold">Locked</th>
-              <th className="px-3 py-2 text-right font-semibold">Archived</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[#2a2a2a]">
-            {data.by_role.map((r) => (
-              <tr key={r.role}>
-                <td className="px-3 py-1.5 text-white whitespace-nowrap">{roleLabel(r.role)}</td>
-                <td className="px-2 py-1.5 text-right font-mono text-white">{r.active}</td>
-                <td className="px-2 py-1.5 text-right font-mono" style={{ color: r.inactive ? COLOR.amber : COLOR.muted }}>{r.inactive}</td>
-                <td className="px-2 py-1.5 text-right font-mono" style={{ color: r.permanently_locked ? COLOR.critical : COLOR.muted }}>{r.permanently_locked}</td>
-                <td className="px-3 py-1.5 text-right font-mono text-[#818181]">{r.archived}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="mt-2 grid grid-cols-2 gap-2">
+    <TableCard.Root className="flex flex-col">
+      <TableCard.Header
+        title="Accounts"
+        description={`${data.total_active} active accounts`}
+        contentTrailing={<CardLink href="/it_admin/administrator-management">Manage</CardLink>}
+      />
+      <Table head={['Role', 'Active', 'Revoked', 'Locked', 'Archived']} minWidth="min-w-[520px]">
+        {data.by_role.map((r) => (
+          <tr key={r.role}>
+            <td className="px-4 md:px-6 py-3 text-white whitespace-nowrap">{roleLabel(r.role)}</td>
+            <td className="px-4 md:px-6 py-3 font-mono text-white">{r.active}</td>
+            <td className="px-4 md:px-6 py-3 font-mono" style={{ color: r.inactive ? COLOR.amber : COLOR.muted }}>{r.inactive}</td>
+            <td className="px-4 md:px-6 py-3 font-mono" style={{ color: r.permanently_locked ? COLOR.critical : COLOR.muted }}>{r.permanently_locked}</td>
+            <td className="px-4 md:px-6 py-3 font-mono text-[#818181]">{r.archived}</td>
+          </tr>
+        ))}
+      </Table>
+      <div className="mt-auto grid grid-cols-2 gap-3 border-t border-[#2a2a2a] p-4 md:px-6">
         <Stat label="Active, never signed in" value={data.never_signed_in} color={COLOR.amber} />
         <Stat label={`No sign-in for ${data.dormant_days} days`} value={data.dormant} color={COLOR.amber} />
       </div>
+    </TableCard.Root>
+  )
+}
 
-      <div className="mt-4">
-        <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-[#818181]">IT Administrator</p>
-        {data.it_admin ? (
-          <div className="rounded-xl border border-[#2a2a2a] px-3 py-2 text-xs">
-            <p className="text-sm font-medium text-white">{data.it_admin.name}</p>
-            <p className="text-[#818181] truncate">{data.it_admin.email}</p>
-            <p className="mt-1 text-[#818181]">
-              Last sign-in: <span className="text-white" title={data.it_admin.last_login_at ? formatDateTime(data.it_admin.last_login_at) : undefined}>
-                {ago(data.it_admin.last_login_at, now)}
-              </span>
-            </p>
-            <p className="mt-0.5 text-[#818181]">
-              Last handover:{' '}
-              {data.last_handover
-                ? <span className="text-white" title={data.last_handover.description}>{formatDateTime(data.last_handover.at)}</span>
-                : <span>None recorded</span>}
-            </p>
-          </div>
-        ) : (
-          <p className="rounded-xl border border-[#f62626]/40 bg-[#f62626]/10 px-3 py-2 text-xs text-[#f62626]">
-            No active IT Administrator. Staff password resets cannot be handled until one is set.
-          </p>
-        )}
-      </div>
-
-      <div className="mt-4">
-        <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-[#818181]">
-          Company Administrators · {data.administrators.length}
+function AdministratorsCard({ data, now }: { data: ItDashboardSummary['accounts']; now: number }) {
+  const lastSignIn = (iso: string | null) => (
+    <span className={iso ? 'text-[#c4c4c4]' : 'text-[#ffea00]'} title={iso ? formatDateTime(iso) : undefined}>
+      {iso ? ago(iso, now) : 'Never signed in'}
+    </span>
+  )
+  return (
+    <TableCard.Root>
+      <TableCard.Header
+        title="Administrators"
+        description={data.last_handover
+          ? `Last IT Administrator handover: ${formatDateTime(data.last_handover.at)}`
+          : 'Last IT Administrator handover: none recorded'}
+      />
+      {!data.it_admin && (
+        <p className="border-b border-[#424242] bg-[#f62626]/10 px-4 md:px-6 py-3 text-sm text-[#f62626]">
+          No active IT Administrator. Staff password resets cannot be handled until one is set.
         </p>
-        <ul className="divide-y divide-[#2a2a2a] rounded-xl border border-[#2a2a2a]">
-          {data.administrators.map((a) => (
-            <li key={a.user_id} className="flex items-center justify-between gap-2 px-3 py-2 text-xs">
-              <div className="min-w-0">
-                <p className="truncate text-white">{a.name}</p>
-                <p className="truncate text-[#818181]">{a.email}</p>
-              </div>
-              <div className="shrink-0 text-right">
-                {a.status !== 'active' && <Pill label={a.status === 'inactive' ? 'Revoked' : 'Locked'} color={COLOR.amber} />}
-                <p className={a.last_login_at ? 'text-[#818181]' : 'text-[#ffea00]'}
-                   title={a.last_login_at ? formatDateTime(a.last_login_at) : undefined}>
-                  {a.last_login_at ? ago(a.last_login_at, now) : 'Never signed in'}
-                </p>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </Card>
+      )}
+      <Table head={['Name', 'Role', 'Status', 'Last sign-in']} minWidth="min-w-[640px]">
+        {data.it_admin && (
+          <tr>
+            <td className="px-4 md:px-6 py-3">
+              <p className="text-white">{data.it_admin.name}</p>
+              <p className="text-xs text-[#818181] break-all">{data.it_admin.email}</p>
+            </td>
+            <td className="px-4 md:px-6 py-3 whitespace-nowrap text-[#c4c4c4]">IT Administrator</td>
+            <td className="px-4 md:px-6 py-3"><Pill label="Active" color={COLOR.green} /></td>
+            <td className="px-4 md:px-6 py-3 whitespace-nowrap">{lastSignIn(data.it_admin.last_login_at)}</td>
+          </tr>
+        )}
+        {data.administrators.map((a) => (
+          <tr key={a.user_id}>
+            <td className="px-4 md:px-6 py-3">
+              <p className="text-white">{a.name}</p>
+              <p className="text-xs text-[#818181] break-all">{a.email}</p>
+            </td>
+            <td className="px-4 md:px-6 py-3 whitespace-nowrap text-[#c4c4c4]">Company Administrator</td>
+            <td className="px-4 md:px-6 py-3">
+              {a.status === 'active'
+                ? <Pill label="Active" color={COLOR.green} />
+                : <Pill label={a.status === 'inactive' ? 'Revoked' : 'Locked'} color={COLOR.amber} />}
+            </td>
+            <td className="px-4 md:px-6 py-3 whitespace-nowrap">{lastSignIn(a.last_login_at)}</td>
+          </tr>
+        ))}
+      </Table>
+    </TableCard.Root>
   )
 }
 
@@ -551,13 +568,13 @@ function StatusBanner({ summary }: { summary: ItDashboardSummary }) {
   const items = attentionItems(summary)
   if (items.length === 0) {
     return (
-      <div className="flex items-center gap-2 rounded-2xl border border-[#3af626]/25 bg-[#3af626]/[0.06] px-4 py-3 text-sm text-[#3af626]">
+      <div className="flex items-center gap-2 rounded-xl border border-[#3af626]/25 bg-[#3af626]/[0.06] px-4 py-3 text-sm text-[#3af626]">
         <CheckCircle2 size={16} /> All systems normal. Nothing needs your attention.
       </div>
     )
   }
   return (
-    <div className="rounded-2xl border border-[#f62626]/30 bg-[#f62626]/[0.06] px-4 py-3">
+    <div className="rounded-xl border border-[#f62626]/30 bg-[#f62626]/[0.06] px-4 py-3">
       <p className="flex items-center gap-2 text-sm font-semibold text-[#f62626]">
         <AlertOctagon size={16} /> {items.length} item{items.length === 1 ? '' : 's'} need{items.length === 1 ? 's' : ''} attention
       </p>
@@ -626,22 +643,20 @@ export default function ItAdminDashboard() {
   return (
     // The dashboard shell clips its content area (overflow-hidden), so the page
     // owns its scroll: fill that area and scroll inside it.
-    <div className="flex-1 min-h-0 overflow-y-auto bg-[#0a0a0a] text-white px-3 py-3 lg:px-4">
+    <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-[#0a0a0a] text-white px-4 py-5 lg:px-8 lg:py-6">
 
-      <div className="flex w-full flex-col gap-3">
+      <div className="flex w-full flex-col gap-5 lg:gap-6">
 
-        <div className="flex flex-wrap items-center justify-between gap-3 mt-1">
-          <div>
-            <h1 className="font-[family-name:var(--font-alegreya-sc)] text-[17px] 3xl:text-[20px] font-bold text-white">Dashboard</h1>
-          </div>
-          <div className="flex items-center gap-3">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0">
+            <h1 className={`${SC} text-[17px] 3xl:text-[20px] font-bold text-white`}>Dashboard</h1>
             {summary && (
-              <span className="text-xs text-[#818181]" title={formatDateTime(summary.generated_at)}>
+              <p className="mt-1 text-sm text-[#818181]" title={formatDateTime(summary.generated_at)}>
                 Updated {ago(summary.generated_at, now).toLowerCase()}
-              </span>
+              </p>
             )}
-            <RefreshButton onClick={() => load()} loading={loading} disabled={loading} />
           </div>
+          <RefreshButton onClick={() => load()} loading={loading} disabled={loading} />
         </div>
 
         <ItAdminHandoverPanel />
@@ -661,13 +676,14 @@ export default function ItAdminDashboard() {
         ) : (
           <>
             <StatusBanner summary={summary} />
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-              <ProblemsCard data={summary.problems} now={now} onResolve={resolve} resolving={resolving} />
-              <SchedulersCard data={summary.schedulers} now={now} />
-              <ServicesCard data={summary.services} now={now} />
-              <SecurityCard data={summary.security} />
-              <AccountsCard data={summary.accounts} now={now} />
+            <ProblemMetrics data={summary.problems} />
+            <SecurityCard data={summary.security} />
+            <ProblemsCard data={summary.problems} now={now} onResolve={resolve} resolving={resolving} />
+            <SchedulersCard data={summary.schedulers} now={now} />
+            <ServicesCard data={summary.services} now={now} />
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 lg:gap-6">
+              <AccountsCard data={summary.accounts} />
+              <AdministratorsCard data={summary.accounts} now={now} />
             </div>
           </>
         )}
