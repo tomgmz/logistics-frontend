@@ -3,7 +3,7 @@
 import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Search, Siren, ChevronRight } from 'lucide-react'
+import { Siren, ChevronRight } from 'lucide-react'
 
 import {
   fetchDriverReports,
@@ -37,6 +37,10 @@ import { useAuthStore } from '@/lib/store/auth.store'
 import RefreshButton from '@/components/ui/RefreshButton'
 import Pagination from '@/components/ui/Pagination'
 import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
+import FilterBar from '@/components/ui/FilterBar'
+import { TableCard } from '@/components/ui/untitled/table-card'
+import { TabsMinimal } from '@/components/ui/untitled/tabs'
+import { formatDate, formatTime } from '@/app/utils/timeFormat'
 
 /**
  * The Reports module — the staff side of the driver app's Reports tab.
@@ -64,11 +68,6 @@ const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
   { key: 'resolved',     label: REPORT_STATUS_LABELS.resolved },
   { key: 'all',          label: 'All' },
 ]
-
-function fmtWhen(iso: string): string {
-  const d = new Date(iso)
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString()
-}
 
 // Opens ?report=<id> (a notification tap) once. Isolated so useSearchParams
 // sits under its own Suspense boundary.
@@ -174,6 +173,12 @@ export default function ReportsView() {
     }
     return c
   }, [reports])
+
+  // The count on each status tab.
+  const statusCount = (key: StatusFilter) =>
+    key === 'all'  ? reports.length
+    : key === 'open' ? counts.reported + counts.acknowledged
+    : counts[key]
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -288,74 +293,55 @@ export default function ReportsView() {
   ) : null
 
   return (
-    <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-y-auto overflow-x-hidden lg:overflow-hidden ff-sc bg-[var(--color-bg)]">
+    <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-y-auto overflow-x-hidden lg:overflow-hidden bg-[#0a0a0a] text-white">
       <Suspense fallback={null}>
         <ReportDeepLink onFocus={focusReport} />
       </Suspense>
 
-      <header className="shrink-0 px-3 py-3 lg:px-4 border-b border-white/[0.07] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="font-[family-name:var(--font-alegreya-sc)] text-[17px] 3xl:text-[20px] font-bold text-white">Reports</h1>
-          <p className="text-xs text-white/40 mt-0.5">
+      <div className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0 px-3 py-3 lg:px-4 gap-6 lg:overflow-hidden">
+        <div className="shrink-0">
+          <h1 className="mt-1 font-[family-name:var(--font-alegreya-sc)] text-[17px] 3xl:text-[20px] font-bold text-white">Reports</h1>
+          <p className="text-xs text-[#818181] mt-0.5">
             {isFleet && 'Vehicle-related reports · '}
             {counts.reported} new · {counts.acknowledged} acknowledged
             {!isFleet && counts.unclassified > 0 && (
-              <span className="text-amber-300"> · {counts.unclassified} to classify</span>
+              <span className="text-[#ffea00]"> · {counts.unclassified} to classify</span>
             )}
           </p>
         </div>
-        <RefreshButton onClick={() => void load()} className="self-start sm:self-auto" />
-      </header>
 
-      <div className="flex flex-[1_0_auto] lg:flex-1 lg:min-h-0 flex-col p-3 lg:p-4 gap-3 lg:overflow-hidden">
-        <div className="flex flex-col xl:flex-row gap-2 xl:items-center shrink-0">
-          <div className="flex items-center gap-2 rounded-[10px] px-3 py-2 flex-1 max-w-md" style={{ background: '#2a2828' }}>
-            <Search size={16} className="text-white/40 shrink-0" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search driver, plate, reference…"
-              className="bg-transparent border-none outline-none text-sm flex-1 text-white/80 placeholder:text-white/35"
-            />
-          </div>
+        {/* Untitled UI's table card, as on Audit Logs and User Management: the
+            header (title + count), then the filter row with the status tabs on
+            the left (a dropdown on phones), search, Filters and Refresh. */}
+        <TableCard.Root className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0">
+          <TableCard.Header
+            className="shrink-0"
+            title="Reports"
+            badge={`${visible.length} ${visible.length === 1 ? 'report' : 'reports'}`}
+          />
+          <FilterBar
+            layout="split"
+            search={{ value: search, onChange: setSearch, placeholder: 'Search driver, plate, reference' }}
+            leading={
+              <TabsMinimal
+                label="Report status"
+                items={STATUS_FILTERS.map(({ key, label }) => ({ id: key, label: `${label} (${statusCount(key)})` }))}
+                selectedKey={statusFilter}
+                onSelectionChange={setStatusFilter}
+              />
+            }
+            fields={[{
+              key: 'type', label: 'Incident type', single: true,
+              options: [
+                ...typeOptions.map((k) => ({ value: k, label: INCIDENT_LABELS[k] })),
+                ...(isFleet ? [] : [{ value: 'unspecified', label: 'Unspecified Emergency' }]),
+              ],
+            }]}
+            values={typeFilter === 'all' ? [] : [{ field: 'type', op: 'is' as const, value: typeFilter }]}
+            onChange={(v) => setTypeFilter((v.find((r) => r.field === 'type')?.value ?? 'all') as typeof typeFilter)}
+            actions={<RefreshButton iconOnly onClick={() => void load()} loading={loading} disabled={loading} />}
+          />
 
-          <div className="flex flex-wrap gap-1.5">
-            <span className="text-[10px] uppercase tracking-wider text-white/35 self-center mr-1">Status</span>
-            {STATUS_FILTERS.map(({ key, label }) => {
-              const active = statusFilter === key
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setStatusFilter(key)}
-                  className="px-2 py-1 rounded-lg text-[11px] font-bold border transition-colors"
-                  style={{
-                    background:  active ? 'rgba(77,249,237,0.12)' : 'transparent',
-                    borderColor: active ? 'rgba(77,249,237,0.35)' : 'rgba(255,255,255,0.08)',
-                    color:       active ? 'var(--color-cyan)' : '#888',
-                  }}
-                >
-                  {label}
-                </button>
-              )
-            })}
-          </div>
-
-          <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value as typeof typeFilter)}
-            className="rounded-lg border border-white/10 bg-[#111] px-3 py-1.5 text-xs text-white/80 outline-none xl:ml-auto"
-            aria-label="Incident type"
-          >
-            <option value="all">All incident types</option>
-            {typeOptions.map((k) => (
-              <option key={k} value={k}>{INCIDENT_LABELS[k]}</option>
-            ))}
-            {!isFleet && <option value="unspecified">Unspecified Emergency</option>}
-          </select>
-        </div>
-
-        <div className="flex-[1_0_auto] lg:flex-1 lg:min-h-0 rounded-xl border border-white/[0.08] overflow-hidden flex flex-col bg-[#0f0f0f]">
           {loading ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-3 py-16">
               <div className="w-9 h-9 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--color-cyan)' }} />
@@ -385,45 +371,49 @@ export default function ReportsView() {
             </div>
           ) : (
             <>
-            <div className="overflow-x-auto lg:overflow-auto flex-[1_0_auto] lg:flex-1 lg:min-h-0">
-              <table className="w-full text-left text-sm border-collapse min-w-[760px]">
-                <thead className="sticky top-0 z-[1] bg-[#141414] border-b border-white/[0.07]">
-                  <tr className="text-[11px] uppercase tracking-wider text-white/40">
-                    <th className="px-3 py-2.5 font-bold">Received</th>
-                    <th className="px-3 py-2.5 font-bold">Incident</th>
-                    <th className="px-3 py-2.5 font-bold">Driver</th>
-                    <th className="px-3 py-2.5 font-bold">Vehicle</th>
-                    <th className="px-3 py-2.5 font-bold hidden lg:table-cell">Booking</th>
-                    <th className="px-3 py-2.5 font-bold">Status</th>
+            <div className="flex-[1_0_auto] lg:flex-1 overflow-x-auto lg:overflow-auto lg:min-h-0">
+              <table className="w-full text-sm min-w-[900px]">
+                <thead className="sticky top-0 z-10 bg-[#222222] font-[family-name:var(--font-alegreya-sc)]">
+                  <tr className="h-11 border-b border-[#424242]">
+                    {['Received', 'Incident', 'Driver', 'Vehicle', 'Booking', 'Status'].map((h) => (
+                      <th key={h} className="px-4 md:px-6 py-2 text-left text-xs font-semibold whitespace-nowrap text-[#818181]">{h}</th>
+                    ))}
                     {/* No header text, as on Vehicle Management; the arrow says the row opens the report. */}
-                    <th className="px-3 py-2.5 w-12"><span className="sr-only">open</span></th>
+                    <th className="px-4 md:px-6 py-2 w-12"><span className="sr-only">open</span></th>
                   </tr>
                 </thead>
-                <tbody>
+                {/* Headers keep the small caps face; the data rows are regular Alegreya Sans. */}
+                <tbody className="ff-regular">
                   {pageRows.map((r) => (
                     <tr
                       key={r.report_id}
-                      className="border-b border-white/[0.05] hover:bg-white/[0.03] transition-colors cursor-pointer"
+                      className="border-b border-[#424242] last:border-b-0 transition-colors cursor-pointer [@media(hover:hover)]:hover:bg-[#222222]"
                       onClick={() => setViewId(r.report_id)}
                     >
-                      <td className="px-3 py-2.5 text-xs text-white/60 tabular-nums whitespace-nowrap">{fmtWhen(r.created_at)}</td>
-                      <td className="px-3 py-2.5">
+                      <td className="px-4 md:px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-white">{formatDate(r.created_at)}</div>
+                        <div className="text-sm text-[#818181]">{formatTime(r.created_at)}</div>
+                      </td>
+                      <td className="px-4 md:px-6 py-4">
                         <div className="flex flex-col gap-1 items-start">
-                          <span className="text-white/85 font-semibold">{incidentLabel(r.incident_type)}</span>
-                          {r.sub_type && <span className="text-[11px] text-white/40">{r.sub_type}</span>}
-                          {!r.incident_type && !isFleet && (
-                            <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border text-amber-300 border-amber-400/35 bg-amber-400/10">
-                              Needs classification
-                            </span>
-                          )}
-                          {isUrgentReport(r) && r.status !== 'resolved' && <UrgentBadge />}
+                          <span className="font-medium text-white">{incidentLabel(r.incident_type)}</span>
+                          {r.sub_type && <span className="text-[#818181]">{r.sub_type}</span>}
+                          {/* Status-type badges keep the small-caps face. */}
+                          <div className="flex flex-wrap gap-1 font-[family-name:var(--font-alegreya-sc)]">
+                            {!r.incident_type && !isFleet && (
+                              <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border text-[#ffea00] border-[#ffea00]/35 bg-[#ffea00]/10">
+                                Needs classification
+                              </span>
+                            )}
+                            {isUrgentReport(r) && r.status !== 'resolved' && <UrgentBadge />}
+                          </div>
                         </div>
                       </td>
-                      <td className="px-3 py-2.5 text-white/70">{reportDriverName(r)}</td>
-                      <td className="px-3 py-2.5 font-mono text-white/70">{r.trucks?.plate_number ?? <span className="text-white/25 font-sans">—</span>}</td>
-                      <td className="px-3 py-2.5 text-xs text-white/60 hidden lg:table-cell">{r.bookings?.reference_number ?? '—'}</td>
-                      <td className="px-3 py-2.5"><ReportStatusBadge status={r.status} /></td>
-                      <td className="px-3 py-2.5">
+                      <td className="px-4 md:px-6 py-4 text-[#c4c4c4]">{reportDriverName(r)}</td>
+                      <td className="px-4 md:px-6 py-4 whitespace-nowrap font-mono text-[#c4c4c4]">{r.trucks?.plate_number ?? <span className="text-[#818181] font-sans">—</span>}</td>
+                      <td className="px-4 md:px-6 py-4 whitespace-nowrap text-[#c4c4c4]">{r.bookings?.reference_number ?? '—'}</td>
+                      <td className="px-4 md:px-6 py-4 font-[family-name:var(--font-alegreya-sc)]"><ReportStatusBadge status={r.status} /></td>
+                      <td className="px-4 md:px-6 py-4">
                         <div className="flex items-center justify-end gap-1.5">
                           <RecordLockBadge holder={reportLocks.get(r.report_id)} />
                           <ChevronRight size={18} className="text-[#818181]" aria-hidden />
@@ -437,7 +427,7 @@ export default function ReportsView() {
             <Pagination page={safePage} totalPages={totalPages} total={visible.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
             </>
           )}
-        </div>
+        </TableCard.Root>
       </div>
 
       <DriverReportDetailModal

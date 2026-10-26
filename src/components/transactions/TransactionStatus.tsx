@@ -1,7 +1,7 @@
 'use client'
 
 import {
-  MapPin, Truck, Clock, CheckCircle2, XCircle, AlertCircle, Loader2, PackageCheck,
+  MapPin, Truck, Clock, Check, CheckCircle2, XCircle, AlertCircle, Loader2, PackageCheck,
 } from 'lucide-react'
 
 import { type BookingStatus, asBookingStatus } from '@/app/types/maps/routemap.types'
@@ -107,40 +107,45 @@ export function StatusTimeline({ booking }: { booking: BookingWithRelations }) {
           : null,
       }))
 
+  // Untitled UI's progress steps, "Icon with number" (Progress.IconsWithText,
+  // type "number", size sm, vertical): a numbered circle per step, a tick on the
+  // success colour once done, a ring round the current one, and a connector
+  // that fills as the booking moves on. brand-solid → cyan, success-solid →
+  // green, ring-secondary → #424242; a cancelled booking's current step is red.
   return (
-    <div className="flex flex-col gap-0">
+    <ol className="flex flex-col">
       {steps.map((step, i) => {
         const resolvedStatus = currentStatus === 'UNKNOWN' ? 'PENDING' : currentStatus
         const state  = getStepState(step.status, resolvedStatus)
         const isLast = i === steps.length - 1
-        const meta   = STATUS_META[step.status]
+        const accent = step.status === 'CANCELLED' ? ERROR : CYAN
 
         return (
-          <div key={step.status} className="flex gap-3">
-            <div className="flex flex-col items-center">
-              <div
-                className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 border transition-all"
+          <li key={step.status} className="flex gap-3" aria-current={state === 'active' ? 'step' : undefined}>
+            <div className="flex flex-col items-center gap-1 pb-1">
+              <span
+                className="flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold tabular-nums"
                 style={
                   state === 'done'
-                    ? { background: `${CYAN}22`,       borderColor: `${CYAN}60`,       color: CYAN }
+                    ? { background: GREEN, color: '#0a0a0a' }
                     : state === 'active'
-                    ? { background: `${meta.color}22`, borderColor: `${meta.color}80`, color: meta.color }
-                    : { background: 'transparent',     borderColor: BORDER_C,          color: MUTED }
-                }>
-                {state === 'done'
-                  ? <CheckCircle2 size={14} />
-                  : state === 'active'
-                  ? meta.icon
-                  : <div className="w-1.5 h-1.5 rounded-full" style={{ background: BORDER_C }} />}
-              </div>
+                    ? { background: accent, color: '#0a0a0a', boxShadow: `0 0 0 4px ${accent}3d` }
+                    : { background: '#1b1b1b', color: MUTED, boxShadow: 'inset 0 0 0 1px #424242' }
+                }
+              >
+                {state === 'done' ? <Check size={14} strokeWidth={3} aria-label="Done" /> : i + 1}
+              </span>
               {!isLast && (
-                <div className="w-px flex-1 my-1"
-                  style={{ background: state === 'done' ? `${CYAN}40` : BORDER_C, minHeight: 20 }} />
+                <span
+                  aria-hidden
+                  className="w-0.5 flex-1 rounded-sm"
+                  style={{ background: state === 'done' ? GREEN : '#424242', minHeight: 20 }}
+                />
               )}
             </div>
 
-            <div className="flex flex-col gap-0.5 pb-4">
-              <span className="text-sm font-bold" style={{ color: state === 'upcoming' ? MUTED : '#fff' }}>
+            <div className={`flex flex-col gap-0.5 pt-0.5 ${isLast ? '' : 'pb-6'}`}>
+              <span className="text-sm font-semibold" style={{ color: state === 'active' ? accent : state === 'upcoming' ? MUTED : '#e5e5e5' }}>
                 {TIMELINE_LABELS[step.status]}
               </span>
               {step.timestamp ? (
@@ -153,9 +158,9 @@ export function StatusTimeline({ booking }: { booking: BookingWithRelations }) {
                 <span className="text-xs" style={{ color: BORDER_C }}>Pending</span>
               )}
             </div>
-          </div>
+          </li>
         )
       })}
-    </div>
+    </ol>
   )
 }
