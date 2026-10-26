@@ -705,7 +705,8 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
   // The IT Administrator's staff live on their own tab of their page.
   const tabs = TABS
 
-  const [activeTab,        setActiveTab]        = useState<TabValue>('clients')
+  // Opens on All Users: every client and driver account at once.
+  const [activeTab,        setActiveTab]        = useState<TabValue>('all')
   const [allRows,          setAllRows]          = useState<AnyUser[]>([])
   const [loading,          setLoading]          = useState(true)
   const [fetching,         setFetching]         = useState(false)

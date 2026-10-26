@@ -364,7 +364,8 @@ export default function AdminManagementClient() {
   const [section,          setSection]          = useState<ModuleSection>(
     deepLinkTab === RESETS_DEEPLINK ? 'password-resets' : 'directory',
   )
-  const [activeTab,        setActiveTab]        = useState<TabValue>('admins')
+  // Opens on All Administrators: every staff account at once.
+  const [activeTab,        setActiveTab]        = useState<TabValue>('all')
   const [resetCount,       setResetCount]       = useState(0)
   const [allRows,          setAllRows]          = useState<AnyUser[]>([])
   const [loading,          setLoading]          = useState(true)

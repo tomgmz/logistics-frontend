@@ -167,6 +167,21 @@ function EmptyRow({ cols, children }: { cols: number; children: ReactNode }) {
   )
 }
 
+/** The dashboard's account lists show this many rows; User Management has the rest. */
+const DASHBOARD_ROWS = 5
+
+/** Under a shortened list: how much is showing, and the way to the whole list. */
+function TableFooter({ shown, total }: { shown: number; total: number }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#2a2a2a] px-4 md:px-6 py-3">
+      <p className="text-xs text-[#818181]">
+        {total > shown ? `Showing ${shown} of ${total}` : `${total} in total`}
+      </p>
+      <CardLink href="/it_admin/administrator-management">Open in User Management</CardLink>
+    </div>
+  )
+}
+
 function Footnote({ children }: { children: ReactNode }) {
   return <p className="border-t border-[#2a2a2a] px-4 md:px-6 py-3 text-xs text-[#818181] leading-snug">{children}</p>
 }
@@ -433,7 +448,7 @@ function SecurityCard({ data }: { data: ItDashboardSummary['security'] }) {
             <Table head={['Locked accounts right now', 'Lock']} minWidth="min-w-[420px]">
               {data.locked_accounts.length === 0 ? (
                 <EmptyRow cols={2}>No accounts are locked.</EmptyRow>
-              ) : data.locked_accounts.map((a) => (
+              ) : data.locked_accounts.slice(0, DASHBOARD_ROWS).map((a) => (
                 <tr key={a.user_id}>
                   <td className="px-4 md:px-6 py-3">
                     <p className="text-white">{a.name}</p>
@@ -448,6 +463,7 @@ function SecurityCard({ data }: { data: ItDashboardSummary['security'] }) {
                 </tr>
               ))}
             </Table>
+            <TableFooter shown={Math.min(data.locked_accounts.length, DASHBOARD_ROWS)} total={data.locked_accounts.length} />
           </div>
         </div>
       </div>
@@ -500,10 +516,14 @@ function AdministratorsCard({ data, now }: { data: ItDashboardSummary['accounts'
       {iso ? ago(iso, now) : 'Never signed in'}
     </span>
   )
+  // The IT Administrator counts as one of the five rows.
+  const total  = data.administrators.length + (data.it_admin ? 1 : 0)
+  const admins = data.administrators.slice(0, DASHBOARD_ROWS - (data.it_admin ? 1 : 0))
   return (
-    <TableCard.Root>
+    <TableCard.Root className="flex flex-col">
       <TableCard.Header
         title="Administrators"
+        badge={String(total)}
         description={data.last_handover
           ? `Last IT Administrator handover: ${formatDateTime(data.last_handover.at)}`
           : 'Last IT Administrator handover: none recorded'}
@@ -525,7 +545,7 @@ function AdministratorsCard({ data, now }: { data: ItDashboardSummary['accounts'
             <td className="px-4 md:px-6 py-3 whitespace-nowrap">{lastSignIn(data.it_admin.last_login_at)}</td>
           </tr>
         )}
-        {data.administrators.map((a) => (
+        {admins.map((a) => (
           <tr key={a.user_id}>
             <td className="px-4 md:px-6 py-3">
               <p className="text-white">{a.name}</p>
@@ -541,6 +561,9 @@ function AdministratorsCard({ data, now }: { data: ItDashboardSummary['accounts'
           </tr>
         ))}
       </Table>
+      <div className="mt-auto">
+        <TableFooter shown={(data.it_admin ? 1 : 0) + admins.length} total={total} />
+      </div>
     </TableCard.Root>
   )
 }
