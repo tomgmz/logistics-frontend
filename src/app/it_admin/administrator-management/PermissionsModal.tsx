@@ -93,6 +93,8 @@ export default function PermissionsModal({ userId, userName, onClose, onSaved }:
   )
 
   const [confirmDiscard, setConfirmDiscard] = useState(false)
+  // Save Access asks first: the change applies to the user at once.
+  const [confirmSave,    setConfirmSave]    = useState(false)
   // Cancel, the X, and the backdrop all leave through here: straight out when
   // nothing changed, otherwise ask before throwing the changes away.
   const requestClose = () => (changed ? setConfirmDiscard(true) : onClose())
@@ -188,7 +190,7 @@ export default function PermissionsModal({ userId, userName, onClose, onSaved }:
               Cancel
             </button>
             <button
-              onClick={handleSave}
+              onClick={() => setConfirmSave(true)}
               disabled={loading || saving || !!error || lock.readOnly || !changed}
               className="flex items-center gap-2 rounded-lg bg-[#4df9ed] px-5 py-2 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5] disabled:opacity-40"
             >
@@ -197,6 +199,17 @@ export default function PermissionsModal({ userId, userName, onClose, onSaved }:
           </div>
         </div>
       </motion.div>
+
+      <ReusableModal
+        open={confirmSave}
+        title="Save access changes?"
+        description={`${userName}'s access will change right away, and they will be notified.`}
+        confirmLabel="Yes"
+        cancelLabel="No"
+        zClassName="z-[110]"
+        onConfirm={() => { setConfirmSave(false); void handleSave() }}
+        onCancel={() => setConfirmSave(false)}
+      />
 
       <ReusableModal
         open={confirmDiscard}
