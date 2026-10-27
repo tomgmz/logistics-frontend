@@ -1,6 +1,6 @@
 import type { CargoMode, ItemGroup, DropoffSection } from '@/lib/store/slice/booking.slice'
 import { nowDate } from '@/app/utils/serverTime'
-import { phDay, phDayPlusMonth, phEarliestBookableDay, phTimeHHMM } from '@/lib/ph-date'
+import { phDay, phDayPlusMonth, phEarliestBookableDay, phTimeHHMM, SAME_DAY_LATEST_CALL_TIME } from '@/lib/ph-date'
 
 export interface ScheduleErrors {
   date?: string
@@ -81,6 +81,8 @@ export function validateSchedule(date: string, time: string): ScheduleErrors {
       errors.date = `Bookings can be made up to 1 month ahead (latest: ${latest})`
     } else if (selected === today && time.trim() && time.slice(0, 5) <= phTimeHHMM(serverNow)) {
       errors.time = 'For a same-day booking, the call time must be later than now'
+    } else if (selected === today && time.trim() && time.slice(0, 5) > SAME_DAY_LATEST_CALL_TIME) {
+      errors.time = 'For a same-day booking, the call time can be no later than 12:00 PM'
     }
   }
 

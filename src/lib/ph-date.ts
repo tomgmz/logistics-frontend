@@ -34,6 +34,9 @@ export function phDayPlus(at: Date | number, days: number): string {
  */
 export const SAME_DAY_CUTOFF_HOUR = 12
 
+/** A same-day booking's call time can be no later than 12:00 noon either. Mirrors the API. */
+export const SAME_DAY_LATEST_CALL_TIME = '12:00'
+
 export function sameDayBookingOpen(at: Date | number): boolean {
   const ms = typeof at === 'number' ? at : at.getTime()
   const ph = new Date(ms + PH_OFFSET_MS)
