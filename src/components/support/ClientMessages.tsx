@@ -22,11 +22,11 @@ import JumpToLatest from '@/components/messaging/JumpToLatest'
  * messenger. Who can reach a client is decided by the API:
  *
  *   - the Company Administrator and the Operations Manager, any time
- *   - the driver (main or second) of an active delivery, from assignment until
- *     the client confirms completion
+ *   - never a driver (driver <-> client chat turned off 2026-10-27; the API
+ *     returns no drivers, so the driver list and composer stay hidden)
  *
- * The client can only write to such a driver. Staff conversations show here
- * read-only; to reach our team the client asks the assistant / opens a ticket.
+ * Staff conversations show here read-only; to reach our team the client asks
+ * the assistant / opens a ticket.
  */
 
 type Thread =
@@ -253,8 +253,7 @@ export function ClientMessagesPanel({ state, userId, onAskAssistant }: {
           <div className="flex flex-col items-center gap-3 py-10 text-center">
             <MessageSquare size={28} className="text-white/20" />
             <p className="text-xs leading-snug text-white/45">
-              No messages yet. When a driver is assigned to your delivery you can message them here,
-              and messages from our team will show up here too.
+              No messages yet. Messages from our team will show up here.
             </p>
           </div>
         ) : (
@@ -426,7 +425,7 @@ export function ClientMessagesPanel({ state, userId, onAskAssistant }: {
       ) : (
         <div className="border-t border-white/[0.07] px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-[11px] leading-snug text-white/45">
           {other?.role === 'driver'
-            ? 'This delivery is complete, so this chat is closed. '
+            ? 'Messaging drivers is no longer available. '
             : 'Replies to our team aren’t sent from here. '}
           <button type="button" onClick={onAskAssistant} className="font-semibold text-[var(--color-cyan)]">
             Need help? Ask the assistant
