@@ -676,6 +676,23 @@ function EmailStep({ onSuccess }: { onSuccess: (email: string) => void }) {
   )
 }
 
+// Both sign-in choices start neutral; neither is pre-selected. Teal shows on
+// hover (Tailwind v4 limits hover: to real-hover devices), keyboard focus and tap.
+const METHOD_CARD =
+  'group w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-left outline-none ' +
+  'border border-white/10 bg-white/5 transition-all duration-200 cursor-pointer ' +
+  'hover:border-[#4df9ed]/30 hover:bg-[#4df9ed]/[0.06] ' +
+  'focus-visible:border-[#4df9ed]/40 focus-visible:bg-[#4df9ed]/[0.06] ' +
+  'active:border-[#4df9ed]/40 active:bg-[#4df9ed]/[0.08] ' +
+  'disabled:opacity-50 disabled:cursor-not-allowed'
+const METHOD_CARD_BLUR = { backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }
+const METHOD_ICON_TILE =
+  'w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-white/[0.07] transition-colors duration-200 ' +
+  'group-hover:bg-[#4df9ed]/10 group-focus-visible:bg-[#4df9ed]/10 group-active:bg-[#4df9ed]/10'
+const METHOD_ICON =
+  'text-white/50 transition-colors duration-200 ' +
+  'group-hover:text-[#4df9ed] group-focus-visible:text-[#4df9ed] group-active:text-[#4df9ed]'
+
 function MethodStep({
   email,
   onSelectOtp,
@@ -743,23 +760,14 @@ function MethodStep({
           whileTap={{ scale: 0.99 }}
           onClick={handleOtp}
           disabled={!!loading}
-          className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-left
-            transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-          style={{
-            background: 'rgba(77,249,237,0.06)',
-            border: '1px solid rgba(77,249,237,0.2)',
-            backdropFilter: 'blur(12px)',
-            WebkitBackdropFilter: 'blur(12px)',
-          }}
+          className={METHOD_CARD}
+          style={METHOD_CARD_BLUR}
         >
-          <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-            style={{ background: 'rgba(77,249,237,0.1)' }}
-          >
+          <div className={METHOD_ICON_TILE}>
             {loading === 'otp' ? (
               <span className="w-4 h-4 border-2 border-[#4df9ed]/20 border-t-[#4df9ed] rounded-full animate-spin" />
             ) : (
-              <span className="text-[#4df9ed]"><IconShield /></span>
+              <span className={METHOD_ICON}><IconShield /></span>
             )}
           </div>
           <div className="flex flex-col gap-0.5">
@@ -783,20 +791,11 @@ function MethodStep({
           whileTap={{ scale: 0.99 }}
           onClick={() => onSelectPassword()}
           disabled={!!loading}
-          className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-left
-            transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-          style={{
-            background: 'rgba(255,255,255,0.05)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            backdropFilter: 'blur(12px)',
-            WebkitBackdropFilter: 'blur(12px)',
-          }}
+          className={METHOD_CARD}
+          style={METHOD_CARD_BLUR}
         >
-          <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-            style={{ background: 'rgba(255,255,255,0.07)' }}
-          >
-            <span className="text-white/50"><IconKey /></span>
+          <div className={METHOD_ICON_TILE}>
+            <span className={METHOD_ICON}><IconKey /></span>
           </div>
           <div className="flex flex-col gap-0.5">
             <span
