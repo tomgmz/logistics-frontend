@@ -14,7 +14,12 @@ import { cn } from '@/lib/utils'
  * Below md it is a dropdown instead, as Untitled UI's tab demos pair the tab
  * list with a NativeSelect on phones: a native select, so iOS and Android show
  * their own picker.
+ *
+ * More than DROPDOWN_OVER tabs is a dropdown at every width (the user's rule,
+ * 2026-10-27): a long row of filter buttons crowds the table's filter bar.
  */
+const DROPDOWN_OVER = 3
+
 export function TabsMinimal<K extends string>({ items, selectedKey, onSelectionChange, label, className }: {
   items: { id: K; label: string }[]
   selectedKey: K
@@ -33,21 +38,23 @@ export function TabsMinimal<K extends string>({ items, selectedKey, onSelectionC
     onSelectionChange(items[next].id)
   }
 
+  const alwaysDropdown = items.length > DROPDOWN_OVER
+
   return (
     <>
-    <div className="relative w-full md:hidden">
+    <div className={cn('relative w-full', alwaysDropdown ? 'md:w-auto md:min-w-[200px]' : 'md:hidden')}>
       <select
         value={selectedKey}
         onChange={(e) => onSelectionChange(e.target.value as K)}
         aria-label={label}
         // 16px: iOS Safari zooms into any smaller focused field.
-        className="w-full cursor-pointer appearance-none rounded-lg bg-[#1b1b1b] py-2 pl-3.5 pr-10 text-[16px] font-medium text-white shadow-[0_1px_2px_rgba(0,0,0,0.3)] ring-1 ring-[#424242] outline-hidden ring-inset [color-scheme:dark] focus:ring-2 focus:ring-[#4df9ed]"
+        className="w-full cursor-pointer appearance-none rounded-lg bg-[#1b1b1b] py-2 pl-3.5 pr-10 text-[16px] md:text-sm font-medium text-white shadow-[0_1px_2px_rgba(0,0,0,0.3)] ring-1 ring-[#424242] outline-hidden ring-inset [color-scheme:dark] focus:ring-2 focus:ring-[#4df9ed]"
       >
         {items.map((t) => <option key={t.id} value={t.id} className="bg-[#1b1b1b] text-white">{t.label}</option>)}
       </select>
       <ChevronDown aria-hidden className="pointer-events-none absolute right-3.5 top-1/2 size-5 -translate-y-1/2 text-[#818181]" />
     </div>
-    <div
+    {!alwaysDropdown && <div
       role="tablist"
       aria-label={label}
       className={cn('flex max-w-full max-md:hidden gap-0.5 overflow-x-auto rounded-lg bg-[#141414] ring-1 ring-[#424242] ring-inset', className)}
@@ -75,7 +82,7 @@ export function TabsMinimal<K extends string>({ items, selectedKey, onSelectionC
           </button>
         )
       })}
-    </div>
+    </div>}
     </>
   )
 }
