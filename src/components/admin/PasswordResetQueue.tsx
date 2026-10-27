@@ -242,7 +242,6 @@ export default function PasswordResetQueue({
           <TableCard.Header
             className="shrink-0"
             title="Password Reset Requests"
-            badge={`${shown.length} ${shown.length === 1 ? 'request' : 'requests'}`}
           />
         )}
         <FilterBar

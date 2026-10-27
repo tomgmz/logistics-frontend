@@ -35,7 +35,7 @@ import { passwordResetService } from '@/lib/services/admin/password-reset.servic
 
 import RefreshButton from '@/components/ui/RefreshButton'
 import FilterBar, { type FilterValues } from '@/components/ui/FilterBar'
-import { TableCard, BadgeModern } from '@/components/ui/untitled/table-card'
+import { TableCard } from '@/components/ui/untitled/table-card'
 import { Button } from '@/components/ui/untitled/button'
 import { TabsMinimal } from '@/components/ui/untitled/tabs'
 import { Plus } from '@untitledui/icons'
@@ -625,13 +625,8 @@ export default function AdminManagementClient() {
 
   return (
     <ThemeProvider theme={muiTheme}>
-      <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-y-auto overflow-x-hidden lg:overflow-hidden bg-[#0a0a0a] text-white">
+      <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-60px)] overflow-y-auto overflow-x-hidden lg:overflow-hidden bg-[#0a0a0a] text-white">
         <div className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0 px-3 py-3 sm:px-4 lg:px-5 3xl:px-6 lg:pt-3 lg:pb-4 3xl:pb-5 gap-3 3xl:gap-4 lg:overflow-hidden">
-
-          {/* Header */}
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 lg:min-h-8 3xl:min-h-9 shrink-0">
-            <h1 className="font-[family-name:var(--font-alegreya-sc)] text-[17px] 3xl:text-[20px] font-bold text-white">User Management</h1>
-          </div>
 
           {/* Stats */}
           <div className="grid grid-cols-3 gap-2.5 sm:gap-3 3xl:gap-4 shrink-0">
@@ -662,11 +657,6 @@ export default function AdminManagementClient() {
             <TableCard.Header
               className="shrink-0"
               title={`${ACCOUNT_NOUN[activeTab]}s`}
-              badge={
-                <BadgeModern className={showArchived ? 'text-[#ffea00]' : undefined}>
-                  {total} {showArchived ? 'archived' : total === 1 ? 'account' : 'accounts'}
-                </BadgeModern>
-              }
               contentTrailing={
                 <Button size="sm" iconLeading={Plus} onClick={openCreate} className="max-md:w-full">
                   Create Administrator

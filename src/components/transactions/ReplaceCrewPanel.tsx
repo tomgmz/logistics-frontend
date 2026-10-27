@@ -16,6 +16,7 @@ import { plateError } from '@/lib/validation/plate'
 import { writeAccess } from '@/components/layout/ModuleAccess'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { appToast } from '@/lib/toast'
+import ReusableModal from '@/components/layout/ReusableModal'
 import { formatDateTime } from './transaction-format'
 import { PALETTE } from '@/lib/palette'
 import { BORDER_C, CYAN, MUTED } from './transaction-theme'
@@ -88,6 +89,8 @@ export default function ReplaceCrewPanel({
   const [editing, setEditing] = useState(false)
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
+  // Replace asks Yes / No before it saves.
+  const [confirming, setConfirming] = useState(false)
   // Vendor drivers from Driver Management, with the booking each is still on.
   // Read fresh when the pop-up opens.
   const [vendorDrivers, setVendorDrivers] = useState<VendorDriverUser[]>([])
@@ -473,7 +476,7 @@ export default function ReplaceCrewPanel({
                 className="flex-1 py-2 rounded-lg text-sm font-bold border border-white/10 text-white/50 hover:text-white transition-colors disabled:opacity-40">
                 Cancel
               </button>
-              <button type="button" disabled={busy || !canSubmit} onClick={() => void submit()}
+              <button type="button" disabled={busy || !canSubmit} onClick={() => setConfirming(true)}
                 className="flex-1 py-2 rounded-lg text-sm font-bold transition-colors disabled:opacity-40"
                 style={{ background: 'rgba(77,249,237,0.12)', border: '1px solid rgba(77,249,237,0.30)', color: CYAN }}>
                 {busy ? 'Replacing…' : 'Replace'}
@@ -482,6 +485,17 @@ export default function ReplaceCrewPanel({
           </div>
         </div>
       )}
+
+      <ReusableModal
+        open={confirming}
+        title="Replace the crew?"
+        description="The new crew takes over this paused trip, and the drivers and the client will be notified."
+        confirmLabel="Yes"
+        cancelLabel="No"
+        zClassName="z-[80]"
+        onConfirm={() => { setConfirming(false); void submit() }}
+        onCancel={() => setConfirming(false)}
+      />
     </div>
   )
 }

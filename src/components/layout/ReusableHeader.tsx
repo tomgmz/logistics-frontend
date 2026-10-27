@@ -13,9 +13,11 @@ import { ROLE_ROUTES } from '@/constants/roles'
 interface ReusableHeaderProps {
   sidebarOpen: boolean
   onToggleSidebar: () => void
+  /** The current module's name, shown at the very top (Figma 3215:1196). Without one the logo shows. */
+  title?: string
 }
 
-export default function ReusableHeader({ sidebarOpen, onToggleSidebar }: ReusableHeaderProps) {
+export default function ReusableHeader({ onToggleSidebar, title }: ReusableHeaderProps) {
   const { totalUnread } = useMessengerStore()
   const router = useRouter()
   const pathname = usePathname()
@@ -29,10 +31,10 @@ export default function ReusableHeader({ sidebarOpen, onToggleSidebar }: Reusabl
       initial={{ y: -80, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.5, ease: 'easeOut' }}
-      className="h-[70px] lg:h-[80px] shrink-0 z-50 flex items-center justify-between
-                 px-4 lg:px-6 border-b border-white/[0.07] bg-[var(--color-bg)]"
+      className="h-[70px] lg:h-[60px] shrink-0 z-50 flex items-center justify-between gap-3
+                 px-4 lg:pl-[19px] lg:pr-[23px] border-b border-white/[0.07] bg-[var(--color-bg)]"
     >
-      <div className="flex items-center gap-3">
+      <div className="flex min-w-0 items-center gap-3">
         {isMessagesPage ? (
           <button
             onClick={() => router.push(backHref)}
@@ -48,10 +50,16 @@ export default function ReusableHeader({ sidebarOpen, onToggleSidebar }: Reusabl
             <Menu size={20} />
           </button>
         )}
-        <LogoMark />
+        {/* The module's name; the logo lives at the top of the sidebar. The
+            Messages page has no sidebar, so it keeps the logo here. */}
+        {title ? (
+          <h1 className="ff-sc truncate text-[20px] lg:text-[28px] font-bold leading-tight text-white">{title}</h1>
+        ) : (
+          <LogoMark />
+        )}
       </div>
 
-      <div className="flex items-center gap-2 lg:gap-3">
+      <div className="flex shrink-0 items-center gap-[5px]">
         {/* Clients reach their messages through the help assistant's launcher. */}
         {!isMessagesPage && user?.role !== 'client' && (
           <motion.button

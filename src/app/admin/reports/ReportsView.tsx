@@ -293,15 +293,14 @@ export default function ReportsView() {
   ) : null
 
   return (
-    <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-y-auto overflow-x-hidden lg:overflow-hidden bg-[#0a0a0a] text-white">
+    <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-60px)] overflow-y-auto overflow-x-hidden lg:overflow-hidden bg-[#0a0a0a] text-white">
       <Suspense fallback={null}>
         <ReportDeepLink onFocus={focusReport} />
       </Suspense>
 
       <div className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0 px-3 py-3 lg:px-4 gap-6 lg:overflow-hidden">
         <div className="shrink-0">
-          <h1 className="mt-1 font-[family-name:var(--font-alegreya-sc)] text-[17px] 3xl:text-[20px] font-bold text-white">Reports</h1>
-          <p className="text-xs text-[#818181] mt-0.5">
+          <p className="text-xs text-[#818181]">
             {isFleet && 'Vehicle-related reports · '}
             {counts.reported} new · {counts.acknowledged} acknowledged
             {!isFleet && counts.unclassified > 0 && (
@@ -317,7 +316,6 @@ export default function ReportsView() {
           <TableCard.Header
             className="shrink-0"
             title="Reports"
-            badge={`${visible.length} ${visible.length === 1 ? 'report' : 'reports'}`}
           />
           <FilterBar
             layout="split"

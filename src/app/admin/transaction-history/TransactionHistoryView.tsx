@@ -7,7 +7,7 @@ import NewEntriesBar from '@/components/ui/NewEntriesBar'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { AnimatePresence, motion } from 'framer-motion'
-import { AlertCircle, Download, History, X } from 'lucide-react'
+import { AlertCircle, Download, X } from 'lucide-react'
 
 import type { BookingWithRelations } from '@/lib/store/slice/routeMap.slice'
 import { bookingRef } from '@/lib/booking'
@@ -56,7 +56,6 @@ import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
  */
 
 
-const BORDER = 'rgba(255,255,255,0.07)'
 const CYAN   = '#4DF9ED'
 const MUTED  = '#818181'
 const ERROR  = '#f62626'
@@ -268,13 +267,6 @@ export default function TransactionHistoryView() {
         <BookingDeepLink onBooking={openDeepLink} />
       </Suspense>
 
-      {/* Header */}
-      <header className="flex shrink-0 items-center gap-2 border-b px-3 py-3 lg:px-4"
-        style={{ borderColor: BORDER }}>
-        <History size={18} style={{ color: CYAN }} />
-        <h1 className="font-[family-name:var(--font-alegreya-sc)] text-[17px] 3xl:text-[20px] font-bold text-white">Transaction History</h1>
-      </header>
-
       <div className="flex lg:min-h-0 flex-[1_0_auto] lg:flex-1 lg:overflow-hidden">
         <div className="flex lg:min-h-0 min-w-0 flex-1 flex-col gap-3 p-3 lg:p-4">
 
@@ -294,7 +286,6 @@ export default function TransactionHistoryView() {
             <TableCard.Header
               className="shrink-0"
               title="Transactions"
-              badge={`${totalRows.toLocaleString()} ${totalRows === 1 ? 'transaction' : 'transactions'}`}
               contentTrailing={canExport && (
                 // Gated on can_export, the tier the IT Admin sets for this module.
                 <Button color="secondary" iconLeading={Download} onClick={() => void handleExport()}

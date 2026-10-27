@@ -839,15 +839,14 @@ export default function VehicleManagementView() {
   }, [confirmKind, modalMode, form.plate_number, actionBusy, archiveTarget])
 
   return (
-    <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-y-auto overflow-x-hidden lg:overflow-hidden ff-sc bg-[var(--color-bg)]">
+    <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-60px)] overflow-y-auto overflow-x-hidden lg:overflow-hidden ff-sc bg-[var(--color-bg)]">
 
       <Suspense fallback={null}>
         <TabDeepLink onTab={(t) => (t === 'models' ? setModelsOpen(true) : setTab(t))} />
       </Suspense>
 
       <header className="shrink-0 px-3 pt-3 lg:px-4 3xl:px-[19px] border-b border-[#424242] flex flex-col gap-2 bg-[#0a0a0a]">
-        <div className="flex flex-wrap items-center gap-2 3xl:gap-[10px]">
-          <h1 className="mr-auto font-[family-name:var(--font-alegreya-sc)] text-[17px] 3xl:text-[20px] font-bold text-white">Vehicle Management</h1>
+        <div className="flex flex-wrap items-center justify-end gap-2 3xl:gap-[10px]">
           <RefreshButton onClick={() => void refreshAll()} />
           <button
             type="button"

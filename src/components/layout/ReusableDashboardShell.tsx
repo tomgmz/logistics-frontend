@@ -38,6 +38,15 @@ export default function ReusableDashboardShell({ children, navItems }: ReusableD
     })
   }, [navItems, user])
 
+  // The header's title: the sidebar item the page sits under (the longest
+  // matching link, so a sub-page takes its module's name).
+  const title = useMemo(() => {
+    const path = pathname ?? ''
+    return navItems
+      .filter((item) => path === item.href || path.startsWith(item.href.replace(/\/$/, '') + '/'))
+      .sort((a, b) => b.href.length - a.href.length)[0]?.label
+  }, [navItems, pathname])
+
   // Gate the active route by module access and expose the flags to its view.
   const currentModule = moduleFromHref(pathname ?? '')
   const currentFlags  = currentModule ? moduleFlags(user, currentModule) : ALL_FLAGS
@@ -50,13 +59,16 @@ export default function ReusableDashboardShell({ children, navItems }: ReusableD
   return (
     <div
       suppressHydrationWarning
-      className="flex flex-col bg-[var(--color-bg)] overflow-hidden"
+      className="flex bg-[var(--color-bg)] overflow-hidden"
       style={{ height: '100dvh' }}
     >
-      <ReusableHeader sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
+      {/* The sidebar runs the full height, from the very top; the header sits
+          beside it over the content only (the Figma), so a module's title can
+          go at the very top. */}
+      <ReusableSidebar navItems={visibleNavItems} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
-      <div className="flex flex-1 min-h-0 overflow-hidden">
-        <ReusableSidebar navItems={visibleNavItems} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <ReusableHeader sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} title={title} />
 
         <main className="relative min-w-0 flex-1 overflow-hidden flex flex-col bg-[var(--color-surface)]">
           <div ref={contentRef} className="flex-1 min-h-0 flex flex-col overflow-hidden">

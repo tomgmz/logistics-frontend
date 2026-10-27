@@ -294,8 +294,9 @@ export default function BookingHistoryModule() {
         <DeepLinkReader onId={setDeepLinkId} />
       </Suspense>
 
-      {/* Header */}
-      <div className="flex items-center gap-3 px-4 lg:px-6 py-4 border-b shrink-0"
+      {/* Header: a booking's back button, number and badges. The list needs
+          none: the module's name is in the page header at the very top. */}
+      <div className={`${view === 'list' ? 'hidden' : 'flex'} items-center gap-3 px-4 lg:px-6 py-4 border-b shrink-0`}
         style={{ borderColor: BORDER }}>
         {view === 'detail' && (
           <button onClick={() => { setView('list'); setSelected(null) }}
@@ -306,7 +307,7 @@ export default function BookingHistoryModule() {
           </button>
         )}
         <h1 className="font-[family-name:var(--font-alegreya-sc)] text-[17px] 3xl:text-[20px] font-bold text-white truncate">
-          {view === 'list' ? 'Transaction History' : bookingRef(selected)}
+          {bookingRef(selected)}
         </h1>
         {view === 'detail' && selected && (
           <div className="ml-auto flex items-center gap-2">
@@ -346,7 +347,7 @@ export default function BookingHistoryModule() {
                   The booking cards stay as they are, inside the card. */}
               {/* Reaches the bottom of the screen even with only a few cards. */}
               <TableCard.Root className="flex flex-[1_0_auto] flex-col">
-              <TableCard.Header title="Bookings" badge={`${bookings.length} ${bookings.length === 1 ? 'booking' : 'bookings'}`} />
+              <TableCard.Header title="Bookings" />
               <FilterBar
                 layout="split"
                 leading={

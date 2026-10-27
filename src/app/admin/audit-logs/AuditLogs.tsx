@@ -123,14 +123,8 @@ export default function AuditLogsPage() {
   }
 
   return (
-    <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-y-auto overflow-x-hidden lg:overflow-hidden bg-[#0a0a0a] text-white">
+    <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-60px)] overflow-y-auto overflow-x-hidden lg:overflow-hidden bg-[#0a0a0a] text-white">
       <div className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0 px-3 py-3 lg:px-4 gap-6 lg:overflow-hidden">
-
-        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 shrink-0">
-          <div>
-            <h1 className="mt-1 font-[family-name:var(--font-alegreya-sc)] text-[17px] 3xl:text-[20px] font-bold text-white">Audit Logs</h1>
-          </div>
-        </div>
 
         {/* Untitled UI's table card, as on the IT Administrator's Logs: the header
             (title, count, Export), then the filter row with search, Filters and
@@ -140,7 +134,6 @@ export default function AuditLogsPage() {
           <TableCard.Header
             className="shrink-0"
             title="Audit Logs"
-            badge={`${total.toLocaleString()} ${total === 1 ? 'record' : 'records'}`}
             contentTrailing={canExport && (
               // Gated on can_export, the tier the IT Admin sets for this module.
               <ExportLogsButton

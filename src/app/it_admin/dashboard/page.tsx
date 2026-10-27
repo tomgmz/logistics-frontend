@@ -249,8 +249,6 @@ function ProblemsCard({ data, now, onResolve, resolving }: {
     <TableCard.Root>
       <TableCard.Header
         title="Problems waiting"
-        badge={data.latest.length ? String(data.latest.length) : undefined}
-        description="Newest critical and error entries"
         contentTrailing={<CardLink href={logsHref({ resolved: false })}>All unresolved</CardLink>}
       />
       <Table head={['Level', 'Type', 'Message', 'When', '']} minWidth="min-w-[760px]">
@@ -296,8 +294,6 @@ function SchedulersCard({ data, now }: { data: SchedulerHealth[]; now: number })
     <TableCard.Root>
       <TableCard.Header
         title="Scheduled jobs"
-        badge={String(data.length)}
-        description="Background jobs, checked by their heartbeat"
         contentTrailing={<CardLink href={logsHref({ event_type: 'cron_job' })}>Job logs</CardLink>}
       />
       <Table head={['Job', 'Runs', 'Status', 'Last run', 'Errors today']} minWidth="min-w-[820px]">
@@ -346,8 +342,6 @@ function ServicesCard({ data, now }: { data: ServiceHealth[]; now: number }) {
     <TableCard.Root>
       <TableCard.Header
         title="External services"
-        badge={String(data.length)}
-        description="Failures recorded when the system called an outside provider"
         contentTrailing={<CardLink href={logsHref({ event_type: 'external_api' })}>Service logs</CardLink>}
       />
       <Table head={['Service', 'Status', 'Last hour', '24 hours', '7 days', 'Last failure']} minWidth="min-w-[900px]">
@@ -488,7 +482,6 @@ function AccountsCard({ data }: { data: ItDashboardSummary['accounts'] }) {
     <TableCard.Root className="flex flex-col">
       <TableCard.Header
         title="Accounts"
-        description={`${data.total_active} active accounts`}
         contentTrailing={<CardLink href="/it_admin/administrator-management">Manage</CardLink>}
       />
       <Table head={['Role', 'Active', 'Revoked', 'Locked', 'Archived']} minWidth="min-w-[520px]">
@@ -523,10 +516,6 @@ function AdministratorsCard({ data, now }: { data: ItDashboardSummary['accounts'
     <TableCard.Root className="flex flex-col">
       <TableCard.Header
         title="Administrators"
-        badge={String(total)}
-        description={data.last_handover
-          ? `Last IT Administrator handover: ${formatDateTime(data.last_handover.at)}`
-          : 'Last IT Administrator handover: none recorded'}
       />
       {!data.it_admin && (
         <p className="border-b border-[#424242] bg-[#f62626]/10 px-4 md:px-6 py-3 text-sm text-[#f62626]">
@@ -672,9 +661,8 @@ export default function ItAdminDashboard() {
 
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div className="min-w-0">
-            <h1 className={`${SC} text-[17px] 3xl:text-[20px] font-bold text-white`}>Dashboard</h1>
             {summary && (
-              <p className="mt-1 text-sm text-[#818181]" title={formatDateTime(summary.generated_at)}>
+              <p className="text-sm text-[#818181]" title={formatDateTime(summary.generated_at)}>
                 Updated {ago(summary.generated_at, now).toLowerCase()}
               </p>
             )}

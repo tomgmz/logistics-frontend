@@ -437,12 +437,9 @@ export default function TransitTrackingView() {
 
   return (
     <APIProvider apiKey={GOOGLE_MAPS_KEY} libraries={['routes']}>
-      <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-hidden" style={SC}>
+      <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-60px)] overflow-hidden" style={SC}>
         <header className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 py-3 border-b border-white/[0.07] bg-[var(--color-bg)]">
-          <div>
-            <h1 className="font-[family-name:var(--font-alegreya-sc)] text-[17px] 3xl:text-[20px] font-bold text-white">Transit Tracking</h1>
-          </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 sm:ml-auto">
             {bookingDetail && <StatusBadge status={bookingDetail.status} />}
             <button
               type="button"

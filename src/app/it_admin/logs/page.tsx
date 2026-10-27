@@ -168,7 +168,6 @@ function AuditLogsTab({ switcher }: { switcher: ReactNode }) {
         <TableCard.Header
           className="shrink-0"
           title="Audit Logs"
-          badge={`${total.toLocaleString()} ${total === 1 ? 'record' : 'records'}`}
           contentTrailing={
             <ExportLogsButton
               untitled
@@ -434,7 +433,6 @@ function SystemLogsTab({ switcher }: { switcher: ReactNode }) {
         <TableCard.Header
           className="shrink-0"
           title="System Logs"
-          badge={`${total.toLocaleString()} ${total === 1 ? 'record' : 'records'}`}
           contentTrailing={
             <ExportLogsButton
               untitled
@@ -641,7 +639,7 @@ export default function LogsPage() {
   )
 
   return (
-    <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-y-auto overflow-x-hidden lg:overflow-hidden bg-[#0a0a0a] text-white">
+    <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-60px)] overflow-y-auto overflow-x-hidden lg:overflow-hidden bg-[#0a0a0a] text-white">
       <div className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0 px-3 py-3 lg:px-4 gap-4 lg:overflow-hidden">
 
         {/* Header */}
@@ -649,7 +647,6 @@ export default function LogsPage() {
 
           {/* Left: title + stats inline */}
           <div className="flex flex-wrap items-center gap-2 mt-1">
-            <h1 className="mr-1 font-[family-name:var(--font-alegreya-sc)] text-[17px] 3xl:text-[20px] font-bold text-white">Logs</h1>
 
             {activeTab === 'system' && systemStats && (
               <>

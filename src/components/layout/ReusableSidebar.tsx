@@ -3,8 +3,10 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { LogOut, PanelLeftClose, PanelLeft } from 'lucide-react'
+import { LogOut } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import Image from 'next/image'
+import { ASSETS } from '@/lib/data'
 import { logout } from '@/lib/api/auth.api'
 import { unregisterWebPush } from '@/lib/push/web-push'
 import { useAuthStore } from '@/lib/store/auth.store'
@@ -13,8 +15,24 @@ import SigningOutOverlay from '@/components/layout/SigningOutOverlay'
 import { roleLabel } from '@/lib/roles'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 
-const SIDEBAR_COLLAPSED = 56
-const SIDEBAR_EXPANDED = 260
+// Figma 3215:1196 (collapsed) and 3215:1485 (open).
+const SIDEBAR_COLLAPSED = 73
+const SIDEBAR_EXPANDED = 290
+// The floating sidebar's gap from the page edges.
+const SIDEBAR_GAP = 6
+
+// Where the three arrows sit inside final-logo.png, as fractions of the image
+// (measured from the file: x 1445–2000 of 2000, y 28–300 of 510).
+const LOGO_ARROWS = { left: 0.7225, top: 0.055, bottom: 0.59 }
+const LOGO_W = 150 // the logo as drawn, px
+// Open: the whole logo, 4px in so it lines up with the icons (button at 21px).
+const LOGO_OPEN = { x: 4, scale: 1, clipPath: 'inset(0% 0% 0% 0%)' }
+// On the rail: only the arrows, scaled to 30px wide, their left edge at 21px.
+const LOGO_RAIL = {
+  x: -LOGO_ARROWS.left * LOGO_W,
+  scale: 30 / ((1 - LOGO_ARROWS.left) * LOGO_W),
+  clipPath: `inset(0% 0% ${(1 - LOGO_ARROWS.bottom) * 100}% ${LOGO_ARROWS.left * 100}%)`,
+}
 
 interface NavItem {
   href: string
@@ -93,47 +111,65 @@ export default function ReusableSidebar({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setSidebarOpen(false)}
-            className="lg:hidden fixed inset-0 bg-black/60 z-30"
+            // Every width: the open sidebar lies over the page, and a click
+            // beside it closes it. Lighter on desktop, where only the slim
+            // rail's widening is covered.
+            className="fixed inset-0 z-[55] bg-black/60 lg:bg-black/30"
           />
         )}
       </AnimatePresence>
 
-      <div className="relative shrink-0 z-40 max-lg:fixed max-lg:left-0 max-lg:top-[70px] max-lg:h-[calc(100dvh-70px)]">
+      {/* Desktop keeps only the slim rail's room, so opening the sidebar
+          never moves the page: it floats over it instead. */}
+      <div aria-hidden className="hidden lg:block shrink-0" style={{ width: SIDEBAR_COLLAPSED + SIDEBAR_GAP * 2 }} />
+
+      {/* Full height, from the very top (Figma 3215:1196 / 3215:1485): the
+          header sits beside it, and on phones the open sidebar covers it. */}
+      <div
+        className="z-[60] fixed"
+        style={{
+          top: SIDEBAR_GAP, bottom: SIDEBAR_GAP, left: SIDEBAR_GAP,
+          pointerEvents: isMobile && !sidebarOpen ? 'none' : undefined,
+        }}
+      >
         <motion.aside
           initial={false}
-          animate={{ width: sidebarOpen ? SIDEBAR_EXPANDED : isMobile ? 0 : SIDEBAR_COLLAPSED }}
+          animate={isMobile
+            ? { width: SIDEBAR_EXPANDED, x: sidebarOpen ? 0 : -(SIDEBAR_EXPANDED + SIDEBAR_GAP * 2) }
+            : { width: sidebarOpen ? SIDEBAR_EXPANDED : SIDEBAR_COLLAPSED, x: 0 }}
           transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] as [number, number, number, number] }}
-          className="h-full border-r border-white/[0.07] bg-[var(--color-bg)] overflow-x-hidden overflow-y-hidden"
+          className={`h-full rounded-xl border-[1.5px] border-white/[0.08] bg-[var(--color-bg)] overflow-hidden transition-shadow ${sidebarOpen ? 'shadow-2xl' : ''}`}
         >
-          <div style={{ width: SIDEBAR_EXPANDED }} className="h-full flex flex-col pt-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] min-h-0">
+          <div style={{ width: SIDEBAR_EXPANDED }} className="h-full flex flex-col min-h-0 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
 
-            <div className="flex items-center gap-3 px-4 mb-7 overflow-hidden shrink-0">
-              <div className="w-8 h-8 rounded-full bg-[var(--color-cyan)] glow-cyan flex items-center justify-center shrink-0">
-                <span className="font-card !text-[0.8rem] lg:!text-[0.9rem] text-[var(--color-bg)] font-bold">
-                  {user?.first_name?.[0]?.toUpperCase() ?? 'A'}
-                </span>
-              </div>
-              <motion.div
-                animate={{ opacity: sidebarOpen ? 1 : 0, x: sidebarOpen ? 0 : -8 }}
-                transition={{ duration: 0.2 }}
-                className="overflow-hidden"
+            {/* The logo; on the slim rail just its three arrows. It is also the
+                toggle: the arrows open the sidebar, the logo closes it.
+                One image morphs between the two: closing wipes away "8338" and
+                "LOGISTICS SERVICES" while the logo's own arrows shrink and slide
+                onto the rail; opening plays it back. */}
+            <div className="h-[80px] shrink-0 pt-[18px]">
+              <button
+                type="button"
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                aria-label={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
+                title={sidebarOpen ? undefined : 'Open sidebar'}
+                className="ml-[21px] block h-[38px] w-[150px] transition-opacity hover:opacity-80"
               >
-                <p className="ff-sc !text-[0.8rem] md:!text-[0.875rem] lg:!text-[0.95rem] text-white whitespace-nowrap">
-                  {user?.first_name && user?.last_name
-                    ? `${user.first_name} ${user.last_name}`
-                    : user?.email ?? 'User'}
-                </p>
-                <p className="ff-sc !text-[0.75rem] lg:!text-[0.8rem] text-white/40 whitespace-nowrap capitalize">
-                  {roleLabel(user?.role)}
-                </p>
-              </motion.div>
+                <motion.span
+                  initial={false}
+                  animate={sidebarOpen ? LOGO_OPEN : LOGO_RAIL}
+                  transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+                  className="block h-full w-full"
+                  style={{ transformOrigin: `${LOGO_ARROWS.left * 100}% ${LOGO_ARROWS.top * 100}%` }}
+                >
+                  <Image src={ASSETS.logo} alt="8338 Logistics" width={150} height={38} className="h-[38px] w-[150px] object-contain object-left" />
+                </motion.span>
+              </button>
             </div>
-
-            <div className="sep-x-cyan mx-4 mb-4 shrink-0" />
 
             <nav
               className={`
-                flex-1 min-h-0 px-2 space-y-0.5
+                flex-1 min-h-0
                 overflow-y-auto overflow-x-hidden
                 [&::-webkit-scrollbar]:w-[3px]
                 [&::-webkit-scrollbar-track]:bg-transparent
@@ -161,40 +197,44 @@ export default function ReusableSidebar({
               ))}
             </nav>
 
-            <div className="px-2 space-y-0.5 pt-4 border-t border-white/[0.07] shrink-0">
-              <motion.button
-                onClick={() => setLogoutModalOpen(true)}
-                whileHover={{ x: sidebarOpen ? 2 : 0 }}
-                whileTap={{ scale: 0.97 }}
-                className="w-full flex items-center gap-3 rounded-xl hover:text-red-400 transition-colors group py-3 px-2"
+            <button
+              type="button"
+              onClick={() => setLogoutModalOpen(true)}
+              title={sidebarOpen ? undefined : 'Sign out'}
+              className="group flex h-[46px] w-full shrink-0 items-center gap-[18px] pl-[27px] text-left text-white transition-colors hover:text-red-400"
+            >
+              <LogOut size={20} className="shrink-0" />
+              <span className={`ff-regular text-[16px] whitespace-nowrap transition-opacity ${sidebarOpen ? 'opacity-100' : 'opacity-0'}`}>
+                Sign out
+              </span>
+            </button>
+
+            {/* Who is signed in: a card when open, just the avatar on the rail. */}
+            <div className="mt-3 shrink-0 px-[11px]">
+              <div
+                className={`flex h-[70px] items-center gap-[14px] rounded-xl border pl-[10px] transition-colors ${
+                  sidebarOpen ? 'border-white/[0.08] bg-white/[0.03]' : 'border-transparent'
+                }`}
               >
-                <span className="shrink-0 flex items-center justify-center" style={{ width: SIDEBAR_COLLAPSED - 32 }}>
-                  <LogOut size={17} className="group-hover:text-red-400 transition-colors" />
-                </span>
-                <motion.span
-                  animate={{ opacity: sidebarOpen ? 1 : 0, width: sidebarOpen ? 'auto' : 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="ff-sc !text-[14px] whitespace-nowrap overflow-hidden"
-                >
-                  Sign out
-                </motion.span>
-              </motion.button>
+                <div className="flex size-[30px] shrink-0 items-center justify-center rounded-full bg-[var(--color-cyan)]">
+                  <span className="font-card !text-[0.75rem] font-bold text-[var(--color-bg)]">
+                    {user?.first_name?.[0]?.toUpperCase() ?? 'A'}
+                  </span>
+                </div>
+                <div className={`min-w-0 transition-opacity ${sidebarOpen ? 'opacity-100' : 'opacity-0'}`}>
+                  <p className="ff-regular truncate text-[16px] leading-[22px] text-white">
+                    {user?.first_name && user?.last_name
+                      ? `${user.first_name} ${user.last_name}`
+                      : user?.email ?? 'User'}
+                  </p>
+                  <p className="ff-regular truncate text-[16px] leading-[22px] text-[#818181]">
+                    {roleLabel(user?.role)}
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </motion.aside>
-
-        {!isMobile && (
-          <motion.button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            whileHover={{ scale: 1.12 }}
-            whileTap={{ scale: 0.9 }}
-            className="absolute top-17 -right-3.5 items-center justify-center
-                       w-7 h-7 rounded-full glass border border-white/10
-                       hover:border-[var(--color-cyan)]/40 transition-colors hidden sm:flex"
-          >
-            {sidebarOpen ? <PanelLeftClose size={12} /> : <PanelLeft size={12} />}
-          </motion.button>
-        )}
       </div>
 
       <ReusableModal
@@ -220,37 +260,41 @@ interface NavItemProps {
   onNavigate: () => void
 }
 
+/**
+ * One 46px row (Figma): icon from 25px, label from 65px. The selected one sits
+ * in a glass box with a cyan outline, open or on the slim rail.
+ */
 function NavItem({ item, isActive, index, expanded, onNavigate }: NavItemProps) {
   return (
     <Link href={item.href} onClick={onNavigate} prefetch={false}>
       <motion.div
         initial={{ opacity: 0, x: -18 }}
         animate={{ opacity: 1, x: 0 }}
-        transition={{ delay: index * 0.06, duration: 0.3 }}
-        whileHover={{ x: expanded ? 3 : 0 }}
-        whileTap={{ scale: 0.97 }}
+        transition={{ delay: index * 0.04, duration: 0.3 }}
         title={!expanded ? item.label : undefined}
-        className={`relative w-full flex items-center gap-3 rounded-xl text-left
-                    transition-colors group py-3 px-2 cursor-pointer
-                    ${isActive ? 'text-[var(--color-cyan)]' : 'hover:[var(--color-cyan)]'}`}
+        className={`relative flex h-[46px] w-full items-center gap-[18px] pl-[25px] text-left transition-colors cursor-pointer
+                    ${isActive ? 'text-[#4DF9ED]' : 'text-white [@media(hover:hover)]:hover:text-[#4DF9ED]'}`}
       >
+        {/* The selected item: a box outlined in #4DF9ED around the whole row,
+            its icon and text the same colour. It widens and narrows with the
+            sidebar (46px on the rail, the row's width when open). */}
         {isActive && (
           <motion.div
             layoutId="activeNav"
-            className="absolute inset-0 rounded-xl glass-surface border border-[var(--color-cyan)]/20"
+            initial={false}
+            animate={{ width: expanded ? SIDEBAR_EXPANDED - 26 : 46 }}
+            className="absolute inset-y-0 left-[13px] rounded-xl glass-surface border border-[#4DF9ED]"
             transition={{ type: 'spring' as const, stiffness: 320, damping: 32 }}
           />
         )}
-        <span className="relative z-10 shrink-0 flex items-center justify-center" style={{ width: 56 - 32 }}>
+        <span className="relative z-10 flex w-[22px] shrink-0 items-center justify-center">
           {item.icon}
         </span>
-        <motion.span
-          animate={{ opacity: expanded ? 1 : 0, width: expanded ? 'auto' : 0 }}
-          transition={{ duration: 0.2 }}
-          className="relative z-10 ff-sc !text-[14px] whitespace-nowrap overflow-hidden"
+        <span
+          className={`relative z-10 ff-sc text-[16px] whitespace-nowrap transition-opacity ${expanded ? 'opacity-100' : 'opacity-0'}`}
         >
           {item.label}
-        </motion.span>
+        </span>
       </motion.div>
     </Link>
   )

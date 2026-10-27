@@ -137,13 +137,6 @@ const ROLE_HIDE_PENDING: Partial<Record<BookingRoleView, boolean>> = {
   operations_manager: true,
 }
 
-const ROLE_TITLE: Record<BookingRoleView, string> = {
-  admin:              'Booking management',
-  general_manager:    'Bookings — General Manager approval',
-  operations_manager: 'Bookings — vehicle & driver assignment',
-  fleet_manager:      'Bookings — assigned vehicles',
-}
-
 type DetailWithExtra = BookingDetail & {
   transaction_documents?: string[] | null
   required_weight_kg?: number | null
@@ -1295,6 +1288,8 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
   const [routeDistance, setRouteDistance]   = useState<RouteDistance | null>(null)
   const [routeLoading, setRouteLoading]     = useState(false)
   const [assignBusy, setAssignBusy]         = useState(false)
+  // Assigning (or changing) the crew asks Yes / No before it saves.
+  const [confirmAssign, setConfirmAssign]   = useState(false)
   // The "Choose vehicle and driver" pop-up is open. Closed on a successful
   // assign; cancelling it puts back what is on the booking.
   const [assignEditMode, setAssignEditMode] = useState(false)
@@ -1994,7 +1989,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     normalizeBookingStatus(status ?? '') === 'pending' && submittedAfterCloseToday(createdAt, clockNow)
 
   return (
-    <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-y-auto overflow-x-hidden lg:overflow-hidden ff-sc bg-[var(--color-bg)]">
+    <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-60px)] overflow-y-auto overflow-x-hidden lg:overflow-hidden ff-sc bg-[var(--color-bg)]">
 
       {/* Notification deep-link: opens the booking named in ?booking=<id>. */}
       <Suspense fallback={null}>
@@ -2044,6 +2039,21 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
       />
 
       <ReusableModal
+        open={confirmAssign}
+        title={committedAssignment.driverId ? 'Change the driver and vehicle?' : 'Assign this driver and vehicle?'}
+        description={
+          committedAssignment.driverId
+            ? 'The booking will move to the crew you picked, and the drivers will be notified.'
+            : 'The crew you picked will be assigned to this booking, and the drivers will be notified.'
+        }
+        confirmLabel="Yes"
+        cancelLabel="No"
+        zClassName="z-[80]"
+        onConfirm={() => { setConfirmAssign(false); void handleAssign() }}
+        onCancel={() => setConfirmAssign(false)}
+      />
+
+      <ReusableModal
         open={!!deleteAskId}
         title="Remove this stop?"
         description={
@@ -2058,10 +2068,6 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
         disableBackdropClose={deleteBusy}
       />
 
-      <header className="shrink-0 px-3 py-3 lg:px-4 border-b border-white/[0.07] flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-        <h1 className="font-[family-name:var(--font-alegreya-sc)] text-[17px] 3xl:text-[20px] font-bold text-white">{ROLE_TITLE[roleView]}</h1>
-      </header>
-
       <div className="flex flex-[1_0_auto] lg:flex-1 lg:min-h-0 lg:overflow-hidden">
         <div className="flex-1 flex flex-col min-w-0 lg:min-h-0 p-3 lg:p-4 3xl:p-[34px] 3xl:pl-9 gap-3 3xl:gap-[14px] bg-[#0a0a0a]">
 
@@ -2074,7 +2080,6 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
             <TableCard.Header
               className="shrink-0"
               title="Bookings"
-              badge={`${totalRows} ${totalRows === 1 ? 'booking' : 'bookings'}`}
             />
             <FilterBar
               layout="split"
@@ -2542,7 +2547,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                                 return next
                               })
                             }
-                            onAssign={() => void handleAssign()}
+                            onAssign={() => setConfirmAssign(true)}
                             onOpenPicker={() => setAssignEditMode(true)}
                             canEdit={canEdit}
                             onClosePicker={() => {

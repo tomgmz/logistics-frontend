@@ -592,14 +592,6 @@ function DocumentLibrary() {
     if (folderRows[0]) go(folderRows[0].to)
   }
 
-  const badge = isFiles
-    ? plural(total, 'file')
-    : nav.level === 'root'
-      ? (search ? plural(folderRows.length, 'result') : plural(folders.length, 'client'))
-      : nav.level === 'client'
-        ? plural(folders.length, 'booking')
-        : plural(folders.length, 'vehicle')
-
   const typeOptions: FilterOption[] = [...DERIVED_DOCUMENT_TYPES, ...STAFF_DOCUMENT_TYPES]
     .filter((t) => (counts.by_type[t] ?? 0) > 0 || types.includes(t))
     .map((t) => ({ value: t, label: `${DOCUMENT_TYPE_LABELS[t]} (${counts.by_type[t] ?? 0})` }))
@@ -614,11 +606,7 @@ function DocumentLibrary() {
   // ── Render ─────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-y-auto overflow-x-hidden lg:overflow-hidden ff-sc bg-[var(--color-bg)]">
-      <header className="shrink-0 px-3 py-3 lg:px-4 border-b border-white/[0.07]">
-        <h1 className="font-[family-name:var(--font-alegreya-sc)] text-[17px] 3xl:text-[20px] font-bold text-white">Document Management</h1>
-      </header>
-
+    <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-60px)] overflow-y-auto overflow-x-hidden lg:overflow-hidden ff-sc bg-[var(--color-bg)]">
       <div className="flex flex-[1_0_auto] lg:flex-1 lg:min-h-0 flex-col p-3 lg:p-4 gap-3 lg:overflow-hidden">
         {/* Where you are: Untitled UI's text breadcrumbs. */}
         <Breadcrumbs
@@ -636,7 +624,6 @@ function DocumentLibrary() {
           <TableCard.Header
             className="shrink-0"
             title={title}
-            badge={badge}
             contentTrailing={
               <div className="flex flex-wrap gap-3 max-md:w-full">
                 {nav.level === 'root' && pendingTotal > 0 && (

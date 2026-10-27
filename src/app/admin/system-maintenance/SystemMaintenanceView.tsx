@@ -936,15 +936,11 @@ export default function SystemMaintenanceView() {
   if (deleting) confirmLabel = 'Working…'
 
   return (
-    <div className="flex flex-col min-h-0 h-[calc(100dvh-70px)] lg:h-[calc(100dvh-80px)] overflow-y-auto overflow-x-hidden lg:overflow-hidden bg-[var(--color-bg,#0d0d0d)]">
+    <div className="flex flex-col min-h-0 h-[calc(100dvh-70px)] lg:h-[calc(100dvh-60px)] overflow-y-auto overflow-x-hidden lg:overflow-hidden bg-[var(--color-bg,#0d0d0d)]">
 
       {/* header */}
       <header className="shrink-0 border-b border-white/[0.07] px-4 py-3 flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/35">Administrator</p>
-          <h1 className="mt-0.5 leading-tight font-[family-name:var(--font-alegreya-sc)] text-[17px] 3xl:text-[20px] font-bold text-white">System Maintenance</h1>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="ml-auto flex shrink-0 items-center gap-2">
           <RefreshButton onClick={() => void load()} />
           {canCreate && (
             <button
