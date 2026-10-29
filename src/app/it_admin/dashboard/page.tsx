@@ -666,57 +666,6 @@ function AccountsCard({ data }: { data: ItDashboardSummary['accounts'] }) {
   )
 }
 
-function AdministratorsCard({ data, now }: { data: ItDashboardSummary['accounts']; now: number }) {
-  const lastSignIn = (iso: string | null) => (
-    <span className={iso ? 'text-[#c4c4c4]' : 'text-[#ffea00]'} title={iso ? formatDateTime(iso) : undefined}>
-      {iso ? ago(iso, now) : 'Never signed in'}
-    </span>
-  )
-  // The IT Administrator counts as one of the five rows.
-  const total  = data.administrators.length + (data.it_admin ? 1 : 0)
-  const admins = data.administrators.slice(0, DASHBOARD_ROWS - (data.it_admin ? 1 : 0))
-  return (
-    <TableCard.Root className="flex flex-col">
-      {!data.it_admin && (
-        <p className="border-b border-[#424242] bg-[#f62626]/10 px-4 md:px-6 py-3 text-sm text-[#f62626]">
-          No active IT Administrator. Staff password resets cannot be handled until one is set.
-        </p>
-      )}
-      <Table head={['Name', 'Role', 'Status', 'Last sign-in']} minWidth="min-w-[560px]">
-        {data.it_admin && (
-          <tr>
-            <td className="px-4 md:px-6 py-3">
-              <p className="text-white">{data.it_admin.name}</p>
-              <p className="text-xs text-[#818181] break-all">{data.it_admin.email}</p>
-            </td>
-            <td className="px-4 md:px-6 py-3">IT Administrator</td>
-            <td className="px-4 md:px-6 py-3"><Pill label="Active" color={COLOR.green} /></td>
-            <td className="px-4 md:px-6 py-3">{lastSignIn(data.it_admin.last_login_at)}</td>
-          </tr>
-        )}
-        {admins.map((a) => (
-          <tr key={a.user_id}>
-            <td className="px-4 md:px-6 py-3">
-              <p className="text-white">{a.name}</p>
-              <p className="text-xs text-[#818181] break-all">{a.email}</p>
-            </td>
-            <td className="px-4 md:px-6 py-3">Company Administrator</td>
-            <td className="px-4 md:px-6 py-3">
-              {a.status === 'active'
-                ? <Pill label="Active" color={COLOR.green} />
-                : <Pill label={a.status === 'inactive' ? 'Revoked' : 'Locked'} color={COLOR.amber} />}
-            </td>
-            <td className="px-4 md:px-6 py-3">{lastSignIn(a.last_login_at)}</td>
-          </tr>
-        ))}
-      </Table>
-      <div className="mt-auto">
-        <TableFooter shown={(data.it_admin ? 1 : 0) + admins.length} total={total} />
-      </div>
-    </TableCard.Root>
-  )
-}
-
 // ── Overall banner ───────────────────────────────────────────────────────────
 
 function attentionItems(s: ItDashboardSummary): string[] {
@@ -915,10 +864,7 @@ export default function ItAdminDashboard() {
             <ProblemsCard data={summary.problems} now={now} onResolve={resolve} resolving={resolving} />
             <SchedulersCard data={summary.schedulers} now={now} />
             <ServicesCard data={summary.services} now={now} />
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 lg:gap-6">
-              <AccountsCard data={summary.accounts} />
-              <AdministratorsCard data={summary.accounts} now={now} />
-            </div>
+            <AccountsCard data={summary.accounts} />
           </>
         )}
 
