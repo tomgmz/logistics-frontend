@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 
 /**
  * The one pagination bar, as the Figma draws it (Vehicle Management, node 2965:1738):
@@ -29,6 +29,43 @@ export function pageItems(page: number, totalPages: number): (number | null)[] {
   return items
 }
 
+const scrollsY = (el: Element) => {
+  const { overflowY } = getComputedStyle(el)
+  return (overflowY === 'auto' || overflowY === 'scroll') && el.scrollHeight > el.clientHeight
+}
+
+/**
+ * After a page change, show the new page from its first row. The bar sits at
+ * the bottom of a table someone has just scrolled through, and the next page
+ * otherwise opened where the last one was left: scrolled to the bottom.
+ *
+ * Two scrolls can be involved, depending on the screen: the table's own box
+ * (desktop, where the table scrolls inside the page) goes back to its top, and
+ * any outer scroll (phones and tablets, where the whole page scrolls) moves
+ * only if the table's top has gone out of view above it. Sideways scroll is
+ * left alone. The "table" is the nearest container holding a <table>, looked
+ * for only a few levels up so a bar in a pop-over (notifications) never
+ * reaches the page's own table; failing that, the bar's parent (card lists).
+ */
+function scrollToTableTop(nav: HTMLElement) {
+  let box: HTMLElement | null = nav.parentElement
+  for (let level = 0; box && level < 3 && !box.querySelector('table'); level++) box = box.parentElement
+  if (!box?.querySelector('table')) box = nav.parentElement
+  if (!box) return
+
+  for (const el of [box, ...Array.from(box.querySelectorAll<HTMLElement>('[class*="overflow"]'))]) {
+    if (el !== nav && !nav.contains(el) && scrollsY(el)) el.scrollTop = 0
+  }
+
+  for (let el = box.parentElement; el && el !== document.body; el = el.parentElement) {
+    if (!scrollsY(el)) continue
+    const above = box.getBoundingClientRect().top - el.getBoundingClientRect().top
+    if (above < 0) el.scrollTop += above
+  }
+  const top = box.getBoundingClientRect().top
+  if (top < 0) window.scrollBy(0, top)
+}
+
 export default function Pagination({
   page,
   totalPages,
@@ -55,10 +92,15 @@ export default function Pagination({
   className?:   string
 }) {
   const [target, setTarget] = useState('')
+  const navRef = useRef<HTMLElement>(null)
   const pages = Math.max(1, totalPages)
   const first = total === 0 ? 0 : (page - 1) * pageSize + 1
   const last  = Math.min(total, page * pageSize)
-  const go    = (p: number) => { if (!disabled && p >= 1 && p <= pages && p !== page) onPageChange(p) }
+  const go    = (p: number) => {
+    if (disabled || p < 1 || p > pages || p === page) return
+    onPageChange(p)
+    if (navRef.current) scrollToTableTop(navRef.current)
+  }
   const jumpTo = () => {
     const n = Number.parseInt(target, 10)
     if (Number.isFinite(n)) go(Math.min(pages, Math.max(1, n)))
@@ -69,6 +111,7 @@ export default function Pagination({
 
   return (
     <nav
+      ref={navRef}
       aria-label="Pagination"
       // Phones: everything stacked and centred. From sm up: count left, controls right.
       className={`flex flex-col items-center gap-y-1.5 sm:flex-row sm:flex-wrap sm:justify-between gap-x-4 text-[12px] text-[#818181] ${

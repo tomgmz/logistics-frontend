@@ -28,6 +28,14 @@ import { DateRangePicker, type DateRange } from '@/components/ui/untitled/date-r
  * matchesFilter and allowedValues work unchanged.
  *
  * It owns no data: the page keeps the rules and decides what they filter.
+ *
+ * `layout="split"` is the table format for the whole web app (Figma
+ * 3234:790 / 3234:594, 2026-10-30), the row under a table's section tabs:
+ *
+ *   [search…………] [leading] [Select Date] [Filters] [actions]      [trailing]
+ *
+ * `trailing` is the table's main action (Create Administrator, Export), at
+ * the far right. Phones wrap it onto lines of their own.
  */
 
 export interface FilterOption { value: string; label: string }
@@ -95,6 +103,7 @@ export default function FilterBar({
   onChange,
   leading,
   actions,
+  trailing,
   summary,
   variant = 'advanced',
   layout = 'inline',
@@ -113,6 +122,8 @@ export default function FilterBar({
   onChange?: (values: FilterValues) => void
   leading?:  ReactNode
   actions?:  ReactNode
+  /** Split layout: the table's main action, at the far right of the row. */
+  trailing?: ReactNode
   summary?:  ReactNode
   /** 'advanced': the one Filters button and rule panel. 'dropdowns': a dropdown per field. */
   variant?:  'advanced' | 'dropdowns'
@@ -123,7 +134,7 @@ export default function FilterBar({
    * search, Filters and `actions` on the right. Phones stack the two and Filters
    * drops to its icon.
    */
-  layout?:   'inline' | 'split'
+  layout?:   'inline' | 'split' | 'untitled'
   /**
    * Split layout: Untitled UI's "Select dates" range picker before Filters, as
    * in their "No users found" table. The page decides which date it filters.
@@ -134,19 +145,39 @@ export default function FilterBar({
   // A field with nothing to pick (no companies loaded yet) is left out.
   const shown = fields.filter((f) => f.options.length > 0)
 
-  if (layout === 'split') {
+  // The earlier Untitled UI row (tabs left; search, dates, Filters right), kept
+  // for the screens the user asked to leave as they are: Document Management
+  // and the client's Transaction History.
+  if (layout === 'untitled') {
     return (
       <div className={`flex shrink-0 flex-wrap gap-3 border-b border-[#424242] px-4 py-3 max-md:flex-col md:px-6 ${className}`}>
         <div className="flex min-w-0 flex-1 flex-wrap gap-3">{leading}</div>
         <div className="flex shrink-0 items-center gap-3 max-md:w-full max-md:flex-wrap">
           {search && <InputShortcut {...search} icon={SearchLg} className="min-w-0 max-md:flex-1 md:w-70" />}
           {/* Phones: the dates get their own full-width line under search. */}
-          {dateRange && <DateRangePicker {...dateRange} className="shrink-0 max-md:order-last max-md:w-full" />}
+          {dateRange && <DateRangePicker {...dateRange} untitled className="shrink-0 max-md:order-last max-md:w-full" />}
           {shown.length > 0 && onChange && (
-            <FiltersButton fields={shown} values={values} onApply={onChange} compact />
+            <FiltersButton fields={shown} values={values} onApply={onChange} compact untitled />
           )}
           {actions}
         </div>
+        {summary}
+      </div>
+    )
+  }
+
+  if (layout === 'split') {
+    return (
+      <div className={`flex shrink-0 flex-wrap items-center gap-2.5 border-b border-[#424242] px-3 py-3 sm:px-4 3xl:px-[25px] 3xl:py-[18px] ${className}`}>
+        {search && <SearchBox {...search} />}
+        {leading && <div className="flex min-w-0 max-md:w-full">{leading}</div>}
+        {/* Phones: the dates get their own full-width line. */}
+        {dateRange && <DateRangePicker {...dateRange} className="shrink-0 max-md:w-full" />}
+        {shown.length > 0 && onChange && (
+          <FiltersButton fields={shown} values={values} onApply={onChange} compact />
+        )}
+        {actions}
+        {trailing && <div className="flex items-center gap-2.5 max-md:w-full max-md:*:flex-1 md:ml-auto">{trailing}</div>}
         {summary}
       </div>
     )
@@ -200,6 +231,34 @@ export default function FilterBar({
           </span>
         )}
       </div>
+    </div>
+  )
+}
+
+/**
+ * The table format's search box (Figma): a #343434 block with a #818181
+ * border, the magnifier and a small-caps placeholder naming exactly what the
+ * search matches ("Search name, email or phone"). 464px wide at 1920.
+ */
+function SearchBox({ value, onChange, placeholder = 'Search', onEnter }: {
+  value:        string
+  onChange:     (value: string) => void
+  placeholder?: string
+  onEnter?:     () => void
+}) {
+  return (
+    <div className="relative min-w-0 max-md:w-full md:w-[300px] lg:w-[340px] xl:w-[400px] 3xl:mr-2.5 3xl:w-[464px]">
+      <Search className="pointer-events-none absolute left-3.5 3xl:left-[18px] top-1/2 size-5 3xl:size-[22px] -translate-y-1/2 text-[#818181]" />
+      <input
+        type="search"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={onEnter ? (e) => { if (e.key === 'Enter') { e.preventDefault(); onEnter() } } : undefined}
+        placeholder={placeholder}
+        aria-label={placeholder}
+        // 16px on phones: iOS Safari zooms the page into any smaller focused field.
+        className="ff-sc h-[38px] 3xl:h-[44px] w-full rounded-[10px] border border-[#818181] bg-[#343434] pl-11 3xl:pl-[48px] pr-3 text-[16px] md:text-[15px] 3xl:text-[18px] text-white placeholder:text-[#818181] outline-none transition focus:border-[#4df9ed] [&::-webkit-search-cancel-button]:hidden"
+      />
     </div>
   )
 }
@@ -337,12 +396,14 @@ const OPS: FilterOption[] = [
 ]
 
 /** The Filters button and its rule panel. Edits a draft; Apply filter hands it over. */
-function FiltersButton({ fields, values, onApply, compact = false }: {
+function FiltersButton({ fields, values, onApply, compact = false, untitled = false }: {
   fields:  FilterField[]
   values:  FilterValues
   onApply: (values: FilterValues) => void
   /** Phones show only the icon (the split layout). */
   compact?: boolean
+  /** The earlier Untitled UI secondary button (icon only on phones). */
+  untitled?: boolean
 }) {
   const [open,  setOpen]  = useState(false)
   const [draft, setDraft] = useState<DraftRule[]>([])
@@ -381,8 +442,7 @@ function FiltersButton({ fields, values, onApply, compact = false }: {
   return (
     <Popover open={open} onOpenChange={openChange}>
       <PopoverTrigger asChild>
-        {compact ? (
-          // Untitled UI's secondary sm button with FilterLines; icon only on phones.
+        {compact && untitled ? (
           <Button
             color="secondary"
             iconLeading={FilterLines}
@@ -390,6 +450,22 @@ function FiltersButton({ fields, values, onApply, compact = false }: {
             className={applied || open ? 'ring-[#4df9ed] text-[#4df9ed]' : undefined}
           >
             <span className="max-md:hidden">Filters</span>
+            {applied > 0 && (
+              <span className="ml-1.5 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#4df9ed] px-1 text-[11px] font-bold leading-none text-black">
+                {applied}
+              </span>
+            )}
+          </Button>
+        ) : compact ? (
+          // The table format's grey Filters block (Figma 3234:790).
+          <Button
+            size="toolbar"
+            color="tool"
+            iconLeading={FilterLines}
+            aria-label={applied ? `Filters, ${applied} applied` : 'Filters'}
+            className={applied || open ? 'border-[#4df9ed] text-[#4df9ed] *:data-icon:text-[#4df9ed]' : undefined}
+          >
+            Filters
             {applied > 0 && (
               <span className="ml-1.5 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#4df9ed] px-1 text-[11px] font-bold leading-none text-black">
                 {applied}

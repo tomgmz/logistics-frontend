@@ -5,9 +5,7 @@ import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { useEffect, useState } from 'react'
 import { AlertTriangle, MailCheck } from 'lucide-react'
 import Pagination from '@/components/ui/Pagination'
-import RefreshButton from '@/components/ui/RefreshButton'
 import FilterBar, { type FilterValues } from '@/components/ui/FilterBar'
-import { TableCard } from '@/components/ui/untitled/table-card'
 import type { DateRange } from '@/components/ui/untitled/date-range-picker'
 import ReusableModal from '@/components/layout/ReusableModal'
 import { useModuleAccess } from '@/components/layout/ModuleAccess'
@@ -76,9 +74,9 @@ const REQUESTED_OPTIONS = [
 ]
 
 // Action buttons: live, or greyed out once the request has been decided.
+// Figma 3234:1681: 28px, 10px corners, bold small caps.
 const BTN_BASE =
-  'flex h-7 3xl:h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[10px] px-2 text-[12px] 3xl:text-[13px] font-bold ' +
-  'transition active:scale-95 disabled:cursor-not-allowed disabled:active:scale-100'
+  'ff-sc flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[10px] px-2 3xl:px-2.5 text-[13px] 3xl:text-[15px] font-bold transition disabled:cursor-not-allowed'
 
 function fullName(r: PasswordResetRequest): string {
   return [r.first_name, r.last_name].filter(Boolean).join(' ') || '—'
@@ -208,15 +206,9 @@ export default function PasswordResetQueue({
   return (
     <>
       <div className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0">
-        {cardHeader && (
-          <TableCard.Header
-            className="shrink-0"
-            title="Password Reset Requests"
-          />
-        )}
         <FilterBar
           layout={cardHeader ? 'split' : 'inline'}
-          search={{ value: search, onChange: setSearch, placeholder: cardHeader ? 'Search' : 'Search name or email...' }}
+          search={{ value: search, onChange: setSearch, placeholder: 'Search name or email' }}
           fields={[
             { key: 'status',    label: 'Status',    options: STATUS_OPTIONS },
             { key: 'role',      label: 'Role',      options: ROLE_OPTIONS },
@@ -228,7 +220,6 @@ export default function PasswordResetQueue({
           onChange={setFilters}
           // Untitled UI's "Dropdowns" filter bar: Status, Role and Requested each their own dropdown.
           variant="dropdowns"
-          actions={<RefreshButton iconOnly onClick={() => void table.reload()} loading={loading} disabled={loading} />}
           summary={!cardHeader && <span className="text-[#4df9ed]">{total} Request{total !== 1 ? 's' : ''}</span>}
           className={regularData ? 'ff-regular' : ''}
         />
@@ -243,16 +234,11 @@ export default function PasswordResetQueue({
           {/* Sized like the Users table. Desktop (lg+): fixed layout, a fixed-width
               actions column and five equal ones; phones and tablets: at least 960px
               wide, scrolling sideways. */}
-          <table className="w-full max-lg:min-w-[960px] lg:min-w-[1080px] lg:table-fixed">
-            <thead className={`sticky top-0 z-10 bg-[#1b1b1b] ${regularData ? 'font-[family-name:var(--font-alegreya-sc)]' : ''}`}>
-              <tr className="border-b border-[#424242]">
+          <table className="data-table max-lg:min-w-[960px] lg:min-w-[1080px] lg:table-fixed">
+            <thead className="sticky top-0 z-10">
+              <tr>
                 {['name', 'email', 'Role', 'Requested', 'Status', 'actions'].map((h, i) => (
-                  <th
-                    key={i}
-                    className={`px-4 3xl:px-5 py-2 3xl:py-2.5 text-[11px] 3xl:text-[13px] font-bold lowercase text-[#818181] whitespace-nowrap ${
-                      i === 5 ? 'text-right lg:w-[300px] 3xl:w-[340px]' : 'text-left'
-                    }`}
-                  >
+                  <th key={i} className={i === 5 ? 'text-right lg:w-[300px] 3xl:w-[340px]' : 'text-left'}>
                     {h}
                   </th>
                 ))}
@@ -295,23 +281,22 @@ export default function PasswordResetQueue({
                   return (
                     <tr
                       key={r.request_id}
-                      className={`border-b border-[#424242] transition-colors ${
-                        isFocus ? 'bg-[#4df9ed]/[0.06]' : 'hover:bg-[#2a2a2a]/40'
+                      className={`transition-colors ${
+                        isFocus ? 'bg-[#4df9ed]/[0.06]' : '[@media(hover:hover)]:hover:bg-[#2a2a2a]/40'
                       }`}
                     >
-                      <td className="px-4 3xl:px-5 py-2 3xl:py-2.5">
-                        <p className="text-[13px] 3xl:text-[15px] font-bold text-[#4df9ed]">{fullName(r)}</p>
-                      </td>
-                      <td title={r.email} className="truncate px-4 3xl:px-5 py-2 3xl:py-2.5 text-[12px] 3xl:text-[14px] font-bold text-white">{r.email}</td>
-                      <td className="px-4 3xl:px-5 py-2 3xl:py-2.5 text-[12px] 3xl:text-[14px] font-bold text-white">
+                      {/* Figma 3234:1681: the name white, the rest grey. */}
+                      <td><p className="t-name text-white">{fullName(r)}</p></td>
+                      <td title={r.email} className="truncate text-[#818181]">{r.email}</td>
+                      <td className="text-[#818181]">
                         {ROLE_LABELS[r.requested_role] ?? r.requested_role.replace(/_/g, ' ')}
                       </td>
-                      <td className="px-4 3xl:px-5 py-2 3xl:py-2.5 text-[12px] 3xl:text-[14px] font-bold text-white whitespace-nowrap">
+                      <td className="text-[#818181] whitespace-nowrap">
                         {requestedAt(r.created_at)}
                       </td>
-                      <td className="px-4 3xl:px-5 py-2 3xl:py-2.5">
+                      <td>
                         <div className="flex flex-col items-start gap-1">
-                          <span className={`font-[family-name:var(--font-alegreya-sc)] inline-flex h-5 min-w-[58px] 3xl:h-[22px] 3xl:min-w-[64px] items-center justify-center whitespace-nowrap rounded-[15px] border-[0.5px] px-1.5 pb-0.5 text-[11px] 3xl:text-[13px] font-bold ${cfg.cls}`}>
+                          <span className={`t-badge min-w-[90px] 3xl:min-w-[102px] ${cfg.cls}`}>
                             {cfg.label}
                           </span>
                           {r.status === 'sent' && left !== null && (
@@ -324,7 +309,7 @@ export default function PasswordResetQueue({
                           )}
                         </div>
                       </td>
-                      <td className="pl-2 max-lg:pl-4 pr-4 3xl:pr-5 py-2 3xl:py-2.5">
+                      <td>
                         {/* Desktop gives this column a fixed width (set on its header) so both
                             buttons sit on one line; the other five share the rest equally. */}
                         <div className="flex flex-nowrap items-center justify-end gap-1.5">

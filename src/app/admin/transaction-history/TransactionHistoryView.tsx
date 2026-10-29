@@ -33,7 +33,6 @@ import {
 } from '@/lib/services/admin/transaction-history.service'
 import StopTimesPanel from '@/components/transactions/StopTimesPanel'
 
-import RefreshButton from '@/components/ui/RefreshButton'
 import FilterBar, { allowedValues } from '@/components/ui/FilterBar'
 import { TableCard } from '@/components/ui/untitled/table-card'
 import { TabsMinimal } from '@/components/ui/untitled/tabs'
@@ -279,23 +278,18 @@ export default function TransactionHistoryView() {
             ))}
           </div>
 
-          {/* Untitled UI's table card, as on Booking Management: the header (title,
-              count, Export), then the filter row with the status tabs on the left
-              and search, Select dates, Filters and Refresh on the right. */}
+          {/* The table format's filter row: search, the status switch, Select
+              Date, Filters, and Export at the far right. */}
           <TableCard.Root className="flex lg:min-h-0 flex-[1_0_auto] lg:flex-1 flex-col">
-            <TableCard.Header
-              className="shrink-0"
-              title="Transactions"
-              contentTrailing={canExport && (
+            <FilterBar
+              layout="split"
+              trailing={canExport && (
                 // Gated on can_export, the tier the IT Admin sets for this module.
-                <Button color="secondary" iconLeading={Download} onClick={() => void handleExport()}
-                  disabled={exporting || loading} className="max-md:w-full">
+                <Button size="toolbar" color="accent" iconLeading={Download} onClick={() => void handleExport()}
+                  disabled={exporting || loading}>
                   {exporting ? 'Exporting…' : 'Export'}
                 </Button>
               )}
-            />
-            <FilterBar
-              layout="split"
               leading={
                 <TabsMinimal
                   label="Status"
@@ -304,7 +298,8 @@ export default function TransactionHistoryView() {
                   onSelectionChange={(k) => { setStatusFilter(k); setPage(0) }}
                 />
               }
-              search={{ value: search, onChange: setSearch, placeholder: 'Search' }}
+              // Names exactly what the server searches (transaction-history.model.ts).
+              search={{ value: search, onChange: setSearch, placeholder: 'Search reference, company or pickup' }}
               dateRange={{ value: dateRange, onChange: (r) => { setDateRange(r); setPage(0) } }}
               fields={[
                 { key: 'company', label: 'Company', options: companies.map((c) => ({ value: c.clientId, label: c.companyName })) },
@@ -323,7 +318,6 @@ export default function TransactionHistoryView() {
                 setSort((v.find((r) => r.field === 'sort')?.value ?? 'date_desc') as SortKey)
                 setPage(0)
               }}
-              actions={<RefreshButton iconOnly onClick={() => void load()} loading={loading} disabled={loading} />}
             />
             <NewEntriesBar count={pending} singular="new update" plural="new updates"
               onRefresh={() => void load(true)} />
@@ -350,9 +344,9 @@ export default function TransactionHistoryView() {
             ) : (
               <>
                 <div className="lg:min-h-0 flex-[1_0_auto] lg:flex-1 overflow-x-auto lg:overflow-auto">
-                  <table className="w-full border-collapse text-left text-sm">
+                  <table className="data-table">
                     {/* Untitled UI's header row: tinted, small caps, sentence case. */}
-                    <thead className="sticky top-0 z-[1] bg-[#222222] font-[family-name:var(--font-alegreya-sc)]">
+                    <thead className="sticky top-0 z-10">
                       <tr className="h-11 border-b border-[#424242] text-xs text-[#818181] [&>th]:px-4 md:[&>th]:px-6 [&>th]:py-2 [&>th]:font-semibold [&>th]:whitespace-nowrap">
                         <th>Reference</th>
                         <th>Company</th>
@@ -384,13 +378,13 @@ export default function TransactionHistoryView() {
                             <td className="max-w-[200px] truncate text-white">
                               {getCompanyName(b)}
                             </td>
-                            <td className="hidden whitespace-nowrap text-[#c4c4c4] lg:table-cell">
+                            <td className="hidden whitespace-nowrap lg:table-cell">
                               {formatDate(b.created_at as string | undefined)}
                             </td>
-                            <td className="whitespace-nowrap text-[#c4c4c4]">
+                            <td className="whitespace-nowrap">
                               {formatDate(b.schedule_date as string | undefined)}
                             </td>
-                            <td className="hidden max-w-[260px] truncate text-[#c4c4c4] md:table-cell">
+                            <td className="hidden max-w-[260px] truncate md:table-cell">
                               {route || '—'}
                               {drops.length > 1 && (
                                 <span className="ml-1 text-xs" style={{ color: MUTED }}>

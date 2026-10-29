@@ -58,6 +58,9 @@ export interface GetLogsParams {
   sort?:     'asc' | 'desc'
   log_type?: LogType
   search?:   string
+  /** Manila days, YYYY-MM-DD, inclusive. */
+  from?:     string
+  to?:       string
 }
 
 export interface GetLogsResponse {

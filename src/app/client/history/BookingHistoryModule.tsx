@@ -315,12 +315,13 @@ export default function BookingHistoryModule() {
                   dropdown on phones) and search, Filters and Refresh on the right.
                   The booking cards stay as they are, inside the card. */}
               {/* Reaches the bottom of the screen even with only a few cards. */}
-              <TableCard.Root className="flex flex-[1_0_auto] flex-col">
+              <TableCard.Root untitled className="flex flex-[1_0_auto] flex-col">
               <TableCard.Header title="Bookings" />
               <FilterBar
-                layout="split"
+                layout="untitled"
                 leading={
                   <TabsMinimal
+                  untitled
                     label="Booking status"
                     items={TABS.map((t) => ({ id: t.key, label: `${t.label} (${counts[t.key] ?? 0})` }))}
                     selectedKey={activeTab}

@@ -24,7 +24,6 @@ import {
 import { formatDateTime } from '@/app/utils/timeFormat'
 import { roleLabel } from '@/lib/roles'
 
-import RefreshButton from '@/components/ui/RefreshButton'
 import ItAdminHandoverPanel from '@/components/admin/ItAdminHandoverPanel'
 import { TableCard } from '@/components/ui/untitled/table-card'
 import { TabsMinimal } from '@/components/ui/untitled/tabs'
@@ -153,8 +152,8 @@ function CardLink({ href, children }: { href: string; children: ReactNode }) {
 function Table({ head, minWidth, children }: { head: string[]; minWidth: string; children: ReactNode }) {
   return (
     <div className="overflow-x-auto">
-      <table className={`w-full text-sm ${minWidth}`}>
-        <thead className={`bg-[#222222] ${SC}`}>
+      <table className={`data-table ${minWidth}`}>
+        <thead>
           <tr>{head.map((h, i) => <th key={i} className={TH}>{h}</th>)}</tr>
         </thead>
         <tbody className="ff-regular divide-y divide-[#2a2a2a]">{children}</tbody>
@@ -242,7 +241,7 @@ function ProblemMetrics({ data, level, onLevel }: {
             }`}
           >
             <div className="flex flex-col gap-4 px-4 py-5 md:flex-row md:px-5">
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-lg text-[#c4c4c4] ring-1 ring-[#424242] ring-inset shadow-[0_1px_2px_rgba(0,0,0,0.4)]">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-lg ring-1 ring-[#424242] ring-inset shadow-[0_1px_2px_rgba(0,0,0,0.4)]">
                 {m.icon}
               </span>
               <div className="flex w-full min-w-0 flex-col gap-2">
@@ -251,7 +250,7 @@ function ProblemMetrics({ data, level, onLevel }: {
                   <p className="flex-1 text-3xl font-semibold leading-none font-mono" style={{ color: value > 0 ? m.color : COLOR.muted }}>
                     {value.toLocaleString()}
                   </p>
-                  <span className="flex items-center gap-1 rounded-md py-0.5 pl-1.5 pr-2 text-sm font-medium text-[#c4c4c4] ring-1 ring-[#424242] ring-inset">
+                  <span className="flex items-center gap-1 rounded-md py-0.5 pl-1.5 pr-2 text-sm font-medium ring-1 ring-[#424242] ring-inset">
                     {day > 0 ? <ArrowUp size={14} className="text-[#818181]" /> : <Minus size={14} className="text-[#818181]" />}
                     {day.toLocaleString()} in 24 hours
                   </span>
@@ -319,7 +318,7 @@ function TrendSection({ level, reloadKey }: { level: TrendLevel; reloadKey: stri
               {shown ? shown.total.toLocaleString() : '—'}
             </span>
             {change !== null && (
-              <span className="flex items-center gap-1 rounded-md py-0.5 pl-1.5 pr-2 text-sm font-medium text-[#c4c4c4] ring-1 ring-[#424242] ring-inset"
+              <span className="flex items-center gap-1 rounded-md py-0.5 pl-1.5 pr-2 text-sm font-medium ring-1 ring-[#424242] ring-inset"
                     title="Against the same length of time just before">
                 {change > 0 ? <ArrowUp size={14} className="text-[#818181]" />
                   : change < 0 ? <ArrowDown size={14} className="text-[#818181]" />
@@ -401,7 +400,7 @@ function ProblemsCard({ data, now, onResolve, resolving }: {
               <p className="font-mono text-xs text-[#818181] break-all">{row.source}</p>
             </td>
             <td className={`${TD} text-white break-words`}>{row.message}</td>
-            <td className={`${TD} whitespace-nowrap text-[#c4c4c4]`} title={formatDateTime(row.timestamp)}>
+            <td className={`${TD} whitespace-nowrap`} title={formatDateTime(row.timestamp)}>
               {ago(row.timestamp, now)}
             </td>
             <td className={`${TD} text-right`}>
@@ -443,9 +442,9 @@ function SchedulersCard({ data, now }: { data: SchedulerHealth[]; now: number })
                   <p className="mt-1 text-xs text-[#f62626] break-words">{s.last_error_message}</p>
                 )}
               </td>
-              <td className={`${TD} whitespace-nowrap text-[#c4c4c4]`}>{every(s.interval_minutes)}</td>
+              <td className={`${TD} whitespace-nowrap`}>{every(s.interval_minutes)}</td>
               <td className={TD}><Pill label={st.label} color={st.color} /></td>
-              <td className={`${TD} whitespace-nowrap text-[#c4c4c4]`} title={s.last_success_at ? formatDateTime(s.last_success_at) : undefined}>
+              <td className={`${TD} whitespace-nowrap`} title={s.last_success_at ? formatDateTime(s.last_success_at) : undefined}>
                 {ago(s.last_success_at, now)}
               </td>
               <td className={`${TD} whitespace-nowrap`}>
@@ -498,7 +497,7 @@ function ServicesCard({ data, now }: { data: ServiceHealth[]; now: number }) {
               <td className={`${TD} text-xs`}>
                 {s.last_failure_at ? (
                   <>
-                    <p className="whitespace-nowrap text-[#c4c4c4]" title={formatDateTime(s.last_failure_at)}>{ago(s.last_failure_at, now)}</p>
+                    <p className="whitespace-nowrap" title={formatDateTime(s.last_failure_at)}>{ago(s.last_failure_at, now)}</p>
                     {s.last_failure_message && <p className="mt-0.5 text-[#f62626] break-words">{s.last_failure_message}</p>}
                   </>
                 ) : <span className="text-[#818181]">None</span>}
@@ -649,9 +648,6 @@ function AdministratorsCard({ data, now }: { data: ItDashboardSummary['accounts'
   const admins = data.administrators.slice(0, DASHBOARD_ROWS - (data.it_admin ? 1 : 0))
   return (
     <TableCard.Root className="flex flex-col">
-      <TableCard.Header
-        title="Administrators"
-      />
       {!data.it_admin && (
         <p className="border-b border-[#424242] bg-[#f62626]/10 px-4 md:px-6 py-3 text-sm text-[#f62626]">
           No active IT Administrator. Staff password resets cannot be handled until one is set.
@@ -664,7 +660,7 @@ function AdministratorsCard({ data, now }: { data: ItDashboardSummary['accounts'
               <p className="text-white">{data.it_admin.name}</p>
               <p className="text-xs text-[#818181] break-all">{data.it_admin.email}</p>
             </td>
-            <td className="px-4 md:px-6 py-3 whitespace-nowrap text-[#c4c4c4]">IT Administrator</td>
+            <td className="px-4 md:px-6 py-3 whitespace-nowrap">IT Administrator</td>
             <td className="px-4 md:px-6 py-3"><Pill label="Active" color={COLOR.green} /></td>
             <td className="px-4 md:px-6 py-3 whitespace-nowrap">{lastSignIn(data.it_admin.last_login_at)}</td>
           </tr>
@@ -675,7 +671,7 @@ function AdministratorsCard({ data, now }: { data: ItDashboardSummary['accounts'
               <p className="text-white">{a.name}</p>
               <p className="text-xs text-[#818181] break-all">{a.email}</p>
             </td>
-            <td className="px-4 md:px-6 py-3 whitespace-nowrap text-[#c4c4c4]">Company Administrator</td>
+            <td className="px-4 md:px-6 py-3 whitespace-nowrap">Company Administrator</td>
             <td className="px-4 md:px-6 py-3">
               {a.status === 'active'
                 ? <Pill label="Active" color={COLOR.green} />
@@ -795,19 +791,6 @@ export default function ItAdminDashboard() {
 
       <div className="flex w-full flex-col gap-5 lg:gap-6">
 
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div className="min-w-0">
-            {summary && (
-              <p className="text-sm text-[#818181]" title={formatDateTime(summary.generated_at)}>
-                Updated {ago(summary.generated_at, now).toLowerCase()}
-              </p>
-            )}
-          </div>
-          <RefreshButton onClick={() => load()} loading={loading} disabled={loading} />
-        </div>
-
-        <ItAdminHandoverPanel />
-
         {error && (
           <div className="rounded-xl border border-[#f62626]/30 bg-[#f62626]/10 px-4 py-2.5 text-sm text-[#f62626]">
             {error}
@@ -835,6 +818,9 @@ export default function ItAdminDashboard() {
             </div>
           </>
         )}
+
+        {/* The handover is rare, so it sits below everything else. */}
+        <ItAdminHandoverPanel />
 
         <div className="h-4" />
       </div>

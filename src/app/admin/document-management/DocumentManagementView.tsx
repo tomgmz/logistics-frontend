@@ -598,7 +598,7 @@ function DocumentLibrary() {
         />
 
         {/* Untitled UI's table card: the filter row, then folders or files. */}
-        <TableCard.Root className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0">
+        <TableCard.Root untitled className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0">
           <TableCard.Header
             className="shrink-0"
             title={title}
@@ -625,10 +625,11 @@ function DocumentLibrary() {
           />
 
           <FilterBar
-            layout="split"
+            layout="untitled"
             // All / Clients / Fleet on the top-level views (a dropdown on phones).
             leading={topTab && (
               <TabsMinimal
+                  untitled
                 label="Show"
                 items={[
                   { id: 'all' as const,     label: 'All' },

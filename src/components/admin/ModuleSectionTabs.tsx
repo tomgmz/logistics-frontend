@@ -35,12 +35,12 @@ export default function ModuleSectionTabs({
   peopleLabel?:    string
   /** Unactioned requests, surfaced on the tab so the queue announces itself. */
   pendingCount?:   number
-  /** 'large' is the User Management look: bigger small-caps labels on #424242 rules. */
+  /** 'large' is the table format's look (Figma 3234:790): 18px small caps on a #424242 rule. */
   variant?:        'compact' | 'large'
 }) {
   const large    = variant === 'large'
   // Large icons step down below 3xl (1920px), like the rest of the User Management Figma.
-  const iconCls = large ? 'size-4 3xl:size-[18px]' : 'size-[14px]'
+  const iconCls = large ? 'size-[18px] 3xl:size-[22px]' : 'size-[14px]'
   const tabs: { key: ModuleSection; label: string; icon: React.ReactNode }[] = [
     { key: 'directory',       label: directoryLabel, icon: <Users className={iconCls} />     },
     ...(peopleLabel ? [{ key: 'people' as const, label: peopleLabel, icon: <Users className={iconCls} /> }] : []),
@@ -52,7 +52,7 @@ export default function ModuleSectionTabs({
       role="tablist"
       aria-label="Module sections"
       className={large
-        ? 'flex items-center shadow-[inset_0_-1px_0_#424242] px-1 sm:px-2 pt-1 3xl:pt-3 shrink-0 overflow-x-auto overflow-y-hidden'
+        ? 'flex items-center shadow-[inset_0_-1px_0_#424242] px-2 sm:px-4 3xl:px-[25px] pt-2.5 3xl:pt-[17px] shrink-0 overflow-x-auto overflow-y-hidden'
         : 'flex items-center gap-1 shadow-[inset_0_-1px_0_#2a2a2a] px-4 pt-2 shrink-0 overflow-x-auto overflow-y-hidden'}
     >
       {tabs.map((t) => {
@@ -66,7 +66,7 @@ export default function ModuleSectionTabs({
             aria-selected={active}
             onClick={() => onChange(t.key)}
             className={`relative flex items-center whitespace-nowrap rounded-t-lg transition-colors
-              ${large ? 'gap-2 px-3 3xl:px-4 pt-1.5 pb-2 3xl:pb-2.5 text-[13px] 3xl:text-[15px] font-bold' : 'gap-2 px-4 py-2.5 text-[13px] font-semibold'}
+              ${large ? 'ff-sc gap-2 3xl:gap-[9px] px-2.5 pb-2.5 3xl:pb-[14px] text-[15px] 3xl:text-[18px] font-bold' : 'gap-2 px-4 py-2.5 text-[13px] font-semibold'}
               ${active
                 ? 'text-[#4df9ed]'
                 : 'text-[#818181] hover:bg-[#2a2a2a]/50 hover:text-white'}`}
@@ -76,7 +76,11 @@ export default function ModuleSectionTabs({
 
             {showCount && (
               <span
-                className={`ml-0.5 inline-flex min-w-[18px] items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none
+                className={large
+                  // Figma: a 22×18 pill, yellow while the tab is not open, cyan when it is.
+                  ? `inline-flex h-[16px] 3xl:h-[18px] min-w-[20px] 3xl:min-w-[22px] items-center justify-center rounded-[10px] border-[0.5px] px-1 text-[12px] 3xl:text-[14px] font-bold leading-none
+                    ${active ? 'border-[#4df9ed] bg-[#4df9ed]/[0.24] text-[#4df9ed]' : 'border-[#ffea00] bg-[#ffea00]/20 text-[#ffea00]'}`
+                  : `ml-0.5 inline-flex min-w-[18px] items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none
                   ${active
                     ? 'bg-[#4df9ed] text-[#0a0a0a]'
                     : 'bg-yellow-500/20 text-yellow-400'}`}

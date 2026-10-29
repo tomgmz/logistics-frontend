@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { FileSpreadsheet } from 'lucide-react'
+import { FileDown, FileSpreadsheet } from 'lucide-react'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { Button } from '@/components/ui/untitled/button'
@@ -22,7 +22,7 @@ export default function ExportLogsButton({
   noun:      string
   cap:       number
   disabled?: boolean
-  /** Untitled UI's secondary button, for a table-card header. */
+  /** The table format's cyan Export button, at the far right of the filter row (Figma 3234:594). */
   untitled?: boolean
 }) {
   const [exporting, setExporting] = useState(false)
@@ -49,12 +49,12 @@ export default function ExportLogsButton({
   if (untitled) {
     return (
       <Button
-        color="secondary"
-        iconLeading={FileSpreadsheet}
+        size="toolbar"
+        color="accent"
+        iconLeading={FileDown}
         onClick={() => void handleClick()}
         disabled={exporting || disabled}
         title="Download every row matching the current filters as an Excel file"
-        className="max-md:w-full"
       >
         {exporting ? 'Exporting…' : 'Export'}
       </Button>

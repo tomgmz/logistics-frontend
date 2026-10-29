@@ -774,3 +774,80 @@
   --sidebar-border:      oklch(1 0 0 / 10%);
   --sidebar-ring:      oklch(0.556 0 0);
 }
+/*
+ * The table format for every web table (Figma 3234:790 / 3234:594 / 3234:1147,
+ * the user's call 2026-10-30). Put `data-table` on the <table>.
+ *
+ * Header row: 44px, grey small caps, lower-case, a #424242 rule under it.
+ * Body rows: 54px, Alegreya Sans bold white, a #424242 rule between rows.
+ * Sizes are the Figma's at 1920 (3xl) and a step smaller below.
+ *
+ * The header and the cell spacing are unlayered on purpose, so they win over
+ * any old per-page padding or text size and every table lines up the same.
+ * The body text is in @layer components: a cell's own colour or size (the
+ * cyan name, a muted second line) still applies.
+ */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.data-table > thead > tr > th {
+  height: 40px;
+  padding: 0 16px;
+  background: #1b1b1b;
+  border-bottom: 1px solid #424242;
+  font-family: var(--font-alegreya-sc), 'Alegreya Sans SC', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: normal;
+  letter-spacing: normal;
+  text-transform: lowercase;
+  color: #818181;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.data-table > tbody > tr > td {
+  height: 48px;
+  padding: 6px 16px;
+  vertical-align: middle;
+}
+.data-table > tbody > tr {
+  border-bottom: 1px solid #424242;
+}
+@media (min-width: 80rem) {
+  .data-table > thead > tr > th,
+  .data-table > tbody > tr > td { padding-left: 20px; padding-right: 20px; }
+}
+@media (min-width: 120rem) {
+  .data-table > thead > tr > th { height: 44px; padding: 0 28px; font-size: 16px; }
+  .data-table > tbody > tr > td { height: 54px; padding: 6px 28px; }
+}
+
+@layer components {
+  /* Headers sit at the left of their column, over the data (browsers centre
+     <th> by default). Layered, so a column's own text-right still wins. */
+  .data-table > thead > tr > th { text-align: left; }
+  .data-table > tbody {
+    font-family: var(--font-alegreya), 'Alegreya Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    color: #ffffff;
+  }
+  /* The row's name (or date): bold cyan, 18px at 1920. */
+  .t-name { font-family: var(--font-alegreya), 'Alegreya Sans', sans-serif; font-weight: 700; font-size: 15px; line-height: 1.15; color: #4df9ed; }
+  /* The small second line under it ([Time], [Role]). */
+  .t-sub  { font-family: var(--font-alegreya), 'Alegreya Sans', sans-serif; font-weight: 700; font-size: 12px; line-height: 1.15; color: #ffffff; }
+  /* The pill every status, role and type is drawn in: small caps, 25px, 0.5px border. */
+  .t-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    height: 22px; padding: 0 6px 1px; border-radius: 15px; border: 0.5px solid currentColor;
+    font-family: var(--font-alegreya-sc), 'Alegreya Sans SC', sans-serif;
+    font-size: 13px; font-weight: 700; line-height: 1; white-space: nowrap;
+  }
+  @media (min-width: 120rem) {
+    .data-table > tbody { font-size: 16px; }
+    .t-name  { font-size: 18px; }
+    .t-sub   { font-size: 14px; }
+    .t-badge { height: 25px; font-size: 15px; }
+  }
+}

@@ -33,12 +33,12 @@ import PasswordResetQueue from '@/components/admin/PasswordResetQueue'
 import ModuleSectionTabs, { type ModuleSection } from '@/components/admin/ModuleSectionTabs'
 import { passwordResetService } from '@/lib/services/admin/password-reset.service'
 
-import RefreshButton from '@/components/ui/RefreshButton'
 import FilterBar, { type FilterValues } from '@/components/ui/FilterBar'
 import { TableCard } from '@/components/ui/untitled/table-card'
 import { Button } from '@/components/ui/untitled/button'
 import { TabsMinimal } from '@/components/ui/untitled/tabs'
-import { Plus } from '@untitledui/icons'
+import { UserPlus01 as UserPlusIcon } from '@untitledui/icons'
+import StatTiles from '@/components/ui/StatTiles'
 import RowActionMenu, { type RowAction } from '@/components/ui/RowActionMenu'
 import AccountActionConfirm, { statusConfirmCopy, type AccountConfirm } from '@/components/admin/AccountActionConfirm'
 import { useServerTable } from '@/lib/hooks/useServerTable'
@@ -126,12 +126,11 @@ function tabFromRole(role: string): AdminMgmtTab {
   }
 }
 
-// Same look as User Management (Figma 3156:400): names in regular Alegreya Sans
-// bold cyan, the rest bold white, headers grey small caps.
-const NAME_TEXT = 'ff-regular text-[13px] 3xl:text-[15px] font-bold text-[#4df9ed]'
-const TD_NAME   = `px-4 3xl:px-5 py-2 3xl:py-2.5 ${NAME_TEXT}`
-const TD_MUTED  = 'ff-regular px-4 3xl:px-5 py-2 3xl:py-2.5 text-[12px] 3xl:text-[14px] font-bold text-white'
-const TD_BADGE  = 'px-4 3xl:px-5 py-2 3xl:py-2.5'
+// The table format (Figma 3234:1321): the name bold cyan, the rest bold white,
+// headers grey small caps. Spacing and sizes come from .data-table (globals.css).
+const TD_NAME   = 't-name'
+const TD_MUTED  = ''
+const TD_BADGE  = ''
 
 
 
@@ -143,7 +142,7 @@ function EmailText({ value }: { value: string | null | undefined }) {
 
 const STATUS_CFG: Record<UserStatus, { label: string; cls: string }> = {
   active:             { label: 'Active',      cls: 'bg-[#4df9ed]/[0.24] text-[#4df9ed] border-[#4df9ed]' },
-  inactive:           { label: 'Revoked',     cls: 'bg-[#818181]/20 text-[#818181] border-[#818181]'     },
+  inactive:           { label: 'Revoked',     cls: 'bg-[#8a38f5]/[0.12] text-[#8a38f5] border-[#8a38f5]' },
   deactivated:        { label: 'Deactivated', cls: 'bg-[#ff7a30]/20 text-[#ff7a30] border-[#ff7a30]'     },
   archived:           { label: 'Archived',    cls: 'bg-[#ffea00]/20 text-[#ffea00] border-[#ffea00]'     },
   permanently_locked: { label: 'Locked',      cls: 'bg-[#f62626]/20 text-[#f62626] border-[#f62626]'     },
@@ -155,13 +154,14 @@ const STATUS_OPTIONS = (Object.keys(STATUS_CFG) as UserStatus[])
   .filter((s) => s !== 'inactive')
   .map((s) => ({ value: s, label: STATUS_CFG[s].label }))
 
-// Same Figma badge as the status column, in the fixed palette.
+// Figma 3234:1321: the role pill is an outline in the role's colour with white
+// text (no fill), in the fixed palette.
 const ROLE_COLORS: Record<string, string> = {
-  admin:              'bg-[#f62626]/20 text-[#f62626] border-[#f62626]',
-  it_admin:           'bg-[#3af626]/20 text-[#3af626] border-[#3af626]',
-  general_manager:    'bg-[#4df9ed]/[0.24] text-[#4df9ed] border-[#4df9ed]',
-  fleet_manager:      'bg-[#ff7a30]/20 text-[#ff7a30] border-[#ff7a30]',
-  operations_manager: 'bg-[#8a38f5]/20 text-[#8a38f5] border-[#8a38f5]',
+  admin:              'border-[#3af626]',
+  it_admin:           'border-[#4df9ed]',
+  general_manager:    'border-[#f62626]',
+  fleet_manager:      'border-[#8a38f5]',
+  operations_manager: 'border-[#ffea00]',
 }
 
 const ROLE_LABELS: Record<string, string> = {
@@ -175,17 +175,17 @@ const ROLE_LABELS: Record<string, string> = {
 function StatusBadge({ status }: { status: UserStatus }) {
   const { label, cls } = STATUS_CFG[status] ?? STATUS_CFG.inactive
   return (
-    <span className={`font-[family-name:var(--font-alegreya-sc)] inline-flex h-5 min-w-[58px] 3xl:h-[22px] 3xl:min-w-[64px] items-center justify-center whitespace-nowrap rounded-[15px] border-[0.5px] px-1.5 pb-0.5 text-[11px] 3xl:text-[13px] font-bold ${cls}`}>
+    <span className={`t-badge min-w-[62px] 3xl:min-w-[70px] ${cls}`}>
       {label}
     </span>
   )
 }
 
 function RoleBadge({ role }: { role: string }) {
-  const cls   = ROLE_COLORS[role]  ?? 'bg-[#818181]/20 text-[#818181] border-[#818181]'
+  const cls   = ROLE_COLORS[role]  ?? 'border-[#818181]'
   const label = ROLE_LABELS[role]  ?? role.replace(/_/g, ' ')
   return (
-    <span className={`font-[family-name:var(--font-alegreya-sc)] inline-flex h-5 3xl:h-[22px] items-center justify-center whitespace-nowrap rounded-[15px] border-[0.5px] px-2 pb-0.5 text-[11px] 3xl:text-[13px] font-bold ${cls}`}>
+    <span className={`t-badge text-white ${cls}`}>
       {label}
     </span>
   )
@@ -247,9 +247,9 @@ function TableSkeleton({ cols, rows }: { cols: number; rows: number }) {
   return (
     <>
       {Array.from({ length: rows }).map((_, i) => (
-        <tr key={i} className="border-b border-[#424242]">
+        <tr key={i}>
           {Array.from({ length: cols }).map((_, j) => (
-            <td key={j} className="px-4 3xl:px-5 py-2 3xl:py-2.5">
+            <td key={j}>
               <div
                 className="h-3 animate-pulse rounded bg-[#2a2a2a]"
                 style={{ width: j === 0 ? '140px' : j === cols - 1 ? '60px' : '100px', animationDelay: `${i * 40}ms` }}
@@ -327,15 +327,6 @@ function renderCells(user: AnyUser) {
       <td className={TD_BADGE}><StatusBadge status={u.status} /></td>
     </>
   )
-}
-
-// What the count beside the search bar calls a row: "2 Fleet Manager Accounts".
-const ACCOUNT_NOUN: Record<TabValue, string> = {
-  all:                 'Administrator',
-  admins:              'Company Administrator',
-  'general-managers':  'General Manager',
-  'fleet-admins':      'Fleet Manager',
-  'operations-admins': 'Operations Manager',
 }
 
 export default function AdminManagementClient() {
@@ -525,9 +516,6 @@ export default function AdminManagementClient() {
     setShowForm(true)
   }
 
-  function handleRefresh() {
-    void refetchCurrentTab()
-  }
 
   const colCount = isResetsTab ? 1 : HEADERS[activeTab].length + 1
 
@@ -551,19 +539,12 @@ export default function AdminManagementClient() {
       <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-60px)] overflow-y-auto overflow-x-hidden lg:overflow-hidden bg-[#0a0a0a] text-white">
         <div className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0 px-3 py-3 sm:px-4 lg:px-5 3xl:px-6 lg:pt-3 lg:pb-4 3xl:pb-5 gap-3 3xl:gap-4 lg:overflow-hidden">
 
-          {/* Stats */}
-          <div className="grid grid-cols-3 gap-2.5 sm:gap-3 3xl:gap-4 shrink-0">
-            {[
-              { label: 'Total Administrators', value: stats.total,    color: 'text-white'     },
-              { label: 'Active',       value: stats.active,   color: 'text-[#4df9ed]' },
-              { label: 'Archived',     value: stats.archived, color: 'text-[#ffea00]' },
-            ].map((s) => (
-              <div key={s.label} className="min-w-0 rounded-[10px] border border-[#424242] bg-[#2a2828] px-2.5 py-2 sm:px-4 sm:py-2.5 3xl:px-5 3xl:py-3 shadow-[0_4px_4px_rgba(0,0,0,0.25)]">
-                <p className="text-[10px] leading-tight sm:text-[11px] 3xl:text-[13px] font-bold uppercase text-[#818181]">{s.label}</p>
-                <p className={`mt-1 3xl:mt-2 text-[18px] sm:text-[20px] 3xl:text-[24px] font-bold leading-none ${s.color}`}>{s.value}</p>
-              </div>
-            ))}
-          </div>
+          {/* Stats (Figma 3234:1321): white small-caps label, the count under it in its colour. */}
+          <StatTiles tiles={[
+            { label: 'Total Administrators', value: stats.total,    color: 'text-[#3af626]' },
+            { label: 'Active',               value: stats.active,   color: 'text-[#4df9ed]' },
+            { label: 'Archived',             value: stats.archived, color: 'text-[#ffea00]' },
+          ]} />
 
           {/* Table card */}
           <TableCard.Root className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0">
@@ -571,21 +552,10 @@ export default function AdminManagementClient() {
             {/* Staff, clients and drivers, and the reset queue: three top-level tabs. */}
             {sectionTabs}
 
-            {/* Untitled UI's table card, as on User Management: the header (title,
-                count, Create Administrator), then the filter row with the role tabs
-                on the left (a dropdown on phones) and search, Filters (Status) and
-                Refresh on the right. The reset queue brings its own header and row. */}
+            {/* The table format's filter row (Figma 3234:1321): search, the role
+                dropdown, Filters (Status), Refresh, and Create Administrator at
+                the far right. The reset queue brings its own row. */}
             {!isResetsTab && (
-            <>
-            <TableCard.Header
-              className="shrink-0"
-              title={`${ACCOUNT_NOUN[activeTab]}s`}
-              contentTrailing={
-                <Button size="sm" iconLeading={Plus} onClick={openCreate} className="max-md:w-full">
-                  Create Administrator
-                </Button>
-              }
-            />
             <FilterBar
               layout="split"
               leading={
@@ -596,14 +566,18 @@ export default function AdminManagementClient() {
                   onSelectionChange={setActiveTab}
                 />
               }
-              search={{ value: searchInput, onChange: setSearchInput, placeholder: 'Search' }}
+              // Names exactly what the server searches (user-directory.service.ts).
+              search={{ value: searchInput, onChange: setSearchInput, placeholder: 'Search name, email or phone' }}
               // One status at a time, as before; now inside the Filters panel.
               fields={[{ key: 'status', label: 'Status', single: true, options: STATUS_OPTIONS }]}
               values={statusFilter}
               onChange={setStatusFilter}
-              actions={<RefreshButton iconOnly onClick={handleRefresh} loading={(loading || fetching)} disabled={loading || fetching} />}
+              trailing={
+                <Button size="toolbar" color="accent" iconLeading={UserPlusIcon} onClick={openCreate}>
+                  Create Administrator
+                </Button>
+              }
             />
-            </>
             )}
 
             {isResetsTab ? (
@@ -624,21 +598,14 @@ export default function AdminManagementClient() {
             {/* Table */}
             <div className="overflow-x-auto flex-[1_0_auto] lg:flex-1 lg:overflow-auto lg:min-h-0">
               {/* Fixed layout: every column, Actions included, gets the same width. */}
-              <table className="w-full max-lg:min-w-[900px] lg:table-fixed">
-                {/* Headers in the small-caps face, every cell below in regular Alegreya Sans. */}
-                <thead className="sticky top-0 z-10 bg-[#1b1b1b] font-[family-name:var(--font-alegreya-sc)]">
-                  <tr className="border-b border-[#424242]">
-                    {HEADERS[activeTab].map((h) => (
-                      <th key={h} className="px-4 3xl:px-5 py-2 3xl:py-2.5 text-[11px] 3xl:text-[13px] font-bold lowercase whitespace-nowrap text-left text-[#818181]">
-                        {h}
-                      </th>
-                    ))}
-                    <th className="px-4 3xl:px-5 py-2 3xl:py-2.5 text-right text-[11px] 3xl:text-[13px] font-bold lowercase text-[#818181]">
-                      actions
-                    </th>
+              <table className="data-table max-lg:min-w-[900px] lg:table-fixed">
+                <thead className="sticky top-0 z-10">
+                  <tr>
+                    {HEADERS[activeTab].map((h) => <th key={h}>{h}</th>)}
+                    <th className="text-right">actions</th>
                   </tr>
                 </thead>
-                <tbody className="ff-regular max-lg:whitespace-nowrap">
+                <tbody className="max-lg:whitespace-nowrap">
                   {(loading || fetching) ? (
                     <TableSkeleton cols={colCount} rows={pageSize} />
                   ) : users.length === 0 ? (
@@ -659,11 +626,11 @@ export default function AdminManagementClient() {
                           initial={{ opacity: 0, y: 6 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: i * 0.02 }}
-                          className="border-b border-[#424242] transition-colors hover:bg-[#2a2a2a]/40"
+                          className="transition-colors [@media(hover:hover)]:hover:bg-[#2a2a2a]/40"
                         >
                           {renderCells(user)}
                           {/* The row menu sits at the far right of the table. */}
-                          <td className="px-4 3xl:px-5 py-2 3xl:py-2.5 text-right">
+                          <td className="text-right">
                             {user.status === 'archived' ? (
                               <ArchivedRowMenu
                                 user={user}

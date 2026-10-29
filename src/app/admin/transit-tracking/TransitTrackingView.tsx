@@ -440,15 +440,9 @@ export default function TransitTrackingView() {
       <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-60px)] overflow-hidden" style={SC}>
         <header className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 py-3 border-b border-white/[0.07] bg-[var(--color-bg)]">
           <div className="flex items-center gap-2 sm:ml-auto">
+            {/* No Refresh: the list follows live:bookings (trips, stops and
+                drop-offs signal it too since 20261030000000). */}
             {bookingDetail && <StatusBadge status={bookingDetail.status} />}
-            <button
-              type="button"
-              onClick={loadBookings}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/5 transition-colors"
-            >
-              <RefreshIcon sx={{ fontSize: 16 }} />
-              Refresh list
-            </button>
           </div>
         </header>
 

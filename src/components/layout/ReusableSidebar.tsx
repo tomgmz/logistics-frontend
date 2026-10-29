@@ -15,18 +15,25 @@ import SigningOutOverlay from '@/components/layout/SigningOutOverlay'
 import { roleLabel } from '@/lib/roles'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 
-// Figma 3215:1196 (collapsed) and 3215:1485 (open); the rail is slimmer than
+// Figma 3241:1835 (collapsed) and 3241:1930 (open); the rail is slimmer than
 // the Figma's 73px (the user's call, 2026-10-29).
 const SIDEBAR_COLLAPSED = 60
 const SIDEBAR_EXPANDED = 290
 // The aside's border, inside its width.
-const SIDEBAR_BORDER = 1.5
+const SIDEBAR_BORDER = 1
+// Figma: the sidebar sits against the left edge, so only its right corners are
+// round, and neither state has a line down the left: only the top, right and
+// bottom are outlined, in #818181 closed and #424242 open. The top and bottom
+// lines fade in from nothing at the left edge: across the whole rail when
+// closed, over the first ~48% when open (measured from the Figma renders).
+const OUTLINE_RAIL = { color: '#818181', radius: '0 20px 20px 0', fade: 'linear-gradient(to right, transparent, #000)' }
+const OUTLINE_OPEN = { color: '#424242', radius: '0 15px 15px 0', fade: 'linear-gradient(to right, transparent, #000 48%)' }
 // The open layout (Figma) centres the icons, logo arrows, Sign out and avatar
 // on x=36 of the content. On the slim rail the contents slide left so that line
-// is the middle of the space inside the border, equal room either side; open,
-// they sit where the Figma has them.
-const RAIL_SHIFT = (SIDEBAR_COLLAPSED - SIDEBAR_BORDER * 2) / 2 - 36
-// The floating sidebar's gap from the page edges.
+// is the middle of the space inside the border (right side only), equal room
+// either side; open, they sit where the Figma has them.
+const RAIL_SHIFT = (SIDEBAR_COLLAPSED - SIDEBAR_BORDER) / 2 - 36
+// The sidebar's gap from the top and bottom of the page (none on the left).
 const SIDEBAR_GAP = 6
 
 // Where the three arrows sit inside final-logo.png, as fractions of the image
@@ -161,7 +168,7 @@ export default function ReusableSidebar({
 
       {/* Desktop keeps only the slim rail's room, so opening the sidebar
           never moves the page: it floats over it instead. */}
-      <div aria-hidden className="hidden lg:block shrink-0" style={{ width: SIDEBAR_COLLAPSED + SIDEBAR_GAP * 2 }} />
+      <div aria-hidden className="hidden lg:block shrink-0" style={{ width: SIDEBAR_COLLAPSED + SIDEBAR_GAP }} />
 
       {/* Full height, from the very top (Figma 3215:1196 / 3215:1485): the
           header sits beside it, and on phones the open sidebar covers it. */}
@@ -170,7 +177,7 @@ export default function ReusableSidebar({
         onMouseEnter={onRailEnter}
         onMouseLeave={onRailLeave}
         style={{
-          top: SIDEBAR_GAP, bottom: SIDEBAR_GAP, left: SIDEBAR_GAP,
+          top: SIDEBAR_GAP, bottom: SIDEBAR_GAP, left: 0,
           pointerEvents: isMobile && !sidebarOpen ? 'none' : undefined,
         }}
       >
@@ -180,9 +187,26 @@ export default function ReusableSidebar({
             ? { width: SIDEBAR_EXPANDED, x: sidebarOpen ? 0 : -(SIDEBAR_EXPANDED + SIDEBAR_GAP * 2) }
             : { width: sidebarOpen ? SIDEBAR_EXPANDED : SIDEBAR_COLLAPSED, x: 0 }}
           transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] as [number, number, number, number] }}
-          style={{ borderWidth: SIDEBAR_BORDER }}
-          className={`h-full rounded-xl border-white/[0.08] bg-[var(--color-bg)] overflow-hidden transition-shadow ${sidebarOpen ? 'shadow-2xl' : ''}`}
+          style={{ borderRadius: (sidebarOpen ? OUTLINE_OPEN : OUTLINE_RAIL).radius }}
+          className={`relative h-full bg-[var(--color-bg)] overflow-hidden transition-[border-radius,box-shadow] duration-[350ms] ${sidebarOpen ? 'shadow-2xl' : ''}`}
         >
+          {/* The outline, drawn over the contents: a border cannot fade, so
+              each state's outline is its own masked layer and they crossfade. */}
+          {[OUTLINE_RAIL, OUTLINE_OPEN].map((o) => (
+            <span
+              key={o.color}
+              aria-hidden
+              className="pointer-events-none absolute inset-0 z-20 transition-opacity duration-[350ms]"
+              style={{
+                opacity: (o === OUTLINE_OPEN) === sidebarOpen ? 1 : 0,
+                border: `${SIDEBAR_BORDER}px solid ${o.color}`,
+                borderLeftWidth: 0,
+                borderRadius: o.radius,
+                maskImage: o.fade,
+                WebkitMaskImage: o.fade,
+              }}
+            />
+          ))}
           <motion.div
             initial={false}
             animate={{ x: sidebarOpen || isMobile ? 0 : RAIL_SHIFT }}
@@ -261,8 +285,8 @@ export default function ReusableSidebar({
             {/* Who is signed in: a card when open, just the avatar on the rail. */}
             <div className="mt-3 shrink-0 px-[11px]">
               <div
-                className={`flex h-[70px] items-center gap-[14px] rounded-xl border pl-[9px] transition-colors ${
-                  sidebarOpen ? 'border-white/[0.08] bg-white/[0.03]' : 'border-transparent'
+                className={`flex h-[70px] items-center gap-[14px] rounded-[10px] border-[0.5px] pl-[9px] transition-colors ${
+                  sidebarOpen ? 'border-[#424242] bg-[#141414]' : 'border-transparent'
                 }`}
               >
                 <div className="flex size-[30px] shrink-0 items-center justify-center rounded-full bg-[var(--color-cyan)]">
@@ -324,19 +348,19 @@ function NavItem({ item, isActive, index, expanded, onNavigate }: NavItemProps) 
         className={`relative flex h-[46px] w-full items-center gap-[18px] pl-[25px] text-left transition-colors cursor-pointer
                     ${isActive ? 'text-[#4DF9ED]' : 'text-white [@media(hover:hover)]:hover:text-[#4DF9ED]'}`}
       >
-        {/* The selected item (Figma): a dark box from 15px to the sidebar's
-            right edge. On the rail the edge cuts it off, solid, with no outline
-            on the right; open, its last stretch fades out into the sidebar. */}
+        {/* The selected item (Figma 3241:1931): a dark box from 15px to the
+            sidebar's right edge, outlined on the top, left and bottom only,
+            round on the left. On the rail the edge cuts it off; open, its fill
+            fades into the sidebar while the outline runs on to the edge. */}
         {isActive && (
           <motion.div
             layoutId="activeNav"
             initial={false}
             style={{
               width: SIDEBAR_EXPANDED - 15,
-              maskImage: 'linear-gradient(to right, #000 88%, transparent)',
-              WebkitMaskImage: 'linear-gradient(to right, #000 88%, transparent)',
+              background: 'linear-gradient(to right, #0e1010 89.9%, #0a0a0a)',
             }}
-            className="absolute inset-y-0 left-[15px] rounded-[10px] border border-[#1b1b1b] bg-[#0e1010]"
+            className="absolute inset-y-0 left-[15px] rounded-l-[10px] border border-r-0 border-[#1b1b1b]"
             transition={{ type: 'spring' as const, stiffness: 320, damping: 32 }}
           />
         )}

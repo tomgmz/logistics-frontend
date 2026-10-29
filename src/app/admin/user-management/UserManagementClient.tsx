@@ -32,11 +32,11 @@ import { READ_ONLY_HINT, useModuleAccess, writeAccess } from '@/components/layou
 import RowActionMenu, { type RowAction } from '@/components/ui/RowActionMenu'
 import AccountActionConfirm, { restoreConfirmDescription, statusConfirmCopy, type AccountConfirm, type AccountKind } from '@/components/admin/AccountActionConfirm'
 
-import RefreshButton from '@/components/ui/RefreshButton'
 import { TableCard } from '@/components/ui/untitled/table-card'
 import { Button } from '@/components/ui/untitled/button'
 import { TabsMinimal } from '@/components/ui/untitled/tabs'
-import { Plus } from '@untitledui/icons'
+import { UserPlus01 as UserPlusIcon } from '@untitledui/icons'
+import StatTiles from '@/components/ui/StatTiles'
 import FilterBar, {
   allowedValues, matchesFilter, optionsFrom, type FilterField, type FilterValues,
 } from '@/components/ui/FilterBar'
@@ -72,6 +72,14 @@ const TABS: { key: TabValue; label: string }[] = [
 ]
 
 type NewAccountType = 'clients' | 'company-driver' | 'vendor-driver'
+
+// The search box names exactly the fields the server matches (user-directory.service.ts).
+const SEARCH_PLACEHOLDER: Record<TabValue, string> = {
+  all:              'Search name, email, phone or company',
+  clients:          'Search name, email, phone or company',
+  drivers:          'Search name, email or phone',
+  'vendor-drivers': 'Search name, email, phone or vendor',
+}
 
 const NEW_ACCOUNT_TYPES: AccountTypeOption<NewAccountType>[] = [
   { key: 'clients',        label: 'Client',                  hint: 'A company that books deliveries.' },
@@ -149,11 +157,11 @@ function formatDateTime(iso: string | null): string {
   })
 }
 
-// Table text, per the Figma (3156:400): names in regular Alegreya Sans bold cyan,
-// the rest bold white. Headers stay grey small caps.
-const NAME_TEXT = 'ff-regular text-[13px] 3xl:text-[15px] font-bold text-[#4df9ed]'
-const TD_NAME   = `px-4 3xl:px-5 py-2 3xl:py-2.5 ${NAME_TEXT}`
-const TD_MUTED  = 'ff-regular px-4 3xl:px-5 py-2 3xl:py-2.5 text-[12px] 3xl:text-[14px] font-bold text-white'
+// The table format (Figma 3234:1482): the name bold cyan, the rest bold white,
+// headers grey small caps. Spacing and sizes come from .data-table (globals.css).
+const NAME_TEXT = 't-name'
+const TD_NAME   = 't-name'
+const TD_MUTED  = ''
 
 
 
@@ -177,7 +185,7 @@ function LastLogin({ iso }: { iso: string | null }) {
 
 const STATUS_CFG: Record<UserStatus, { label: string; cls: string }> = {
   active:             { label: 'Active',      cls: 'bg-[#4df9ed]/[0.24] text-[#4df9ed] border-[#4df9ed]' },
-  inactive:           { label: 'Revoked',     cls: 'bg-[#818181]/20 text-[#818181] border-[#818181]'     },
+  inactive:           { label: 'Revoked',     cls: 'bg-[#8a38f5]/[0.12] text-[#8a38f5] border-[#8a38f5]' },
   deactivated:        { label: 'Deactivated', cls: 'bg-[#ff7a30]/20 text-[#ff7a30] border-[#ff7a30]'     },
   archived:           { label: 'Archived',    cls: 'bg-[#ffea00]/20 text-[#ffea00] border-[#ffea00]'     },
   permanently_locked: { label: 'Locked',      cls: 'bg-[#f62626]/20 text-[#f62626] border-[#f62626]'     },
@@ -186,7 +194,7 @@ const STATUS_CFG: Record<UserStatus, { label: string; cls: string }> = {
 function StatusBadge({ status }: { status: UserStatus }) {
   const { label, cls } = STATUS_CFG[status] ?? STATUS_CFG.inactive
   return (
-    <span className={`font-[family-name:var(--font-alegreya-sc)] inline-flex h-5 min-w-[58px] 3xl:h-[22px] 3xl:min-w-[64px] items-center justify-center whitespace-nowrap rounded-[15px] border-[0.5px] px-1.5 pb-0.5 text-[11px] 3xl:text-[13px] font-bold ${cls}`}>
+    <span className={`t-badge min-w-[62px] 3xl:min-w-[70px] ${cls}`}>
       {label}
     </span>
   )
@@ -270,7 +278,7 @@ function AccessBadge({ access }: { access: VendorDriverUser['access'] | undefine
   return (
     <span
       title={access.last_used_at ? `Last used ${formatDateTime(access.last_used_at)}` : undefined}
-      className={`font-[family-name:var(--font-alegreya-sc)] inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold tracking-wide ${cfg.cls}`}
+      className={`t-badge gap-1 ${cfg.cls}`}
     >
       <KeyRound size={10} /> {cfg.label}
     </span>
@@ -403,9 +411,9 @@ function TableSkeleton({ cols, rows }: { cols: number; rows: number }) {
   return (
     <>
       {Array.from({ length: rows }).map((_, i) => (
-        <tr key={i} className="border-b border-[#424242]">
+        <tr key={i}>
           {Array.from({ length: cols }).map((_, j) => (
-            <td key={j} className="px-4 3xl:px-5 py-2 3xl:py-2.5">
+            <td key={j}>
               <div
                 className="h-3 animate-pulse rounded bg-[#2a2a2a]"
                 style={{ width: j === 0 ? '140px' : j === cols - 1 ? '60px' : '100px', animationDelay: `${i * 40}ms` }}
@@ -449,9 +457,10 @@ function EmptyState({ tab, onAdd, showAdd, canAdd, archived = false, filtered, o
   )
 }
 
+// Figma 3234:1482: an outline in the role's colour, white text, no fill.
 const ROLE_COLORS: Record<string, string> = {
-  driver: 'bg-sky-500/15 text-sky-400 border-sky-500/30',
-  client: 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30',
+  driver: 'border-[#f62626]',
+  client: 'border-[#3af626]',
 }
 const ROLE_LABELS: Record<string, string> = {
   driver: 'Driver',
@@ -459,10 +468,10 @@ const ROLE_LABELS: Record<string, string> = {
 }
 
 function RoleBadge({ role }: { role: string }) {
-  const cls = ROLE_COLORS[role] ?? 'bg-[#818181]/10 text-[#818181] border-[#818181]/30'
+  const cls = ROLE_COLORS[role] ?? 'border-[#818181]'
   const label = ROLE_LABELS[role] ?? role
   return (
-    <span className={`font-[family-name:var(--font-alegreya-sc)] inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold tracking-wide ${cls}`}>
+    <span className={`t-badge text-white ${cls}`}>
       {label}
     </span>
   )
@@ -490,7 +499,7 @@ function LicenseExpiryBadge({ expiry }: { expiry: string | null }) {
   return (
     <span
       title="Update this driver's license details once it is renewed."
-      className={`font-[family-name:var(--font-alegreya-sc)] inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold tracking-wide whitespace-nowrap ${cls}`}
+      className={`t-badge gap-1 whitespace-nowrap ${cls}`}
     >
       <AlertTriangle size={11} /> {label}
     </span>
@@ -505,8 +514,8 @@ function renderCells(user: AnyUser, tab: TabValue) {
         <td className={TD_NAME}>{name}</td>
         <td className={TD_MUTED}><EmailText value={user.email} /></td>
         <td className={TD_MUTED}>{user.phone ?? '—'}</td>
-        <td className="px-4 3xl:px-5 py-2 3xl:py-2.5"><RoleBadge role={user.role} /></td>
-        <td className="px-4 3xl:px-5 py-2 3xl:py-2.5"><StatusBadge status={user.status} /></td>
+        <td><RoleBadge role={user.role} /></td>
+        <td><StatusBadge status={user.status} /></td>
       </>
     )
   }
@@ -520,7 +529,7 @@ function renderCells(user: AnyUser, tab: TabValue) {
           <td className={TD_NAME}>{name}</td>
           <td className={TD_MUTED}><EmailText value={u.email} /></td>
           <td className={TD_MUTED}>{u.clients?.company_name ?? '—'}</td>
-          <td className="px-4 3xl:px-5 py-2 3xl:py-2.5"><StatusBadge status={u.status} /></td>
+          <td><StatusBadge status={u.status} /></td>
           <td className={TD_MUTED}><LastLogin iso={u.last_login_at ?? null} /></td>
         </>
       )
@@ -533,20 +542,20 @@ function renderCells(user: AnyUser, tab: TabValue) {
         <>
           <td className={TD_NAME}>{name}</td>
           <td className={TD_MUTED}>{u.drivers?.license_number ?? '—'}</td>
-          <td className="px-4 3xl:px-5 py-2 3xl:py-2.5 text-[12px] 3xl:text-[14px] text-white">
+          <td >
             <div className="flex flex-col items-start gap-1">
               <span className="ff-regular font-bold">{formatDate(u.drivers?.license_expiry ?? null)}</span>
               <LicenseExpiryBadge expiry={u.drivers?.license_expiry ?? null} />
             </div>
           </td>
-          <td className="px-4 3xl:px-5 py-2 3xl:py-2.5">
+          <td>
             {drvStatus && (
-              <span className="font-[family-name:var(--font-alegreya-sc)] inline-flex items-center rounded-full border border-[#4df9ed]/30 bg-[#4df9ed]/10 px-2 py-0.5 text-[11px] font-semibold text-[#4df9ed]">
+              <span className="t-badge border-[#4df9ed] bg-[#4df9ed]/[0.24] text-[#4df9ed]">
                 {drvStatus.replace(/_/g, ' ')}
               </span>
             )}
           </td>
-          <td className="px-4 3xl:px-5 py-2 3xl:py-2.5"><StatusBadge status={u.status} /></td>
+          <td><StatusBadge status={u.status} /></td>
         </>
       )
     }
@@ -555,20 +564,20 @@ function renderCells(user: AnyUser, tab: TabValue) {
       const name = [u.first_name, u.middle_name, u.last_name, u.suffix].filter(Boolean).join(' ') || '—'
       return (
         <>
-          <td className="px-4 3xl:px-5 py-2 3xl:py-2.5">
+          <td>
             <p className={NAME_TEXT}>{name}</p>
             <RevokedFlag user={u} />
           </td>
           <td className={TD_MUTED}>{u.drivers?.vendor_name || '—'}</td>
           <td className={TD_MUTED}><EmailText value={u.email} /></td>
-          <td className="px-4 3xl:px-5 py-2 3xl:py-2.5 text-[12px] 3xl:text-[14px] text-white">
+          <td >
             <div className="flex flex-col items-start gap-1">
               <span className="ff-regular font-bold">{formatDate(u.drivers?.license_expiry ?? null)}</span>
               <LicenseExpiryBadge expiry={u.drivers?.license_expiry ?? null} />
             </div>
           </td>
-          <td className="px-4 3xl:px-5 py-2 3xl:py-2.5"><AccessBadge access={u.access} /></td>
-          <td className="px-4 3xl:px-5 py-2 3xl:py-2.5"><StatusBadge status={u.status} /></td>
+          <td><AccessBadge access={u.access} /></td>
+          <td><StatusBadge status={u.status} /></td>
         </>
       )
     }
@@ -839,9 +848,6 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
 
   const newAccountTypes = itMode ? [] : NEW_ACCOUNT_TYPES
 
-  function handleRefresh() {
-    void refetchCurrentTab()
-  }
 
   const colCount = HEADERS[activeTab].length + 1
 
@@ -850,19 +856,12 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
       <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-60px)] overflow-y-auto overflow-x-hidden lg:overflow-hidden bg-[#0a0a0a] text-white">
         <div className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0 px-3 py-3 sm:px-4 lg:px-5 3xl:px-6 lg:pt-3 lg:pb-4 3xl:pb-5 gap-3 3xl:gap-4 lg:overflow-hidden">
 
-          {/* Stats */}
-          <div className="grid grid-cols-3 gap-2.5 sm:gap-3 3xl:gap-4 shrink-0">
-            {[
-              { label: 'Total Users', value: stats.total,    color: 'text-white'     },
-              { label: 'Active',      value: stats.active,   color: 'text-[#4df9ed]' },
-              { label: 'Archived',    value: stats.archived, color: 'text-[#ffea00]' },
-            ].map((s) => (
-              <div key={s.label} className="min-w-0 rounded-[10px] border border-[#424242] bg-[#2a2828] px-2.5 py-2 sm:px-4 sm:py-2.5 3xl:px-5 3xl:py-3 shadow-[0_4px_4px_rgba(0,0,0,0.25)]">
-                <p className="text-[10px] leading-tight sm:text-[11px] 3xl:text-[13px] font-bold uppercase text-[#818181]">{s.label}</p>
-                <p className={`mt-1 3xl:mt-2 text-[18px] sm:text-[20px] 3xl:text-[24px] font-bold leading-none ${s.color}`}>{s.value}</p>
-              </div>
-            ))}
-          </div>
+          {/* Stats (Figma 3234:1482). */}
+          <StatTiles tiles={[
+            { label: 'Total Users', value: stats.total,    color: 'text-[#3af626]' },
+            { label: 'Active',      value: stats.active,   color: 'text-[#4df9ed]' },
+            { label: 'Archived',    value: stats.archived, color: 'text-[#ffea00]' },
+          ]} />
 
           {/* Table card */}
           <TableCard.Root className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0">
@@ -872,30 +871,22 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
                 to the IT Administrator (2026-10-24), so no tab row at all. */}
             {sectionTabs}
 
-            {/* Untitled UI's TableCard.Header from the "No vendors found" table
-                (components/ui/untitled): title and count badge, the add
-                button on the right. On the IT Admin tab there is nothing to add:
-                the IT Administrator hands the role over from their own portal. */}
-            <TableCard.Header
-              className="shrink-0"
-              title={`${ACCOUNT_NOUN[activeTab]}s`}
-              contentTrailing={!itMode && (
-                <Button size="sm" iconLeading={Plus} onClick={openCreate} {...writeAccess(access.canCreate)} className="max-md:w-full">
-                  Add User
-                </Button>
-              )}
-            />
-
-            {/* Untitled UI's filter row from the same table: tabs on the left
-                (which list), search with Ctrl/⌘ K, Filters (Archived is a status
-                there) and Refresh on the right. */}
+            {/* The table format's filter row (Figma 3234:1482): search, the
+                All Users / Clients / Drivers switch, Filters (Archived is a status
+                there), Refresh, and Add User at the far right. The IT
+                Administrator adds nobody here. */}
             <FilterBar
               layout="split"
-              search={{ value: searchInput, onChange: setSearchInput, placeholder: 'Search' }}
+              // Names exactly what the server searches (user-directory.service.ts).
+              search={{ value: searchInput, onChange: setSearchInput, placeholder: SEARCH_PLACEHOLDER[activeTab] }}
               fields={filterDefs}
               values={filters}
               onChange={applyFilters}
-              actions={<RefreshButton iconOnly onClick={handleRefresh} loading={(loading || fetching)} disabled={loading || fetching} />}
+              trailing={!itMode && (
+                <Button size="toolbar" color="accent" iconLeading={UserPlusIcon} onClick={openCreate} {...writeAccess(access.canCreate)}>
+                  Add User
+                </Button>
+              )}
               leading={
                 <TabsMinimal
                   label="Accounts"
@@ -955,21 +946,14 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
             <div className="overflow-x-auto flex-[1_0_auto] lg:flex-1 lg:overflow-auto lg:min-h-0">
               {/* Fixed layout: every column, Actions included, gets the same width.
                   Content starts at the left of its column; the row menu sits right. */}
-              <table className="w-full max-lg:min-w-[900px] lg:table-fixed">
-                {/* Headers in the small-caps face, every cell below in regular Alegreya Sans. */}
-                <thead className="sticky top-0 z-10 bg-[#1b1b1b] font-[family-name:var(--font-alegreya-sc)]">
-                  <tr className="border-b border-[#424242]">
-                    {HEADERS[activeTab].map((h) => (
-                      <th key={h} className={`px-4 3xl:px-5 py-2 3xl:py-2.5 text-[11px] 3xl:text-[13px] font-bold lowercase whitespace-nowrap text-left text-[#818181]`}>
-                        {h}
-                      </th>
-                    ))}
-                    <th className="px-4 3xl:px-5 py-2 3xl:py-2.5 text-right text-[11px] 3xl:text-[13px] font-bold lowercase text-[#818181]">
-                      actions
-                    </th>
+              <table className="data-table max-lg:min-w-[900px] lg:table-fixed">
+                <thead className="sticky top-0 z-10">
+                  <tr>
+                    {HEADERS[activeTab].map((h) => <th key={h}>{h}</th>)}
+                    <th className="text-right">actions</th>
                   </tr>
                 </thead>
-                <tbody className="ff-regular max-lg:whitespace-nowrap">
+                <tbody className="max-lg:whitespace-nowrap">
                   {(loading || fetching) ? (
                     <TableSkeleton cols={colCount} rows={pageSize} />
                   ) : users.length === 0 ? (
@@ -991,11 +975,11 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
                           initial={{ opacity: 0, y: 6 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: i * 0.02 }}
-                          className="border-b border-[#424242] transition-colors hover:bg-[#2a2a2a]/40"
+                          className="transition-colors [@media(hover:hover)]:hover:bg-[#2a2a2a]/40"
                         >
                           {renderCells(user, activeTab)}
                           {/* The row menu sits at the far right of the table. */}
-                          <td className="px-4 3xl:px-5 py-2 3xl:py-2.5 text-right">
+                          <td className="text-right">
                             {user.status === 'archived' ? (
                               <ArchivedRowMenu
                                 user={user}

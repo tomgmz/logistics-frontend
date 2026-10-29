@@ -34,7 +34,6 @@ import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { useAuthStore } from '@/lib/store/auth.store'
 
-import RefreshButton from '@/components/ui/RefreshButton'
 import Pagination from '@/components/ui/Pagination'
 import { useServerTable } from '@/lib/hooks/useServerTable'
 import { useDebouncedValue } from '@/lib/hooks/useDebouncedValue'
@@ -285,13 +284,9 @@ export default function ReportsView() {
             header (title + count), then the filter row with the status tabs on
             the left (a dropdown on phones), search, Filters and Refresh. */}
         <TableCard.Root className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0">
-          <TableCard.Header
-            className="shrink-0"
-            title="Reports"
-          />
           <FilterBar
             layout="split"
-            search={{ value: search, onChange: setSearch, placeholder: 'Search driver, plate, reference' }}
+            search={{ value: search, onChange: setSearch, placeholder: 'Search driver, plate or booking' }}
             leading={
               <TabsMinimal
                 label="Report status"
@@ -309,7 +304,6 @@ export default function ReportsView() {
             }]}
             values={typeFilter === 'all' ? [] : [{ field: 'type', op: 'is' as const, value: typeFilter }]}
             onChange={(v) => setTypeFilter((v.find((r) => r.field === 'type')?.value ?? 'all') as typeof typeFilter)}
-            actions={<RefreshButton iconOnly onClick={() => void load()} loading={loading} disabled={loading} />}
           />
 
           {loading ? (
@@ -342,8 +336,8 @@ export default function ReportsView() {
           ) : (
             <>
             <div className="flex-[1_0_auto] lg:flex-1 overflow-x-auto lg:overflow-auto lg:min-h-0">
-              <table className="w-full text-sm min-w-[900px]">
-                <thead className="sticky top-0 z-10 bg-[#222222] font-[family-name:var(--font-alegreya-sc)]">
+              <table className="data-table min-w-[900px]">
+                <thead className="sticky top-0 z-10">
                   <tr className="h-11 border-b border-[#424242]">
                     {['Received', 'Incident', 'Driver', 'Vehicle', 'Booking', 'Status'].map((h) => (
                       <th key={h} className="px-4 md:px-6 py-2 text-left text-xs font-semibold whitespace-nowrap text-[#818181]">{h}</th>
@@ -379,9 +373,9 @@ export default function ReportsView() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 md:px-6 py-4 text-[#c4c4c4]">{reportDriverName(r)}</td>
-                      <td className="px-4 md:px-6 py-4 whitespace-nowrap font-mono text-[#c4c4c4]">{r.trucks?.plate_number ?? <span className="text-[#818181] font-sans">—</span>}</td>
-                      <td className="px-4 md:px-6 py-4 whitespace-nowrap text-[#c4c4c4]">{r.bookings?.reference_number ?? '—'}</td>
+                      <td className="px-4 md:px-6 py-4">{reportDriverName(r)}</td>
+                      <td className="px-4 md:px-6 py-4 whitespace-nowrap font-mono">{r.trucks?.plate_number ?? <span className="text-[#818181] font-sans">—</span>}</td>
+                      <td className="px-4 md:px-6 py-4 whitespace-nowrap">{r.bookings?.reference_number ?? '—'}</td>
                       <td className="px-4 md:px-6 py-4 font-[family-name:var(--font-alegreya-sc)]"><ReportStatusBadge status={r.status} /></td>
                       <td className="px-4 md:px-6 py-4">
                         <div className="flex items-center justify-end gap-1.5">

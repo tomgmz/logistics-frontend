@@ -15,7 +15,6 @@ import {
   supportService, TICKET_CATEGORY_LABEL, type SupportTicket, type TicketCategory,
 } from '@/lib/services/support.service'
 
-import RefreshButton from '@/components/ui/RefreshButton'
 import Pagination from '@/components/ui/Pagination'
 import { useServerTable } from '@/lib/hooks/useServerTable'
 import { useDebouncedValue } from '@/lib/hooks/useDebouncedValue'
@@ -128,13 +127,9 @@ export default function SupportTicketsView() {
             (title + count), then the filter row with the status tabs on the
             left (a dropdown on phones), search and Refresh. */}
         <TableCard.Root className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0">
-          <TableCard.Header
-            className="shrink-0"
-            title="Tickets"
-          />
           <FilterBar
             layout="split"
-            search={{ value: search, onChange: setSearch, placeholder: 'Search ticket, client, subject, booking' }}
+            search={{ value: search, onChange: setSearch, placeholder: 'Search ticket, client, subject or booking' }}
             leading={
               <TabsMinimal
                 label="Ticket status"
@@ -146,7 +141,6 @@ export default function SupportTicketsView() {
                 onSelectionChange={setStatusFilter}
               />
             }
-            actions={<RefreshButton iconOnly onClick={() => void load()} loading={loading} disabled={loading} />}
           />
 
           {loading ? (
@@ -181,8 +175,8 @@ export default function SupportTicketsView() {
           ) : (
             <>
             <div className="flex-[1_0_auto] lg:flex-1 overflow-x-auto lg:overflow-auto lg:min-h-0">
-              <table className="w-full text-sm min-w-[960px]">
-                <thead className="sticky top-0 z-10 bg-[#222222] font-[family-name:var(--font-alegreya-sc)]">
+              <table className="data-table min-w-[960px]">
+                <thead className="sticky top-0 z-10">
                   <tr className="h-11 border-b border-[#424242]">
                     {['Ticket', 'Subject', 'Client', 'Category', 'Booking', 'Raised', 'Status'].map((h) => (
                       <th key={h} className={TH}>{h}</th>
@@ -218,8 +212,8 @@ export default function SupportTicketsView() {
                             <p className="text-[#c4c4c4]">{t.clients?.company_name ?? '—'}</p>
                             {opener && <p className="text-[#818181]">{opener}</p>}
                           </td>
-                          <td className={`${TD} whitespace-nowrap text-[#c4c4c4]`}>{TICKET_CATEGORY_LABEL[t.category as TicketCategory] ?? t.category}</td>
-                          <td className={`${TD} whitespace-nowrap text-[#c4c4c4]`}>{t.bookings?.reference_number ?? '—'}</td>
+                          <td className={`${TD} whitespace-nowrap`}>{TICKET_CATEGORY_LABEL[t.category as TicketCategory] ?? t.category}</td>
+                          <td className={`${TD} whitespace-nowrap`}>{t.bookings?.reference_number ?? '—'}</td>
                           <td className={`${TD} whitespace-nowrap`}>
                             <div className="text-white">{formatDate(t.created_at)}</div>
                             <div className="text-[#818181]">{formatTime(t.created_at)}</div>

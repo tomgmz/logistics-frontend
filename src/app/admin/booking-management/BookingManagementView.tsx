@@ -97,7 +97,6 @@ import {
   DocumentRow,
 } from './BookingDetailParts'
 
-import RefreshButton from '@/components/ui/RefreshButton'
 import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
 
 const BOOKING_STATUSES: AdminBookingLifecycleStatus[] = [
@@ -2077,16 +2076,11 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
               on the right. The General Manager and Fleet Manager views have one
               fixed status, so no tabs. */}
           <TableCard.Root className="flex-[1_0_auto] lg:flex-1 lg:min-h-0 flex flex-col">
-            <TableCard.Header
-              className="shrink-0"
-              title="Bookings"
-            />
             <FilterBar
               layout="split"
-              search={{ value: search, onChange: (v) => { setSearch(v); setPage(0) }, placeholder: 'Search' }}
+              search={{ value: search, onChange: (v) => { setSearch(v); setPage(0) }, placeholder: 'Search reference, company, pickup or drop-off' }}
               // Untitled UI's "Select dates": the schedule-date window, filtered on the server.
               dateRange={{ value: dateRange, onChange: (r) => { setDateRange(r); setPage(0) } }}
-              actions={<RefreshButton iconOnly onClick={() => void loadPage()} />}
               leading={!forcedStatus && (
                 <TabsMinimal
                   label="Booking status"
@@ -2121,9 +2115,9 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
             ) : (
               <>
                 <div className="overflow-x-auto lg:overflow-auto flex-[1_0_auto] lg:flex-1 lg:min-h-0">
-                  <table className="w-full text-left border-collapse">
+                  <table className="data-table">
                     {/* Headers keep the small caps face; the data rows are regular Alegreya Sans. */}
-                    <thead className="sticky top-0 z-[1] bg-[#181717]">
+                    <thead className="sticky top-0 z-10">
                       <tr className="text-[13px] 3xl:text-[16px] text-[#818181] [&>th]:border-b-[0.5px] [&>th]:border-[#818181] [&>th]:font-bold [&>th]:px-4 3xl:[&>th]:px-6 [&>th]:py-2.5 3xl:[&>th]:py-[13px] [&>th]:whitespace-nowrap">
                         <th>booking</th>
                         <th>status</th>
