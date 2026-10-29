@@ -4,13 +4,11 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-} from 'recharts'
-import {
-  AlertTriangle, CalendarCheck, CheckCircle2, ClipboardCheck, Gauge, Flag,
+  AlertTriangle, CalendarCheck, CheckCircle2, ClipboardCheck, Gauge,
   MapPin, PackageCheck, ShieldAlert, Truck, Wrench, ChevronRight, Clock, Ticket,
 } from 'lucide-react'
 import SupportTicketsPanel from './SupportTicketsPanel'
+import AdminDashboard, { AdminDashboardSkeleton } from './AdminDashboard'
 import { Skeleton } from '@/components/ui/Skeleton'
 
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
@@ -42,22 +40,6 @@ const BASE: Record<StaffRole, string> = {
   fleet_manager:      '/fleet_admin',
 }
 
-// Validated (dataviz validate_palette, dark, surface #1b1b1b): both inside the
-// lightness band, CVD and normal-vision separation pass. The brand cyan itself
-// is too light to read as a filled bar on this surface.
-const SERIES = { created: '#4df9ed', delivered: '#8a38f5' } as const
-
-const STATUS_LABEL: Record<string, string> = {
-  pending:    'Pending approval',
-  approved:   'Approved, awaiting assignment',
-  assigned:   'Assigned',
-  in_transit: 'In transit',
-  delivered:  'Delivered, awaiting client',
-  completed:  'Completed',
-  cancelled:  'Cancelled',
-}
-const STATUS_ORDER = ['pending', 'approved', 'assigned', 'in_transit', 'delivered', 'completed', 'cancelled']
-
 type Tone = 'cyan' | 'amber' | 'red' | 'muted'
 const TONE: Record<Tone, string> = {
   cyan:  'var(--color-cyan)',
@@ -66,7 +48,7 @@ const TONE: Record<Tone, string> = {
   muted: '#818181',
 }
 
-interface CardSpec {
+export interface CardSpec {
   label: string
   hint:  string
   count: number
@@ -154,13 +136,11 @@ function cardsFor(role: StaffRole, d: Data): CardSpec[] {
           href: `${base}/vehicle-management`, icon: <Truck size={16} />, tone: 'amber' },
         reportsCard,
         ticketsCard,
-        { label: 'Flagged vendor drivers', hint: 'Access revoked; restore before reuse', count: d.flagged_vendor_drivers,
-          href: `${base}/user-management`, icon: <Flag size={16} />, tone: 'muted' },
       ]
   }
 }
 
-interface ListSpec {
+export interface ListSpec {
   title: string
   empty: string
   bookings?: DashboardBooking[]
@@ -200,11 +180,8 @@ function listsFor(role: StaffRole, d: Data): ListSpec[] {
         { title: 'Dispatching today', empty: 'No dispatches today.', bookings: q.dispatch_today.items, total: q.dispatch_today.count },
       ]
     case 'admin':
-      return [
-        { title: 'Awaiting approval', empty: 'Nothing to approve.', bookings: q.gm_pending.items, total: q.gm_pending.count },
-        { title: 'Needs vehicle and driver', empty: 'Every approved booking is crewed.', bookings: q.ops_pending.items, total: q.ops_pending.count },
-        { title: 'Vehicles needing a look', empty: 'Every vehicle is ready.', vehicles: vehicleList(), total: vehicleTotal },
-      ]
+      // The Company Administrator's cards already open each queue's module.
+      return []
   }
 }
 
@@ -277,103 +254,16 @@ function ListPanel({ list, base }: { list: ListSpec; base: string }) {
   )
 }
 
-function Analytics({ d }: { d: Data }) {
-  const a = d.analytics
-  const series = a.series.map((p) => ({ ...p, label: formatDate(p.day).replace(/,?\s*\d{4}$/, '') }))
-  const inTransit = d.queues.in_transit.count
-  const mixTotal  = Object.values(a.status_mix).reduce((s, n) => s + n, 0)
-  const topMax    = Math.max(1, ...a.top_clients.map((c) => c.count))
-
-  const tiles = [
-    { label: 'Total bookings', value: a.totals.bookings },
-    { label: 'In transit now', value: inTransit },
-    { label: 'Completed',      value: a.totals.completed },
-    { label: 'Cancelled',      value: a.totals.cancelled },
-  ]
-
-  return (
-    <section className="space-y-3">
-      <h2 className="text-xs font-bold uppercase tracking-wider text-white/40">Analytics</h2>
-
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {tiles.map((t) => (
-          <div key={t.label} className="rounded-xl border border-white/[0.08] bg-[var(--color-surface)] p-3.5">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-white/45">{t.label}</p>
-            <p className="mt-1 text-2xl font-bold tabular-nums text-white">{t.value}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="grid gap-3 lg:grid-cols-3">
-        <div className="rounded-xl border border-white/[0.08] bg-[var(--color-surface)] p-3.5 lg:col-span-2">
-          <h3 className="text-sm font-bold text-white">Bookings, last 14 days</h3>
-          <p className="mb-3 text-[11px] text-white/40">Created per day against delivered per day</p>
-          <div className="h-[220px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={series} barGap={2} barCategoryGap="22%" margin={{ top: 4, right: 4, bottom: 0, left: -24 }}>
-                <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.06)" />
-                <XAxis dataKey="label" tick={{ fill: '#818181', fontSize: 10 }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-                <YAxis allowDecimals={false} tick={{ fill: '#818181', fontSize: 10 }} tickLine={false} axisLine={false} />
-                <Tooltip
-                  cursor={{ fill: 'rgba(255,255,255,0.04)' }}
-                  contentStyle={{ background: '#111', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, fontSize: 12 }}
-                  labelStyle={{ color: '#fff' }}
-                  itemStyle={{ color: '#d4d4d4' }}
-                />
-                <Legend iconType="square" iconSize={9} wrapperStyle={{ fontSize: 11, color: '#bdbdbd' }} />
-                <Bar dataKey="created"   name="Created"   fill={SERIES.created}   radius={[4, 4, 0, 0]} maxBarSize={14} />
-                <Bar dataKey="delivered" name="Delivered" fill={SERIES.delivered} radius={[4, 4, 0, 0]} maxBarSize={14} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-white/[0.08] bg-[var(--color-surface)] p-3.5">
-          <h3 className="mb-3 text-sm font-bold text-white">Where bookings stand</h3>
-          <ul className="space-y-2">
-            {STATUS_ORDER.filter((s) => a.status_mix[s]).map((s) => (
-              <li key={s} className="flex items-center justify-between gap-2 text-xs">
-                <span className="text-white/70">{STATUS_LABEL[s] ?? s}</span>
-                <span className="tabular-nums text-white">
-                  {a.status_mix[s]}
-                  <span className="ml-1.5 text-white/35">{Math.round((a.status_mix[s] / Math.max(1, mixTotal)) * 100)}%</span>
-                </span>
-              </li>
-            ))}
-            {mixTotal === 0 && <li className="text-xs text-white/40">No bookings yet.</li>}
-          </ul>
-
-          <h3 className="mb-2 mt-5 text-sm font-bold text-white">Busiest clients, last 30 days</h3>
-          <ul className="space-y-2">
-            {a.top_clients.map((c) => (
-              <li key={c.client} className="text-xs">
-                <div className="flex justify-between gap-2">
-                  <span className="truncate text-white/70">{c.client}</span>
-                  <span className="tabular-nums text-white">{c.count}</span>
-                </div>
-                <div className="mt-1 h-1 rounded-full bg-white/[0.06]">
-                  <div className="h-1 rounded-full" style={{ width: `${(c.count / topMax) * 100}%`, background: SERIES.created }} />
-                </div>
-              </li>
-            ))}
-            {a.top_clients.length === 0 && <li className="text-xs text-white/40">No bookings in the last 30 days.</li>}
-          </ul>
-        </div>
-      </div>
-    </section>
-  )
-}
-
 /** How many shortcut cards and lists each desk shows (cardsFor / listsFor). */
 const SKELETON_COUNTS: Record<StaffRole, { cards: number; lists: number }> = {
-  admin:              { cards: 7, lists: 3 },
+  admin:              { cards: 6, lists: 0 },
   general_manager:    { cards: 4, lists: 2 },
   operations_manager: { cards: 6, lists: 3 },
   fleet_manager:      { cards: 5, lists: 3 },
 }
 
 function cardGrid(role: StaffRole) {
-  return `grid grid-cols-2 gap-3 md:grid-cols-3 ${role === 'general_manager' ? 'xl:grid-cols-4' : 'xl:grid-cols-5'} ${role === 'admin' ? '2xl:grid-cols-6' : ''}`
+  return `grid grid-cols-2 gap-3 md:grid-cols-3 ${role === 'general_manager' ? 'xl:grid-cols-4' : 'xl:grid-cols-5'}`
 }
 
 const PANEL = 'rounded-xl border border-white/[0.08] bg-[var(--color-surface)]'
@@ -395,31 +285,6 @@ function StaffDashboardSkeleton({ role }: { role: StaffRole }) {
           </div>
         ))}
       </div>
-
-      {role === 'admin' && (
-        <section className="space-y-3">
-          <Skeleton className="h-3 w-20" />
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className={`${PANEL} space-y-2 p-3.5`}>
-                <Skeleton className="h-2.5 w-24" />
-                <Skeleton className="h-7 w-14" />
-              </div>
-            ))}
-          </div>
-          <div className="grid gap-3 lg:grid-cols-3">
-            <div className={`${PANEL} p-3.5 lg:col-span-2`}>
-              <Skeleton className="h-3.5 w-44" />
-              <Skeleton className="mb-3 mt-1.5 h-2.5 w-56" />
-              <Skeleton className="h-[220px] w-full rounded-lg" />
-            </div>
-            <div className={`${PANEL} space-y-2.5 p-3.5`}>
-              <Skeleton className="mb-3 h-3.5 w-36" />
-              {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-3 w-full" />)}
-            </div>
-          </div>
-        </section>
-      )}
 
       <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
         {Array.from({ length: lists }).map((_, i) => (
@@ -469,6 +334,24 @@ export default function StaffDashboard({ role }: { role: StaffRole }) {
 
   const base = BASE[role]
 
+  // The Company Administrator's dashboard follows Untitled UI's dashboard-04,
+  // like the IT Administrator's, so it has its own shell and layout.
+  if (role === 'admin') {
+    return (
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-[#0a0a0a] text-white px-4 py-5 lg:px-8 lg:py-6">
+        <div className="flex w-full flex-col gap-5 lg:gap-6">
+          {error && (
+            <div className="rounded-xl border border-[#f62626]/30 bg-[#f62626]/10 px-4 py-2.5 text-sm text-[#f62626]">{error}</div>
+          )}
+          {!data
+            ? loading && <AdminDashboardSkeleton cards={SKELETON_COUNTS.admin.cards} />
+            : <AdminDashboard data={data} cards={cardsFor(role, data)} />}
+          <div className="h-4" />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex-1 overflow-y-auto bg-[var(--color-bg)] ff-sc">
       <div className="w-full space-y-5 px-4 py-4 lg:px-5">
@@ -487,8 +370,6 @@ export default function StaffDashboard({ role }: { role: StaffRole }) {
             <div className={cardGrid(role)}>
               {cardsFor(role, data).map((c, i) => <ShortcutCard key={c.label} card={c} index={i} />)}
             </div>
-
-            {role === 'admin' && <Analytics d={data} />}
 
             <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
               {listsFor(role, data).map((l) => <ListPanel key={l.title} list={l} base={base} />)}

@@ -598,7 +598,8 @@ function SecurityCard({ data }: { data: ItDashboardSummary['security'] }) {
               ))}
             </Table>
           </div>
-          <div className="overflow-hidden rounded-xl ring-1 ring-[#2a2a2a] ring-inset">
+          {/* Stretched to the row's height; the footer stays at the bottom. */}
+          <div className="flex flex-col overflow-hidden rounded-xl ring-1 ring-[#2a2a2a] ring-inset">
             <Table head={['Locked accounts right now', 'Lock']} minWidth="min-w-[420px]">
               {data.locked_accounts.length === 0 ? (
                 <EmptyRow cols={2}>No accounts are locked.</EmptyRow>
@@ -617,7 +618,9 @@ function SecurityCard({ data }: { data: ItDashboardSummary['security'] }) {
                 </tr>
               ))}
             </Table>
-            <TableFooter shown={Math.min(data.locked_accounts.length, DASHBOARD_ROWS)} total={data.locked_accounts.length} />
+            <div className="mt-auto">
+              <TableFooter shown={Math.min(data.locked_accounts.length, DASHBOARD_ROWS)} total={data.locked_accounts.length} />
+            </div>
           </div>
         </div>
       </div>
@@ -679,16 +682,16 @@ function AdministratorsCard({ data, now }: { data: ItDashboardSummary['accounts'
           No active IT Administrator. Staff password resets cannot be handled until one is set.
         </p>
       )}
-      <Table head={['Name', 'Role', 'Status', 'Last sign-in']} minWidth="min-w-[640px]">
+      <Table head={['Name', 'Role', 'Status', 'Last sign-in']} minWidth="min-w-[560px]">
         {data.it_admin && (
           <tr>
             <td className="px-4 md:px-6 py-3">
               <p className="text-white">{data.it_admin.name}</p>
               <p className="text-xs text-[#818181] break-all">{data.it_admin.email}</p>
             </td>
-            <td className="px-4 md:px-6 py-3 whitespace-nowrap">IT Administrator</td>
+            <td className="px-4 md:px-6 py-3">IT Administrator</td>
             <td className="px-4 md:px-6 py-3"><Pill label="Active" color={COLOR.green} /></td>
-            <td className="px-4 md:px-6 py-3 whitespace-nowrap">{lastSignIn(data.it_admin.last_login_at)}</td>
+            <td className="px-4 md:px-6 py-3">{lastSignIn(data.it_admin.last_login_at)}</td>
           </tr>
         )}
         {admins.map((a) => (
@@ -697,13 +700,13 @@ function AdministratorsCard({ data, now }: { data: ItDashboardSummary['accounts'
               <p className="text-white">{a.name}</p>
               <p className="text-xs text-[#818181] break-all">{a.email}</p>
             </td>
-            <td className="px-4 md:px-6 py-3 whitespace-nowrap">Company Administrator</td>
+            <td className="px-4 md:px-6 py-3">Company Administrator</td>
             <td className="px-4 md:px-6 py-3">
               {a.status === 'active'
                 ? <Pill label="Active" color={COLOR.green} />
                 : <Pill label={a.status === 'inactive' ? 'Revoked' : 'Locked'} color={COLOR.amber} />}
             </td>
-            <td className="px-4 md:px-6 py-3 whitespace-nowrap">{lastSignIn(a.last_login_at)}</td>
+            <td className="px-4 md:px-6 py-3">{lastSignIn(a.last_login_at)}</td>
           </tr>
         ))}
       </Table>
