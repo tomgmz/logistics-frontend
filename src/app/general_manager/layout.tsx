@@ -1,16 +1,16 @@
 'use client'
 
 import { ReactNode, useEffect } from 'react'
-import { CalendarCheck, FileSearch, Truck, LayoutDashboard } from 'lucide-react'
+import { CalendarRange, Files, Truck, LayoutDashboard } from 'lucide-react'
 import ReusableDashboardShell from '@/components/layout/ReusableDashboardShell'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { goHomeSignedOut } from '@/lib/auth-redirect'
 
 const NAV_ITEMS = [
-  { href: '/general_manager/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={17} /> },
-  { href: '/general_manager/booking-management', label: 'Booking Management', icon: <CalendarCheck size={17} /> },
-  { href: '/general_manager/vehicle-management', label: 'Vehicle Management', icon: <Truck size={17} /> },
-  { href: '/general_manager/document-management', label: 'Document Management', icon: <FileSearch size={17} /> },
+  { href: '/general_manager/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
+  { href: '/general_manager/booking-management', label: 'Booking Management', icon: <CalendarRange size={20} /> },
+  { href: '/general_manager/vehicle-management', label: 'Vehicle Management', icon: <Truck size={20} /> },
+  { href: '/general_manager/document-management', label: 'Document Management', icon: <Files size={20} /> },
 ]
 
 export default function GeneralManagerLayout({ children }: { children: ReactNode }) {

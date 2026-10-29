@@ -2,16 +2,16 @@
 
 import {
   Users,
-  FileSearch,
-  ScrollText,
+  Files,
+  ListMinus,
   Truck,
-  CalendarCheck,
+  CalendarRange,
   MapPin,
   CreditCard,
   History,
-  Layers,
+  MonitorCog,
   LayoutDashboard,
-  Siren,
+  TriangleAlert,
   Ticket,
 } from 'lucide-react'
 import ReusableDashboardShell from '@/components/layout/ReusableDashboardShell'
@@ -23,57 +23,57 @@ const adminNavItems = [
   {
     href: '/admin/dashboard',
     label: 'Dashboard',
-    icon: <LayoutDashboard size={17} />,
+    icon: <LayoutDashboard size={20} />,
   },
   {
     href: '/admin/user-management',
     label: 'User Management',
-    icon: <Users size={17} />,
+    icon: <Users size={20} />,
   },
   {
     href: '/admin/booking-management',
     label: 'Booking Management',
-    icon: <CalendarCheck size={17} />,
+    icon: <CalendarRange size={20} />,
   },
   {
     href: '/admin/transit-tracking',
     label: 'Transit Tracking',
-    icon: <MapPin size={17} />,
+    icon: <MapPin size={20} />,
   },
   {
     href: '/admin/vehicle-management',
     label: 'Vehicle Management',
-    icon: <Truck size={17} />,
+    icon: <Truck size={20} />,
   },
   {
     href: '/admin/reports',
     label: 'Reports',
-    icon: <Siren size={17} />,
+    icon: <TriangleAlert size={20} />,
   },
   {
     href: '/admin/transaction-history',
     label: 'Transaction History',
-    icon: <History size={17} />,
+    icon: <History size={20} />,
   },
   {
     href: '/admin/document-management',
     label: 'Document Management',
-    icon: <FileSearch size={17} />,
+    icon: <Files size={20} />,
   },
   {
     href: '/admin/system-maintenance',
     label: 'System Maintenance',
-    icon: <Layers size={17} />,
+    icon: <MonitorCog size={20} />,
   },
   {
     href: '/admin/audit-logs',
     label: 'Audit Logs',
-    icon: <ScrollText size={17} />,
+    icon: <ListMinus size={20} />,
   },
   {
     href: '/admin/support-tickets',
     label: 'Tickets',
-    icon: <Ticket size={17} />,
+    icon: <Ticket size={20} />,
   },
 ]
 

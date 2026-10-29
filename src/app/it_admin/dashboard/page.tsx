@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import {
-  AlertOctagon, CheckCircle2, ExternalLink, Loader2,
+  AlertOctagon, AlertTriangle, ArrowDown, ArrowUp, CheckCircle2, ExternalLink, Loader2, Minus, XCircle,
   Mail, MapPin, Bell, ScanLine, Cloud, ShieldAlert, Plug,
 } from 'lucide-react'
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { systemLogService, type SystemLogEventType, type SystemLogLevel } from '@/lib/services/admin/system-logs.service'
 import {
@@ -16,6 +17,9 @@ import {
   type ServiceHealth,
   type ServiceStatus,
   type SecurityWindow,
+  type ItDashboardTrend,
+  type TrendLevel,
+  type TrendRange,
 } from '@/lib/services/admin/it-dashboard.service'
 import { formatDateTime } from '@/app/utils/timeFormat'
 import { roleLabel } from '@/lib/roles'
@@ -186,27 +190,6 @@ function Footnote({ children }: { children: ReactNode }) {
   return <p className="border-t border-[#2a2a2a] px-4 md:px-6 py-3 text-xs text-[#818181] leading-snug">{children}</p>
 }
 
-/** Untitled UI's simple metric card: label, big number, link in the footer. */
-function MetricCard({ label, value, color, href, linkLabel }: {
-  label: string; value: number; color: string; href: string; linkLabel: string
-}) {
-  return (
-    <div className="flex flex-col rounded-xl bg-[#1b1b1b] shadow-[0_1px_2px_rgba(0,0,0,0.3)] ring-1 ring-[#424242] min-w-0">
-      <div className="flex flex-col gap-2 px-4 py-5 md:px-5">
-        <p className="text-sm font-medium text-[#818181]">{label}</p>
-        <p className="text-3xl font-semibold leading-none font-mono" style={{ color: value > 0 ? color : COLOR.muted }}>
-          {value.toLocaleString()}
-        </p>
-      </div>
-      <div className="flex justify-end border-t border-[#2a2a2a] px-4 py-3 md:px-5">
-        <Link href={href} className="inline-flex items-center gap-1 text-sm font-semibold text-[#e5e5e5] [@media(hover:hover)]:hover:text-white">
-          {linkLabel} <ExternalLink size={13} className="text-[#818181]" />
-        </Link>
-      </div>
-    </div>
-  )
-}
-
 /** A small number inside a card, for the sign-in and account counts. */
 function Stat({ label, value, color, href, hint }: {
   label: string; value: number; color: string; href?: string; hint?: string
@@ -227,17 +210,169 @@ function Stat({ label, value, color, href, hint }: {
 
 // ── A · Problems waiting ─────────────────────────────────────────────────────
 
-function ProblemMetrics({ data }: { data: ItDashboardSummary['problems'] }) {
-  const { critical, error, warn } = data.unresolved
+const LEVEL_METRIC: Record<TrendLevel, { label: string; plural: string; icon: ReactNode; color: string }> = {
+  critical: { label: 'Unresolved critical', plural: 'Critical entries', icon: <AlertOctagon size={20} />,  color: COLOR.critical },
+  error:    { label: 'Unresolved errors',   plural: 'Errors',           icon: <XCircle size={20} />,       color: COLOR.red },
+  warn:     { label: 'Unresolved warnings', plural: 'Warnings',         icon: <AlertTriangle size={20} />, color: COLOR.amber },
+}
+
+/**
+ * dashboard-04's metric row: each card is also the chart's switch, the chosen
+ * one ringed in cyan. The number is what is still unresolved; the badge is how
+ * many were logged in the last 24 hours, resolved or not.
+ */
+function ProblemMetrics({ data, level, onLevel }: {
+  data: ItDashboardSummary['problems']; level: TrendLevel; onLevel: (level: TrendLevel) => void
+}) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-5">
-      <MetricCard label="Unresolved critical" value={critical} color={COLOR.critical}
-                  href={logsHref({ level: 'critical', resolved: false })} linkLabel="View critical" />
-      <MetricCard label="Unresolved errors" value={error} color={COLOR.red}
-                  href={logsHref({ level: 'error', resolved: false })} linkLabel="View errors" />
-      <MetricCard label="Unresolved warnings" value={warn} color={COLOR.amber}
-                  href={logsHref({ level: 'warn', resolved: false })} linkLabel="View warnings" />
+    <div className="flex flex-col gap-4 md:flex-row md:flex-wrap md:gap-5">
+      {(['critical', 'error', 'warn'] as const).map((key) => {
+        const m = LEVEL_METRIC[key]
+        const value = data.unresolved[key]
+        const day = data.last_24h[key]
+        const selected = key === level
+        return (
+          <button
+            key={key}
+            type="button"
+            onClick={() => onLevel(key)}
+            aria-pressed={selected}
+            className={`min-w-0 flex-1 rounded-xl bg-[#1b1b1b] text-left shadow-[0_1px_2px_rgba(0,0,0,0.3)] ring-inset transition md:min-w-[260px] ${
+              selected ? 'ring-2 ring-[#4df9ed]' : 'ring-1 ring-[#424242] [@media(hover:hover)]:hover:ring-[#5a5a5a]'
+            }`}
+          >
+            <div className="flex flex-col gap-4 px-4 py-5 md:flex-row md:px-5">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-lg text-[#c4c4c4] ring-1 ring-[#424242] ring-inset shadow-[0_1px_2px_rgba(0,0,0,0.4)]">
+                {m.icon}
+              </span>
+              <div className="flex w-full min-w-0 flex-col gap-2">
+                <p className="text-sm font-semibold text-[#818181]">{m.label}</p>
+                <div className="flex w-full flex-wrap items-center justify-between gap-4">
+                  <p className="flex-1 text-3xl font-semibold leading-none font-mono" style={{ color: value > 0 ? m.color : COLOR.muted }}>
+                    {value.toLocaleString()}
+                  </p>
+                  <span className="flex items-center gap-1 rounded-md py-0.5 pl-1.5 pr-2 text-sm font-medium text-[#c4c4c4] ring-1 ring-[#424242] ring-inset">
+                    {day > 0 ? <ArrowUp size={14} className="text-[#818181]" /> : <Minus size={14} className="text-[#818181]" />}
+                    {day.toLocaleString()} in 24 hours
+                  </span>
+                </div>
+              </div>
+            </div>
+          </button>
+        )
+      })}
     </div>
+  )
+}
+
+const RANGE_ITEMS: { id: TrendRange; label: string }[] = [
+  { id: '12m', label: '12 months' },
+  { id: '30d', label: '30 days' },
+  { id: '7d',  label: '7 days' },
+  { id: '24h', label: '24 hours' },
+]
+
+const MANILA = 'Asia/Manila'
+
+/** A bucket's axis tick and its tooltip title, in Manila time. */
+function bucketLabels(startIso: string, range: TrendRange): { tick: string; title: string } {
+  const d = new Date(startIso)
+  const f = (o: Intl.DateTimeFormatOptions) => d.toLocaleString('en-PH', { timeZone: MANILA, ...o })
+  if (range === '24h') return { tick: f({ hour: '2-digit', minute: '2-digit', hour12: false }), title: f({ month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) }
+  if (range === '12m') return { tick: f({ month: 'short' }), title: f({ month: 'long', year: 'numeric' }) }
+  return { tick: f({ month: 'short', day: 'numeric' }), title: f({ weekday: 'short', month: 'short', day: 'numeric' }) }
+}
+
+/**
+ * dashboard-04's chart section: the chosen level's entries per hour, day or
+ * month, its total and the change on the period before, a time-range switch.
+ * Reloads with the summary (`reloadKey`) so it stays as current as the cards.
+ */
+function TrendSection({ level, reloadKey }: { level: TrendLevel; reloadKey: string }) {
+  const [range, setRange] = useState<TrendRange>('30d')
+  const [trend, setTrend] = useState<ItDashboardTrend | null>(null)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    let live = true
+    itDashboardService.getTrend(range, level)
+      .then((t) => { if (live) { setTrend(t); setFailed(false) } })
+      .catch(() => { if (live) setFailed(true) })
+    return () => { live = false }
+  }, [range, level, reloadKey])
+
+  const m = LEVEL_METRIC[level]
+  // Only the data for what is chosen now: an older answer is not shown under a new heading.
+  const shown = trend && trend.range === range && trend.level === level ? trend : null
+  const points = (shown?.buckets ?? []).map((b) => ({ ...bucketLabels(b.start, range), count: b.count }))
+  const change = shown && shown.previous_total > 0
+    ? Math.round(((shown.total - shown.previous_total) / shown.previous_total) * 1000) / 10
+    : null
+
+  return (
+    <section className="flex flex-col gap-5">
+      <div className="flex flex-col items-start justify-between gap-4 lg:flex-row">
+        <div className="flex flex-col gap-2">
+          <p className="text-sm font-semibold text-[#818181]">{m.plural} logged</p>
+          <div className="flex items-center gap-3">
+            <span className="text-3xl font-semibold leading-none font-mono text-white">
+              {shown ? shown.total.toLocaleString() : '—'}
+            </span>
+            {change !== null && (
+              <span className="flex items-center gap-1 rounded-md py-0.5 pl-1.5 pr-2 text-sm font-medium text-[#c4c4c4] ring-1 ring-[#424242] ring-inset"
+                    title="Against the same length of time just before">
+                {change > 0 ? <ArrowUp size={14} className="text-[#818181]" />
+                  : change < 0 ? <ArrowDown size={14} className="text-[#818181]" />
+                  : <Minus size={14} className="text-[#818181]" />}
+                {Math.abs(change)}%
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="flex w-full flex-wrap items-center gap-3 lg:w-auto">
+          <div className="min-w-0 flex-1 lg:flex-none">
+            <TabsMinimal label="Time range" items={RANGE_ITEMS} selectedKey={range} onSelectionChange={setRange} />
+          </div>
+          <CardLink href={logsHref({ level })}>View in Logs</CardLink>
+        </div>
+      </div>
+
+      <div className="h-60">
+        {failed && !shown ? (
+          <div className="flex h-full items-center justify-center rounded-xl ring-1 ring-[#2a2a2a] ring-inset text-sm text-[#818181]">
+            The chart could not be loaded.
+          </div>
+        ) : !shown ? (
+          <div className="flex h-full items-center justify-center gap-2 rounded-xl ring-1 ring-[#2a2a2a] ring-inset text-sm text-[#818181]">
+            <Loader2 size={16} className="animate-spin" /> Loading chart…
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={points} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
+              <defs>
+                <linearGradient id={`trend-${level}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%"   stopColor={m.color} stopOpacity={0.25} />
+                  <stop offset="100%" stopColor={m.color} stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.06)" />
+              <XAxis dataKey="tick" tick={{ fill: '#818181', fontSize: 12 }} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={16} />
+              <YAxis allowDecimals={false} tick={{ fill: '#818181', fontSize: 12 }} tickLine={false} axisLine={false} />
+              <Tooltip
+                cursor={{ stroke: '#5a5a5a', strokeWidth: 1 }}
+                contentStyle={{ background: '#111', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, fontSize: 12 }}
+                labelStyle={{ color: '#e5e5e5' }}
+                itemStyle={{ color: '#e5e5e5' }}
+                labelFormatter={(_, p) => (p?.[0]?.payload as { title?: string } | undefined)?.title ?? ''}
+                formatter={(v) => [Number(v).toLocaleString(), m.plural]}
+              />
+              <Area type="monotone" dataKey="count" stroke={m.color} strokeWidth={2} fill={`url(#trend-${level})`}
+                    activeDot={{ r: 4, stroke: '#0a0a0a', strokeWidth: 2 }} isAnimationActive={false} />
+            </AreaChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+    </section>
   )
 }
 
@@ -605,6 +740,7 @@ export default function ItAdminDashboard() {
   const [error, setError]         = useState<string | null>(null)
   const [now, setNow]             = useState(() => Date.now())
   const [resolving, setResolving] = useState<Set<string>>(new Set())
+  const [chartLevel, setChartLevel] = useState<TrendLevel>('error')
   const inFlight = useRef(false)
 
   const load = useCallback(async () => {
@@ -687,7 +823,8 @@ export default function ItAdminDashboard() {
         ) : (
           <>
             <StatusBanner summary={summary} />
-            <ProblemMetrics data={summary.problems} />
+            <ProblemMetrics data={summary.problems} level={chartLevel} onLevel={setChartLevel} />
+            <TrendSection level={chartLevel} reloadKey={summary.generated_at} />
             <SecurityCard data={summary.security} />
             <ProblemsCard data={summary.problems} now={now} onResolve={resolve} resolving={resolving} />
             <SchedulersCard data={summary.schedulers} now={now} />

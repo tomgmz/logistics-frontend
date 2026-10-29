@@ -5,11 +5,11 @@ import ReusableDashboardShell from '@/components/layout/ReusableDashboardShell'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { goHomeSignedOut } from '@/lib/auth-redirect'
 import HelpAssistant from '@/components/support/HelpAssistant'
-import { History, CalendarCheck, MapPin, CreditCard, LayoutDashboard } from 'lucide-react'
+import { History, CalendarRange, MapPin, CreditCard, LayoutDashboard } from 'lucide-react'
 
 const NAV_ITEMS = [
   { href: '/client/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
-  { href: '/client/booking',  label: 'Booking',  icon: <CalendarCheck size={20} /> },
+  { href: '/client/booking',  label: 'Booking',  icon: <CalendarRange size={20} /> },
   { href: '/client/tracking', label: 'Transit Tracking', icon: <MapPin size={20} /> },
   { href: '/client/history',  label: 'Transaction History',  icon: <History size={20} /> },
 ]

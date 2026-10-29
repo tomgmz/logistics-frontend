@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { LogOut } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import { ASSETS } from '@/lib/data'
 import { logout } from '@/lib/api/auth.api'
@@ -15,9 +15,17 @@ import SigningOutOverlay from '@/components/layout/SigningOutOverlay'
 import { roleLabel } from '@/lib/roles'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 
-// Figma 3215:1196 (collapsed) and 3215:1485 (open).
-const SIDEBAR_COLLAPSED = 73
+// Figma 3215:1196 (collapsed) and 3215:1485 (open); the rail is slimmer than
+// the Figma's 73px (the user's call, 2026-10-29).
+const SIDEBAR_COLLAPSED = 60
 const SIDEBAR_EXPANDED = 290
+// The aside's border, inside its width.
+const SIDEBAR_BORDER = 1.5
+// The open layout (Figma) centres the icons, logo arrows, Sign out and avatar
+// on x=36 of the content. On the slim rail the contents slide left so that line
+// is the middle of the space inside the border, equal room either side; open,
+// they sit where the Figma has them.
+const RAIL_SHIFT = (SIDEBAR_COLLAPSED - SIDEBAR_BORDER * 2) / 2 - 36
 // The floating sidebar's gap from the page edges.
 const SIDEBAR_GAP = 6
 
@@ -101,6 +109,38 @@ export default function ReusableSidebar({
     if (isMobile) setSidebarOpen(false)
   }, [pathname, isMobile, setSidebarOpen])
 
+  // Hovering the rail opens the sidebar and leaving closes it again, with a
+  // mouse only: touch has no hover, the logo stays the toggle there. A sidebar
+  // opened by a click is left alone. The short delay keeps a pointer that only
+  // passes over the rail from flicking it open.
+  const hoverOpened = useRef(false)
+  const hoverTimer  = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const canHover = () => typeof window !== 'undefined'
+    && window.matchMedia('(hover: hover) and (pointer: fine)').matches
+  const clearHoverTimer = () => { if (hoverTimer.current) { clearTimeout(hoverTimer.current); hoverTimer.current = null } }
+  useEffect(() => clearHoverTimer, [])
+
+  const onRailEnter = () => {
+    if (isMobile || sidebarOpen || !canHover()) return
+    clearHoverTimer()
+    hoverTimer.current = setTimeout(() => {
+      hoverOpened.current = true
+      setSidebarOpen(true)
+    }, 120)
+  }
+  const onRailLeave = () => {
+    clearHoverTimer()
+    if (!hoverOpened.current) return
+    hoverOpened.current = false
+    setSidebarOpen(false)
+  }
+  // Any other open or close (the logo, a link, the overlay) takes it over.
+  const toggleSidebar = (open: boolean) => {
+    clearHoverTimer()
+    hoverOpened.current = false
+    setSidebarOpen(open)
+  }
+
   return (
     <>
       <AnimatePresence>
@@ -110,7 +150,7 @@ export default function ReusableSidebar({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={() => setSidebarOpen(false)}
+            onClick={() => toggleSidebar(false)}
             // Every width: the open sidebar lies over the page, and a click
             // beside it closes it. Lighter on desktop, where only the slim
             // rail's widening is covered.
@@ -127,6 +167,8 @@ export default function ReusableSidebar({
           header sits beside it, and on phones the open sidebar covers it. */}
       <div
         className="z-[60] fixed"
+        onMouseEnter={onRailEnter}
+        onMouseLeave={onRailLeave}
         style={{
           top: SIDEBAR_GAP, bottom: SIDEBAR_GAP, left: SIDEBAR_GAP,
           pointerEvents: isMobile && !sidebarOpen ? 'none' : undefined,
@@ -138,9 +180,16 @@ export default function ReusableSidebar({
             ? { width: SIDEBAR_EXPANDED, x: sidebarOpen ? 0 : -(SIDEBAR_EXPANDED + SIDEBAR_GAP * 2) }
             : { width: sidebarOpen ? SIDEBAR_EXPANDED : SIDEBAR_COLLAPSED, x: 0 }}
           transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] as [number, number, number, number] }}
-          className={`h-full rounded-xl border-[1.5px] border-white/[0.08] bg-[var(--color-bg)] overflow-hidden transition-shadow ${sidebarOpen ? 'shadow-2xl' : ''}`}
+          style={{ borderWidth: SIDEBAR_BORDER }}
+          className={`h-full rounded-xl border-white/[0.08] bg-[var(--color-bg)] overflow-hidden transition-shadow ${sidebarOpen ? 'shadow-2xl' : ''}`}
         >
-          <div style={{ width: SIDEBAR_EXPANDED }} className="h-full flex flex-col min-h-0 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+          <motion.div
+            initial={false}
+            animate={{ x: sidebarOpen || isMobile ? 0 : RAIL_SHIFT }}
+            transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+            style={{ width: SIDEBAR_EXPANDED }}
+            className="h-full flex flex-col min-h-0 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
+          >
 
             {/* The logo; on the slim rail just its three arrows. It is also the
                 toggle: the arrows open the sidebar, the logo closes it.
@@ -150,7 +199,7 @@ export default function ReusableSidebar({
             <div className="h-[80px] shrink-0 pt-[18px]">
               <button
                 type="button"
-                onClick={() => setSidebarOpen(!sidebarOpen)}
+                onClick={() => toggleSidebar(!sidebarOpen)}
                 aria-label={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
                 title={sidebarOpen ? undefined : 'Open sidebar'}
                 className="ml-[21px] block h-[38px] w-[150px] transition-opacity hover:opacity-80"
@@ -201,7 +250,7 @@ export default function ReusableSidebar({
               type="button"
               onClick={() => setLogoutModalOpen(true)}
               title={sidebarOpen ? undefined : 'Sign out'}
-              className="group flex h-[46px] w-full shrink-0 items-center gap-[18px] pl-[27px] text-left text-white transition-colors hover:text-red-400"
+              className="group flex h-[46px] w-full shrink-0 items-center gap-[18px] pl-[26px] text-left text-white transition-colors hover:text-red-400"
             >
               <LogOut size={20} className="shrink-0" />
               <span className={`ff-regular text-[16px] whitespace-nowrap transition-opacity ${sidebarOpen ? 'opacity-100' : 'opacity-0'}`}>
@@ -212,7 +261,7 @@ export default function ReusableSidebar({
             {/* Who is signed in: a card when open, just the avatar on the rail. */}
             <div className="mt-3 shrink-0 px-[11px]">
               <div
-                className={`flex h-[70px] items-center gap-[14px] rounded-xl border pl-[10px] transition-colors ${
+                className={`flex h-[70px] items-center gap-[14px] rounded-xl border pl-[9px] transition-colors ${
                   sidebarOpen ? 'border-white/[0.08] bg-white/[0.03]' : 'border-transparent'
                 }`}
               >
@@ -233,7 +282,7 @@ export default function ReusableSidebar({
                 </div>
               </div>
             </div>
-          </div>
+          </motion.div>
         </motion.aside>
       </div>
 
@@ -262,7 +311,7 @@ interface NavItemProps {
 
 /**
  * One 46px row (Figma): icon from 25px, label from 65px. The selected one sits
- * in a glass box with a cyan outline, open or on the slim rail.
+ * in a dark box with its icon and label in cyan (Figma 1490:3989 / 1490:4179).
  */
 function NavItem({ item, isActive, index, expanded, onNavigate }: NavItemProps) {
   return (
@@ -275,15 +324,19 @@ function NavItem({ item, isActive, index, expanded, onNavigate }: NavItemProps) 
         className={`relative flex h-[46px] w-full items-center gap-[18px] pl-[25px] text-left transition-colors cursor-pointer
                     ${isActive ? 'text-[#4DF9ED]' : 'text-white [@media(hover:hover)]:hover:text-[#4DF9ED]'}`}
       >
-        {/* The selected item: a box outlined in #4DF9ED around the whole row,
-            its icon and text the same colour. It widens and narrows with the
-            sidebar (46px on the rail, the row's width when open). */}
+        {/* The selected item (Figma): a dark box from 15px to the sidebar's
+            right edge. On the rail the edge cuts it off, solid, with no outline
+            on the right; open, its last stretch fades out into the sidebar. */}
         {isActive && (
           <motion.div
             layoutId="activeNav"
             initial={false}
-            animate={{ width: expanded ? SIDEBAR_EXPANDED - 26 : 46 }}
-            className="absolute inset-y-0 left-[13px] rounded-xl glass-surface border border-[#4DF9ED]"
+            style={{
+              width: SIDEBAR_EXPANDED - 15,
+              maskImage: 'linear-gradient(to right, #000 88%, transparent)',
+              WebkitMaskImage: 'linear-gradient(to right, #000 88%, transparent)',
+            }}
+            className="absolute inset-y-0 left-[15px] rounded-[10px] border border-[#1b1b1b] bg-[#0e1010]"
             transition={{ type: 'spring' as const, stiffness: 320, damping: 32 }}
           />
         )}

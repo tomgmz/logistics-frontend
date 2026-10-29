@@ -1,17 +1,17 @@
 'use client'
 
 import { ReactNode, useEffect } from 'react'
-import { CalendarCheck, FileSearch, MapPin, LayoutDashboard, Siren } from 'lucide-react'
+import { CalendarRange, Files, MapPin, LayoutDashboard, TriangleAlert } from 'lucide-react'
 import ReusableDashboardShell from '@/components/layout/ReusableDashboardShell'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { goHomeSignedOut } from '@/lib/auth-redirect'
 
 const NAV_ITEMS = [
-  { href: '/operations_admin/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={17} /> },
-  { href: '/operations_admin/booking-management', label: 'Booking Management', icon: <CalendarCheck size={17} /> },
-  { href: '/operations_admin/transit-tracking', label: 'Transit Tracking', icon: <MapPin size={17} /> },
-  { href: '/operations_admin/reports', label: 'Reports', icon: <Siren size={17} /> },
-  { href: '/operations_admin/document-management', label: 'Document Management', icon: <FileSearch size={17} /> },
+  { href: '/operations_admin/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
+  { href: '/operations_admin/booking-management', label: 'Booking Management', icon: <CalendarRange size={20} /> },
+  { href: '/operations_admin/transit-tracking', label: 'Transit Tracking', icon: <MapPin size={20} /> },
+  { href: '/operations_admin/reports', label: 'Reports', icon: <TriangleAlert size={20} /> },
+  { href: '/operations_admin/document-management', label: 'Document Management', icon: <Files size={20} /> },
 ]
 
 export default function OperationsAdminLayout({ children }: { children: ReactNode }) {

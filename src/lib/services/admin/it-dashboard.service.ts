@@ -86,6 +86,8 @@ export interface ItDashboardSummary {
   generated_at: string
   problems: {
     unresolved: { critical: number; error: number; warn: number }
+    /** Logged in the last 24 hours, resolved or not. */
+    last_24h:   { critical: number; error: number; warn: number }
     latest:     DashboardLogRow[]
   }
   schedulers: SchedulerHealth[]
@@ -110,10 +112,28 @@ export interface ItDashboardSummary {
   }
 }
 
+export type TrendRange = '12m' | '30d' | '7d' | '24h'
+export type TrendLevel = 'critical' | 'error' | 'warn'
+
+/** One level's system_logs per hour / day / month, Manila time, oldest first. */
+export interface ItDashboardTrend {
+  range:          TrendRange
+  level:          TrendLevel
+  buckets:        { start: string; count: number }[]
+  total:          number
+  /** The same length of time just before the range. */
+  previous_total: number
+}
+
 export const itDashboardService = {
   getSummary: (): Promise<ItDashboardSummary> =>
     proxyApi
       .get<{ status: string; data: ItDashboardSummary }>('/admin/it-dashboard')
+      .then((r) => r.data.data),
+
+  getTrend: (range: TrendRange, level: TrendLevel): Promise<ItDashboardTrend> =>
+    proxyApi
+      .get<{ status: string; data: ItDashboardTrend }>('/admin/it-dashboard/trend', { params: { range, level } })
       .then((r) => r.data.data),
 }
 
