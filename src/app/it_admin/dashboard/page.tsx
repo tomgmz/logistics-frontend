@@ -3,10 +3,10 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import {
-  AlertOctagon, AlertTriangle, ArrowDown, ArrowUp, CheckCircle2, ExternalLink, Loader2, Minus, XCircle,
+  AlertOctagon, AlertTriangle, ArrowUp, CheckCircle2, ExternalLink, Loader2, Minus, XCircle,
   Mail, MapPin, Bell, ScanLine, Cloud, ShieldAlert, Plug,
 } from 'lucide-react'
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { systemLogService, type SystemLogEventType, type SystemLogLevel } from '@/lib/services/admin/system-logs.service'
 import {
@@ -284,9 +284,48 @@ function bucketLabels(startIso: string, range: TrendRange): { tick: string; titl
 }
 
 /**
- * dashboard-04's chart section: the chosen level's entries per hour, day or
- * month, its total and the change on the period before, a time-range switch.
- * Reloads with the summary (`reloadKey`) so it stays as current as the cards.
+ * Untitled UI's button group (dashboard-05's time range): bordered, the picked
+ * button filled. Full width on phones, each button an equal share.
+ */
+function RangeGroup({ value, onChange }: { value: TrendRange; onChange: (r: TrendRange) => void }) {
+  return (
+    <div role="group" aria-label="Time range"
+         className="flex w-full overflow-hidden rounded-lg shadow-[0_1px_2px_rgba(0,0,0,0.3)] ring-1 ring-[#424242] ring-inset sm:w-auto">
+      {RANGE_ITEMS.map((r, i) => {
+        const on = r.id === value
+        return (
+          <button
+            key={r.id}
+            type="button"
+            aria-pressed={on}
+            onClick={() => onChange(r.id)}
+            className={`flex-1 whitespace-nowrap px-2.5 py-2 text-sm font-semibold transition sm:flex-none sm:px-3.5 ${
+              i > 0 ? 'border-l border-[#424242]' : ''
+            } ${on ? 'bg-[#262626] text-[#e5e5e5]' : 'text-[#818181] [@media(hover:hover)]:hover:bg-[#1f1f1f] [@media(hover:hover)]:hover:text-[#e5e5e5]'}`}
+          >
+            {r.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+/** The dotted trend line: each bucket averaged with its neighbours. */
+function withTrend<T extends { count: number }>(points: T[]): (T & { trend: number })[] {
+  return points.map((p, i) => {
+    const near = points.slice(Math.max(0, i - 1), i + 2)
+    return { ...p, trend: near.reduce((s, x) => s + x.count, 0) / near.length }
+  })
+}
+
+/**
+ * dashboard-05's chart (Untitled UI, "Site traffic"): title with the change on
+ * the period before, the range as a button group, thin bars with a dotted
+ * trend line over them, month/day/hour labels only. Bars are neutral; which
+ * level is shown is the ringed metric card above. More problems than before
+ * reads red, fewer green. Reloads with the summary (`reloadKey`) so it stays
+ * as current as the cards.
  */
 function TrendSection({ level, reloadKey }: { level: TrendLevel; reloadKey: string }) {
   const [range, setRange] = useState<TrendRange>('30d')
@@ -304,35 +343,26 @@ function TrendSection({ level, reloadKey }: { level: TrendLevel; reloadKey: stri
   const m = LEVEL_METRIC[level]
   // Only the data for what is chosen now: an older answer is not shown under a new heading.
   const shown = trend && trend.range === range && trend.level === level ? trend : null
-  const points = (shown?.buckets ?? []).map((b) => ({ ...bucketLabels(b.start, range), count: b.count }))
+  const points = withTrend((shown?.buckets ?? []).map((b) => ({ ...bucketLabels(b.start, range), count: b.count })))
   const change = shown && shown.previous_total > 0
     ? Math.round(((shown.total - shown.previous_total) / shown.previous_total) * 1000) / 10
     : null
 
   return (
     <section className="flex flex-col gap-5">
-      <div className="flex flex-col items-start justify-between gap-4 lg:flex-row">
-        <div className="flex flex-col gap-2">
-          <p className="text-sm font-semibold text-[#818181]">{m.plural} logged</p>
-          <div className="flex items-center gap-3">
-            <span className="text-3xl font-semibold leading-none font-mono text-white">
-              {shown ? shown.total.toLocaleString() : '—'}
+      <div className="flex flex-col items-start justify-between gap-4 lg:flex-row lg:items-center">
+        <h2 className="flex flex-wrap items-baseline gap-x-2 text-lg font-semibold text-white">
+          {m.plural} logged
+          <span className="font-mono">{shown ? shown.total.toLocaleString() : '—'}</span>
+          {change !== null && (
+            <span title="Against the same length of time just before"
+                  style={{ color: change > 0 ? COLOR.red : change < 0 ? COLOR.green : COLOR.muted }}>
+              {change > 0 ? '+' : ''}{change}%
             </span>
-            {change !== null && (
-              <span className="flex items-center gap-1 rounded-md py-0.5 pl-1.5 pr-2 text-sm font-medium ring-1 ring-[#424242] ring-inset"
-                    title="Against the same length of time just before">
-                {change > 0 ? <ArrowUp size={14} className="text-[#818181]" />
-                  : change < 0 ? <ArrowDown size={14} className="text-[#818181]" />
-                  : <Minus size={14} className="text-[#818181]" />}
-                {Math.abs(change)}%
-              </span>
-            )}
-          </div>
-        </div>
+          )}
+        </h2>
         <div className="flex w-full flex-wrap items-center gap-3 lg:w-auto">
-          <div className="min-w-0 flex-1 lg:flex-none">
-            <TabsMinimal label="Time range" items={RANGE_ITEMS} selectedKey={range} onSelectionChange={setRange} />
-          </div>
+          <RangeGroup value={range} onChange={setRange} />
           <CardLink href={logsHref({ level })}>View in Logs</CardLink>
         </div>
       </div>
@@ -346,27 +376,24 @@ function TrendSection({ level, reloadKey }: { level: TrendLevel; reloadKey: stri
           <Skeleton className="h-full w-full rounded-xl" />
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={points} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
-              <defs>
-                <linearGradient id={`trend-${level}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%"   stopColor={m.color} stopOpacity={0.25} />
-                  <stop offset="100%" stopColor={m.color} stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.06)" />
+            <ComposedChart data={points} barCategoryGap="35%" margin={{ top: 8, right: 0, bottom: 0, left: 0 }}>
+              <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.08)" />
               <XAxis dataKey="tick" tick={{ fill: '#818181', fontSize: 12 }} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={16} />
-              <YAxis allowDecimals={false} tick={{ fill: '#818181', fontSize: 12 }} tickLine={false} axisLine={false} />
+              <YAxis hide allowDecimals={false} />
               <Tooltip
-                cursor={{ stroke: '#5a5a5a', strokeWidth: 1 }}
+                cursor={{ fill: 'rgba(255,255,255,0.04)' }}
                 contentStyle={{ background: '#111', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, fontSize: 12 }}
                 labelStyle={{ color: '#e5e5e5' }}
                 itemStyle={{ color: '#e5e5e5' }}
                 labelFormatter={(_, p) => (p?.[0]?.payload as { title?: string } | undefined)?.title ?? ''}
-                formatter={(v) => [Number(v).toLocaleString(), m.plural]}
+                formatter={(v, name) => name === 'trend'
+                  ? [Number(v).toLocaleString(undefined, { maximumFractionDigits: 1 }), 'Average']
+                  : [Number(v).toLocaleString(), m.plural]}
               />
-              <Area type="monotone" dataKey="count" stroke={m.color} strokeWidth={2} fill={`url(#trend-${level})`}
-                    activeDot={{ r: 4, stroke: '#0a0a0a', strokeWidth: 2 }} isAnimationActive={false} />
-            </AreaChart>
+              <Bar dataKey="count" fill="#a3a3a3" radius={[3, 3, 0, 0]} maxBarSize={10} isAnimationActive={false} />
+              <Line type="monotone" dataKey="trend" stroke="#4df9ed" strokeWidth={1.5} strokeDasharray="2 4"
+                    dot={false} activeDot={false} isAnimationActive={false} />
+            </ComposedChart>
           </ResponsiveContainer>
         )}
       </div>
@@ -774,12 +801,9 @@ function ItDashboardSkeleton() {
       </div>
 
       <section className="flex flex-col gap-5">
-        <div className="flex flex-col items-start justify-between gap-4 lg:flex-row">
-          <div className="flex flex-col gap-2">
-            <Skeleton className="h-3.5 w-28" />
-            <Skeleton className="h-8 w-20" />
-          </div>
-          <Skeleton className="h-9 w-full rounded-lg lg:w-[420px]" />
+        <div className="flex flex-col items-start justify-between gap-4 lg:flex-row lg:items-center">
+          <Skeleton className="h-6 w-56" />
+          <Skeleton className="h-9 w-full rounded-lg lg:w-[460px]" />
         </div>
         <Skeleton className="h-60 w-full rounded-xl" />
       </section>

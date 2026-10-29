@@ -39,6 +39,11 @@ export interface MapLocationPickerProps {
   onConfirm: (place: ResolvedPlace) => void
   onClose?: () => void
   initialValue?: string
+  /**
+   * The pin already chosen for this field. The map opens on it, ready to
+   * confirm as is, instead of jumping to the device's location.
+   */
+  initialCoords?: { lat: number; lng: number } | null
 }
 
 const LocationIcon = ({ color }: { color: string }) => (
@@ -93,16 +98,21 @@ export default function MapLocationPicker({
   onConfirm,
   onClose,
   initialValue = '',
+  initialCoords = null,
 }: MapLocationPickerProps) {
   const mapDivRef   = useRef<HTMLDivElement>(null)
   const mapRef      = useRef<google.maps.Map | null>(null)
   const geocoderRef = useRef<google.maps.Geocoder | null>(null)
   const searchRef   = useRef<HTMLDivElement>(null)
-  const lastValidCenter = useRef<{ lat: number; lng: number }>(DEFAULT_CENTER)
+  const lastValidCenter = useRef<{ lat: number; lng: number }>(initialCoords ?? DEFAULT_CENTER)
   const skipNextDragEndRef = useRef(false)
+  // Read once when the map is built; later prop changes don't move the map.
+  const initialCoordsRef = useRef(initialCoords)
 
   const [address,     setAddress]     = useState(initialValue)
-  const [coords,      setCoords]      = useState<{ lat: number; lng: number } | null>(null)
+  const [coords,      setCoords]      = useState<{ lat: number; lng: number } | null>(
+    initialCoords && initialValue ? initialCoords : null,
+  )
   const [isDragging,  setIsDragging]  = useState(false)
   const [isGeocoding, setIsGeocoding] = useState(false)
   const [mapReady,    setMapReady]    = useState(false)
@@ -163,9 +173,10 @@ export default function MapLocationPicker({
 
       geocoderRef.current = new google.maps.Geocoder()
 
+      const saved = initialCoordsRef.current
       const map = new google.maps.Map(mapDivRef.current, {
-        center:           DEFAULT_CENTER,
-        zoom:             15,
+        center:           saved ?? DEFAULT_CENTER,
+        zoom:             saved ? 17 : 15,
         minZoom:          6,
         disableDefaultUI: true,
         gestureHandling:  'greedy',
@@ -176,7 +187,7 @@ export default function MapLocationPicker({
       mapRef.current = map
       setMapReady(true)
 
-      navigator.geolocation?.getCurrentPosition(
+      if (!saved) navigator.geolocation?.getCurrentPosition(
         async pos => {
           const c = { lat: pos.coords.latitude, lng: pos.coords.longitude }
           if (!geocoderRef.current) return

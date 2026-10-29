@@ -321,27 +321,25 @@ export default function BookingHistoryModule() {
             <motion.div key="list" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="flex flex-[1_0_auto] flex-col gap-4">
 
-              {/* Untitled UI's table card, as on the staff tables: the header (title +
-                  count), then its filter row with the status tabs on the left (a
-                  dropdown on phones) and search and dates on the right. No Refresh:
-                  the list is live.
+              {/* The table format, as on the staff tables (Figma 3234:790): no title
+                  row, then the filter row: search, the status switch (a dropdown
+                  on phones) and Select Date. No Refresh: the list is live.
                   The booking cards stay as they are, inside the card. */}
               {/* Reaches the bottom of the screen even with only a few cards. */}
-              <TableCard.Root untitled className="flex flex-[1_0_auto] flex-col">
-              <TableCard.Header title="Bookings" />
+              <TableCard.Root className="flex flex-[1_0_auto] flex-col">
               <FilterBar
-                layout="untitled"
+                layout="split"
                 leading={
                   <TabsMinimal
-                  untitled
                     label="Booking status"
                     items={TABS.map((t) => ({ id: t.key, label: `${t.label} (${counts[t.key] ?? 0})` }))}
                     selectedKey={activeTab}
                     onSelectionChange={setActiveTab}
                   />
                 }
-                search={{ value: search, onChange: setSearch, placeholder: 'Search' }}
-                // Untitled UI's "Select dates": the scheduled-date window.
+                // Names exactly what the server searches (booking.model.ts, client scope).
+                search={{ value: search, onChange: setSearch, placeholder: 'Search reference, pickup or drop-off' }}
+                // "Select Date": the scheduled-date window.
                 dateRange={{
                   value: dateFrom || dateTo ? { from: dateFrom || dateTo, to: dateTo || dateFrom } : null,
                   onChange: (r) => { setDateFrom(r?.from ?? ''); setDateTo(r?.to ?? '') },

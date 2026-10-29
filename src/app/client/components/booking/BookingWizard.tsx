@@ -13,6 +13,7 @@ import type { BookingWithRelations } from '@/lib/store/slice/routeMap.slice'
 import { bookingToResubmitDraft, isAwaitingResubmit } from '@/lib/booking-resubmit'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { appToast } from '@/lib/toast'
+import { loadDraftFiles, saveDraftFiles } from '@/lib/store/booking-draft'
 import './BookingDetails.css'
 
 const STEPS = [
@@ -87,11 +88,31 @@ export default function BookingWizard() {
   const step     = useAppSelector((s) => s.booking.step)
   const service  = useAppSelector((s) => s.booking.service)
   const resubmit = useAppSelector((s) => s.booking.resubmit)
+  // The form is restored from this tab's draft before anything reads it, so a
+  // reload neither flashes an empty form nor lets ResubmitLoader refetch over
+  // the client's edits.
+  const rehydrated = useAppSelector((s) => s.booking._persist?.rehydrated ?? false)
   const [loadingDraft, setLoadingDraft] = useState(false)
 
   const [dir,          setDir]          = useState(1)
   const [wizardKey,    setWizardKey]    = useState(0)
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
+  const [filesRestored, setFilesRestored] = useState(false)
+
+  // Attached documents survive the reload too (kept in IndexedDB, not Redux).
+  useEffect(() => {
+    let cancelled = false
+    loadDraftFiles().then((files) => {
+      if (cancelled) return
+      if (files.length) setPendingFiles(files)
+      setFilesRestored(true)
+    })
+    return () => { cancelled = true }
+  }, [])
+
+  useEffect(() => {
+    if (filesRestored) void saveDraftFiles(pendingFiles)
+  }, [pendingFiles, filesRestored])
 
   const goNext = () => {
     setDir(1)
@@ -170,9 +191,11 @@ export default function BookingWizard() {
         <div className="hidden sm:block" />
       </div>
 
-      <Suspense fallback={null}>
-        <ResubmitLoader onLoaded={handleDraftLoaded} onLoading={setLoadingDraft} />
-      </Suspense>
+      {rehydrated && (
+        <Suspense fallback={null}>
+          <ResubmitLoader onLoaded={handleDraftLoaded} onLoading={setLoadingDraft} />
+        </Suspense>
+      )}
 
       {/* Why the booking being corrected was turned down, kept in view while editing. */}
       {resubmit && (
@@ -193,7 +216,7 @@ export default function BookingWizard() {
             <span className="ff-sc booking-text text-sm text-white/70">Loading booking…</span>
           </div>
         )}
-        <AnimatePresence mode="wait" custom={dir}>
+        {rehydrated && filesRestored && <AnimatePresence mode="wait" custom={dir}>
           <motion.div
             key={step}
             custom={dir}
@@ -221,7 +244,7 @@ export default function BookingWizard() {
               />
             )}
           </motion.div>
-        </AnimatePresence>
+        </AnimatePresence>}
       </div>
     </div>
   )

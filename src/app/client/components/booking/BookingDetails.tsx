@@ -873,6 +873,14 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
     ? mapTarget.kind === 'pickup' ? pickup : dropoffs[mapTarget.index] ?? ''
     : ''
 
+  const mapInitialCoords = (() => {
+    if (!mapTarget) return null
+    const c = mapTarget.kind === 'pickup'
+      ? { lat: pickupLat, lng: pickupLng }
+      : dropoffCoords[mapTarget.index]
+    return c && c.lat != null && c.lng != null ? { lat: c.lat, lng: c.lng } : null
+  })()
+
   const mapPickerMode: 'pickup' | 'dropoff' =
     mapTarget?.kind === 'pickup' ? 'pickup' : 'dropoff'
 
@@ -924,6 +932,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                 onConfirm={handleMapConfirm}
                 onClose={() => setMapTarget(null)}
                 initialValue={mapInitialValue}
+                initialCoords={mapInitialCoords}
               />
             </motion.div>
           )}
