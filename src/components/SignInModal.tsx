@@ -15,6 +15,8 @@ import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 
 const OTP_LENGTH  = 6
 const RESEND_SECS = 60
+// Used only if a 429 arrives without the server's retryAfter.
+const RATE_LIMIT_FALLBACK_SECS = 60
 
 interface ApiErrorResponse { message?: string; code?: string; retryAfter?: number }
 
@@ -847,10 +849,26 @@ function OtpStep({
     Math.max(0, Math.floor((resendExpiresAt.current - now()) / 1000))
   )
   const [resending,     setResending]     = useState(false)
-  const [lockState,     setLockState]     = useState<'none' | 'temporary' | 'permanent'>('none')
+  // 'rate_limited' is the server's "too many requests", not an account lock:
+  // the boxes stay disabled and nothing is sent until the countdown ends,
+  // because every attempt inside the window is refused and restarts nothing.
+  const [lockState,     setLockState]     = useState<'none' | 'temporary' | 'permanent' | 'rate_limited'>('none')
   const [lockRemaining, setLockRemaining] = useState(0)
   const [statusChecked, setStatusChecked] = useState(false)
   const inputRefs = useRef<(HTMLInputElement | null)[]>([])
+
+  /** On a 429, count down until the server will accept a code again. */
+  const startRateLimitCooldown = (err: unknown): boolean => {
+    if (!(err instanceof AxiosError) || err.response?.status !== 429) return false
+    const retryAfter = (err.response.data as ApiErrorResponse | undefined)?.retryAfter
+    const secs = typeof retryAfter === 'number' && retryAfter > 0 ? Math.ceil(retryAfter) : RATE_LIMIT_FALLBACK_SECS
+    lockExpiresAt.current = now() + secs * 1000
+    setLockRemaining(secs)
+    setLockState('rate_limited')
+    setError('')
+    setOtp(Array(OTP_LENGTH).fill(''))
+    return true
+  }
 
   const applyStatus = useCallback((status: Awaited<ReturnType<typeof getAuthStatus>>) => {
     if (status.permanent) {
@@ -889,7 +907,7 @@ function OtpStep({
   }, [resendSec, resendExpiresAt])
 
   useEffect(() => {
-    if (lockState !== 'temporary') return
+    if (lockState !== 'temporary' && lockState !== 'rate_limited') return
     const interval = setInterval(() => {
       const remaining = Math.max(0, Math.floor((lockExpiresAt.current - now()) / 1000))
       setLockRemaining(remaining)
@@ -965,6 +983,7 @@ function OtpStep({
       succeeded = true
       onSuccess(res.user, destination)
     } catch (err) {
+      if (startRateLimitCooldown(err)) return
       const message = extractErrorMessage(err, 'Invalid or expired code. Please try again.')
       const detected = classifyError(message)
       setError(message)
@@ -1014,6 +1033,7 @@ function OtpStep({
       setOtp(Array(OTP_LENGTH).fill(''))
       focusInput(0)
     } catch (err) {
+      if (startRateLimitCooldown(err)) return
       setError(extractErrorMessage(err, 'Failed to resend. Please try again.'))
     } finally {
       setResending(false)
@@ -1087,7 +1107,7 @@ function OtpStep({
               background: lockState !== 'none'
                 ? 'rgba(255,255,255,0.04)'
                 : digit ? 'rgba(77,249,237,0.08)' : 'rgba(255,255,255,0.08)',
-              border: lockState === 'temporary'
+              border: lockState === 'temporary' || lockState === 'rate_limited'
                 ? '1px solid rgba(255,122,48,0.4)'
                 : digit
                   ? '1px solid rgba(77,249,237,0.4)'
@@ -1102,7 +1122,7 @@ function OtpStep({
       </div>
 
       <AnimatePresence mode="wait">
-        {lockState === 'temporary' && (
+        {(lockState === 'temporary' || lockState === 'rate_limited') && (
           <motion.div
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
@@ -1115,7 +1135,11 @@ function OtpStep({
               fontFamily: "'League Spartan', sans-serif",
             }}
           >
-            <span>Account temporarily locked. Try again in</span>
+            <span>
+              {lockState === 'rate_limited'
+                ? 'Too many sign-in attempts. Try again in'
+                : 'Account temporarily locked. Try again in'}
+            </span>
             <span
               className="font-bold shrink-0"
               style={{ fontFamily: 'monospace', fontSize: '0.95rem', color: 'rgba(255,122,48,1)' }}
@@ -1135,7 +1159,7 @@ function OtpStep({
         disabled={code.length !== OTP_LENGTH || lockState !== 'none'}
         onClick={handleSubmit}
       >
-        {lockState === 'temporary' ? 'Locked' : 'Verify & Sign In'}
+        {lockState === 'temporary' ? 'Locked' : lockState === 'rate_limited' ? 'Please wait' : 'Verify & Sign In'}
       </PrimaryButton>
 
       <div className="flex items-center justify-between">

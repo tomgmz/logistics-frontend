@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { NextRequest, NextResponse } from 'next/server'
 import { backendCookieHeader } from '@/lib/server/token-cookies'
+import { forwardedIpHeaders } from '@/lib/server/ip-forward'
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL!
 export const isProd  = process.env.NODE_ENV === 'production'
@@ -47,6 +48,8 @@ export async function getForwardHeaders(req: NextRequest) {
     ...(req.headers.get('x-csrf-token')
       ? { 'X-CSRF-Token': req.headers.get('x-csrf-token')! }
       : {}),
+    // Rate limits key on the visitor, not on Vercel. See lib/server/ip-forward.
+    ...forwardedIpHeaders(req),
   }
 }
 

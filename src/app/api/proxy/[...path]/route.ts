@@ -2,6 +2,7 @@ import axios, { type AxiosResponse } from 'axios'
 import { NextRequest, NextResponse } from 'next/server'
 import { backendCookieHeader, TOKEN_COOKIES } from '@/lib/server/token-cookies'
 import { forwardedGeoHeaders } from '@/lib/server/geo-forward'
+import { forwardedIpHeaders } from '@/lib/server/ip-forward'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL!
 
@@ -59,6 +60,8 @@ async function handler(
         // The password-changed emails say roughly where the change came from;
         // only the proxy knows the visitor's location. See lib/server/geo-forward.
         ...(GEO_FORWARD_PATHS.has(path) ? forwardedGeoHeaders(req) : {}),
+        // Rate limits key on the visitor, not on Vercel. See lib/server/ip-forward.
+        ...forwardedIpHeaders(req),
       },
       data: body,
     })
