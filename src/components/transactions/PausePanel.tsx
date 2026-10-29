@@ -14,6 +14,7 @@ import { formatCallClock } from '@/app/admin/booking-management/DriverCallTime'
 import { phDay } from '@/lib/ph-date'
 import { formatDateTime } from './transaction-format'
 import { AMBER, BORDER_C, GREEN, MUTED } from './transaction-theme'
+import { MapPointLink } from '@/components/map/LocationMapModal'
 
 /**
  * Staff view of the pauses on one booking: a way to pause a delivery in
@@ -202,8 +203,8 @@ export default function PausePanel({ bookingId, pausedAt, inTransit, canControl,
             Since {formatDateTime(open.paused_at)} ({duration(open.paused_at, null)})
             {personName(open.pauser) ? ` · by ${personName(open.pauser)}` : ''}
             {open.latitude != null && open.longitude != null && (
-              <> · <a className="underline" target="_blank" rel="noreferrer"
-                href={`https://www.google.com/maps?q=${open.latitude},${open.longitude}`}>where the truck was</a></>
+              <> · <MapPointLink className="underline"
+                point={{ latitude: open.latitude, longitude: open.longitude, label: 'Where the truck was when paused' }}>where the truck was</MapPointLink></>
             )}
           </span>
           {open.report_id && (

@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, MapPin, Video, AlertTriangle } from 'lucide-react'
 
 import { BLOWBAGETS_ITEMS } from '@/lib/blowbagets'
+import { MapPointLink } from '@/components/map/LocationMapModal'
 import {
   incidentLabel,
   isUrgentReport,
@@ -156,15 +157,13 @@ export default function DriverReportDetailModal({
                 </Row>
                 <Row label="Location">
                   {report.latitude != null && report.longitude != null ? (
-                    <a
-                      href={`https://www.google.com/maps?q=${report.latitude},${report.longitude}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-[var(--color-cyan)] hover:underline"
+                    <MapPointLink
+                      point={{ latitude: report.latitude, longitude: report.longitude, label: report.address }}
+                      className="inline-flex items-center gap-1 text-left text-[var(--color-cyan)] hover:underline"
                     >
-                      <MapPin size={12} />
+                      <MapPin size={12} className="shrink-0" />
                       {report.address || `${report.latitude.toFixed(5)}, ${report.longitude.toFixed(5)}`}
-                    </a>
+                    </MapPointLink>
                   ) : (report.address || <span className="text-white/35">Not captured</span>)}
                 </Row>
               </div>

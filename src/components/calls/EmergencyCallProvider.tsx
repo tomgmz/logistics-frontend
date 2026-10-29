@@ -10,6 +10,7 @@ import { useAuthStore } from '@/lib/store/auth.store'
 import { emergencyCallService, type IncomingCall } from '@/lib/services/emergencyCall.service'
 import { useRingtone, useTitleFlash, useElapsed } from './callHooks'
 import { CallAlert, CallCircleButton } from './CallAlert'
+import { MapPointLink } from '@/components/map/LocationMapModal'
 
 /**
  * The driver's in-app emergency call, on the staff side.
@@ -298,14 +299,12 @@ function CallLinks({ call, reportHref }: { call: IncomingCall; reportHref?: stri
   return (
     <>
       {hasFix && (
-        <a
-          href={`https://www.google.com/maps/search/?api=1&query=${call.latitude},${call.longitude}`}
-          target="_blank"
-          rel="noreferrer"
-          className="text-[#f62626]"
+        <MapPointLink
+          point={{ latitude: call.latitude!, longitude: call.longitude!, label: call.address ?? 'Where the alert came from' }}
+          className="text-[#f62626] pointer-events-auto"
         >
           Open in Google Maps
-        </a>
+        </MapPointLink>
       )}
       {reportHref && <Link href={reportHref} className="text-white/80">Open the report</Link>}
     </>

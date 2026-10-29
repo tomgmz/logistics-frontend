@@ -23,7 +23,7 @@ import {
 } from '@/lib/store/slice/routeMap.slice'
 import { statusColor } from './status.colors'
 import { bookingRef } from '@/lib/booking'
-import { useLiveDriverPosition, formatAge } from '@/lib/hooks/useLiveDriverPosition'
+import { useLiveDriverPosition } from '@/lib/hooks/useLiveDriverPosition'
 import { LiveTruckMarker } from './LiveTruckMarker'
 import { useRouteChanged } from '@/hooks/useRouteChanged'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
@@ -170,49 +170,6 @@ function MapMarkers({ routeData, stops }: { routeData: OptimizeRouteResponse; st
         )
       })}
     </>
-  )
-}
-
-/**
- * The header pill, which used to read "Live Tracking" with a pulsing dot at all
- * times — including on a pending booking with no driver, and on a page that did
- * no polling and held no subscription. It now says what is actually true.
- */
-function LiveTrackingPill({
-  active,
-  hasFix,
-  isStale,
-  ageMs,
-}: {
-  active:  boolean
-  hasFix:  boolean
-  isStale: boolean
-  ageMs:   number | null
-}) {
-  const isLive = active && hasFix && !isStale
-
-  const label = !active ? 'Not in transit'
-    : !hasFix  ? 'Awaiting driver position'
-    : isStale  ? `No signal · ${formatAge(ageMs)}`
-    : `Live · ${formatAge(ageMs)}`
-
-  const color = isLive ? 'var(--color-cyan)' : '#9f9c9c'
-
-  return (
-    <div
-      className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full border whitespace-nowrap"
-      style={{
-        color,
-        borderColor: isLive ? 'rgba(77,249,237,0.35)' : 'rgba(159,156,156,0.3)',
-        background:  isLive ? 'rgba(77,249,237,0.12)' : 'transparent',
-      }}
-    >
-      <span
-        className={`w-1.5 h-1.5 rounded-full ${isLive ? 'animate-pulse' : ''}`}
-        style={{ background: color }}
-      />
-      {label}
-    </div>
   )
 }
 
@@ -393,6 +350,9 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
       defaultZoom={11}
       gestureHandling="greedy"
       className="w-full h-full"
+      // Only fullscreen; the map is still pannable/zoomable by gesture and wheel.
+      disableDefaultUI
+      fullscreenControl
     >
       <MapMarkers routeData={routeData} stops={stops} />
       {isInTransit && (
@@ -577,27 +537,6 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
         className="hidden lg:flex h-dvh overflow-hidden flex-col"
         style={{ fontFamily: "var(--font-alegreya-sc), 'Alegreya Sans SC', sans-serif", background: 'var(--color-bg)' }}
       >
-        <div
-          className="h-16 flex items-center justify-end px-6 flex-shrink-0 border-b"
-          style={{ borderColor: 'var(--color-surface-dark)', background: 'var(--color-bg)' }}
-        >
-          <div className="flex items-center gap-2">
-            <LiveTrackingPill
-              active={isInTransit}
-              hasFix={!!live.latest}
-              isStale={live.isStale}
-              ageMs={live.ageMs}
-            />
-            <button
-              onClick={loadBookings}
-              className="w-8 h-8 rounded-full flex items-center justify-center border hover:opacity-70 transition-opacity"
-              style={{ borderColor: 'var(--color-border)' }}
-            >
-              <RefreshIcon sx={{ fontSize: 14, color: '#9ca3af' }} />
-            </button>
-          </div>
-        </div>
-
         <div className="flex flex-1 overflow-hidden">
           <div
             className="w-[265px] flex-shrink-0 overflow-hidden flex flex-col border-r"
