@@ -27,6 +27,7 @@ import { roleLabel } from '@/lib/roles'
 import ItAdminHandoverPanel from '@/components/admin/ItAdminHandoverPanel'
 import { TableCard } from '@/components/ui/untitled/table-card'
 import { TabsMinimal } from '@/components/ui/untitled/tabs'
+import { Skeleton } from '@/components/ui/Skeleton'
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Scheduler staleness is a function of time, not of any row changing. */
@@ -342,9 +343,7 @@ function TrendSection({ level, reloadKey }: { level: TrendLevel; reloadKey: stri
             The chart could not be loaded.
           </div>
         ) : !shown ? (
-          <div className="flex h-full items-center justify-center gap-2 rounded-xl ring-1 ring-[#2a2a2a] ring-inset text-sm text-[#818181]">
-            <Loader2 size={16} className="animate-spin" /> Loading chart…
-          </div>
+          <Skeleton className="h-full w-full rounded-xl" />
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={points} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
@@ -728,6 +727,87 @@ function StatusBanner({ summary }: { summary: ItDashboardSummary }) {
   )
 }
 
+// ── Loading ──────────────────────────────────────────────────────────────────
+
+const CARD = 'rounded-xl bg-[#1b1b1b] shadow-[0_1px_2px_rgba(0,0,0,0.3)] ring-1 ring-[#424242] ring-inset'
+
+/** A table card in grey: title bar, then rows. */
+function TableCardSkeleton({ rows }: { rows: number }) {
+  return (
+    <div className={CARD}>
+      <div className="flex items-center justify-between gap-4 border-b border-[#424242] px-4 py-5 md:px-6">
+        <Skeleton className="h-5 w-40" />
+        <Skeleton className="h-9 w-32 rounded-lg" />
+      </div>
+      <div className="divide-y divide-[#2a2a2a]">
+        {Array.from({ length: rows }).map((_, i) => (
+          <div key={i} className="flex items-center gap-6 px-4 py-4 md:px-6">
+            <Skeleton className="h-5 w-20 rounded-full" />
+            <Skeleton className="h-3.5 flex-1" />
+            <Skeleton className="hidden h-3.5 w-24 sm:block" />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** The dashboard's own layout in grey, shown until the first load lands. */
+function ItDashboardSkeleton() {
+  return (
+    <div className="flex flex-col gap-5 lg:gap-6" aria-busy="true" aria-label="Loading dashboard">
+      <Skeleton className="h-12 w-full rounded-xl" />
+
+      <div className="flex flex-col gap-4 md:flex-row md:flex-wrap md:gap-5">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className={`${CARD} flex min-w-0 flex-1 flex-col gap-4 px-4 py-5 md:min-w-[260px] md:flex-row md:px-5`}>
+            <Skeleton className="size-10 shrink-0 rounded-lg" />
+            <div className="flex w-full flex-col gap-3">
+              <Skeleton className="h-3.5 w-32" />
+              <div className="flex items-center justify-between gap-4">
+                <Skeleton className="h-8 w-14" />
+                <Skeleton className="h-6 w-28" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <section className="flex flex-col gap-5">
+        <div className="flex flex-col items-start justify-between gap-4 lg:flex-row">
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-3.5 w-28" />
+            <Skeleton className="h-8 w-20" />
+          </div>
+          <Skeleton className="h-9 w-full rounded-lg lg:w-[420px]" />
+        </div>
+        <Skeleton className="h-60 w-full rounded-xl" />
+      </section>
+
+      <div className={CARD}>
+        <div className="flex items-center gap-3 border-b border-[#424242] px-4 py-5 md:px-6">
+          <Skeleton className="h-8 w-8 rounded-lg" />
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-4 w-36" />
+            <Skeleton className="h-3 w-64 max-w-full" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3 p-4 md:p-6 lg:grid-cols-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="space-y-2.5 rounded-xl bg-[#141414] px-4 py-3 ring-1 ring-[#2a2a2a] ring-inset">
+              <Skeleton className="h-3.5 w-24" />
+              <Skeleton className="h-6 w-10" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <TableCardSkeleton rows={4} />
+      <TableCardSkeleton rows={5} />
+    </div>
+  )
+}
+
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ItAdminDashboard() {
@@ -798,11 +878,7 @@ export default function ItAdminDashboard() {
         )}
 
         {!summary ? (
-          loading && (
-            <div className="flex items-center justify-center gap-2 py-24 text-sm text-[#818181]">
-              <Loader2 size={16} className="animate-spin" /> Loading dashboard…
-            </div>
-          )
+          loading && <ItDashboardSkeleton />
         ) : (
           <>
             <StatusBanner summary={summary} />

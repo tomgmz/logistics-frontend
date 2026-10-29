@@ -11,6 +11,7 @@ import {
   MapPin, PackageCheck, ShieldAlert, Truck, Wrench, ChevronRight, Clock, Ticket,
 } from 'lucide-react'
 import SupportTicketsPanel from './SupportTicketsPanel'
+import { Skeleton } from '@/components/ui/Skeleton'
 
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { getApiErrorMessage } from '@/lib/api-error'
@@ -363,6 +364,88 @@ function Analytics({ d }: { d: Data }) {
   )
 }
 
+/** How many shortcut cards and lists each desk shows (cardsFor / listsFor). */
+const SKELETON_COUNTS: Record<StaffRole, { cards: number; lists: number }> = {
+  admin:              { cards: 7, lists: 3 },
+  general_manager:    { cards: 4, lists: 2 },
+  operations_manager: { cards: 6, lists: 3 },
+  fleet_manager:      { cards: 5, lists: 3 },
+}
+
+function cardGrid(role: StaffRole) {
+  return `grid grid-cols-2 gap-3 md:grid-cols-3 ${role === 'general_manager' ? 'xl:grid-cols-4' : 'xl:grid-cols-5'} ${role === 'admin' ? '2xl:grid-cols-6' : ''}`
+}
+
+const PANEL = 'rounded-xl border border-white/[0.08] bg-[var(--color-surface)]'
+
+/** The dashboard's own layout in grey, shown until the first load lands. */
+function StaffDashboardSkeleton({ role }: { role: StaffRole }) {
+  const { cards, lists } = SKELETON_COUNTS[role]
+  return (
+    <div className="space-y-5" aria-busy="true" aria-label="Loading dashboard">
+      <div className={cardGrid(role)}>
+        {Array.from({ length: cards }).map((_, i) => (
+          <div key={i} className={`${PANEL} flex flex-col gap-2 p-3.5`}>
+            <Skeleton className="h-8 w-8 rounded-lg" />
+            <Skeleton className="h-[30px] w-12" />
+            <div className="space-y-1.5">
+              <Skeleton className="h-3.5 w-3/4" />
+              <Skeleton className="h-2.5 w-full" />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {role === 'admin' && (
+        <section className="space-y-3">
+          <Skeleton className="h-3 w-20" />
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className={`${PANEL} space-y-2 p-3.5`}>
+                <Skeleton className="h-2.5 w-24" />
+                <Skeleton className="h-7 w-14" />
+              </div>
+            ))}
+          </div>
+          <div className="grid gap-3 lg:grid-cols-3">
+            <div className={`${PANEL} p-3.5 lg:col-span-2`}>
+              <Skeleton className="h-3.5 w-44" />
+              <Skeleton className="mb-3 mt-1.5 h-2.5 w-56" />
+              <Skeleton className="h-[220px] w-full rounded-lg" />
+            </div>
+            <div className={`${PANEL} space-y-2.5 p-3.5`}>
+              <Skeleton className="mb-3 h-3.5 w-36" />
+              {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-3 w-full" />)}
+            </div>
+          </div>
+        </section>
+      )}
+
+      <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+        {Array.from({ length: lists }).map((_, i) => (
+          <section key={i} className={PANEL}>
+            <div className="flex items-center justify-between border-b border-white/[0.07] px-3.5 py-2.5">
+              <Skeleton className="h-3.5 w-40" />
+              <Skeleton className="h-3 w-5" />
+            </div>
+            <div className="divide-y divide-white/[0.05]">
+              {Array.from({ length: 4 }).map((_, j) => (
+                <div key={j} className="flex items-center justify-between gap-3 px-3.5 py-2.5">
+                  <div className="space-y-1.5">
+                    <Skeleton className="h-3 w-24" />
+                    <Skeleton className="h-2.5 w-36" />
+                  </div>
+                  <Skeleton className="h-2.5 w-16" />
+                </div>
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function StaffDashboard({ role }: { role: StaffRole }) {
   const [data,    setData]    = useState<Data | null>(null)
   const [error,   setError]   = useState<string | null>(null)
@@ -398,16 +481,10 @@ export default function StaffDashboard({ role }: { role: StaffRole }) {
         )}
 
         {!data ? (
-          loading && (
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="h-[132px] animate-pulse rounded-xl bg-white/[0.04]" />
-              ))}
-            </div>
-          )
+          loading && <StaffDashboardSkeleton role={role} />
         ) : (
           <>
-            <div className={`grid grid-cols-2 gap-3 md:grid-cols-3 ${role === 'general_manager' ? 'xl:grid-cols-4' : 'xl:grid-cols-5'} ${role === 'admin' ? '2xl:grid-cols-6' : ''}`}>
+            <div className={cardGrid(role)}>
               {cardsFor(role, data).map((c, i) => <ShortcutCard key={c.label} card={c} index={i} />)}
             </div>
 
