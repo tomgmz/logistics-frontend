@@ -10,7 +10,6 @@ import {
   ChevronRight, ChevronLeft, Package,
   AlertCircle, RefreshCw,
 } from 'lucide-react'
-import RefreshButton from '@/components/ui/RefreshButton'
 import FilterBar from '@/components/ui/FilterBar'
 import { TableCard } from '@/components/ui/untitled/table-card'
 import { TabsMinimal } from '@/components/ui/untitled/tabs'
@@ -229,6 +228,18 @@ export default function BookingHistoryModule() {
   // through the API, which only ever returns this client's own.
   useLiveTable(['live:bookings'], () => { void loadBookings(true) }, { enabled: !!clientId })
 
+  // The open booking is live too: its status, details and the completion and
+  // rejection panels follow every change. Those panels keep what the client is
+  // typing in their own state, so a re-read never clears it; the panels below
+  // (stop times, documents, resubmission changes) re-read themselves.
+  const selectedId = selected?.booking_id as string | undefined
+  useLiveTable(['live:bookings'], () => {
+    if (!selectedId) return
+    bookingService.getBookingById(selectedId)
+      .then((b) => setSelected((cur) => (cur?.booking_id === selectedId ? b as BookingWithRelations : cur)))
+      .catch(() => {})
+  }, { enabled: !!clientId && view === 'detail' && !!selectedId })
+
   // Notification deep-link: open the booking named in ?booking=. It is fetched
   // on its own, since the list is paged and it may not be on the page showing.
   const [deepLinkId, setDeepLinkId] = useState<string | null>(null)
@@ -312,7 +323,8 @@ export default function BookingHistoryModule() {
 
               {/* Untitled UI's table card, as on the staff tables: the header (title +
                   count), then its filter row with the status tabs on the left (a
-                  dropdown on phones) and search, Filters and Refresh on the right.
+                  dropdown on phones) and search and dates on the right. No Refresh:
+                  the list is live.
                   The booking cards stay as they are, inside the card. */}
               {/* Reaches the bottom of the screen even with only a few cards. */}
               <TableCard.Root untitled className="flex flex-[1_0_auto] flex-col">
@@ -334,7 +346,6 @@ export default function BookingHistoryModule() {
                   value: dateFrom || dateTo ? { from: dateFrom || dateTo, to: dateTo || dateFrom } : null,
                   onChange: (r) => { setDateFrom(r?.from ?? ''); setDateTo(r?.to ?? '') },
                 }}
-                actions={<RefreshButton iconOnly onClick={() => void loadBookings()} loading={loading} disabled={loading} />}
               />
 
               <div className="flex flex-[1_0_auto] flex-col gap-4 p-4 md:p-6">

@@ -70,7 +70,7 @@ export default function ReusableDashboardShell({ children, navItems }: ReusableD
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <ReusableHeader sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} title={title} />
 
-        <main className="relative min-w-0 flex-1 overflow-hidden flex flex-col bg-[var(--color-surface)]">
+        <main className="relative min-w-0 flex-1 overflow-hidden flex flex-col bg-[var(--color-bg)]">
           <div ref={contentRef} className="flex-1 min-h-0 flex flex-col overflow-hidden">
             {blocked ? (
               <ModuleNoAccess />
