@@ -1,13 +1,13 @@
 'use client'
 
 import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Upload, Truck as TruckIcon, Pencil, Archive, Eye, Plus, Search } from 'lucide-react'
 import type { CreateTruckModelInput, UpdateTruckModelInput } from '@/app/types/truck.types'
 import { TruckModel } from '@/app/types/truck-model'
 import {
-  adminFetchTruckModels,
+  adminFetchTruckModelsPage,
   adminCreateTruckModel,
   adminUpdateTruckModel,
   adminArchiveTruckModel,
@@ -26,7 +26,8 @@ import { ModelThumb, fmtDimensions, kgToTons } from './vehicle-ui'
 import RefreshButton from '@/components/ui/RefreshButton'
 import Pagination from '@/components/ui/Pagination'
 import { useVehicleTypeOptions } from '@/lib/hooks/useVehicleTypes'
-import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
+import { useServerTable } from '@/lib/hooks/useServerTable'
+import { useDebouncedValue } from '@/lib/hooks/useDebouncedValue'
 
 
 interface ModelFormState {
@@ -93,13 +94,17 @@ type FieldErrors = Partial<Record<keyof ModelFormState | 'image', string>>
  * never deleted, so past bookings keep their details.
  */
 export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props) {
-  // 10 rows on phones, 20 from tablet up (lib/hooks/useTablePageSize).
-  const PAGE_SIZE = useTablePageSize()
-  const [models,      setModels]      = useState<TruckModel[]>([])
-  const [listLoading, setListLoading] = useState(true)
-  const [listError,   setListError]   = useState<string | null>(null)
   const [search,      setSearch]      = useState('')
-  const [page,        setPage]        = useState(1)
+  const debouncedSearch = useDebouncedValue(search.trim())
+
+  // Server-side pages, searched on the server (10 rows on phones, 20 from tablet up).
+  const table = useServerTable(
+    (q) => adminFetchTruckModelsPage({ ...q, ...(debouncedSearch && { search: debouncedSearch }) }),
+    debouncedSearch,
+    { errorMessage: 'Request failed. Please try again.' },
+  )
+  const { rows: models, loading: listLoading, error: listError, page, setPage, pageSize: PAGE_SIZE, total, totalPages } = table
+  const modelCount = table.meta?.unfiltered ?? 0
 
   const [formMode,     setFormMode]    = useState<FormMode>(null)
   const [editingId,    setEditingId]   = useState<string | null>(null)
@@ -117,7 +122,11 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
   const [actionBusy,  setActionBusy]  = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const editingModel = models.find((m) => m.model_id === editingId) ?? null
+  // The model being edited, kept even if a live re-read moves it off this page.
+  const editingRef   = useRef<TruckModel | null>(null)
+  const editingModel = (editingId && (models.find((m) => m.model_id === editingId)
+    ?? (editingRef.current?.model_id === editingId ? editingRef.current : null))) || null
+  editingRef.current = editingModel
   // Managed in System Maintenance → Vehicle Types. An edited model keeps its
   // type even if that type has since been made inactive.
   const vehicleTypes = useVehicleTypeOptions(formMode === 'edit' ? editingModel?.vehicle_type : null, !!formMode)
@@ -130,37 +139,9 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
     )
   )
 
-  const loadModels = useCallback(async (quiet = false) => {
-    try {
-      if (!quiet) setListLoading(true)
-      setListError(null)
-      setModels(await adminFetchTruckModels())
-    } catch (e) {
-      if (!quiet) setListError(getApiErrorMessage(e, 'Request failed. Please try again.'))
-    } finally {
-      if (!quiet) setListLoading(false)
-    }
-  }, [])
+  const loadModels = table.reload
 
   useLiveTable(['live:truck_models'], () => { void loadModels(true) })
-
-  useEffect(() => {
-    void loadModels()
-  }, [loadModels])
-
-  const visibleModels = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    if (!q) return models
-    return models.filter((m) =>
-      [m.name, m.vehicle_type, m.suitable_for].some((v) => v?.toLowerCase().includes(q)),
-    )
-  }, [models, search])
-
-  // A new search starts again from the first page.
-  useEffect(() => { setPage(1) }, [search])
-  const totalPages = Math.max(1, Math.ceil(visibleModels.length / PAGE_SIZE))
-  const safePage   = Math.min(page, totalPages)
-  const pageModels = visibleModels.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
   const openCreate = () => {
     setEditingId(null)
@@ -444,14 +425,14 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
                 Try again
               </button>
             </div>
-          ) : visibleModels.length === 0 ? (
+          ) : models.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-4 py-12 text-center px-4">
               <TruckIcon size={40} className="text-white/20" />
               <p className="text-sm text-white/45">
-                {models.length === 0 ? 'No truck models yet.' : 'No models match your search.'}
+                {modelCount === 0 ? 'No truck models yet.' : 'No models match your search.'}
               </p>
-              <ClearFiltersLink show={models.length > 0} onClear={() => setSearch('')} className="mt-0" />
-              {models.length === 0 && canCreate && (
+              <ClearFiltersLink show={modelCount > 0} onClear={() => setSearch('')} className="mt-0" />
+              {modelCount === 0 && canCreate && (
                 <button type="button" onClick={openCreate} className="text-[var(--color-cyan)] text-sm font-bold">
                   Add the first model
                 </button>
@@ -474,7 +455,7 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
                   </tr>
                 </thead>
                 <tbody>
-                  {pageModels.map((m) => (
+                  {models.map((m) => (
                     <tr key={m.model_id} className="border-b border-white/[0.05] hover:bg-white/[0.03] transition-colors">
                       <td className="px-2 py-2 align-middle">
                         <div className="flex justify-center">
@@ -506,7 +487,7 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
                 </tbody>
               </table>
             </div>
-            <Pagination page={safePage} totalPages={totalPages} total={visibleModels.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
+            <Pagination page={page} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPageChange={setPage} disabled={table.fetching} />
             </>
           )}
         </div>

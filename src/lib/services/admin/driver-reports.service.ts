@@ -1,5 +1,6 @@
 import authApi, { initCsrf } from '../../api/auth.api'
 import type { DriverReport, IncidentType, ReportStatus } from '@/app/types/driver-report.types'
+import type { PagedResponse, PageRequest } from '@/lib/hooks/useServerTable'
 
 /**
  * The staff side of the driver Reports module (Company Administrator,
@@ -16,6 +17,18 @@ export async function fetchDriverReports(status?: ReportStatus | null): Promise<
     params: status ? { status } : undefined,
   })
   return data?.data ?? []
+}
+
+export interface DriverReportCounts {
+  all: number; open: number; reported: number; acknowledged: number; resolved: number; unclassified: number
+}
+
+/** One page of the Reports table; filters, search and tab counts are server-side. */
+export async function fetchDriverReportsPage(
+  params: PageRequest & { status: string; type: string; search?: string },
+): Promise<PagedResponse<DriverReport, { counts: DriverReportCounts }>> {
+  const { data } = await authApi.get<PagedResponse<DriverReport, { counts: DriverReportCounts }>>(BASE, { params })
+  return { data: data.data, meta: data.meta }
 }
 
 export async function fetchDriverReport(reportId: string): Promise<DriverReport> {

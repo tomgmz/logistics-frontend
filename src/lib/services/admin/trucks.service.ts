@@ -1,6 +1,7 @@
 import authApi, { initCsrf } from '../../api/auth.api'
 import type { Truck, TruckInspection, CreateTruckInput, UpdateTruckInput, CreateTruckModelInput,UpdateTruckModelInput, MaintenanceTruck, OdometerReading, TruckService } from '@/app/types/truck.types'
 import type { BlowbagetsItems } from '@/lib/services/client/booking.service'
+import type { PagedResponse, PageRequest } from '@/lib/hooks/useServerTable'
 import type { TruckModel } from '@/app/types/truck-model'
 
 const ADMIN = '/admin'
@@ -110,6 +111,14 @@ export async function adminFetchTruckModels(): Promise<TruckModel[]> {
   return data?.data ?? []
 }
 
+/** One page of the Models table, searched on the server; `meta.unfiltered` is the count before searching. */
+export async function adminFetchTruckModelsPage(
+  params: PageRequest & { search?: string },
+): Promise<PagedResponse<TruckModel, { unfiltered: number }>> {
+  const { data } = await authApi.get<PagedResponse<TruckModel, { unfiltered: number }>>(`${ADMIN}/truck-models`, { params })
+  return { data: data.data, meta: data.meta }
+}
+
 export async function adminFetchTruckModelById(modelId: string): Promise<TruckModel> {
   const { data } = await authApi.get<{ data: TruckModel }>(`${ADMIN}/truck-models/${modelId}`)
   return data.data
@@ -155,6 +164,28 @@ export async function adminArchiveTruckModel(modelId: string): Promise<void> {
  * service, failed BLOWBAGETS, or an open breakdown/accident report from a
  * driver), each with the reasons and the open reports that put it there.
  */
+/** A row of the Upkeep table as the server pages it (the wording is added in UpkeepTab). */
+export interface UpkeepProblemRow {
+  key:      string
+  truck:    MaintenanceTruck
+  reason:   MaintenanceTruck['maintenance_reasons'][number]
+  report?:  MaintenanceTruck['open_reports'][number]
+  group:    'blowbagets' | 'vehicle_maintenance' | 'driver_report'
+  since:    string | null
+  blocking: boolean
+  type:     'inspection' | 'service' | 'report' | 'odometer' | 'registration'
+}
+
+/** One page of the Upkeep table: one row per problem, filtered and ordered on the server. */
+export async function adminFetchUpkeepPage(
+  params: PageRequest & { group: string; search?: string; focus?: string },
+): Promise<PagedResponse<UpkeepProblemRow, { focusHasProblems: boolean }>> {
+  const { data } = await authApi.get<PagedResponse<UpkeepProblemRow, { focusHasProblems: boolean }>>(
+    `${ADMIN}/trucks/maintenance-queue`, { params },
+  )
+  return { data: data.data, meta: data.meta }
+}
+
 export async function adminFetchMaintenanceQueue(): Promise<MaintenanceTruck[]> {
   const { data } = await authApi.get<{ data: MaintenanceTruck[] }>(`${ADMIN}/trucks/maintenance`)
   return data?.data ?? []

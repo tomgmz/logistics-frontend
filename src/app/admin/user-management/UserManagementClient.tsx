@@ -3,7 +3,7 @@
 import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
 import Pagination from '@/components/ui/Pagination'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
-import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
+import { useState, useEffect, useCallback, type ReactNode } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Users, UserPlus,
@@ -26,7 +26,7 @@ import UserFormModal, { type DriverSource } from './UserFormModal'
 import AccountTypePicker, { type AccountTypeOption } from '@/components/admin/AccountTypePicker'
 import { useRecordLocks } from '@/lib/hooks/useRecordLock'
 import { RecordLockBadge } from '@/components/ui/RecordLockBanner'
-import { licenseExpiryState, needsLicenseUpdate } from '@/lib/license-expiry'
+import { licenseExpiryState } from '@/lib/license-expiry'
 import { externalDriverService, type VendorDriverUser } from '@/lib/services/admin/external-driver.service'
 import { READ_ONLY_HINT, useModuleAccess, writeAccess } from '@/components/layout/ModuleAccess'
 import RowActionMenu, { type RowAction } from '@/components/ui/RowActionMenu'
@@ -40,7 +40,7 @@ import { Plus } from '@untitledui/icons'
 import FilterBar, {
   allowedValues, matchesFilter, optionsFrom, type FilterField, type FilterValues,
 } from '@/components/ui/FilterBar'
-import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
+import { useServerTable } from '@/lib/hooks/useServerTable'
 // No IT Administrator tab: IT Administrators are the IT Administrator's own
 // business, and a new one is only made through their handover (2026-10-25).
 type UserMgmtTab = Extract<UserTab, 'clients' | 'drivers'>
@@ -59,7 +59,6 @@ export type UserManagementMode = 'company-admin' | 'it-admin'
 // company crew — so they get their own list and their own access actions. Both
 // kinds are added and edited through the same driver form.
 type TabValue = UserMgmtTab | 'vendor-drivers' | 'all'
-type DirectoryTab = Exclude<TabValue, 'all'>
 
 const DRIVER_TABS: { key: 'drivers' | 'vendor-drivers'; label: string }[] = [
   { key: 'drivers',        label: 'Company Drivers' },
@@ -90,29 +89,6 @@ const muiTheme = createTheme({
 
 // Rows per page: 10 on a phone, 20 on anything wider (the user's call, 2026-10-25).
 
-async function fetchByTab(tab: DirectoryTab): Promise<AnyUser[]> {
-  switch (tab) {
-    case 'clients':   return clientService.getAll() as Promise<AnyUser[]>
-    case 'drivers':   return driverService.getAll() as Promise<AnyUser[]>
-    case 'vendor-drivers': return externalDriverService.list() as Promise<AnyUser[]>
-  }
-}
-
-// The archived view reads /admin/users?status=archived (the per-role lists hide
-// archived accounts). Both driver tabs read the drivers and split on is_external.
-const ARCHIVED_ROLE: Record<DirectoryTab, string> = {
-  clients:          'client',
-  drivers:          'driver',
-  'vendor-drivers': 'driver',
-}
-
-async function fetchArchivedByTab(tab: DirectoryTab): Promise<AnyUser[]> {
-  const { data } = await userService.getAll({ role: ARCHIVED_ROLE[tab], status: 'archived' })
-  if (tab === 'drivers')        return data.filter((u) => !(u as DriverUser).drivers?.is_external)
-  if (tab === 'vendor-drivers') return data.filter((u) =>  (u as DriverUser).drivers?.is_external)
-  return data
-}
-
 // "Archived" is one of the Status filter's options. Archived accounts come from
 // their own list, so the Status filter decides which lists to read:
 //   none: current accounts only (no Status filter, or Archived not in it)
@@ -128,12 +104,6 @@ function archivedModeOf(f: FilterValues): ArchivedMode {
   const status = allowedValues(f, 'status', CURRENT_STATUSES)
   if (!status?.includes('archived')) return 'none'
   return status.length === 1 ? 'only' : 'both'
-}
-
-async function loadTabRows(tab: DirectoryTab, mode: ArchivedMode): Promise<AnyUser[]> {
-  if (mode === 'only') return fetchArchivedByTab(tab)
-  if (mode === 'both') return (await Promise.all([fetchByTab(tab), fetchArchivedByTab(tab)])).flat()
-  return fetchByTab(tab)
 }
 
 /** Company driver, vendor driver or anyone else: what the pop-ups say about passkeys. */
@@ -637,14 +607,6 @@ const ACCESS_OPTIONS = [
   { value: 'revoked',    label: 'Revoked' },
 ]
 
-/** The same states AccessBadge draws, as filter values. */
-function accessState(access: VendorDriverUser['access'] | undefined): string | null {
-  if (!access) return null
-  if (!access.account_active) return 'revoked'
-  if (access.enrolled)        return 'enrolled'
-  return access.invite_pending ? 'invited' : 'not_set_up'
-}
-
 /** "on_trip" → "On Trip". */
 function humanize(v: string): string {
   return v.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
@@ -683,19 +645,6 @@ function filterFields(tab: TabValue, rows: AnyUser[], archivedOnly: boolean): Fi
   }
 }
 
-/** The client-side half of the filters. The All tab filters on the server instead. */
-function matchesFilters(u: AnyUser, tab: DirectoryTab, f: FilterValues): boolean {
-  if (!matchesFilter(f, 'status', u.status)) return false
-  if (tab === 'clients') return matchesFilter(f, 'company', (u as ClientUser).clients?.company_name)
-  if (tab === 'drivers' || tab === 'vendor-drivers') {
-    const d = (u as VendorDriverUser).drivers
-    if (!matchesFilter(f, 'license', needsLicenseUpdate(d?.license_expiry) ? 'attention' : 'ok')) return false
-    if (tab === 'drivers') return matchesFilter(f, 'driver_status', d?.status)
-    return matchesFilter(f, 'vendor', d?.vendor_name) && matchesFilter(f, 'access', accessState((u as VendorDriverUser).access))
-  }
-  return true
-}
-
 export default function UserManagementClient({ mode = 'company-admin', sectionTabs }: {
   mode?:        UserManagementMode
   /** The IT Admin page's own section tabs, drawn where this page's would be. */
@@ -707,19 +656,11 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
 
   // Opens on All Users: every client and driver account at once.
   const [activeTab,        setActiveTab]        = useState<TabValue>('all')
-  const [allRows,          setAllRows]          = useState<AnyUser[]>([])
-  const [loading,          setLoading]          = useState(true)
-  const [fetching,         setFetching]         = useState(false)
-  const [error,            setError]            = useState<string | null>(null)
   const [searchInput,      setSearchInput]      = useState('')
   const [search,           setSearch]           = useState('')
-  const [page,             setPage]             = useState(1)
-  const pageSize = useTablePageSize()
   // The Filters panel's applied values. They belong to the tab (and view) they
   // were set on, so switching either clears them.
   const [filters,          setFilters]          = useState<FilterValues>([])
-  const filtersRef = useRef(filters)
-  filtersRef.current = filters
   const [stats,            setStats]            = useState({ total: 0, active: 0, archived: 0 })
   const [showForm,         setShowForm]         = useState(false)
   const [editUser,         setEditUser]         = useState<AnyUser | null>(null)
@@ -733,8 +674,6 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
   // Archived accounts are picked in the Status filter; their rows get a Restore action.
   // "Status: All" means every status, archived included.
   const archivedMode: ArchivedMode = !filters.some((r) => r.field === 'status') ? 'both' : archivedModeOf(filters)
-  const archivedRef = useRef(archivedMode)
-  archivedRef.current = archivedMode
   // Only archived accounts on screen: the old "Archived view" wording and rules.
   const showArchived = archivedMode === 'only'
 
@@ -745,164 +684,73 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
   const isDriverTab    = activeTab === 'drivers' || activeTab === 'vendor-drivers'
   const dropdownTab: TabValue = isDriverTab ? 'drivers' : activeTab
 
-  const isInitialAllFetch = useRef(true)
-
-  // Drop the old tab's rows in the same render that switches the tab. Leaving it
-  // to the fetch effect is one render too late: that render draws the previous
-  // tab's rows with the new tab's cells — company drivers through the vendor
-  // columns, which read an `access` field they don't have.
+  // A new tab starts clean: no filters, no search.
   const switchTab = useCallback((tab: TabValue) => {
     if (tab === activeTab) return
-    setAllRows([])
-    setLoading(true)
     setFilters([])
+    setSearch('')
+    setSearchInput('')
     setActiveTab(tab)
   }, [activeTab])
 
 
   // Debounce search
   useEffect(() => {
-    const t = setTimeout(() => { setSearch(searchInput); setPage(1) }, 400)
+    const t = setTimeout(() => setSearch(searchInput), 400)
     return () => clearTimeout(t)
   }, [searchInput])
 
-  // `quiet` re-reads in place (a live signal): no spinner, and a failed re-read
-  // keeps the rows already on screen instead of replacing them with an error.
-  const fetchAllUsers = useCallback(async (searchQuery: string, hard = false, quiet = false) => {
-    if (!quiet) {
-      if (hard) setLoading(true); else setFetching(true)
-      setError(null)
-    }
-    const archived = archivedRef.current
-    // This list is paged on the server, so its filters go there too.
-    const role   = allowedValues(filtersRef.current, 'role', ['client', 'driver'])
-    const status = allowedValues(filtersRef.current, 'status', CURRENT_STATUSES)
-      ?? [...CURRENT_STATUSES, 'archived']
-    try {
-      const [result, statsResult] = await Promise.all([
-        userService.getAll({
-          search: searchQuery || undefined,
-          role:   role?.length ? role.join(',') : 'client,driver',
-          // The API takes Archived in the same comma list.
-          status: status?.length ? status.join(',') : undefined,
+  // Server-side pages (10 on phones, 20 from tablet up): the server builds the
+  // tab's list, applies the filters and search, and sends one page. The stat
+  // tiles are re-read with it. `meta.tab` says which tab the rows belong to:
+  // drawing the previous tab's rows through the new tab's cells (company
+  // drivers through the vendor columns, which read an `access` field they
+  // don't have) crashed the page, so rows only show under their own tab.
+  const table = useServerTable(
+    async (q) => {
+      const tab = activeTab
+      const [res, statsResult] = await Promise.all([
+        userService.getDirectory({
+          ...q,
+          tab,
+          ...(filters.length && { filters: JSON.stringify(filters) }),
+          ...(search && { search }),
         }),
         userService.getStats('client,driver'),
       ])
-      // Left the All tab (or switched archived view) while this was in flight: its rows don't belong here.
-      if (currentTabRef.current !== 'all' || archivedRef.current !== archived) return
-      setAllRows(result.data)
       setStats({ total: statsResult.total, active: statsResult.active, archived: statsResult.archived })
-    } catch {
-      if (!quiet) setError('Failed to load users. Check your connection or permissions.')
-    } finally {
-      if (!quiet) {
-        setLoading(false)
-        setFetching(false)
-      }
-    }
-  }, [])
-
-  // The tab whose rows may land. A request for a tab the admin has already left
-  // (Drivers, then straight to Vendor Drivers, with Drivers answering last) must
-  // not put its rows under the new tab's columns — company drivers drawn
-  // through the vendor cells crashed the page on their missing `access`.
-  const currentTabRef = useRef<TabValue>(activeTab)
-  currentTabRef.current = activeTab
-
-  const fetchTabUsers = useCallback(async (tab: DirectoryTab, quiet = false) => {
-    if (!quiet) {
-      setLoading(true)
-      setError(null)
-      setAllRows([])
-    }
-    const archived = archivedRef.current
-    try {
-      const [rows, statsResult] = await Promise.all([
-        loadTabRows(tab, archived),
-        userService.getStats('client,driver')
-      ])
-      if (currentTabRef.current !== tab || archivedRef.current !== archived) return
-      setAllRows(rows)
-      setStats({ total: statsResult.total, active: statsResult.active, archived: statsResult.archived })
-    } catch {
-      if (!quiet && currentTabRef.current === tab) setError('Failed to load users. Check your connection or permissions.')
-    } finally {
-      if (!quiet && currentTabRef.current === tab) setLoading(false)
-    }
-  }, [])
+      return { data: res.data, meta: { ...res.meta, tab } }
+    },
+    `${activeTab}|${JSON.stringify(filters)}|${search}`,
+    { errorMessage: 'Failed to load users. Check your connection or permissions.' },
+  )
+  const tableReady = table.meta?.tab === activeTab
+  const loading    = table.loading || !tableReady
+  const fetching   = table.fetching
+  const error      = table.error
+  const { page, setPage, pageSize, total, totalPages } = table
+  const users      = tableReady ? table.rows : []
 
   // Someone else (or the driver app) changed an account: re-read the open tab.
-  useLiveTable(['live:users'], () => {
-    if (activeTab === 'all') void fetchAllUsers(search, false, true)
-    else void fetchTabUsers(activeTab, true)
-  })
-
-  // Picking or dropping Archived changes which lists a tab reads. The All tab
-  // re-reads on any filter change already (allTabFilterKey).
-  const tabArchivedKey = activeTab === 'all' ? '' : archivedMode
-
-  useEffect(() => {
-    isInitialAllFetch.current = true
-    setPage(1)
-    setSearch('')
-    setSearchInput('')
-    if (activeTab === 'all') fetchAllUsers('', true)
-    else fetchTabUsers(activeTab)
-  }, [activeTab, tabArchivedKey]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // The All tab re-reads from the server when its filters change.
-  const allTabFilterKey = activeTab === 'all' ? JSON.stringify(filters) : ''
-
-  useEffect(() => {
-    if (activeTab !== 'all') return
-    if (isInitialAllFetch.current) { isInitialAllFetch.current = false; return }
-    fetchAllUsers(search, false)
-  }, [search, allTabFilterKey, activeTab, fetchAllUsers])
+  useLiveTable(['live:users'], () => { void table.reload(true) })
 
   /** Reload whichever user list is showing. */
-  const refetchCurrentTab = useCallback(async () => {
-    if (activeTab === 'all') await fetchAllUsers(search, false)
-    else await fetchTabUsers(activeTab)
-  }, [activeTab, search, fetchAllUsers, fetchTabUsers])
+  const refetchCurrentTab = table.reload
 
   // Counted over the whole roster, not the current page or search, so the notice
   // never undercounts.
-  const licenseFlagCount = isDriverTab
-    ? allRows.filter((u) => needsLicenseUpdate((u as DriverUser).drivers?.license_expiry)).length
-    : 0
+  const licenseFlagCount = isDriverTab ? table.meta?.licenseFlagCount ?? 0 : 0
 
   // Both pages filter by account status only, in Untitled UI's dropdowns filter
   // bar (the user's call, 2026-10-25). One status at a time, read "Status:
   // Active"; "All" means every status, archived included.
-  const filterDefs = filterFields(activeTab, allRows, showArchived)
+  const filterDefs = filterFields(activeTab, users, showArchived)
     .filter((f) => f.key === 'status')
     .map((f) => ({ ...f, label: 'Status', single: true }))
   const licenseOnly = matchesFilter(filters, 'license', 'attention') && !matchesFilter(filters, 'license', 'ok')
 
-  const applyFilters = (next: FilterValues) => {
-    setFilters(next)
-    setPage(1)
-  }
-
-  const filtered = activeTab === 'all'
-    ? allRows
-    : allRows.filter((u) => {
-        if (!matchesFilters(u, activeTab, filters)) return false
-        if (!search) return true
-        const q = search.toLowerCase()
-        return (
-          u.email?.toLowerCase().includes(q) ||
-          u.first_name?.toLowerCase().includes(q) ||
-          u.last_name?.toLowerCase().includes(q)
-        )
-      })
-
-  // The API returns the whole list on every tab (All included), so every view
-  // is cut into pages here. All used to show the full list on every page.
-  const total      = filtered.length
-  const totalPages = Math.max(1, Math.ceil(total / pageSize))
-  const safePage   = Math.min(page, totalPages)
-  const users      = filtered.slice((safePage - 1) * pageSize, safePage * pageSize)
+  // New filters go back to page 1 (useServerTable).
+  const applyFilters = (next: FilterValues) => setFilters(next)
 
   function handleStatusChange(user: AnyUser, status: UserStatus) {
     const serviceTab = activeTab === 'clients' || activeTab === 'drivers'
@@ -1187,7 +1035,7 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
 
             {/* Pagination */}
             {!loading && total > 0 && (
-              <Pagination page={safePage} totalPages={totalPages} total={total} pageSize={pageSize} onPageChange={setPage} disabled={fetching} />
+              <Pagination page={page} totalPages={totalPages} total={total} pageSize={pageSize} onPageChange={setPage} disabled={fetching} />
             )}
           </TableCard.Root>
         </div>

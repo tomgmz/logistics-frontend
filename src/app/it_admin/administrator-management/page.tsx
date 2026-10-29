@@ -3,7 +3,7 @@
 import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
 import Pagination from '@/components/ui/Pagination'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -41,7 +41,7 @@ import { TabsMinimal } from '@/components/ui/untitled/tabs'
 import { Plus } from '@untitledui/icons'
 import RowActionMenu, { type RowAction } from '@/components/ui/RowActionMenu'
 import AccountActionConfirm, { statusConfirmCopy, type AccountConfirm } from '@/components/admin/AccountActionConfirm'
-import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
+import { useServerTable } from '@/lib/hooks/useServerTable'
 type AdminMgmtTab = Extract<
   UserTab,
   'admins' | 'general-managers' | 'fleet-admins' | 'operations-admins'
@@ -84,15 +84,6 @@ const muiTheme = createTheme({
 
 // Rows per page: 10 on a phone, 20 on anything wider (the user's call, 2026-10-25).
 
-async function fetchByTab(tab: AdminMgmtTab): Promise<AnyUser[]> {
-  switch (tab) {
-    case 'admins':            return adminService.getAll()           as Promise<AnyUser[]>
-    case 'general-managers':  return generalManagerService.getAll()  as Promise<AnyUser[]>
-    case 'fleet-admins':      return fleetAdminService.getAll()      as Promise<AnyUser[]>
-    case 'operations-admins': return operationsAdminService.getAll() as Promise<AnyUser[]>
-  }
-}
-
 async function updateStatus(tab: AdminMgmtTab, id: string, status: UserStatus): Promise<void> {
   const svcMap = {
     admins:              adminService,
@@ -121,14 +112,6 @@ const SERVICE_FOR_TAB = {
 // hide them).
 
 // "Status: All" means every status, archived included.
-const ALL_STATUSES = 'active,inactive,deactivated,permanently_locked,archived'
-const ARCHIVED_ROLE: Record<AdminMgmtTab, string> = {
-  admins:              'admin',
-  'general-managers':  'general_manager',
-  'fleet-admins':      'fleet_manager',
-  'operations-admins': 'operations_manager',
-}
-
 function displayName(u: AnyUser): string {
   return [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email
 }
@@ -367,14 +350,8 @@ export default function AdminManagementClient() {
   // Opens on All Administrators: every staff account at once.
   const [activeTab,        setActiveTab]        = useState<TabValue>('all')
   const [resetCount,       setResetCount]       = useState(0)
-  const [allRows,          setAllRows]          = useState<AnyUser[]>([])
-  const [loading,          setLoading]          = useState(true)
-  const [fetching,         setFetching]         = useState(false)
-  const [error,            setError]            = useState<string | null>(null)
   const [searchInput,      setSearchInput]      = useState('')
   const [search,           setSearch]           = useState('')
-  const [page,             setPage]             = useState(1)
-  const pageSize = useTablePageSize()
   const [stats,            setStats]            = useState({ total: 0, active: 0, archived: 0 })
   const [showForm,         setShowForm]         = useState(false)
   const [editUser,         setEditUser]         = useState<AnyUser | null>(null)
@@ -390,14 +367,6 @@ export default function AdminManagementClient() {
   const [statusFilter,     setStatusFilter]     = useState<FilterValues>([])
   const statusPick   = statusFilter.find((r) => r.field === 'status')?.value ?? null
   const showArchived = statusPick === 'archived'
-  const statusRef = useRef(statusPick)
-  statusRef.current = statusPick
-  // The tab whose rows may land: a response for a tab (or view) already left is dropped.
-  const currentTabRef = useRef<TabValue>(activeTab)
-  currentTabRef.current = activeTab
-
-  const isInitialAllFetch = useRef(true)
-
   const isResetsTab = section === 'password-resets'
   // Clients & Drivers: the Company Admin's directory in IT Administrator mode
   // (status, restore and vendor passkey access; no add or edit).
@@ -417,112 +386,66 @@ export default function AdminManagementClient() {
   useLiveTable(['live:password_resets'], loadResetCount)
 
   useEffect(() => {
-    const t = setTimeout(() => { setSearch(searchInput); setPage(1) }, 400)
+    const t = setTimeout(() => setSearch(searchInput), 400)
     return () => clearTimeout(t)
   }, [searchInput])
 
-  // `quiet` re-reads in place (a live signal): no spinner, and a failed re-read
-  // keeps the rows already on screen instead of replacing them with an error.
-  const fetchAllUsers = useCallback(async (searchQuery: string, hard = false, quiet = false) => {
-    if (!quiet) {
-      if (hard) setLoading(true); else setFetching(true)
-      setError(null)
-    }
-    const pick = statusRef.current
-    try {
-      const [result, statsResult] = await Promise.all([
-        userService.getAll({ search: searchQuery || undefined, role: ADMIN_ROLE_FILTER, status: pick ?? ALL_STATUSES }),
-        userService.getStats(ADMIN_ROLE_FILTER)
+  // Server-side pages (10 on phones, 20 from tablet up): the server builds the
+  // tab's list, applies the Status pick and the search, and sends one page; the
+  // stat tiles are re-read with it. `meta.tab` keeps a response for a tab
+  // already left off the screen. The resets panel and Clients & Drivers load
+  // their own data.
+  const directoryTab = activeTab === 'all' ? 'all-admins' : activeTab
+  const table = useServerTable(
+    async (q) => {
+      const tab = directoryTab
+      const [res, statsResult] = await Promise.all([
+        userService.getDirectory({
+          ...q,
+          tab,
+          ...(statusPick && { filters: JSON.stringify([{ field: 'status', op: 'is', value: statusPick }]) }),
+          ...(search && { search }),
+        }),
+        userService.getStats(ADMIN_ROLE_FILTER),
       ])
-      if (currentTabRef.current !== 'all' || statusRef.current !== pick) return
-      setAllRows(result.data)
       setStats({ total: statsResult.total, active: statsResult.active, archived: statsResult.archived })
-    } catch {
-      if (!quiet) setError('Failed to load accounts. Check your connection or permissions.')
-    } finally {
-      if (!quiet) {
-        setLoading(false)
-        setFetching(false)
-      }
-    }
-  }, [])
-
-  const fetchTabUsers = useCallback(async (tab: AdminMgmtTab, quiet = false) => {
-    if (!quiet) {
-      setLoading(true)
-      setError(null)
-      setAllRows([])
-    }
-    const pick = statusRef.current
-    const archivedRows = () => userService.getAll({ role: ARCHIVED_ROLE[tab], status: 'archived' }).then((r) => r.data)
-    try {
-      const [rows, statsResult] = await Promise.all([
-        pick === 'archived' ? archivedRows()
-          // One current status: the role's list (archived accounts are not in it), narrowed.
-          : pick ? fetchByTab(tab).then((list) => list.filter((u) => u.status === pick))
-          // All: current and archived together.
-          : Promise.all([fetchByTab(tab), archivedRows()]).then((lists) => lists.flat()),
-        userService.getStats(ADMIN_ROLE_FILTER)
-      ])
-      if (currentTabRef.current !== tab || statusRef.current !== pick) return
-      setAllRows(rows)
-      setStats({ total: statsResult.total, active: statsResult.active, archived: statsResult.archived })
-    } catch {
-      if (!quiet) setError('Failed to load accounts. Check your connection or permissions.')
-    } finally {
-      if (!quiet) setLoading(false)
-    }
-  }, [])
+      return { data: res.data, meta: { ...res.meta, tab } }
+    },
+    `${directoryTab}|${statusPick ?? ''}|${search}`,
+    {
+      enabled:      !isResetsTab && !isPeopleTab,
+      errorMessage: 'Failed to load accounts. Check your connection or permissions.',
+    },
+  )
+  const tableReady = table.meta?.tab === directoryTab
+  const loading    = table.loading || !tableReady
+  const fetching   = table.fetching
+  const error      = table.error
+  const { page, setPage, pageSize, total, totalPages } = table
+  const users      = tableReady ? table.rows : []
 
   // Someone else (or the driver app) changed an account: re-read the open tab.
   useLiveTable(['live:users'], () => {
     if (isResetsTab || isPeopleTab) return
-    if (activeTab === 'all') void fetchAllUsers(search, false, true)
-    else void fetchTabUsers(activeTab, true)
+    void table.reload(true)
   })
 
-  useEffect(() => {
-    isInitialAllFetch.current = true
-    setPage(1)
+  // A new tab or status starts with an empty search box (page 1 comes with it),
+  // reset during render so the old search is never sent with the new tab.
+  const viewKey = `${activeTab}|${section}|${statusPick ?? ''}`
+  const [lastViewKey, setLastViewKey] = useState(viewKey)
+  if (viewKey !== lastViewKey) {
+    setLastViewKey(viewKey)
     setSearch('')
     setSearchInput('')
-    // The resets panel and Clients & Drivers load their own data.
-    if (isResetsTab || isPeopleTab) { setLoading(false); return }
-    if (activeTab === 'all') fetchAllUsers('', true)
-    else fetchTabUsers(activeTab)
-  }, [activeTab, isResetsTab, isPeopleTab, statusPick]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (isResetsTab || activeTab !== 'all') return
-    if (isInitialAllFetch.current) { isInitialAllFetch.current = false; return }
-    fetchAllUsers(search, false)
-  }, [search, activeTab, isResetsTab, fetchAllUsers])
+  }
 
   /** Reload whichever user list is showing. A no-op on the resets panel, which owns its own data. */
+  const reloadTable = table.reload
   const refetchCurrentTab = useCallback(async () => {
     if (isResetsTab) return
-    if (activeTab === 'all') await fetchAllUsers(search, false)
-    else await fetchTabUsers(activeTab)
-  }, [isResetsTab, activeTab, search, fetchAllUsers, fetchTabUsers])
-
-  const filtered = activeTab === 'all' || isResetsTab
-    ? allRows
-    : allRows.filter((u) => {
-        if (!search) return true
-        const q = search.toLowerCase()
-        return (
-          u.email?.toLowerCase().includes(q) ||
-          u.first_name?.toLowerCase().includes(q) ||
-          u.last_name?.toLowerCase().includes(q)
-        )
-      })
-
-  // The API returns the whole list on every tab (All included), so every view
-  // is cut into pages here. All used to show the full list on every page.
-  const total      = filtered.length
-  const totalPages = Math.max(1, Math.ceil(total / pageSize))
-  const safePage   = Math.min(page, totalPages)
-  const users      = filtered.slice((safePage - 1) * pageSize, safePage * pageSize)
+    await reloadTable()
+  }, [isResetsTab, reloadTable])
 
   function handleStatusChange(user: AnyUser, status: UserStatus) {
     const serviceTab = activeTab === 'all'
@@ -770,7 +693,7 @@ export default function AdminManagementClient() {
 
             {/* Pagination */}
             {!loading && total > 0 && (
-              <Pagination page={safePage} totalPages={totalPages} total={total} pageSize={pageSize} onPageChange={setPage} disabled={fetching} />
+              <Pagination page={page} totalPages={totalPages} total={total} pageSize={pageSize} onPageChange={setPage} disabled={fetching} />
             )}
             </>
             )}

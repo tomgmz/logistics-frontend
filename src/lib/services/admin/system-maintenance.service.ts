@@ -1,4 +1,5 @@
 import proxyApi, { initCsrf } from '@/lib/api/auth.api'
+import type { PagedResponse, PageRequest } from '@/lib/hooks/useServerTable'
 
 interface ApiResponse<T> {
   status: string
@@ -152,7 +153,25 @@ const PR = '/admin/products'
 const LP = '/admin/landline-prefixes'
 const VT = '/admin/vehicle-types'
 
+export type CatalogTab = 'handling' | 'commodities' | 'products' | 'landline' | 'vehicle_types'
+
+const CATALOG_URL: Record<CatalogTab, string> = {
+  handling: HC, commodities: CM, products: PR, landline: LP, vehicle_types: VT,
+}
+
 export const systemMaintenanceService = {
+
+  /**
+   * One page of a System Maintenance tab, searched on the server. `unfiltered`
+   * is the tab's count before the search (for "3 of 40").
+   */
+  getCatalogPage: async (
+    tab: CatalogTab,
+    params: PageRequest & { search?: string; commodity_id?: string },
+  ): Promise<PagedResponse<unknown, { unfiltered: number }>> => {
+    const { data } = await proxyApi.get<PagedResponse<unknown, { unfiltered: number }>>(CATALOG_URL[tab], { params })
+    return { data: data.data, meta: data.meta }
+  },
 
   getHandlingCodes: (type?: HandlingCodeType) =>
     get<HandlingCode[]>(type ? `${HC}?type=${type}` : HC),

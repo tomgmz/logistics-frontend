@@ -2,11 +2,11 @@
 
 import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AlertTriangle, MailCheck } from 'lucide-react'
 import Pagination from '@/components/ui/Pagination'
 import RefreshButton from '@/components/ui/RefreshButton'
-import FilterBar, { matchesFilter, type FilterValues } from '@/components/ui/FilterBar'
+import FilterBar, { type FilterValues } from '@/components/ui/FilterBar'
 import { TableCard } from '@/components/ui/untitled/table-card'
 import type { DateRange } from '@/components/ui/untitled/date-range-picker'
 import ReusableModal from '@/components/layout/ReusableModal'
@@ -20,7 +20,8 @@ import {
   type PasswordResetRequest,
   type ResetRequestStatus,
 } from '@/lib/services/admin/password-reset.service'
-import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
+import { useServerTable } from '@/lib/hooks/useServerTable'
+import { useDebouncedValue } from '@/lib/hooks/useDebouncedValue'
 
 /**
  * The pending-reset queue on the IT Admin's User Management page. Since
@@ -68,13 +69,6 @@ const ROLE_OPTIONS = ['client', 'driver', 'admin', 'general_manager', 'operation
 
 // "Requested" is one window at a time, counted back from now.
 /** The request's day on this device's calendar, inside the picked range (inclusive). */
-function inRange(iso: string, r: DateRange): boolean {
-  const d = new Date(iso)
-  const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-  return day >= r.from && day <= r.to
-}
-
-const REQUESTED_WINDOWS: Record<string, number> = { '1d': 1, '7d': 7, '30d': 30 }
 const REQUESTED_OPTIONS = [
   { value: '1d',  label: 'Last 24 hours' },
   { value: '7d',  label: 'Last 7 days' },
@@ -130,39 +124,30 @@ export default function PasswordResetQueue({
 }) {
   // Sending a link is a create, dismissing a request an edit (user-management tier).
   const { canCreate, canEdit } = useModuleAccess()
-  const [rows,          setRows]          = useState<PasswordResetRequest[]>([])
-  const [loading,       setLoading]       = useState(true)
   const [busyId,        setBusyId]        = useState<string | null>(null)
-  const [error,         setError]         = useState<string | null>(null)
-  // The whole history is listed; decided rows keep their buttons, greyed out.
-  const includeClosed = true
-  const [page,          setPage]          = useState(1)
-  const pageSize = useTablePageSize()
   const [pending,       setPending]       = useState<PendingAction | null>(null)
   const [search,        setSearch]        = useState('')
   const [filters,       setFilters]       = useState<FilterValues>([])
   // The card layout's "Select dates": the day the request came in.
   const [dateRange,     setDateRange]     = useState<DateRange | null>(null)
 
-  // `quiet` re-reads in place (a live signal): no spinner, and a failed re-read
-  // keeps the rows already on screen instead of replacing them with an error.
-  const load = useCallback(async (closed: boolean, quiet = false) => {
-    if (!quiet) {
-      setLoading(true)
-      setError(null)
-    }
-    try {
-      setRows(await passwordResetService.list(closed))
-    } catch (err) {
-      if (!quiet) setError(getApiErrorMessage(err, 'Failed to load reset requests.'))
-    } finally {
-      if (!quiet) setLoading(false)
-    }
-  }, [])
+  // The whole history is listed (decided rows keep their buttons, greyed out),
+  // one server page at a time: filters, search and the pending count are
+  // worked out on the server (10 rows on phones, 20 from tablet up).
+  const debouncedSearch = useDebouncedValue(search.trim())
+  const table = useServerTable(
+    (q) => passwordResetService.listPage({
+      ...q,
+      ...(filters.length   && { filters: JSON.stringify(filters) }),
+      ...(debouncedSearch && { search: debouncedSearch }),
+      ...(dateRange       && { from: dateRange.from, to: dateRange.to }),
+    }),
+    `${JSON.stringify(filters)}|${debouncedSearch}|${dateRange?.from ?? ''}|${dateRange?.to ?? ''}`,
+    { errorMessage: 'Failed to load reset requests.' },
+  )
+  const { rows: pageRows, loading, error, page, setPage, pageSize, total, totalPages } = table
 
-  useEffect(() => { void load(includeClosed) }, [includeClosed, load])
-
-  useLiveTable(['live:password_resets'], () => { void load(includeClosed, true) })
+  useLiveTable(['live:password_resets'], () => { void table.reload(true) })
 
   // Two admins working the queue must not both send a link for one request:
   // the confirm dialog holds the request's lock, and a request someone else is
@@ -171,7 +156,7 @@ export default function PasswordResetQueue({
   const actionLock = useRecordLock({
     type:    'password_reset',
     id:      pending?.request.request_id ?? null,
-    onStale: () => void load(includeClosed),
+    onStale: () => void table.reload(),
   })
   useEffect(() => {
     if (actionLock.status !== 'locked' || !pending) return
@@ -201,7 +186,7 @@ export default function PasswordResetQueue({
         },
         { action: `password-reset-${kind}`, entityId: request.request_id },
       )
-      await load(includeClosed)
+      await table.reload()
     } catch {
       /* surfaced by the toast */
     } finally {
@@ -210,24 +195,9 @@ export default function PasswordResetQueue({
     }
   }
 
-  // Anything an admin still has to act on, not just untouched requests.
-  const pendingCount = rows.filter((r) => SENDABLE.includes(r.status)).length
-
-  const q      = search.trim().toLowerCase()
-  const requested = filters.find((r) => r.field === 'requested')?.value
-  const days   = requested ? REQUESTED_WINDOWS[requested] : null
-  const since  = days ? Date.now() - days * 86_400_000 : null
-  const shown  = rows.filter((r) =>
-    matchesFilter(filters, 'status', r.status) &&
-    matchesFilter(filters, 'role', r.requested_role) &&
-    (since === null || new Date(r.created_at).getTime() >= since) &&
-    (!dateRange || inRange(r.created_at, dateRange)) &&
-    (!q || fullName(r).toLowerCase().includes(q) || r.email.toLowerCase().includes(q)),
-  )
-
-  const totalPages = Math.max(1, Math.ceil(shown.length / pageSize))
-  const safePage   = Math.min(page, totalPages)
-  const pageRows   = shown.slice((safePage - 1) * pageSize, safePage * pageSize)
+  // Anything an admin still has to act on, not just untouched requests (counted by the server).
+  const pendingCount = table.meta?.pendingCount ?? 0
+  const unfiltered   = table.meta?.unfiltered ?? 0
 
   useEffect(() => {
     // Only meaningful once a load has finished — reporting 0 from the empty
@@ -246,20 +216,20 @@ export default function PasswordResetQueue({
         )}
         <FilterBar
           layout={cardHeader ? 'split' : 'inline'}
-          search={{ value: search, onChange: (v) => { setSearch(v); setPage(1) }, placeholder: cardHeader ? 'Search' : 'Search name or email...' }}
+          search={{ value: search, onChange: setSearch, placeholder: cardHeader ? 'Search' : 'Search name or email...' }}
           fields={[
             { key: 'status',    label: 'Status',    options: STATUS_OPTIONS },
             { key: 'role',      label: 'Role',      options: ROLE_OPTIONS },
             // The card layout picks dates with "Select dates" instead.
             ...(cardHeader ? [] : [{ key: 'requested', label: 'Requested', options: REQUESTED_OPTIONS, single: true, anyLabel: 'Any time' }]),
           ]}
-          dateRange={cardHeader ? { value: dateRange, onChange: (r) => { setDateRange(r); setPage(1) } } : undefined}
+          dateRange={cardHeader ? { value: dateRange, onChange: setDateRange } : undefined}
           values={filters}
-          onChange={(v) => { setFilters(v); setPage(1) }}
+          onChange={setFilters}
           // Untitled UI's "Dropdowns" filter bar: Status, Role and Requested each their own dropdown.
           variant="dropdowns"
-          actions={<RefreshButton iconOnly onClick={() => void load(includeClosed)} loading={loading} disabled={loading} />}
-          summary={!cardHeader && <span className="text-[#4df9ed]">{shown.length} Request{shown.length !== 1 ? 's' : ''}</span>}
+          actions={<RefreshButton iconOnly onClick={() => void table.reload()} loading={loading} disabled={loading} />}
+          summary={!cardHeader && <span className="text-[#4df9ed]">{total} Request{total !== 1 ? 's' : ''}</span>}
           className={regularData ? 'ff-regular' : ''}
         />
         {error && (
@@ -295,22 +265,20 @@ export default function PasswordResetQueue({
                     <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-t-[#4df9ed]" />
                   </td>
                 </tr>
-              ) : shown.length === 0 ? (
+              ) : pageRows.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-20 text-center">
                     <div className="mb-4 inline-flex rounded-full border border-[#2a2a2a] bg-[#1b1b1b] p-4">
                       <MailCheck size={26} className="text-[#818181]" />
                     </div>
-                    <p className="text-base font-semibold text-white">{rows.length > 0 ? 'No records found' : 'Nothing to action'}</p>
+                    <p className="text-base font-semibold text-white">{unfiltered > 0 ? 'No records found' : 'Nothing to action'}</p>
                     <p className="mt-1 text-sm text-[#818181]">
-                      {rows.length > 0
+                      {unfiltered > 0
                         ? 'No requests match your search or filters.'
-                        : includeClosed
-                        ? 'No password reset requests on record.'
-                        : 'No one is waiting on a password reset right now.'}
+                        : 'No password reset requests on record.'}
                     </p>
                     <ClearFiltersLink
-                      show={rows.length > 0}
+                      show={unfiltered > 0}
                       onClear={() => { setSearch(''); setFilters([]); setDateRange(null); setPage(1) }}
                       className="mt-4"
                     />
@@ -408,8 +376,8 @@ export default function PasswordResetQueue({
             </tbody>
           </table>
         </div>
-        {!loading && shown.length > 0 && (
-          <Pagination page={safePage} totalPages={totalPages} total={shown.length} pageSize={pageSize} onPageChange={setPage} />
+        {!loading && total > 0 && (
+          <Pagination page={page} totalPages={totalPages} total={total} pageSize={pageSize} onPageChange={setPage} disabled={table.fetching} />
         )}
       </div>
 

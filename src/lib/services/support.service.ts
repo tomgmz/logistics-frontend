@@ -1,4 +1,5 @@
 import proxyApi, { initCsrf } from '@/lib/api/auth.api'
+import type { PagedResponse, PageRequest } from '@/lib/hooks/useServerTable'
 
 /**
  * Client support tickets, raised from the help assistant when the FAQ doesn't
@@ -61,6 +62,16 @@ export const supportService = {
   async list(status: 'open' | 'resolved' | 'all' = 'open'): Promise<{ tickets: SupportTicket[]; inbox: string }> {
     const { data } = await proxyApi.get<{ data: SupportTicket[]; inbox?: string }>('/support/tickets', { params: { status } })
     return { tickets: data.data ?? [], inbox: data.inbox ?? '' }
+  },
+
+  /** One page of the Tickets table; status, search and counts are server-side. */
+  async listPage(params: PageRequest & { status: 'open' | 'resolved' | 'all'; search?: string }): Promise<
+    PagedResponse<SupportTicket, { counts: { all: number; open: number; resolved: number } }> & { inbox: string }
+  > {
+    const { data } = await proxyApi.get<
+      PagedResponse<SupportTicket, { counts: { all: number; open: number; resolved: number } }> & { inbox?: string }
+    >('/support/tickets', { params })
+    return { data: data.data, meta: data.meta, inbox: data.inbox ?? '' }
   },
 
   async resolve(ticketId: string, note: string | null): Promise<SupportTicket> {

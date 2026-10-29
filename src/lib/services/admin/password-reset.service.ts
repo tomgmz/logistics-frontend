@@ -1,4 +1,5 @@
 import proxyApi from '@/lib/api/auth.api'
+import type { PagedResponse, PageRequest } from '@/lib/hooks/useServerTable'
 
 interface ApiResponse<T> {
   status:   string
@@ -41,6 +42,14 @@ export const passwordResetService = {
         params: includeClosed ? { include_closed: 'true' } : undefined,
       })
       .then((r) => r.data.data ?? []),
+
+  /** One page of the reset queue table; filters, search and the pending count are server-side. */
+  listPage: (params: PageRequest & { filters?: string; search?: string; from?: string; to?: string }) =>
+    proxyApi
+      .get<PagedResponse<PasswordResetRequest, { unfiltered: number; pendingCount: number }>>(`${B}/password-resets`, {
+        params: { include_closed: 'true', ...params },
+      })
+      .then((r) => ({ data: r.data.data, meta: r.data.meta })),
 
   send: (requestId: string) =>
     proxyApi

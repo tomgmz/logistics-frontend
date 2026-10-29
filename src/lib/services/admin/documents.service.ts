@@ -1,4 +1,5 @@
 import proxyApi, { initCsrf } from '@/lib/api/auth.api'
+import type { PagedResponse, PageRequest } from '@/lib/hooks/useServerTable'
 import { downloadXlsx, manilaCellDate, manilaDateStamp, type XlsxColumn } from '@/lib/xlsx-export'
 import { roleLabel } from '@/lib/roles'
 import {
@@ -59,6 +60,26 @@ export async function fetchFolders(level: DocumentFolderLevel, q: {
   if (q.search?.trim())  params.search     = q.search.trim()
   const { data } = await proxyApi.get<{ data: DocumentFolder[] }>(`${B}/folders`, { params })
   return data?.data ?? []
+}
+
+/** A folder row of the Documents table; `kind` is set on the paged top level. */
+export type DocumentFolderRow = DocumentFolder & { kind?: 'client' | 'booking' | 'fleet' }
+
+/**
+ * One page of the folder table. `root` is the top level (clients, matching
+ * bookings while searching, then Fleet when `fleet` is set); the others are a
+ * client's bookings or the vehicles.
+ */
+export async function fetchFoldersPage(
+  level: DocumentFolderLevel | 'root',
+  q: PageRequest & { client_id?: string; search?: string; fleet?: boolean },
+): Promise<PagedResponse<DocumentFolderRow>> {
+  const params: Record<string, string | number> = { level, page: q.page, limit: q.limit }
+  if (q.client_id)      params.client_id = q.client_id
+  if (q.search?.trim()) params.search    = q.search.trim()
+  if (q.fleet)          params.fleet     = '1'
+  const { data } = await proxyApi.get<PagedResponse<DocumentFolderRow>>(`${B}/folders`, { params })
+  return { data: data.data ?? [], meta: data.meta }
 }
 
 export async function searchBookingsForUpload(search: string): Promise<BookingOption[]> {

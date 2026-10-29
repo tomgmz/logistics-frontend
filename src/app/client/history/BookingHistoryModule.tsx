@@ -1,8 +1,10 @@
 'use client'
 
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
+import { useServerTable } from '@/lib/hooks/useServerTable'
+import { useDebouncedValue } from '@/lib/hooks/useDebouncedValue'
 import { motion, Variants, AnimatePresence } from 'framer-motion'
-import { Suspense, useState, useEffect, useRef, useCallback } from 'react'
+import { Suspense, useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import {
   ChevronRight, ChevronLeft, Package,
@@ -19,7 +21,6 @@ import { bookingService } from '@/lib/services/client/booking.service'
 import { useAuthStore }    from '@/lib/store/auth.store'
 import type {
   BookingWithRelations,
-  BookingDestination,
 } from '@/lib/store/slice/routeMap.slice'
 import { type BookingStatus, asBookingStatus } from '@/app/types/maps/routemap.types'
 import { bookingRef } from '@/lib/booking'
@@ -195,87 +196,53 @@ function DeepLinkReader({ onId }: { onId: (id: string | null) => void }) {
 export default function BookingHistoryModule() {
   const clientId = useAuthStore((s) => s.user?.clients?.client_id)
 
-  const [bookings,    setBookings]    = useState<BookingWithRelations[]>([])
-  const [loading,     setLoading]     = useState(true)
-  const [error,       setError]       = useState<string | null>(null)
   const [view,        setView]        = useState<View>('list')
   const [selected,    setSelected]    = useState<BookingWithRelations | null>(null)
   const [search,      setSearch]      = useState('')
   const [activeTab,   setActiveTab]   = useState<BookingStatus | 'all'>('all')
   const [dateFrom,    setDateFrom]    = useState('')
   const [dateTo,      setDateTo]      = useState('')
-  const [page,        setPage]        = useState(1)
+  const debouncedSearch = useDebouncedValue(search.trim())
 
-  // `quiet` re-reads in place (a live signal): no spinner, and a failed re-read
-  // keeps the bookings already on screen instead of replacing them with an error.
-  const loadBookings = useCallback(async (quiet = false) => {
-    if (!clientId) { setLoading(false); return }
-    if (!quiet) {
-      setLoading(true)
-      setError(null)
-    }
-    try {
-      const data = await bookingService.fetchBookingsByClient(clientId)
-      setBookings(data)
-    } catch {
-      if (!quiet) setError('Failed to load bookings. Please try again.')
-    } finally {
-      if (!quiet) setLoading(false)
-    }
-  }, [clientId])
-
-  useEffect(() => { loadBookings() }, [loadBookings])
+  // Server-side pages of 12 cards: the server keeps to this client's own
+  // bookings, applies the tab, search and dates, orders by schedule date
+  // (newest first) and counts every status for the tabs.
+  const table = useServerTable(
+    (q) => bookingService.fetchClientBookingsPage({
+      page:  q.page,
+      limit: PAGE_SIZE,
+      ...(activeTab !== 'all' && { status: activeTab.toLowerCase() }),
+      ...(debouncedSearch && { search: debouncedSearch }),
+      ...(dateFrom && { date_from: dateFrom }),
+      ...(dateTo   && { date_to: dateTo }),
+    }),
+    `${activeTab}|${debouncedSearch}|${dateFrom}|${dateTo}`,
+    { enabled: !!clientId, errorMessage: 'Failed to load bookings. Please try again.' },
+  )
+  const { rows: bookings, setRows: setBookings, error, page, setPage, total, totalPages } = table
+  const loading = !!clientId && table.loading
+  const loadBookings = table.reload
 
   // The signal is id-only and covers every client's bookings; the re-read goes
   // through the API, which only ever returns this client's own.
   useLiveTable(['live:bookings'], () => { void loadBookings(true) }, { enabled: !!clientId })
 
-  // Notification deep-link: once bookings load, open the one named in ?booking=.
+  // Notification deep-link: open the booking named in ?booking=. It is fetched
+  // on its own, since the list is paged and it may not be on the page showing.
   const [deepLinkId, setDeepLinkId] = useState<string | null>(null)
   const deepLinkAppliedRef = useRef<string | null>(null)
   useEffect(() => {
     if (!deepLinkId || deepLinkAppliedRef.current === deepLinkId) return
-    const match = bookings.find((b) => b.booking_id === deepLinkId)
-    if (match) {
-      deepLinkAppliedRef.current = deepLinkId
-      setSelected(match)
-      setView('detail')
-    }
-  }, [deepLinkId, bookings])
+    deepLinkAppliedRef.current = deepLinkId
+    bookingService.getBookingById(deepLinkId)
+      .then((b) => { setSelected(b as BookingWithRelations); setView('detail') })
+      .catch(() => {})
+  }, [deepLinkId])
 
-  const filtered = bookings
-    .filter((b) => {
-      const bStatus     = asBookingStatus(b.status)
-      const matchTab    = activeTab === 'all' || bStatus === activeTab
-      const q           = search.toLowerCase()
-      const bRef        = typeof b.reference_number === 'string' ? b.reference_number : ''
-      const bId         = typeof b.booking_id === 'string' ? b.booking_id : ''
-      const bOrigin     = typeof b.origin === 'string' ? b.origin : ''
-      const bDests      = (b.booking_destinations as BookingDestination[] | undefined) ?? []
-      const matchSearch =
-        !q ||
-        bRef.toLowerCase().includes(q) ||
-        bId.toLowerCase().includes(q) ||
-        bOrigin.toLowerCase().includes(q) ||
-        bDests.some((d) => (d.address as string | undefined)?.toLowerCase().includes(q))
-      const schedDate   = (b.schedule_date as string | undefined) ?? ''
-      const matchFrom   = !dateFrom || schedDate >= dateFrom
-      const matchTo     = !dateTo   || schedDate <= dateTo
-      return matchTab && matchSearch && matchFrom && matchTo
-    })
-    // Newest scheduled first.
-    .sort((a, b) => ((b.schedule_date as string | undefined) ?? '').localeCompare((a.schedule_date as string | undefined) ?? ''))
-
-  // A new search, tab or date range starts again from the first page.
-  useEffect(() => { setPage(1) }, [search, activeTab, dateFrom, dateTo])
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-  const safePage   = Math.min(page, totalPages)
-  const pageCards  = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
-
+  // Counted by the server over every booking of this client.
+  const statusCounts = table.meta?.statusCounts ?? {}
   const counts = TABS.reduce<Record<string, number>>((acc, t) => {
-    acc[t.key] = t.key === 'all'
-      ? bookings.length
-      : bookings.filter((b) => asBookingStatus(b.status) === t.key).length
+    acc[t.key] = statusCounts[t.key === 'all' ? 'all' : t.key.toLowerCase()] ?? 0
     return acc
   }, {})
 
@@ -379,7 +346,7 @@ export default function BookingHistoryModule() {
               {/* Results count */}
               {(search || dateFrom || dateTo) && !loading && (
                 <p className="text-xs" style={{ color: MUTED }}>
-                  {filtered.length} result{filtered.length !== 1 ? 's' : ''} found
+                  {total} result{total !== 1 ? 's' : ''} found
                 </p>
               )}
 
@@ -405,11 +372,11 @@ export default function BookingHistoryModule() {
               )}
 
               {/* Empty */}
-              {!loading && !error && filtered.length === 0 && (
+              {!loading && !error && bookings.length === 0 && (
                 <div className="flex flex-col items-center gap-3 py-16">
                   <Package size={32} style={{ color: MUTED }} />
                   <p className="text-sm" style={{ color: MUTED }}>
-                    {bookings.length === 0 ? 'No bookings yet.' : 'No bookings match your filters.'}
+                    {(statusCounts.all ?? 0) === 0 ? 'No bookings yet.' : 'No bookings match your filters.'}
                   </p>
                   {hasActiveFilters && (
                     <button onClick={clearFilters}
@@ -422,16 +389,16 @@ export default function BookingHistoryModule() {
               )}
 
               {/* Cards */}
-              {!loading && !error && filtered.length > 0 && (
+              {!loading && !error && bookings.length > 0 && (
                 <>
-                <motion.div key={safePage} variants={stagger} initial="hidden" animate="show"
+                <motion.div key={page} variants={stagger} initial="hidden" animate="show"
                   className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                  {pageCards.map((b) => (
+                  {bookings.map((b) => (
                     <BookingCard key={b.booking_id} booking={b}
                       onSelect={() => { setSelected(b); setView('detail') }} />
                   ))}
                 </motion.div>
-                <Pagination page={safePage} totalPages={totalPages} total={filtered.length} pageSize={PAGE_SIZE} onPageChange={setPage} className="mt-auto rounded-[10px]" />
+                <Pagination page={page} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPageChange={setPage} disabled={table.fetching} className="mt-auto rounded-[10px]" />
                 </>
               )}
               </div>

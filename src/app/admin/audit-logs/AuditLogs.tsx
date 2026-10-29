@@ -94,6 +94,8 @@ export default function AuditLogsPage() {
     try {
       const res = await systemLogService.getAll({
         sort,
+        page,
+        limit: PAGE_SIZE,
         ...(logType         && { log_type: logType }),
         ...(debouncedSearch && { search: debouncedSearch }),
       })
@@ -106,14 +108,15 @@ export default function AuditLogsPage() {
     } finally {
       if (!quiet) setLoading(false)
     }
-  }, [sort, logType, debouncedSearch, clearPending])
+  }, [sort, logType, debouncedSearch, page, PAGE_SIZE, clearPending])
 
   useEffect(() => { fetchLogs() }, [fetchLogs])
 
 
   const totalPages = Math.ceil(total / PAGE_SIZE)
-  const safePage = Math.min(page, totalPages)
-  const displayedLogs = logs.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+  const safePage = Math.min(page, Math.max(1, totalPages))
+  // Already the current page's rows — the server paginated them.
+  const displayedLogs = logs
 
   const displayName = (log: SystemLog) => {
     if (!log.users) return '—'

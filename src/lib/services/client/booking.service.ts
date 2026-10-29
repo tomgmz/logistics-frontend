@@ -345,6 +345,23 @@ export const bookingService = {
   fetchBookingTimeline: (bookingId: string) =>
     get<TimelineTrip[]>(`/booking/${bookingId}/timeline`),
 
+  /**
+   * One page of the client's Booking History (GET /booking, scoped to the
+   * caller's company on the server): newest schedule date first, with the
+   * status tab, search and dates applied there. `meta.statusCounts` covers all
+   * of the client's bookings, keyed by lower-case status plus `all`.
+   */
+  fetchClientBookingsPage: async (params: {
+    page: number; limit: number; status?: string; search?: string; date_from?: string; date_to?: string
+  }): Promise<{ data: BookingWithRelations[]; meta: { total: number; page: number; limit: number; totalPages: number; statusCounts: Record<string, number> } }> => {
+    const { data } = await proxyApi.get<{
+      status: string
+      data:   BookingWithRelations[]
+      meta:   { total: number; page: number; limit: number; totalPages: number; statusCounts: Record<string, number> }
+    }>('/booking', { params: { ...params, order: 'schedule' } })
+    return { data: data.data ?? [], meta: data.meta }
+  },
+
   fetchBookingsByClient: async (clientId: string): Promise<BookingWithRelations[]> => {
     const { data } = await proxyApi.get<{ status: string; data: BookingWithRelations[] }>(
       `/booking/client/${clientId}`,

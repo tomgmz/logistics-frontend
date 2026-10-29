@@ -15,6 +15,7 @@ import {
   exportDocumentsXlsx,
   fetchDocuments,
   fetchFolders,
+  fetchFoldersPage,
   restoreDocument,
   reviewDocument,
   DOCUMENT_EXPORT_ROW_CAP,
@@ -53,6 +54,7 @@ import { TabsMinimal } from '@/components/ui/untitled/tabs'
 import { Button } from '@/components/ui/untitled/button'
 import type { DateRange } from '@/components/ui/untitled/date-range-picker'
 import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
+import { useServerTable } from '@/lib/hooks/useServerTable'
 
 /**
  * Document Management — one library over every file the system keeps, shared
@@ -226,47 +228,27 @@ function DocumentLibrary() {
 
   // ── Folder rows (root / client / fleet) ───────────────────────────────────
   const tablePageSize = useTablePageSize()
-  const [folders,       setFolders]       = useState<DocumentFolder[]>([])
-  const [folderBookings, setFolderBookings] = useState<DocumentFolder[]>([])
-  const [folderLoading, setFolderLoading] = useState(true)
-  const [folderError,   setFolderError]   = useState<string | null>(null)
-  const [folderPage,    setFolderPage]    = useState(1)
-  const folderReq = useRef(0)
-
-  const loadFolders = useCallback(async (quiet = false) => {
-    if (isFiles) return
-    const id = ++folderReq.current
-    if (!quiet) { setFolderLoading(true); setFolderError(null) }
-    try {
-      let rows: DocumentFolder[] = []
-      let bookings: DocumentFolder[] = []
-      if (nav.level === 'root') {
-        // Searching from the top finds clients and, across every client, bookings.
-        ;[rows, bookings] = await Promise.all([
-          fetchFolders('clients', { search }),
-          search ? fetchFolders('bookings', { search }) : Promise.resolve([]),
-        ])
-      } else if (nav.level === 'client') {
-        rows = await fetchFolders('bookings', { client_id: nav.clientId, search })
-      } else if (nav.level === 'fleet') {
-        rows = await fetchFolders('vehicles', { search })
-      }
-      if (id !== folderReq.current) return
-      setFolders(rows)
-      setFolderBookings(bookings)
-    } catch (e) {
-      if (id === folderReq.current && !quiet) setFolderError(getApiErrorMessage(e, 'Could not load folders. Please try again.'))
-    } finally {
-      if (id === folderReq.current && !quiet) setFolderLoading(false)
-    }
-  }, [isFiles, nav, search])
-  useEffect(() => { void loadFolders() }, [loadFolders])
-  useEffect(() => { setFolderPage(1) }, [navKey, search])
+  // One server page of folders (10 rows on phones, 20 from tablet up). From
+  // the top, searching finds clients and, across every client, bookings; the
+  // Fleet folder comes last when not searching.
+  const folderTable = useServerTable(
+    (q) => nav.level === 'root'
+      ? fetchFoldersPage('root', { ...q, search, fleet: !nav.only })
+      : nav.level === 'client'
+      ? fetchFoldersPage('bookings', { ...q, client_id: nav.clientId, search })
+      : fetchFoldersPage('vehicles', { ...q, search }),
+    `${navKey}|${search}`,
+    { enabled: !isFiles, errorMessage: 'Could not load folders. Please try again.' },
+  )
+  const folders       = folderTable.rows
+  const folderLoading = folderTable.loading
+  const folderError   = folderTable.error
+  const loadFolders   = folderTable.reload
 
   // Typing a full booking reference opens that booking.
   const bookingMatches = useMemo(
-    () => (nav.level === 'root' ? folderBookings : nav.level === 'client' ? folders : []),
-    [nav.level, folderBookings, folders],
+    () => (nav.level === 'root' ? folders.filter((f) => f.kind === 'booking') : nav.level === 'client' ? folders : []),
+    [nav.level, folders],
   )
   useEffect(() => {
     if (!search || !FULL_REF.test(search)) return
@@ -516,7 +498,6 @@ function DocumentLibrary() {
     id === 'none' ? 'No client on record' : clients.find((c) => c.id === id)?.name ?? 'Client'
   const plateOf = (id: string) => vehicles.find((v) => v.id === id)?.name ?? 'Vehicle'
   const pendingTotal = clients.reduce((n, c) => n + c.pending_review, 0)
-  const fleetFiles   = vehicles.reduce((n, v) => n + v.file_count, 0)
 
   const crumbs: { label: string; to?: Nav }[] = [{ label: 'Documents', to: { level: 'root' } }]
   let title = 'Documents'
@@ -545,27 +526,25 @@ function DocumentLibrary() {
 
   const folderRows: FolderRow[] = useMemo(() => {
     if (nav.level === 'root') {
-      const rows: FolderRow[] = folders.map((c) => ({
-        key: `c:${c.id}`, to: { level: 'client', clientId: c.id ?? 'none' },
-        name: c.name ?? 'No client on record', sub: 'Client',
-        detail: plural(c.booking_count, 'booking'), files: c.file_count, pending: c.pending_review, last: c.last_upload,
-      }))
-      // While searching, the bookings that matched, across every client.
-      rows.push(...folderBookings.map((b) => ({
-        key: `b:${b.id}`, to: { level: 'booking' as const, bookingId: b.id ?? '' },
-        name: b.name ?? 'Booking', sub: b.company_name ?? 'No client on record',
-        detail: <StatusPill status={b.booking_status} />, files: b.file_count, pending: b.pending_review, last: b.last_upload,
-      })))
-      // Fleet sits at the end, unless a search has narrowed the list to something else.
-      if (!search && !nav.only && vehicles.length > 0) {
-        rows.push({
-          key: 'fleet', to: { level: 'fleet' }, fleet: true,
-          name: 'Fleet', sub: 'Odometer photos and service receipts',
-          detail: plural(vehicles.length, 'vehicle'), files: fleetFiles, pending: 0,
-          last: vehicles.reduce<string | null>((m, v) => (v.last_upload && (!m || v.last_upload > m) ? v.last_upload : m), null),
-        })
-      }
-      return rows
+      // The server sends clients, then (while searching) the bookings that
+      // matched across every client, then the Fleet folder.
+      return folders.map((r): FolderRow => r.kind === 'fleet'
+        ? {
+            key: 'fleet', to: { level: 'fleet' }, fleet: true,
+            name: 'Fleet', sub: 'Odometer photos and service receipts',
+            detail: plural(r.booking_count, 'vehicle'), files: r.file_count, pending: 0, last: r.last_upload,
+          }
+        : r.kind === 'booking'
+        ? {
+            key: `b:${r.id}`, to: { level: 'booking', bookingId: r.id ?? '' },
+            name: r.name ?? 'Booking', sub: r.company_name ?? 'No client on record',
+            detail: <StatusPill status={r.booking_status} />, files: r.file_count, pending: r.pending_review, last: r.last_upload,
+          }
+        : {
+            key: `c:${r.id}`, to: { level: 'client', clientId: r.id ?? 'none' },
+            name: r.name ?? 'No client on record', sub: 'Client',
+            detail: plural(r.booking_count, 'booking'), files: r.file_count, pending: r.pending_review, last: r.last_upload,
+          })
     }
     if (nav.level === 'client') {
       return folders.map((b) => ({
@@ -579,11 +558,10 @@ function DocumentLibrary() {
       name: v.name ?? 'Vehicle', sub: 'Vehicle',
       detail: v.booking_count > 0 ? plural(v.booking_count, 'booking') : '—', files: v.file_count, pending: v.pending_review, last: v.last_upload,
     }))
-  }, [nav, folders, folderBookings, vehicles, search, fleetFiles])
+  }, [nav, folders])
 
-  const folderPages = Math.max(1, Math.ceil(folderRows.length / tablePageSize))
-  const folderPageSafe = Math.min(folderPage, folderPages)
-  const folderSlice = folderRows.slice((folderPageSafe - 1) * tablePageSize, folderPageSafe * tablePageSize)
+  // Already the current page's rows — the server paginated them.
+  const folderSlice = folderRows
 
   // Enter in the search box opens the first matching booking (or folder).
   const openFirst = () => {
@@ -884,7 +862,7 @@ function DocumentLibrary() {
                 </div>
               )}
               {!folderLoading && !folderError && folderRows.length > 0 && (
-                <Pagination page={folderPageSafe} totalPages={folderPages} total={folderRows.length} pageSize={tablePageSize} onPageChange={setFolderPage} />
+                <Pagination page={folderTable.page} totalPages={folderTable.totalPages} total={folderTable.total} pageSize={folderTable.pageSize} onPageChange={folderTable.setPage} disabled={folderTable.fetching} />
               )}
             </>
           )}

@@ -130,6 +130,8 @@ function AuditLogsTab({ switcher }: { switcher: ReactNode }) {
     try {
       const res = await auditLogService.getAll({
         sort,
+        page,
+        limit: PAGE_SIZE,
         ...(logType         && { log_type: logType }),
         ...(debouncedSearch && { search: debouncedSearch }),
       })
@@ -142,7 +144,7 @@ function AuditLogsTab({ switcher }: { switcher: ReactNode }) {
     } finally {
       if (!quiet) setLoading(false)
     }
-  }, [sort, logType, debouncedSearch, clearPending])
+  }, [sort, logType, debouncedSearch, page, PAGE_SIZE, clearPending])
 
   useEffect(() => { fetchLogs() }, [fetchLogs, refreshKey])
 
@@ -422,7 +424,8 @@ function SystemLogsTab({ switcher }: { switcher: ReactNode }) {
 
   const totalPages    = Math.ceil(total / PAGE_SIZE)
   const safePage      = Math.min(page, Math.max(1, totalPages))
-  const displayedLogs = logs.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+  // Already the current page's rows — the server paginated them.
+  const displayedLogs = logs
 
   return (
     <div className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0 gap-3 lg:overflow-hidden">

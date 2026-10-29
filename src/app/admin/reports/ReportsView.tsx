@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import { Siren, ChevronRight } from 'lucide-react'
 
 import {
-  fetchDriverReports,
+  fetchDriverReportsPage,
   fetchDriverReport,
   setDriverReportStatus,
   classifyDriverReport,
@@ -36,7 +36,8 @@ import { useAuthStore } from '@/lib/store/auth.store'
 
 import RefreshButton from '@/components/ui/RefreshButton'
 import Pagination from '@/components/ui/Pagination'
-import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
+import { useServerTable } from '@/lib/hooks/useServerTable'
+import { useDebouncedValue } from '@/lib/hooks/useDebouncedValue'
 import FilterBar from '@/components/ui/FilterBar'
 import { TableCard } from '@/components/ui/untitled/table-card'
 import { TabsMinimal } from '@/components/ui/untitled/tabs'
@@ -85,16 +86,12 @@ function ReportDeepLink({ onFocus }: { onFocus: (id: string) => void }) {
 }
 
 export default function ReportsView() {
-  // 10 rows on phones, 20 from tablet up (lib/hooks/useTablePageSize).
-  const PAGE_SIZE = useTablePageSize()
-  const [reports, setReports] = useState<DriverReport[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error,   setError]   = useState<string | null>(null)
-
   const [search,       setSearch]       = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('open')
   const [typeFilter,   setTypeFilter]   = useState<'all' | IncidentType | 'unspecified'>('all')
-  const [page,         setPage]         = useState(1)
+  const debouncedSearch = useDebouncedValue(search.trim())
+  // A report opened from a notification may sit on another page.
+  const [focused, setFocused] = useState<DriverReport | null>(null)
 
   const [viewId,      setViewId]      = useState<string | null>(null)
   const [confirmAck,  setConfirmAck]  = useState<DriverReport | null>(null)
@@ -110,19 +107,20 @@ export default function ReportsView() {
   const canClassify = !isFleet
   const typeOptions = isFleet ? VEHICLE_INCIDENTS : (Object.keys(INCIDENT_LABELS) as IncidentType[])
 
-  const load = useCallback(async (quiet = false) => {
-    try {
-      if (!quiet) setLoading(true)
-      setError(null)
-      setReports(await fetchDriverReports())
-    } catch (e) {
-      if (!quiet) setError(getApiErrorMessage(e, 'Could not load reports. Please try again.'))
-    } finally {
-      if (!quiet) setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => { void load() }, [load])
+  // Server-side pages: the server filters, searches and counts the tabs, and
+  // sends only the rows on screen (10 on phones, 20 from tablet up).
+  const table = useServerTable(
+    (q) => fetchDriverReportsPage({
+      ...q,
+      status: statusFilter,
+      type:   typeFilter,
+      ...(debouncedSearch && { search: debouncedSearch }),
+    }),
+    `${statusFilter}|${typeFilter}|${debouncedSearch}`,
+    { errorMessage: 'Could not load reports. Please try again.' },
+  )
+  const { rows: reports, loading, error, page, setPage, pageSize: PAGE_SIZE, total, totalPages } = table
+  const load = table.reload
 
   // A driver in trouble should not wait for someone to press Refresh.
   useLiveTable(['live:driver_reports'], () => { void load(true) })
@@ -139,16 +137,17 @@ export default function ReportsView() {
   const focusReport = useCallback((id: string) => {
     setViewId(id)
     void fetchDriverReport(id)
-      .then((r) => setReports((prev) => (prev.some((p) => p.report_id === id)
-        ? prev.map((p) => (p.report_id === id ? r : p))
-        : [r, ...prev])))
+      .then((r) => setFocused(r))
       .catch(() => {
         appToast.error('That report could not be found.', { action: 'report-open', entityId: id })
         setViewId(null)
       })
   }, [])
 
-  const viewReport = useMemo(() => reports.find((r) => r.report_id === viewId) ?? null, [reports, viewId])
+  const viewReport = useMemo(
+    () => reports.find((r) => r.report_id === viewId) ?? (focused?.report_id === viewId ? focused : null),
+    [reports, focused, viewId],
+  )
 
   // One responder per incident. Only taken while the report can still change.
   const reportLock = useRecordLock({
@@ -165,46 +164,19 @@ export default function ReportsView() {
   })
   const reportLocks = useRecordLocks('driver_report', canEdit)
 
-  const counts = useMemo(() => {
-    const c = { reported: 0, acknowledged: 0, resolved: 0, unclassified: 0 }
-    for (const r of reports) {
-      c[r.status]++
-      if (!r.incident_type && r.status !== 'resolved') c.unclassified++
-    }
-    return c
-  }, [reports])
+  // Counted by the server over every report, whatever page is showing.
+  const counts = table.meta?.counts ?? { all: 0, open: 0, reported: 0, acknowledged: 0, resolved: 0, unclassified: 0 }
 
   // The count on each status tab.
-  const statusCount = (key: StatusFilter) =>
-    key === 'all'  ? reports.length
-    : key === 'open' ? counts.reported + counts.acknowledged
-    : counts[key]
+  const statusCount = (key: StatusFilter) => counts[key]
 
-  const visible = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    return reports.filter((r) => {
-      if (statusFilter === 'open' && r.status === 'resolved') return false
-      if (statusFilter !== 'open' && statusFilter !== 'all' && r.status !== statusFilter) return false
-      if (typeFilter === 'unspecified' && r.incident_type !== null) return false
-      if (typeFilter !== 'all' && typeFilter !== 'unspecified' && r.incident_type !== typeFilter) return false
-      if (!q) return true
-      return [
-        reportDriverName(r),
-        r.trucks?.plate_number,
-        r.bookings?.reference_number,
-        r.sub_type,
-        r.description,
-        r.address,
-        incidentLabel(r.incident_type),
-      ].some((v) => v?.toLowerCase().includes(q))
-    })
-  }, [reports, search, statusFilter, typeFilter])
-
-  // A new search or filter starts again from the first page.
-  useEffect(() => { setPage(1) }, [search, statusFilter, typeFilter])
-  const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE))
-  const safePage   = Math.min(page, totalPages)
-  const pageRows   = visible.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+  // The page, plus the open report when it came from another page.
+  async function refreshAll() {
+    await load(true)
+    if (focused && viewId === focused.report_id) {
+      await fetchDriverReport(focused.report_id).then(setFocused).catch(() => {})
+    }
+  }
 
   async function applyStatus(r: DriverReport, next: 'acknowledged' | 'resolved', note?: string) {
     setBusy(true)
@@ -219,7 +191,7 @@ export default function ReportsView() {
       setClassifyOf(null)
       // Re-read the list rather than patching the row: the PATCH response does
       // not carry the responder names the table shows.
-      await load(true)
+      await refreshAll()
     } catch (e) {
       appToast.error(getApiErrorMessage(e, 'Request failed. Please try again.'), { action: `report-${next}`, entityId: r.report_id })
     } finally {
@@ -240,7 +212,7 @@ export default function ReportsView() {
         { action: 'report-classify', entityId: r.report_id },
       )
       setClassifyOf(null)
-      await load(true)
+      await refreshAll()
     } catch (e) {
       appToast.error(getApiErrorMessage(e, 'Request failed. Please try again.'), { action: 'report-classify', entityId: r.report_id })
     } finally {
@@ -352,17 +324,17 @@ export default function ReportsView() {
                 Try again
               </button>
             </div>
-          ) : visible.length === 0 ? (
+          ) : reports.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-3 py-12 text-center px-4">
               <Siren size={40} className="text-white/20" />
               <p className="text-sm text-white/45">
-                {reports.length === 0
+                {counts.all === 0
                   ? (isFleet ? 'No vehicle-related reports yet.' : 'No driver has raised a report yet.')
                   : 'No reports match your filters.'}
               </p>
               {/* Clearing shows every report, resolved ones too. */}
               <ClearFiltersLink
-                show={reports.length > 0}
+                show={counts.all > 0}
                 onClear={() => { setSearch(''); setStatusFilter('all'); setTypeFilter('all'); setPage(1) }}
                 className="mt-0"
               />
@@ -382,7 +354,7 @@ export default function ReportsView() {
                 </thead>
                 {/* Headers keep the small caps face; the data rows are regular Alegreya Sans. */}
                 <tbody className="ff-regular">
-                  {pageRows.map((r) => (
+                  {reports.map((r) => (
                     <tr
                       key={r.report_id}
                       className="border-b border-[#424242] last:border-b-0 transition-colors cursor-pointer [@media(hover:hover)]:hover:bg-[#222222]"
@@ -422,7 +394,7 @@ export default function ReportsView() {
                 </tbody>
               </table>
             </div>
-            <Pagination page={safePage} totalPages={totalPages} total={visible.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
+            <Pagination page={page} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPageChange={setPage} disabled={table.fetching} />
             </>
           )}
         </TableCard.Root>

@@ -1,7 +1,7 @@
 'use client'
 
 import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowUpRight, Ban, CalendarClock, ClipboardCheck, FileWarning, Gauge, Settings2, Wrench } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/lib/store/auth.store'
@@ -10,9 +10,8 @@ import { MODULES_BY_ROLE, isManagedRole } from '@/constants/modules'
 import { ROLE_ROUTES } from '@/constants/roles'
 
 import type { MaintenanceReason, MaintenanceTruck, Truck } from '@/app/types/truck.types'
-import { assignedDriverName } from '@/app/types/truck.types'
 import { incidentLabel, type DriverReport } from '@/app/types/driver-report.types'
-import { adminUpdateTruck, flaggedBookingNotice } from '@/lib/services/admin/trucks.service'
+import { adminFetchUpkeepPage, adminUpdateTruck, flaggedBookingNotice } from '@/lib/services/admin/trucks.service'
 import { BLOWBAGETS_ITEMS } from '@/lib/blowbagets'
 import BlowbagetsInspectionModal from './BlowbagetsInspectionModal'
 import RecordServiceModal from './RecordServiceModal'
@@ -26,7 +25,8 @@ import Pagination from '@/components/ui/Pagination'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { ModelThumb, TABLE_TAG, resolveModelImageUrl } from './vehicle-ui'
-import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
+import { useServerTable } from '@/lib/hooks/useServerTable'
+import { useDebouncedValue } from '@/lib/hooks/useDebouncedValue'
 
 /**
  * Vehicle Management → Maintenance: everything a vehicle owes before it can go out,
@@ -127,6 +127,66 @@ function fmtSince(iso: string | null): string {
     : d.toLocaleString('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
 
+/** What the details column says for one of a vehicle's problems (not driver reports). */
+function detailsOf(t: MaintenanceTruck, reason: MaintenanceReason): string {
+  const svc = t.service_status
+  let details: string = ''
+  switch (reason) {
+    case 'return_odometer_due':
+      details = 'Back from a delivery — record the odometer'
+      break
+    case 'recheck_due':
+      details = 'Back from a delivery since its last pass'
+      break
+    case 'never_inspected':
+      details = 'No BLOWBAGETS on record'
+      break
+    case 'failed_inspection':
+      details = failedItems(t).length ? `Failed: ${failedItems(t).join(', ')}` : 'Latest inspection failed'
+      break
+    case 'under_maintenance':
+      details = 'Out of service — a passing inspection returns it'
+      break
+    case 'service_overdue':
+    case 'service_due_soon':
+      details = svc ? `Due ${fmtDay(svc.due_date)} or at ${fmtKm(svc.due_km)} · now ${fmtKm(t.odometer_km)}` : ''
+      break
+    case 'service_schedule_missing':
+      details = t.service_interval_km == null || t.service_interval_months == null
+        ? 'Enter the service interval'
+        : t.last_service_at == null ? 'Enter the last service' : 'Enter the current odometer'
+      break
+    case 'registration_expired':
+      details = t.registration_expiry
+        ? `Registration expired ${fmtDay(t.registration_expiry)} — renew it and enter the new date`
+        : 'Registration expired'
+      break
+    case 'registration_expiring':
+      details = t.registration_expiry ? `Registration expires ${fmtDay(t.registration_expiry)} — renew it` : 'Registration expires soon'
+      break
+    case 'registration_missing':
+      details = 'Enter the registration expiry date'
+      break
+  }
+  return details
+}
+
+/** When the problem started, for the oldest-first order (mirrors the server's upkeep-problems.ts). */
+function sinceOf(t: MaintenanceTruck, reason: MaintenanceReason): string | null {
+  switch (reason) {
+    case 'return_odometer_due':
+    case 'recheck_due':              return t.last_fleet_return_at ?? null
+    case 'never_inspected':
+    case 'service_schedule_missing':
+    case 'registration_missing':     return t.created_at ?? null
+    case 'failed_inspection':        return t.latest_inspection?.inspected_at ?? null
+    case 'under_maintenance':        return t.updated_at ?? null
+    case 'service_overdue':          return t.service_status?.due_date ? `${t.service_status.due_date}T00:00:00+08:00` : null
+    case 'registration_expired':     return t.registration_expiry ? `${t.registration_expiry}T00:00:00+08:00` : null
+    default:                         return null
+  }
+}
+
 /** Explode each vehicle into one row per problem. */
 export function toProblems(trucks: MaintenanceTruck[]): Problem[] {
   const out: Problem[] = []
@@ -137,7 +197,6 @@ export function toProblems(trucks: MaintenanceTruck[]): Problem[] {
       if (reason === 'under_maintenance' && t.maintenance_reasons.includes('failed_inspection')) continue
       const cfg  = NEEDS[reason]
       const base = { truck: t, reason, needs: NEED_GROUPS[cfg.group].label, group: cfg.group, blocking: cfg.blocking, type: cfg.type }
-      const svc  = t.service_status
 
       if (reason === 'driver_report') {
         for (const r of t.open_reports) {
@@ -150,55 +209,7 @@ export function toProblems(trucks: MaintenanceTruck[]): Problem[] {
         continue
       }
 
-      let details = ''
-      let since: string | null = null
-      switch (reason) {
-        case 'return_odometer_due':
-          details = 'Back from a delivery — record the odometer'
-          since   = t.last_fleet_return_at ?? null
-          break
-        case 'recheck_due':
-          details = 'Back from a delivery since its last pass'
-          since   = t.last_fleet_return_at ?? null
-          break
-        case 'never_inspected':
-          details = 'No BLOWBAGETS on record'
-          since   = t.created_at ?? null
-          break
-        case 'failed_inspection':
-          details = failedItems(t).length ? `Failed: ${failedItems(t).join(', ')}` : 'Latest inspection failed'
-          since   = t.latest_inspection?.inspected_at ?? null
-          break
-        case 'under_maintenance':
-          details = 'Out of service — a passing inspection returns it'
-          since   = t.updated_at ?? null
-          break
-        case 'service_overdue':
-        case 'service_due_soon':
-          details = svc ? `Due ${fmtDay(svc.due_date)} or at ${fmtKm(svc.due_km)} · now ${fmtKm(t.odometer_km)}` : ''
-          since   = reason === 'service_overdue' && svc?.due_date ? `${svc.due_date}T00:00:00+08:00` : null
-          break
-        case 'service_schedule_missing':
-          details = t.service_interval_km == null || t.service_interval_months == null
-            ? 'Enter the service interval'
-            : t.last_service_at == null ? 'Enter the last service' : 'Enter the current odometer'
-          since   = t.created_at ?? null
-          break
-        case 'registration_expired':
-          details = t.registration_expiry
-            ? `Registration expired ${fmtDay(t.registration_expiry)} — renew it and enter the new date`
-            : 'Registration expired'
-          since   = t.registration_expiry ? `${t.registration_expiry}T00:00:00+08:00` : null
-          break
-        case 'registration_expiring':
-          details = t.registration_expiry ? `Registration expires ${fmtDay(t.registration_expiry)} — renew it` : 'Registration expires soon'
-          break
-        case 'registration_missing':
-          details = 'Enter the registration expiry date'
-          since   = t.created_at ?? null
-          break
-      }
-      out.push({ ...base, key: `${t.truck_id}:${reason}`, details, since })
+      out.push({ ...base, key: `${t.truck_id}:${reason}`, details: detailsOf(t, reason), since: sinceOf(t, reason) })
     }
   }
   // Blocking first; within each group, oldest first (no date sorts last).
@@ -241,10 +252,7 @@ export default function UpkeepTab({
   /** The vehicle's own actions (view, update, odometer, service, archive), added to each row's menu. */
   vehicleActions?: (t: Truck) => RowAction[]
 }) {
-  // 10 rows on phones, 20 from tablet up (lib/hooks/useTablePageSize).
-  const PAGE_SIZE = useTablePageSize()
   const [groupFilter, setGroupFilter] = useState<GroupFilter>('all')
-  const [page,       setPage]       = useState(1)
 
   const [inspectTruck, setInspectTruck] = useState<MaintenanceTruck | null>(null)
   const [viewReport,   setViewReport]   = useState<DriverReport | null>(null)
@@ -265,28 +273,44 @@ export default function UpkeepTab({
     return `${ROLE_ROUTES[role]}/reports`
   }, [user])
 
+  // Server-side pages (10 rows on phones, 20 from tablet up): the server
+  // explodes the queue into problems, applies the group and search, and puts
+  // the vehicle clicked on the Vehicles tab first. A vehicle that owes nothing
+  // (or is archived) has no rows, so it gets a pinned row of its own: that is
+  // where its actions live now.
+  const focusId         = focusTruck?.truck_id ?? null
+  const debouncedSearch = useDebouncedValue(search.trim())
+  const table = useServerTable(
+    (q) => adminFetchUpkeepPage({
+      ...q,
+      group: groupFilter,
+      ...(debouncedSearch && { search: debouncedSearch }),
+      ...(focusId && { focus: focusId }),
+    }),
+    `${groupFilter}|${debouncedSearch}|${focusId ?? ''}`,
+    { errorMessage: 'Could not load the maintenance list. Please try again.' },
+  )
+  const { page, setPage, pageSize: PAGE_SIZE, total, totalPages } = table
+  const pageRows: Problem[] = useMemo(() => table.rows.map((p) => ({
+    ...p,
+    needs:   NEED_GROUPS[p.group].label,
+    details: p.reason === 'driver_report' && p.report
+      ? `${p.report.sub_type || incidentLabel(p.report.incident_type)}${p.report.trip_can_continue === false ? ' · cannot continue' : ''}`
+      : detailsOf(p.truck, p.reason),
+  })), [table.rows])
+  const pinFocus = !!focusTruck && !!table.meta && !table.meta.focusHasProblems
+  // The dropdown's counts come from the whole queue the page already holds.
   const problems = useMemo(() => toProblems(rows), [rows])
-  const visible  = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    return problems.filter((p) =>
-      matchesFilter(p, groupFilter) &&
-      (!q || [p.truck.plate_number, p.truck.truck_model?.name, p.truck.truck_model?.vehicle_type, assignedDriverName(p.truck)]
-        .some((v) => v?.toLowerCase().includes(q))))
-  }, [problems, search, groupFilter])
+  const listLoading = loading || table.loading
+  const listError   = error ?? table.error
 
-  // The vehicle clicked on the Vehicles tab goes first and is highlighted. A
-  // vehicle that owes nothing (or is archived) has no rows, so it gets a pinned
-  // row of its own: that is where its actions live now.
-  const focusId  = focusTruck?.truck_id ?? null
-  const ordered  = useMemo(() => focusId
-    ? [...visible.filter((p) => p.truck.truck_id === focusId), ...visible.filter((p) => p.truck.truck_id !== focusId)]
-    : visible, [visible, focusId])
-  const pinFocus = !!focusTruck && !problems.some((p) => p.truck.truck_id === focusId)
-  useEffect(() => { if (focusId) setPage(1) }, [focusId])
-
-  const totalPages = Math.max(1, Math.ceil(ordered.length / PAGE_SIZE))
-  const safePage   = Math.min(page, totalPages)
-  const pageRows   = ordered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+  // The page re-reads the whole queue after every fix (and on live signals);
+  // the table follows it.
+  const firstRows = useRef(true)
+  useEffect(() => {
+    if (firstRows.current) { firstRows.current = false; return }
+    void table.reload(true)
+  }, [rows]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function executeHold() {
     if (!holdTarget) return
@@ -378,7 +402,7 @@ export default function UpkeepTab({
             <select
               id="maintenance-needs-filter"
               value={groupFilter}
-              onChange={(e) => { setGroupFilter(e.target.value as GroupFilter); setPage(1) }}
+              onChange={(e) => setGroupFilter(e.target.value as GroupFilter)}
               className="appearance-none h-8 3xl:h-[38px] min-w-[150px] rounded-[10px] border-[0.5px] border-[#818181] bg-[#2a2828] pl-3 3xl:pl-[15px] pr-8 text-[13px] 3xl:text-[16px] font-bold text-[#4df9ed] outline-none focus:border-[#4df9ed] cursor-pointer [&>option]:bg-[#2a2828] [&>option]:text-white"
             >
               {GROUP_FILTERS.map((f) => (
@@ -395,17 +419,17 @@ export default function UpkeepTab({
       </div>
 
       <div className="flex-[1_0_auto] lg:flex-1 lg:min-h-0 rounded-[10px] border-[0.5px] border-[#424242] overflow-hidden flex flex-col bg-[#1b1b1b] shadow-[0_4px_4px_rgba(0,0,0,0.25)]">
-        {loading ? (
+        {listLoading ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-3 py-16">
             <div className="w-9 h-9 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--color-cyan)' }} />
             <p className="text-sm text-white/45">Loading maintenance…</p>
           </div>
-        ) : error ? (
+        ) : listError ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-3 p-6">
-            <p className="text-red-400 text-sm text-center">{error}</p>
-            <button type="button" onClick={onReload} className="text-[var(--color-cyan)] text-sm font-semibold">Try again</button>
+            <p className="text-red-400 text-sm text-center">{listError}</p>
+            <button type="button" onClick={() => { onReload(); void table.reload() }} className="text-[var(--color-cyan)] text-sm font-semibold">Try again</button>
           </div>
-        ) : visible.length === 0 && !pinFocus ? (
+        ) : total === 0 && !pinFocus ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-3 py-12 text-center px-4">
             <Wrench size={40} className="text-white/20" />
             <p className="text-sm text-white/45">
@@ -435,7 +459,7 @@ export default function UpkeepTab({
                   </tr>
                 </thead>
                 <tbody className="ff-regular text-[13px] 3xl:text-[16px] text-white">
-                  {pinFocus && focusTruck && safePage === 1 && (
+                  {pinFocus && focusTruck && page === 1 && (
                     <tr className={`border-b border-[#818181] ${FOCUS_ROW} [&>td]:px-3 3xl:[&>td]:px-6 [&>td]:py-2 3xl:h-[55px]`}>
                       <td className="align-middle">
                         <ModelThumb
@@ -516,7 +540,7 @@ export default function UpkeepTab({
                 </tbody>
               </table>
             </div>
-            <Pagination page={safePage} totalPages={totalPages} total={visible.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
+            <Pagination page={page} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPageChange={setPage} disabled={table.fetching} />
           </>
         )}
       </div>

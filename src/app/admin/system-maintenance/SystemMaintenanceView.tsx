@@ -7,7 +7,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Plus, Tag, Layers, Package, Phone, Truck, Pencil, Trash2, X, Search } from 'lucide-react'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
-import { systemMaintenanceService } from '@/lib/services/admin/system-maintenance.service'
+import { systemMaintenanceService, type CatalogTab } from '@/lib/services/admin/system-maintenance.service'
 import { useModuleAccess } from '@/components/layout/ModuleAccess'
 import { useRecordLock, useRecordLocks } from '@/lib/hooks/useRecordLock'
 import { useIsMobile } from '@/lib/hooks/useIsMobile'
@@ -30,7 +30,8 @@ import type {
 
 import RefreshButton from '@/components/ui/RefreshButton'
 import Pagination from '@/components/ui/Pagination'
-import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
+import { useServerTable } from '@/lib/hooks/useServerTable'
+import { useDebouncedValue } from '@/lib/hooks/useDebouncedValue'
 
 
 const TABS = [
@@ -82,19 +83,15 @@ type ConfirmTarget =
   | { kind: 'vehicle_type'; item: VehicleType }
 
 export default function SystemMaintenanceView() {
-  // 10 rows on phones, 20 from tablet up (lib/hooks/useTablePageSize).
-  const PAGE_SIZE = useTablePageSize()
   // System-maintenance tier: hide the create/edit form and per-row write actions.
   const { canCreate, canEdit, canDelete } = useModuleAccess()
 
   const [tab, setTab] = useState<TabKey>('handling')
-  const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
 
-  const [handlingCodes, setHandling]     = useState<HandlingCode[]>([])
+  // Full lists only where a form needs them: the product form's commodity
+  // picker and the vehicle type duplicate-name check. The table pages on the server.
   const [commodities,   setCommodities]  = useState<Commodity[]>([])
-  const [products,      setProducts]     = useState<Product[]>([])
-  const [prefixes,      setPrefixes]     = useState<LandlinePrefix[]>([])
   const [vehicleTypes,  setVehicleTypes] = useState<VehicleType[]>([])
 
   const [loading,  setLoading]  = useState(false)
@@ -105,6 +102,27 @@ export default function SystemMaintenanceView() {
   const [hForm, setHForm] = useState<HandlingForm>(initHandling)
   const [cForm, setCForm] = useState<CommodityForm>(initCommodity)
   const [pForm, setPForm] = useState<ProductForm>(initProduct)
+
+  // The active tab's list, one server page at a time (10 on phones, 20 from
+  // tablet up). `meta.tab` says which tab the rows belong to, so a tab switch
+  // never renders the previous tab's rows with the new tab's columns.
+  const debouncedSearch = useDebouncedValue(search.trim())
+  const table = useServerTable(
+    async (q) => {
+      const t   = tab as CatalogTab
+      const res = await systemMaintenanceService.getCatalogPage(t, {
+        ...q,
+        ...(debouncedSearch && { search: debouncedSearch }),
+        ...(t === 'products' && pForm.commodity_id && { commodity_id: pForm.commodity_id }),
+      })
+      return { data: res.data, meta: { ...res.meta, tab: t } }
+    },
+    `${tab}|${debouncedSearch}|${tab === 'products' ? pForm.commodity_id : ''}`,
+    { errorMessage: 'Failed to load data' },
+  )
+  const { page, setPage, pageSize: PAGE_SIZE, totalPages } = table
+  const tableReady = table.meta?.tab === tab
+  const refreshTable = () => { void table.reload(true) }
   const [lForm, setLForm] = useState<LandlineForm>(initLandline)
   const [vForm, setVForm] = useState<VehicleTypeForm>(initVehicleType)
   const [vTouched, setVTouched] = useState(false)
@@ -146,17 +164,12 @@ export default function SystemMaintenanceView() {
   async function load(quiet = false) {
     try {
       if (!quiet) setLoading(true)
-      const [codes, comms, prods, pfxs, types] = await Promise.all([
-        systemMaintenanceService.getHandlingCodes(),
+      const [comms, types] = await Promise.all([
         systemMaintenanceService.getCommodities(),
-        systemMaintenanceService.getProducts(),
-        systemMaintenanceService.getLandlinePrefixes(),
         systemMaintenanceService.getVehicleTypes(),
+        table.reload(true),
       ])
-      setHandling(codes)
       setCommodities(comms)
-      setProducts(prods)
-      setPrefixes(pfxs)
       setVehicleTypes(types)
     } catch (e: unknown) {
       if (!quiet) appToast.error(getApiErrorMessage(e) || 'Failed to load data')
@@ -223,7 +236,7 @@ export default function SystemMaintenanceView() {
     try {
       setSaving(true)
       const created = await systemMaintenanceService.createHandlingCode(payload)
-      setHandling(prev => [created, ...prev])
+      refreshTable()
       setHForm(initHandling)
       setSheetOpen(false)
       appToast.success(`Handling code ${created.code} added.`)
@@ -248,6 +261,7 @@ export default function SystemMaintenanceView() {
       setSaving(true)
       const created = await systemMaintenanceService.createCommodity(payload)
       setCommodities(prev => [created, ...prev])
+      refreshTable()
       setCForm(initCommodity)
       setSheetOpen(false)
       appToast.success(`Commodity "${created.name}" added.`)
@@ -276,9 +290,8 @@ export default function SystemMaintenanceView() {
     try {
       setSaving(true)
       const created = await systemMaintenanceService.createProduct(payload)
-      // The list endpoint embeds the commodity; the create response does not.
-      const commodity = commodities.find(c => c.commodity_id === created.commodity_id)
-      setProducts(prev => [{ ...created, commodities: created.commodities ?? (commodity ? { name: commodity.name, category: commodity.category } : null) }, ...prev])
+      // Re-read the page: the list endpoint embeds the commodity; the create response does not.
+      refreshTable()
       setPForm(initProduct)
       setSheetOpen(false)
       appToast.success(`Product "${created.name}" added.`)
@@ -313,7 +326,7 @@ export default function SystemMaintenanceView() {
           region: lForm.region.trim() || null,
         }
         const updated = await systemMaintenanceService.updateLandlinePrefix(editingPrefix.prefix_id, payload)
-        setPrefixes(prev => prev.map(p => p.prefix_id === updated.prefix_id ? updated : p))
+        refreshTable()
         appToast.success(`Prefix (${updated.prefix}) updated.`)
         closeSheet()
       } else {
@@ -323,7 +336,7 @@ export default function SystemMaintenanceView() {
           region: lForm.region.trim() || null,
         }
         const created = await systemMaintenanceService.createLandlinePrefix(payload)
-        setPrefixes(prev => [...prev, created].sort((a, b) => Number(a.prefix) - Number(b.prefix)))
+        refreshTable()
         setLForm(initLandline)
         setSheetOpen(false)
         appToast.success(`Prefix (${created.prefix}) added.`)
@@ -371,6 +384,7 @@ export default function SystemMaintenanceView() {
         const renamed = payload.name !== editingType.name && editingType.model_count > 0
         const updated = await systemMaintenanceService.updateVehicleType(editingType.vehicle_type_id, payload)
         setVehicleTypes(prev => prev.map(t => t.vehicle_type_id === updated.vehicle_type_id ? updated : t))
+        refreshTable()
         appToast.success(renamed
           ? `${updated.name} saved. ${updated.model_count} truck model${updated.model_count === 1 ? '' : 's'} renamed with it.`
           : `${updated.name} saved.`)
@@ -378,6 +392,7 @@ export default function SystemMaintenanceView() {
       } else {
         const created = await systemMaintenanceService.createVehicleType(payload)
         setVehicleTypes(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)))
+        refreshTable()
         setVForm(initVehicleType)
         setVTouched(false)
         setSheetOpen(false)
@@ -399,7 +414,7 @@ export default function SystemMaintenanceView() {
       try {
         setDeleting(pfx.prefix_id)
         await systemMaintenanceService.deleteLandlinePrefix(pfx.prefix_id)
-        setPrefixes(prev => prev.filter(p => p.prefix_id !== pfx.prefix_id))
+        refreshTable()
         if (editingPrefix?.prefix_id === pfx.prefix_id) closeSheet()
         appToast.success(`Prefix (${pfx.prefix}) deleted.`)
         setConfirm(null)
@@ -420,10 +435,12 @@ export default function SystemMaintenanceView() {
       if (vt.model_count > 0) {
         const updated = await systemMaintenanceService.updateVehicleType(vt.vehicle_type_id, { is_active: false })
         setVehicleTypes(prev => prev.map(t => t.vehicle_type_id === updated.vehicle_type_id ? updated : t))
+        refreshTable()
         appToast.success(`${vt.name} is now inactive.`)
       } else {
         await systemMaintenanceService.deleteVehicleType(vt.vehicle_type_id)
         setVehicleTypes(prev => prev.filter(t => t.vehicle_type_id !== vt.vehicle_type_id))
+        refreshTable()
         appToast.success(`${vt.name} deleted.`)
       }
       if (editingType?.vehicle_type_id === vt.vehicle_type_id) closeSheet()
@@ -714,65 +731,21 @@ export default function SystemMaintenanceView() {
     )
   }
 
-  // ── list: search, then page ────────────────────────────────────────────────
-  const q = search.trim().toLowerCase()
-  const has = (...vals: (string | null | undefined)[]) => !q || vals.some(v => v?.toLowerCase().includes(q))
+  // ── list: searched and paged on the server ─────────────────────────────────
+  const q = search.trim()
 
-  const visibleHandling = useMemo(
-    () => handlingCodes.filter(h => has(h.code, h.name, h.description)),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [handlingCodes, q],
-  )
-  const visibleCommodities = useMemo(
-    () => commodities.filter(c => has(c.name, c.category, c.description)),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [commodities, q],
-  )
-  const visibleProducts = useMemo(
-    () => products.filter(p =>
-      (!pForm.commodity_id || p.commodity_id === pForm.commodity_id) &&
-      has(p.name, p.unit, p.description, p.commodities?.name),
-    ),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [products, pForm.commodity_id, q],
-  )
-  const visiblePrefixes = useMemo(
-    () => prefixes.filter(p => has(p.prefix, p.city, p.region)),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [prefixes, q],
-  )
-  const visibleTypes = useMemo(
-    () => vehicleTypes.filter(t => has(t.name, t.description)),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [vehicleTypes, q],
-  )
-
-  // Each tab pages its own list; a new tab, search or product filter starts on page 1.
-  useEffect(() => { setPage(1) }, [tab, pForm.commodity_id, q])
-  const tabList: unknown[] =
-    tab === 'handling'      ? visibleHandling :
-    tab === 'commodities'   ? visibleCommodities :
-    tab === 'products'      ? visibleProducts :
-    tab === 'vehicle_types' ? visibleTypes :
-    visiblePrefixes
-  const tabTotal =
-    tab === 'handling'      ? handlingCodes.length :
-    tab === 'commodities'   ? commodities.length :
-    tab === 'products'      ? products.length :
-    tab === 'vehicle_types' ? vehicleTypes.length :
-    prefixes.length
-  const totalPages = Math.max(1, Math.ceil(tabList.length / PAGE_SIZE))
-  const safePage   = Math.min(page, totalPages)
-  const pageSlice  = <T,>(list: T[]) => list.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+  const rows     = table.rows
+  const tabTotal = table.meta?.unfiltered ?? 0
+  const tabCount = table.total
 
   function renderList() {
-    if (loading) return (
+    if (loading || !tableReady) return (
       <div className="flex items-center justify-center py-12">
         <div className="h-7 w-7 animate-spin rounded-full border-2 border-white/10 border-t-[#4DF9ED]" />
       </div>
     )
 
-    if (!tabList.length) return (
+    if (!rows.length) return (
       <EmptyState
         filtered={tabTotal > 0}
         canAdd={canCreate}
@@ -784,7 +757,7 @@ export default function SystemMaintenanceView() {
 
     if (tab === 'handling') return (
       <div className="space-y-2">
-        {pageSlice(visibleHandling).map(hc => (
+        {(rows as HandlingCode[]).map(hc => (
           <div key={hc.handling_code_id} className={rowCls}>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
               <span className="font-mono text-sm font-bold text-[#4DF9ED] break-all">{hc.code}</span>
@@ -801,7 +774,7 @@ export default function SystemMaintenanceView() {
 
     if (tab === 'commodities') return (
       <div className="space-y-2">
-        {pageSlice(visibleCommodities).map(c => (
+        {(rows as Commodity[]).map(c => (
           <div key={c.commodity_id} className={rowCls}>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -818,7 +791,7 @@ export default function SystemMaintenanceView() {
 
     if (tab === 'products') return (
       <div className="space-y-2">
-        {pageSlice(visibleProducts).map(prod => (
+        {(rows as Product[]).map(prod => (
           <div key={prod.product_id} className={rowCls}>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -839,7 +812,7 @@ export default function SystemMaintenanceView() {
 
     if (tab === 'vehicle_types') return (
       <div className="space-y-2">
-        {pageSlice(visibleTypes).map(vt => {
+        {(rows as VehicleType[]).map(vt => {
           const lockedBy = typeLocks.get(vt.vehicle_type_id)
           const busy     = deleting === vt.vehicle_type_id || !!lockedBy
           const selected = editingType?.vehicle_type_id === vt.vehicle_type_id
@@ -876,7 +849,7 @@ export default function SystemMaintenanceView() {
     // landline tab
     return (
       <div className="space-y-2">
-        {pageSlice(visiblePrefixes).map(pfx => {
+        {(rows as LandlinePrefix[]).map(pfx => {
           const lockedBy = prefixLocks.get(pfx.prefix_id)
           const busy     = deleting === pfx.prefix_id || !!lockedBy
           const selected = editingPrefix?.prefix_id === pfx.prefix_id
@@ -1009,7 +982,7 @@ export default function SystemMaintenanceView() {
               </div>
               {!loading && (
                 <p className="shrink-0 text-xs text-white/30 tabular-nums">
-                  {q || (tab === 'products' && pForm.commodity_id) ? `${tabList.length} of ${tabTotal}` : tabTotal}
+                  {q || (tab === 'products' && pForm.commodity_id) ? `${tabCount} of ${tabTotal}` : tabTotal}
                 </p>
               )}
             </div>
@@ -1047,8 +1020,8 @@ export default function SystemMaintenanceView() {
           <div className="flex-[1_0_auto] lg:flex-1 lg:min-h-0 overflow-x-auto lg:overflow-y-auto lg:overscroll-contain p-3 sm:p-4">
             {renderList()}
           </div>
-          {!loading && tabList.length > 0 && (
-            <Pagination page={safePage} totalPages={totalPages} total={tabList.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
+          {!loading && tableReady && rows.length > 0 && (
+            <Pagination page={page} totalPages={totalPages} total={tabCount} pageSize={PAGE_SIZE} onPageChange={setPage} disabled={table.fetching} />
           )}
         </div>
       </div>

@@ -1,7 +1,7 @@
 'use client'
 
 import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
+import { Fragment, useState } from 'react'
 import { CheckCircle2, ChevronDown, ExternalLink, Mail, Ticket } from 'lucide-react'
 
 import { RemarksModal } from '@/components/layout/ReusableModal'
@@ -17,7 +17,8 @@ import {
 
 import RefreshButton from '@/components/ui/RefreshButton'
 import Pagination from '@/components/ui/Pagination'
-import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
+import { useServerTable } from '@/lib/hooks/useServerTable'
+import { useDebouncedValue } from '@/lib/hooks/useDebouncedValue'
 import FilterBar from '@/components/ui/FilterBar'
 import { TableCard } from '@/components/ui/untitled/table-card'
 import { TabsMinimal } from '@/components/ui/untitled/tabs'
@@ -60,74 +61,37 @@ function StatusBadge({ status }: { status: SupportTicket['status'] }) {
 }
 
 export default function SupportTicketsView() {
-  // 10 rows on phones, 20 from tablet up (lib/hooks/useTablePageSize).
-  const PAGE_SIZE = useTablePageSize()
   // Tickets tier: Read Only sees the reply and resolve actions, disabled.
   const { canEdit } = useModuleAccess()
-  const [tickets, setTickets] = useState<SupportTicket[]>([])
   const [inbox,   setInbox]   = useState('')
-  const [loading, setLoading] = useState(true)
-  const [error,   setError]   = useState<string | null>(null)
 
   const [search,       setSearch]       = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('open')
-  const [page,         setPage]         = useState(1)
+  const debouncedSearch = useDebouncedValue(search.trim())
   const [expanded,     setExpanded]     = useState<string | null>(null)
   const [resolving,    setResolving]    = useState<SupportTicket | null>(null)
   const [busy,         setBusy]         = useState(false)
 
-  // Always read every ticket; the status filter is applied here so the counts
-  // in the header stay right whichever tab is showing.
-  const load = useCallback(async (quiet = false) => {
-    try {
-      if (!quiet) setLoading(true)
-      setError(null)
-      const res = await supportService.list('all')
-      setTickets(res.tickets)
+  // Server-side pages: the server applies the tab and search, counts every
+  // ticket for the header, and sends only the rows on screen.
+  const table = useServerTable(
+    async (q) => {
+      const res = await supportService.listPage({
+        ...q,
+        status: statusFilter,
+        ...(debouncedSearch && { search: debouncedSearch }),
+      })
       setInbox(res.inbox)
-    } catch (e) {
-      if (!quiet) setError(getApiErrorMessage(e, 'Could not load tickets. Please try again.'))
-    } finally {
-      if (!quiet) setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => { void load() }, [load])
+      return res
+    },
+    `${statusFilter}|${debouncedSearch}`,
+    { errorMessage: 'Could not load tickets. Please try again.' },
+  )
+  const { rows: tickets, loading, error, page, setPage, pageSize: PAGE_SIZE, total, totalPages } = table
+  const load = table.reload
   useLiveTable(['live:support_tickets'], () => { void load(true) })
 
-  const counts = useMemo(() => {
-    let open = 0
-    for (const t of tickets) if (t.status === 'open') open++
-    return { open, resolved: tickets.length - open }
-  }, [tickets])
-
-  const visible = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    const rows = tickets.filter((t) => {
-      if (statusFilter !== 'all' && t.status !== statusFilter) return false
-      if (!q) return true
-      return [
-        t.reference,
-        t.subject,
-        t.message,
-        t.clients?.company_name,
-        personName(t.opener),
-        t.opener?.email,
-        t.bookings?.reference_number,
-        TICKET_CATEGORY_LABEL[t.category],
-      ].some((v) => v?.toLowerCase().includes(q))
-    })
-    // Open tickets oldest first (who has waited longest); otherwise newest first.
-    return rows.sort((a, b) => (statusFilter === 'open'
-      ? a.created_at.localeCompare(b.created_at)
-      : b.created_at.localeCompare(a.created_at)))
-  }, [tickets, search, statusFilter])
-
-  // A new search or filter starts again from the first page.
-  useEffect(() => { setPage(1) }, [search, statusFilter])
-  const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE))
-  const safePage   = Math.min(page, totalPages)
-  const pageRows   = visible.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+  const counts = table.meta?.counts ?? { all: 0, open: 0, resolved: 0 }
 
   async function resolve(note: string) {
     if (!resolving) return
@@ -176,7 +140,7 @@ export default function SupportTicketsView() {
                 label="Ticket status"
                 items={STATUS_FILTERS.map(({ key, label }) => ({
                   id: key,
-                  label: `${label} (${key === 'all' ? tickets.length : counts[key]})`,
+                  label: `${label} (${counts[key]})`,
                 }))}
                 selectedKey={statusFilter}
                 onSelectionChange={setStatusFilter}
@@ -197,11 +161,11 @@ export default function SupportTicketsView() {
                 Try again
               </button>
             </div>
-          ) : visible.length === 0 ? (
+          ) : tickets.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-3 py-12 text-center px-4">
               <Ticket size={40} className="text-white/20" />
               <p className="text-sm text-white/45">
-                {tickets.length === 0
+                {counts.all === 0
                   ? 'No client has raised a ticket yet.'
                   : statusFilter === 'open' && !search.trim()
                     ? 'No open tickets.'
@@ -209,7 +173,7 @@ export default function SupportTicketsView() {
               </p>
               {/* Clearing shows every ticket, resolved ones too. */}
               <ClearFiltersLink
-                show={tickets.length > 0}
+                show={counts.all > 0}
                 onClear={() => { setSearch(''); setStatusFilter('all'); setPage(1) }}
                 className="mt-0"
               />
@@ -228,7 +192,7 @@ export default function SupportTicketsView() {
                 </thead>
                 {/* Headers keep the small caps face; the data rows are regular Alegreya Sans. */}
                 <tbody className="ff-regular">
-                  {pageRows.map((t) => {
+                  {tickets.map((t) => {
                     const isOpen   = expanded === t.ticket_id
                     const opener   = personName(t.opener)
                     const resolver = personName(t.resolver)
@@ -347,7 +311,7 @@ export default function SupportTicketsView() {
                 </tbody>
               </table>
             </div>
-            <Pagination page={safePage} totalPages={totalPages} total={visible.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
+            <Pagination page={page} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPageChange={setPage} disabled={table.fetching} />
             </>
           )}
         </TableCard.Root>

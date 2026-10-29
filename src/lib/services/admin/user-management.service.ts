@@ -1,4 +1,5 @@
 import proxyApi from '@/lib/api/auth.api'
+import type { PagedResponse, PageRequest } from '@/lib/hooks/useServerTable'
 import type {
   AdminUser,
   CreateAdminPayload,
@@ -81,6 +82,16 @@ export const userService = {
         limit:      r.data.limit,
         totalPages: r.data.totalPages,
       })),
+
+  /**
+   * One page of a User Management tab, built, filtered and searched on the
+   * server (GET /admin/user-directory). `filters` is the Filters panel's rules
+   * as JSON; `meta.licenseFlagCount` counts the whole tab's roster.
+   */
+  getDirectory: (params: PageRequest & { tab: string; filters?: string; search?: string }) =>
+    proxyApi
+      .get<PagedResponse<AnyUser, { licenseFlagCount: number }>>(`${B}/user-directory`, { params })
+      .then((r) => ({ data: r.data.data, meta: r.data.meta })),
 
     getStats: (roles?: string) =>
         proxyApi
