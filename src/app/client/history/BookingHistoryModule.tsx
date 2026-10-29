@@ -171,7 +171,9 @@ function BookingCard({ booking, onSelect }: {
         ))}
       </div>
 
-      <div className="flex items-center justify-between gap-3 pt-2 border-t border-white/80">
+      {/* mt-auto: pinned to the card's bottom, so the line sits at the same
+          height across a grid row whatever the number of drop-offs. */}
+      <div className="mt-auto flex items-center justify-between gap-3 pt-2 border-t border-white/80">
         <div className="flex items-center gap-1.5 text-[13px] min-w-0" style={{ color: MUTED }}>
           <HistoryIcon name="cargo.svg" size={18} />
           <span className="truncate whitespace-pre">{cargoLine(booking)}</span>
@@ -390,7 +392,6 @@ export default function BookingHistoryModule() {
 
               {/* Cards */}
               {!loading && !error && bookings.length > 0 && (
-                <>
                 <motion.div key={page} variants={stagger} initial="hidden" animate="show"
                   className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                   {bookings.map((b) => (
@@ -398,10 +399,13 @@ export default function BookingHistoryModule() {
                       onSelect={() => { setSelected(b); setView('detail') }} />
                   ))}
                 </motion.div>
-                <Pagination page={page} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPageChange={setPage} disabled={table.fetching} className="mt-auto rounded-[10px]" />
-                </>
               )}
               </div>
+              {/* The card's own footer, full width under the cards, as on Booking
+                  Management; the body above grows to keep it at the bottom. */}
+              {!loading && !error && bookings.length > 0 && (
+                <Pagination page={page} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPageChange={setPage} disabled={table.fetching} />
+              )}
               </TableCard.Root>
             </motion.div>
           )}
