@@ -36,12 +36,12 @@ const STATUS_LABEL: Record<string, string> = {
 }
 const STATUS_ORDER = ['pending', 'approved', 'assigned', 'in_transit', 'delivered', 'completed', 'cancelled']
 
-const TONE = { cyan: '#4df9ed', amber: '#ffea00', red: '#f62626', muted: '#818181' } as const
+const TONE = { cyan: '#4df9ed', amber: '#ffea00', red: '#f62626', green: '#3af626', muted: '#818181' } as const
 
 const CARD = 'rounded-xl bg-[#1b1b1b] shadow-[0_1px_2px_rgba(0,0,0,0.3)] ring-1 ring-[#424242] ring-inset'
 
 /** Untitled UI's secondary button, size sm, as a link. */
-function CardLink({ href, children }: { href: string; children: ReactNode }) {
+export function CardLink({ href, children }: { href: string; children: ReactNode }) {
   return (
     <Link
       href={href}
@@ -55,9 +55,9 @@ function CardLink({ href, children }: { href: string; children: ReactNode }) {
 // ── Metric row ───────────────────────────────────────────────────────────────
 
 /** dashboard-04's metric cards, each a link into the module where the work is done. */
-function MetricRow({ cards }: { cards: CardSpec[] }) {
+export function MetricRow({ cards, cols = 'md:grid-cols-3' }: { cards: CardSpec[]; cols?: string }) {
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 md:gap-5">
+    <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-5 ${cols}`}>
       {cards.map((c) => {
         const color = c.count > 0 ? TONE[c.tone] : TONE.muted
         return (
@@ -285,6 +285,24 @@ export default function AdminDashboard({ data, cards }: { data: Data; cards: Car
 }
 
 /** The dashboard's own layout in grey, shown until the first load lands. */
+/** The metric row in grey, for any dashboard that opens with MetricRow. */
+export function MetricRowSkeleton({ cards, cols = 'md:grid-cols-3' }: { cards: number; cols?: string }) {
+  return (
+    <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-5 ${cols}`}>
+      {Array.from({ length: cards }).map((_, i) => (
+        <div key={i} className={`${CARD} flex min-w-0 flex-col gap-4 px-4 py-5 md:px-5 xl:flex-row`}>
+          <Skeleton className="size-10 shrink-0 rounded-lg" />
+          <div className="flex w-full flex-col gap-3">
+            <Skeleton className="h-3.5 w-32" />
+            <Skeleton className="h-8 w-14" />
+            <Skeleton className="h-3 w-48 max-w-full" />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function AdminDashboardSkeleton({ cards }: { cards: number }) {
   return (
     <div className="flex flex-col gap-5 lg:gap-6" aria-busy="true" aria-label="Loading dashboard">

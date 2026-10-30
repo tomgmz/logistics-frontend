@@ -40,11 +40,12 @@ const BASE: Record<StaffRole, string> = {
   fleet_manager:      '/fleet_admin',
 }
 
-type Tone = 'cyan' | 'amber' | 'red' | 'muted'
+type Tone = 'cyan' | 'amber' | 'red' | 'green' | 'muted'
 const TONE: Record<Tone, string> = {
   cyan:  'var(--color-cyan)',
   amber: '#ffea00',
   red:   '#f62626',
+  green: '#3af626',
   muted: '#818181',
 }
 

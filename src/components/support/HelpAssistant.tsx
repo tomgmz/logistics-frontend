@@ -329,7 +329,7 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
                 <LifeBuoy size={16} />
               </span>
               <div>
-                <p className="text-sm font-bold text-white">Help &amp; support</p>
+                <p className="text-sm font-bold text-white">Chat Support</p>
                 <p className="text-[11px] text-white/40">
                   {tab === 'messages' && canTicket ? 'Your driver and our team' : 'Answers right away · our team replies by email'}
                 </p>

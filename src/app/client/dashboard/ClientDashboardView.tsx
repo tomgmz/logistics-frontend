@@ -1,16 +1,12 @@
 'use client'
 
-import { motion, Variants } from 'framer-motion'
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import {
-  LayoutDashboard, RefreshCw, AlertCircle, Truck, Clock,
-  CheckCircle2, MapPin, Package, Plus, ChevronRight, Bell,
-  CreditCard, XCircle, Inbox, LifeBuoy,
+  AlertCircle, Truck, Clock, CheckCircle2, MapPin, Plus, ChevronRight, XCircle,
 } from 'lucide-react'
 
 import { bookingService } from '@/lib/services/client/booking.service'
-import { notificationService, type AppNotification } from '@/lib/services/notification.service'
 import { useAuthStore } from '@/lib/store/auth.store'
 import type { BookingWithRelations, BookingDestination } from '@/lib/store/slice/routeMap.slice'
 import { type BookingStatus, asBookingStatus } from '@/app/types/maps/routemap.types'
@@ -20,25 +16,30 @@ import { isAwaitingResubmit } from '@/lib/booking-resubmit'
 import RejectionPanel from '@/components/transactions/RejectionPanel'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { RouteStepper, countSteps } from '@/components/map/RouteStepper'
-import { supportService, openHelpAssistant, type SupportTicket } from '@/lib/services/support.service'
-import { useLiveTable } from '@/lib/hooks/useLiveTable'
+import { TableCard } from '@/components/ui/untitled/table-card'
+import { Skeleton } from '@/components/ui/Skeleton'
+import { CardLink, MetricRow, MetricRowSkeleton } from '@/components/dashboard/AdminDashboard'
+import type { CardSpec } from '@/components/dashboard/StaffDashboard'
 
-const BG_PAGE  = '#0a0a0a'
-const BG_PANEL = '#2A2828'
-const BG_CARD  = '#424242'
-const EDGE     = '#424242'
-const BORDER   = 'rgba(255,255,255,0.07)'
-const BORDER_C = 'rgba(255,255,255,0.12)'
-const CYAN     = '#4DF9ED'
-const MUTED    = '#818181'
-const ERROR    = '#f62626'
-const AMBER    = '#ffea00'
-const GREEN    = '#3af626'
+/**
+ * The client's dashboard, in the same Untitled UI dashboard-04 format as the
+ * Company Administrator's: the metric row, then Active shipments as a table
+ * card, then Needs your attention under it.
+ */
+
+const CYAN  = '#4DF9ED'
+const MUTED = '#818181'
+const ERROR = '#f62626'
+
+/** Four metric cards across from lg up. */
+const METRIC_COLS = 'md:grid-cols-2 lg:grid-cols-4'
+
+/** Rows shown in each card; the rest are in Transaction History. */
+const MAX_ROWS = 5
 
 /** Statuses that mean a shipment is live: accepted, and not yet finished. */
 const ACTIVE_STATUSES: BookingStatus[] = ['APPROVED', 'ASSIGNED', 'IN_TRANSIT', 'DELIVERED']
 
-/** In-transit first — that is what a client opens the dashboard to look at. */
 // Delivered first: it is the one waiting on the client's confirmation.
 const ACTIVE_SORT: Record<string, number> = { DELIVERED: -1, IN_TRANSIT: 0, ASSIGNED: 1, APPROVED: 2 }
 
@@ -95,11 +96,8 @@ function getPlateNumber(booking: BookingWithRelations): string | null {
 }
 
 /**
- * How far along a shipment is, as stops the driver has actually confirmed.
- *
- * There is no live vehicle position anywhere in the system, so this is the only
- * honest progress signal we have — and it is a real one, written when the driver
- * confirms a stop with a proof photo.
+ * How far along a shipment is, as stops the driver has actually confirmed —
+ * written when the driver confirms a stop with a proof photo.
  */
 function stopProgress(booking: BookingWithRelations): { done: number; total: number } {
   const stops = destinationsOf(booking)
@@ -112,48 +110,18 @@ function formatDate(iso: string | Date | null | undefined): string {
   return new Date(iso).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-function timeAgo(iso: string): string {
-  const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
-  if (m < 1) return 'just now'
-  if (m < 60) return `${m}m ago`
-  const h = Math.floor(m / 60)
-  if (h < 24) return `${h}h ago`
-  return `${Math.floor(h / 24)}d ago`
-}
-
 /** Today in the Philippines as YYYY-MM-DD — schedule_date is a PH calendar day. */
 function phToday(): string {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
 }
 
-const fadeUp: Variants = {
-  hidden: { opacity: 0, y: 16 },
-  show:   { opacity: 1, y: 0, transition: { duration: 0.35 } },
-}
-const stagger: Variants = {
-  hidden: {},
-  show:   { transition: { staggerChildren: 0.06 } },
-}
-
 // ── presentational ─────────────────────────────────────────────────────────
-
-function SectionHeader({ icon, title, action }: {
-  icon: React.ReactNode; title: string; action?: React.ReactNode
-}) {
-  return (
-    <div className="flex items-center gap-2">
-      <span className="text-white">{icon}</span>
-      <h3 className="ff-sc text-white font-bold tracking-wide text-sm">{title}</h3>
-      {action && <div className="ml-auto">{action}</div>}
-    </div>
-  )
-}
 
 function StatusBadge({ status }: { status: string }) {
   const m = statusMeta(status)
   return (
     <span
-      className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-sm shrink-0"
+      className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-sm whitespace-nowrap"
       style={{ color: m.color, background: `${m.color}1f`, border: `1px solid ${m.color}` }}
     >
       {m.icon}{m.label}
@@ -161,206 +129,178 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
-/**
- * Help & support: the assistant answers common questions straight away, and
- * opens a ticket to our team (answered by email) when it can't.
- */
-function HelpPanel() {
-  const [tickets, setTickets] = useState<SupportTicket[] | null>(null)
-  const load = useCallback(() => {
-    supportService.mine().then(setTickets).catch(() => setTickets([]))
-  }, [])
-  useEffect(() => { load() }, [load])
-  useLiveTable(['live:support_tickets'], load)
-
-  const open   = (tickets ?? []).filter((t) => t.status === 'open')
-  const latest = (tickets ?? [])[0]
-
+/** CardLink's shape in cyan with a plus, for starting a booking. */
+function NewBookingLink() {
   return (
-    <Panel accent={GREEN}>
-      <SectionHeader icon={<LifeBuoy size={16} />} title="Help & Support" />
-      <p className="text-xs leading-snug" style={{ color: MUTED }}>
-        {open.length > 0
-          ? `${open.length} ticket${open.length === 1 ? '' : 's'} waiting for a reply by email.`
-          : 'Questions about a booking or delivery? The assistant answers right away.'}
-      </p>
-      {latest && (
-        <p className="text-[11px]" style={{ color: MUTED }}>
-          Latest: <span className="font-mono text-white/70">{latest.reference}</span> · {latest.subject}
-          {' · '}<span style={{ color: latest.status === 'open' ? AMBER : CYAN }}>
-            {latest.status === 'open' ? 'Waiting for reply' : 'Resolved'}
-          </span>
-        </p>
-      )}
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={() => openHelpAssistant('chat')}
-          className="flex-1 rounded-lg px-3 py-2 text-xs font-bold cursor-pointer"
-          style={{ background: `${GREEN}1f`, border: `1px solid ${GREEN}`, color: GREEN }}
-        >
-          Ask the assistant
-        </button>
-        <button
-          type="button"
-          onClick={() => openHelpAssistant('tickets')}
-          className="rounded-lg border px-3 py-2 text-xs font-semibold cursor-pointer hover:bg-white/5"
-          style={{ borderColor: MUTED, color: GREEN }}
-        >
-          My tickets
-        </button>
-      </div>
-    </Panel>
-  )
-}
-
-function Panel({ children, accent, className = '' }: {
-  children: React.ReactNode; accent: string; className?: string
-}) {
-  return (
-    <motion.div
-      variants={fadeUp}
-      className={`rounded-xl border p-4 flex flex-col gap-3 ${className}`}
-      style={{ background: BG_PANEL, borderColor: BORDER, borderTopColor: accent }}
+    <Link
+      href="/client/booking"
+      className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold shadow-[0_1px_2px_rgba(0,0,0,0.3)] transition [@media(hover:hover)]:hover:opacity-85"
+      style={{ background: `${CYAN}1f`, color: CYAN, boxShadow: `inset 0 0 0 1px ${CYAN}` }}
     >
-      {children}
-    </motion.div>
+      <Plus size={14} /> New booking
+    </Link>
   )
 }
 
-function KpiTile({ label, value, sub, color }: {
-  label: string; value: number; sub: string; color: string
-}) {
-  return (
-    <motion.div
-      variants={fadeUp}
-      className="rounded-xl border p-3 flex flex-col gap-1"
-      style={{ background: BG_PANEL, borderColor: EDGE }}
-    >
-      <p className="text-[10px] font-bold uppercase tracking-[0.15em]" style={{ color: MUTED }}>{label}</p>
-      <p className="text-2xl font-bold tabular-nums leading-none" style={{ color }}>{value}</p>
-      <p className="text-[10px]" style={{ color: MUTED }}>{sub}</p>
-    </motion.div>
-  )
-}
+// ── active shipments ───────────────────────────────────────────────────────
 
-/** Stops confirmed out of total, as a stepper. */
-function StopProgressBar({ done, total }: { done: number; total: number }) {
-  return (
-    <div className="flex items-center gap-2">
-      <div className="flex-1 min-w-0">
-        <RouteStepper steps={countSteps(done, total)} compact />
-      </div>
-      <span className="text-[10px] font-bold tabular-nums shrink-0 text-white">
-        {done}/{total} stops
-      </span>
-    </div>
-  )
-}
-
-function EmptyPanel({ icon, message, cta }: {
-  icon: React.ReactNode; message: string; cta?: React.ReactNode
-}) {
-  return (
-    <div className="flex flex-col items-center gap-2 py-8 text-center">
-      <span style={{ color: MUTED }}>{icon}</span>
-      <p className="text-xs" style={{ color: MUTED }}>{message}</p>
-      {cta}
-    </div>
-  )
-}
-
-function SkeletonPanel({ height = 'h-44' }: { height?: string }) {
-  return (
-    <div
-      className={`rounded-xl border ${height} animate-pulse`}
-      style={{ background: BG_PANEL, borderColor: BORDER }}
-    />
-  )
-}
-
-// ── rows ───────────────────────────────────────────────────────────────────
+const HEAD = ['Booking', 'Status', 'Schedule', 'Route', 'Progress', 'Driver', '']
 
 function ActiveShipmentRow({ booking }: { booking: BookingWithRelations }) {
-  const stops    = destinationsOf(booking)
-  const progress = stopProgress(booking)
-  const driver   = getDriverName(booking)
-  const plate    = getPlateNumber(booking)
+  const stops     = destinationsOf(booking)
+  const progress  = stopProgress(booking)
+  const driver    = getDriverName(booking)
+  const plate     = getPlateNumber(booking)
   const inTransit = asBookingStatus(booking.status) === 'IN_TRANSIT'
 
   return (
-    <div
-      className="rounded-lg border p-3 flex flex-col gap-2"
-      style={{ background: BG_CARD, borderColor: BORDER }}
-    >
-      <div className="flex items-center gap-2 flex-wrap">
+    <tr>
+      <td className="whitespace-nowrap">
         <Link
           href={`/client/history?booking=${booking.booking_id}`}
-          className="text-sm font-bold text-white hover:opacity-80 transition-opacity"
+          className="text-white transition-opacity [@media(hover:hover)]:hover:opacity-80"
         >
           {bookingRef(booking)}
         </Link>
-        <StatusBadge status={booking.status} />
-        <span className="ml-auto text-[11px]" style={{ color: MUTED }}>
-          {formatDate(booking.schedule_date)}
-          {typeof booking.call_time === 'string' ? ` · ${booking.call_time}` : ''}
+      </td>
+      <td><StatusBadge status={booking.status} /></td>
+      <td className="whitespace-nowrap">
+        {formatDate(booking.schedule_date)}
+        {typeof booking.call_time === 'string' && <span style={{ color: MUTED }}> · {booking.call_time}</span>}
+      </td>
+      <td className="max-w-[260px]">
+        <span className="flex items-center gap-1.5">
+          <MapPin size={13} className="shrink-0" style={{ color: CYAN }} />
+          <span className="truncate">{(booking.origin as string | undefined) ?? '—'}</span>
+          <span className="shrink-0" style={{ color: MUTED }}>→ {stops.length} {stops.length === 1 ? 'stop' : 'stops'}</span>
         </span>
-      </div>
-
-      <div className="flex items-start gap-1.5 text-[11px]" style={{ color: MUTED }}>
-        <MapPin size={12} className="mt-0.5 shrink-0" style={{ color: CYAN }} />
-        <span className="truncate">
-          {(booking.origin as string | undefined) ?? '—'}
-          <span style={{ color: BORDER_C }}> → </span>
-          {stops.length} {stops.length === 1 ? 'stop' : 'stops'}
-        </span>
-      </div>
-
-      <StopProgressBar done={progress.done} total={progress.total} />
-
-      <div className="flex items-center gap-2 flex-wrap text-[11px]" style={{ color: MUTED }}>
-        {driver ? (
-          <span className="flex items-center gap-1"><Truck size={11} /> {driver}{plate ? ` · ${plate}` : ''}</span>
-        ) : (
-          <span className="italic">Driver not assigned yet</span>
-        )}
+      </td>
+      <td className="min-w-[180px]">
+        <div className="flex items-center gap-2">
+          <div className="min-w-0 flex-1"><RouteStepper steps={countSteps(progress.done, progress.total)} compact /></div>
+          <span className="shrink-0 font-mono text-xs">{progress.done}/{progress.total}</span>
+        </div>
+      </td>
+      <td className="whitespace-nowrap">
+        {driver
+          ? <>{driver}{plate && <span style={{ color: MUTED }}> · {plate}</span>}</>
+          : <span className="italic" style={{ color: MUTED }}>Not assigned yet</span>}
+      </td>
+      <td className="whitespace-nowrap text-right">
         {inTransit && (
           <Link
             href="/client/tracking"
-            className="ml-auto flex items-center gap-0.5 font-bold hover:opacity-80 transition-opacity"
+            className="inline-flex items-center gap-0.5 transition-opacity [@media(hover:hover)]:hover:opacity-80"
             style={{ color: CYAN }}
           >
-            Track <ChevronRight size={11} />
+            Track <ChevronRight size={13} />
           </Link>
         )}
-      </div>
-    </div>
+      </td>
+    </tr>
   )
 }
 
-function RejectedRow({ booking, onUpdated }: {
-  booking:   BookingWithRelations
+function ActiveShipmentsCard({ active }: { active: BookingWithRelations[] }) {
+  return (
+    <TableCard.Root untitled>
+      <TableCard.Header
+        title="Active shipments"
+        contentTrailing={
+          <div className="flex flex-wrap items-center gap-2">
+            <NewBookingLink />
+            <CardLink href="/client/history">View all</CardLink>
+          </div>
+        }
+      />
+      <div className="overflow-x-auto">
+        <table className="data-table min-w-[980px]">
+          <thead>
+            <tr>{HEAD.map((h, i) => <th key={i}>{h}</th>)}</tr>
+          </thead>
+          <tbody className="ff-regular text-sm text-white">
+            {active.length === 0 ? (
+              <tr>
+                <td colSpan={HEAD.length} style={{ color: MUTED }}>
+                  No active shipments right now.{' '}
+                  <Link href="/client/booking" className="underline underline-offset-2" style={{ color: CYAN }}>Book a delivery</Link>
+                </td>
+              </tr>
+            ) : active.slice(0, MAX_ROWS).map((b) => <ActiveShipmentRow key={b.booking_id} booking={b} />)}
+          </tbody>
+        </table>
+      </div>
+    </TableCard.Root>
+  )
+}
+
+// ── needs your attention ───────────────────────────────────────────────────
+
+function AttentionCard({ rejected, onUpdated }: {
+  rejected:  BookingWithRelations[]
   onUpdated: (next: BookingWithRelations) => void
 }) {
-  const reason = booking.rejection_reason as string | undefined
   return (
-    <div className="rounded-lg border p-3 flex flex-col gap-1.5" style={{ background: BG_CARD, borderColor: `${ERROR}40` }}>
-      <div className="flex items-center gap-2">
-        <XCircle size={13} style={{ color: ERROR }} />
-        <Link
-          href={`/client/history?booking=${booking.booking_id}`}
-          className="text-sm font-bold text-white hover:opacity-80 transition-opacity"
-        >
-          {bookingRef(booking)}
-        </Link>
-        <span className="ml-auto text-[10px] uppercase tracking-widest" style={{ color: ERROR }}>
-          Rejected
-        </span>
-      </div>
-      <p className="text-[11px] leading-snug" style={{ color: MUTED }}>
-        {reason ? `Reason: ${reason}` : 'This booking was turned down.'}
-      </p>
-      <RejectionPanel booking={booking} onUpdated={onUpdated} compact />
+    <TableCard.Root untitled id="needs-attention" className="scroll-mt-4">
+      <TableCard.Header title="Needs your attention" />
+      {rejected.length === 0 ? (
+        <p className="flex items-center gap-2 px-4 py-6 text-sm md:px-6" style={{ color: MUTED }}>
+          <CheckCircle2 size={16} /> Nothing needs you right now.
+        </p>
+      ) : (
+        <ul className="ff-regular divide-y divide-[#424242]">
+          {rejected.slice(0, MAX_ROWS).map((b) => {
+            const reason = b.rejection_reason as string | undefined
+            return (
+              <li key={b.booking_id} className="flex flex-col gap-2 px-4 py-4 md:px-6">
+                <div className="flex items-center gap-2">
+                  <XCircle size={15} style={{ color: ERROR }} />
+                  <Link
+                    href={`/client/history?booking=${b.booking_id}`}
+                    className="text-sm font-semibold text-white transition-opacity [@media(hover:hover)]:hover:opacity-80"
+                  >
+                    {bookingRef(b)}
+                  </Link>
+                  <span className="ml-auto text-xs font-semibold uppercase tracking-wider" style={{ color: ERROR }}>Rejected</span>
+                </div>
+                <p className="text-sm leading-snug" style={{ color: MUTED }}>
+                  {reason ? `Reason: ${reason}` : 'This booking was turned down.'}
+                </p>
+                <RejectionPanel booking={b} onUpdated={onUpdated} compact />
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </TableCard.Root>
+  )
+}
+
+/** The page's own layout in grey, shown until the first load lands. */
+function ClientDashboardSkeleton() {
+  return (
+    <div className="flex flex-col gap-5 lg:gap-6" aria-busy="true" aria-label="Loading dashboard">
+      <MetricRowSkeleton cards={4} cols={METRIC_COLS} />
+      <TableCard.Root untitled>
+        <div className="flex items-center justify-between gap-4 border-b border-[#424242] px-4 py-5 md:px-6">
+          <Skeleton className="h-5 w-40" />
+          <Skeleton className="h-9 w-48 rounded-lg" />
+        </div>
+        <div className="divide-y divide-[#2a2a2a]">
+          {Array.from({ length: 4 }).map((_, j) => (
+            <div key={j} className="flex items-center gap-6 px-4 py-4 md:px-6">
+              <Skeleton className="h-3.5 w-24" />
+              <Skeleton className="h-3.5 w-20" />
+              <Skeleton className="h-3.5 flex-1" />
+              <Skeleton className="hidden h-3.5 w-28 sm:block" />
+            </div>
+          ))}
+        </div>
+      </TableCard.Root>
+      <TableCard.Root untitled>
+        <div className="border-b border-[#424242] px-4 py-5 md:px-6"><Skeleton className="h-5 w-44" /></div>
+        <div className="px-4 py-6 md:px-6"><Skeleton className="h-3.5 w-56" /></div>
+      </TableCard.Root>
     </div>
   )
 }
@@ -369,10 +309,8 @@ function RejectedRow({ booking, onUpdated }: {
 
 export default function ClientDashboardView() {
   const clientId = useAuthStore((s) => s.user?.clients?.client_id)
-  const company  = useAuthStore((s) => s.user?.clients?.company_name)
 
   const [bookings, setBookings] = useState<BookingWithRelations[]>([])
-  const [notes,    setNotes]    = useState<AppNotification[]>([])
   const [loading,  setLoading]  = useState(true)
   const [error,    setError]    = useState<string | null>(null)
 
@@ -381,12 +319,7 @@ export default function ClientDashboardView() {
     setLoading(true)
     setError(null)
     try {
-      const [bookingRows, noteRows] = await Promise.all([
-        bookingService.fetchBookingsByClient(clientId),
-        notificationService.list({ limit: 6 }),
-      ])
-      setBookings(bookingRows)
-      setNotes(noteRows ?? [])
+      setBookings(await bookingService.fetchBookingsByClient(clientId))
     } catch (err) {
       setError(getApiErrorMessage(err))
     } finally {
@@ -396,7 +329,7 @@ export default function ClientDashboardView() {
 
   useEffect(() => { void load() }, [load])
 
-  // Every figure below is derived from the two lists already fetched — the
+  // Every figure below is derived from the one list already fetched — the
   // dashboard adds no endpoint of its own.
   const active = useMemo(() => (
     bookings
@@ -429,14 +362,18 @@ export default function ClientDashboardView() {
     bookings
       .filter(isAwaitingResubmit)
       .sort((a, b) => String(b.updated_at ?? '').localeCompare(String(a.updated_at ?? '')))
-      .slice(0, 2)
   ), [bookings])
 
-  const attentionCount = rejected.length
+  const cards: CardSpec[] = [
+    { label: 'Active shipments',     hint: 'Approved, assigned or moving', count: active.length,      href: '/client/history',  icon: <Truck size={20} />,        tone: 'cyan' },
+    { label: 'Awaiting approval',    hint: 'With 8338',                    count: pending.length,     href: '/client/history',  icon: <Clock size={20} />,        tone: 'amber' },
+    { label: 'Completed this month', hint: 'Deliveries finished',          count: completedThisMonth, href: '/client/history',  icon: <CheckCircle2 size={20} />, tone: 'green' },
+    { label: 'Needs your attention', hint: 'Rejected bookings',            count: rejected.length,    href: '#needs-attention', icon: <AlertCircle size={20} />,  tone: 'red' },
+  ]
 
   if (!clientId) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-3" style={{ background: BG_PAGE }}>
+      <div className="flex flex-col items-center justify-center h-full gap-3 bg-[#0a0a0a]">
         <AlertCircle size={32} style={{ color: ERROR }} />
         <p className="text-sm" style={{ color: ERROR }}>
           Your account is not linked to a client company.
@@ -447,170 +384,35 @@ export default function ClientDashboardView() {
   }
 
   return (
-    <div className="flex flex-col h-full overflow-hidden" style={{ background: BG_PAGE, color: '#fff' }}>
-
-      {/* Header */}
-      <div className="flex items-center gap-3 px-4 lg:px-6 py-4 border-b shrink-0" style={{ borderColor: BORDER }}>
-        <LayoutDashboard size={18} style={{ color: CYAN }} />
-        <div className="min-w-0">
-          <h1 className="font-[family-name:var(--font-alegreya-sc)] text-[17px] 3xl:text-[20px] font-bold text-white truncate">
-            {company ? `Welcome back, ${company}` : 'Dashboard'}
-          </h1>
-        </div>
-
-
-        <Link
-          href="/client/booking"
-          className="ml-auto flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold
-                     uppercase tracking-wider transition-opacity hover:opacity-85 shrink-0"
-          style={{ background: `${CYAN}30`, border: `1px solid ${CYAN}`, color: CYAN }}
-        >
-          <Plus size={14} /> <span className="hidden sm:inline">New Booking</span>
-        </Link>
-      </div>
-
-      {/* Body */}
-      <div className="flex-1 overflow-auto p-4 lg:p-6 flex flex-col gap-3 sm:gap-4">
-
-        {loading && (
-          <>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-              {[0, 1, 2, 3].map((i) => <SkeletonPanel key={i} height="h-[76px]" />)}
-            </div>
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
-              <div className="xl:col-span-2"><SkeletonPanel height="h-80" /></div>
-              <div className="flex flex-col gap-3">
-                <SkeletonPanel />
-                <SkeletonPanel />
-              </div>
-            </div>
-          </>
-        )}
+    <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-[#0a0a0a] text-white px-4 py-5 lg:px-8 lg:py-6">
+      <div className="flex w-full flex-col gap-5 lg:gap-6">
+        {loading && <ClientDashboardSkeleton />}
 
         {!loading && error && (
           <div className="flex flex-col items-center gap-3 py-16">
             <AlertCircle size={32} style={{ color: ERROR }} />
             <p className="text-sm" style={{ color: ERROR }}>{error}</p>
-            <button onClick={load}
-              className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider
-                         transition-opacity hover:opacity-70 cursor-pointer"
-              style={{ color: CYAN }}>
-              <RefreshCw size={12} /> Retry
+            <button
+              onClick={load}
+              className="text-sm font-semibold transition-opacity [@media(hover:hover)]:hover:opacity-70 cursor-pointer"
+              style={{ color: CYAN }}
+            >
+              Retry
             </button>
           </div>
         )}
 
         {!loading && !error && (
-          <motion.div variants={stagger} initial="hidden" animate="show" className="flex flex-col gap-3 sm:gap-4">
-
-            {/* KPIs */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-              <KpiTile label="Active Shipments" value={active.length}
-                sub="approved, assigned or moving" color={CYAN} />
-              <KpiTile label="Awaiting Approval" value={pending.length}
-                sub="with 8338" color={AMBER} />
-              <KpiTile label="Completed This Month" value={completedThisMonth}
-                sub="deliveries finished" color={GREEN} />
-              <KpiTile label="Needs Your Attention" value={attentionCount}
-                sub="rejected bookings" color="#fff" />
-            </div>
-
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
-
-              {/* Active shipments */}
-              <Panel accent={CYAN} className="xl:col-span-2">
-                <SectionHeader
-                  icon={<Truck size={16} />}
-                  title="Active Shipments"
-                  action={
-                    <Link href="/client/history"
-                      className="flex items-center gap-0.5 text-[11px] font-bold hover:opacity-80 transition-opacity"
-                      style={{ color: CYAN }}>
-                      View all <ChevronRight size={11} />
-                    </Link>
-                  }
-                />
-                {active.length === 0 ? (
-                  <EmptyPanel
-                    icon={<Package size={26} />}
-                    message="No active shipments right now."
-                    cta={
-                      <Link href="/client/booking"
-                        className="text-[11px] font-bold underline underline-offset-2 hover:opacity-80"
-                        style={{ color: CYAN }}>
-                        Book a delivery
-                      </Link>
-                    }
-                  />
-                ) : (
-                  <div className="flex flex-col gap-2">
-                    {active.slice(0, 6).map((b) => (
-                      <ActiveShipmentRow key={b.booking_id} booking={b} />
-                    ))}
-                  </div>
-                )}
-              </Panel>
-
-              {/* Right column */}
-              <div className="flex flex-col gap-3">
-
-                <Panel accent={ERROR}>
-                  <SectionHeader icon={<AlertCircle size={16} />} title="Needs Your Attention" />
-                  {attentionCount === 0 ? (
-                    <EmptyPanel icon={<CheckCircle2 size={26} />} message="Nothing needs you right now." />
-                  ) : (
-                    <div className="flex flex-col gap-2">
-                      {rejected.map((b) => (
-                        <RejectedRow key={b.booking_id} booking={b} onUpdated={(next) => {
-                          setBookings((prev) => prev.map((x) => (x.booking_id === next.booking_id ? next : x)))
-                        }} />
-                      ))}
-                    </div>
-                  )}
-                </Panel>
-
-                <HelpPanel />
-
-              </div>
-            </div>
-
-            {/* Recent activity */}
-            <Panel accent="#fff">
-              <SectionHeader icon={<Bell size={16} />} title="Recent Activity" />
-              {notes.length === 0 ? (
-                <EmptyPanel icon={<Inbox size={26} />} message="No activity yet." />
-              ) : (
-                <div className="flex flex-col">
-                  {notes.map((n, i) => {
-                    const href = typeof n.data?.action_url === 'string' ? n.data.action_url : null
-                    const body = (
-                      <div
-                        className="flex items-start gap-2.5 py-2.5"
-                        style={i > 0 ? { borderTop: `1px solid ${BORDER}` } : undefined}
-                      >
-                        <span
-                          className="mt-1 w-1.5 h-1.5 rounded-full shrink-0"
-                          style={{ background: n.read_at ? BG_CARD : CYAN }}
-                        />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs font-bold text-white truncate">{n.title}</p>
-                          <p className="text-[11px] leading-snug" style={{ color: MUTED }}>{n.body}</p>
-                        </div>
-                        <span className="text-[10px] shrink-0" style={{ color: MUTED }}>
-                          {timeAgo(n.created_at)}
-                        </span>
-                      </div>
-                    )
-                    return href
-                      ? <Link key={n.notification_id} href={href} className="hover:opacity-80 transition-opacity">{body}</Link>
-                      : <div key={n.notification_id}>{body}</div>
-                  })}
-                </div>
-              )}
-            </Panel>
-
-          </motion.div>
+          <>
+            <MetricRow cards={cards} cols={METRIC_COLS} />
+            <ActiveShipmentsCard active={active} />
+            <AttentionCard
+              rejected={rejected}
+              onUpdated={(next) => setBookings((prev) => prev.map((x) => (x.booking_id === next.booking_id ? next : x)))}
+            />
+          </>
         )}
+        <div className="h-4" />
       </div>
     </div>
   )
