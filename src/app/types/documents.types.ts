@@ -162,7 +162,11 @@ export function previewKind(url: string): PreviewKind {
  */
 export async function downloadFile(url: string, fileName: string): Promise<void> {
   try {
-    const res = await fetch(url)
+    // no-store: the thumbnail already loaded this exact link through <img>,
+    // which sends no Origin, and storage answers that without CORS headers or
+    // `Vary: Origin`. Read from the browser cache, that copy fails CORS here,
+    // so ask storage directly.
+    const res = await fetch(url, { cache: 'no-store' })
     if (!res.ok) throw new Error(String(res.status))
     const href = URL.createObjectURL(await res.blob())
     const a    = document.createElement('a')
