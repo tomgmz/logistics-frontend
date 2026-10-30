@@ -453,15 +453,21 @@ function DocumentLibrary() {
     }
   }
 
+  // Nothing ticked: everything this folder and its filters show. Ticked: just those.
   async function handleExport() {
-    if (selected.size === 0) return
-    if (selected.size > MAX_DOWNLOAD_FILES) {
+    const all = selected.size === 0
+    if (all && total === 0) return
+    if (!all && selected.size > MAX_DOWNLOAD_FILES) {
       appToast.error(`You can download up to ${MAX_DOWNLOAD_FILES} files at once. Untick ${selected.size - MAX_DOWNLOAD_FILES} and try again.`)
+      return
+    }
+    if (all && total > MAX_DOWNLOAD_FILES) {
+      appToast.error(`There are ${total.toLocaleString()} documents here. Download All takes up to ${MAX_DOWNLOAD_FILES} at a time; narrow the filters or tick the files you need.`)
       return
     }
     setExporting(true)
     try {
-      const { included, failed } = await downloadDocuments([...selected.keys()])
+      const { included, failed } = await downloadDocuments(all ? { filters } : { keys: [...selected.keys()] })
       if (failed > 0) {
         appToast.error(`Downloaded ${included} of ${included + failed} files. ${failed} could not be fetched; the list inside the ZIP marks which.`)
       } else {
@@ -673,10 +679,12 @@ function DocumentLibrary() {
                   </span>
                 )}
                 {isFiles && canExport && (
-                  <Button color="secondary" iconLeading={Download} onClick={() => void handleExport()} disabled={exporting || selected.size === 0}
-                    title={selected.size === 0 ? 'Tick the documents to download first' : selected.size === 1 ? 'Download the selected file' : 'Download the selected files as one ZIP, with a list of them'}
+                  <Button color="secondary" iconLeading={Download} onClick={() => void handleExport()} disabled={exporting || (selected.size === 0 && total === 0)}
+                    title={selected.size === 0
+                      ? 'Download every document shown here (all pages) as one ZIP, with a list of them'
+                      : 'Download the ticked documents as one ZIP, with a list of them'}
                     className="max-md:flex-1">
-                    {exporting ? 'Downloading…' : 'Download'}
+                    {exporting ? 'Downloading…' : selected.size === 0 ? 'Download All' : 'Download Selected Files'}
                   </Button>
                 )}
                 {canCreate && (

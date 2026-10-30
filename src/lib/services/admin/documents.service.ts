@@ -172,18 +172,29 @@ function zipName(d: LibraryDocument, used: Set<string>): string {
 }
 
 /**
- * Downloads the ticked documents. The rows are read again first, so every
- * link is freshly signed however long ago it was ticked (document links last
- * 10–15 minutes). One file downloads as itself; more become one ZIP holding
- * the files plus documents.xlsx listing them. A file that cannot be fetched
- * is left out and marked in the list rather than failing the whole download.
+ * Downloads documents: the ticked ones (`keys`), or every one the current
+ * folder and filters show (`filters`, "Download All"). The rows are read
+ * again first, so every link is freshly signed however long ago the page
+ * loaded (document links last 10–15 minutes). One file downloads as itself;
+ * more become one ZIP holding the files plus documents.xlsx listing them. A
+ * file that cannot be fetched is left out and marked in the list rather than
+ * failing the whole download.
  */
-export async function downloadDocuments(keys: string[]): Promise<{ included: number; failed: number }> {
-  const { data: body } = await proxyApi.get<{ data: LibraryDocument[] }>(`${B}/export`, {
-    params: { keys: keys.slice(0, MAX_DOWNLOAD_FILES).join(',') },
-  })
-  const rows = [...(body?.data ?? [])].sort((a, b) => (b.uploaded_at ?? '').localeCompare(a.uploaded_at ?? ''))
-  if (rows.length === 0) throw new Error('Those documents could not be found any more. Refresh and try again.')
+export async function downloadDocuments(
+  source: { keys: string[] } | { filters: DocumentFilters },
+): Promise<{ included: number; failed: number }> {
+  const params = 'keys' in source
+    ? { keys: source.keys.slice(0, MAX_DOWNLOAD_FILES).join(',') }
+    : toParams(source.filters)
+  const { data: body } = await proxyApi.get<{ data: LibraryDocument[]; meta?: { count: number } }>(`${B}/export`, { params })
+  const found = body?.data ?? []
+  if (found.length > MAX_DOWNLOAD_FILES) {
+    throw new Error(`There are ${found.length.toLocaleString()} documents here. Download All takes up to ${MAX_DOWNLOAD_FILES} at a time; narrow the filters or tick the files you need.`)
+  }
+  const rows = [...found].sort((a, b) => (b.uploaded_at ?? '').localeCompare(a.uploaded_at ?? ''))
+  if (rows.length === 0) {
+    throw new Error('keys' in source ? 'Those documents could not be found any more. Refresh and try again.' : 'There are no documents to download here.')
+  }
 
   if (rows.length === 1) {
     await downloadFile(rows[0].file_url, zipName(rows[0], new Set()))
