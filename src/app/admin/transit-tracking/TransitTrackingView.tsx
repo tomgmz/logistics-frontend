@@ -10,7 +10,6 @@ import LocalShippingIcon from '@mui/icons-material/LocalShipping'
 
 import { DirectionsRenderer } from '@/components/map/DirectionsRenderer'
 import { DetailsPanelContent } from '@/components/map/DetailsPanelContent'
-import { StatusBadge } from '@/components/map/RouteMapComponents'
 import { statusColor } from '@/components/map/status.colors'
 import { useAppDispatch, useAppSelector } from '@/lib/hooks/hooks'
 import { useAuthStore } from '@/lib/store/auth.store'
@@ -370,6 +369,9 @@ export default function TransitTrackingView() {
       defaultZoom={11}
       gestureHandling="greedy"
       className="w-full h-full min-h-[240px]"
+      // Only fullscreen; the map is still pannable/zoomable by gesture and wheel.
+      disableDefaultUI
+      fullscreenControl
     >
       <FitBounds fitKey={fitKey} points={showSingle ? singlePoints : fleetPoints} />
 
@@ -438,14 +440,9 @@ export default function TransitTrackingView() {
   return (
     <APIProvider apiKey={GOOGLE_MAPS_KEY} libraries={['routes']}>
       <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-60px)] overflow-hidden" style={SC}>
-        <header className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 py-3 border-b border-white/[0.07] bg-[var(--color-bg)]">
-          <div className="flex items-center gap-2 sm:ml-auto">
-            {/* No Refresh: the list follows live:bookings (trips, stops and
-                drop-offs signal it too since 20261030000000). */}
-            {bookingDetail && <StatusBadge status={bookingDetail.status} />}
-          </div>
-        </header>
-
+        {/* No header bar over the map (status badge dropped, as on RouteMap) and
+            no Refresh: the list follows live:bookings (trips, stops and
+            drop-offs signal it too since 20261030000000). */}
         <div className="flex flex-1 min-h-0 flex-col lg:flex-row overflow-hidden">
           <aside className="w-full lg:w-[300px] shrink-0 flex flex-col border-b lg:border-b-0 lg:border-r border-white/[0.07] bg-[var(--color-bg)] min-h-0 max-h-[42dvh] lg:max-h-none">
             <div className="p-2.5 flex-shrink-0">
