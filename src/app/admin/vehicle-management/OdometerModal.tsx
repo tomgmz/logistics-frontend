@@ -50,6 +50,9 @@ export default function OdometerModal({
     if (truck?.odometer_km != null && reading < truck.odometer_km) {
       setError(`The odometer can't go below the last reading (${fmtKm(truck.odometer_km)}).`); return
     }
+    if (isReturn && truck?.odometer_km != null && reading === truck.odometer_km) {
+      setError(`The return odometer must be higher than the last reading (${fmtKm(truck.odometer_km)}).`); return
+    }
     if (!photo) { setError('Add a photo of the odometer.'); return }
     setError(null)
     setConfirmOpen(true)
