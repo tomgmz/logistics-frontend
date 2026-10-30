@@ -4,7 +4,6 @@ import SignedOutNotice from '@/components/layout/SignedOutNotice';
 import SiteFooter from '@/components/layout/SiteFooter';
 import HeroSection from '@/components/sections/HeroSection';
 import AboutSection from '@/components/sections/AboutSection';
-import BrandsSection from '@/components/sections/BrandsSection';
 import ServicesSection from '@/components/sections/ServicesSection';
 import MetricsSection from '@/components/sections/MetricsSection';
 import FaqSection from '@/components/sections/FaqSection';
@@ -42,7 +41,6 @@ export default async function HomePage() {
       <main>
         <HeroSection />
         <AboutSection />
-        <BrandsSection />
         <ServicesSection />
         <MetricsSection metrics={metrics} />
         <FaqSection />

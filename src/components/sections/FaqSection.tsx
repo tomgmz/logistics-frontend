@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useRef } from 'react';
+import Image from 'next/image';
 import { motion, useInView, AnimatePresence } from 'framer-motion';
-import { FAQS } from '@/lib/data';
+import { ASSETS, FAQS } from '@/lib/data';
 
 function FaqItem({ 
   q, 
@@ -34,7 +35,7 @@ function FaqItem({
     >
       <button
         onClick={onToggle}
-        className="w-full flex items-center justify-between gap-4 px-5 sm:px-7 py-5 sm:py-6 text-left
+        className="w-full flex items-center justify-between gap-4 px-5 sm:px-7 py-5 sm:py-6 short:py-4 text-left
           cursor-pointer bg-transparent border-0 group"
       >
         <span
@@ -85,12 +86,15 @@ export default function FaqSection() {
   const ref    = useRef<HTMLDivElement>(null);
   const inView = useInView(ref as React.RefObject<Element>, { once: true, margin: '-80px' });
 
+  // overflow-x only: the glow below spills down behind the contact section, as in the Figma.
   return (
-    <section id="faq" className="relative w-full bg-[#0a0a0a] py-16 sm:py-20 md:py-28 overflow-hidden">
+    <section id="faq" className="relative w-full bg-[#0a0a0a] pt-[clamp(5.5rem,12svh,7rem)] pb-[clamp(2rem,8svh,6rem)] overflow-x-clip">
 
-      <div className="absolute left-1/2 -translate-x-1/2 top-[40%] -translate-y-1/2
-        w-[500px] h-[500px] pointer-events-none z-0">
-        <div className="w-full h-full rounded-full bg-[#ffea00]/[0.03] blur-[120px]" />
+      {/* White glow from the Figma, centred just above the bottom of the question list. */}
+      <div className="absolute left-1/2 bottom-[clamp(2rem,8svh,6rem)] -translate-x-1/2 translate-y-[30%] size-[340px] pointer-events-none z-0">
+        <div className="absolute inset-[-205.88%]">
+          <Image src={ASSETS.sectionEllipse} alt="" width={1740} height={1740} className="block max-w-none size-full" />
+        </div>
       </div>
 
       <div className="relative z-10 max-w-[860px] mx-auto px-5 sm:px-8 md:px-12">
@@ -114,7 +118,7 @@ export default function FaqSection() {
           animate={inView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6, delay: 0.1 }}
           className="font-'Alegreysa Sans SC, sans-serif' text-[#818181] text-sm sm:text-sm md:text-base lg:text-2xl
-            text-center tracking-widest uppercase mb-10 sm:mb-14"
+            text-center tracking-widest uppercase mb-[clamp(1.5rem,5svh,3.5rem)]"
         >
           Find quick answers to common question about our efficient logistics
         </motion.p>

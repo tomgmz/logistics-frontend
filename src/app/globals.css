@@ -5,6 +5,9 @@
 @import "shadcn/tailwind.css";
 
 @custom-variant dark (&:is(.dark *));
+/* Screens with little height (laptops, landscape phones): the landing page
+   tightens spacing so each section still fits on one screen. */
+@custom-variant short (@media (max-height: 760px));
 
 /* The fixed palette. Every badge and accent uses one of these six:
    cyan #4DF9ED · green #3AF626 · yellow #FFEA00 · orange #FF7A30 · red #F62626 · purple #8A38F5.
@@ -316,21 +319,23 @@
     font-size: clamp(1.25rem, 7.6vw, 2.3rem);
   }
 
+  /* From tablets up the size also follows the screen height (7svh), so a short
+     laptop or a landscape phone keeps the whole section on screen. */
   @media (min-width: 640px) {
     .font-display-italic {
-      font-size: 2.5rem;
+      font-size: clamp(1.5rem, 7svh, 2.5rem);
     }
   }
 
   @media (min-width: 768px) {
     .font-display-italic {
-      font-size: 3rem;
+      font-size: clamp(1.75rem, 7svh, 3rem);
     }
   }
 
   @media (min-width: 1024px) {
     .font-display-italic {
-      font-size: 3.5rem;
+      font-size: clamp(2.25rem, 7svh, 3.5rem);
     }
   }
 
@@ -476,25 +481,6 @@
     border: 1px solid rgba(255, 255, 255, 0.06);
   }
 
-  .marquee-track {
-    display: flex;
-    width: max-content;
-    animation: marquee 22s linear infinite;
-  }
-
-  .marquee-track-reverse {
-    display: flex;
-    width: max-content;
-    animation: marquee-reverse 26s linear infinite;
-  }
-
-  @media (hover: hover) {
-    .marquee-track:hover,
-    .marquee-track-reverse:hover {
-      animation-play-state: paused;
-    }
-  }
-
   .border-gradient-cyan {
     position: relative;
   }
@@ -596,16 +582,6 @@
     font-style: italic;
     text-shadow: 0 4px 6px rgba(0, 0, 0, 0.4);
   }
-}
-
-@keyframes marquee {
-  0%   { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
-}
-
-@keyframes marquee-reverse {
-  0%   { transform: translateX(-50%); }
-  100% { transform: translateX(0); }
 }
 
 @keyframes blink {

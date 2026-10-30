@@ -18,6 +18,13 @@ export default function HeroSection() {
         />
         <div className="absolute inset-0 bg-gradient-to-r from-[#0a0a0a]/90 via-[#0a0a0a]/60 to-[#0a0a0a]/20" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-transparent to-transparent" />
+        {/* White glow from the Figma: a 340px circle blurred far past its edges.
+            Above the darkening gradients, or they would hide it. */}
+        <div className="absolute left-[47.8%] top-[34.3%] -translate-x-1/2 -translate-y-1/2 size-[340px] pointer-events-none">
+          <div className="absolute inset-[-147.06%]">
+            <Image src={ASSETS.heroGlow} alt="" width={1340} height={1340} className="block max-w-none size-full" />
+          </div>
+        </div>
       </div>
 
       <div className="relative z-10 w-full max-w-[1600px] mx-auto px-5 sm:px-8 md:px-12 lg:px-[60px] pt-28 sm:pt-32 pb-16 sm:pb-24 text-center sm:text-left">

@@ -6,15 +6,10 @@ export const ASSETS = {
 
   // Hero
   heroContainers: '/landingpage/heroSection/hero-section-bg.png',
+  heroGlow:       '/landingpage/heroSection/hero-glow.svg',
   // Trucks
   cargoTruck:     '/landingpage/aboutSection/cargo-truck.png',
   l300Van:        '/landingpage/aboutSection/l300-van.png',
-  // Brands
-  airspeed:       '/logos/airspeed.png',
-  shopee:         '/logos/shopee.png',
-  lazada:         '/logos/lazada.png',
-  shein:          '/logos/shein.png',
-  temu:           '/logos/temu.png',
   // Services
   svcContainers:  '/landingpage/servicesSection/svc-containers.jpg',
   svcDelivery:    '/landingpage/servicesSection/svc-delivery.jpg',
@@ -24,14 +19,6 @@ export const ASSETS = {
   // Metrics
   metricsBg:      '/landingpage/metrics-section/metricsbg.png',
 };
-
-export const BRANDS = [
-  { src: ASSETS.airspeed, alt: 'Airspeed', className: 'h-8 w-auto' },
-  { src: ASSETS.shopee,   alt: 'Shopee',   className: 'h-20 w-auto' },
-  { src: ASSETS.lazada,   alt: 'Lazada',   className: 'h-12 w-auto' },
-  { src: ASSETS.shein,    alt: 'Shein',    className: 'h-12 w-auto' },
-  { src: ASSETS.temu,     alt: 'Temu',     className: 'h-20 w-20' },
-];
 
 export const CONTACT = {
   phone:   '+63 9685 536 8975',

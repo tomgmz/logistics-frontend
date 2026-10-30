@@ -44,15 +44,15 @@ function StatCard({ value, label, index }: { value: string; label: string; index
       initial={{ opacity: 0, y: 28, scale: 0.97 }}
       animate={inView ? { opacity: 1, y: 0, scale: 1 } : {}}
       transition={{ duration: 0.55, delay: index * 0.08, ease: [0.22, 1, 0.36, 1] }}
-      className="relative rounded-[18px] border border-white/10 p-4 sm:p-6
+      className="relative rounded-[18px] border border-white/10 p-3 sm:p-6
         flex flex-col justify-center items-center text-center
         bg-white cursor-default overflow-hidden"
     >
-      <span className="font-eurostile text-[2.1rem] sm:text-[2.5rem] md:text-[3rem] lg:text-[2.5rem] text-[#0a0a0a] leading-none mb-1 sm:mb-2">
+      <span className="font-eurostile text-[clamp(1.1rem,6.5vw,2.1rem)] sm:text-[2.5rem] md:text-[3rem] lg:text-[2.5rem] text-[#0a0a0a] leading-none mb-1 sm:mb-2">
         <AnimatedValue raw={value} />
       </span>
 
-      <span className="ff-sc text-[#555]
+      <span className="ff-sc max-sm:!text-[0.7rem] text-[#555]
         tracking-wider leading-snug uppercase">
         {label}
       </span>
@@ -93,7 +93,7 @@ export default function MetricsSection({ metrics }: { metrics: PublicMetrics | n
   const inView = useInView(ref as React.RefObject<Element>, { once: true, margin: '-80px' });
 
   return (
-    <section id="metrics" className="relative w-full bg-[#0a0a0a] py-16 sm:py-20 md:py-28 overflow-hidden">
+    <section id="metrics" className="relative w-full bg-[#0a0a0a] pt-[clamp(5.5rem,12svh,7rem)] pb-[clamp(2rem,8svh,6rem)] overflow-hidden">
 
       <div
         className="absolute inset-0 pointer-events-none"
@@ -114,7 +114,7 @@ export default function MetricsSection({ metrics }: { metrics: PublicMetrics | n
           className="text-center mb-4 sm:mb-6"
         >
           <h2 className="font-display-italic text-white leading-[1.05]
-            text-[1.5rem] xs:text-[1.5rem] sm:text-[2.4rem] md:text-[3rem] lg:text-[5rem]">
+            text-[1.5rem] xs:text-[1.5rem] sm:text-[2.4rem] md:text-[3rem] lg:text-[clamp(3rem,8svh,5rem)]">
             <span className="text-[#ff7a30] font-display-italic">METRICS</span>{' '}
             THAT MOVE
             <br />
@@ -127,20 +127,24 @@ export default function MetricsSection({ metrics }: { metrics: PublicMetrics | n
           animate={inView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6, delay: 0.12 }}
           className="ff-sc text-[#818181]
-            text-center max-w-2xl mx-auto mb-10 sm:mb-14 md:mb-16 tracking-wide leading-relaxed"
+            text-center max-w-2xl mx-auto mb-[clamp(1.5rem,5svh,4rem)] tracking-wide leading-relaxed"
         >
           See how our logistics solutions deliver speed, reliability, and satisfaction for every shipment.
         </motion.p>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4
-          auto-rows-[120px] sm:auto-rows-[160px]">
+        {/* Row heights follow the screen height so the grid fits on one screen.
+            From lg the photo sits behind the cards, as in the Figma: it starts
+            at the left edge and the three card columns overlap its right part. */}
+        <div className="relative grid grid-cols-2 lg:grid-cols-3 lg:ml-[27%] gap-3 sm:gap-4
+          auto-rows-[clamp(84px,15svh,120px)] sm:auto-rows-[clamp(100px,12svh,160px)] lg:auto-rows-[clamp(110px,17svh,160px)]">
 
           <motion.div
             initial={{ opacity: 0, x: -40 }}
             animate={inView ? { opacity: 1, x: 0 } : {}}
             transition={{ duration: 0.7, delay: 0.06 }}
             className="relative rounded-[18px] overflow-hidden
-              sm:row-span-2 col-span-1 cursor-default"
+              hidden sm:block sm:row-span-2 col-span-1 cursor-default
+              lg:absolute lg:right-auto lg:left-[-37%] lg:w-[63%] lg:-top-[clamp(1rem,4svh,3.75rem)] lg:-bottom-[clamp(1rem,4svh,3.75rem)]"
           >
             <Image
               src={ASSETS.metricsBg ?? ASSETS.heroContainers}
