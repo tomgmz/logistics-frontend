@@ -911,11 +911,25 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
   const mapPickerMode: 'pickup' | 'dropoff' =
     mapTarget?.kind === 'pickup' ? 'pickup' : 'dropoff'
 
-  /** SHA-256 of some bytes, or null where the browser cannot (no secure context). */
+  /**
+   * SHA-256 of some bytes. crypto.subtle only exists on https and localhost;
+   * opened over plain http (a phone on the LAN), two 32-bit FNV-1a hashes
+   * with different seeds plus the length stand in, which is plenty to tell
+   * two picked files apart and fast on a 10 MB file.
+   */
   const fingerprint = async (data: ArrayBuffer): Promise<string | null> => {
     try {
-      const digest = await crypto.subtle.digest('SHA-256', data)
-      return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('')
+      if (globalThis.crypto?.subtle) {
+        const digest = await crypto.subtle.digest('SHA-256', data)
+        return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('')
+      }
+      const bytes = new Uint8Array(data)
+      let a = 0x811c9dc5, b = 0x01000193 ^ 0x5bd1e995
+      for (let i = 0; i < bytes.length; i++) {
+        a = Math.imul(a ^ bytes[i], 0x01000193)
+        b = Math.imul(b ^ bytes[i], 0x01000193)
+      }
+      return `fnv:${bytes.length}:${(a >>> 0).toString(16)}${(b >>> 0).toString(16)}`
     } catch {
       return null
     }
