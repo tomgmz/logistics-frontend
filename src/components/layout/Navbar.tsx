@@ -91,7 +91,9 @@ export default function Navbar() {
             />
           </a>
 
-          <ul className="hidden md:flex items-center gap-1 list-none m-0 p-0
+          {/* Centred on the bar, so it only shows from lg: below ~1000px the six
+              links run into the logo, and the hamburger menu takes over. */}
+          <ul className="hidden lg:flex items-center gap-1 list-none m-0 p-0
             absolute left-1/2 -translate-x-1/2">
             {NAV_LINKS.map((item, i) => (
               <motion.li
@@ -128,7 +130,7 @@ export default function Navbar() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4, duration: 0.4 }}
               onClick={() => setSignInOpen(true)}
-              className="hidden md:flex items-center gap-2 text-[0.84rem] tracking-wider
+              className="hidden lg:flex items-center gap-2 text-[0.84rem] tracking-wider
                 px-4 py-2 rounded-xl border border-[#4df9ed]/30 text-[#4df9ed]
                 hover:bg-[#4df9ed]/[0.08] hover:border-[#4df9ed]/60
                 transition-all duration-200 cursor-pointer bg-transparent"
@@ -138,7 +140,7 @@ export default function Navbar() {
 
             {/* Mobile hamburger */}
             <button
-              className="md:hidden flex flex-col gap-[5px] items-end w-10 h-10 justify-center
+              className="lg:hidden flex flex-col gap-[5px] items-end w-10 h-10 justify-center
                 hover:opacity-70 transition-opacity"
               onClick={() => setMenuOpen(true)}
               aria-label="Open menu"
