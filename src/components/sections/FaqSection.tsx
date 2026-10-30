@@ -34,7 +34,7 @@ function FaqItem({
     >
       <button
         onClick={onToggle}
-        className="w-full flex items-center justify-between gap-4 px-5 sm:px-7 py-5 sm:py-6 short:py-4 text-left
+        className="w-full flex items-center justify-between gap-4 px-5 sm:px-7 py-[clamp(0.875rem,2.2svh,1.5rem)] text-left
           cursor-pointer bg-transparent border-0 group"
       >
         <span
@@ -86,9 +86,9 @@ export default function FaqSection() {
   const inView = useInView(ref as React.RefObject<Element>, { once: true, margin: '-80px' });
 
   return (
-    <section id="faq" className="relative w-full bg-[#0a0a0a] pt-[clamp(5.5rem,12svh,7rem)] pb-[clamp(2rem,8svh,6rem)] overflow-hidden">
+    <section id="faq" className="relative w-full bg-[#0a0a0a] pt-[clamp(5.5rem,12svh,7rem)] pb-[clamp(2rem,8svh,6rem)] min-h-svh flex items-center overflow-hidden">
 
-      <div className="relative z-10 max-w-[860px] mx-auto px-5 sm:px-8 md:px-12">
+      <div className="relative z-10 w-full max-w-[860px] mx-auto px-5 sm:px-8 md:px-12">
 
         <motion.div
           ref={ref}
@@ -97,10 +97,10 @@ export default function FaqSection() {
           transition={{ duration: 0.6 }}
           className="text-center mb-4 sm:mb-5"
         >
-          <h2 className="font-display-italic xs:!text-[2rem] text-white leading-[1.0]">
+          <h2 className="font-display-italic text-white leading-[1.0] lg:-mx-40">
             FREQUENTLY ASKED
             <br />
-            <span className="font-eurostile xs:!text-[2rem] text-[#ffea00]">QUESTIONS</span>
+            <span className="font-eurostile text-[#ffea00]">QUESTIONS</span>
           </h2>
         </motion.div>
 

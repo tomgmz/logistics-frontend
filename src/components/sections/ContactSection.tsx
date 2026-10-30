@@ -129,7 +129,7 @@ export default function ContactSection() {
 
   return (
     <>
-      <section id="contact" className="relative w-full bg-[#0a0a0a] pt-[clamp(5.5rem,12svh,7rem)] pb-[clamp(2rem,8svh,6rem)] short:pb-6 overflow-hidden">
+      <section id="contact" className="relative w-full bg-[#0a0a0a] pt-[clamp(5.5rem,12svh,7rem)] pb-[clamp(2rem,8svh,6rem)] short:pb-6 min-h-svh flex items-center overflow-hidden">
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
@@ -139,7 +139,7 @@ export default function ContactSection() {
           }}
         />
 
-        <div ref={ref} className="relative z-10 max-w-[1100px] mx-auto px-5 sm:px-8 md:px-12">
+        <div ref={ref} className="relative z-10 w-full max-w-[1100px] mx-auto px-5 sm:px-8 md:px-12">
 
           <motion.div
             initial={{ opacity: 0, y: 30 }}
@@ -264,8 +264,9 @@ export default function ContactSection() {
                 </div>
                 <div className="flex items-start gap-3">
                   <span className="text-[#4df9ed] text-base mt-0.5">✉️</span>
-                  <span className="font-'Alegreysa Sans SC, sans-serif' text-white/70 text-sm leading-relaxed break-all">
-                    8338LogisticsServices@gmail.com
+                  <span className="font-'Alegreysa Sans SC, sans-serif' text-white/70 text-sm leading-relaxed break-words">
+                    {/* Wraps after the @ on narrow panels, not mid-word. */}
+                    8338LogisticsServices@<wbr />gmail.com
                   </span>
                 </div>
                 <div className="flex items-start gap-3">
