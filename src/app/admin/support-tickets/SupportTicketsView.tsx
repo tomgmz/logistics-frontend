@@ -1,8 +1,9 @@
 'use client'
 
 import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
-import { Fragment, useState } from 'react'
-import { CheckCircle2, ChevronDown, ExternalLink, Mail, Ticket } from 'lucide-react'
+import { useState, type ReactNode } from 'react'
+import { CheckCircle2, ChevronRight, ExternalLink, Mail, Ticket } from 'lucide-react'
+import SidePanel from '@/components/ui/SidePanel'
 
 import { RemarksModal } from '@/components/layout/ReusableModal'
 import { MailAction, gmailComposeUrl, gmailThreadUrl } from '@/components/dashboard/SupportTicketsPanel'
@@ -59,6 +60,112 @@ function StatusBadge({ status }: { status: SupportTicket['status'] }) {
   )
 }
 
+function DetailRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex items-start justify-between gap-4 py-2 border-b border-white/[0.05] last:border-0">
+      <span className="text-[11px] font-bold uppercase tracking-wide text-white/40 shrink-0">{label}</span>
+      <span className="text-sm text-white/80 text-right min-w-0 break-words">{children}</span>
+    </div>
+  )
+}
+
+/** The side panel's body: who raised it, about what, the message, and how it ended. */
+function TicketDetail({ ticket: t }: { ticket: SupportTicket }) {
+  const opener   = personName(t.opener)
+  const resolver = personName(t.resolver)
+  return (
+    <>
+      <div className="flex flex-wrap items-center gap-2 font-[family-name:var(--font-alegreya-sc)]">
+        <StatusBadge status={t.status} />
+      </div>
+
+      <div className="rounded-xl border border-white/[0.08] bg-black/20 px-3">
+        <DetailRow label="Client">{t.clients?.company_name ?? '—'}</DetailRow>
+        <DetailRow label="Raised by">
+          {opener ?? '—'}
+          {t.opener?.email && <span className="block text-[11px] text-white/40 break-all">{t.opener.email}</span>}
+        </DetailRow>
+        <DetailRow label="Category">{TICKET_CATEGORY_LABEL[t.category as TicketCategory] ?? t.category}</DetailRow>
+        <DetailRow label="Booking">{t.bookings?.reference_number ?? '—'}</DetailRow>
+        <DetailRow label="Subject">{t.subject}</DetailRow>
+      </div>
+
+      <div>
+        <p className="text-[11px] font-bold uppercase tracking-wide text-white/40 mb-1.5">Message</p>
+        <p className="text-sm text-white/80 whitespace-pre-wrap rounded-xl border border-white/[0.08] bg-black/20 px-3 py-2.5">{t.message}</p>
+      </div>
+
+      {t.chat_transcript && t.chat_transcript.length > 0 && (
+        <details className="rounded-xl border border-white/[0.08] bg-black/20 px-3 py-2.5 text-sm">
+          <summary className="cursor-pointer text-white/55">Help assistant chat before the ticket ({t.chat_transcript.length} messages)</summary>
+          <ul className="mt-2 flex flex-col gap-1.5 ff-chat">
+            {t.chat_transcript.map((line, i) => (
+              <li key={i} className={line.from === 'client' ? 'text-white/80' : 'text-white/45'}>
+                <span className="font-bold">{line.from === 'client' ? 'Client' : 'Assistant'}:</span> {line.text}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+
+      {t.status === 'resolved' && (
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-wide text-white/40 mb-1.5">
+            Resolved{resolver ? ` by ${resolver}` : ''}{t.resolved_at ? ` · ${formatDateTime(t.resolved_at)}` : ''}
+          </p>
+          <p className="text-sm text-white/70 whitespace-pre-wrap rounded-xl border border-white/[0.08] bg-black/20 px-3 py-2.5">
+            {t.resolution_note || 'No note was added.'}
+          </p>
+        </div>
+      )}
+    </>
+  )
+}
+
+/** The side panel's footer: answer by email, then mark it resolved. */
+function TicketActions({ ticket: t, inbox, canEdit, onResolve }: {
+  ticket:    SupportTicket
+  inbox:     string
+  canEdit:   boolean
+  onResolve: () => void
+}) {
+  const compose = t.opener?.email && inbox
+    ? gmailComposeUrl(inbox, t.opener.email, `[${t.reference}] ${t.subject}`)
+    : null
+  const open = t.status === 'open'
+  if (!inbox && !open) return null
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-2 px-4 py-3 border-t border-white/[0.07] shrink-0">
+      {/* Replying is a write; reading a resolved thread is not. */}
+      {inbox && (
+        <MailAction
+          href={gmailThreadUrl(inbox, t.reference)}
+          title={`Opens the ${t.reference} thread in ${inbox}. Use Reply all so your answer reaches the client in the same thread.`}
+          allowed={canEdit || !open}
+        >
+          <ExternalLink size={12} /> {open ? 'Reply all in Gmail' : 'Open thread in Gmail'}
+        </MailAction>
+      )}
+      {compose && open && (
+        <MailAction href={compose} title={`New email to ${t.opener?.email}`} allowed={canEdit}>
+          <Mail size={12} /> New email
+        </MailAction>
+      )}
+      {open && (
+        <button
+          type="button"
+          onClick={onResolve}
+          {...writeAccess(canEdit)}
+          className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-bold text-[#0a0a0a] disabled:cursor-not-allowed disabled:opacity-40"
+          style={{ background: 'var(--color-cyan)' }}
+        >
+          <CheckCircle2 size={12} /> Mark resolved
+        </button>
+      )}
+    </div>
+  )
+}
+
 export default function SupportTicketsView() {
   // Tickets tier: Read Only sees the reply and resolve actions, disabled.
   const { canEdit } = useModuleAccess()
@@ -67,7 +174,10 @@ export default function SupportTicketsView() {
   const [search,       setSearch]       = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('open')
   const debouncedSearch = useDebouncedValue(search.trim())
-  const [expanded,     setExpanded]     = useState<string | null>(null)
+  // The open ticket. The panel shows the live row from the page whenever it is
+  // on it (a resolve elsewhere shows at once), else the copy from the click.
+  const [selectedId,   setSelectedId]   = useState<string | null>(null)
+  const [snapshot,     setSnapshot]     = useState<SupportTicket | null>(null)
   const [resolving,    setResolving]    = useState<SupportTicket | null>(null)
   const [busy,         setBusy]         = useState(false)
 
@@ -91,6 +201,9 @@ export default function SupportTicketsView() {
   useLiveTable(['live:support_tickets'], () => { void load(true) })
 
   const counts = table.meta?.counts ?? { all: 0, open: 0, resolved: 0 }
+  const selected = selectedId
+    ? tickets.find((t) => t.ticket_id === selectedId) ?? (snapshot?.ticket_id === selectedId ? snapshot : null)
+    : null
 
   async function resolve(note: string) {
     if (!resolving) return
@@ -116,13 +229,9 @@ export default function SupportTicketsView() {
 
   return (
     <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-60px)] overflow-y-auto overflow-x-hidden lg:overflow-hidden bg-[#0a0a0a] text-white">
-      <div className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0 px-3 py-3 lg:px-4 gap-6 lg:overflow-hidden">
-        <div className="shrink-0">
-          <p className="text-xs text-[#818181]">
-            Client support tickets · {counts.open} open · {counts.resolved} resolved
-          </p>
-        </div>
-
+      {/* The table, and the open ticket's panel beside it (over the page below lg). */}
+      <div className="flex flex-[1_0_auto] lg:flex-1 lg:min-h-0 lg:overflow-hidden">
+      <div className="flex flex-col flex-1 min-w-0 lg:min-h-0 px-3 py-3 lg:px-4 gap-6 lg:overflow-hidden">
         {/* Untitled UI's table card, as on Reports and Audit Logs: the header
             (title + count), then the filter row with the status tabs on the
             left (a dropdown on phones), search and Refresh. */}
@@ -187,21 +296,16 @@ export default function SupportTicketsView() {
                 {/* Headers keep the small caps face; the data rows are regular Alegreya Sans. */}
                 <tbody className="ff-regular">
                   {tickets.map((t) => {
-                    const isOpen   = expanded === t.ticket_id
-                    const opener   = personName(t.opener)
-                    const resolver = personName(t.resolver)
-                    const compose  = t.opener?.email && inbox
-                      ? gmailComposeUrl(inbox, t.opener.email, `[${t.reference}] ${t.subject}`)
-                      : null
-                    const toggle = () => setExpanded(isOpen ? null : t.ticket_id)
+                    const isOpen = selectedId === t.ticket_id
+                    const opener = personName(t.opener)
+                    const open   = () => { setSnapshot(t); setSelectedId(t.ticket_id) }
                     return (
-                      <Fragment key={t.ticket_id}>
                         <tr
+                          key={t.ticket_id}
                           role="button"
                           tabIndex={0}
-                          aria-expanded={isOpen}
-                          onClick={toggle}
-                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle() } }}
+                          onClick={open}
+                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open() } }}
                           className={`border-b border-[#424242] cursor-pointer transition-colors ${
                             isOpen ? 'bg-[rgba(77,249,237,0.06)]' : '[@media(hover:hover)]:hover:bg-[#222222]'
                           }`}
@@ -220,86 +324,9 @@ export default function SupportTicketsView() {
                           </td>
                           <td className={`${TD} font-[family-name:var(--font-alegreya-sc)]`}><StatusBadge status={t.status} /></td>
                           <td className={TD}>
-                            <ChevronDown size={18} className={`text-[#818181] transition-transform ${isOpen ? 'rotate-180' : ''}`} aria-hidden />
+                            <ChevronRight size={18} className="text-[#818181]" aria-hidden />
                           </td>
                         </tr>
-
-                        {isOpen && (
-                          <tr className="border-b border-[#424242] bg-[#141414]">
-                            <td colSpan={8} className="px-4 md:px-6 py-4">
-                              {/* Pinned to the left edge so it stays in view while a phone slides the table. */}
-                              <div className="sticky left-0 flex flex-col gap-3 text-xs max-w-[calc(100vw-3.5rem)] lg:max-w-4xl">
-                                <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-white/60">
-                                  <div><dt className="inline text-white/35">Client: </dt><dd className="inline">{t.clients?.company_name ?? '—'}</dd></div>
-                                  <div><dt className="inline text-white/35">Raised by: </dt><dd className="inline">{[opener, t.opener?.email].filter(Boolean).join(' · ') || '—'}</dd></div>
-                                  <div><dt className="inline text-white/35">Category: </dt><dd className="inline">{TICKET_CATEGORY_LABEL[t.category] ?? t.category}</dd></div>
-                                  <div><dt className="inline text-white/35">Booking: </dt><dd className="inline">{t.bookings?.reference_number ?? '—'}</dd></div>
-                                  <div className="sm:col-span-2"><dt className="inline text-white/35">Subject: </dt><dd className="inline">{t.subject}</dd></div>
-                                  <div><dt className="inline text-white/35">Raised: </dt><dd className="inline">{formatDateTime(t.created_at)}</dd></div>
-                                </dl>
-
-                                <div>
-                                  <p className="text-[10px] uppercase tracking-wider text-white/35 mb-1">Message</p>
-                                  <p className="whitespace-pre-wrap rounded-lg border border-white/[0.07] bg-white/[0.02] px-3 py-2 text-white/80">{t.message}</p>
-                                </div>
-
-                                {t.chat_transcript && t.chat_transcript.length > 0 && (
-                                  <details className="rounded-lg border border-white/[0.07] bg-white/[0.02] px-3 py-2">
-                                    <summary className="cursor-pointer text-white/55">Help assistant chat before the ticket ({t.chat_transcript.length} messages)</summary>
-                                    <ul className="mt-2 flex flex-col gap-1.5 ff-chat">
-                                      {t.chat_transcript.map((line, i) => (
-                                        <li key={i} className={line.from === 'client' ? 'text-white/80' : 'text-white/45'}>
-                                          <span className="font-bold">{line.from === 'client' ? 'Client' : 'Assistant'}:</span> {line.text}
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  </details>
-                                )}
-
-                                {t.status === 'resolved' && (
-                                  <div>
-                                    <p className="text-[10px] uppercase tracking-wider text-white/35 mb-1">
-                                      Resolved{resolver ? ` by ${resolver}` : ''}{t.resolved_at ? ` · ${formatDateTime(t.resolved_at)}` : ''}
-                                    </p>
-                                    <p className="whitespace-pre-wrap rounded-lg border border-white/[0.07] bg-white/[0.02] px-3 py-2 text-white/70">
-                                      {t.resolution_note || 'No note was added.'}
-                                    </p>
-                                  </div>
-                                )}
-
-                                <div className="flex flex-wrap items-center gap-2">
-                                  {/* Replying is a write; reading a resolved thread is not. */}
-                                  {inbox && (
-                                    <MailAction
-                                      href={gmailThreadUrl(inbox, t.reference)}
-                                      title={`Opens the ${t.reference} thread in ${inbox}. Use Reply all so your answer reaches the client in the same thread.`}
-                                      allowed={canEdit || t.status !== 'open'}
-                                    >
-                                      <ExternalLink size={12} /> {t.status === 'open' ? 'Reply all in Gmail' : 'Open thread in Gmail'}
-                                    </MailAction>
-                                  )}
-                                  {compose && t.status === 'open' && (
-                                    <MailAction href={compose} title={`New email to ${t.opener?.email}`} allowed={canEdit}>
-                                      <Mail size={12} /> New email
-                                    </MailAction>
-                                  )}
-                                  {t.status === 'open' && (
-                                    <button
-                                      type="button"
-                                      onClick={() => setResolving(t)}
-                                      {...writeAccess(canEdit)}
-                                      className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-bold text-[#0a0a0a] disabled:cursor-not-allowed disabled:opacity-40"
-                                      style={{ background: 'var(--color-cyan)' }}
-                                    >
-                                      <CheckCircle2 size={12} /> Mark resolved
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            </td>
-                          </tr>
-                        )}
-                      </Fragment>
                     )
                   })}
                 </tbody>
@@ -311,6 +338,17 @@ export default function SupportTicketsView() {
         </TableCard.Root>
       </div>
 
+      <SidePanel
+        open={!!selected}
+        onClose={() => setSelectedId(null)}
+        label="Ticket details"
+        title={selected?.reference ?? ''}
+        subtitle={selected ? `Raised ${formatDateTime(selected.created_at)}` : undefined}
+        footer={selected && <TicketActions ticket={selected} inbox={inbox} canEdit={canEdit} onResolve={() => setResolving(selected)} />}
+      >
+        {selected && <TicketDetail ticket={selected} />}
+      </SidePanel>
+      </div>
 
       <RemarksModal
         open={!!resolving}

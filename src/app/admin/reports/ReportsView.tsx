@@ -23,7 +23,7 @@ import {
   type IncidentType,
   type ReportStatus,
 } from '@/app/types/driver-report.types'
-import DriverReportDetailModal, { ReportStatusBadge, UrgentBadge } from '@/components/reports/DriverReportDetailModal'
+import { DriverReportDetailPanel, ReportStatusBadge, UrgentBadge } from '@/components/reports/DriverReportDetailModal'
 import ClassifyReportModal from '@/components/reports/ClassifyReportModal'
 import ReusableModal, { RemarksModal } from '@/components/layout/ReusableModal'
 import { useModuleAccess, writeAccess } from '@/components/layout/ModuleAccess'
@@ -269,17 +269,9 @@ export default function ReportsView() {
         <ReportDeepLink onFocus={focusReport} />
       </Suspense>
 
-      <div className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0 px-3 py-3 lg:px-4 gap-6 lg:overflow-hidden">
-        <div className="shrink-0">
-          <p className="text-xs text-[#818181]">
-            {isFleet && 'Vehicle-related reports · '}
-            {counts.reported} new · {counts.acknowledged} acknowledged
-            {!isFleet && counts.unclassified > 0 && (
-              <span className="text-[#ffea00]"> · {counts.unclassified} to classify</span>
-            )}
-          </p>
-        </div>
-
+      {/* The table, and the open report's panel beside it (over the page below lg). */}
+      <div className="flex flex-[1_0_auto] lg:flex-1 lg:min-h-0 lg:overflow-hidden">
+      <div className="flex flex-col flex-1 min-w-0 lg:min-h-0 px-3 py-3 lg:px-4 gap-6 lg:overflow-hidden">
         {/* Untitled UI's table card, as on Audit Logs and User Management: the
             header (title + count), then the filter row with the status tabs on
             the left (a dropdown on phones), search, Filters and Refresh. */}
@@ -351,7 +343,9 @@ export default function ReportsView() {
                   {reports.map((r) => (
                     <tr
                       key={r.report_id}
-                      className="border-b border-[#424242] last:border-b-0 transition-colors cursor-pointer [@media(hover:hover)]:hover:bg-[#222222]"
+                      className={`border-b border-[#424242] last:border-b-0 transition-colors cursor-pointer ${
+                        viewId === r.report_id ? 'bg-[#4df9ed]/[0.06]' : '[@media(hover:hover)]:hover:bg-[#222222]'
+                      }`}
                       onClick={() => setViewId(r.report_id)}
                     >
                       <td className="px-4 md:px-6 py-4 whitespace-nowrap">
@@ -394,12 +388,13 @@ export default function ReportsView() {
         </TableCard.Root>
       </div>
 
-      <DriverReportDetailModal
+      <DriverReportDetailPanel
         report={viewReport}
         onClose={() => setViewId(null)}
         banner={<RecordLockBanner lock={reportLock} noun="report" />}
         actions={detailActions}
       />
+      </div>
 
       <ReusableModal
         open={!!confirmAck}

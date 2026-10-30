@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, MapPin, Video, AlertTriangle } from 'lucide-react'
 
+import SidePanel from '@/components/ui/SidePanel'
 import { BLOWBAGETS_ITEMS } from '@/lib/blowbagets'
 import { MapPointLink } from '@/components/map/LocationMapModal'
 import {
@@ -67,25 +68,195 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
-/**
- * Read-only view of one driver report. The caller supplies whatever actions it
- * allows (acknowledge / resolve on the Reports desk, nothing on Maintenance)
- * through `actions`, and a lock banner through `banner`.
- */
-export default function DriverReportDetailModal({
-  report,
-  onClose,
-  banner,
-  actions,
-  replaceClose,
-}: {
+interface DetailProps {
   report:   DriverReport | null
   onClose:  () => void
   banner?:  ReactNode
   actions?: ReactNode
   /** Takes the footer Close button's place (the header X still closes). */
   replaceClose?: ReactNode
-}) {
+}
+
+/** The title row: what happened and when, and the X. */
+function DetailHeader({ report, onClose }: { report: DriverReport; onClose: () => void }) {
+  return (
+    <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.07] shrink-0">
+      <div className="min-w-0">
+        <h2 className="text-sm font-bold text-white uppercase tracking-widest truncate">
+          {incidentLabel(report.incident_type)}
+        </h2>
+        <p className="text-[11px] text-white/40 mt-0.5">Received {fmtWhen(report.created_at)}</p>
+      </div>
+      <button type="button" onClick={onClose} className="p-2 rounded-lg hover:bg-white/5 text-white/50" aria-label="Close">
+        <X size={18} />
+      </button>
+    </div>
+  )
+}
+
+/** Everything the driver sent, and who handled it. The caller supplies the scrolling frame. */
+function DetailContent({ report, banner }: { report: DriverReport; banner?: ReactNode }) {
+  return (
+    <>
+      {banner}
+
+      <div className="flex flex-wrap items-center gap-2">
+        <ReportStatusBadge status={report.status} />
+        {isUrgentReport(report) && <UrgentBadge />}
+        <span className="text-[10px] font-bold uppercase tracking-wide text-white/35">
+          {report.source === 'quick' ? 'Emergency alert' : 'Detailed report'}
+        </span>
+      </div>
+
+      <div className="rounded-xl border border-white/[0.08] bg-black/20 px-3">
+        <Row label="Driver">
+          {reportDriverName(report)}
+          {report.drivers?.users?.phone && (
+            <a href={`tel:${report.drivers.users.phone}`} className="block text-[11px] text-[var(--color-cyan)] font-mono">
+              {report.drivers.users.phone}
+            </a>
+          )}
+        </Row>
+        <Row label="Vehicle">
+          {report.trucks
+            ? <><span className="font-mono">{report.trucks.plate_number}</span>{report.trucks.truck_models?.name ? <span className="block text-[11px] text-white/40">{report.trucks.truck_models.name}</span> : null}</>
+            : <span className="text-white/35">Not on a vehicle</span>}
+        </Row>
+        <Row label="Booking">
+          {report.bookings?.reference_number ?? (report.booking_id ? report.bookings?.origin ?? 'Linked booking' : <span className="text-white/35">None</span>)}
+        </Row>
+        {report.sub_type && <Row label="Type">{report.sub_type}</Row>}
+        <Row label="Trip can continue">
+          {report.trip_can_continue == null
+            ? <span className="text-white/35">Not stated</span>
+            : report.trip_can_continue
+              ? 'Yes'
+              : <span className="text-red-300 font-semibold">No — the trip is stopped</span>}
+        </Row>
+        <Row label="Location">
+          {report.latitude != null && report.longitude != null ? (
+            <MapPointLink
+              point={{ latitude: report.latitude, longitude: report.longitude, label: report.address }}
+              className="inline-flex items-center gap-1 text-left text-[var(--color-cyan)] hover:underline"
+            >
+              <MapPin size={12} className="shrink-0" />
+              {report.address || `${report.latitude.toFixed(5)}, ${report.longitude.toFixed(5)}`}
+            </MapPointLink>
+          ) : (report.address || <span className="text-white/35">Not captured</span>)}
+        </Row>
+      </div>
+
+      <div>
+        <p className="text-[11px] font-bold uppercase tracking-wide text-white/40 mb-1.5">What happened</p>
+        <p className="text-sm text-white/80 whitespace-pre-wrap rounded-xl border border-white/[0.08] bg-black/20 px-3 py-2.5">
+          {report.description?.trim() || <span className="text-white/35">The driver did not describe it.</span>}
+        </p>
+      </div>
+
+      {/* The driver's roadside re-check. A tick means "I looked at this",
+          not "it passed" — so unticked items are "not checked", never failed. */}
+      {report.blowbagets_check && (
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-wide text-white/40 mb-1.5">
+            Driver&apos;s BLOWBAGETS check
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {BLOWBAGETS_ITEMS.filter((it) => report.blowbagets_check!.items[it.key]).map((it) => (
+              <span
+                key={it.key}
+                className="text-[10px] font-bold px-2 py-0.5 rounded-md border"
+                style={{ color: 'var(--color-cyan)', borderColor: 'rgba(77,249,237,0.35)', background: 'rgba(77,249,237,0.10)' }}
+              >
+                {it.label}
+              </span>
+            ))}
+          </div>
+          {(() => {
+            const notChecked = BLOWBAGETS_ITEMS.filter((it) => !report.blowbagets_check!.items[it.key])
+            return notChecked.length > 0 ? (
+              <p className="text-[11px] text-white/40 mt-1.5">
+                Not checked: {notChecked.map((it) => it.label).join(', ')}
+              </p>
+            ) : null
+          })()}
+        </div>
+      )}
+
+      {(report.photo_urls?.length > 0 || report.video_urls?.length > 0) && (
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-wide text-white/40 mb-1.5">Attachments</p>
+          <div className="grid grid-cols-3 gap-2">
+            {report.photo_urls.map((url) => (
+              <a key={url} href={url} target="_blank" rel="noopener noreferrer">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={url} alt="Report photo" className="w-full aspect-square object-cover rounded-lg border border-white/10 bg-black/30" loading="lazy" />
+              </a>
+            ))}
+            {report.video_urls.map((url, i) => (
+              <a
+                key={url}
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex flex-col items-center justify-center gap-1 aspect-square rounded-lg border border-white/10 bg-white/[0.04] text-white/60 hover:text-white"
+              >
+                <Video size={20} />
+                <span className="text-[10px]">Video {i + 1}</span>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {(report.acknowledged_at || report.resolved_at) && (
+        <div className="rounded-xl border border-white/[0.08] bg-black/20 px-3">
+          {report.acknowledged_at && (
+            <Row label="Acknowledged">
+              {fmtWhen(report.acknowledged_at)}
+              {personName(report.acknowledger) && <span className="block text-[11px] text-white/40">by {personName(report.acknowledger)}</span>}
+            </Row>
+          )}
+          {report.resolved_at && (
+            <Row label="Resolved">
+              {fmtWhen(report.resolved_at)}
+              {personName(report.resolver) && <span className="block text-[11px] text-white/40">by {personName(report.resolver)}</span>}
+            </Row>
+          )}
+          {report.resolution_note && <Row label="Resolution">{report.resolution_note}</Row>}
+        </div>
+      )}
+    </>
+  )
+}
+
+/**
+ * Close (or its replacement) and the caller's actions. Phones: a two-column
+ * grid of full-width buttons (an odd last one spans both), so up to four
+ * actions fit. From sm up they sit in one right-aligned row.
+ */
+function DetailFooter({ onClose, actions, replaceClose }: Pick<DetailProps, 'onClose' | 'actions' | 'replaceClose'>) {
+  return (
+    <div className="grid grid-cols-2 gap-2 px-4 py-3 border-t border-white/[0.07] shrink-0 [&>*]:w-full [&>*]:min-w-0 [&>*]:px-2 [&>*:last-child:nth-child(odd)]:col-span-2 sm:flex sm:justify-end sm:[&>*]:w-auto sm:[&>*]:px-4">
+      {replaceClose ?? (
+        <button
+          type="button"
+          onClick={onClose}
+          className="px-4 py-2 rounded-lg border border-white/15 text-sm text-white/80 hover:bg-white/5"
+        >
+          Close
+        </button>
+      )}
+      {actions}
+    </div>
+  )
+}
+
+/**
+ * Read-only view of one driver report, as a centred pop-up. The caller supplies
+ * whatever actions it allows (nothing on Maintenance) through `actions`, and a
+ * lock banner through `banner`.
+ */
+export default function DriverReportDetailModal({ report, onClose, banner, actions, replaceClose }: DetailProps) {
   return (
     <AnimatePresence>
       {report && (
@@ -107,167 +278,30 @@ export default function DriverReportDetailModal({
             className="w-full max-w-xl max-h-[90dvh] flex flex-col rounded-2xl border border-white/10 bg-[var(--color-surface)] shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.07] shrink-0">
-              <div className="min-w-0">
-                <h2 className="text-sm font-bold text-white uppercase tracking-widest truncate">
-                  {incidentLabel(report.incident_type)}
-                </h2>
-                <p className="text-[11px] text-white/40 mt-0.5">Received {fmtWhen(report.created_at)}</p>
-              </div>
-              <button type="button" onClick={onClose} className="p-2 rounded-lg hover:bg-white/5 text-white/50" aria-label="Close">
-                <X size={18} />
-              </button>
+            <DetailHeader report={report} onClose={onClose} />
+            <div className="flex-1 p-4 space-y-4 overflow-y-auto overscroll-contain min-h-0">
+              <DetailContent report={report} banner={banner} />
             </div>
-
-            <div className="p-4 space-y-4 overflow-y-auto min-h-0">
-              {banner}
-
-              <div className="flex flex-wrap items-center gap-2">
-                <ReportStatusBadge status={report.status} />
-                {isUrgentReport(report) && <UrgentBadge />}
-                <span className="text-[10px] font-bold uppercase tracking-wide text-white/35">
-                  {report.source === 'quick' ? 'Emergency alert' : 'Detailed report'}
-                </span>
-              </div>
-
-              <div className="rounded-xl border border-white/[0.08] bg-black/20 px-3">
-                <Row label="Driver">
-                  {reportDriverName(report)}
-                  {report.drivers?.users?.phone && (
-                    <a href={`tel:${report.drivers.users.phone}`} className="block text-[11px] text-[var(--color-cyan)] font-mono">
-                      {report.drivers.users.phone}
-                    </a>
-                  )}
-                </Row>
-                <Row label="Vehicle">
-                  {report.trucks
-                    ? <><span className="font-mono">{report.trucks.plate_number}</span>{report.trucks.truck_models?.name ? <span className="block text-[11px] text-white/40">{report.trucks.truck_models.name}</span> : null}</>
-                    : <span className="text-white/35">Not on a vehicle</span>}
-                </Row>
-                <Row label="Booking">
-                  {report.bookings?.reference_number ?? (report.booking_id ? report.bookings?.origin ?? 'Linked booking' : <span className="text-white/35">None</span>)}
-                </Row>
-                {report.sub_type && <Row label="Type">{report.sub_type}</Row>}
-                <Row label="Trip can continue">
-                  {report.trip_can_continue == null
-                    ? <span className="text-white/35">Not stated</span>
-                    : report.trip_can_continue
-                      ? 'Yes'
-                      : <span className="text-red-300 font-semibold">No — the trip is stopped</span>}
-                </Row>
-                <Row label="Location">
-                  {report.latitude != null && report.longitude != null ? (
-                    <MapPointLink
-                      point={{ latitude: report.latitude, longitude: report.longitude, label: report.address }}
-                      className="inline-flex items-center gap-1 text-left text-[var(--color-cyan)] hover:underline"
-                    >
-                      <MapPin size={12} className="shrink-0" />
-                      {report.address || `${report.latitude.toFixed(5)}, ${report.longitude.toFixed(5)}`}
-                    </MapPointLink>
-                  ) : (report.address || <span className="text-white/35">Not captured</span>)}
-                </Row>
-              </div>
-
-              <div>
-                <p className="text-[11px] font-bold uppercase tracking-wide text-white/40 mb-1.5">What happened</p>
-                <p className="text-sm text-white/80 whitespace-pre-wrap rounded-xl border border-white/[0.08] bg-black/20 px-3 py-2.5">
-                  {report.description?.trim() || <span className="text-white/35">The driver did not describe it.</span>}
-                </p>
-              </div>
-
-              {/* The driver's roadside re-check. A tick means "I looked at this",
-                  not "it passed" — so unticked items are "not checked", never failed. */}
-              {report.blowbagets_check && (
-                <div>
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-white/40 mb-1.5">
-                    Driver&apos;s BLOWBAGETS check
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {BLOWBAGETS_ITEMS.filter((it) => report.blowbagets_check!.items[it.key]).map((it) => (
-                      <span
-                        key={it.key}
-                        className="text-[10px] font-bold px-2 py-0.5 rounded-md border"
-                        style={{ color: 'var(--color-cyan)', borderColor: 'rgba(77,249,237,0.35)', background: 'rgba(77,249,237,0.10)' }}
-                      >
-                        {it.label}
-                      </span>
-                    ))}
-                  </div>
-                  {(() => {
-                    const notChecked = BLOWBAGETS_ITEMS.filter((it) => !report.blowbagets_check!.items[it.key])
-                    return notChecked.length > 0 ? (
-                      <p className="text-[11px] text-white/40 mt-1.5">
-                        Not checked: {notChecked.map((it) => it.label).join(', ')}
-                      </p>
-                    ) : null
-                  })()}
-                </div>
-              )}
-
-              {(report.photo_urls?.length > 0 || report.video_urls?.length > 0) && (
-                <div>
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-white/40 mb-1.5">Attachments</p>
-                  <div className="grid grid-cols-3 gap-2">
-                    {report.photo_urls.map((url) => (
-                      <a key={url} href={url} target="_blank" rel="noopener noreferrer">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={url} alt="Report photo" className="w-full aspect-square object-cover rounded-lg border border-white/10 bg-black/30" loading="lazy" />
-                      </a>
-                    ))}
-                    {report.video_urls.map((url, i) => (
-                      <a
-                        key={url}
-                        href={url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex flex-col items-center justify-center gap-1 aspect-square rounded-lg border border-white/10 bg-white/[0.04] text-white/60 hover:text-white"
-                      >
-                        <Video size={20} />
-                        <span className="text-[10px]">Video {i + 1}</span>
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {(report.acknowledged_at || report.resolved_at) && (
-                <div className="rounded-xl border border-white/[0.08] bg-black/20 px-3">
-                  {report.acknowledged_at && (
-                    <Row label="Acknowledged">
-                      {fmtWhen(report.acknowledged_at)}
-                      {personName(report.acknowledger) && <span className="block text-[11px] text-white/40">by {personName(report.acknowledger)}</span>}
-                    </Row>
-                  )}
-                  {report.resolved_at && (
-                    <Row label="Resolved">
-                      {fmtWhen(report.resolved_at)}
-                      {personName(report.resolver) && <span className="block text-[11px] text-white/40">by {personName(report.resolver)}</span>}
-                    </Row>
-                  )}
-                  {report.resolution_note && <Row label="Resolution">{report.resolution_note}</Row>}
-                </div>
-              )}
-            </div>
-
-            {/* Phones: a two-column grid of full-width buttons (an odd last one
-                spans both), so up to four actions fit inside the modal. From sm
-                up they sit in one right-aligned row. */}
-            <div className="grid grid-cols-2 gap-2 px-4 py-3 border-t border-white/[0.07] shrink-0 [&>*]:w-full [&>*]:min-w-0 [&>*]:px-2 [&>*:last-child:nth-child(odd)]:col-span-2 sm:flex sm:justify-end sm:[&>*]:w-auto sm:[&>*]:px-4">
-
-              {replaceClose ?? (
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="px-4 py-2 rounded-lg border border-white/15 text-sm text-white/80 hover:bg-white/5"
-                >
-                  Close
-                </button>
-              )}
-              {actions}
-            </div>
+            <DetailFooter onClose={onClose} actions={actions} replaceClose={replaceClose} />
           </motion.div>
         </motion.div>
       )}
     </AnimatePresence>
+  )
+}
+
+/** The same view as the Reports desk's right-hand side panel (components/ui/SidePanel). */
+export function DriverReportDetailPanel({ report, onClose, banner, actions, replaceClose }: DetailProps) {
+  return (
+    <SidePanel
+      open={!!report}
+      onClose={onClose}
+      label="Driver report details"
+      title={report ? incidentLabel(report.incident_type) : ''}
+      subtitle={report ? `Received ${fmtWhen(report.created_at)}` : undefined}
+      footer={<DetailFooter onClose={onClose} actions={actions} replaceClose={replaceClose} />}
+    >
+      {report && <DetailContent report={report} banner={banner} />}
+    </SidePanel>
   )
 }
