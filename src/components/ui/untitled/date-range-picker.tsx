@@ -266,13 +266,11 @@ function PresetButton({ value, onPick, children }: { value: RangeValue; onPick: 
 
 /* ── The picker (date-range-picker.tsx) ───────────────────────────────────── */
 
-export function DateRangePicker({ value, onChange, label, className, untitled = false }: {
+export function DateRangePicker({ value, onChange, label = 'Select Date', className }: {
   value: DateRange | null
   onChange: (range: DateRange | null) => void
   label?: string
   className?: string
-  /** The earlier Untitled UI trigger ("Select dates"), for the screens kept as they were. */
-  untitled?: boolean
 }) {
   const { locale } = useLocale()
   const fmt = useDateFormatter({ month: 'short', day: 'numeric', year: 'numeric' })
@@ -317,25 +315,14 @@ export function DateRangePicker({ value, onChange, label, className, untitled = 
       className={className}
     >
       <AriaGroup className="max-md:w-full">
-        {untitled ? (
-        <AriaButton className={cn(
-          'relative inline-flex max-md:w-full max-md:justify-start cursor-pointer items-center justify-center gap-1 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold outline-[#4df9ed] transition focus-visible:outline-2 focus-visible:outline-offset-2',
-          'shadow-[0_1px_2px_rgba(0,0,0,0.4),inset_0_0_0_1px_rgba(0,0,0,0.18),inset_0_-2px_0_rgba(0,0,0,0.25)] ring-1 ring-inset',
-          value ? 'bg-[#4df9ed]/[0.12] text-[#4df9ed] ring-[#4df9ed]' : 'bg-[#1b1b1b] text-[#e5e5e5] ring-[#424242] [@media(hover:hover)]:hover:bg-[#262626]',
-        )}>
-          <CalendarIcon className={cn('size-5 shrink-0', value ? 'text-[#4df9ed]' : 'text-[#818181]')} />
-          <span className="px-0.5">{text ?? <span className="text-[#818181]">{label ?? 'Select dates'}</span>}</span>
-        </AriaButton>
-        ) : (
-        // The table format's grey "Select Date" block (Figma 3234:594).
+        {/* The table format's grey "Select Date" block (Figma 3234:594). */}
         <AriaButton className={cn(
           'ff-sc relative inline-flex h-[38px] 3xl:h-[44px] max-md:w-full max-md:justify-start cursor-pointer items-center justify-center gap-1.5 3xl:gap-2 whitespace-nowrap rounded-[10px] border px-3 3xl:px-3.5 text-[15px] 3xl:text-[18px] outline-[#4df9ed] transition focus-visible:outline-2 focus-visible:outline-offset-2',
           value ? 'border-[#4df9ed] bg-[#4df9ed]/[0.12] text-[#4df9ed]' : 'border-[#343434] bg-[#2a2828] text-white [@media(hover:hover)]:hover:bg-[#343232]',
         )}>
           <CalendarIcon className={cn('size-5 3xl:size-[22px] shrink-0', value ? 'text-[#4df9ed]' : 'text-white')} />
-          <span className="px-0.5">{text ?? label ?? 'Select Date'}</span>
+          <span className="px-0.5">{text ?? label}</span>
         </AriaButton>
-        )}
       </AriaGroup>
       <AriaPopover
         placement="bottom right"

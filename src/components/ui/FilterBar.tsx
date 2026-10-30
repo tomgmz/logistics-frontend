@@ -1,11 +1,10 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
-import { FilterLines, SearchLg } from '@untitledui/icons'
+import { FilterLines } from '@untitledui/icons'
 import { Search, ListFilter, Plus, X, ChevronDown, Check } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Button } from '@/components/ui/untitled/button'
-import { InputShortcut } from '@/components/ui/untitled/input'
 import { DateRangePicker, type DateRange } from '@/components/ui/untitled/date-range-picker'
 
 /**
@@ -128,13 +127,11 @@ export default function FilterBar({
   /** 'advanced': the one Filters button and rule panel. 'dropdowns': a dropdown per field. */
   variant?:  'advanced' | 'dropdowns'
   /**
-   * 'inline': everything in one row from the left. 'split': Untitled UI's table
-   * filter row (the "No vendors found" table), built from the ported Untitled UI
-   * parts in components/ui/untitled: `leading` (tabs) on the left; the shortcut
-   * search, Filters and `actions` on the right. Phones stack the two and Filters
-   * drops to its icon.
+   * 'inline': everything in one row from the left. 'split': the table format's
+   * filter row (see the top of this file): search, `leading`, dates, Filters,
+   * `actions`, and `trailing` at the far right. Phones wrap it onto lines.
    */
-  layout?:   'inline' | 'split' | 'untitled'
+  layout?:   'inline' | 'split'
   /**
    * Split layout: Untitled UI's "Select dates" range picker before Filters, as
    * in their "No users found" table. The page decides which date it filters.
@@ -144,27 +141,6 @@ export default function FilterBar({
 }) {
   // A field with nothing to pick (no companies loaded yet) is left out.
   const shown = fields.filter((f) => f.options.length > 0)
-
-  // The earlier Untitled UI row (tabs left; search, dates, Filters right), kept
-  // for the screens the user asked to leave as they are: Document Management
-  // and the client's Transaction History.
-  if (layout === 'untitled') {
-    return (
-      <div className={`flex shrink-0 flex-wrap gap-3 border-b border-[#424242] px-4 py-3 max-md:flex-col md:px-6 ${className}`}>
-        <div className="flex min-w-0 flex-1 flex-wrap gap-3">{leading}</div>
-        <div className="flex shrink-0 items-center gap-3 max-md:w-full max-md:flex-wrap">
-          {search && <InputShortcut {...search} icon={SearchLg} className="min-w-0 max-md:flex-1 md:w-70" />}
-          {/* Phones: the dates get their own full-width line under search. */}
-          {dateRange && <DateRangePicker {...dateRange} untitled className="shrink-0 max-md:order-last max-md:w-full" />}
-          {shown.length > 0 && onChange && (
-            <FiltersButton fields={shown} values={values} onApply={onChange} compact untitled />
-          )}
-          {actions}
-        </div>
-        {summary}
-      </div>
-    )
-  }
 
   if (layout === 'split') {
     return (
@@ -400,14 +376,12 @@ const OPS: FilterOption[] = [
 ]
 
 /** The Filters button and its rule panel. Edits a draft; Apply filter hands it over. */
-function FiltersButton({ fields, values, onApply, compact = false, untitled = false }: {
+function FiltersButton({ fields, values, onApply, compact = false }: {
   fields:  FilterField[]
   values:  FilterValues
   onApply: (values: FilterValues) => void
   /** Phones show only the icon (the split layout). */
   compact?: boolean
-  /** The earlier Untitled UI secondary button (icon only on phones). */
-  untitled?: boolean
 }) {
   const [open,  setOpen]  = useState(false)
   const [draft, setDraft] = useState<DraftRule[]>([])
@@ -446,21 +420,7 @@ function FiltersButton({ fields, values, onApply, compact = false, untitled = fa
   return (
     <Popover open={open} onOpenChange={openChange}>
       <PopoverTrigger asChild>
-        {compact && untitled ? (
-          <Button
-            color="secondary"
-            iconLeading={FilterLines}
-            aria-label={applied ? `Filters, ${applied} applied` : 'Filters'}
-            className={applied || open ? 'ring-[#4df9ed] text-[#4df9ed]' : undefined}
-          >
-            <span className="max-md:hidden">Filters</span>
-            {applied > 0 && (
-              <span className="ml-1.5 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#4df9ed] px-1 text-[11px] font-bold leading-none text-black">
-                {applied}
-              </span>
-            )}
-          </Button>
-        ) : compact ? (
+        {compact ? (
           // The table format's grey Filters block (Figma 3234:790).
           <Button
             size="toolbar"

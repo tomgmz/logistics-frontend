@@ -12,8 +12,7 @@ import { cn } from '@/lib/utils'
 
 /**
  * `untitled` keeps the earlier Untitled UI card (ring, xl corners) for the
- * screens the user asked to leave as they are: Document Management and the
- * client's Transaction History.
+ * dashboard panels, which are not tables.
  */
 function Root({ children, className, untitled = false, ...props }: HTMLAttributes<HTMLDivElement> & { untitled?: boolean }) {
   return (

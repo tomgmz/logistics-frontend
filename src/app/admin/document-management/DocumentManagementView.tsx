@@ -47,7 +47,6 @@ import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { getStatusMeta } from '@/components/transactions/TransactionStatus'
 
-import RefreshButton from '@/components/ui/RefreshButton'
 import FilterBar, { type FilterOption, type FilterValues } from '@/components/ui/FilterBar'
 import { TableCard } from '@/components/ui/untitled/table-card'
 import { Breadcrumbs } from '@/components/ui/untitled/breadcrumbs'
@@ -107,8 +106,9 @@ const ARCHIVED_OPTIONS: FilterOption[] = [{ value: 'only', label: 'Archived only
 // A full booking reference, e.g. BK-202610-00035.
 const FULL_REF = /^[A-Z]{2,4}-\d{6}-\d{3,}$/i
 
-const TH = 'px-4 md:px-6 py-2 text-left text-xs font-semibold whitespace-nowrap text-[#818181]'
-const TD = 'px-4 md:px-6 py-4'
+// Header and cell spacing come from .data-table (globals.css), the table format.
+const TH = ''
+const TD = ''
 const CHECKBOX = 'h-4 w-4 cursor-pointer accent-[#4df9ed]'
 
 /** A native checkbox that can also show "some selected". */
@@ -658,20 +658,21 @@ function DocumentLibrary() {
           }))}
         />
 
-        {/* Untitled UI's table card: the filter row, then folders or files. */}
-        <TableCard.Root untitled className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0">
-          <TableCard.Header
-            className="shrink-0"
-            title={title}
-            contentTrailing={
-              <div className="flex flex-wrap gap-3 max-md:w-full">
+        {/* The table format (Figma 3234:790): no title row (the breadcrumbs say
+            where you are), then the filter row with the card's buttons at its
+            far right, then folders or files. */}
+        <TableCard.Root className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0">
+          <FilterBar
+            layout="split"
+            trailing={(nav.level === 'root' && pendingTotal > 0) || (isFiles && canExport) || canCreate ? (
+              <>
                 {nav.level === 'root' && pendingTotal > 0 && (
-                  <Button color="secondary" onClick={() => go({ level: 'review' })} className="max-md:flex-1">
+                  <Button size="toolbar" color="tool" onClick={() => go({ level: 'review' })}>
                     Awaiting review ({pendingTotal})
                   </Button>
                 )}
                 {isFiles && canExport && selected.size > 0 && (
-                  <span className="ff-regular self-center text-sm text-[#c4c4c4] max-md:w-full">
+                  <span className="ff-regular self-center whitespace-nowrap text-sm text-[#c4c4c4]">
                     {selected.size.toLocaleString()} selected ·{' '}
                     <button type="button" onClick={() => setSelected(new Map())} className="text-[#4df9ed] underline-offset-2 [@media(hover:hover)]:hover:underline">
                       Clear
@@ -679,29 +680,23 @@ function DocumentLibrary() {
                   </span>
                 )}
                 {isFiles && canExport && (
-                  <Button color="secondary" iconLeading={Download} onClick={() => void handleExport()} disabled={exporting || (selected.size === 0 && total === 0)}
+                  <Button size="toolbar" color="tool" iconLeading={Download} onClick={() => void handleExport()} disabled={exporting || (selected.size === 0 && total === 0)}
                     title={selected.size === 0
                       ? 'Download every document shown here (all pages) as one ZIP, with a list of them'
-                      : 'Download the ticked documents as one ZIP, with a list of them'}
-                    className="max-md:flex-1">
+                      : 'Download the ticked documents as one ZIP, with a list of them'}>
                     {exporting ? 'Downloading…' : selected.size === 0 ? 'Download All' : 'Download Selected Files'}
                   </Button>
                 )}
                 {canCreate && (
-                  <Button iconLeading={Upload01} onClick={() => setUploadOpen(true)} className="max-md:flex-1">
+                  <Button size="toolbar" color="accent" iconLeading={Upload01} onClick={() => setUploadOpen(true)}>
                     Upload Document
                   </Button>
                 )}
-              </div>
-            }
-          />
-
-          <FilterBar
-            layout="untitled"
+              </>
+            ) : undefined}
             // All / Clients / Fleet on the top-level views (a dropdown on phones).
             leading={topTab && (
               <TabsMinimal
-                  untitled
                 label="Show"
                 items={[
                   { id: 'all' as const,     label: 'All' },
@@ -717,7 +712,7 @@ function DocumentLibrary() {
             search={{
               value: searchInput,
               onChange: setSearchInput,
-              placeholder: nav.level === 'root' ? 'Search client or booking' : nav.level === 'client' ? 'Search booking' : nav.level === 'fleet' ? 'Search plate' : 'Search',
+              placeholder: nav.level === 'root' ? 'Search client or booking' : nav.level === 'client' ? 'Search booking' : nav.level === 'fleet' ? 'Search plate' : 'Search file, booking, client, plate or uploader',
               onEnter: isFiles ? undefined : openFirst,
             }}
             dateRange={isFiles ? { value: dateRange, onChange: setDateRange } : undefined}
@@ -742,18 +737,19 @@ function DocumentLibrary() {
             actions={
               <>
                 {isFiles && (
-                  <div className="flex shrink-0 overflow-hidden rounded-lg ring-1 ring-inset ring-[#424242]" role="group" aria-label="Layout">
+                  // The table format's switch: a #181717 well, the picked view a #2a2828 block.
+                  <div className="flex h-[38px] 3xl:h-[44px] shrink-0 rounded-[10px] border border-[#343434] bg-[#181717]" role="group" aria-label="Layout">
                     <button type="button" onClick={() => changeView('table')} aria-label="List view" aria-pressed={view === 'table'}
-                      className={`p-2 ${view === 'table' ? 'bg-[#262626] text-white' : 'text-[#818181] [@media(hover:hover)]:hover:text-white'}`}>
-                      <List size={16} />
+                      className={`-m-px flex w-[38px] 3xl:w-[44px] items-center justify-center rounded-[10px] border ${view === 'table' ? 'border-[#343434] bg-[#2a2828] text-white' : 'border-transparent text-[#818181] [@media(hover:hover)]:hover:text-white'}`}>
+                      <List size={18} />
                     </button>
                     <button type="button" onClick={() => changeView('grid')} aria-label="Grid view" aria-pressed={view === 'grid'}
-                      className={`p-2 ${view === 'grid' ? 'bg-[#262626] text-white' : 'text-[#818181] [@media(hover:hover)]:hover:text-white'}`}>
-                      <LayoutGrid size={16} />
+                      className={`-m-px flex w-[38px] 3xl:w-[44px] items-center justify-center rounded-[10px] border ${view === 'grid' ? 'border-[#343434] bg-[#2a2828] text-white' : 'border-transparent text-[#818181] [@media(hover:hover)]:hover:text-white'}`}>
+                      <LayoutGrid size={18} />
                     </button>
                   </div>
                 )}
-                <RefreshButton iconOnly onClick={() => reloadAll()} loading={isFiles ? loading : folderLoading} disabled={isFiles ? loading : folderLoading} />
+                {/* No Refresh: the page is live (live:documents, below). */}
               </>
             }
           />
@@ -815,11 +811,11 @@ function DocumentLibrary() {
                 </div>
               ) : (
                 <div className="overflow-x-auto lg:overflow-auto flex-[1_0_auto] lg:flex-1 lg:min-h-0">
-                  <table className="w-full min-w-[820px] border-collapse text-left text-sm">
-                    <thead className="sticky top-0 z-[1] bg-[#222222] font-[family-name:var(--font-alegreya-sc)]">
-                      <tr className="h-11 border-b border-[#424242]">
+                  <table className="data-table min-w-[820px]">
+                    <thead className="sticky top-0 z-10">
+                      <tr>
                         {canExport && (
-                          <th className="w-12 pl-4 md:pl-6 pr-0 py-2">
+                          <th className="w-12">
                             <SelectBox
                               checked={allPageSelected}
                               indeterminate={pageSelected > 0 && !allPageSelected}
@@ -837,15 +833,15 @@ function DocumentLibrary() {
                         <th className={`${TH} w-[70px]`}><span className="sr-only">Actions</span></th>
                       </tr>
                     </thead>
-                    <tbody className="ff-regular">
+                    <tbody>
                       {docs.map((d) => (
                         <tr
                           key={d.doc_key}
-                          className={`cursor-pointer border-b border-[#424242] transition-colors last:border-b-0 [@media(hover:hover)]:hover:bg-[#222222] ${selected.has(d.doc_key) ? 'bg-[#4df9ed]/[0.06]' : ''}`}
+                          className={`cursor-pointer transition-colors [@media(hover:hover)]:hover:bg-[#2a2a2a]/40 ${selected.has(d.doc_key) ? 'bg-[#4df9ed]/[0.06]' : ''}`}
                           onClick={() => setPreviewKey(d.doc_key)}
                         >
                           {canExport && (
-                            <td className="w-12 pl-4 md:pl-6 pr-0" onClick={(e) => e.stopPropagation()}>
+                            <td className="w-12" onClick={(e) => e.stopPropagation()}>
                               <label className="-m-2 flex cursor-pointer p-2">
                                 <SelectBox checked={selected.has(d.doc_key)} onChange={() => toggleDoc(d)} label={`Select ${d.file_name}`} />
                               </label>
@@ -855,7 +851,7 @@ function DocumentLibrary() {
                             <div className="flex min-w-0 max-w-[300px] items-center gap-3">
                               <DocumentThumb doc={d} />
                               <div className="min-w-0">
-                                <p className="truncate font-medium text-white" title={d.file_name}>{d.file_name}</p>
+                                <p className="t-name truncate" title={d.file_name}>{d.file_name}</p>
                                 <p className="text-[#818181]">{DOCUMENT_SOURCE_LABELS[d.source]}</p>
                               </div>
                             </div>
@@ -874,7 +870,7 @@ function DocumentLibrary() {
                             </td>
                           )}
                           <td className={`${TD} hidden xl:table-cell`}>
-                            <p className="max-w-[260px] truncate text-[#c4c4c4]" title={d.detail ?? undefined}>{d.detail ?? d.notes ?? '—'}</p>
+                            <p className="max-w-[260px] truncate" title={d.detail ?? undefined}>{d.detail ?? d.notes ?? '—'}</p>
                             {d.override_reason && (
                               <p className="mt-0.5 flex items-center gap-1 text-xs text-amber-300" title={d.override_reason}>
                                 <MapPinOff size={11} /> Taken away from the stop
@@ -920,9 +916,9 @@ function DocumentLibrary() {
                 </div>
               ) : (
                 <div className="overflow-x-auto lg:overflow-auto flex-[1_0_auto] lg:flex-1 lg:min-h-0">
-                  <table className="w-full min-w-[720px] border-collapse text-left text-sm">
-                    <thead className="sticky top-0 z-[1] bg-[#222222] font-[family-name:var(--font-alegreya-sc)]">
-                      <tr className="h-11 border-b border-[#424242]">
+                  <table className="data-table min-w-[720px]">
+                    <thead className="sticky top-0 z-10">
+                      <tr>
                         <th className={TH}>Name</th>
                         <th className={TH}>{nav.level === 'root' ? 'Contents' : nav.level === 'client' ? 'Status' : 'Bookings'}</th>
                         <th className={TH}>Files</th>
@@ -930,7 +926,7 @@ function DocumentLibrary() {
                         <th className={TH}>Last upload</th>
                       </tr>
                     </thead>
-                    <tbody className="ff-regular">
+                    <tbody>
                       {folderSlice.map((r) => (
                         <tr
                           key={r.key}
@@ -938,21 +934,21 @@ function DocumentLibrary() {
                           tabIndex={0}
                           onClick={() => go(r.to)}
                           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(r.to) } }}
-                          className="cursor-pointer border-b border-[#424242] transition-colors last:border-b-0 [@media(hover:hover)]:hover:bg-[#222222]"
+                          className="cursor-pointer transition-colors [@media(hover:hover)]:hover:bg-[#2a2a2a]/40"
                         >
                           <td className={TD}>
                             <div className="flex min-w-0 items-center gap-3">
                               <FolderIcon fleet={r.fleet} />
                               <div className="min-w-0">
-                                <p className="truncate font-semibold text-white">{r.name}</p>
+                                <p className="t-name truncate">{r.name}</p>
                                 <p className="truncate text-[#818181]">{r.sub}</p>
                               </div>
                             </div>
                           </td>
-                          <td className={`${TD} text-[#c4c4c4]`}>{r.detail}</td>
-                          <td className={`${TD} tabular-nums text-[#c4c4c4]`}>{r.files.toLocaleString()}</td>
+                          <td className={`${TD}`}>{r.detail}</td>
+                          <td className={`${TD} tabular-nums`}>{r.files.toLocaleString()}</td>
                           <td className={TD}><PendingPill n={r.pending} /></td>
-                          <td className={`${TD} whitespace-nowrap text-[#c4c4c4]`}>{r.last ? formatDate(r.last) : '—'}</td>
+                          <td className={`${TD} whitespace-nowrap`}>{r.last ? formatDate(r.last) : '—'}</td>
                         </tr>
                       ))}
                     </tbody>
