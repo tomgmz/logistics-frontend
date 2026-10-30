@@ -3,11 +3,12 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { ExternalLink } from 'lucide-react'
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Bar, BarChart, CartesianGrid, Cell, LabelList, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 
 import { TableCard } from '@/components/ui/untitled/table-card'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { formatDate } from '@/app/utils/timeFormat'
+import { bookingStatusColor } from '@/lib/palette'
 import type { StaffDashboard as Data } from '@/lib/services/admin/staff-dashboard.service'
 import type { CardSpec } from './StaffDashboard'
 
@@ -37,8 +38,6 @@ const STATUS_ORDER = ['pending', 'approved', 'assigned', 'in_transit', 'delivere
 
 const TONE = { cyan: '#4df9ed', amber: '#ffea00', red: '#f62626', muted: '#818181' } as const
 
-const TH   = 'px-4 md:px-6 py-2 text-left text-xs font-semibold whitespace-nowrap text-[#818181]'
-const TD   = 'px-4 md:px-6 py-4 align-top'
 const CARD = 'rounded-xl bg-[#1b1b1b] shadow-[0_1px_2px_rgba(0,0,0,0.3)] ring-1 ring-[#424242] ring-inset'
 
 /** Untitled UI's secondary button, size sm, as a link. */
@@ -50,20 +49,6 @@ function CardLink({ href, children }: { href: string; children: ReactNode }) {
     >
       {children} <ExternalLink size={14} className="text-[#818181]" />
     </Link>
-  )
-}
-
-/** A table that keeps its columns on phones and slides sideways. */
-function Table({ head, minWidth, children }: { head: string[]; minWidth: string; children: ReactNode }) {
-  return (
-    <div className="overflow-x-auto">
-      <table className={`data-table ${minWidth}`}>
-        <thead>
-          <tr>{head.map((h, i) => <th key={i} className={TH}>{h}</th>)}</tr>
-        </thead>
-        <tbody className="ff-regular divide-y divide-[#2a2a2a]">{children}</tbody>
-      </table>
-    </div>
   )
 }
 
@@ -151,75 +136,135 @@ function BookingsChart({ d }: { d: Data }) {
   )
 }
 
-// ── Totals, status mix, busiest clients ──────────────────────────────────────
+// ── Bookings overall (status donut) and busiest clients (bars) ───────────────
 
-function Stat({ label, value }: { label: string; value: number }) {
+/** Delivered and Completed share the palette's green, so Delivered is striped. */
+const STRIPED = new Set(['delivered'])
+const stripeId = (s: string) => `status-stripe-${s}`
+
+const TOOLTIP = {
+  contentStyle: { background: '#111', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, fontSize: 12 },
+  labelStyle:   { color: '#e5e5e5' },
+  itemStyle:    { color: '#e5e5e5' },
+}
+
+function Swatch({ status }: { status: string }) {
+  const color = bookingStatusColor(status)
   return (
-    <div className="min-w-0 rounded-xl bg-[#141414] px-4 py-3 ring-1 ring-[#2a2a2a] ring-inset">
-      <p className="text-sm font-medium leading-snug text-[#818181]">{label}</p>
-      <p className="mt-2 text-2xl font-semibold font-mono leading-none text-white">{value.toLocaleString()}</p>
-    </div>
+    <span
+      className="size-2.5 shrink-0 rounded-full"
+      style={STRIPED.has(status)
+        ? { background: `repeating-linear-gradient(45deg, ${color} 0 2px, transparent 2px 4px)`, boxShadow: `inset 0 0 0 1px ${color}` }
+        : { background: color }}
+    />
   )
 }
 
-function TotalsCard({ d }: { d: Data }) {
-  const a = d.analytics
+/**
+ * The booking totals and where every booking stands, in one card: an
+ * Untitled UI pie-chart card (donut + legend). Total sits in the middle;
+ * In transit, Completed and Cancelled are legend rows.
+ */
+function BookingsOverallCard({ d }: { d: Data }) {
+  const mix    = d.analytics.status_mix
+  const total  = d.analytics.totals.bookings
+  const known  = STATUS_ORDER.filter((s) => s in STATUS_LABEL)
+  const slices = known.filter((s) => (mix[s] ?? 0) > 0).map((s) => ({ status: s, name: STATUS_LABEL[s], value: mix[s] }))
+  const sum    = slices.reduce((n, s) => n + s.value, 0)
+
   return (
-    <TableCard.Root untitled>
+    <TableCard.Root untitled className="flex flex-col">
       <TableCard.Header title="Bookings overall" contentTrailing={<CardLink href={`${BASE}/booking-management`}>Booking Management</CardLink>} />
-      <div className="grid grid-cols-2 gap-3 p-4 md:p-6 lg:grid-cols-4">
-        <Stat label="Total bookings" value={a.totals.bookings} />
-        <Stat label="In transit now" value={d.queues.in_transit.count} />
-        <Stat label="Completed"      value={a.totals.completed} />
-        <Stat label="Cancelled"      value={a.totals.cancelled} />
+      <div className="flex flex-col items-center gap-6 p-4 md:flex-row md:gap-10 md:p-6">
+        <div className="relative size-44 shrink-0 sm:size-52">
+          {sum > 0 && (
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <defs>
+                  {[...STRIPED].map((s) => (
+                    <pattern key={s} id={stripeId(s)} width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                      <rect width="6" height="6" fill={bookingStatusColor(s)} fillOpacity={0.35} />
+                      <rect width="3" height="6" fill={bookingStatusColor(s)} />
+                    </pattern>
+                  ))}
+                </defs>
+                <Pie
+                  data={slices}
+                  dataKey="value"
+                  nameKey="name"
+                  innerRadius="68%"
+                  outerRadius="100%"
+                  startAngle={90}
+                  endAngle={-270}
+                  stroke="#1b1b1b"
+                  strokeWidth={2}
+                  cornerRadius={4}
+                  isAnimationActive={false}
+                >
+                  {slices.map((s) => (
+                    <Cell key={s.status} fill={STRIPED.has(s.status) ? `url(#${stripeId(s.status)})` : bookingStatusColor(s.status)} />
+                  ))}
+                </Pie>
+                <Tooltip {...TOOLTIP} />
+              </PieChart>
+            </ResponsiveContainer>
+          )}
+          {sum === 0 && <div className="absolute inset-0 rounded-full border-[14px] border-white/[0.06]" />}
+          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+            <span className="text-xs text-[#818181]">Total bookings</span>
+            <span className="text-3xl font-semibold font-mono leading-tight text-white">{total.toLocaleString()}</span>
+          </div>
+        </div>
+
+        <ul className="ff-regular flex w-full min-w-0 flex-col gap-3">
+          {known.map((s) => {
+            const n = mix[s] ?? 0
+            return (
+              <li key={s} className="flex min-w-0 items-center gap-2.5 text-sm">
+                <Swatch status={s} />
+                <span className={`min-w-0 flex-1 truncate ${n > 0 ? 'text-white' : 'text-[#818181]'}`}>{STATUS_LABEL[s]}</span>
+                <span className={`font-mono ${n > 0 ? 'text-white' : 'text-[#818181]'}`}>{n.toLocaleString()}</span>
+                <span className="w-10 text-right font-mono text-[#818181]">{Math.round((n / Math.max(1, sum)) * 100)}%</span>
+              </li>
+            )
+          })}
+        </ul>
       </div>
     </TableCard.Root>
   )
 }
 
-function StatusMixCard({ d }: { d: Data }) {
-  const mix   = d.analytics.status_mix
-  const total = Object.values(mix).reduce((s, n) => s + n, 0)
-  const rows  = STATUS_ORDER.filter((s) => mix[s])
-  return (
-    <TableCard.Root untitled className="flex flex-col">
-      <TableCard.Header title="Where bookings stand" />
-      <Table head={['Status', 'Bookings', 'Share']} minWidth="min-w-[420px]">
-        {total === 0 ? (
-          <tr><td colSpan={3} className="px-4 md:px-6 py-6 text-sm text-[#818181]">No bookings yet.</td></tr>
-        ) : rows.map((s) => (
-          <tr key={s}>
-            <td className={`${TD} text-white`}>{STATUS_LABEL[s] ?? s}</td>
-            <td className={`${TD} font-mono text-white`}>{mix[s].toLocaleString()}</td>
-            <td className={`${TD} font-mono text-[#818181]`}>{Math.round((mix[s] / Math.max(1, total)) * 100)}%</td>
-          </tr>
-        ))}
-      </Table>
-    </TableCard.Root>
-  )
-}
-
+/** Untitled UI's horizontal bar card: one bar per client, count at the end. */
 function TopClientsCard({ d }: { d: Data }) {
   const top = d.analytics.top_clients
-  const max = Math.max(1, ...top.map((c) => c.count))
   return (
     <TableCard.Root untitled className="flex flex-col">
       <TableCard.Header title="Busiest clients, last 30 days" />
-      <Table head={['Client', 'Bookings', '']} minWidth="min-w-[420px]">
-        {top.length === 0 ? (
-          <tr><td colSpan={3} className="px-4 md:px-6 py-6 text-sm text-[#818181]">No bookings in the last 30 days.</td></tr>
-        ) : top.map((c) => (
-          <tr key={c.client}>
-            <td className={`${TD} text-white break-words`}>{c.client}</td>
-            <td className={`${TD} font-mono text-white`}>{c.count.toLocaleString()}</td>
-            <td className={`${TD} w-2/5`}>
-              <div className="mt-1.5 h-1.5 rounded-full bg-white/[0.06]">
-                <div className="h-1.5 rounded-full" style={{ width: `${(c.count / max) * 100}%`, background: SERIES.created }} />
-              </div>
-            </td>
-          </tr>
-        ))}
-      </Table>
+      {top.length === 0 ? (
+        <p className="px-4 md:px-6 py-6 text-sm text-[#818181]">No bookings in the last 30 days.</p>
+      ) : (
+        <div className="p-4 md:p-6" style={{ height: top.length * 44 + 32 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={top} layout="vertical" barCategoryGap="30%" margin={{ top: 0, right: 36, bottom: 0, left: 0 }}>
+              <CartesianGrid horizontal={false} stroke="rgba(255,255,255,0.08)" />
+              <XAxis type="number" allowDecimals={false} tick={{ fill: '#818181', fontSize: 12 }} tickLine={false} axisLine={false} />
+              <YAxis
+                type="category"
+                dataKey="client"
+                width={110}
+                tick={{ fill: '#e5e5e5', fontSize: 13 }}
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(v: string) => (v.length > 14 ? `${v.slice(0, 13)}…` : v)}
+              />
+              <Tooltip {...TOOLTIP} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
+              <Bar dataKey="count" name="Bookings" fill={SERIES.created} radius={[0, 4, 4, 0]} maxBarSize={14} isAnimationActive={false}>
+                <LabelList dataKey="count" position="right" fill="#e5e5e5" fontSize={12} />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
     </TableCard.Root>
   )
 }
@@ -231,9 +276,8 @@ export default function AdminDashboard({ data, cards }: { data: Data; cards: Car
     <>
       <MetricRow cards={cards} />
       <BookingsChart d={data} />
-      <TotalsCard d={data} />
       <div className="grid grid-cols-1 gap-5 lg:gap-6 xl:grid-cols-2">
-        <StatusMixCard d={data} />
+        <BookingsOverallCard d={data} />
         <TopClientsCard d={data} />
       </div>
     </>
@@ -268,38 +312,32 @@ export function AdminDashboardSkeleton({ cards }: { cards: number }) {
         <Skeleton className="h-60 w-full rounded-xl" />
       </section>
 
-      <div className={CARD}>
-        <div className="flex items-center justify-between gap-4 border-b border-[#424242] px-4 py-5 md:px-6">
-          <Skeleton className="h-5 w-40" />
-          <Skeleton className="h-9 w-40 rounded-lg" />
-        </div>
-        <div className="grid grid-cols-2 gap-3 p-4 md:p-6 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="space-y-2.5 rounded-xl bg-[#141414] px-4 py-3 ring-1 ring-[#2a2a2a] ring-inset">
-              <Skeleton className="h-3.5 w-24" />
-              <Skeleton className="h-6 w-10" />
-            </div>
-          ))}
-        </div>
-      </div>
-
       <div className="grid grid-cols-1 gap-5 lg:gap-6 xl:grid-cols-2">
-      {Array.from({ length: 2 }).map((_, i) => (
-        <div key={i} className={CARD}>
+        <div className={CARD}>
+          <div className="flex items-center justify-between gap-4 border-b border-[#424242] px-4 py-5 md:px-6">
+            <Skeleton className="h-5 w-40" />
+            <Skeleton className="h-9 w-40 rounded-lg" />
+          </div>
+          <div className="flex flex-col items-center gap-6 p-4 md:flex-row md:gap-10 md:p-6">
+            <Skeleton className="size-44 shrink-0 rounded-full sm:size-52" />
+            <div className="w-full space-y-3">
+              {Array.from({ length: 7 }).map((_, j) => <Skeleton key={j} className="h-3.5 w-full" />)}
+            </div>
+          </div>
+        </div>
+        <div className={CARD}>
           <div className="border-b border-[#424242] px-4 py-5 md:px-6">
             <Skeleton className="h-5 w-40" />
           </div>
-          <div className="divide-y divide-[#2a2a2a]">
-            {Array.from({ length: 4 }).map((_, j) => (
-              <div key={j} className="flex items-center gap-6 px-4 py-4 md:px-6">
-                <Skeleton className="h-3.5 w-24" />
-                <Skeleton className="h-3.5 flex-1" />
-                <Skeleton className="hidden h-3.5 w-24 sm:block" />
+          <div className="space-y-5 p-4 md:p-6">
+            {Array.from({ length: 5 }).map((_, j) => (
+              <div key={j} className="flex items-center gap-4">
+                <Skeleton className="h-3.5 w-24 shrink-0" />
+                <Skeleton className={`h-3.5 ${['w-full', 'w-3/4', 'w-3/5', 'w-2/5', 'w-1/4'][j]}`} />
               </div>
             ))}
           </div>
         </div>
-      ))}
       </div>
     </div>
   )
