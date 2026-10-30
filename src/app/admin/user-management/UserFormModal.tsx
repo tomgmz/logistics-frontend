@@ -141,6 +141,7 @@ function buildInitialState(tab: UserTab, user: AnyUser | null, driverSource: Dri
       landline:        c?.landline ? toLocalLandlineDigits(c.landline) : '',
       company_name:    c?.company_name    ?? '',
       billing_address: c?.billing_address ?? '',
+      contract_valid_until: c?.contract_valid_until?.split('T')[0] ?? '',
     }
   }
 
@@ -1025,6 +1026,16 @@ export default function UserFormModal({
                   rows={2}
                   maxLength={300}
                   textareaClassName={`${inputBase} resize-none ${fe.billing_address ? 'border-red-500/60' : ''}`}
+                />
+              </Field>
+
+              <Field label="Contract Valid Until" required={!isEdit} error={fe.contract_valid_until}>
+                <Input
+                  type="date"
+                  value={form.contract_valid_until as string}
+                  onChange={e => set('contract_valid_until', e.target.value)}
+                  error={fe.contract_valid_until}
+                  className="[color-scheme:dark]"
                 />
               </Field>
             </>)}

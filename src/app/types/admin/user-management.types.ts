@@ -56,6 +56,7 @@ export interface ClientUser extends BaseUser {
     company_name: string | null
     billing_address: string | null
     landline: string | null
+    contract_valid_until: string | null
   } | null
 }
 
@@ -101,6 +102,7 @@ export interface CreateClientPayload {
   last_name?: string
   company_name?: string
   billing_address?: string
+  contract_valid_until?: string
 }
 
 export interface CreateDriverPayload {

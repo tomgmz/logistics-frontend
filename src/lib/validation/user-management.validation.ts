@@ -57,6 +57,19 @@ const baseUpdateFields = {
   phone:       phoneOptional,
 }
 
+// Contract validity is a plain calendar date. A new client's contract can't
+// already have run out; an edit only checks the date is real, so a lapsed
+// client can still be saved. Mirrors the backend client schema.
+const contractDate = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format')
+  .refine(val => !isNaN(new Date(`${val}T00:00:00Z`).getTime()), 'Invalid date')
+
+const todayIso = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 export const createClientSchema = z.object({
   ...baseCreateFields,
   landline: landlineOptional,
@@ -67,6 +80,11 @@ export const createClientSchema = z.object({
   billing_address: z
     .string({ error: 'Billing address is required' })
     .min(1, 'Billing address is required'),
+  contract_valid_until: z
+    .string({ error: 'Contract validity date is required' })
+    .min(1, 'Contract validity date is required')
+    .pipe(contractDate)
+    .refine(val => val >= todayIso(), 'Contract validity date is already past'),
 })
 
 export const updateClientSchema = z.object({
@@ -74,6 +92,7 @@ export const updateClientSchema = z.object({
   landline:        landlineOptional,
   company_name:    z.string().max(100, 'Company name is too long').optional(),
   billing_address: z.string().optional(),
+  contract_valid_until: contractDate.optional(),
 })
 
 // A vendor driver also names the vendor they come from; Booking Management
