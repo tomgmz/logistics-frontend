@@ -1,6 +1,6 @@
 import proxyApi, { initCsrf } from '@/lib/api/auth.api'
 import type { PagedResponse, PageRequest } from '@/lib/hooks/useServerTable'
-import { downloadXlsx, manilaCellDate, manilaDateStamp, type XlsxColumn } from '@/lib/xlsx-export'
+import { manilaCellDate, manilaDateStamp, xlsxBlob, type XlsxColumn } from '@/lib/xlsx-export'
 import { roleLabel } from '@/lib/roles'
 import {
   DOCUMENT_SOURCE_LABELS,
@@ -13,6 +13,8 @@ import {
   type DocumentPage,
   type LibraryDocument,
   type StaffDocumentType,
+  downloadFile,
+  saveBlob,
 } from '@/app/types/documents.types'
 
 /**
@@ -118,11 +120,18 @@ export async function restoreDocument(documentId: string): Promise<void> {
   await proxyApi.post(`${B}/${documentId}/restore`)
 }
 
-const DOCUMENT_XLSX_COLUMNS: XlsxColumn<LibraryDocument>[] = [
+/** Most files one download may hold (the backend caps the same). */
+export const MAX_DOWNLOAD_FILES = 100
+
+/** A ticked document as listed in the ZIP's spreadsheet. */
+type ZipRow = LibraryDocument & { zip_name: string | null }
+
+const DOCUMENT_XLSX_COLUMNS: XlsxColumn<ZipRow>[] = [
+  { label: 'File in ZIP',      width: 44, value: (d) => d.zip_name ?? 'Not included: it could not be downloaded' },
   { label: 'Uploaded (PHT)',   width: 20, value: (d) => manilaCellDate(d.uploaded_at) },
   { label: 'Type',             width: 24, value: (d) => DOCUMENT_TYPE_LABELS[d.doc_type] ?? d.doc_type },
   { label: 'Source',           width: 16, value: (d) => DOCUMENT_SOURCE_LABELS[d.source] },
-  { label: 'File',             width: 36, value: (d) => d.file_name },
+  { label: 'Original File',    width: 36, value: (d) => d.file_name },
   { label: 'Booking',          width: 18, value: (d) => d.reference_number },
   { label: 'Client',           width: 26, value: (d) => d.company_name },
   { label: 'Vehicle',          width: 14, value: (d) => d.plate_number },
@@ -134,12 +143,90 @@ const DOCUMENT_XLSX_COLUMNS: XlsxColumn<LibraryDocument>[] = [
   { label: 'Rejection Reason', width: 36, value: (d) => d.rejection_reason },
   { label: 'Outside Geofence', width: 36, value: (d) => d.override_reason },
   { label: 'Notes',            width: 36, value: (d) => d.notes },
-  { label: 'Link',             width: 60, value: (d) => d.file_url },
 ]
 
-/** The documents someone ticked in the library, newest first, as an Excel file. */
-export async function exportSelectedDocumentsXlsx(rows: LibraryDocument[]): Promise<void> {
-  const sorted = [...rows].sort((a, b) => (b.uploaded_at ?? '').localeCompare(a.uploaded_at ?? ''))
-  await downloadXlsx(`documents_${manilaDateStamp()}.xlsx`, 'Documents', sorted, DOCUMENT_XLSX_COLUMNS)
+/** Photos stored under a random id; in the ZIP they are named after their booking or vehicle. */
+const PHOTO_TYPES = new Set(['pickup_proof', 'delivery_proof', 'odometer_photo', 'service_receipt'])
+
+function extensionOf(d: LibraryDocument): string {
+  const fromName = /\.([a-z0-9]{2,5})$/i.exec(d.file_name)?.[1]
+  if (fromName) return fromName.toLowerCase()
+  try {
+    return /\.([a-z0-9]{2,5})$/i.exec(new URL(d.file_url).pathname)?.[1]?.toLowerCase() ?? 'bin'
+  } catch {
+    return 'bin'
+  }
 }
 
+/** A readable, unique, filesystem-safe name for each file in the ZIP. */
+function zipName(d: LibraryDocument, used: Set<string>): string {
+  const ext  = extensionOf(d)
+  const base = PHOTO_TYPES.has(d.doc_type)
+    ? [d.reference_number ?? d.plate_number, DOCUMENT_TYPE_LABELS[d.doc_type] ?? d.doc_type].filter(Boolean).join(' - ')
+    : d.file_name.replace(/\.[a-z0-9]{2,5}$/i, '')
+  const safe = (base || 'document').replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').trim().slice(0, 120) || 'document'
+  let name = `${safe}.${ext}`
+  for (let n = 2; used.has(name.toLowerCase()); n++) name = `${safe} (${n}).${ext}`
+  used.add(name.toLowerCase())
+  return name
+}
+
+/**
+ * Downloads the ticked documents. The rows are read again first, so every
+ * link is freshly signed however long ago it was ticked (document links last
+ * 10–15 minutes). One file downloads as itself; more become one ZIP holding
+ * the files plus documents.xlsx listing them. A file that cannot be fetched
+ * is left out and marked in the list rather than failing the whole download.
+ */
+export async function downloadDocuments(keys: string[]): Promise<{ included: number; failed: number }> {
+  const { data: body } = await proxyApi.get<{ data: LibraryDocument[] }>(`${B}/export`, {
+    params: { keys: keys.slice(0, MAX_DOWNLOAD_FILES).join(',') },
+  })
+  const rows = [...(body?.data ?? [])].sort((a, b) => (b.uploaded_at ?? '').localeCompare(a.uploaded_at ?? ''))
+  if (rows.length === 0) throw new Error('Those documents could not be found any more. Refresh and try again.')
+
+  if (rows.length === 1) {
+    await downloadFile(rows[0].file_url, zipName(rows[0], new Set()))
+    return { included: 1, failed: 0 }
+  }
+
+  const used  = new Set<string>(['documents.xlsx'])
+  const named = rows.map((d) => ({ d, name: zipName(d, used) }))
+  const fetched = new Map<string, Uint8Array>()
+
+  // A few at a time: quick, without opening dozens of requests at once.
+  let next = 0
+  const worker = async () => {
+    while (next < named.length) {
+      const { d, name } = named[next++]
+      try {
+        // no-store: a cached thumbnail copy of this link would fail CORS (see downloadFile).
+        const res = await fetch(d.file_url, { cache: 'no-store' })
+        if (!res.ok) throw new Error(String(res.status))
+        fetched.set(name, new Uint8Array(await res.arrayBuffer()))
+      } catch {
+        // Left out; the list marks it.
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(4, named.length) }, worker))
+
+  const included = fetched.size
+  if (included === 0) throw new Error('None of the selected files could be downloaded. Please try again.')
+
+  // Newest first in the ZIP and in its list, whatever order the fetches finished in.
+  const files: Record<string, Uint8Array> = {}
+  const listed: ZipRow[] = named.map(({ d, name }) => {
+    const bytes = fetched.get(name)
+    if (bytes) files[name] = bytes
+    return { ...d, zip_name: bytes ? name : null }
+  })
+  files['documents.xlsx'] = new Uint8Array(await (await xlsxBlob('Documents', listed, DOCUMENT_XLSX_COLUMNS)).arrayBuffer())
+
+  // Loaded on click so the ZIP writer stays out of the page bundle. Level 0:
+  // photos, PDFs and Office files are already compressed.
+  const { zipSync } = await import('fflate')
+  const zipped = zipSync(files, { level: 0 })
+  saveBlob(new Blob([zipped as BlobPart], { type: 'application/zip' }), `documents_${manilaDateStamp()}.zip`)
+  return { included, failed: rows.length - included }
+}

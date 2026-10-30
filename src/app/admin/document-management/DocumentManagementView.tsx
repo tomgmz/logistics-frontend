@@ -12,7 +12,8 @@ import { Folder, Truck01, Upload01 } from '@untitledui/icons'
 
 import {
   archiveDocument,
-  exportSelectedDocumentsXlsx,
+  downloadDocuments,
+  MAX_DOWNLOAD_FILES,
   fetchDocuments,
   fetchFolders,
   fetchFoldersPage,
@@ -454,10 +455,18 @@ function DocumentLibrary() {
 
   async function handleExport() {
     if (selected.size === 0) return
+    if (selected.size > MAX_DOWNLOAD_FILES) {
+      appToast.error(`You can download up to ${MAX_DOWNLOAD_FILES} files at once. Untick ${selected.size - MAX_DOWNLOAD_FILES} and try again.`)
+      return
+    }
     setExporting(true)
     try {
-      await exportSelectedDocumentsXlsx([...selected.values()])
-      appToast.success(`Downloaded ${selected.size.toLocaleString()} document${selected.size === 1 ? '' : 's'}.`)
+      const { included, failed } = await downloadDocuments([...selected.keys()])
+      if (failed > 0) {
+        appToast.error(`Downloaded ${included} of ${included + failed} files. ${failed} could not be fetched; the list inside the ZIP marks which.`)
+      } else {
+        appToast.success(included === 1 ? 'Downloaded 1 file.' : `Downloaded ${included} files as one ZIP.`)
+      }
     } catch (e) {
       appToast.error(getApiErrorMessage(e, 'Download failed. Please try again.'))
     } finally {
@@ -665,7 +674,7 @@ function DocumentLibrary() {
                 )}
                 {isFiles && canExport && (
                   <Button color="secondary" iconLeading={Download} onClick={() => void handleExport()} disabled={exporting || selected.size === 0}
-                    title={selected.size === 0 ? 'Tick the documents to download first' : 'Download the selected documents as an Excel file'}
+                    title={selected.size === 0 ? 'Tick the documents to download first' : selected.size === 1 ? 'Download the selected file' : 'Download the selected files as one ZIP, with a list of them'}
                     className="max-md:flex-1">
                     {exporting ? 'Downloading…' : 'Download'}
                   </Button>

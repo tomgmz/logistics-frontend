@@ -37,10 +37,24 @@ export async function downloadXlsx<T>(
   columns: XlsxColumn<T>[],
   options: XlsxOptions = {},
 ): Promise<void> {
+  await (await workbook(sheet, rows, columns, options)).toFile(fileName)
+}
+
+/** The same workbook as bytes, to put inside something else (a ZIP of documents). */
+export async function xlsxBlob<T>(
+  sheet: string,
+  rows: T[],
+  columns: XlsxColumn<T>[],
+  options: XlsxOptions = {},
+): Promise<Blob> {
+  return (await workbook(sheet, rows, columns, options)).toBlob()
+}
+
+async function workbook<T>(sheet: string, rows: T[], columns: XlsxColumn<T>[], options: XlsxOptions) {
   // Loaded on click so the writer stays out of the page bundle.
   const { default: writeXlsxFile } = await import('write-excel-file/browser')
 
-  await writeXlsxFile(rows, {
+  return writeXlsxFile(rows, {
     sheet,
     stickyRowsCount: 1,
     columns: columns.map((c) => ({
@@ -63,7 +77,7 @@ export async function downloadXlsx<T>(
         return c.align && v != null ? { value: v, ...align } : v ?? null
       },
     })),
-  }).toFile(fileName)
+  })
 }
 
 const MANILA_OFFSET_MS = 8 * 60 * 60 * 1000

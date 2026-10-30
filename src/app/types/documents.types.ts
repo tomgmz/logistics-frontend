@@ -168,18 +168,23 @@ export async function downloadFile(url: string, fileName: string): Promise<void>
     // so ask storage directly.
     const res = await fetch(url, { cache: 'no-store' })
     if (!res.ok) throw new Error(String(res.status))
-    const href = URL.createObjectURL(await res.blob())
-    const a    = document.createElement('a')
-    a.href     = href
-    a.download = fileName
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
-    // Safari reads the blob after click() returns; revoke it later, not now.
-    setTimeout(() => URL.revokeObjectURL(href), 60_000)
+    saveBlob(await res.blob(), fileName)
   } catch {
     window.open(url, '_blank', 'noopener')
   }
+}
+
+/** Hands a file built in the browser to the user as a download. */
+export function saveBlob(blob: Blob, fileName: string): void {
+  const href = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
+  a.href     = href
+  a.download = fileName
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  // Safari reads the blob after click() returns; revoke it later, not now.
+  setTimeout(() => URL.revokeObjectURL(href), 60_000)
 }
 
 export function fileSizeLabel(bytes: number | null): string | null {
