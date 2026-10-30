@@ -728,6 +728,13 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
   const inBrowser = useSyncExternalStore(noopSubscribe, () => true, () => false)
   const [isDragging, setIsDragging] = useState(false)
   const [docError,   setDocError]   = useState<string | null>(null)
+  // The document list was added to or emptied: its "required" error shows live.
+  const [docTouched, setDocTouched] = useState(false)
+  // Fingerprints (SHA-256) of the files picked here and of the documents kept
+  // from a rejected booking, so the same file is refused the moment it is
+  // picked rather than at Confirm. The server checks the same thing again.
+  const fileHashes = useRef(new WeakMap<File, string>())
+  const keptHashes = useRef(new Map<string, string | null>())
   const [infoOpen,   setInfoOpen]   = useState(false)
   // Drop-offs close to the pickup, waiting on the client to confirm the pins.
   const [nearDropoffs, setNearDropoffs] = useState<{ index: number; meters: number }[]>([])
@@ -809,6 +816,26 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
     ) as GroupErrors
   }
 
+  // Drop-offs very close to the pickup, shown under each one as soon as both
+  // are on the map (Next still asks to confirm them).
+  const nearNow = new Map(dropoffsNearPickup(routeCoords).map((n) => [n.index, n.meters]))
+
+  // Everything still missing, always visible beside Next, so nothing waits to
+  // be discovered by pressing it.
+  const stillNeeded: string[] = (() => {
+    const out: string[] = []
+    if (rawErrors.schedule.date) out.push('pickup date')
+    if (rawErrors.schedule.time) out.push('call time')
+    if (rawErrors.route.pickup) out.push('pickup point')
+    const badDrops = Object.keys(rawErrors.route.dropoffs).map((i) => Number(i) + 1).sort((a, b) => a - b)
+    if (badDrops.length) out.push(badDrops.length === 1 ? `drop-off ${badDrops[0]}` : `drop-offs ${badDrops.join(', ')}`)
+    const productFields = rawErrors.sections.reduce(
+      (n, sec) => n + Object.values(sec.groups).reduce((m, g) => m + Object.keys(g).length, 0), 0)
+    if (productFields) out.push(productFields === 1 ? '1 cargo detail' : `${productFields} cargo details`)
+    if (rawErrors.documents) out.push('a transaction document')
+    return out
+  })()
+
   const handleNext = () => {
     setTouched(true)
     if (hasAnyErrors(rawErrors)) return
@@ -884,8 +911,39 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
   const mapPickerMode: 'pickup' | 'dropoff' =
     mapTarget?.kind === 'pickup' ? 'pickup' : 'dropoff'
 
-  const validateAndAddFiles = (incoming: File[]) => {
+  /** SHA-256 of some bytes, or null where the browser cannot (no secure context). */
+  const fingerprint = async (data: ArrayBuffer): Promise<string | null> => {
+    try {
+      const digest = await crypto.subtle.digest('SHA-256', data)
+      return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('')
+    } catch {
+      return null
+    }
+  }
+  const hashOfFile = async (f: File): Promise<string | null> => {
+    const known = fileHashes.current.get(f)
+    if (known) return known
+    const h = await fingerprint(await f.arrayBuffer())
+    if (h) fileHashes.current.set(f, h)
+    return h
+  }
+  /** A kept document's fingerprint, read once through its link; null if unreadable. */
+  const hashOfKept = async (url: string): Promise<string | null> => {
+    const key = documentName(url)
+    if (keptHashes.current.has(key)) return keptHashes.current.get(key) ?? null
+    let h: string | null = null
+    try {
+      // no-store: a cached copy loaded without CORS would be refused here.
+      const res = await fetch(url, { cache: 'no-store' })
+      if (res.ok) h = await fingerprint(await res.arrayBuffer())
+    } catch { /* the server still checks it at Confirm */ }
+    keptHashes.current.set(key, h)
+    return h
+  }
+
+  const validateAndAddFiles = async (incoming: File[]) => {
     setDocError(null)
+    setDocTouched(true)
     const slots    = MAX_DOC_COUNT - docCount
     const accepted = incoming.slice(0, slots)
     if (accepted.length === 0) return
@@ -902,12 +960,28 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
       }
     }
 
-    onFilesChange([...files, ...accepted])
+    // The same file twice (whatever its name) is refused here, at once.
+    const have = new Map<string, string>()
+    for (const f of files) { const h = await hashOfFile(f); if (h) have.set(h, f.name) }
+    for (const url of keptDocs) { const h = await hashOfKept(url); if (h) have.set(h, documentName(url)) }
+    const added: File[] = []
+    for (const f of accepted) {
+      const h = await hashOfFile(f)
+      const twin = h ? have.get(h) : undefined
+      if (twin) {
+        setDocError(twin === f.name ? `"${f.name}" is already added.` : `"${f.name}" is the same file as "${twin}", which is already added.`)
+        continue
+      }
+      if (h) have.set(h, f.name)
+      added.push(f)
+    }
+    if (added.length) onFilesChange([...files, ...added])
   }
 
   const removeFile = (index: number) => {
     onFilesChange(files.filter((_, i) => i !== index))
     setDocError(null)
+    setDocTouched(true)
   }
 
   return (
@@ -1020,6 +1094,11 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                       pin="dropoff"
                       onClick={() => setMapTarget({ kind: 'dropoff', index: i })}
                     />
+                    {nearNow.has(i) && !errors.route?.dropoffs?.[i] && (
+                      <p className="ff-sc booking-text mt-1 text-xs text-[#ffea00]">
+                        Only {nearNow.get(i)! < 100 ? Math.round(nearNow.get(i)!) : Math.round(nearNow.get(i)! / 10) * 10} m from the pickup. Check both pins.
+                      </p>
+                    )}
                   </div>
                   {i > 0 && (
                     <button
@@ -1390,14 +1469,14 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
               e.preventDefault()
               setIsDragging(false)
               if (docCount >= MAX_DOC_COUNT) return
-              validateAndAddFiles(Array.from(e.dataTransfer.files))
+              void validateAndAddFiles(Array.from(e.dataTransfer.files))
             }}
             onClick={() => { if (docCount < MAX_DOC_COUNT) fileInputRef.current?.click() }}
             className="flex flex-col items-center gap-2 rounded-md px-4 py-6 border border-dashed transition-colors cursor-pointer"
             style={{
               background:    INPUT_BG_CARD,
               borderColor:   isDragging ? CYAN
-                           : (touched && !!rawErrors.documents && !docError) ? ERROR_BORDER
+                           : ((touched || docTouched) && !!rawErrors.documents && !docError) ? ERROR_BORDER
                            : '#818181',
               opacity:       docCount >= MAX_DOC_COUNT ? 0.5 : 1,
               pointerEvents: docCount >= MAX_DOC_COUNT ? 'none' : 'auto',
@@ -1420,14 +1499,14 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
               multiple
               className="sr-only"
               onChange={(e) => {
-                validateAndAddFiles(Array.from(e.target.files ?? []))
+                void validateAndAddFiles(Array.from(e.target.files ?? []))
                 e.target.value = ''
               }}
             />
           </div>
 
           {docError && <p className="ff-sc booking-text text-xs text-red-400">{docError}</p>}
-          {touched && rawErrors.documents && !docError && (
+          {(touched || docTouched) && rawErrors.documents && !docError && (
             <p className="ff-sc booking-text text-xs text-red-400">{rawErrors.documents}</p>
           )}
           {docCount >= MAX_DOC_COUNT && (
@@ -1557,9 +1636,13 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
           className={`flex items-center gap-3 pt-2 ${onBack ? 'justify-between' : 'justify-end'}`}
         >
           {onBack && <WizBtn onClick={onBack} variant="back">BACK</WizBtn>}
-          {unchanged && (
+          {unchanged ? (
             <p className="ff-sc booking-text text-xs text-white/50 text-right">
               Change the booking details to address the rejection before resubmitting.
+            </p>
+          ) : stillNeeded.length > 0 && (
+            <p className="ff-sc booking-text min-w-0 flex-1 text-xs text-white/50 text-right" aria-live="polite">
+              Still needed: {stillNeeded.join(', ')}
             </p>
           )}
           <WizBtn onClick={handleNext} variant="next" disabled={unchanged}>
