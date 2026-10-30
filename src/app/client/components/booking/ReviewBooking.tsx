@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import { isAxiosError } from 'axios'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Truck } from 'lucide-react'
 import Image from 'next/image'
@@ -12,6 +13,7 @@ import { calcCargoSummary, palletizedGroup, looseGroup } from '@/lib/cargo/summa
 import type { CargoItemPayload } from '@/lib/services/client/booking.service'
 import { uploadService } from '@/lib/services/admin/documentUpload.service'
 import { appToast } from '@/lib/toast'
+import { getApiErrorMessage } from '@/lib/api-error'
 import { documentName } from '@/lib/booking-resubmit'
 import './BookingDetails.css'
 import SuccessView from './SuccessView'
@@ -145,13 +147,19 @@ export default function StepReview({ selectedService, pendingFiles, onBack, onNe
       } else if (!transactionUrls) {
         setDocUploadState('uploading')
         try {
-          const uploadResult = await uploadService.uploadBookingDocuments(pendingFiles)
+          const uploadResult = await uploadService.uploadBookingDocuments(pendingFiles, undefined, keptDocuments)
           transactionUrls = uploadResult.urls
           setUploadedUrls(transactionUrls)
           setDocUploadState('done')
         } catch (uploadErr) {
           console.error('Document upload failed:', uploadErr)
           setDocUploadState('failed')
+          // The same file picked twice, or one already on the booking: the
+          // server names it, so say exactly that.
+          if (isAxiosError(uploadErr) && uploadErr.response?.status === 409) {
+            setError(getApiErrorMessage(uploadErr))
+            return
+          }
           // The API requires at least one document, so there is no "book it
           // anyway" path — submitting without them is a guaranteed rejection.
           // Say so plainly instead of letting it fail as a validation error.

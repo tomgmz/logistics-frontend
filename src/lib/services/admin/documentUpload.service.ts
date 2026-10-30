@@ -28,10 +28,16 @@ async function post<T>(url: string, payload: unknown, headers?: Record<string, s
 const B = '/uploads'
 
 export const uploadService = {
-  uploadBookingDocuments: (files: File[], bookingRef?: string) => {
+  /**
+   * `existingUrls`: documents already on the booking that stay (Edit &
+   * Resubmit), so the server can number a same-named file and refuse one
+   * that is already attached.
+   */
+  uploadBookingDocuments: (files: File[], bookingRef?: string, existingUrls: string[] = []) => {
     const form = new FormData()
     files.forEach((f) => form.append('documents', f))
     if (bookingRef) form.append('booking_ref', bookingRef)
+    existingUrls.forEach((u) => form.append('existing_urls', u))
 
     return post<UploadDocumentsResponse>(
       `${B}/booking-documents`,
