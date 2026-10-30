@@ -1435,6 +1435,9 @@ function PasswordStep({
   )
 }
 
+/** How long the success tick shows at least; its spring settles at ~0.6s. */
+const SUCCESS_MIN_MS = 800
+
 function SuccessStep() {
   return (
     <motion.div
@@ -1500,6 +1503,7 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
   const [role,   setRole]   = useState<string | null>(null)
   const resendExpiresAt     = useRef<number>(0)
   const redirectTimer       = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const router              = useRouter()
 
   useEffect(() => () => {
     if (redirectTimer.current) clearTimeout(redirectTimer.current)
@@ -1541,40 +1545,39 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
   const handleAuthSuccess = async (user: AuthUser, portalUrl: string) => {
     const mustChange = user.must_change_password
 
-    let finalUser = user
-    try {
-      const freshUser = await getMe()
-      finalUser = { ...freshUser, must_change_password: freshUser.must_change_password ?? mustChange }
-    } catch {
-      // keep original login response user
-    }
-
-    const shouldChangePassword = finalUser.must_change_password
-
+    // Show the tick straight away. The fuller profile (module permissions) and
+    // the portal's code load while it plays, rather than before it.
     setStep('success')
+    if (!mustChange) router.prefetch(portalUrl)
 
     // Commit the user only once the success animation is done, and let
     // AuthRehydrator own the redirect (it already routes on `user` for both
     // the portal and the must-change-password case). Setting the user or
     // navigating from here as well produced two replaces to the same route,
     // so the portal mounted and then immediately remounted.
-    redirectTimer.current = setTimeout(() => {
-      redirectTimer.current = null
+    const [finalUser] = await Promise.all([
+      getMe()
+        .then((freshUser): AuthUser => ({ ...freshUser, must_change_password: freshUser.must_change_password ?? mustChange }))
+        // keep original login response user
+        .catch(() => user),
+      new Promise<void>((resolve) => { redirectTimer.current = setTimeout(resolve, SUCCESS_MIN_MS) }),
+    ])
+    // A timer cleared on unmount never resolves, so nothing below runs then.
+    redirectTimer.current = null
 
-      if (!shouldChangePassword) {
-        const ch = new BroadcastChannel(`auth_sync_${finalUser.user_id}`)
-        ch.postMessage({ type: 'LOGIN', user: finalUser, portalUrl })
-        ch.close()
-      }
+    if (!finalUser.must_change_password) {
+      const ch = new BroadcastChannel(`auth_sync_${finalUser.user_id}`)
+      ch.postMessage({ type: 'LOGIN', user: finalUser, portalUrl })
+      ch.close()
+    }
 
-      useAuthStore.getState().setUser(finalUser)
+    useAuthStore.getState().setUser(finalUser)
 
-      handleClose()
-      setStep('email')
-      setEmail('')
-      setMethod(null)
-      resendExpiresAt.current = 0
-    }, 1800)
+    handleClose()
+    setStep('email')
+    setEmail('')
+    setMethod(null)
+    resendExpiresAt.current = 0
   }
 
   const progressSteps = method === 'password' ? STEP_ORDER_PW : STEP_ORDER
