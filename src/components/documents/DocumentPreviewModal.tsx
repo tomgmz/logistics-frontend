@@ -10,7 +10,7 @@ import { roleLabel } from '@/lib/roles'
 import {
   DOCUMENT_SOURCE_LABELS,
   DOCUMENT_TYPE_LABELS,
-  downloadUrl,
+  downloadFile,
   fileSizeLabel,
   previewKind,
   type LibraryDocument,
@@ -42,9 +42,10 @@ function Preview({ doc }: { doc: LibraryDocument }) {
       <FileQuestion size={40} className="text-white/25" />
       <p className="text-sm text-white/50">This file type can&apos;t be previewed in the browser.</p>
       <a
-        href={downloadUrl(doc.file_url)}
+        href={doc.file_url}
         target="_blank"
         rel="noopener noreferrer"
+        onClick={(e) => { e.preventDefault(); void downloadFile(doc.file_url, doc.file_name) }}
         className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold text-black"
         style={{ background: 'var(--color-cyan)' }}
       >
@@ -111,9 +112,10 @@ export default function DocumentPreviewModal({
                   <ExternalLink size={17} />
                 </a>
                 <a
-                  href={downloadUrl(doc.file_url)}
+                  href={doc.file_url}
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={(e) => { e.preventDefault(); void downloadFile(doc.file_url, doc.file_name) }}
                   className="p-2 rounded-lg hover:bg-white/5 text-white/60"
                   title="Download"
                   aria-label="Download"

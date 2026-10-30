@@ -78,7 +78,7 @@ const SERVICE_STATUS: Record<ServiceStatus, { label: string; color: string }> = 
 
 const SERVICE_ICON: Record<string, ReactNode> = {
   'email':         <Mail size={15} />,
-  'cloudinary':    <Cloud size={15} />,
+  'storage':       <Cloud size={15} />,
   'google-maps':   <MapPin size={15} />,
   'push':          <Bell size={15} />,
   'google-vision': <ScanLine size={15} />,

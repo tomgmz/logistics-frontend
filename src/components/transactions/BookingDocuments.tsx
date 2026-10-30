@@ -10,7 +10,7 @@ import {
 } from '@/lib/services/client/booking.service'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { getApiErrorMessage } from '@/lib/api-error'
-import { downloadUrl } from '@/app/types/documents.types'
+import { downloadFile } from '@/app/types/documents.types'
 import { DocumentThumb, DocumentTypeBadge } from '@/components/documents/DocumentVisuals'
 import { SectionHeader } from './TransactionDetail'
 import { formatDateTime } from './transaction-format'
@@ -52,7 +52,8 @@ function FileRow({ doc }: { doc: ClientBookingDocument }) {
           title="Open in a new tab" aria-label={`Open ${doc.file_name} in a new tab`}>
           <ExternalLink size={14} />
         </a>
-        <a href={downloadUrl(doc.file_url)} target="_blank" rel="noopener noreferrer"
+        <a href={doc.file_url} target="_blank" rel="noopener noreferrer"
+          onClick={(e) => { e.preventDefault(); void downloadFile(doc.file_url, doc.file_name) }}
           className="p-2 rounded-lg hover:bg-white/5" style={{ color: CYAN }}
           title="Download" aria-label={`Download ${doc.file_name}`}>
           <Download size={14} />

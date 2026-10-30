@@ -149,20 +149,33 @@ export function previewKind(url: string): PreviewKind {
   const path = url.split('?')[0].toLowerCase()
   if (/\.(jpe?g|png|webp|gif|heic|heif|avif)$/.test(path)) return 'image'
   if (path.endsWith('.pdf')) return 'pdf'
-  // Cloudinary image resources without an extension are still images.
+  // Older Cloudinary image resources without an extension are still images.
   if (path.includes('/image/upload/') && !/\.[a-z0-9]{2,5}$/.test(path)) return 'image'
   return 'other'
 }
 
 /**
- * A URL that downloads instead of opening. Cloudinary's fl_attachment flag
- * only works on image/video resources; raw files (DOCX, XLSX) are served as
- * downloads by the browser anyway.
+ * Saves the file instead of opening it. File links are signed and expire, so
+ * the name cannot be forced through the URL; the file is fetched and saved
+ * from a blob instead. If the fetch is refused (storage CORS not set for this
+ * site, very old browser), it opens in a new tab, where it can still be saved.
  */
-export function downloadUrl(url: string): string {
-  return url.includes('/image/upload/')
-    ? url.replace('/image/upload/', '/image/upload/fl_attachment/')
-    : url
+export async function downloadFile(url: string, fileName: string): Promise<void> {
+  try {
+    const res = await fetch(url)
+    if (!res.ok) throw new Error(String(res.status))
+    const href = URL.createObjectURL(await res.blob())
+    const a    = document.createElement('a')
+    a.href     = href
+    a.download = fileName
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    // Safari reads the blob after click() returns; revoke it later, not now.
+    setTimeout(() => URL.revokeObjectURL(href), 60_000)
+  } catch {
+    window.open(url, '_blank', 'noopener')
+  }
 }
 
 export function fileSizeLabel(bytes: number | null): string | null {

@@ -11,16 +11,11 @@ import {
 } from '@/app/types/documents.types'
 
 /**
- * A small Cloudinary-rendered thumbnail. PDFs stored as image resources can be
- * rasterised (first page); raw files have nothing to render, so they get an icon.
+ * The thumbnail source: photos are shown themselves (scaled by the box), every
+ * other file has nothing to render and gets an icon.
  */
-export function thumbnailUrl(url: string, size = 96): string | null {
-  if (!url.includes('/image/upload/')) return null
-  const t = `c_fill,w_${size},h_${size},q_auto`
-  if (url.toLowerCase().split('?')[0].endsWith('.pdf')) {
-    return url.replace('/image/upload/', `/image/upload/${t},pg_1,f_jpg/`).replace(/\.pdf(\?|$)/i, '.jpg$1')
-  }
-  return url.replace('/image/upload/', `/image/upload/${t},f_auto/`)
+export function thumbnailUrl(url: string): string | null {
+  return previewKind(url) === 'image' ? url : null
 }
 
 /** All a thumbnail needs, so the client's history can use it with its slimmer rows. */
@@ -39,7 +34,7 @@ function FallbackIcon({ doc, size }: { doc: ThumbDoc; size: number }) {
 }
 
 export function DocumentThumb({ doc, size = 40, big = false }: { doc: ThumbDoc; size?: number; big?: boolean }) {
-  const thumb = thumbnailUrl(doc.file_url, big ? 360 : 96)
+  const thumb = thumbnailUrl(doc.file_url)
   return (
     <div
       className="shrink-0 overflow-hidden rounded-lg border border-white/10 bg-black/40 flex items-center justify-center"

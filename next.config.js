@@ -15,6 +15,11 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'res.cloudinary.com',
       },
+      // Private file storage: signed, expiring links (see backend lib/storage.ts).
+      {
+        protocol: 'https',
+        hostname: '*.r2.cloudflarestorage.com',
+      },
     ],
   },
   // Apple fetches /.well-known/apple-app-site-association and REQUIRES

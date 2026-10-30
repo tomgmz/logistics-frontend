@@ -25,7 +25,7 @@ import {
   DOCUMENT_SOURCE_LABELS,
   DOCUMENT_TYPE_LABELS,
   STAFF_DOCUMENT_TYPES,
-  downloadUrl,
+  downloadFile,
   type DocumentCounts,
   type DocumentFilters,
   type DocumentFolder,
@@ -422,7 +422,7 @@ function DocumentLibrary() {
   function rowActions(d: LibraryDocument): RowAction[] {
     const actions: RowAction[] = [
       { label: 'Preview', icon: <Eye size={13} />, onSelect: () => setPreviewKey(d.doc_key) },
-      { label: 'Download', icon: <Download size={13} />, onSelect: () => window.open(downloadUrl(d.file_url), '_blank', 'noopener') },
+      { label: 'Download', icon: <Download size={13} />, onSelect: () => { void downloadFile(d.file_url, d.file_name) } },
     ]
     const href = bookingHref(d)
     if (href) actions.push({ label: 'Open Booking', icon: <ExternalLink size={13} />, onSelect: () => router.push(href) })
