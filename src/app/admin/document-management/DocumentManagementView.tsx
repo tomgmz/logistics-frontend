@@ -40,6 +40,7 @@ import ReusableModal, { RemarksModal } from '@/components/layout/ReusableModal'
 import RowActionMenu, { type RowAction } from '@/components/ui/RowActionMenu'
 import { useModuleAccess } from '@/components/layout/ModuleAccess'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
+import { useSignedLinkRefresh, withFreshLinks } from '@/lib/hooks/useSignedLinkRefresh'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { formatDate, formatTime } from '@/app/utils/timeFormat'
 import { appToast } from '@/lib/toast'
@@ -337,6 +338,14 @@ function DocumentLibrary() {
   }, [isFiles, filters, page, PAGE_SIZE])
 
   useEffect(() => { void load() }, [load])
+
+  // Document links expire after 10–15 minutes: fresh links for the same page,
+  // swapped in place so the rows someone is reading never move.
+  useSignedLinkRefresh(docs, () => {
+    fetchDocuments(filters, page, PAGE_SIZE)
+      .then((res) => setDocs((prev) => withFreshLinks(prev, res.data)))
+      .catch(() => {})
+  }, isFiles)
 
   const reloadAll = useCallback((quiet = false) => {
     void loadTop()

@@ -3,6 +3,7 @@
 import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
 import Pagination from '@/components/ui/Pagination'
 import { useLivePending } from '@/lib/hooks/useLiveTable'
+import { useSignedLinkRefresh, withFreshLinks } from '@/lib/hooks/useSignedLinkRefresh'
 import NewEntriesBar from '@/components/ui/NewEntriesBar'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
@@ -193,6 +194,15 @@ export default function TransactionHistoryView() {
   // window.location: on an in-app navigation the address only changes after
   // this page starts rendering. Each id opens once; the address is then tidied
   // so a refresh starts clean.
+  // The open booking's document links expire; swap in fresh ones.
+  const selectedBookingId = selected?.booking_id as string | undefined
+  useSignedLinkRefresh(selected, () => {
+    if (!selectedBookingId) return
+    bookingService.getBookingById(selectedBookingId)
+      .then((b) => setSelected((cur) => (cur?.booking_id === selectedBookingId ? withFreshLinks(cur, b as BookingWithRelations) : cur)))
+      .catch(() => {})
+  })
+
   const openedDeepLink = useRef<string | null>(null)
   const openDeepLink = useCallback((id: string | null) => {
     if (!id || openedDeepLink.current === id) return

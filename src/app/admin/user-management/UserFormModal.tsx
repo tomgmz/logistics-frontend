@@ -42,6 +42,7 @@ import { EMPTY_FLAGS, MODULES_BY_ROLE, levelToFlags, type ManagedRole, type Modu
 import { permissionsService } from '@/lib/services/admin/permissions.service'
 import ModulePermissionMatrix, { lockedLevelFor } from '@/app/it_admin/administrator-management/ModulePermissionMatrix'
 import { useRecordLock } from '@/lib/hooks/useRecordLock'
+import { useSignedLinkRefresh } from '@/lib/hooks/useSignedLinkRefresh'
 import RecordLockBanner, { RecordLockBadge } from '@/components/ui/RecordLockBanner'
 import { writeAccess } from '@/components/layout/ModuleAccess'
 
@@ -359,8 +360,20 @@ export default function UserFormModal({
   // Words where the scan may have read an Ñ as a plain N.
   const [nChecks, setNChecks] = useState<NonNullable<LicenseOCRResult['name_n_checks']>>([])
 
-  const storedLicenseUrl =
+  // Licence links expire after 10–15 minutes. A fresh one is kept here rather
+  // than in `user`, because a new `user` resets whatever the admin has typed.
+  const [freshLicense, setFreshLicense] = useState<{ userId: string; url: string | null } | null>(null)
+  const savedLicenseUrl =
     tab === 'drivers' ? (user as DriverUser | null)?.drivers?.license_image_url ?? null : null
+  const storedLicenseUrl =
+    freshLicense && freshLicense.userId === user?.user_id ? freshLicense.url : savedLicenseUrl
+  useSignedLinkRefresh(storedLicenseUrl, () => {
+    const id = user?.user_id
+    if (!id) return
+    driverService.getOne(id)
+      .then((d) => setFreshLicense({ userId: id, url: d?.drivers?.license_image_url ?? null }))
+      .catch(() => {})
+  }, tab === 'drivers' && !!user?.user_id)
 
   useEffect(() => {
     return () => { if (licensePreview) URL.revokeObjectURL(licensePreview) }

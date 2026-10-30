@@ -1,6 +1,7 @@
 'use client'
 
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
+import { useSignedLinkRefresh, withFreshLinks } from '@/lib/hooks/useSignedLinkRefresh'
 import { useServerTable } from '@/lib/hooks/useServerTable'
 import { useDebouncedValue } from '@/lib/hooks/useDebouncedValue'
 import { motion, Variants, AnimatePresence } from 'framer-motion'
@@ -239,6 +240,14 @@ export default function BookingHistoryModule() {
       .then((b) => setSelected((cur) => (cur?.booking_id === selectedId ? b as BookingWithRelations : cur)))
       .catch(() => {})
   }, { enabled: !!clientId && view === 'detail' && !!selectedId })
+
+  // Its document links expire; swap in fresh ones (the panels' typing is untouched).
+  useSignedLinkRefresh(selected, () => {
+    if (!selectedId) return
+    bookingService.getBookingById(selectedId)
+      .then((b) => setSelected((cur) => (cur?.booking_id === selectedId ? withFreshLinks(cur, b) : cur)))
+      .catch(() => {})
+  }, view === 'detail')
 
   // Notification deep-link: open the booking named in ?booking=. It is fetched
   // on its own, since the list is paged and it may not be on the page showing.

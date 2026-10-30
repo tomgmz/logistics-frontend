@@ -9,6 +9,7 @@ import {
   type ClientDocumentType,
 } from '@/lib/services/client/booking.service'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
+import { useSignedLinkRefresh } from '@/lib/hooks/useSignedLinkRefresh'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { downloadFile } from '@/app/types/documents.types'
 import { DocumentThumb, DocumentTypeBadge } from '@/components/documents/DocumentVisuals'
@@ -96,6 +97,8 @@ export default function BookingDocuments({ bookingId }: { bookingId: string }) {
   // Proof photos and staff uploads both signal on live:documents.
   const bump = useCallback(() => setReload((n) => n + 1), [])
   useLiveTable(['live:documents', 'live:bookings'], bump)
+  // Document links expire after 10–15 minutes; re-read before they do.
+  useSignedLinkRefresh(docs, bump)
 
   if (error && !docs) {
     return (

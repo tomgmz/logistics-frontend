@@ -56,6 +56,7 @@ import { isAssignable, type Truck as TruckType } from '@/app/types/truck.types'
 import { BLOWBAGETS_ITEMS } from '@/lib/blowbagets'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
+import { useSignedLinkRefresh, withFreshLinks } from '@/lib/hooks/useSignedLinkRefresh'
 import { nowDate } from '@/app/utils/serverTime'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
@@ -1681,6 +1682,16 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
       setDetailLoading(false)
     }
   }, [restoreAssignment])
+
+  // The open booking's file links expire; swap in fresh ones without touching
+  // anything someone may be editing.
+  useSignedLinkRefresh(detail, () => {
+    const id = selectedIdRef.current
+    if (!id) return
+    bookingService.getBookingById(id)
+      .then((b) => { if (selectedIdRef.current === id) setDetail((prev) => (prev ? withFreshLinks(prev, b) : prev)) })
+      .catch(() => {})
+  })
 
   /**
    * Re-read the open booking in place — for when someone else changed it. Unlike
