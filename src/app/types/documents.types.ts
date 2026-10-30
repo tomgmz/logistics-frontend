@@ -6,16 +6,24 @@
  * paperwork attached from this page — can be reviewed or archived.
  */
 
+/**
+ * Staff paperwork, in the order the upload form lists it. A Contract belongs
+ * to a client (its Contract folder), never a booking, and is staff only.
+ * Proof of Delivery and Other go on a booking; Other carries the type the
+ * uploader typed in and is staff only.
+ */
 export const STAFF_DOCUMENT_TYPES = [
-  'delivery_receipt',
-  'trip_ticket',
-  'dtr',
+  'contract',
   'proof_of_delivery',
-  'purchase_order',
-  'maintenance_record',
   'other',
 ] as const
 export type StaffDocumentType = (typeof STAFF_DOCUMENT_TYPES)[number]
+
+/** What can be picked when uploading to a booking. */
+export const BOOKING_DOCUMENT_TYPES = ['proof_of_delivery', 'other'] as const satisfies readonly StaffDocumentType[]
+
+/** The longest type an uploader may type in for Other (the backend's OTHER_LABEL_MAX). */
+export const OTHER_LABEL_MAX = 60
 
 export const DERIVED_DOCUMENT_TYPES = [
   'transaction_document',
@@ -35,13 +43,15 @@ export const DOCUMENT_TYPE_LABELS: Record<LibraryDocumentType, string> = {
   delivery_proof:       'Delivery Proof',
   odometer_photo:       'Odometer Photo',
   service_receipt:      'Service Receipt',
-  delivery_receipt:     'Signed Delivery Receipt',
-  trip_ticket:          'Trip Ticket',
-  dtr:                  'Daily Time Record',
   proof_of_delivery:    'Proof of Delivery',
-  purchase_order:       'Purchase Order',
-  maintenance_record:   'Maintenance Record',
-  other:                'Other Document',
+  other:                'Other',
+  contract:             'Contract',
+}
+
+/** A row's type as shown: Other reads "Other: <what was typed>". */
+export function documentTypeLabel(d: { doc_type: LibraryDocumentType; other_label?: string | null }): string {
+  if (d.doc_type === 'other' && d.other_label) return `Other: ${d.other_label}`
+  return DOCUMENT_TYPE_LABELS[d.doc_type] ?? d.doc_type
 }
 
 export type DocumentSource = 'client' | 'driver' | 'fleet' | 'staff'
@@ -64,7 +74,8 @@ export const REVIEW_STATUS_LABELS: Record<ReviewStatus, string> = {
 export interface LibraryDocument {
   doc_key:          string
   doc_type:         LibraryDocumentType
-  doc_group:        'booking' | 'fleet'
+  /** `client`: a contract, filed under the client rather than a booking. */
+  doc_group:        'booking' | 'fleet' | 'client'
   source:           DocumentSource
   file_url:         string
   file_name:        string
@@ -76,6 +87,9 @@ export interface LibraryDocument {
   reference_number: string | null
   booking_status:   string | null
   company_name:     string | null
+  client_id:        string | null
+  /** Other only: the type the uploader typed in. */
+  other_label:      string | null
   truck_id:         string | null
   plate_number:     string | null
   uploaded_by:      string | null
@@ -99,9 +113,11 @@ export interface DocumentCounts {
 export interface DocumentFilters {
   search?:        string
   types?:         LibraryDocumentType[]
-  group?:         'booking' | 'fleet'
+  group?:         'booking' | 'fleet' | 'client'
   review_status?: ReviewStatus
   booking_id?:    string
+  /** A client's Contract folder (with group 'client'). */
+  client_id?:     string
   /** A vehicle's folder. */
   truck_id?:      string
   date_from?:     string
@@ -133,6 +149,11 @@ export interface DocumentFolder {
 }
 
 export type DocumentFolderLevel = 'clients' | 'bookings' | 'vehicles'
+
+export interface ClientOption {
+  client_id:    string
+  company_name: string | null
+}
 
 export interface BookingOption {
   booking_id:       string

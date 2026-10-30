@@ -4,12 +4,14 @@ import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, UploadCloud, Search, FileText, Trash2, Check } from 'lucide-react'
 
-import { searchBookingsForUpload, uploadDocuments } from '@/lib/services/admin/documents.service'
+import { fetchOtherLabels, searchBookingsForUpload, searchClientsForUpload, uploadDocuments } from '@/lib/services/admin/documents.service'
 import {
   DOCUMENT_TYPE_LABELS,
+  OTHER_LABEL_MAX,
   STAFF_DOCUMENT_TYPES,
   fileSizeLabel,
   type BookingOption,
+  type ClientOption,
   type StaffDocumentType,
 } from '@/app/types/documents.types'
 import { appToast } from '@/lib/toast'
@@ -25,15 +27,25 @@ function titleCase(s: string): string {
   return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
+/**
+ * Staff upload. The type decides where it goes: Proof of Delivery and Other
+ * onto a booking (Other with a typed-in type, suggested from earlier ones),
+ * a Contract onto a client, in that client's Contract folder.
+ */
 export default function UploadDocumentModal({
   open,
   initialBooking,
+  initialClient,
+  initialType = 'proof_of_delivery',
   onClose,
   onUploaded,
 }: {
   open:            boolean
   /** Pre-selects the booking when the library is already focused on one. */
   initialBooking?: BookingOption | null
+  /** Pre-selects the client inside a client's folder (for a contract). */
+  initialClient?:  ClientOption | null
+  initialType?:    StaffDocumentType
   onClose:         () => void
   onUploaded:      () => void
 }) {
@@ -41,7 +53,12 @@ export default function UploadDocumentModal({
   const [query,    setQuery]    = useState('')
   const [options,  setOptions]  = useState<BookingOption[]>([])
   const [searching, setSearching] = useState(false)
-  const [docType,  setDocType]  = useState<StaffDocumentType>('delivery_receipt')
+  const [client,        setClient]        = useState<ClientOption | null>(null)
+  const [clientQuery,   setClientQuery]   = useState('')
+  const [clientOptions, setClientOptions] = useState<ClientOption[]>([])
+  const [otherLabel,    setOtherLabel]    = useState('')
+  const [labelHints,    setLabelHints]    = useState<string[]>([])
+  const [docType,  setDocType]  = useState<StaffDocumentType>(initialType)
   const [notes,    setNotes]    = useState('')
   const [files,    setFiles]    = useState<File[]>([])
   const [dragging, setDragging] = useState(false)
@@ -53,14 +70,19 @@ export default function UploadDocumentModal({
     if (!open) return
     setBooking(initialBooking ?? null)
     setQuery('')
-    setDocType('delivery_receipt')
+    setClient(initialClient ?? null)
+    setClientQuery('')
+    setOtherLabel('')
+    setDocType(initialType)
     setNotes('')
     setFiles([])
-  }, [open, initialBooking])
+  }, [open, initialBooking, initialClient, initialType])
+
+  const isContract = docType === 'contract'
 
   // Debounced booking search; an empty query lists the most recent bookings.
   useEffect(() => {
-    if (!open || booking) return
+    if (!open || isContract || booking) return
     let cancelled = false
     setSearching(true)
     const t = window.setTimeout(() => {
@@ -70,7 +92,33 @@ export default function UploadDocumentModal({
         .finally(() => { if (!cancelled) setSearching(false) })
     }, 250)
     return () => { cancelled = true; window.clearTimeout(t) }
-  }, [open, booking, query])
+  }, [open, isContract, booking, query])
+
+  // Debounced client search, for a contract.
+  useEffect(() => {
+    if (!open || !isContract || client) return
+    let cancelled = false
+    setSearching(true)
+    const t = window.setTimeout(() => {
+      searchClientsForUpload(clientQuery)
+        .then((rows) => { if (!cancelled) setClientOptions(rows) })
+        .catch(() => { if (!cancelled) setClientOptions([]) })
+        .finally(() => { if (!cancelled) setSearching(false) })
+    }, 250)
+    return () => { cancelled = true; window.clearTimeout(t) }
+  }, [open, isContract, client, clientQuery])
+
+  // Types typed for Other before, read once when Other is chosen.
+  useEffect(() => {
+    if (!open || docType !== 'other') return
+    let cancelled = false
+    fetchOtherLabels().then((l) => { if (!cancelled) setLabelHints(l) }).catch(() => {})
+    return () => { cancelled = true }
+  }, [open, docType])
+  const typed = otherLabel.trim().toLowerCase()
+  const hints = labelHints
+    .filter((l) => l.toLowerCase() !== typed && (!typed || l.toLowerCase().includes(typed)))
+    .slice(0, 6)
 
   function addFiles(list: FileList | File[]) {
     const incoming = Array.from(list)
@@ -97,18 +145,23 @@ export default function UploadDocumentModal({
   }
 
   async function submit() {
-    if (!booking || files.length === 0) return
+    if (!canSubmit) return
     setBusy(true)
     try {
       const { document_ids } = await uploadDocuments({
-        bookingId:    booking.booking_id,
+        bookingId:    isContract ? null : booking?.booking_id,
+        clientId:     isContract ? client?.client_id : null,
         documentType: docType,
+        otherLabel:   docType === 'other' ? otherLabel : null,
         notes,
         files,
       })
+      const n = `${document_ids.length} document${document_ids.length === 1 ? '' : 's'}`
       appToast.success(
-        `${document_ids.length} document${document_ids.length === 1 ? '' : 's'} attached to ${booking.reference_number ?? 'the booking'}. Awaiting review.`,
-        { action: 'document-upload', entityId: booking.booking_id },
+        isContract
+          ? `${n} added to the contracts of ${client?.company_name ?? 'the client'}. Awaiting review.`
+          : `${n} attached to ${booking?.reference_number ?? 'the booking'}. Awaiting review.`,
+        { action: 'document-upload', entityId: isContract ? client?.client_id : booking?.booking_id },
       )
       onUploaded()
       onClose()
@@ -119,7 +172,9 @@ export default function UploadDocumentModal({
     }
   }
 
-  const canSubmit = !!booking && files.length > 0 && !busy
+  const canSubmit = (isContract ? !!client : !!booking)
+    && (docType !== 'other' || !!otherLabel.trim())
+    && files.length > 0 && !busy
 
   return (
     <AnimatePresence>
@@ -145,7 +200,9 @@ export default function UploadDocumentModal({
             <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.07] shrink-0">
               <div>
                 <h2 className="text-base font-bold text-white">Upload Document</h2>
-                <p className="text-[11px] text-white/40 mt-0.5">Attach paperwork to a booking. It will wait for another reviewer to approve it.</p>
+                <p className="text-[11px] text-white/40 mt-0.5">
+                  {isContract ? 'Add a contract to a client.' : 'Attach paperwork to a booking.'} It will wait for another reviewer to approve it.
+                </p>
               </div>
               <button type="button" disabled={busy} onClick={onClose} className="p-2 rounded-lg hover:bg-white/5 text-white/50" aria-label="Close">
                 <X size={18} />
@@ -153,7 +210,67 @@ export default function UploadDocumentModal({
             </div>
 
             <div className="p-5 space-y-5 overflow-y-auto min-h-0">
-              {/* Booking */}
+              {/* Type */}
+              <div>
+                <label htmlFor="doc-type" className="block text-[11px] font-bold uppercase tracking-wide text-white/45 mb-1.5">Document Type</label>
+                <select
+                  id="doc-type"
+                  value={docType}
+                  disabled={busy}
+                  onChange={(e) => setDocType(e.target.value as StaffDocumentType)}
+                  className="w-full rounded-xl border border-white/10 bg-[#111] px-3 py-2.5 text-sm text-white/85 outline-none focus:border-[var(--color-cyan)]/50"
+                >
+                  {STAFF_DOCUMENT_TYPES.map((t) => (
+                    <option key={t} value={t}>{DOCUMENT_TYPE_LABELS[t]}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Client (a contract) */}
+              {isContract && (
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wide text-white/45 mb-1.5">Client</label>
+                  {client ? (
+                    <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--color-cyan)]/35 bg-[rgba(77,249,237,0.06)] px-3 py-2.5">
+                      <p className="min-w-0 truncate text-sm font-semibold text-white">{client.company_name ?? 'Unnamed client'}</p>
+                      <button type="button" disabled={busy} onClick={() => setClient(null)} className="text-xs font-semibold text-[var(--color-cyan)] hover:underline shrink-0">
+                        Change
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="overflow-hidden rounded-xl border border-white/10 bg-black/20">
+                      <div className="flex items-center gap-2 px-3 py-2 border-b border-white/[0.06]">
+                        <Search size={14} className="text-white/35" />
+                        <input
+                          value={clientQuery}
+                          onChange={(e) => setClientQuery(e.target.value)}
+                          placeholder="Search by company…"
+                          className="bg-transparent outline-none text-sm flex-1 text-white/85 placeholder:text-white/30"
+                        />
+                      </div>
+                      <div className="max-h-48 overflow-y-auto">
+                        {searching && clientOptions.length === 0 ? (
+                          <p className="px-3 py-3 text-xs text-white/40">Searching…</p>
+                        ) : clientOptions.length === 0 ? (
+                          <p className="px-3 py-3 text-xs text-white/40">No clients match.</p>
+                        ) : clientOptions.map((o) => (
+                          <button
+                            key={o.client_id}
+                            type="button"
+                            onClick={() => setClient(o)}
+                            className="w-full text-left px-3 py-2 hover:bg-white/5 text-sm text-white/85 truncate"
+                          >
+                            {o.company_name ?? 'Unnamed client'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Booking (Proof of Delivery, Other) */}
+              {!isContract && (
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wide text-white/45 mb-1.5">Booking</label>
                 {booking ? (
@@ -170,11 +287,10 @@ export default function UploadDocumentModal({
                     </button>
                   </div>
                 ) : (
-                  <div className="rounded-xl border border-white/10 bg-black/20">
+                  <div className="overflow-hidden rounded-xl border border-white/10 bg-black/20">
                     <div className="flex items-center gap-2 px-3 py-2 border-b border-white/[0.06]">
                       <Search size={14} className="text-white/35" />
                       <input
-                        autoFocus
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
                         placeholder="Search by booking reference or client…"
@@ -204,22 +320,40 @@ export default function UploadDocumentModal({
                   </div>
                 )}
               </div>
+              )}
 
-              {/* Type */}
-              <div>
-                <label htmlFor="doc-type" className="block text-[11px] font-bold uppercase tracking-wide text-white/45 mb-1.5">Document Type</label>
-                <select
-                  id="doc-type"
-                  value={docType}
-                  disabled={busy}
-                  onChange={(e) => setDocType(e.target.value as StaffDocumentType)}
-                  className="w-full rounded-xl border border-white/10 bg-[#111] px-3 py-2.5 text-sm text-white/85 outline-none focus:border-[var(--color-cyan)]/50"
-                >
-                  {STAFF_DOCUMENT_TYPES.map((t) => (
-                    <option key={t} value={t}>{DOCUMENT_TYPE_LABELS[t]}</option>
-                  ))}
-                </select>
-              </div>
+              {/* Other: what kind of document */}
+              {docType === 'other' && (
+                <div>
+                  <label htmlFor="doc-other" className="block text-[11px] font-bold uppercase tracking-wide text-white/45 mb-1.5">
+                    What kind of document? <span className="normal-case font-normal text-white/30">(staff only)</span>
+                  </label>
+                  <input
+                    id="doc-other"
+                    value={otherLabel}
+                    disabled={busy}
+                    maxLength={OTHER_LABEL_MAX}
+                    onChange={(e) => setOtherLabel(e.target.value)}
+                    placeholder="e.g. Invoice"
+                    className="w-full rounded-xl border border-white/10 bg-[#111] px-3 py-2.5 text-sm text-white/85 outline-none focus:border-[var(--color-cyan)]/50 placeholder:text-white/25"
+                  />
+                  {hints.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {hints.map((h) => (
+                        <button
+                          key={h}
+                          type="button"
+                          disabled={busy}
+                          onClick={() => setOtherLabel(h)}
+                          className="rounded-full border border-white/15 px-2.5 py-1 text-xs text-white/75 [@media(hover:hover)]:hover:border-[var(--color-cyan)]/50 [@media(hover:hover)]:hover:text-white"
+                        >
+                          {h}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Files */}
               <div>

@@ -56,23 +56,20 @@ const TYPE_TONE: Record<LibraryDocumentType, string> = {
   delivery_proof:       '#3af626',
   odometer_photo:       '#8a38f5',
   service_receipt:      '#8a38f5',
-  delivery_receipt:     '#4df9ed',
-  trip_ticket:          '#4df9ed',
-  dtr:                  '#4df9ed',
   proof_of_delivery:    '#4df9ed',
-  purchase_order:       '#4df9ed',
-  maintenance_record:   '#4df9ed',
   other:                '#4df9ed',
+  contract:             '#ff7a30',
 }
 
-export function DocumentTypeBadge({ type }: { type: LibraryDocumentType }) {
+/** `label` overrides the type's name, e.g. "Other: Invoice" (documentTypeLabel). */
+export function DocumentTypeBadge({ type, label }: { type: LibraryDocumentType; label?: string }) {
   const color = TYPE_TONE[type] ?? '#aaa'
   return (
     <span
       className="inline-flex text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border whitespace-nowrap"
       style={{ color, borderColor: `${color}55`, background: `${color}14` }}
     >
-      {DOCUMENT_TYPE_LABELS[type] ?? type}
+      {label ?? DOCUMENT_TYPE_LABELS[type] ?? type}
     </span>
   )
 }

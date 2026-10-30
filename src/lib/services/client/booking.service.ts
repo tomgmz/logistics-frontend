@@ -112,9 +112,9 @@ export interface UpdateBookingPayload {
   transaction_documents?: string[] | null
 }
 
+/** What a client can be shown (the backend's CLIENT_VISIBLE_DOCUMENT_TYPES). */
 export type ClientDocumentType =
-  | 'transaction_document' | 'pickup_proof' | 'delivery_proof'
-  | 'delivery_receipt' | 'proof_of_delivery' | 'trip_ticket' | 'purchase_order' | 'other'
+  | 'transaction_document' | 'pickup_proof' | 'delivery_proof' | 'proof_of_delivery'
 
 /** One step's time at a stop. `proof` = the photo confirmation (the finish). */
 export interface StepTime {

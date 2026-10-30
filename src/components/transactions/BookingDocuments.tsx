@@ -28,7 +28,7 @@ import { BG_PANEL, BG_CARD, BORDER, BORDER_C, CYAN, MUTED, ERROR } from './trans
  */
 
 const PROOF_TYPES: ReadonlySet<ClientDocumentType> = new Set([
-  'pickup_proof', 'delivery_proof', 'proof_of_delivery', 'delivery_receipt',
+  'pickup_proof', 'delivery_proof', 'proof_of_delivery',
 ])
 
 function FileRow({ doc }: { doc: ClientBookingDocument }) {

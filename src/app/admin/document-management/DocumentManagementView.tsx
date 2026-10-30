@@ -25,6 +25,7 @@ import {
   DOCUMENT_SOURCE_LABELS,
   DOCUMENT_TYPE_LABELS,
   STAFF_DOCUMENT_TYPES,
+  documentTypeLabel,
   downloadFile,
   type DocumentCounts,
   type DocumentFilters,
@@ -87,6 +88,8 @@ type ViewMode = 'table' | 'grid'
 type Nav =
   | { level: 'root'; only?: 'clients' }
   | { level: 'client';  clientId: string }
+  /** A client's Contract folder, pinned first inside the client's folder. */
+  | { level: 'contract'; clientId: string }
   | { level: 'booking'; bookingId: string }
   | { level: 'fleet' }
   | { level: 'vehicle'; truckId: string }
@@ -124,7 +127,9 @@ function navFrom(p: URLSearchParams): Nav {
   const booking = p.get('booking')
   const vehicle = p.get('vehicle')
   const client  = p.get('client')
+  const contract = p.get('contract')
   if (booking) return { level: 'booking', bookingId: booking }
+  if (contract) return { level: 'contract', clientId: contract }
   if (vehicle) return { level: 'vehicle', truckId: vehicle }
   if (p.get('review') === '1') return { level: 'review' }
   if (client)  return { level: 'client', clientId: client }
@@ -136,6 +141,7 @@ function navQuery(n: Nav): string {
   switch (n.level) {
     case 'root':    return n.only === 'clients' ? '?show=clients' : ''
     case 'client':  return `?client=${encodeURIComponent(n.clientId)}`
+    case 'contract': return `?contract=${encodeURIComponent(n.clientId)}`
     case 'booking': return `?booking=${encodeURIComponent(n.bookingId)}`
     case 'fleet':   return '?fleet=1'
     case 'vehicle': return `?vehicle=${encodeURIComponent(n.truckId)}`
@@ -198,7 +204,7 @@ function DocumentLibrary() {
   const { canCreate, canEdit, canDelete, canExport } = useModuleAccess()
 
   const nav     = useMemo(() => navFrom(new URLSearchParams(searchParams?.toString() ?? '')), [searchParams])
-  const isFiles = nav.level === 'booking' || nav.level === 'vehicle' || nav.level === 'review'
+  const isFiles = nav.level === 'booking' || nav.level === 'vehicle' || nav.level === 'review' || nav.level === 'contract'
   const go      = useCallback((n: Nav) => router.push(`${pathname}${navQuery(n)}`), [router, pathname])
 
   // ── The top-level lists: the root's rows, and the names in the breadcrumb ──
@@ -258,7 +264,7 @@ function DocumentLibrary() {
 
   // Typing a full booking reference opens that booking.
   const bookingMatches = useMemo(
-    () => (nav.level === 'root' ? folders.filter((f) => f.kind === 'booking') : nav.level === 'client' ? folders : []),
+    () => (nav.level === 'root' || nav.level === 'client' ? folders.filter((f) => f.kind === 'booking') : []),
     [nav.level, folders],
   )
   useEffect(() => {
@@ -320,7 +326,8 @@ function DocumentLibrary() {
     review_status: nav.level === 'review' ? 'pending' : (review || undefined),
     booking_id:    nav.level === 'booking' ? nav.bookingId : undefined,
     truck_id:      nav.level === 'vehicle' ? nav.truckId : undefined,
-    group:         nav.level === 'vehicle' ? 'fleet' : undefined,
+    client_id:     nav.level === 'contract' ? nav.clientId : undefined,
+    group:         nav.level === 'vehicle' ? 'fleet' : nav.level === 'contract' ? 'client' : undefined,
     date_from:     dateRange?.from,
     date_to:       dateRange?.to,
     archived:      archived ? 'only' : 'hide',
@@ -565,6 +572,10 @@ function DocumentLibrary() {
   if (nav.level === 'client') {
     title = clientName(nav.clientId)
     crumbs.push({ label: title })
+  } else if (nav.level === 'contract') {
+    crumbs.push({ label: clientName(nav.clientId), to: { level: 'client', clientId: nav.clientId } })
+    title = 'Contract'
+    crumbs.push({ label: title })
   } else if (nav.level === 'booking') {
     const cid = bookingInfo ? (bookingInfo.client_id ?? 'none') : null
     if (cid) crumbs.push({ label: clientName(cid), to: { level: 'client', clientId: cid } })
@@ -608,11 +619,17 @@ function DocumentLibrary() {
           })
     }
     if (nav.level === 'client') {
-      return folders.map((b) => ({
+      return folders.map((b): FolderRow => b.kind === 'contract'
+        ? {
+            key: `k:${b.id}`, to: { level: 'contract', clientId: nav.clientId },
+            name: 'Contract', sub: 'Staff only',
+            detail: '—', files: b.file_count, pending: b.pending_review, last: b.last_upload,
+          }
+        : {
         key: `b:${b.id}`, to: { level: 'booking', bookingId: b.id ?? '' },
         name: b.name ?? 'Booking', sub: b.schedule_date ? `Scheduled ${formatDate(b.schedule_date)}` : 'Booking',
         detail: <StatusPill status={b.booking_status} />, files: b.file_count, pending: b.pending_review, last: b.last_upload,
-      }))
+      })
     }
     return folders.map((v) => ({
       key: `v:${v.id}`, to: { level: 'vehicle', truckId: v.id ?? '' }, fleet: true,
@@ -790,7 +807,7 @@ function DocumentLibrary() {
                         <DocumentThumb doc={d} big />
                         <div className="mt-2 min-w-0 space-y-1">
                           <div className="flex items-start justify-between gap-1">
-                            <DocumentTypeBadge type={d.doc_type} />
+                            <DocumentTypeBadge type={d.doc_type} label={documentTypeLabel(d)} />
                             <div onClick={(e) => e.stopPropagation()}>
                               <RowActionMenu label={`Actions for ${d.file_name}`} heading={d.file_name} actions={rowActions(d)} />
                             </div>
@@ -856,7 +873,7 @@ function DocumentLibrary() {
                               </div>
                             </div>
                           </td>
-                          <td className={TD}><DocumentTypeBadge type={d.doc_type} /></td>
+                          <td className={TD}><DocumentTypeBadge type={d.doc_type} label={documentTypeLabel(d)} /></td>
                           {showRefColumn && (
                             <td className={TD}>
                               {d.reference_number ? (
@@ -980,6 +997,10 @@ function DocumentLibrary() {
           schedule_date:    bookingInfo.schedule_date,
           company_name:     bookingInfo.company_name,
         } : null}
+        initialClient={nav.level === 'client' || nav.level === 'contract'
+          ? { client_id: nav.clientId, company_name: clientName(nav.clientId) }
+          : null}
+        initialType={nav.level === 'contract' ? 'contract' : 'proof_of_delivery'}
         onClose={() => setUploadOpen(false)}
         onUploaded={() => reloadAll(true)}
       />
@@ -988,7 +1009,7 @@ function DocumentLibrary() {
         open={!!approveOf}
         title="Approve document?"
         description={approveOf
-          ? `Approve "${approveOf.file_name}" as the ${DOCUMENT_TYPE_LABELS[approveOf.doc_type].toLowerCase()} for ${approveOf.reference_number ?? 'this booking'}.`
+          ? `Approve "${approveOf.file_name}" as the ${documentTypeLabel(approveOf).toLowerCase()} for ${approveOf.reference_number ?? approveOf.company_name ?? 'this booking'}.`
           : undefined}
         confirmLabel={busy ? 'Saving…' : 'Approve'}
         cancelLabel="Cancel"

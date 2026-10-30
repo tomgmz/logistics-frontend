@@ -9,7 +9,7 @@ import { formatDateTime } from '@/app/utils/timeFormat'
 import { roleLabel } from '@/lib/roles'
 import {
   DOCUMENT_SOURCE_LABELS,
-  DOCUMENT_TYPE_LABELS,
+  documentTypeLabel,
   downloadFile,
   fileSizeLabel,
   previewKind,
@@ -95,7 +95,7 @@ export default function DocumentPreviewModal({
               <div className="min-w-0">
                 <h2 className="text-sm font-bold text-white truncate">{doc.file_name}</h2>
                 <p className="text-[11px] text-white/40 mt-0.5">
-                  {DOCUMENT_TYPE_LABELS[doc.doc_type]}
+                  {documentTypeLabel(doc)}
                   {doc.reference_number && ` · ${doc.reference_number}`}
                   {doc.plate_number && ` · ${doc.plate_number}`}
                 </p>
@@ -136,7 +136,7 @@ export default function DocumentPreviewModal({
               <aside className="lg:w-[340px] shrink-0 border-t lg:border-t-0 lg:border-l border-white/[0.07] flex flex-col min-h-0 max-h-[45%] lg:max-h-none">
                 <div className="p-4 space-y-4 overflow-y-auto min-h-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <DocumentTypeBadge type={doc.doc_type} />
+                    <DocumentTypeBadge type={doc.doc_type} label={documentTypeLabel(doc)} />
                     <ReviewStatusBadge doc={doc} />
                   </div>
 

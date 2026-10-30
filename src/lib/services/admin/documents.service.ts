@@ -4,15 +4,16 @@ import { manilaCellDate, manilaDateStamp, xlsxBlob, type XlsxColumn } from '@/li
 import { roleLabel } from '@/lib/roles'
 import {
   DOCUMENT_SOURCE_LABELS,
-  DOCUMENT_TYPE_LABELS,
   REVIEW_STATUS_LABELS,
   type BookingOption,
+  type ClientOption,
   type DocumentFilters,
   type DocumentFolder,
   type DocumentFolderLevel,
   type DocumentPage,
   type LibraryDocument,
   type StaffDocumentType,
+  documentTypeLabel,
   downloadFile,
   saveBlob,
 } from '@/app/types/documents.types'
@@ -33,6 +34,7 @@ function toParams(f: DocumentFilters): Record<string, string> {
   if (f.review_status)        p.review_status = f.review_status
   if (f.booking_id)           p.booking_id    = f.booking_id
   if (f.truck_id)             p.truck_id      = f.truck_id
+  if (f.client_id)            p.client_id     = f.client_id
   if (f.date_from)            p.date_from     = f.date_from
   if (f.date_to)              p.date_to       = f.date_to
   if (f.archived === 'only')  p.archived      = 'only'
@@ -62,7 +64,7 @@ export async function fetchFolders(level: DocumentFolderLevel, q: {
 }
 
 /** A folder row of the Documents table; `kind` is set on the paged top level. */
-export type DocumentFolderRow = DocumentFolder & { kind?: 'client' | 'booking' | 'fleet' }
+export type DocumentFolderRow = DocumentFolder & { kind?: 'client' | 'booking' | 'fleet' | 'contract' }
 
 /**
  * One page of the folder table. `root` is the top level (clients, matching
@@ -86,16 +88,33 @@ export async function searchBookingsForUpload(search: string): Promise<BookingOp
   return data?.data ?? []
 }
 
+/** The client picker for uploading a contract. */
+export async function searchClientsForUpload(search: string): Promise<ClientOption[]> {
+  const { data } = await proxyApi.get<{ data: ClientOption[] }>(`${B}/clients`, { params: { search } })
+  return data?.data ?? []
+}
+
+/** Types typed in for Other before, most used first. */
+export async function fetchOtherLabels(): Promise<string[]> {
+  const { data } = await proxyApi.get<{ data: string[] }>(`${B}/other-labels`)
+  return data?.data ?? []
+}
+
+/** A booking upload (Proof of Delivery, Other + its type) or a client's contract. */
 export async function uploadDocuments(input: {
-  bookingId:    string
+  bookingId?:   string | null
+  clientId?:    string | null
   documentType: StaffDocumentType
+  otherLabel?:  string | null
   notes:        string
   files:        File[]
 }): Promise<{ document_ids: string[] }> {
   await initCsrf()
   const form = new FormData()
-  form.append('booking_id', input.bookingId)
+  if (input.bookingId) form.append('booking_id', input.bookingId)
+  if (input.clientId)  form.append('client_id', input.clientId)
   form.append('document_type', input.documentType)
+  if (input.documentType === 'other' && input.otherLabel?.trim()) form.append('other_label', input.otherLabel.trim())
   if (input.notes.trim()) form.append('notes', input.notes.trim())
   input.files.forEach((f) => form.append('documents', f))
 
@@ -129,7 +148,7 @@ type ZipRow = LibraryDocument & { zip_name: string | null }
 const DOCUMENT_XLSX_COLUMNS: XlsxColumn<ZipRow>[] = [
   { label: 'File in ZIP',      width: 44, value: (d) => d.zip_name ?? 'Not included: it could not be downloaded' },
   { label: 'Uploaded (PHT)',   width: 20, value: (d) => manilaCellDate(d.uploaded_at) },
-  { label: 'Type',             width: 24, value: (d) => DOCUMENT_TYPE_LABELS[d.doc_type] ?? d.doc_type },
+  { label: 'Type',             width: 24, value: (d) => documentTypeLabel(d) },
   { label: 'Source',           width: 16, value: (d) => DOCUMENT_SOURCE_LABELS[d.source] },
   { label: 'Original File',    width: 36, value: (d) => d.file_name },
   { label: 'Booking',          width: 18, value: (d) => d.reference_number },
@@ -162,7 +181,7 @@ function extensionOf(d: LibraryDocument): string {
 function zipName(d: LibraryDocument, used: Set<string>): string {
   const ext  = extensionOf(d)
   const base = PHOTO_TYPES.has(d.doc_type)
-    ? [d.reference_number ?? d.plate_number, DOCUMENT_TYPE_LABELS[d.doc_type] ?? d.doc_type].filter(Boolean).join(' - ')
+    ? [d.reference_number ?? d.plate_number, documentTypeLabel(d)].filter(Boolean).join(' - ')
     : d.file_name.replace(/\.[a-z0-9]{2,5}$/i, '')
   const safe = (base || 'document').replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').trim().slice(0, 120) || 'document'
   let name = `${safe}.${ext}`
