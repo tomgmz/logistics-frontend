@@ -129,7 +129,7 @@ export default function ContactSection() {
 
   return (
     <>
-      <section id="contact" className="relative w-full pt-[clamp(5.5rem,12svh,7rem)] pb-[clamp(2rem,8svh,6rem)] short:pb-6 overflow-hidden">
+      <section id="contact" className="relative w-full bg-[#0a0a0a] pt-[clamp(5.5rem,12svh,7rem)] pb-[clamp(2rem,8svh,6rem)] short:pb-6 overflow-hidden">
         <div
           className="absolute inset-0 pointer-events-none"
           style={{

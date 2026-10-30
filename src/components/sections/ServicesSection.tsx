@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, useInView } from 'framer-motion';
 import Image from 'next/image';
-import { ASSETS, SERVICES, CYCLING_WORDS } from '@/lib/data';
+import { SERVICES, CYCLING_WORDS } from '@/lib/data';
 
 const WORD_COLORS = [
   '#4df9ed',
@@ -102,12 +102,6 @@ export default function ServicesSection() {
 
   return (
     <section id="services" className="relative w-full min-h-svh bg-[#1b1b1b] overflow-hidden pt-[clamp(5.5rem,12svh,7rem)] pb-[clamp(2rem,8svh,6rem)] flex items-center justify-center">
-      {/* White background glow from the Figma, centred behind the heading and cards. */}
-      <div className="absolute left-1/2 top-[46.4%] -translate-x-1/2 -translate-y-1/2 size-[340px] pointer-events-none z-0">
-        <div className="absolute inset-[-205.88%]">
-          <Image src={ASSETS.sectionEllipse} alt="" width={1740} height={1740} className="block max-w-none size-full" />
-        </div>
-      </div>
       <div className="relative z-10 max-w-[1600px] w-full mx-auto px-5 sm:px-8 md:px-12 lg:px-16">
 
         <motion.div

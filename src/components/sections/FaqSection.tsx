@@ -1,9 +1,8 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import Image from 'next/image';
 import { motion, useInView, AnimatePresence } from 'framer-motion';
-import { ASSETS, FAQS } from '@/lib/data';
+import { FAQS } from '@/lib/data';
 
 function FaqItem({ 
   q, 
@@ -86,16 +85,8 @@ export default function FaqSection() {
   const ref    = useRef<HTMLDivElement>(null);
   const inView = useInView(ref as React.RefObject<Element>, { once: true, margin: '-80px' });
 
-  // overflow-x only: the glow below spills down behind the contact section, as in the Figma.
   return (
-    <section id="faq" className="relative w-full bg-[#0a0a0a] pt-[clamp(5.5rem,12svh,7rem)] pb-[clamp(2rem,8svh,6rem)] overflow-x-clip">
-
-      {/* White glow from the Figma, centred just above the bottom of the question list. */}
-      <div className="absolute left-1/2 bottom-[clamp(2rem,8svh,6rem)] -translate-x-1/2 translate-y-[30%] size-[340px] pointer-events-none z-0">
-        <div className="absolute inset-[-205.88%]">
-          <Image src={ASSETS.sectionEllipse} alt="" width={1740} height={1740} className="block max-w-none size-full" />
-        </div>
-      </div>
+    <section id="faq" className="relative w-full bg-[#0a0a0a] pt-[clamp(5.5rem,12svh,7rem)] pb-[clamp(2rem,8svh,6rem)] overflow-hidden">
 
       <div className="relative z-10 max-w-[860px] mx-auto px-5 sm:px-8 md:px-12">
 

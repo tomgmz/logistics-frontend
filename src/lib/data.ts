@@ -6,7 +6,6 @@ export const ASSETS = {
 
   // Hero
   heroContainers: '/landingpage/heroSection/hero-section-bg.png',
-  heroGlow:       '/landingpage/heroSection/hero-glow.svg',
   // Trucks
   cargoTruck:     '/landingpage/aboutSection/cargo-truck.png',
   l300Van:        '/landingpage/aboutSection/l300-van.png',
@@ -14,7 +13,6 @@ export const ASSETS = {
   svcContainers:  '/landingpage/servicesSection/svc-containers.jpg',
   svcDelivery:    '/landingpage/servicesSection/svc-delivery.jpg',
   svcTracking:    '/landingpage/servicesSection/svc-tracking.jpg',
-  sectionEllipse: '/landingpage/servicesSection/section-ellipse.svg',
 
   // Metrics
   metricsBg:      '/landingpage/metrics-section/metricsbg.png',
