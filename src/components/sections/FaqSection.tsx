@@ -108,13 +108,13 @@ export default function FaqSection() {
           initial={{ opacity: 0, y: 20 }}
           animate={inView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6, delay: 0.1 }}
-          className="font-'Alegreysa Sans SC, sans-serif' text-[#818181] text-sm sm:text-sm md:text-base lg:text-2xl
-            text-center tracking-widest uppercase mb-[clamp(1.5rem,5svh,3.5rem)]"
+          className="ff-sc text-[#818181]
+            text-center max-w-2xl mx-auto mb-[clamp(1.5rem,5svh,3.5rem)] short:mb-4 tracking-wide leading-relaxed"
         >
           Find quick answers to common question about our efficient logistics
         </motion.p>
 
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3 short:gap-2">
           {FAQS.map((faq, i) => (
             <FaqItem 
               key={i} 

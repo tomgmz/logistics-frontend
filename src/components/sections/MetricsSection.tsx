@@ -93,7 +93,7 @@ export default function MetricsSection({ metrics }: { metrics: PublicMetrics | n
   const inView = useInView(ref as React.RefObject<Element>, { once: true, margin: '-80px' });
 
   return (
-    <section id="metrics" className="relative w-full bg-[#0a0a0a] pt-[clamp(5.5rem,12svh,7rem)] pb-[clamp(2rem,8svh,6rem)] overflow-hidden">
+    <section id="metrics" className="relative w-full bg-[#0a0a0a] pt-[clamp(5.5rem,12svh,7rem)] pb-[clamp(2rem,8svh,6rem)] short:pt-20 short:pb-8 overflow-hidden">
 
       <div
         className="absolute inset-0 pointer-events-none"
@@ -127,7 +127,7 @@ export default function MetricsSection({ metrics }: { metrics: PublicMetrics | n
           animate={inView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6, delay: 0.12 }}
           className="ff-sc text-[#818181]
-            text-center max-w-2xl mx-auto mb-[clamp(1.5rem,5svh,4rem)] tracking-wide leading-relaxed"
+            text-center max-w-2xl mx-auto mb-[clamp(1.5rem,5svh,4rem)] short:mb-4 tracking-wide leading-relaxed"
         >
           See how our logistics solutions deliver speed, reliability, and satisfaction for every shipment.
         </motion.p>
@@ -135,8 +135,8 @@ export default function MetricsSection({ metrics }: { metrics: PublicMetrics | n
         {/* Row heights follow the screen height so the grid fits on one screen.
             From lg the photo sits behind the cards, as in the Figma: it starts
             at the left edge and the three card columns overlap its right part. */}
-        <div className="relative grid grid-cols-2 lg:grid-cols-3 lg:ml-[27%] gap-3 sm:gap-4
-          auto-rows-[clamp(84px,15svh,120px)] sm:auto-rows-[clamp(100px,12svh,160px)] lg:auto-rows-[clamp(110px,17svh,160px)]">
+        <div className="relative grid grid-cols-2 lg:grid-cols-3 lg:ml-[27%] gap-3 sm:gap-4 short:gap-2
+          auto-rows-[clamp(84px,15svh,120px)] max-sm:short:auto-rows-[80px] sm:auto-rows-[clamp(100px,12svh,160px)] lg:auto-rows-[clamp(110px,17svh,160px)]">
 
           <motion.div
             initial={{ opacity: 0, x: -40 }}

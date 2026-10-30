@@ -129,7 +129,7 @@ export default function ContactSection() {
 
   return (
     <>
-      <section id="contact" className="relative w-full bg-[#0a0a0a] pt-[clamp(5.5rem,12svh,7rem)] pb-[clamp(2rem,8svh,6rem)] short:pb-6 min-h-svh flex items-center overflow-hidden">
+      <section id="contact" className="relative w-full bg-[#0a0a0a] pt-[clamp(5.5rem,12svh,7rem)] pb-[clamp(2rem,6svh,6rem)] short:pb-6 min-h-svh flex items-center overflow-hidden">
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
@@ -159,7 +159,7 @@ export default function ContactSection() {
             animate={inView ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.6, delay: 0.1 }}
             className="font-'Alegreysa Sans SC, sans-serif' text-[#818181]
-              text-center tracking-widest uppercase mb-[clamp(1.25rem,4svh,3.5rem)] short:!text-sm max-w-2xl mx-auto leading-relaxed"
+              text-center tracking-widest uppercase mb-[clamp(1.25rem,4svh,3.5rem)] short:mb-4 short:!text-sm max-w-2xl mx-auto leading-relaxed"
           >
             Be our partner by sending us a message. Our team is here to assist you with any logistics
             inquiries or service requests. Fast, direct, and reliable.
@@ -220,7 +220,7 @@ export default function ContactSection() {
                   value={form.message}
                   onChange={(e) => set('message', e.target.value)}
                   aria-invalid={!!errors.message}
-                  className={`${inputClass} ${borderFor('message')} resize-none h-[clamp(4.5rem,12svh,7.5rem)]`}
+                  className={`${inputClass} ${borderFor('message')} resize-none h-[clamp(4.5rem,12svh,7.5rem)] short:h-16`}
                 />
                 <FieldError message={errors.message} />
               </div>
