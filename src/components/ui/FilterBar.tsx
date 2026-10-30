@@ -239,6 +239,10 @@ export default function FilterBar({
  * The table format's search box (Figma): a #343434 block with a #818181
  * border, the magnifier and a small-caps placeholder naming exactly what the
  * search matches ("Search name, email or phone"). 464px wide at 1920.
+ *
+ * From md up it grows to that width but gives way first when the row is short
+ * of room (a detail panel open beside the table), so the row stays on one line
+ * instead of pushing the trailing action onto a line of its own.
  */
 function SearchBox({ value, onChange, placeholder = 'Search', onEnter }: {
   value:        string
@@ -247,7 +251,7 @@ function SearchBox({ value, onChange, placeholder = 'Search', onEnter }: {
   onEnter?:     () => void
 }) {
   return (
-    <div className="relative min-w-0 max-md:w-full md:w-[300px] lg:w-[340px] xl:w-[400px] 3xl:mr-2.5 3xl:w-[464px]">
+    <div className="relative min-w-0 max-md:w-full md:min-w-[200px] md:flex-1 md:max-w-[300px] lg:max-w-[340px] xl:max-w-[400px] 3xl:mr-2.5 3xl:max-w-[464px]">
       <Search className="pointer-events-none absolute left-3.5 3xl:left-[18px] top-1/2 size-5 3xl:size-[22px] -translate-y-1/2 text-[#818181]" />
       <input
         type="search"

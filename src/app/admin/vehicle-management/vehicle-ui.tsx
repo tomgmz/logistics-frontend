@@ -94,9 +94,8 @@ export function statusStyle(status: string): { bg: string; color: string; border
   }
 }
 
-/** The table tag as the Figma draws it: square-ish corners, a solid border in the tag colour.
- *  Always the small-caps face, even inside a table body set in regular Alegreya Sans. */
-export const TABLE_TAG = 'inline-flex items-center justify-center whitespace-nowrap rounded-[5px] border p-1 text-[12px] 3xl:text-[16px] leading-none font-[family-name:var(--font-alegreya-sc)]'
+/** The table format's pill (`.t-badge` in globals.css); the caller's style sets its colours. */
+export const TABLE_TAG = 't-badge'
 
 /** Cargo bed as "L x W x H" in mm, or '—' when any side is missing. */
 export function fmtDimensions(m: { length_mm?: number | null; width_mm?: number | null; height_mm?: number | null } | null | undefined): string {

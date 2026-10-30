@@ -5,6 +5,7 @@ import { ImageIcon } from 'lucide-react'
 
 import type { OdometerReading, TruckService } from '@/app/types/truck.types'
 import { adminFetchTruckUpkeep } from '@/lib/services/admin/trucks.service'
+import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { fmtDay, fmtKm } from './upkeep-ui'
 
 const READING_LABEL: Record<OdometerReading['kind'], string> = {
@@ -45,6 +46,14 @@ export default function UpkeepHistory({ truckId }: { truckId: string }) {
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [truckId])
+
+  // Live: a reading or service recorded elsewhere shows up here. A failed quiet
+  // re-read keeps what is on screen.
+  useLiveTable(['live:trucks'], () => {
+    adminFetchTruckUpkeep(truckId)
+      .then((h) => { setServices(h.services); setReadings(h.readings); setFailed(false) })
+      .catch(() => {})
+  })
 
   if (loading) return <p className="text-[11px] text-white/35">Loading history…</p>
   if (failed)  return <p className="text-[11px] text-red-400">Could not load the service history.</p>

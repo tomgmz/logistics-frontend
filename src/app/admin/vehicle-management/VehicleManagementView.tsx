@@ -70,7 +70,11 @@ import { getApiErrorMessage } from '@/lib/api-error'
 import { formatPlateNumber, plateError } from '@/lib/validation/plate'
 import { registrationStatus } from '@/lib/registration-expiry'
 
-import RefreshButton from '@/components/ui/RefreshButton'
+import FilterBar from '@/components/ui/FilterBar'
+import { TableCard } from '@/components/ui/untitled/table-card'
+import { TabsMinimal } from '@/components/ui/untitled/tabs'
+import { Button } from '@/components/ui/untitled/button'
+import { Plus } from '@untitledui/icons'
 import { useVehicleTypeOptions } from '@/lib/hooks/useVehicleTypes'
 import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
 
@@ -308,10 +312,11 @@ function VehicleDetailsModal({
 // pop-up ('models' survives only so old ?tab=models links still open it).
 type VehicleTab = 'vehicles' | 'models' | 'upkeep'
 
-const TABS: { key: VehicleTab; label: string; icon: ReactNode }[] = [
-  { key: 'vehicles', label: 'Vehicles', icon: <TruckIcon size={14} /> },
-  { key: 'upkeep',   label: 'Maintenance', icon: <Wrench size={14} /> },
-]
+/** The header's Manage Models picture, as a Button icon. */
+function ManageModelsIcon({ className }: { className?: string }) {
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src="/icons/vehicle-management/manage-models.svg" alt="" width={24} height={24} draggable={false} className={className} />
+}
 
 /** ?tab= value -> tab. 'maintenance' is the old name, kept so earlier links still land. */
 function tabFromParam(v: string | null): VehicleTab | null {
@@ -389,7 +394,9 @@ export default function VehicleManagementView() {
   const [confirmKind, setConfirmKind] = useState<ConfirmKind>(null)
   const [actionBusy,  setActionBusy]  = useState(false)
   const [archiveTarget, setArchiveTarget] = useState<Truck | null>(null)
-  const [viewTruck,     setViewTruck]     = useState<Truck | null>(null)
+  // The vehicle as it was when View Details opened; the pop-up shows the live
+  // copy (the Vehicles page, else the queue) whenever one is loaded.
+  const [viewSnapshot,  setViewTruck]     = useState<Truck | null>(null)
 
 
   const isUnchanged = modalMode === 'edit' && formsEqual(form, originalForm)
@@ -398,13 +405,13 @@ export default function VehicleManagementView() {
     [trucks, editingId, editingSnapshot],
   )
 
-  const loadModels = useCallback(async () => {
+  const loadModels = useCallback(async (quiet = false) => {
     try {
-      setListError(null)
+      if (!quiet) setListError(null)
       const mList = await adminFetchTruckModels()
       setModels(mList)
     } catch (e) {
-      setListError(getApiErrorMessage(e, 'Request failed. Please try again.'))
+      if (!quiet) setListError(getApiErrorMessage(e, 'Request failed. Please try again.'))
     }
   }, [])
 
@@ -437,9 +444,7 @@ export default function VehicleManagementView() {
     }
   }, [page, statusFilter, debouncedSearch, PAGE_SIZE])
 
-  useEffect(() => {
-    if (tab === 'vehicles') void loadModels()
-  }, [tab, loadModels])
+  useEffect(() => { void loadModels() }, [loadModels])
 
   const loadUpkeep = useCallback(async (quiet = false) => {
     try {
@@ -494,16 +499,28 @@ export default function VehicleManagementView() {
     switchTab('upkeep')
   }
 
+  const viewTruck = viewSnapshot
+    ? trucks.find((t) => t.truck_id === viewSnapshot.truck_id) ?? upkeep.find((t) => t.truck_id === viewSnapshot.truck_id) ?? viewSnapshot
+    : null
+
   const blockingCount = useMemo(() => toProblems(upkeep).filter((p) => p.blocking).length, [upkeep])
 
   // Live: someone else's edit, an inspection, a reading, a driver's return or
-  // report — the vehicle list and the upkeep queue follow on their own.
-  useLiveTable(['live:trucks', 'live:truck_models'], () => {
-    if (tab === 'vehicles') {
-      void loadTrucksPage(true)
-      void loadModels()
-    }
+  // report — the vehicle list and the upkeep queue follow on their own. The
+  // Vehicles page is re-read on either tab: the Maintenance tab's focused row
+  // and the details pop-up read from it too.
+  useLiveTable(['live:trucks'], () => {
+    void loadTrucksPage(true)
     void loadUpkeep(true)
+  })
+  // A renamed or re-pictured model shows in the rows and the vehicle form.
+  useLiveTable(['live:truck_models'], () => {
+    void loadTrucksPage(true)
+    void loadModels(true)
+  })
+  // The regular-driver picker follows new, renamed and archived drivers.
+  useLiveTable(['live:users'], () => {
+    void driverService.getAll().then(setDrivers).catch(() => {})
   })
 
   const switchTab = useCallback((next: VehicleTab) => {
@@ -838,64 +855,39 @@ export default function VehicleManagementView() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [confirmKind, modalMode, form.plate_number, actionBusy, archiveTarget])
 
+  // The table format's filter row (as on User Management): the Vehicles /
+  // Maintenance switch after the search, Manage Models and Add Vehicle at the
+  // far right. Both tabs draw the same switch and buttons.
+  const switcher = (
+    <TabsMinimal
+      label="Vehicle management sections"
+      items={[
+        { id: 'vehicles' as const, label: 'Vehicles' },
+        { id: 'upkeep' as const,   label: blockingCount > 0 ? `Maintenance (${blockingCount})` : 'Maintenance' },
+      ]}
+      selectedKey={tab === 'upkeep' ? 'upkeep' : 'vehicles'}
+      onSelectionChange={(key) => { setFocusId(null); switchTab(key) }}
+    />
+  )
+  const trailing = (
+    <>
+      <Button size="toolbar" color="tool" iconLeading={ManageModelsIcon} onClick={() => setModelsOpen(true)} aria-haspopup="dialog">
+        Manage Models
+      </Button>
+      {canCreate && (
+        <Button size="toolbar" color="accent" iconLeading={Plus} onClick={openCreate}>
+          Add Vehicle
+        </Button>
+      )}
+    </>
+  )
+
   return (
-    <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-60px)] overflow-y-auto overflow-x-hidden lg:overflow-hidden ff-sc bg-[var(--color-bg)]">
+    <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-60px)] overflow-y-auto overflow-x-hidden lg:overflow-hidden ff-sc bg-[#0a0a0a] text-white">
 
       <Suspense fallback={null}>
         <TabDeepLink onTab={(t) => (t === 'models' ? setModelsOpen(true) : setTab(t))} />
       </Suspense>
-
-      <header className="shrink-0 px-3 pt-3 lg:px-4 3xl:px-[19px] border-b border-[#424242] flex flex-col gap-2 bg-[#0a0a0a]">
-        <div className="flex flex-wrap items-center justify-end gap-2 3xl:gap-[10px]">
-          <RefreshButton onClick={() => void refreshAll()} />
-          <button
-            type="button"
-            onClick={() => setModelsOpen(true)}
-            aria-haspopup="dialog"
-            className="inline-flex h-9 3xl:h-11 items-center gap-2 3xl:gap-[9px] whitespace-nowrap rounded-[10px] border border-[#818181] px-3 3xl:px-6 text-[14px] 3xl:text-[18px] text-white transition hover:bg-white/5 active:scale-95"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/icons/vehicle-management/manage-models.svg" alt="" width={24} height={24} draggable={false} className="size-5 3xl:size-6" />
-            Manage Models
-          </button>
-          {canCreate && (
-            <button
-              type="button"
-              onClick={openCreate}
-              className="inline-flex h-9 3xl:h-11 items-center gap-2 3xl:gap-[9px] whitespace-nowrap rounded-[10px] border border-[#4df9ed] bg-[#4df9ed]/[0.19] px-3 3xl:px-6 text-[14px] 3xl:text-[18px] text-[#4df9ed] transition hover:bg-[#4df9ed]/30 active:scale-95"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/icons/vehicle-management/add.svg" alt="" width={24} height={24} draggable={false} className="size-5 3xl:size-6" />
-              Add Vehicle
-            </button>
-          )}
-        </div>
-        <nav className="flex gap-1 -mb-px overflow-x-auto" role="tablist" aria-label="Vehicle management sections">
-          {TABS.map(({ key, label, icon }) => {
-            const active = tab === key
-            return (
-              <button
-                key={key}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                onClick={() => { setFocusId(null); switchTab(key) }}
-                className={`inline-flex items-center gap-1.5 px-3 py-2 text-[13px] 3xl:text-[16px] font-bold border-b-2 transition-colors whitespace-nowrap ${
-                  active ? 'text-[var(--color-cyan)] border-[var(--color-cyan)]' : 'text-[#818181] border-transparent hover:text-white/80'
-                }`}
-              >
-                {icon}
-                {label}
-                {key === 'upkeep' && blockingCount > 0 && (
-                  <span className="ml-0.5 min-w-[18px] px-1 rounded-full text-[11px] leading-[18px] text-center bg-[#4df9ed] text-black font-bold">
-                    {blockingCount}
-                  </span>
-                )}
-              </button>
-            )
-          })}
-        </nav>
-      </header>
 
       {/* Manage Models pop-up. z-60: the models' own form (z-66), row menus (z-65)
           and confirm pop-ups (z-70) open above it. */}
@@ -934,8 +926,11 @@ export default function VehicleManagementView() {
         )}
       </AnimatePresence>
 
+      <div className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0 px-3 py-3 sm:px-4 lg:px-5 3xl:px-6 lg:pt-3 lg:pb-4 3xl:pb-5 gap-3 3xl:gap-4 lg:overflow-hidden">
       {tab === 'upkeep' && (
         <UpkeepTab
+          switcher={switcher}
+          trailing={trailing}
           rows={upkeep}
           loading={upkeepLoading}
           error={upkeepError}
@@ -951,51 +946,21 @@ export default function VehicleManagementView() {
       )}
 
       {tab === 'vehicles' && (
-      <div className="flex flex-[1_0_auto] lg:flex-1 lg:min-h-0 flex-col p-3 lg:p-4 3xl:p-[34px] 3xl:pl-9 gap-3 3xl:gap-[14px] lg:overflow-hidden bg-[#0a0a0a]">
+        <TableCard.Root className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0">
+          <FilterBar
+            layout="split"
+            // Names exactly what the server searches (truck.model.ts).
+            search={{ value: search, onChange: (v) => { setSearch(v); setPage(0) }, placeholder: 'Search plate, model or status' }}
+            leading={switcher}
+            fields={[{
+              key: 'status', label: 'Status', single: true,
+              options: STATUSES.map((s) => ({ value: s, label: fmtLabel(s) })),
+            }]}
+            values={statusFilter === 'all' ? [] : [{ field: 'status', op: 'is' as const, value: statusFilter }]}
+            onChange={(v) => { setStatusFilter(v.find((r) => r.field === 'status')?.value ?? 'all'); setPage(0) }}
+            trailing={trailing}
+          />
 
-        {/* Filters */}
-        <div className="flex flex-col xl:flex-row gap-2 xl:items-center shrink-0">
-          <div className="relative min-w-0 flex-1 xl:max-w-[360px] 3xl:max-w-[466px]">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/icons/booking-management/search.svg" alt="" width={22} height={22} draggable={false}
-              className="pointer-events-none absolute left-3 3xl:left-[18px] top-1/2 size-4 3xl:size-[22px] -translate-y-1/2" />
-            <input
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(0) }}
-              placeholder="Search plate, model, status..."
-              aria-label="Search vehicles"
-              className="h-9 3xl:h-[46px] w-full rounded-[10px] border border-[#818181] bg-[#424242] pl-9 3xl:pl-[49px] pr-4 text-[14px] 3xl:text-[18px] text-white placeholder:text-[#818181] outline-none transition focus:border-[#4df9ed]"
-            />
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0 xl:ml-auto">
-            <label htmlFor="vehicle-status-filter" className="text-[13px] 3xl:text-[16px] font-bold text-[#818181]">
-              status
-            </label>
-            <div className="relative">
-              <select
-                id="vehicle-status-filter"
-                value={statusFilter}
-                onChange={(e) => { setStatusFilter(e.target.value); setPage(0) }}
-                className="appearance-none h-8 3xl:h-[38px] min-w-[140px] 3xl:min-w-[141px] rounded-[10px] border-[0.5px] border-[#818181] bg-[#2a2828] pl-3 3xl:pl-[15px] pr-8 text-[13px] 3xl:text-[16px] font-bold text-[#4df9ed] outline-none focus:border-[#4df9ed] cursor-pointer [&>option]:bg-[#2a2828] [&>option]:text-white"
-              >
-                {(['all', ...STATUSES] as const).map((key) => (
-                  <option key={key} value={key}>
-                    {key === 'all' ? 'All' : fmtLabel(key)}
-                    {key === statusFilter && listMeta ? ` (${listMeta.total})` : ''}
-                  </option>
-                ))}
-              </select>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/icons/vehicle-management/chevron-down.svg" alt="" width={15} height={15} draggable={false}
-                className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2" />
-            </div>
-          </div>
-
-        </div>
-
-        {/* Table */}
-        <div className="flex-[1_0_auto] lg:flex-1 lg:min-h-0 rounded-[10px] border-[0.5px] border-[#424242] overflow-hidden flex flex-col bg-[#1b1b1b] shadow-[0_4px_4px_rgba(0,0,0,0.25)]">
           {listLoading ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-3 py-16">
               <div
@@ -1033,10 +998,9 @@ export default function VehicleManagementView() {
           ) : (
             <>
               <div className="overflow-x-auto lg:overflow-auto flex-[1_0_auto] lg:flex-1 lg:min-h-0">
-                <table className="w-full text-left border-collapse min-w-[900px]">
-                  {/* Headers keep the small caps face; the data rows are regular Alegreya Sans. */}
-                  <thead className="sticky top-0 z-[1] bg-[#181717]">
-                    <tr className="text-[13px] 3xl:text-[16px] text-[#818181] [&>th]:border-b [&>th]:border-[#818181] [&>th]:font-bold [&>th]:px-3 3xl:[&>th]:px-6 [&>th]:py-2.5 3xl:[&>th]:py-[13px] [&>th]:whitespace-nowrap">
+                <table className="data-table min-w-[900px]">
+                  <thead className="sticky top-0 z-10">
+                    <tr className="[&>th]:whitespace-nowrap">
                       <th className="w-14 3xl:w-[100px]">image</th>
                       <th>plate no.</th>
                       <th>vehicle type</th>
@@ -1049,7 +1013,7 @@ export default function VehicleManagementView() {
                       <th className="w-12"><span className="sr-only">open</span></th>
                     </tr>
                   </thead>
-                  <tbody className="ff-regular text-[13px] 3xl:text-[16px] text-white">
+                  <tbody>
                     {trucks.map((t) => {
                       const st         = statusStyle(t.status)
                       const needs      = needsFor(t)
@@ -1065,16 +1029,16 @@ export default function VehicleManagementView() {
                           onKeyDown={(e) => {
                             if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openInMaintenance(t) }
                           }}
-                          className="border-b border-[#818181] cursor-pointer hover:bg-white/[0.03] transition-colors [&>td]:px-3 3xl:[&>td]:px-6 [&>td]:py-2 3xl:h-[55px]"
+                          className="cursor-pointer transition-colors [@media(hover:hover)]:hover:bg-[#2a2a2a]/40"
                         >
-                          <td className="align-middle">
+                          <td>
                             <ModelThumb imageUrl={thumbUrl} label={modelLabel} size={40} />
                           </td>
-                          <td className="font-bold text-[#4df9ed] whitespace-nowrap">
-                            {t.plate_number}
+                          <td className="whitespace-nowrap">
+                            <div className="t-name">{t.plate_number}</div>
                             {(t.registration_status?.state === 'expired' || t.registration_status?.state === 'expiring') && (
                               <span
-                                className={`block text-[11px] font-normal ${t.registration_status.state === 'expired' ? 'text-[#f62626]' : 'text-[#ffea00]'}`}
+                                className={`t-sub block ${t.registration_status.state === 'expired' ? 'text-[#f62626]' : 'text-[#ffea00]'}`}
                               >
                                 {t.registration_status.state === 'expired' ? 'Registration expired' : 'Registration expires soon'}
                               </span>
@@ -1097,13 +1061,13 @@ export default function VehicleManagementView() {
                                 <span>
                                   {assignedDriverName(t)}
                                   {t.assigned_driver?.license_number && (
-                                    <span className="block text-[11px] text-[#818181]/70">
+                                    <span className="t-sub block text-[#818181]">
                                       {t.assigned_driver.license_number}
                                     </span>
                                   )}
                                 </span>
                               )
-                              : <span className="text-[#818181]/60">Unassigned</span>}
+                              : <span className="text-[#818181]">Unassigned</span>}
                           </td>
                           <td>
                             <span className={TABLE_TAG} style={{ color: st.color, borderColor: st.color, background: st.bg }}>
@@ -1149,9 +1113,9 @@ export default function VehicleManagementView() {
               <Pagination page={pageSafe + 1} totalPages={pageCount} total={totalRows} pageSize={PAGE_SIZE} onPageChange={(p) => setPage(p - 1)} />
             </>
           )}
-        </div>
-      </div>
+        </TableCard.Root>
       )}
+      </div>
 
       <OdometerModal
         truck={odometerTruck}

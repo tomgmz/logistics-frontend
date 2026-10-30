@@ -3,7 +3,7 @@
 import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
 import { useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Upload, Truck as TruckIcon, Pencil, Archive, Eye, Plus, Search } from 'lucide-react'
+import { X, Upload, Truck as TruckIcon, Pencil, Archive, Eye } from 'lucide-react'
 import type { CreateTruckModelInput, UpdateTruckModelInput } from '@/app/types/truck.types'
 import { TruckModel } from '@/app/types/truck-model'
 import {
@@ -23,7 +23,10 @@ import RecordLockBanner, { RecordLockBadge } from '@/components/ui/RecordLockBan
 import RowActionMenu, { type RowAction } from '@/components/ui/RowActionMenu'
 import { ModelThumb, fmtDimensions, kgToTons } from './vehicle-ui'
 
-import RefreshButton from '@/components/ui/RefreshButton'
+import FilterBar from '@/components/ui/FilterBar'
+import { TableCard } from '@/components/ui/untitled/table-card'
+import { Button } from '@/components/ui/untitled/button'
+import { Plus as PlusIcon } from '@untitledui/icons'
 import Pagination from '@/components/ui/Pagination'
 import { useVehicleTypeOptions } from '@/lib/hooks/useVehicleTypes'
 import { useServerTable } from '@/lib/hooks/useServerTable'
@@ -380,36 +383,18 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
   return (
     <>
       <div className="flex flex-1 min-h-0 flex-col p-3 lg:p-4 gap-3 overflow-y-auto overflow-x-hidden lg:overflow-hidden">
-        <div className="flex flex-col sm:flex-row gap-2 sm:items-center shrink-0">
-          <div
-            className="flex items-center gap-2 rounded-[10px] px-3 py-2 flex-1 max-w-md"
-            style={{ background: '#2a2828' }}
-          >
-            <Search size={16} className="text-white/40 shrink-0" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search model, type, use…"
-              className="bg-transparent border-none outline-none text-sm flex-1 text-white/80 placeholder:text-white/35"
-            />
-          </div>
-          <div className="flex items-center gap-2 sm:ml-auto">
-            <RefreshButton onClick={() => void loadModels()} />
-            {canCreate && (
-              <button
-                type="button"
-                onClick={openCreate}
-                className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-wide text-black"
-                style={{ background: 'var(--color-cyan)' }}
-              >
-                <Plus size={16} />
-                Add model
-              </button>
+        <TableCard.Root className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0">
+          <FilterBar
+            layout="split"
+            // Names exactly what the server searches (truck-model.controller.ts).
+            search={{ value: search, onChange: setSearch, placeholder: 'Search model, type or use' }}
+            trailing={canCreate && (
+              <Button size="toolbar" color="accent" iconLeading={PlusIcon} onClick={openCreate}>
+                Add Model
+              </Button>
             )}
-          </div>
-        </div>
+          />
 
-        <div className="flex-[1_0_auto] lg:flex-1 lg:min-h-0 rounded-xl border border-white/[0.08] overflow-hidden flex flex-col bg-[#0f0f0f]">
           {listLoading ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-3 py-16">
               <div
@@ -441,42 +426,40 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
           ) : (
             <>
             <div className="overflow-x-auto lg:overflow-auto flex-[1_0_auto] lg:flex-1 lg:min-h-0">
-              <table className="w-full text-left text-sm border-collapse min-w-[700px]">
-                <thead className="sticky top-0 z-[1] bg-[#141414] border-b border-white/[0.07]">
-                  <tr className="text-[11px] uppercase tracking-wider text-white/40">
-                    <th className="px-2 py-2.5 font-bold w-14 text-center">Image</th>
-                    <th className="px-3 py-2.5 font-bold">Model</th>
-                    <th className="px-3 py-2.5 font-bold">Vehicle type</th>
-                    <th className="px-3 py-2.5 font-bold hidden md:table-cell">Cargo bed (mm)</th>
-                    <th className="px-3 py-2.5 font-bold">Max weight</th>
-                    <th className="px-3 py-2.5 font-bold hidden md:table-cell">Max volume</th>
-                    <th className="px-3 py-2.5 font-bold hidden lg:table-cell">Stackable</th>
-                    <th className="px-3 py-2.5 font-bold text-right w-[90px]">Actions</th>
+              <table className="data-table min-w-[700px]">
+                <thead className="sticky top-0 z-10">
+                  <tr className="[&>th]:whitespace-nowrap">
+                    <th className="w-14 3xl:w-[100px]">image</th>
+                    <th>model</th>
+                    <th>vehicle type</th>
+                    <th className="hidden md:table-cell">cargo bed (mm)</th>
+                    <th>max weight</th>
+                    <th className="hidden md:table-cell">max volume</th>
+                    <th className="hidden lg:table-cell">stackable</th>
+                    <th className="text-right">actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {models.map((m) => (
-                    <tr key={m.model_id} className="border-b border-white/[0.05] hover:bg-white/[0.03] transition-colors">
-                      <td className="px-2 py-2 align-middle">
-                        <div className="flex justify-center">
-                          <ModelThumb imageUrl={m.image_url ?? null} label={m.name} size={44} />
-                        </div>
+                    <tr key={m.model_id} className="transition-colors [@media(hover:hover)]:hover:bg-[#2a2a2a]/40">
+                      <td>
+                        <ModelThumb imageUrl={m.image_url ?? null} label={m.name} size={40} />
                       </td>
-                      <td className="px-3 py-2.5 font-semibold text-white max-w-[240px] truncate">{m.name}</td>
-                      <td className="px-3 py-2.5 text-white/70">{m.vehicle_type ?? '—'}</td>
-                      <td className="px-3 py-2.5 text-white/60 text-xs hidden md:table-cell tabular-nums">{fmtDimensions(m)}</td>
-                      <td className="px-3 py-2.5 text-white/60 text-xs tabular-nums">
+                      <td className="t-name max-w-[240px] truncate">{m.name}</td>
+                      <td>{m.vehicle_type ?? '—'}</td>
+                      <td className="hidden md:table-cell tabular-nums">{fmtDimensions(m)}</td>
+                      <td className="tabular-nums whitespace-nowrap">
                         {m.max_weight_kg != null ? `${m.max_weight_kg.toLocaleString()} kg · ${kgToTons(m.max_weight_kg)} t` : '—'}
                       </td>
-                      <td className="px-3 py-2.5 text-white/60 text-xs hidden md:table-cell tabular-nums">
+                      <td className="hidden md:table-cell tabular-nums">
                         {m.max_volume_cbm != null ? `${m.max_volume_cbm} cbm` : '—'}
                       </td>
-                      <td className="px-3 py-2.5 text-xs hidden lg:table-cell">
+                      <td className="hidden lg:table-cell">
                         {m.stackable_friendly
-                          ? <span className="text-emerald-400/80">Yes</span>
-                          : <span className="text-white/35">No</span>}
+                          ? <span className="text-[#3af626]">Yes</span>
+                          : <span className="text-[#818181]">No</span>}
                       </td>
-                      <td className="px-3 py-2.5">
+                      <td>
                         <div className="flex items-center justify-end gap-1.5">
                           <RecordLockBadge holder={modelLocks.get(m.model_id)} />
                           <RowActionMenu brightText label={`Actions for ${m.name}`} heading={m.name} actions={rowActions(m)} />
@@ -490,7 +473,7 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
             <Pagination page={page} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPageChange={setPage} disabled={table.fetching} />
             </>
           )}
-        </div>
+        </TableCard.Root>
       </div>
 
       {/* Create / Edit form modal */}

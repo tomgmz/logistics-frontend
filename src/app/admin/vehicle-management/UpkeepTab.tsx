@@ -1,7 +1,9 @@
 'use client'
 
 import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import FilterBar from '@/components/ui/FilterBar'
+import { TableCard } from '@/components/ui/untitled/table-card'
 import { ArrowUpRight, Ban, CalendarClock, ClipboardCheck, FileWarning, Gauge, Settings2, Wrench } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/lib/store/auth.store'
@@ -233,7 +235,13 @@ export default function UpkeepTab({
   onRecordOdometer,
   focusTruck = null,
   vehicleActions,
+  switcher,
+  trailing,
 }: {
+  /** The page's Vehicles / Maintenance switch, drawn after the search. */
+  switcher?: ReactNode
+  /** The page's Manage Models / Add Vehicle buttons, at the far right of the filter row. */
+  trailing?: ReactNode
   /** The maintenance queue; the page owns it so the tab badge and the Vehicles "issues" links share one read. */
   rows:      MaintenanceTruck[]
   loading:   boolean
@@ -382,43 +390,25 @@ export default function UpkeepTab({
   }
 
   return (
-    <div className="flex flex-[1_0_auto] lg:flex-1 lg:min-h-0 flex-col p-3 lg:p-4 3xl:p-[34px] 3xl:pl-9 gap-3 3xl:gap-[14px] lg:overflow-hidden bg-[#0a0a0a]">
-      <div className="flex flex-col xl:flex-row gap-2 xl:items-center shrink-0">
-        <div className="relative min-w-0 flex-1 xl:max-w-[360px] 3xl:max-w-[466px]">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/icons/booking-management/search.svg" alt="" width={22} height={22} draggable={false}
-            className="pointer-events-none absolute left-3 3xl:left-[18px] top-1/2 size-4 3xl:size-[22px] -translate-y-1/2" />
-          <input
-            value={search}
-            onChange={(e) => { onSearchChange(e.target.value); setPage(1) }}
-            placeholder="Search plate, model, driver..."
-            aria-label="Search maintenance"
-            className="h-9 3xl:h-[46px] w-full rounded-[10px] border border-[#818181] bg-[#424242] pl-9 3xl:pl-[49px] pr-4 text-[14px] 3xl:text-[18px] text-white placeholder:text-[#818181] outline-none transition focus:border-[#4df9ed]"
-          />
-        </div>
-        <div className="flex items-center gap-2 shrink-0 xl:ml-auto">
-          <label htmlFor="maintenance-needs-filter" className="text-[13px] 3xl:text-[16px] font-bold text-[#818181]">status</label>
-          <div className="relative">
-            <select
-              id="maintenance-needs-filter"
-              value={groupFilter}
-              onChange={(e) => setGroupFilter(e.target.value as GroupFilter)}
-              className="appearance-none h-8 3xl:h-[38px] min-w-[150px] rounded-[10px] border-[0.5px] border-[#818181] bg-[#2a2828] pl-3 3xl:pl-[15px] pr-8 text-[13px] 3xl:text-[16px] font-bold text-[#4df9ed] outline-none focus:border-[#4df9ed] cursor-pointer [&>option]:bg-[#2a2828] [&>option]:text-white"
-            >
-              {GROUP_FILTERS.map((f) => (
-                <option key={f.key} value={f.key}>
-                  {f.label} ({problems.filter((p) => matchesFilter(p, f.key)).length})
-                </option>
-              ))}
-            </select>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/icons/vehicle-management/chevron-down.svg" alt="" width={15} height={15} draggable={false}
-              className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2" />
-          </div>
-        </div>
-      </div>
+    <>
+      <TableCard.Root className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0">
+        <FilterBar
+          layout="split"
+          // Names exactly what the server searches (upkeep-problems.ts).
+          search={{ value: search, onChange: (v) => { onSearchChange(v); setPage(1) }, placeholder: 'Search plate, model or driver' }}
+          leading={switcher}
+          fields={[{
+            key: 'needs', label: 'Needs', single: true,
+            options: GROUP_FILTERS.filter((f) => f.key !== 'all').map((f) => ({
+              value: f.key,
+              label: `${f.label} (${problems.filter((p) => matchesFilter(p, f.key)).length})`,
+            })),
+          }]}
+          values={groupFilter === 'all' ? [] : [{ field: 'needs', op: 'is' as const, value: groupFilter }]}
+          onChange={(v) => { setGroupFilter((v.find((r) => r.field === 'needs')?.value ?? 'all') as GroupFilter); setPage(1) }}
+          trailing={trailing}
+        />
 
-      <div className="flex-[1_0_auto] lg:flex-1 lg:min-h-0 rounded-[10px] border-[0.5px] border-[#424242] overflow-hidden flex flex-col bg-[#1b1b1b] shadow-[0_4px_4px_rgba(0,0,0,0.25)]">
         {listLoading ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-3 py-16">
             <div className="w-9 h-9 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--color-cyan)' }} />
@@ -444,10 +434,9 @@ export default function UpkeepTab({
         ) : (
           <>
             <div className="overflow-x-auto lg:overflow-auto flex-[1_0_auto] lg:flex-1 lg:min-h-0">
-              <table className="w-full text-left border-collapse min-w-[860px]">
-                {/* Headers keep the small caps face; the data rows are regular Alegreya Sans. */}
-                <thead className="sticky top-0 z-[1] bg-[#181717]">
-                  <tr className="text-[13px] 3xl:text-[16px] text-[#818181] [&>th]:border-b [&>th]:border-[#818181] [&>th]:font-bold [&>th]:px-3 3xl:[&>th]:px-6 [&>th]:py-2.5 3xl:[&>th]:py-[13px] [&>th]:whitespace-nowrap">
+              <table className="data-table min-w-[860px]">
+                <thead className="sticky top-0 z-10">
+                  <tr className="[&>th]:whitespace-nowrap">
                     <th className="w-14 3xl:w-[100px]">image</th>
                     <th>plate no.</th>
                     <th className="hidden md:table-cell">vehicle model</th>
@@ -458,17 +447,17 @@ export default function UpkeepTab({
                     <th className="text-right">actions</th>
                   </tr>
                 </thead>
-                <tbody className="ff-regular text-[13px] 3xl:text-[16px] text-white">
+                <tbody>
                   {pinFocus && focusTruck && page === 1 && (
-                    <tr className={`border-b border-[#818181] ${FOCUS_ROW} [&>td]:px-3 3xl:[&>td]:px-6 [&>td]:py-2 3xl:h-[55px]`}>
-                      <td className="align-middle">
+                    <tr className={FOCUS_ROW}>
+                      <td>
                         <ModelThumb
                           imageUrl={resolveModelImageUrl((focusTruck.truck_model?.image_url as string | null | undefined) ?? null)}
                           label={focusTruck.truck_model?.name ?? 'Vehicle'}
                           size={40}
                         />
                       </td>
-                      <td className="font-bold text-[#4df9ed] whitespace-nowrap">{focusTruck.plate_number}</td>
+                      <td className="t-name whitespace-nowrap">{focusTruck.plate_number}</td>
                       <td className="max-w-[200px] truncate hidden md:table-cell">{focusTruck.truck_model?.name ?? '—'}</td>
                       <td>
                         {focusTruck.status === 'archived' ? '---' : (
@@ -493,17 +482,17 @@ export default function UpkeepTab({
                     const cfg = NEED_GROUPS[p.group]
                     const tagStyle = { color: cfg.color, borderColor: cfg.color, background: cfg.bg }
                     return (
-                      <tr key={p.key} className={`border-b border-[#818181] transition-colors [&>td]:px-3 3xl:[&>td]:px-6 [&>td]:py-2 3xl:h-[55px] ${
-                        t.truck_id === focusId ? FOCUS_ROW : 'hover:bg-white/[0.03]'
+                      <tr key={p.key} className={`transition-colors ${
+                        t.truck_id === focusId ? FOCUS_ROW : '[@media(hover:hover)]:hover:bg-[#2a2a2a]/40'
                       }`}>
-                        <td className="align-middle">
+                        <td>
                           <ModelThumb
                             imageUrl={resolveModelImageUrl((t.truck_model?.image_url as string | null | undefined) ?? null)}
                             label={t.truck_model?.name ?? 'Vehicle'}
                             size={40}
                           />
                         </td>
-                        <td className="font-bold text-[#4df9ed] whitespace-nowrap">{t.plate_number}</td>
+                        <td className="t-name whitespace-nowrap">{t.plate_number}</td>
                         <td className="max-w-[200px] truncate hidden md:table-cell">{t.truck_model?.name ?? '—'}</td>
                         <td>
                           {/* "View Driver Report" opens the report it names. */}
@@ -515,7 +504,7 @@ export default function UpkeepTab({
                             <span className={TABLE_TAG} style={tagStyle}>{p.needs}</span>
                           )}
                           {/* Details fold under the tag where the column is hidden. */}
-                          <span className="mt-1 block text-[11px] text-[#818181] lg:hidden">{p.details}</span>
+                          <span className="t-sub mt-1 block text-[#818181] lg:hidden">{p.details}</span>
                         </td>
                         <td className="hidden lg:table-cell max-w-[320px]">{p.details}</td>
                         <td className="hidden md:table-cell whitespace-nowrap tabular-nums">{fmtSince(p.since)}</td>
@@ -543,7 +532,7 @@ export default function UpkeepTab({
             <Pagination page={page} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPageChange={setPage} disabled={table.fetching} />
           </>
         )}
-      </div>
+      </TableCard.Root>
 
       {/* Read-only here: answering a report is the Reports desk's job. */}
       <DriverReportDetailModal
@@ -577,6 +566,6 @@ export default function UpkeepTab({
         onCancel={() => { if (!busy) setHoldTarget(null) }}
         onConfirm={() => { void executeHold() }}
       />
-    </div>
+    </>
   )
 }
