@@ -23,9 +23,6 @@ import {
 
 const B = '/admin/documents'
 
-/** Same as the backend's DOCUMENT_EXPORT_ROW_CAP. */
-export const DOCUMENT_EXPORT_ROW_CAP = 5_000
-
 function toParams(f: DocumentFilters): Record<string, string> {
   const p: Record<string, string> = {}
   if (f.search?.trim())       p.search        = f.search.trim()
@@ -140,15 +137,9 @@ const DOCUMENT_XLSX_COLUMNS: XlsxColumn<LibraryDocument>[] = [
   { label: 'Link',             width: 60, value: (d) => d.file_url },
 ]
 
-export async function exportDocumentsXlsx(f: DocumentFilters): Promise<{ count: number; truncated: boolean }> {
-  const { data: body } = await proxyApi.get<{
-    data: LibraryDocument[]
-    meta: { truncated: boolean; count: number }
-  }>(`${B}/export`, { params: toParams(f) })
-
-  const rows = body?.data ?? []
-  if (rows.length > 0) {
-    await downloadXlsx(`documents_${manilaDateStamp()}.xlsx`, 'Documents', rows, DOCUMENT_XLSX_COLUMNS)
-  }
-  return { count: rows.length, truncated: !!body?.meta?.truncated }
+/** The documents someone ticked in the library, newest first, as an Excel file. */
+export async function exportSelectedDocumentsXlsx(rows: LibraryDocument[]): Promise<void> {
+  const sorted = [...rows].sort((a, b) => (b.uploaded_at ?? '').localeCompare(a.uploaded_at ?? ''))
+  await downloadXlsx(`documents_${manilaDateStamp()}.xlsx`, 'Documents', sorted, DOCUMENT_XLSX_COLUMNS)
 }
+

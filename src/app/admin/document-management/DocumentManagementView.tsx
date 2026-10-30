@@ -12,13 +12,12 @@ import { Folder, Truck01, Upload01 } from '@untitledui/icons'
 
 import {
   archiveDocument,
-  exportDocumentsXlsx,
+  exportSelectedDocumentsXlsx,
   fetchDocuments,
   fetchFolders,
   fetchFoldersPage,
   restoreDocument,
   reviewDocument,
-  DOCUMENT_EXPORT_ROW_CAP,
 } from '@/lib/services/admin/documents.service'
 import {
   DERIVED_DOCUMENT_TYPES,
@@ -109,6 +108,16 @@ const FULL_REF = /^[A-Z]{2,4}-\d{6}-\d{3,}$/i
 
 const TH = 'px-4 md:px-6 py-2 text-left text-xs font-semibold whitespace-nowrap text-[#818181]'
 const TD = 'px-4 md:px-6 py-4'
+const CHECKBOX = 'h-4 w-4 cursor-pointer accent-[#4df9ed]'
+
+/** A native checkbox that can also show "some selected". */
+function SelectBox({ checked, indeterminate = false, onChange, label }: {
+  checked: boolean; indeterminate?: boolean; onChange: () => void; label: string
+}) {
+  const ref = useRef<HTMLInputElement>(null)
+  useEffect(() => { if (ref.current) ref.current.indeterminate = indeterminate }, [indeterminate])
+  return <input ref={ref} type="checkbox" checked={checked} onChange={onChange} aria-label={label} className={CHECKBOX} />
+}
 
 function navFrom(p: URLSearchParams): Nav {
   const booking = p.get('booking')
@@ -280,10 +289,14 @@ function DocumentLibrary() {
   const [archiveOf,  setArchiveOf]  = useState<LibraryDocument | null>(null)
   const [busy,       setBusy]       = useState(false)
   const [exporting,  setExporting]  = useState(false)
+  // Ticked documents, kept across pages and filters of one folder; the
+  // Download button exports exactly these.
+  const [selected,   setSelected]   = useState<Map<string, LibraryDocument>>(() => new Map())
 
   // A new folder starts with no file filters.
   useEffect(() => {
     setTypes([]); setReview(''); setDateRange(null); setArchived(false); setSort('desc')
+    setSelected(new Map())
   }, [navKey])
 
   // Remembered per browser; storage can be unavailable, which is fine.
@@ -369,6 +382,36 @@ function DocumentLibrary() {
 
   const previewDoc = useMemo(() => docs.find((d) => d.doc_key === previewKey) ?? null, [docs, previewKey])
 
+  // A re-read (review, archive, fresh links) updates the ticked copies too, so
+  // the download never carries a stale status.
+  useEffect(() => {
+    setSelected((prev) => {
+      if (prev.size === 0) return prev
+      let changed = false
+      const next = new Map(prev)
+      for (const d of docs) if (next.has(d.doc_key) && next.get(d.doc_key) !== d) { next.set(d.doc_key, d); changed = true }
+      return changed ? next : prev
+    })
+  }, [docs])
+
+  function toggleDoc(d: LibraryDocument) {
+    setSelected((prev) => {
+      const next = new Map(prev)
+      if (next.has(d.doc_key)) next.delete(d.doc_key); else next.set(d.doc_key, d)
+      return next
+    })
+  }
+  const pageSelected = docs.filter((d) => selected.has(d.doc_key)).length
+  const allPageSelected = docs.length > 0 && pageSelected === docs.length
+  function togglePage() {
+    setSelected((prev) => {
+      const next = new Map(prev)
+      if (allPageSelected) docs.forEach((d) => next.delete(d.doc_key))
+      else docs.forEach((d) => next.set(d.doc_key, d))
+      return next
+    })
+  }
+
   // The Company Administrator and the General Manager open the booking in
   // Transaction History; the Operations Manager has no such page, so theirs is
   // Booking Management.
@@ -410,19 +453,13 @@ function DocumentLibrary() {
   }
 
   async function handleExport() {
+    if (selected.size === 0) return
     setExporting(true)
     try {
-      const { count, truncated } = await exportDocumentsXlsx(filters)
-      if (count === 0) {
-        appToast.error('Nothing to export for these filters.')
-        return
-      }
-      appToast.success(`Exported ${count.toLocaleString()} documents.`)
-      if (truncated) {
-        appToast.error(`Export was capped at ${DOCUMENT_EXPORT_ROW_CAP.toLocaleString()} rows — narrow the filters for the rest.`)
-      }
+      await exportSelectedDocumentsXlsx([...selected.values()])
+      appToast.success(`Downloaded ${selected.size.toLocaleString()} document${selected.size === 1 ? '' : 's'}.`)
     } catch (e) {
-      appToast.error(getApiErrorMessage(e, 'Export failed. Please try again.'))
+      appToast.error(getApiErrorMessage(e, 'Download failed. Please try again.'))
     } finally {
       setExporting(false)
     }
@@ -618,10 +655,19 @@ function DocumentLibrary() {
                     Awaiting review ({pendingTotal})
                   </Button>
                 )}
+                {isFiles && canExport && selected.size > 0 && (
+                  <span className="ff-regular self-center text-sm text-[#c4c4c4] max-md:w-full">
+                    {selected.size.toLocaleString()} selected ·{' '}
+                    <button type="button" onClick={() => setSelected(new Map())} className="text-[#4df9ed] underline-offset-2 [@media(hover:hover)]:hover:underline">
+                      Clear
+                    </button>
+                  </span>
+                )}
                 {isFiles && canExport && (
-                  <Button color="secondary" iconLeading={Download} onClick={() => void handleExport()} disabled={exporting}
-                    title="Download every document matching the current filters as an Excel file" className="max-md:flex-1">
-                    {exporting ? 'Exporting…' : 'Export'}
+                  <Button color="secondary" iconLeading={Download} onClick={() => void handleExport()} disabled={exporting || selected.size === 0}
+                    title={selected.size === 0 ? 'Tick the documents to download first' : 'Download the selected documents as an Excel file'}
+                    className="max-md:flex-1">
+                    {exporting ? 'Downloading…' : 'Download'}
                   </Button>
                 )}
                 {canCreate && (
@@ -717,9 +763,17 @@ function DocumentLibrary() {
                     {docs.map((d) => (
                       <div
                         key={d.doc_key}
-                        className="group relative cursor-pointer rounded-xl bg-[#1b1b1b] p-2 ring-1 ring-inset ring-[#424242] transition-colors [@media(hover:hover)]:hover:bg-[#222222]"
+                        className={`group relative cursor-pointer rounded-xl bg-[#1b1b1b] p-2 ring-1 ring-inset transition-colors [@media(hover:hover)]:hover:bg-[#222222] ${selected.has(d.doc_key) ? 'ring-[#4df9ed]' : 'ring-[#424242]'}`}
                         onClick={() => setPreviewKey(d.doc_key)}
                       >
+                        {canExport && (
+                          <label
+                            className="absolute left-2 top-2 z-[1] flex cursor-pointer rounded-md bg-black/70 p-2"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <SelectBox checked={selected.has(d.doc_key)} onChange={() => toggleDoc(d)} label={`Select ${d.file_name}`} />
+                          </label>
+                        )}
                         <DocumentThumb doc={d} big />
                         <div className="mt-2 min-w-0 space-y-1">
                           <div className="flex items-start justify-between gap-1">
@@ -747,6 +801,16 @@ function DocumentLibrary() {
                   <table className="w-full min-w-[820px] border-collapse text-left text-sm">
                     <thead className="sticky top-0 z-[1] bg-[#222222] font-[family-name:var(--font-alegreya-sc)]">
                       <tr className="h-11 border-b border-[#424242]">
+                        {canExport && (
+                          <th className="w-12 pl-4 md:pl-6 pr-0 py-2">
+                            <SelectBox
+                              checked={allPageSelected}
+                              indeterminate={pageSelected > 0 && !allPageSelected}
+                              onChange={togglePage}
+                              label={allPageSelected ? 'Clear this page' : 'Select every document on this page'}
+                            />
+                          </th>
+                        )}
                         <th className={TH}>Document</th>
                         <th className={TH}>Type</th>
                         {showRefColumn && <th className={TH}>Booking / Vehicle</th>}
@@ -760,9 +824,16 @@ function DocumentLibrary() {
                       {docs.map((d) => (
                         <tr
                           key={d.doc_key}
-                          className="cursor-pointer border-b border-[#424242] transition-colors last:border-b-0 [@media(hover:hover)]:hover:bg-[#222222]"
+                          className={`cursor-pointer border-b border-[#424242] transition-colors last:border-b-0 [@media(hover:hover)]:hover:bg-[#222222] ${selected.has(d.doc_key) ? 'bg-[#4df9ed]/[0.06]' : ''}`}
                           onClick={() => setPreviewKey(d.doc_key)}
                         >
+                          {canExport && (
+                            <td className="w-12 pl-4 md:pl-6 pr-0" onClick={(e) => e.stopPropagation()}>
+                              <label className="-m-2 flex cursor-pointer p-2">
+                                <SelectBox checked={selected.has(d.doc_key)} onChange={() => toggleDoc(d)} label={`Select ${d.file_name}`} />
+                              </label>
+                            </td>
+                          )}
                           <td className={TD}>
                             <div className="flex min-w-0 max-w-[300px] items-center gap-3">
                               <DocumentThumb doc={d} />
