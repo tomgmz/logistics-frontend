@@ -181,7 +181,7 @@ export async function adminFetchUpkeepPage(
   params: PageRequest & { group: string; search?: string; focus?: string },
 ): Promise<PagedResponse<UpkeepProblemRow, { focusHasProblems: boolean }>> {
   const { data } = await authApi.get<PagedResponse<UpkeepProblemRow, { focusHasProblems: boolean }>>(
-    `${ADMIN}/trucks/maintenance-queue`, { params },
+    `${ADMIN}/trucks/maintenance`, { params },
   )
   return { data: data.data, meta: data.meta }
 }
