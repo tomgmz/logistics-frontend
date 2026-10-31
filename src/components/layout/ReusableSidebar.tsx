@@ -277,7 +277,7 @@ export default function ReusableSidebar({
               className="group flex h-[46px] w-full shrink-0 items-center gap-[18px] pl-[26px] text-left text-white transition-colors hover:text-red-400"
             >
               <LogOut size={20} className="shrink-0" />
-              <span className={`ff-regular text-[16px] whitespace-nowrap transition-opacity ${sidebarOpen ? 'opacity-100' : 'opacity-0'}`}>
+              <span className={`font-[family-name:var(--font-alegreya-sc)] text-[16px] whitespace-nowrap transition-opacity ${sidebarOpen ? 'opacity-100' : 'opacity-0'}`}>
                 Sign out
               </span>
             </button>
