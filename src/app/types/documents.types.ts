@@ -170,8 +170,6 @@ export function previewKind(url: string): PreviewKind {
   const path = url.split('?')[0].toLowerCase()
   if (/\.(jpe?g|png|webp|gif|heic|heif|avif)$/.test(path)) return 'image'
   if (path.endsWith('.pdf')) return 'pdf'
-  // Older Cloudinary image resources without an extension are still images.
-  if (path.includes('/image/upload/') && !/\.[a-z0-9]{2,5}$/.test(path)) return 'image'
   return 'other'
 }
 

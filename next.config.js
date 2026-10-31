@@ -11,10 +11,6 @@ const nextConfig = {
         hostname: 'www.figma.com',
         pathname: '/api/mcp/asset/**',
       },
-      {
-        protocol: 'https',
-        hostname: 'res.cloudinary.com',
-      },
       // Private file storage: signed, expiring links (see backend lib/storage.ts).
       {
         protocol: 'https',

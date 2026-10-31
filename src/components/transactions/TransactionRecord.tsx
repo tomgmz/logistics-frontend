@@ -89,7 +89,7 @@ function Photo({ url, caption }: { url: string; caption?: string }) {
   return (
     <a href={url} target="_blank" rel="noopener noreferrer"
       className="group flex flex-col gap-1 w-[104px] shrink-0">
-      {/* eslint-disable-next-line @next/next/no-img-element -- Cloudinary URLs, any host shape */}
+      {/* eslint-disable-next-line @next/next/no-img-element -- signed storage links, any host shape */}
       <img src={url} alt={caption ?? 'Photo'} loading="lazy"
         className="h-[78px] w-[104px] rounded-md border object-cover transition-opacity group-hover:opacity-80"
         style={{ borderColor: BORDER_C }} />

@@ -241,7 +241,7 @@ export default function TransactionDetail({ booking, animated = true, showCrew =
         </div>
       )}
 
-      {/* Transaction documents (Cloudinary URLs) */}
+      {/* Transaction documents (signed storage links) */}
       {showDocuments && docs.length > 0 && (
         <div className="rounded-xl border p-4 flex flex-col gap-3"
           style={{ background: BG_PANEL, borderColor: BORDER }}>

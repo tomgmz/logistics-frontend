@@ -110,11 +110,11 @@ export default function StepReview({ selectedService, pendingFiles, onBack, onNe
   const allGroups = sections.flatMap((s) => s.groups)
 
   /**
-   * Documents already in Cloudinary for THIS attempt.
+   * Documents already in storage for THIS attempt.
    *
    * The upload runs before the booking is created, so a create that failed used
    * to send the same files up again on every press of the button, piling up
-   * duplicates in Cloudinary that nothing ever cleaned away. Holding the URLs
+   * duplicates in storage that nothing ever cleaned away. Holding the URLs
    * means the retry reuses what already landed.
    */
   const [uploadedUrls, setUploadedUrls] = useState<string[] | null>(null)

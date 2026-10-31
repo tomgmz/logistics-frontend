@@ -154,7 +154,7 @@ export default function StaffTransactionDetail({ booking }: { booking: BookingWi
         </div>
       </section>
 
-      {/* Transaction documents (Cloudinary URLs) */}
+      {/* Transaction documents (signed storage links) */}
       {docs.length > 0 && (
         <section>
           <SectionHeading icon={<FileText size={18} strokeWidth={2} />}>Transaction Documents</SectionHeading>
