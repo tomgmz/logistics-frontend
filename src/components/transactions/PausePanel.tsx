@@ -14,6 +14,7 @@ import { formatCallClock } from '@/app/admin/booking-management/DriverCallTime'
 import { phDay } from '@/lib/ph-date'
 import { formatDateTime } from './transaction-format'
 import { AMBER, BORDER_C, GREEN, MUTED } from './transaction-theme'
+import { PALETTE } from '@/lib/palette'
 import { MapPointLink } from '@/components/map/LocationMapModal'
 
 /**
@@ -132,6 +133,12 @@ export default function PausePanel({ bookingId, pausedAt, inTransit, canControl,
     }
   }
 
+  // The continuation time came and went with the delivery still paused.
+  const continuationAtMs = open?.expected_resume_date && open?.expected_resume_call_time
+    ? Date.parse(`${open.expected_resume_date.slice(0, 10)}T${open.expected_resume_call_time.slice(0, 5)}:00+08:00`)
+    : null
+  const continuationOverdue = continuationAtMs != null && Number.isFinite(continuationAtMs) && continuationAtMs <= Date.now()
+
   function beginPlan() {
     setPlanDate(open?.expected_resume_date ?? '')
     setPlanTime(open?.expected_resume_call_time?.slice(0, 5) ?? '')
@@ -146,7 +153,7 @@ export default function PausePanel({ bookingId, pausedAt, inTransit, canControl,
     setBusy(true)
     try {
       await pauseService.setContinuation(bookingId, planDate, planTime)
-      appToast.success('Continuation set. The client was told the date; the driver the date and call time.')
+      appToast.success('Continuation set. The planned arrival was moved to that day; the client and the driver were told.')
       setPlanning(false)
       await load()
       onUpdated()
@@ -220,7 +227,7 @@ export default function PausePanel({ bookingId, pausedAt, inTransit, canControl,
                 {open.expected_resume_date
                   ? <>Continues {dayLabel(open.expected_resume_date)}
                       {open.expected_resume_call_time ? ` · driver call time ${formatCallClock(open.expected_resume_call_time)}` : ''}</>
-                  : 'No continuation date set yet'}
+                  : 'No continuation date set yet — the client sees the delivery date as to be confirmed'}
               </span>
               {canAct && !planning && (
                 <button type="button" disabled={busy} onClick={beginPlan} {...writeAccess(allowed)}
@@ -230,6 +237,11 @@ export default function PausePanel({ bookingId, pausedAt, inTransit, canControl,
                 </button>
               )}
             </div>
+            {continuationOverdue && !planning && (
+              <p className="text-[12px] font-semibold" style={{ color: PALETTE.orange }}>
+                That call time has passed and the delivery is still paused. Resume it, or set a new date.
+              </p>
+            )}
             {planning && (
               <div className="flex flex-col gap-2">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -247,7 +259,7 @@ export default function PausePanel({ bookingId, pausedAt, inTransit, canControl,
                   </label>
                 </div>
                 <p className="text-[11px]" style={{ color: MUTED }}>
-                  The client is told the date. The driver is told the date and the call time.
+                  The planned arrival moves to that day and call time. The client is told the date and the new expected arrival; the driver the date and the call time, with a reminder an hour before.
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <button type="button" disabled={busy} onClick={() => setPlanning(false)}

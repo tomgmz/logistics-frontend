@@ -13,8 +13,11 @@ import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { formatDate, formatDateTime, formatTime } from '@/app/utils/timeFormat'
 import {
-  supportService, TICKET_CATEGORY_LABEL, type SupportTicket, type TicketCategory,
+  openedByStaff, supportService, TICKET_CATEGORY_LABEL, type SupportTicket, type TicketCategory,
 } from '@/lib/services/support.service'
+import NewTicketModal from '@/components/support/NewTicketModal'
+import { Plus } from '@untitledui/icons'
+import { Button } from '@/components/ui/untitled/button'
 
 import Pagination from '@/components/ui/Pagination'
 import { useServerTable } from '@/lib/hooks/useServerTable'
@@ -30,6 +33,7 @@ import { TabsMinimal } from '@/components/ui/untitled/tabs'
  * led to it and, once closed, who resolved it and the note the client got.
  * Answering still happens by email (Reply all in Gmail on the ticket thread),
  * then the ticket is marked resolved here, which emails the client the note.
+ * "New Ticket" opens one for a client who called, emailed or walked in.
  */
 
 type StatusFilter = 'open' | 'resolved' | 'all'
@@ -73,6 +77,8 @@ function DetailRow({ label, children }: { label: string; children: ReactNode }) 
 function TicketDetail({ ticket: t }: { ticket: SupportTicket }) {
   const opener   = personName(t.opener)
   const resolver = personName(t.resolver)
+  const byStaff  = openedByStaff(t)
+  const contact  = t.clients?.users ?? null
   return (
     <>
       <div className="flex flex-wrap items-center gap-2 font-[family-name:var(--font-alegreya-sc)]">
@@ -81,9 +87,14 @@ function TicketDetail({ ticket: t }: { ticket: SupportTicket }) {
 
       <div className="rounded-xl border border-white/[0.08] bg-black/20 px-3">
         <DetailRow label="Client">{t.clients?.company_name ?? '—'}</DetailRow>
+        <DetailRow label="Contact">
+          {personName(contact) ?? (byStaff ? '—' : opener ?? '—')}
+          {(contact?.email ?? (!byStaff ? t.opener?.email : null)) && (
+            <span className="block text-[11px] text-white/40 break-all">{contact?.email ?? t.opener?.email}</span>
+          )}
+        </DetailRow>
         <DetailRow label="Raised by">
-          {opener ?? '—'}
-          {t.opener?.email && <span className="block text-[11px] text-white/40 break-all">{t.opener.email}</span>}
+          {byStaff ? `${opener ?? 'Staff'} (for the client)` : 'The client'}
         </DetailRow>
         <DetailRow label="Category">{TICKET_CATEGORY_LABEL[t.category as TicketCategory] ?? t.category}</DetailRow>
         <DetailRow label="Booking">{t.bookings?.reference_number ?? '—'}</DetailRow>
@@ -129,8 +140,10 @@ function TicketActions({ ticket: t, inbox, canEdit, onResolve }: {
   canEdit:   boolean
   onResolve: () => void
 }) {
-  const compose = t.opener?.email && inbox
-    ? gmailComposeUrl(inbox, t.opener.email, `[${t.reference}] ${t.subject}`)
+  // The thread is with the client's account, even when staff opened the ticket.
+  const clientEmail = t.clients?.users?.email ?? (openedByStaff(t) ? null : t.opener?.email) ?? null
+  const compose = clientEmail && inbox
+    ? gmailComposeUrl(inbox, clientEmail, `[${t.reference}] ${t.subject}`)
     : null
   const open = t.status === 'open'
   if (!inbox && !open) return null
@@ -147,7 +160,7 @@ function TicketActions({ ticket: t, inbox, canEdit, onResolve }: {
         </MailAction>
       )}
       {compose && open && (
-        <MailAction href={compose} title={`New email to ${t.opener?.email}`} allowed={canEdit}>
+        <MailAction href={compose} title={`New email to ${clientEmail}`} allowed={canEdit}>
           <Mail size={12} /> New email
         </MailAction>
       )}
@@ -180,6 +193,7 @@ export default function SupportTicketsView() {
   const [snapshot,     setSnapshot]     = useState<SupportTicket | null>(null)
   const [resolving,    setResolving]    = useState<SupportTicket | null>(null)
   const [busy,         setBusy]         = useState(false)
+  const [creating,     setCreating]     = useState(false)
 
   // Server-side pages: the server applies the tab and search, counts every
   // ticket for the header, and sends only the rows on screen.
@@ -239,6 +253,11 @@ export default function SupportTicketsView() {
           <FilterBar
             layout="split"
             search={{ value: search, onChange: setSearch, placeholder: 'Search ticket, client, subject or booking' }}
+            trailing={
+              <Button size="toolbar" color="accent" iconLeading={Plus} onClick={() => setCreating(true)} {...writeAccess(canEdit)}>
+                New Ticket
+              </Button>
+            }
             leading={
               <TabsMinimal
                 label="Ticket status"
@@ -269,7 +288,7 @@ export default function SupportTicketsView() {
               <Ticket size={40} className="text-white/20" />
               <p className="text-sm text-white/45">
                 {counts.all === 0
-                  ? 'No client has raised a ticket yet.'
+                  ? 'No tickets yet.'
                   : statusFilter === 'open' && !search.trim()
                     ? 'No open tickets.'
                     : 'No tickets match your filters.'}
@@ -297,7 +316,7 @@ export default function SupportTicketsView() {
                 <tbody className="ff-regular">
                   {tickets.map((t) => {
                     const isOpen = selectedId === t.ticket_id
-                    const opener = personName(t.opener)
+                    const opener = openedByStaff(t) ? personName(t.clients?.users) : personName(t.opener)
                     const open   = () => { setSnapshot(t); setSelectedId(t.ticket_id) }
                     return (
                         <tr
@@ -349,6 +368,8 @@ export default function SupportTicketsView() {
         {selected && <TicketDetail ticket={selected} />}
       </SidePanel>
       </div>
+
+      <NewTicketModal open={creating} onClose={() => setCreating(false)} onCreated={() => { void load(true) }} />
 
       <RemarksModal
         open={!!resolving}

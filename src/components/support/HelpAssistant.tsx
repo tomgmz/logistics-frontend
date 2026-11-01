@@ -18,7 +18,7 @@ import { formatDateTime } from '@/app/utils/timeFormat'
 import { bookingRef } from '@/lib/booking'
 import { matchFaq, CONFIDENT_SCORE, STARTER_QUESTIONS, PUBLIC_STARTER_QUESTIONS, type FaqEntry } from '@/lib/support/faq'
 import {
-  supportService, TICKET_CATEGORY_LABEL, OPEN_HELP_EVENT,
+  supportService, TICKET_CATEGORY_LABEL, OPEN_HELP_EVENT, openedByStaff,
   type ChatLine, type HelpTab, type SupportTicket, type TicketCategory,
 } from '@/lib/services/support.service'
 import { useIsMobile } from '@/lib/hooks/useIsMobile'
@@ -567,6 +567,7 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
                         {TICKET_CATEGORY_LABEL[t.category]}
                         {t.bookings?.reference_number ? ` · ${t.bookings.reference_number}` : ''}
                         {' · '}{formatDateTime(t.created_at)}
+                        {openedByStaff(t) ? ' · Opened by our team' : ''}
                       </p>
                       {t.resolution_note && (
                         <p className="mt-2 rounded-lg bg-white/[0.04] px-2.5 py-2 text-[11px] leading-snug text-white/70">{t.resolution_note}</p>

@@ -55,12 +55,15 @@ const ACTIONABLE_TYPES = new Set([
   "booking.trip_resumed_by_staff",
   "booking.pause_continuation",
   "booking.pause_continuation_driver",
+  "booking.pause_continuation_due",
+  "booking.pause_continuation_overdue",
   "booking.driver_call_reminder",
   "driver.emergency",
   "driver.report",
   "auth.password_reset_requested",
   "support.ticket_opened",
   "support.ticket_resolved",
+  "support.ticket_logged",
   "vehicle.registration_expiring",
 ]);
 
@@ -136,6 +139,8 @@ const VALUE_LABELS: Record<string, Record<string, string>> = {
     trip_resumed_by_staff: "Delivery resumed by the office",
     pause_continuation:        "New delivery date",
     pause_continuation_driver: "Delivery continues on a new date",
+    pause_continuation_due:     "Paused delivery continues soon",
+    pause_continuation_overdue: "Paused delivery not resumed",
     driver_call_reminder:  "Call time in 1 hour",
   },
   window: {

@@ -127,12 +127,12 @@ export interface StepTime {
   clock_adjusted?: boolean
 }
 
+/** One stop visit: arrival (recorded by the phone itself), the driver's
+ *  "Start loading/unloading" tap, and the finish (the proof photo). */
 export interface StopTimes {
-  arrived_parking: StepTime | null
-  docked:          StepTime | null
-  started:         StepTime | null
-  finished:        StepTime | null
-  departed:        StepTime | null
+  arrived:  StepTime | null
+  started:  StepTime | null
+  finished: StepTime | null
 }
 
 export interface TimelineStop extends StopTimes {
@@ -153,7 +153,7 @@ export interface TimelineTrip {
   stops:        TimelineStop[]
 }
 
-export type TimelineStage = 'arrived_parking' | 'docked' | 'started' | 'departed'
+export type TimelineStage = 'arrived' | 'started'
 
 export interface ClientBookingDocument {
   doc_key:     string
@@ -340,7 +340,7 @@ export const bookingService = {
   fetchBookingRevisions: (bookingId: string) =>
     get<BookingRevision[]>(`/booking/${bookingId}/revisions`),
 
-  // The times at each stop (arrival, docking, start, finish, departure) and the
+  // The times at each stop (arrival, start, finish) and the
   // total loaded per run. Correction notes are staff-only (admin route).
   fetchBookingTimeline: (bookingId: string) =>
     get<TimelineTrip[]>(`/booking/${bookingId}/timeline`),

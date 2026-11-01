@@ -32,12 +32,38 @@ export interface SupportTicket {
   created_at:      string
   resolved_at:     string | null
   resolution_note: string | null
-  clients?:        { company_name: string | null } | null
+  /** The client's account (`users`) is the ticket's contact, whoever opened it. */
+  clients?:        {
+    company_name: string | null
+    user_id?:     string | null
+    users?:       { first_name: string | null; last_name: string | null; email: string | null } | null
+  } | null
+  /** Who opened it: the client, or a staff member who opened it for them. */
+  opened_by?:      string | null
   opener?:         { first_name: string | null; last_name: string | null; email: string } | null
   bookings?:       { booking_id: string; reference_number: string | null } | null
   /** Staff reads only: the help-assistant chat that led to the ticket. */
   chat_transcript?: ChatLine[] | null
   resolver?:       { first_name: string | null; last_name: string | null } | null
+}
+
+export interface TicketClientOption {
+  client_id:    string
+  company_name: string | null
+  contact_name: string | null
+  email:        string | null
+}
+
+export interface TicketBookingOption {
+  booking_id:       string
+  reference_number: string | null
+  status:           string
+  schedule_date:    string | null
+}
+
+/** The office opened it for the client (the opener is not the client's account). */
+export function openedByStaff(t: SupportTicket): boolean {
+  return !!t.opened_by && !!t.clients?.user_id && t.opened_by !== t.clients.user_id
 }
 
 export const supportService = {
@@ -72,6 +98,29 @@ export const supportService = {
       PagedResponse<SupportTicket, { counts: { all: number; open: number; resolved: number } }> & { inbox?: string }
     >('/support/tickets', { params })
     return { data: data.data, meta: data.meta, inbox: data.inbox ?? '' }
+  },
+
+  /** Staff open a ticket for a client (a call, an email, a walk-in). It is emailed to the client as usual. */
+  async openForClient(input: {
+    client_id:   string
+    category:    TicketCategory
+    subject:     string
+    message:     string
+    booking_id?: string | null
+  }): Promise<SupportTicket> {
+    await initCsrf()
+    const { data } = await proxyApi.post<{ data: SupportTicket }>('/support/tickets/staff', input)
+    return data.data
+  },
+
+  async searchClients(search: string): Promise<TicketClientOption[]> {
+    const { data } = await proxyApi.get<{ data: TicketClientOption[] }>('/support/clients', { params: { search } })
+    return data.data ?? []
+  },
+
+  async clientBookings(clientId: string): Promise<TicketBookingOption[]> {
+    const { data } = await proxyApi.get<{ data: TicketBookingOption[] }>(`/support/clients/${clientId}/bookings`)
+    return data.data ?? []
   },
 
   async resolve(ticketId: string, note: string | null): Promise<SupportTicket> {

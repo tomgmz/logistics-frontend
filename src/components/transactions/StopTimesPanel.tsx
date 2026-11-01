@@ -25,13 +25,21 @@ const ORANGE = PALETTE.orange
 
 /**
  * The times at each stop, per trip: the loading at the origin and the unloading
- * at every drop-off, each as arrival at the parking → arrival at the docking →
- * start → finish → departure, plus the total goods loaded on the run.
+ * at every drop-off visit, each as arrival → start → finish, plus how long the
+ * stop took and the total goods loaded on the run.
  *
- * The finish is the proof confirmation (its photo is elsewhere on the page);
- * the other four are the driver's taps. Staff with edit rights can fill in a
- * missing time or correct one, with a reason — the original stays in the audit
- * log. The client sees the same times, without the office's notes.
+ * The arrival is recorded by the driver's phone when it reaches the stop; the
+ * start is the driver's one tap ("Start loading" / "Start unloading"); the
+ * finish is the proof confirmation (its photo is elsewhere on the page) and is
+ * the delivery time for a drop-off.
+ *
+ * A booking is one truck making several runs, so a drop-off can be served over
+ * several trips. Each visit is its own block, labelled "visit 1 of 3", and only
+ * the last one completes the drop-off.
+ *
+ * Staff with edit rights can fill in a missing arrival or start, or correct
+ * one, with a reason — the original stays in the audit log. The client sees the
+ * same times, without the office's notes.
  *
  * Renders nothing until a trip has at least one time on it.
  */
@@ -39,21 +47,48 @@ const ORANGE = PALETTE.orange
 type Step = keyof StopTimes
 
 const LOADING_STEPS: Array<[Step, string]> = [
-  ['arrived_parking', 'Arrival at parking'],
-  ['docked',          'Arrival at docking'],
-  ['started',         'Start loading'],
-  ['finished',        'Loading finished'],
-  ['departed',        'Departure'],
+  ['arrived',  'Arrived at pickup'],
+  ['started',  'Start loading'],
+  ['finished', 'Loading finished'],
 ]
 const UNLOADING_STEPS: Array<[Step, string]> = [
-  ['arrived_parking', 'Arrival at parking'],
-  ['docked',          'Arrival at docking'],
-  ['started',         'Start unloading'],
-  ['finished',        'End unloading'],
-  ['departed',        'Departure'],
+  ['arrived',  'Arrived at drop-off'],
+  ['started',  'Start unloading'],
+  ['finished', 'Delivered'],
 ]
 
 const hasAny = (t: StopTimes) => Object.values(t).some(Boolean)
+
+/** "1 h 5 min", "40 min" between two step times; null when either is missing. */
+function span(from: StepTime | null, to: StepTime | null): string | null {
+  if (!from || !to) return null
+  const min = Math.round((Date.parse(to.at) - Date.parse(from.at)) / 60_000)
+  if (!Number.isFinite(min) || min < 0) return null
+  const h = Math.floor(min / 60)
+  const m = min % 60
+  return h === 0 ? `${m} min` : m === 0 ? `${h} h` : `${h} h ${m} min`
+}
+
+/** Where a drop-off visit sits among the trips that serve the same drop-off. */
+interface Visit { index: number; of: number; laterTrip: number | null }
+
+function visitsOf(trips: TimelineTrip[]): Map<string, Visit> {
+  const byDest = new Map<string, Array<{ tripStopId: string; trip: number }>>()
+  for (const t of [...trips].sort((a, b) => a.trip_number - b.trip_number)) {
+    for (const s of t.stops) {
+      const list = byDest.get(s.destination_id) ?? []
+      list.push({ tripStopId: s.trip_stop_id, trip: t.trip_number })
+      byDest.set(s.destination_id, list)
+    }
+  }
+  const out = new Map<string, Visit>()
+  for (const list of byDest.values()) {
+    list.forEach((v, i) => out.set(v.tripStopId, {
+      index: i + 1, of: list.length, laterTrip: list[i + 1]?.trip ?? null,
+    }))
+  }
+  return out
+}
 
 /** "2026-10-18T14:05" in Manila for a datetime-local input. */
 function toManilaInput(iso: string | null | undefined): string {
@@ -93,13 +128,14 @@ export default function StopTimesPanel({ bookingId, staff = false, canEdit = fal
     fetchTimeline().then((rows) => { if (!cancelled) setTrips(rows ?? []) }).catch(() => {})
     return () => { cancelled = true }
   }, [fetchTimeline])
-  // A driver's tap lands while the page is open.
+  // An arrival or a driver's tap lands while the page is open.
   useLiveTable(['live:bookings'], () => { fetchTimeline().then((rows) => setTrips(rows ?? [])).catch(() => {}) })
 
   const shown = trips.filter((t) => hasAny(t.loading) || t.stops.some(hasAny))
   if (shown.length === 0) return null
 
-  const many = trips.length > 1
+  const many   = trips.length > 1
+  const visits = visitsOf(trips)
 
   return (
     <div className="flex flex-col gap-3">
@@ -124,6 +160,7 @@ export default function StopTimesPanel({ bookingId, staff = false, canEdit = fal
             title="Loading"
             steps={LOADING_STEPS}
             times={t.loading}
+            workLabel="Loading took"
             canEdit={canEdit}
             allowed={allowed}
             onEdit={(stage, label) => setEditing({
@@ -132,22 +169,33 @@ export default function StopTimesPanel({ bookingId, staff = false, canEdit = fal
             })}
           />
 
-          {t.stops.map((s, i) => (
-            <StopBlock
-              key={s.trip_stop_id}
-              title={`Unloading · Drop-off ${s.stop_number ?? i + 1}`}
-              subtitle={s.address}
-              steps={UNLOADING_STEPS}
-              times={s}
-              canEdit={canEdit}
-              allowed={allowed}
-              onEdit={(stage, label) => setEditing({
-                tripId: t.trip_id, tripStopId: s.trip_stop_id, stage, label,
-                where: `Drop-off ${s.stop_number ?? i + 1}${many ? `, trip ${t.trip_number}` : ''}`,
-                current: s[stage],
-              })}
-            />
-          ))}
+          {t.stops.map((s, i) => {
+            const v     = visits.get(s.trip_stop_id)
+            const split = !!v && v.of > 1
+            // A delivery on an earlier visit is part of the drop-off, not all of it.
+            const note = split && s.finished
+              ? v!.laterTrip ? `Part delivered · rest on trip ${v!.laterTrip}` : 'Last visit · drop-off complete'
+              : null
+            const visitText = split ? `visit ${v!.index} of ${v!.of}` : null
+            return (
+              <StopBlock
+                key={s.trip_stop_id}
+                title={`Unloading · Drop-off ${s.stop_number ?? i + 1}${visitText ? ` · ${visitText}` : ''}`}
+                subtitle={s.address}
+                note={note}
+                steps={UNLOADING_STEPS}
+                times={s}
+                workLabel="Unloading took"
+                canEdit={canEdit}
+                allowed={allowed}
+                onEdit={(stage, label) => setEditing({
+                  tripId: t.trip_id, tripStopId: s.trip_stop_id, stage, label,
+                  where: `Drop-off ${s.stop_number ?? i + 1}${visitText ? `, ${visitText}` : ''}${many ? `, trip ${t.trip_number}` : ''}`,
+                  current: s[stage],
+                })}
+              />
+            )
+          })}
         </div>
       ))}
 
@@ -163,20 +211,26 @@ export default function StopTimesPanel({ bookingId, staff = false, canEdit = fal
   )
 }
 
-function StopBlock({ title, subtitle, steps, times, canEdit, allowed, onEdit }: {
-  title:    string
+function StopBlock({ title, subtitle, note, steps, times, workLabel, canEdit, allowed, onEdit }: {
+  title:     string
   subtitle?: string | null
-  steps:    Array<[Step, string]>
-  times:    StopTimes
-  canEdit:  boolean
-  allowed:  boolean
-  onEdit:   (stage: TimelineStage, label: string) => void
+  /** For a drop-off split over trips: whether this visit finished it. */
+  note?:     string | null
+  steps:     Array<[Step, string]>
+  times:     StopTimes
+  workLabel: string
+  canEdit:   boolean
+  allowed:   boolean
+  onEdit:    (stage: TimelineStage, label: string) => void
 }) {
+  const work   = span(times.started, times.finished)
+  const atStop = span(times.arrived, times.finished)
   return (
     <div className="flex flex-col gap-1.5">
       <div className="min-w-0">
         <p className="text-[12px] font-bold uppercase tracking-wider" style={{ color: CYAN }}>{title}</p>
         {subtitle && <p className="text-[11px] truncate" style={{ color: MUTED }}>{subtitle}</p>}
+        {note && <p className="text-[11px] font-semibold text-white/75">{note}</p>}
       </div>
       <dl className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1 m-0">
         {steps.map(([key, label]) => {
@@ -213,6 +267,18 @@ function StopBlock({ title, subtitle, steps, times, canEdit, allowed, onEdit }: 
             </div>
           )
         })}
+        {work && (
+          <div className="contents">
+            <dt className="text-[12px] min-w-0" style={{ color: MUTED }}>{workLabel}</dt>
+            <dd className="m-0 text-[12px] text-right text-white/85">{work}</dd>
+          </div>
+        )}
+        {atStop && (
+          <div className="contents">
+            <dt className="text-[12px] min-w-0" style={{ color: MUTED }}>Total time at the stop</dt>
+            <dd className="m-0 text-[12px] text-right text-white/85">{atStop}</dd>
+          </div>
+        )}
       </dl>
     </div>
   )
@@ -278,7 +344,7 @@ function EditStopTime({ bookingId, editing, onClose, onSaved }: {
         <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 flex flex-col gap-3">
           {editing.current && (
             <p className="text-[12px]" style={{ color: MUTED }}>
-              Now: {formatDateTime(editing.current.at)} ({editing.current.source === 'staff' ? 'set by the office' : 'tapped by the driver'})
+              Now: {formatDateTime(editing.current.at)} ({editing.current.source === 'staff' ? 'set by the office' : 'from the driver’s phone'})
             </p>
           )}
           <div>
@@ -289,7 +355,7 @@ function EditStopTime({ bookingId, editing, onClose, onSaved }: {
           <div>
             <label className="text-[11px] text-white/40 block mb-1">Reason<span className="text-red-400"> *</span></label>
             <textarea value={note} disabled={busy} onChange={(e) => setNote(e.target.value)} rows={3} maxLength={500}
-              placeholder="e.g. Driver forgot to tap; warehouse log says 09:40."
+              placeholder="e.g. Phone was offline at the gate; warehouse log says 09:40."
               className={`${field} resize-none`} />
           </div>
         </div>

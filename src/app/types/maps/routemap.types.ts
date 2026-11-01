@@ -44,6 +44,9 @@ export interface BookingDetail {
   // on this record.
   paused_at?:     string | null
   pause_reason?:  string | null
+  // Every pause's continuation (the open one has no resumed_at): the day + call
+  // time the office expects the delivery to move again. See lib/pause-continuation.
+  pauses?:        Array<{ expected_resume_date: string | null; expected_resume_call_time: string | null; resumed_at: string | null }> | null
 
   required_volume_cbm?:  number | null
   required_weight_kg?:   number | null

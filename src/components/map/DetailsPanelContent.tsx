@@ -17,6 +17,7 @@ import { formatEta, formatEtaClock, type StopEta } from '@/lib/hooks/useLiveDriv
 import { arrivalWindow, formatArrivalWindow, isPastWindow } from '@/lib/arrival-window'
 import { RouteStepper, routeSteps } from './RouteStepper'
 import { pauseReasonLabel } from '@/lib/pause-reasons'
+import { continuationDayLabel, openContinuation, pausedPlanState } from '@/lib/pause-continuation'
 
 const SC = { fontFamily: "var(--font-alegreya-sc), 'Alegreya Sans SC', sans-serif" } as const
 
@@ -150,7 +151,15 @@ export function DetailsPanelContent({
     : null
   const movedDay    = !!plannedDay && !!scheduleDate && plannedDay !== scheduleDate.slice(0, 10)
   const windowText  = formatArrivalWindow(plannedAt)
-  const estDelivery = windowText ? (movedDay ? `Now expected ${windowText}` : windowText) : scheduleDate
+  // Paused: the plan is real only once the office has set when it continues;
+  // until then (or once that time passes still paused) it would keep sliding.
+  const planState   = pausedPlanState(bookingDetail)
+  const continuation = openContinuation(bookingDetail)
+  const estDelivery = planState === 'tbc'
+    ? 'To be confirmed'
+    : windowText
+      ? (movedDay || planState === 'planned' ? `Now expected ${windowText}` : windowText)
+      : scheduleDate
 
   // The final stop's live ETA, which is what "estimate arrival" has always meant
   // on this panel and never actually showed — `estimated_arrival` was a declared
@@ -272,7 +281,10 @@ export function DetailsPanelContent({
           <PauseCircle size={15} className="shrink-0" style={{ color: '#ffea00' }} />
           <span className="text-[12px] leading-snug text-white/85" style={SC}>
             <span style={{ color: '#ffea00' }}>Delivery paused · {pauseReasonLabel(bookingDetail.pause_reason)}</span>
-            {' '}since {formatEtaClock(bookingDetail.paused_at)}. It continues as soon as the driver can move again.
+            {' '}since {formatEtaClock(bookingDetail.paused_at)}.{' '}
+            {planState === 'planned' && continuation
+              ? `Expected to continue on ${continuationDayLabel(continuation.date)}.`
+              : 'Our team will set the new delivery date and let you know.'}
           </span>
         </div>
       )}

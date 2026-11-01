@@ -2498,7 +2498,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                           }}
                         />
 
-                        {/* Arrival, docking, start, finish and departure at the loading
+                        {/* Arrival, start and finish at the loading
                             and each drop-off, and the total loaded per trip. */}
                         <StopTimesPanel
                           bookingId={detail.booking_id}
