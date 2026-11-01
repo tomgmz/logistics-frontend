@@ -63,6 +63,7 @@ const ACTIONABLE_TYPES = new Set([
   "booking.driver_call_reminder",
   "driver.emergency",
   "driver.report",
+  "driver.license_expiring_staff",
   "auth.password_reset_requested",
   "support.ticket_opened",
   "support.ticket_resolved",
