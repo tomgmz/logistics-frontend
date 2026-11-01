@@ -27,6 +27,7 @@ import {
   History,
   CalendarRange,
   Pencil,
+  Clock,
 } from 'lucide-react'
 
 import { supabase } from '@/lib/supabase'
@@ -78,6 +79,7 @@ import ResubmissionChanges from '@/components/transactions/ResubmissionChanges'
 import ReplaceCrewPanel from '@/components/transactions/ReplaceCrewPanel'
 import StopTimesPanel from '@/components/transactions/StopTimesPanel'
 import PausePanel from '@/components/transactions/PausePanel'
+import DrivingShiftsPanel from '@/components/transactions/DrivingShiftsPanel'
 import { pauseReasonLabel } from '@/lib/services/admin/pause.service'
 import type { BookingWithRelations } from '@/lib/store/slice/routeMap.slice'
 import { useRecordLock, useRecordLocks } from '@/lib/hooks/useRecordLock'
@@ -249,6 +251,20 @@ function VehiclePulledBanner({
   )
 }
 
+/** List badge: the next stop is running 15+ min past its planned window (delay.scheduler). */
+function DelayedBadge({ minutes }: { minutes: number | null }) {
+  return (
+    <span
+      title="Running late against the planned arrival"
+      className="flex w-fit items-center gap-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border mt-1"
+      style={{ color: '#FF7A30', borderColor: '#FF7A3055', background: '#FF7A3014' }}
+    >
+      <Clock size={9} />
+      Delayed{minutes ? ` · ${minutes} min` : ''}
+    </span>
+  )
+}
+
 /** List badge: the delivery is paused (weather, breakdown, closed stop…). */
 function PausedBadge({ reason }: { reason: string }) {
   return (
@@ -285,6 +301,8 @@ interface ListRow {
   created_at: string | null
   /** Set while the delivery is paused. */
   pause_reason: string | null
+  /** Minutes late when flagged delayed (and not paused); null otherwise. */
+  delayed: number | null | undefined
   /** True while the client's reported problem is unresolved. */
   issue_open: boolean
   issue_note: string | null
@@ -308,6 +326,8 @@ function toRows(raw: Record<string, unknown>[]): ListRow[] {
       stops:             Array.isArray(dests) ? dests.length : 0,
       created_at:        typeof b.created_at === 'string' ? b.created_at : null,
       pause_reason:      b.paused_at && typeof b.pause_reason === 'string' ? b.pause_reason : null,
+      // undefined = not delayed; a paused delivery is explained by its pause.
+      delayed:           b.delayed_since && !b.paused_at ? (typeof b.delay_minutes === 'number' ? b.delay_minutes : null) : undefined,
       issue_open:        hasOpenClientIssue(b),
       issue_note:        typeof b.client_issue_note === 'string' ? b.client_issue_note : null,
       resubmissions:     resubmissionsOf(b),
@@ -2175,6 +2195,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                                 {fmtStatus(r.status)}
                               </span>
                               {r.pause_reason && <PausedBadge reason={r.pause_reason} />}
+                              {r.delayed !== undefined && <DelayedBadge minutes={r.delayed} />}
                               {r.issue_open && <ProblemReportedBadge note={r.issue_note} />}
                               <ResubmittedBadge count={r.resubmissions} />
                             </td>
@@ -2468,6 +2489,21 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                           canControl={(roleView === 'admin' || roleView === 'operations_manager') && !bookingReadOnly}
                           allowed={canEdit}
                           onUpdated={() => { void refreshDetail(detail.booking_id); void loadPage(true) }}
+                        />
+
+                        {/* Who has been at the wheel, and swapping the main and second
+                            driver when the main driver's phone is dead. */}
+                        <DrivingShiftsPanel
+                          bookingId={detail.booking_id}
+                          inTransit={normalizeBookingStatus(detail.status) === 'in_transit'}
+                          hasSecondDriver={!!committedAssignment.secondDriverId}
+                          canSwap={(roleView === 'admin' || roleView === 'operations_manager') && !bookingReadOnly}
+                          allowed={canEdit}
+                          onSwapped={() => {
+                            void refreshDetail(detail.booking_id)
+                            void loadPage(true)
+                            assignmentService.getAll().then(setAllAssignments).catch(() => {})
+                          }}
                         />
 
                         {/* On the road the crew can no longer be re-assigned; while the

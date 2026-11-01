@@ -80,8 +80,11 @@ function TransitBookingRow({
   const pausedReason    = (booking as { paused_at?: string | null }).paused_at
     ? ((booking as { pause_reason?: string | null }).pause_reason ?? 'other')
     : null
-  const color           = pausedReason ? '#ffea00' : statusColor(booking.status)
-  const label           = fmtStatus(booking.status)
+  // Running late (delay.scheduler) and not paused: orange, with the minutes.
+  const delayed         = !pausedReason && !!(booking as { delayed_since?: string | null }).delayed_since
+  const delayMin        = (booking as { delay_minutes?: number | null }).delay_minutes ?? null
+  const color           = pausedReason ? '#ffea00' : delayed ? '#FF7A30' : statusColor(booking.status)
+  const label           = delayed ? `Delayed${delayMin ? ` · ${delayMin} min` : ''}` : fmtStatus(booking.status)
   const origin          = booking.origin?.split(',')[0] ?? '—'
   const lastDestAddress = booking.booking_destinations?.[booking.booking_destinations.length - 1]?.address
   const dest            = lastDestAddress?.split(',')[0] ?? '—'

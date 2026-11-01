@@ -8,7 +8,8 @@ import {
   type SelectHTMLAttributes,
 } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Loader2, Pencil, Eye, Upload } from 'lucide-react'
+import { X, Loader2, Pencil, Eye, Upload, Undo2 } from 'lucide-react'
+import LicenseHistory from './LicenseHistory'
 import type {
   UserTab,
   ClientUser,
@@ -102,6 +103,17 @@ function savedLicenseLocks(tab: UserTab, state: FormState, isEdit: boolean): Set
   return new Set(LICENSE_FIELDS.filter(k => String(state[k] ?? '').trim() !== ''))
 }
 
+/** The value each locked field had when it was locked: what Undo goes back to. */
+function lockValuesOf(keys: Iterable<string>, state: FormState): Record<string, string> {
+  return Object.fromEntries([...keys].map(k => [k, String(state[k] ?? '')]))
+}
+
+/** Same license number, ignoring dashes and spaces. */
+const sameLicenseNumber = (a: unknown, b: unknown) =>
+  String(a ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '') === String(b ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '')
+/** Names compared without accents (a worn Ñ scans as N) or case. */
+const nameKey = (v: unknown) => String(v ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z]+/g, ' ').trim()
+
 interface ScanEligibilityState {
   dl_codes:            string[]
   restriction_codes:   string[]
@@ -171,6 +183,8 @@ async function submitForm(
   licenseFile: File | null,
   editId?: string,
   initial?: FormState,
+  // A license change on an existing driver: the LTMS confirmation and the note.
+  licenseExtra?: Record<string, string>,
 ): Promise<string | undefined> {
   const clean = Object.fromEntries(
     Object.entries(form).filter(([key, value]) =>
@@ -206,6 +220,7 @@ async function submitForm(
     }
     // Chosen on create only; the server refuses to move a driver between kinds.
     if (editId) delete clean.is_external
+    if (licenseExtra) Object.assign(clean, licenseExtra)
   }
 
   if (tab === 'drivers' && (!editId || licenseFile)) {
@@ -358,6 +373,15 @@ export default function UserFormModal({
   // the license's values aren't changed by a stray keystroke. An existing
   // driver's license details open the same way (savedLicenseLocks).
   const [scanLocked, setScanLocked] = useState<Set<string>>(() => savedLicenseLocks(tab, initialState, isEdit))
+  // What Undo restores for each field that was locked (the scan's or the saved value).
+  const [lockValues, setLockValues] = useState<Record<string, string>>(() => lockValuesOf(savedLicenseLocks(tab, initialState, isEdit), initialState))
+  // A license change on a saved driver (renewal, new photo, corrected number):
+  // the editor confirms the card against LTO's LTMS, and explains anything the
+  // checks flag. The server runs the same checks on its own scan.
+  const [licenseVerified, setLicenseVerified] = useState(false)
+  const [licenseNote,     setLicenseNote]     = useState('')
+  const [licenseIssues,   setLicenseIssues]   = useState<string[]>([])
+  const [renewalScanning, setRenewalScanning] = useState(false)
   // Words where the scan may have read an Ñ as a plain N.
   const [nChecks, setNChecks] = useState<NonNullable<LicenseOCRResult['name_n_checks']>>([])
 
@@ -414,9 +438,11 @@ export default function UserFormModal({
         ...(result.license_number && { license_number: result.license_number }),
         ...(result.license_expiry && { license_expiry: result.license_expiry }),
       }))
-      setScanLocked(new Set(
-        LICENSE_FIELDS.filter(k => result[k]),
-      ))
+      const scannedKeys = LICENSE_FIELDS.filter(k => result[k])
+      setScanLocked(new Set(scannedKeys))
+      setLockValues(Object.fromEntries(scannedKeys.map(k => [k,
+        k === 'license_number' || k === 'license_expiry' ? String(result[k] ?? '') : toNameCase(String(result[k] ?? '')),
+      ])))
       if (result.vehicle_eligibility) {
         setEligibility({
           dl_codes:            result.dl_codes          ?? [],
@@ -434,9 +460,12 @@ export default function UserFormModal({
     }
   }
 
-  // Replacing the license on an existing driver only swaps the image. It is not
-  // re-scanned, so the saved name and license details are never overwritten.
-  function handleLicenseReplace(e: React.ChangeEvent<HTMLInputElement>) {
+  // Replacing the license on an existing driver (usually a renewal). The new
+  // card is scanned: its expiry is filled in (locked, with Undo), and the name
+  // and license number are only COMPARED with the saved ones, never overwritten,
+  // so another person's license shows up as a mismatch instead of quietly
+  // replacing this driver's details.
+  async function handleLicenseReplace(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
@@ -444,7 +473,35 @@ export default function UserFormModal({
     if (licensePreview) URL.revokeObjectURL(licensePreview)
     setLicensePreview(URL.createObjectURL(file))
     setLicenseActions(false)
+    setLicenseVerified(false)
     setFieldErrors(prev => { const n = { ...prev }; delete n.license_image; return n })
+
+    setRenewalScanning(true)
+    const issues: string[] = []
+    try {
+      const r = await ocrService.scanLicense(file)
+      if (r.license_number && !sameLicenseNumber(r.license_number, form.license_number)) {
+        issues.push(`The new card reads license number ${r.license_number}, not ${String(form.license_number)}. It may be another person's license.`)
+      }
+      const savedName = `${String(form.first_name ?? '')} ${String(form.last_name ?? '')}`
+      const cardName  = `${r.first_name ?? ''} ${r.last_name ?? ''}`.trim()
+      if (cardName && nameKey(r.last_name) && !nameKey(savedName).includes(nameKey(r.last_name))) {
+        issues.push(`The new card reads the name ${toNameCase(cardName)}, not ${savedName.trim()}.`)
+      }
+      if (r.license_expiry) {
+        const expiry = r.license_expiry
+        setForm(prev => ({ ...prev, license_expiry: expiry }))
+        setScanLocked(prev => new Set(prev).add('license_expiry'))
+        setLockValues(prev => ({ ...prev, license_expiry: expiry }))
+      } else {
+        issues.push('The expiry could not be read from the new card. Enter it by hand.')
+      }
+    } catch {
+      issues.push('The new card could not be read automatically. Check its details by eye.')
+    } finally {
+      setRenewalScanning(false)
+      setLicenseIssues(issues)
+    }
   }
 
   useEffect(() => {
@@ -480,6 +537,10 @@ export default function UserFormModal({
     setNameCheck(null)
     setNChecks([])
     setScanLocked(savedLicenseLocks(tab, initialState, isEdit))
+    setLockValues(lockValuesOf(savedLicenseLocks(tab, initialState, isEdit), initialState))
+    setLicenseVerified(false)
+    setLicenseNote('')
+    setLicenseIssues([])
     setShowCustomSuffix(
       !!initialState.suffix && !USER_SUFFIXES.includes(initialState.suffix as never),
     )
@@ -533,6 +594,14 @@ export default function UserFormModal({
     const confirmError = needsEmailConfirm ? confirmEmailError(String(form.email ?? ''), confirmEmail) : undefined
     if (confirmError) errors.confirm_email = confirmError
     if (Object.keys(errors).length > 0) { setFieldErrors(errors); return }
+    if (licenseCheck && !licenseVerified) {
+      setGlobalError('Tick that you checked this license against LTO (LTMS) before saving.')
+      return
+    }
+    if (licenseCheck && shownIssues.length > 0 && licenseNote.trim().length < 10) {
+      setGlobalError('Add a note explaining the flagged license details before saving.')
+      return
+    }
     setConfirmSave(true)
   }
 
@@ -542,7 +611,8 @@ export default function UserFormModal({
     setGlobalError(null)
     setFieldErrors({})
     try {
-      const newUserId = await submitForm(tab, form, licenseFile, isEdit ? user!.user_id : undefined, initialState)
+      const newUserId = await submitForm(tab, form, licenseFile, isEdit ? user!.user_id : undefined, initialState,
+        licenseCheck ? { license_verified: 'true', license_change_note: licenseNote.trim() } : undefined)
 
       // Persist the module-access matrix for newly created accounts. Only sent
       // when at least one module is granted — otherwise the account keeps its
@@ -577,6 +647,9 @@ export default function UserFormModal({
     } catch (err: unknown) {
       const { message, fieldErrors: fe } = extractApiError(err)
       setFieldErrors(fe)
+      // The server's own license checks: show what it found, so the note can answer it.
+      const serverIssues = (err as { response?: { data?: { issues?: unknown } } })?.response?.data?.issues
+      if (Array.isArray(serverIssues) && serverIssues.length) setLicenseIssues(serverIssues.map(String))
       if (message) {
         setGlobalError(message)
         appToast.error(message, { action: 'user-form-error' })
@@ -599,6 +672,10 @@ export default function UserFormModal({
     setLicensePreview(null)
     setLicenseActions(false)
     setScanLocked(savedLicenseLocks(tab, initialState, isEdit))
+    setLockValues(lockValuesOf(savedLicenseLocks(tab, initialState, isEdit), initialState))
+    setLicenseVerified(false)
+    setLicenseNote('')
+    setLicenseIssues([])
     setViewing(true)
   }
 
@@ -611,6 +688,41 @@ export default function UserFormModal({
     }
   }
 
+  // The license on a saved driver is changing: a new photo, number or expiry,
+  // or the holder's name (it is printed on the license too).
+  const nameEdited = (['first_name', 'middle_name', 'last_name'] as const)
+    .filter(k => nameKey(form[k]) !== nameKey(initialState[k]))
+  const licenseChanging = tab === 'drivers' && isEdit && (
+    licenseFile !== null
+    || !sameLicenseNumber(form.license_number, initialState.license_number)
+    || String(form.license_expiry ?? '') !== String(initialState.license_expiry ?? '')
+    || nameEdited.length > 0
+  )
+  // Every new driver gets the license check too (LTMS tick, note for anything
+  // that differs from the card), as does every license change on a saved one.
+  const licenseCheck = licenseChanging || (tab === 'drivers' && !isEdit)
+  // New driver: a scanned field changed by hand no longer matches the card.
+  const LICENSE_LABEL: Record<string, string> = {
+    first_name: 'first name', last_name: 'last name', middle_name: 'middle name',
+    license_number: 'license number', license_expiry: 'license expiry',
+  }
+  const createIssues = tab === 'drivers' && !isEdit
+    ? [
+        ...(scanError ? ['The license could not be read automatically, so its details were typed by hand.'] : []),
+        ...Object.entries(lockValues)
+          .filter(([k, v]) => v !== '' && String(form[k] ?? '').trim() !== v.trim())
+          .map(([k, v]) => `The ${LICENSE_LABEL[k] ?? k} was changed from what the card reads (${v}) to ${String(form[k] ?? '') || 'empty'}.`),
+      ]
+    : []
+  // Saved driver: a name edited away from the license on file.
+  const fullName = (st: FormState) => [st.first_name, st.middle_name, st.last_name].map(v => String(v ?? '').trim()).filter(Boolean).join(' ')
+  const editIssues = tab === 'drivers' && isEdit && nameEdited.length > 0
+    ? [licenseFile
+        ? `The driver's name changes from ${fullName(initialState)} to ${fullName(form)}.`
+        : `The driver's name changes from ${fullName(initialState)} to ${fullName(form)}, but the license on file still reads ${fullName(initialState)}. Upload the new license if the name on it changed.`]
+    : []
+  const localIssues = [...createIssues, ...editIssues]
+  const shownIssues = [...localIssues, ...licenseIssues.filter((m) => !localIssues.includes(m))]
   const isSaveDisabled = loading || (isEdit && !isDirty)
   const fe = fieldErrors
 
@@ -620,6 +732,14 @@ export default function UserFormModal({
   function unlockScanned(key: string) {
     setScanLocked(prev => { const n = new Set(prev); n.delete(key); return n })
     requestAnimationFrame(() => document.getElementById(`user-form-${key}`)?.focus())
+  }
+
+  /** Undo: put back the value it was locked with, and lock it again. */
+  function relockScanned(key: string) {
+    if (!(key in lockValues)) return
+    setForm(prev => ({ ...prev, [key]: lockValues[key] }))
+    setFieldErrors(prev => { const n = { ...prev }; delete n[key]; return n })
+    setScanLocked(prev => new Set(prev).add(key))
   }
 
   /** Read-only props for a field the scan filled, plus the Edit button that unlocks it. */
@@ -635,14 +755,25 @@ export default function UserFormModal({
       lockedClass: locked
         ? 'opacity-70 cursor-default caret-transparent hover:border-[#424242]! focus:border-[#424242]!'
         : '',
-      // Viewing: the whole form is read-only already, so no Edit buttons.
-      action: locked && !viewing ? (
+      // Viewing: the whole form is read-only already, so no Edit buttons. Once
+      // unlocked, Edit becomes Undo, which puts the scanned/saved value back and
+      // locks the field again: the way back from an edit that was a mistake.
+      action: viewing ? undefined : locked ? (
         <button
           type="button"
           onClick={() => unlockScanned(key)}
-          className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#4df9ed] transition hover:text-[#7bfbf5]"
+          className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#4df9ed] transition [@media(hover:hover)]:hover:text-[#7bfbf5]"
         >
           <Pencil size={11} /> Edit
+        </button>
+      ) : key in lockValues ? (
+        <button
+          type="button"
+          onClick={() => relockScanned(key)}
+          title={`Back to ${lockValues[key] || 'empty'} and lock it again`}
+          className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#818181] transition [@media(hover:hover)]:hover:text-white"
+        >
+          <Undo2 size={11} /> Undo{String(form[key] ?? '') !== lockValues[key] ? ` (was ${lockValues[key] || 'empty'})` : ''}
         </button>
       ) : undefined,
     }
@@ -808,6 +939,8 @@ export default function UserFormModal({
                   <p className="mt-2 text-[11px] text-red-400">{fe.license_image}</p>
                 )}
 
+                {isEdit && user?.user_id && <LicenseHistory userId={user.user_id} />}
+
               </div>
             )}
 
@@ -907,6 +1040,8 @@ export default function UserFormModal({
                       const swap = (v: string) => v.split(' ').map(w => (w === c.word ? c.suggested : w)).join(' ')
                       setForm(prev => ({ ...prev, [c.field]: swap(String(prev[c.field] ?? '')) }))
                       setNameCheck(prev => prev && { first: swap(prev.first), middle: swap(prev.middle) })
+                      // The card's own reading, corrected: not a change from the card.
+                      setLockValues(prev => c.field in prev ? { ...prev, [c.field]: swap(prev[c.field]) } : prev)
                       setNChecks(prev => prev.filter(x => x !== c))
                     }}
                     className="rounded-[8px] border border-[#424242] px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:border-[#4df9ed]"
@@ -944,6 +1079,8 @@ export default function UserFormModal({
                     onClick={() => {
                       const { first, middle } = nameCheck
                       setForm(prev => ({ ...prev, first_name: `${first} ${middle}`, middle_name: '' }))
+                      // How the card's name splits, not a change from the card.
+                      setLockValues(prev => ({ ...prev, first_name: `${first} ${middle}`, middle_name: '' }))
                       setFieldErrors(prev => { const n = { ...prev }; delete n.first_name; delete n.middle_name; return n })
                       setNameCheck(null)
                     }}
@@ -1100,6 +1237,37 @@ export default function UserFormModal({
                   value={perms}
                   onChange={(m, next) => setPerms((prev) => ({ ...prev, [m]: next }))}
                 />
+              </div>
+            )}
+
+            {licenseCheck && (
+              <div className="rounded-xl border border-[#FFEA00]/30 bg-[#FFEA00]/[0.05] px-4 py-3.5 flex flex-col gap-3">
+                <p className="text-[10px] font-bold tracking-[0.12em] uppercase text-[#FFEA00]">{isEdit ? 'License change' : 'License check'}</p>
+                {renewalScanning && (
+                  <p className="flex items-center gap-2 text-[12px] text-[#c4c4c4]"><Loader2 size={13} className="animate-spin" /> Reading the new card…</p>
+                )}
+                {shownIssues.length > 0 && (
+                  <ul className="flex flex-col gap-1.5 text-[12px] leading-snug text-white/85 list-disc pl-4">
+                    {shownIssues.map((m) => <li key={m}>{m}</li>)}
+                  </ul>
+                )}
+                <label className="flex items-start gap-2.5 text-[12px] leading-snug text-white/85 cursor-pointer">
+                  <input type="checkbox" checked={licenseVerified} onChange={e => setLicenseVerified(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 shrink-0 accent-[#4df9ed]" />
+                  I checked this license against LTO (LTMS): it is valid and belongs to this driver.
+                </label>
+                {shownIssues.length > 0 && (
+                  <div>
+                    <label htmlFor="license-change-note" className="block text-[11px] font-semibold uppercase tracking-widest text-[#818181] mb-1.5">
+                      Note<span className="text-red-400"> *</span>
+                    </label>
+                    <textarea id="license-change-note" rows={3} maxLength={1000} value={licenseNote}
+                      onChange={e => setLicenseNote(e.target.value)}
+                      placeholder="e.g. Married name on the new card; LTMS shows the same license number."
+                      className="w-full resize-none rounded-lg border border-[#424242] bg-[#1b1b1b] px-3 py-2 text-base sm:text-sm text-white outline-none focus:border-[#4df9ed]" />
+                  </div>
+                )}
+                {isEdit && <p className="text-[11px] text-[#818181]">The previous license is kept in the driver&apos;s license history.</p>}
               </div>
             )}
 

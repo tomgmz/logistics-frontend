@@ -122,6 +122,17 @@ export const clientService = {
   restore:    (id: string) => post<ClientUser>(`${B}/clients/${id}/restore`, {}),
 }
 
+export interface DriverLicenseHistoryRow {
+  history_id:        string
+  license_number:    string | null
+  license_expiry:    string | null
+  license_image_url: string | null
+  dl_codes:          string[] | null
+  replaced_at:       string
+  change_note:       string | null
+  replacer:          { first_name: string | null; last_name: string | null } | null
+}
+
 export const driverService = {
   getAll: () => get<DriverUser[]>(`${B}/drivers`),
   // Who can be crewed onto a booking scheduled for `date`. The driver calendar
@@ -138,6 +149,8 @@ export const driverService = {
     )
   },
   getOne: (id: string) => get<DriverUser>(`${B}/drivers/${id}`),
+  // The licenses the driver held before this one, newest first.
+  licenseHistory: (id: string) => get<DriverLicenseHistoryRow[]>(`${B}/drivers/${id}/license-history`),
   create: (p: CreateDriverPayload) => post<DriverUser>(`${B}/drivers`, p),
   update: (id: string, p: UpdateDriverPayload) => patch<DriverUser>(`${B}/drivers/${id}`, p),
   remove: (id: string) => del(`${B}/drivers/${id}`),

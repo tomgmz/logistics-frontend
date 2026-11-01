@@ -28,7 +28,7 @@ export interface Queue<T> {
 
 export type BookingQueueKey =
   | 'gm_pending' | 'ops_pending' | 'dispatch_today' | 'dispatch_tomorrow'
-  | 'in_transit' | 'open_issues' | 'awaiting_client' | 'awaiting_return'
+  | 'in_transit' | 'open_issues' | 'awaiting_client' | 'awaiting_return' | 'delayed'
 
 export type VehicleQueueKey =
   | 'return_odometer_due' | 'recheck_due' | 'failed_inspection' | 'service_overdue' | 'service_due_soon'

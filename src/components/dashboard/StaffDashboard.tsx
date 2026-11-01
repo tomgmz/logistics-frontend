@@ -173,6 +173,8 @@ function listsFor(role: StaffRole, d: Data): ListSpec[] {
       return [
         { title: 'Choose a vehicle and driver', empty: 'Every approved booking is crewed.', bookings: q.ops_pending.items, total: q.ops_pending.count },
         { title: 'Client reported a problem', empty: 'No open problems.', bookings: q.open_issues.items, total: q.open_issues.count },
+        // Running 15+ min past the planned arrival (an older backend sends no queue).
+        { title: 'Delayed deliveries', empty: 'Every delivery on the road is on time.', bookings: q.delayed?.items ?? [], total: q.delayed?.count ?? 0 },
         { title: 'Dispatching today', empty: 'No dispatches today.', bookings: q.dispatch_today.items, total: q.dispatch_today.count },
       ]
     case 'fleet_manager':

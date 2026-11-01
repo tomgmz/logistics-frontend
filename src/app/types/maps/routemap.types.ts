@@ -46,6 +46,12 @@ export interface BookingDetail {
   pause_reason?:  string | null
   // Every pause's continuation (the open one has no resumed_at): the day + call
   // time the office expects the delivery to move again. See lib/pause-continuation.
+  // Set by delay.scheduler while the next stop runs 15+ min past its planned
+  // window. delay_expected_at is null when the truck has no recent position.
+  delayed_since?:        string | null
+  delay_minutes?:        number | null
+  delay_expected_at?:    string | null
+  delay_destination_id?: string | null
   pauses?:        Array<{ expected_resume_date: string | null; expected_resume_call_time: string | null; resumed_at: string | null }> | null
 
   required_volume_cbm?:  number | null

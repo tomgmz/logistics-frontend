@@ -10,6 +10,7 @@ import {
   PackageCheck,
   ArrowRight,
   PauseCircle,
+  Clock,
 } from 'lucide-react'
 import type { OptimizeRouteResponse, BookingDetail } from '@/app/types/maps/routemap.types'
 import { fetchTruckModels } from '@/lib/api/client/truck-model'
@@ -175,9 +176,13 @@ export function DetailsPanelContent({
   // flagged "Late", and there is no countdown to an arrival that isn't moving.
   const pausedAt   = !done ? bookingDetail?.paused_at ?? null : null
   const pausedMin  = usePausedMinutes(pausedAt)
-  const isLate     = !done && !pausedAt && !!plannedEnd && (
+  // The server's delay flag (delay.scheduler: next stop 15+ min past its
+  // window) counts too, so this badge and the client's notice agree.
+  const delayedFlag = !done && !pausedAt && !!bookingDetail?.delayed_since
+  const isLate     = delayedFlag || (!done && !pausedAt && !!plannedEnd && (
     destEta ? Date.parse(destEta.eta_at) > plannedEnd.getTime() : isPastWindow(plannedAt)
-  )
+  ))
+  const delayNewWindow = delayedFlag ? formatArrivalWindow(bookingDetail?.delay_expected_at ?? null) : null
 
   const arrivalLabel = pausedAt
     ? 'Paused'
@@ -270,6 +275,21 @@ export function DetailsPanelContent({
           </div>
         ))}
       </div>
+
+      {/* Running late against the plan (and not paused): how late, and the new
+          expected time when the truck is reporting. */}
+      {!isLoading && delayedFlag && (
+        <div
+          className="mx-3 mt-3 flex items-center gap-2 rounded-[8px] border px-3 py-2"
+          style={{ borderColor: 'rgba(255,122,48,0.45)', background: 'rgba(255,122,48,0.08)' }}
+        >
+          <Clock size={15} className="shrink-0" style={{ color: '#FF7A30' }} />
+          <span className="text-[12px] leading-snug text-white/85" style={SC}>
+            <span style={{ color: '#FF7A30' }}>Delayed{bookingDetail?.delay_minutes ? ` · about ${bookingDetail.delay_minutes} min` : ''}</span>
+            {' '}{delayNewWindow ? `Now expected ${delayNewWindow}.` : 'A new time will show once the truck reports its position.'}
+          </span>
+        </div>
+      )}
 
       {/* The driver paused the delivery. Reason only — the same thing the client
           is told; the driver's note stays with the office. */}
