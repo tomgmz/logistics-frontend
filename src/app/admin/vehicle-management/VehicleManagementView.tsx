@@ -28,6 +28,7 @@ import {
   fmtDimensions,
   InspectionBadge,
   TABLE_TAG,
+  breakdownLabel,
 } from './vehicle-ui'
 import { assignedDriverName, needsReinspection, type Truck, type MaintenanceTruck, type CreateTruckInput, type UpdateTruckInput } from '@/app/types/truck.types'
 import type { TruckModel } from '@/app/types/truck-model'
@@ -214,6 +215,11 @@ function VehicleDetailsModal({
                   >
                     {fmtLabel(truck.status)}
                   </span>
+                  {breakdownLabel(truck) && (
+                    <p className="mt-1 text-[11px] leading-snug" style={{ color: statusStyle(truck.status).color }}>
+                      {breakdownLabel(truck)}{truck.maintenance_note ? `: ${truck.maintenance_note}` : ''}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -1073,6 +1079,9 @@ export default function VehicleManagementView() {
                             <span className={TABLE_TAG} style={{ color: st.color, borderColor: st.color, background: st.bg }}>
                               {fmtLabel(t.status)}
                             </span>
+                            {breakdownLabel(t) && (
+                              <p className="mt-1 text-[11px] whitespace-nowrap" style={{ color: st.color }}>{breakdownLabel(t)}</p>
+                            )}
                           </td>
                           {/* Maintenance: Passed when nothing is owed, otherwise one tag per need. */}
                           <td>

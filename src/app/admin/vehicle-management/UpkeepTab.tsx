@@ -147,7 +147,10 @@ function detailsOf(t: MaintenanceTruck, reason: MaintenanceReason): string {
       details = failedItems(t).length ? `Failed: ${failedItems(t).join(', ')}` : 'Latest inspection failed'
       break
     case 'under_maintenance':
-      details = 'Out of service — a passing inspection returns it'
+      details = t.maintenance_reason === 'breakdown'
+        ? `${t.maintenance_booking_ref ? `Broke down on ${t.maintenance_booking_ref}` : 'Broke down on a delivery'}` +
+          `${t.maintenance_note ? `: ${t.maintenance_note}` : ''} — a passing inspection returns it`
+        : 'Out of service — a passing inspection returns it'
       break
     case 'service_overdue':
     case 'service_due_soon':

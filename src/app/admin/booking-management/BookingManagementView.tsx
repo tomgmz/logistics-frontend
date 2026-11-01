@@ -80,6 +80,7 @@ import ReplaceCrewPanel from '@/components/transactions/ReplaceCrewPanel'
 import StopTimesPanel from '@/components/transactions/StopTimesPanel'
 import PausePanel from '@/components/transactions/PausePanel'
 import DrivingShiftsPanel from '@/components/transactions/DrivingShiftsPanel'
+import BreakdownPanel from '@/components/transactions/BreakdownPanel'
 import { pauseReasonLabel } from '@/lib/services/admin/pause.service'
 import type { BookingWithRelations } from '@/lib/store/slice/routeMap.slice'
 import { useRecordLock, useRecordLocks } from '@/lib/hooks/useRecordLock'
@@ -303,6 +304,8 @@ interface ListRow {
   pause_reason: string | null
   /** Minutes late when flagged delayed (and not paused); null otherwise. */
   delayed: number | null | undefined
+  /** The driver reported a breakdown and the office hasn't paused or closed it. */
+  breakdown: boolean
   /** True while the client's reported problem is unresolved. */
   issue_open: boolean
   issue_note: string | null
@@ -328,6 +331,7 @@ function toRows(raw: Record<string, unknown>[]): ListRow[] {
       pause_reason:      b.paused_at && typeof b.pause_reason === 'string' ? b.pause_reason : null,
       // undefined = not delayed; a paused delivery is explained by its pause.
       delayed:           b.delayed_since && !b.paused_at ? (typeof b.delay_minutes === 'number' ? b.delay_minutes : null) : undefined,
+      breakdown:         !!b.breakdown_reported_at && !b.paused_at,
       issue_open:        hasOpenClientIssue(b),
       issue_note:        typeof b.client_issue_note === 'string' ? b.client_issue_note : null,
       resubmissions:     resubmissionsOf(b),
@@ -2196,6 +2200,13 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                               </span>
                               {r.pause_reason && <PausedBadge reason={r.pause_reason} />}
                               {r.delayed !== undefined && <DelayedBadge minutes={r.delayed} />}
+                              {r.breakdown && (
+                                <span title="The driver reported a breakdown: pause the delivery or close it"
+                                  className="flex w-fit items-center gap-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border mt-1"
+                                  style={{ color: '#F62626', borderColor: '#F6262655', background: '#F6262614' }}>
+                                  Breakdown · needs decision
+                                </span>
+                              )}
                               {r.issue_open && <ProblemReportedBadge note={r.issue_note} />}
                               <ResubmittedBadge count={r.resubmissions} />
                             </td>
@@ -2478,6 +2489,22 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                             onTheRoad={normalizeBookingStatus(detail.status) !== 'assigned'}
                           />
                         )}
+
+                        {/* A breakdown the driver reported, waiting for the office: pause
+                            it (note pre-filled) or close it if the truck moves on. */}
+                        {(() => {
+                          const bd = detail as { breakdown_reported_at?: string | null; breakdown_note?: string | null; paused_at?: string | null }
+                          return bd.breakdown_reported_at && !bd.paused_at && normalizeBookingStatus(detail.status) === 'in_transit' ? (
+                            <BreakdownPanel
+                              bookingId={detail.booking_id}
+                              reportedAt={bd.breakdown_reported_at}
+                              note={bd.breakdown_note ?? null}
+                              canAct={(roleView === 'admin' || roleView === 'operations_manager') && !bookingReadOnly}
+                              allowed={canEdit}
+                              onUpdated={() => { void refreshDetail(detail.booking_id); void loadPage(true) }}
+                            />
+                          ) : null
+                        })()}
 
                         {/* Pausing a delivery in transit, and ending the pause: the
                             Operations Manager's and the Company Administrator's, never

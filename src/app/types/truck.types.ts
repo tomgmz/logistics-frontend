@@ -37,6 +37,12 @@ export interface Truck {
   model_name:   string | null
   truck_model?: TruckModel | null
   status:       'available' | 'recheck_due' | 'in_use' | 'under_maintenance' | 'inactive' | 'archived'
+  // Why it is Under Maintenance, when the system put it there: 'breakdown' (a
+  // vehicle_breakdown report the trip couldn't continue from). Cleared with the hold.
+  maintenance_reason?:      'breakdown' | null
+  maintenance_since?:       string | null
+  maintenance_booking_ref?: string | null
+  maintenance_note?:        string | null
   // Most recent inspection, or null when the vehicle has never been inspected
   // (which reads the same as a fail: it can't be assigned).
   latest_inspection?: TruckInspection | null

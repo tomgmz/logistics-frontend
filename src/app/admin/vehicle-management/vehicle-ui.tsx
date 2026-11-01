@@ -109,6 +109,12 @@ export function kgToTons(kg: number | null | undefined): string {
   return parseFloat(tons.toFixed(3)).toString()
 }
 
+/** "Broke down on BK-…" for a vehicle the system put on hold after a breakdown; null otherwise. */
+export function breakdownLabel(t: Pick<Truck, 'status' | 'maintenance_reason' | 'maintenance_booking_ref'>): string | null {
+  if (t.status !== 'under_maintenance' || t.maintenance_reason !== 'breakdown') return null
+  return t.maintenance_booking_ref ? `Broke down on ${t.maintenance_booking_ref}` : 'Broke down on a delivery'
+}
+
 export function TruckStatusBadge({ status }: { status: string }) {
   const st = statusStyle(status)
   return (

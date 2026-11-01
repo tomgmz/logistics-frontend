@@ -60,6 +60,7 @@ const ACTIONABLE_TYPES = new Set([
   "booking.delivery_delayed",
   "booking.delivery_delayed_staff",
   "booking.crew_roles_swapped",
+  "booking.breakdown_unhandled",
   "booking.driver_call_reminder",
   "driver.emergency",
   "driver.report",
@@ -148,6 +149,7 @@ const VALUE_LABELS: Record<string, Record<string, string>> = {
     delivery_delayed:           "Running late",
     delivery_delayed_staff:     "Delivery delayed",
     crew_roles_swapped:         "Main and second driver swapped",
+    breakdown_unhandled:        "Breakdown waiting for a decision",
     driver_call_reminder:  "Call time in 1 hour",
   },
   window: {

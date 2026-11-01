@@ -244,6 +244,8 @@ export interface RemarksModalProps {
   confirmDisabled?: boolean;
   /** 'danger' (red, the default) for reject/cancel; 'approve' (blue) for approvals. */
   tone?: "danger" | "approve";
+  /** Pre-fills the remarks when the modal mounts (still editable); mount it when opening. */
+  initialRemarks?: string;
 }
 
 // Confirm button and focus colours per tone, from the fixed palette.
@@ -267,9 +269,11 @@ export function RemarksModal({
   children,
   confirmDisabled = false,
   tone = "danger",
+  initialRemarks,
 }: RemarksModalProps) {
   const toneStyle = REMARKS_TONE[tone];
-  const [remarks, setRemarks] = useState("");
+  // Seeded when the modal mounts; a caller with a draft mounts it fresh.
+  const [remarks, setRemarks] = useState(initialRemarks ?? "");
 
   const handleCancel = () => {
     setRemarks("");
