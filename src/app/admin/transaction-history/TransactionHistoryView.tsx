@@ -23,6 +23,7 @@ import { getStatusMeta } from '@/components/transactions/TransactionStatus'
 import { PANEL_BG, Tag } from '@/app/admin/booking-management/BookingDetailParts'
 import ProblemReportedBadge, { hasOpenClientIssue } from '@/components/transactions/ProblemReportedBadge'
 import ResubmittedBadge, { resubmissionsOf } from '@/components/transactions/ResubmittedBadge'
+import DelayedBadge from '@/components/transactions/DelayedBadge'
 import ResubmissionChanges from '@/components/transactions/ResubmissionChanges'
 import {
   formatDate, formatPeso, getCompanyName, getDropoffs,
@@ -66,6 +67,8 @@ const TABS: { key: string; label: string }[] = [
   { key: 'approved',   label: 'Approved' },
   { key: 'assigned',   label: 'Assigned' },
   { key: 'in_transit', label: 'In Transit' },
+  // Not a status: every booking that ran late at any point (any status).
+  { key: 'delayed',    label: 'Delayed' },
   { key: 'delivered',  label: 'Delivered' },
   { key: 'completed',  label: 'Completed' },
   { key: 'cancelled',  label: 'Cancelled' },
@@ -413,6 +416,7 @@ export default function TransactionHistoryView() {
                                 <ProblemReportedBadge note={b.client_issue_note as string | null | undefined} />
                               )}
                               <ResubmittedBadge count={resubmissionsOf(b)} />
+                              <DelayedBadge booking={b} />
                             </td>
                             <td className="whitespace-nowrap text-right font-semibold tabular-nums text-white">
                               {formatPeso(b.total_cost as number | null | undefined)}
@@ -458,6 +462,7 @@ export default function TransactionHistoryView() {
                       <ProblemReportedBadge className="" note={selected.client_issue_note as string | null | undefined} />
                     )}
                     <ResubmittedBadge className="" count={resubmissionsOf(selected)} />
+                    <DelayedBadge className="" booking={selected} />
                     <Tag color={getStatusMeta(selected.status).color} size="md">
                       {getStatusMeta(selected.status).label}
                     </Tag>

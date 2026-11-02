@@ -2119,10 +2119,13 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
               leading={!forcedStatus && (
                 <TabsMinimal
                   label="Booking status"
-                  items={(['all', ...BOOKING_STATUSES.filter((s) => !hidePending || s !== 'pending')]).map((key) => ({
-                    id: key,
-                    label: `${key === 'all' ? (hidePending ? 'All (active)' : 'All') : fmtStatus(key)} (${key === 'all' ? statusCounts.all : statusCounts[key] ?? 0})`,
-                  }))}
+                  // "Delayed" sits after In Transit: in-transit bookings running late now.
+                  items={(['all', ...BOOKING_STATUSES.filter((s) => !hidePending || s !== 'pending')])
+                    .flatMap((key) => (key === 'in_transit' ? [key, 'delayed'] : [key]))
+                    .map((key) => ({
+                      id: key,
+                      label: `${key === 'all' ? (hidePending ? 'All (active)' : 'All') : fmtStatus(key)} (${key === 'all' ? statusCounts.all : statusCounts[key] ?? 0})`,
+                    }))}
                   selectedKey={statusFilter}
                   onSelectionChange={(key) => { setStatusFilter(key); setPage(0) }}
                 />

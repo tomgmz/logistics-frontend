@@ -2,12 +2,10 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { motion } from 'framer-motion'
 import {
   AlertTriangle, CalendarCheck, CheckCircle2, ClipboardCheck, Gauge,
-  MapPin, PackageCheck, ShieldAlert, Truck, Wrench, ChevronRight, Clock, Ticket,
+  MapPin, ShieldAlert, Truck, Wrench, Clock, Ticket,
 } from 'lucide-react'
-import SupportTicketsPanel from './SupportTicketsPanel'
 import AdminDashboard, { AdminDashboardSkeleton, CardLink, MetricRow, MetricRowSkeleton } from './AdminDashboard'
 import { TableCard } from '@/components/ui/untitled/table-card'
 import { Skeleton } from '@/components/ui/Skeleton'
@@ -41,14 +39,8 @@ const BASE: Record<StaffRole, string> = {
   fleet_manager:      '/fleet_admin',
 }
 
+/** A card's colour when its queue has something in it (MetricRow's TONE). */
 type Tone = 'cyan' | 'amber' | 'red' | 'green' | 'muted'
-const TONE: Record<Tone, string> = {
-  cyan:  'var(--color-cyan)',
-  amber: '#ffea00',
-  red:   '#f62626',
-  green: '#3af626',
-  muted: '#818181',
-}
 
 export interface CardSpec {
   label: string
@@ -87,11 +79,11 @@ function cardsFor(role: StaffRole, d: Data): CardSpec[] {
     count: d.open_driver_reports, href: `${base}/reports`, icon: <ShieldAlert size={16} />, tone: 'red',
   }
 
-  // Client support tickets from the help assistant. The Company Administrator
-  // works them on the Tickets page; Operations from the panel on this page.
+  // Client support tickets from the help assistant, worked on the Tickets page
+  // (the Company Administrator's and the Operations Manager's).
   const ticketsCard: CardSpec = {
     label: 'Client support tickets', hint: 'Reply by email, then mark resolved',
-    count: d.support_tickets.count, href: role === 'admin' ? `${base}/support-tickets` : '#support-tickets',
+    count: d.support_tickets.count, href: `${base}/support-tickets`,
     icon: <Ticket size={16} />, tone: 'amber',
   }
 
@@ -175,7 +167,6 @@ function listsFor(role: StaffRole, d: Data): ListSpec[] {
         { title: 'Client reported a problem', empty: 'No open problems.', bookings: q.open_issues.items, total: q.open_issues.count },
         // Running 15+ min past the planned arrival (an older backend sends no queue).
         { title: 'Delayed deliveries', empty: 'Every delivery on the road is on time.', bookings: q.delayed?.items ?? [], total: q.delayed?.count ?? 0 },
-        { title: 'Dispatching today', empty: 'No dispatches today.', bookings: q.dispatch_today.items, total: q.dispatch_today.count },
       ]
     case 'fleet_manager':
       return [
@@ -189,75 +180,6 @@ function listsFor(role: StaffRole, d: Data): ListSpec[] {
   }
 }
 
-function ShortcutCard({ card, index }: { card: CardSpec; index: number }) {
-  const active = card.count > 0
-  const color  = active ? TONE[card.tone] : TONE.muted
-  return (
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.04 }}>
-      <Link
-        href={card.href}
-        className="group flex h-full flex-col gap-2 rounded-xl border border-white/[0.08] bg-[var(--color-surface)] p-3.5 transition-colors hover:border-white/20"
-      >
-        <div className="flex items-center justify-between">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.04]" style={{ color }}>
-            {card.icon}
-          </span>
-          <ChevronRight size={15} className="text-white/25 transition-transform group-hover:translate-x-0.5" />
-        </div>
-        <p className="text-3xl font-bold tabular-nums leading-none text-white">{card.count}</p>
-        <div>
-          <p className="text-sm font-semibold text-white">{card.label}</p>
-          <p className="text-[11px] leading-snug text-white/45">{card.hint}</p>
-        </div>
-      </Link>
-    </motion.div>
-  )
-}
-
-function ListPanel({ list, base }: { list: ListSpec; base: string }) {
-  const rows = list.bookings ?? list.vehicles ?? []
-  return (
-    <section className="rounded-xl border border-white/[0.08] bg-[var(--color-surface)]">
-      <header className="flex items-center justify-between border-b border-white/[0.07] px-3.5 py-2.5">
-        <h2 className="text-sm font-bold text-white">{list.title}</h2>
-        <span className="text-[11px] tabular-nums text-white/40">{list.total}</span>
-      </header>
-      {rows.length === 0 ? (
-        <p className="flex items-center gap-2 px-3.5 py-6 text-xs text-white/40">
-          <CheckCircle2 size={14} className="text-[var(--color-cyan)]" /> {list.empty}
-        </p>
-      ) : (
-        <ul className="divide-y divide-white/[0.05]">
-          {list.bookings?.map((b) => (
-            <li key={b.booking_id}>
-              <Link href={bookingHref(base, b)} className="flex items-center justify-between gap-3 px-3.5 py-2.5 hover:bg-white/[0.03]">
-                <span className="min-w-0">
-                  <span className="block truncate text-xs font-mono font-bold text-white/80">{b.reference_number ?? 'Booking'}</span>
-                  <span className="block truncate text-[11px] text-white/45">
-                    {[b.client, b.origin?.split(',')[0]].filter(Boolean).join(' · ') || '—'}
-                  </span>
-                </span>
-                <span className="shrink-0 text-right text-[11px] text-white/55">
-                  {b.schedule_date ? formatDate(b.schedule_date) : '—'}
-                  {b.call_time && <span className="block text-white/35">{b.call_time.slice(0, 5)}</span>}
-                </span>
-              </Link>
-            </li>
-          ))}
-          {list.vehicles?.map((v) => (
-            <li key={v.truck_id + v.reason}>
-              <Link href={`${base}/vehicle-management`} className="flex items-center justify-between gap-3 px-3.5 py-2.5 hover:bg-white/[0.03]">
-                <span className="text-xs font-mono font-bold text-white/80">{v.plate_number}</span>
-                <span className="text-[11px] text-amber-200/90">{v.reason}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  )
-}
-
 /** How many shortcut cards and lists each desk shows (cardsFor / listsFor). */
 const SKELETON_COUNTS: Record<StaffRole, { cards: number; lists: number }> = {
   admin:              { cards: 6, lists: 0 },
@@ -266,61 +188,26 @@ const SKELETON_COUNTS: Record<StaffRole, { cards: number; lists: number }> = {
   fleet_manager:      { cards: 5, lists: 3 },
 }
 
-const CARD_GRID = 'grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5'
+// ── General Manager, Operations Manager, Fleet Manager: dashboard-04 format ──
 
-const PANEL = 'rounded-xl border border-white/[0.08] bg-[var(--color-surface)]'
+type DeskRole = Exclude<StaffRole, 'admin'>
 
-/** The dashboard's own layout in grey, shown until the first load lands. */
-function StaffDashboardSkeleton({ role }: { role: StaffRole }) {
-  const { cards, lists } = SKELETON_COUNTS[role]
-  return (
-    <div className="space-y-5" aria-busy="true" aria-label="Loading dashboard">
-      <div className={CARD_GRID}>
-        {Array.from({ length: cards }).map((_, i) => (
-          <div key={i} className={`${PANEL} flex flex-col gap-2 p-3.5`}>
-            <Skeleton className="h-8 w-8 rounded-lg" />
-            <Skeleton className="h-[30px] w-12" />
-            <div className="space-y-1.5">
-              <Skeleton className="h-3.5 w-3/4" />
-              <Skeleton className="h-2.5 w-full" />
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
-        {Array.from({ length: lists }).map((_, i) => (
-          <section key={i} className={PANEL}>
-            <div className="flex items-center justify-between border-b border-white/[0.07] px-3.5 py-2.5">
-              <Skeleton className="h-3.5 w-40" />
-              <Skeleton className="h-3 w-5" />
-            </div>
-            <div className="divide-y divide-white/[0.05]">
-              {Array.from({ length: 4 }).map((_, j) => (
-                <div key={j} className="flex items-center justify-between gap-3 px-3.5 py-2.5">
-                  <div className="space-y-1.5">
-                    <Skeleton className="h-3 w-24" />
-                    <Skeleton className="h-2.5 w-36" />
-                  </div>
-                  <Skeleton className="h-2.5 w-16" />
-                </div>
-              ))}
-            </div>
-          </section>
-        ))}
-      </div>
-    </div>
-  )
+/** General Manager: 4 cards across. Operations and Fleet Manager: 3 per row. */
+const DESK_METRIC_COLS: Record<DeskRole, string> = {
+  general_manager:    'md:grid-cols-2 lg:grid-cols-4',
+  operations_manager: 'md:grid-cols-3',
+  fleet_manager:      'md:grid-cols-3',
 }
+const DESK_HEAD = ['Booking', 'Client', 'Pickup', 'Schedule', 'Call time']
+/** Rows per table card; the rest are in Booking Management. */
+const DESK_ROWS = 5
+/** Two table cards across; an odd last one takes the full width. */
+const DESK_LISTS = 'grid grid-cols-1 gap-5 lg:gap-6 xl:grid-cols-2 xl:[&>*:last-child:nth-child(odd)]:col-span-2'
 
-// ── General Manager: dashboard-04 format, like the Company Administrator's ───
-
-const GM_METRIC_COLS = 'md:grid-cols-2 lg:grid-cols-4'
-const GM_HEAD = ['Booking', 'Client', 'Pickup', 'Schedule', 'Call time']
-
-/** One of the General Manager's queues as a table card. */
-function BookingListCard({ list, base }: { list: ListSpec; base: string }) {
-  const rows = list.bookings ?? []
+/** One of a desk's queues as a table card: bookings, or the Fleet Manager's vehicles. */
+function ListCard({ list, base }: { list: ListSpec; base: string }) {
+  if (list.vehicles) return <VehicleListCard list={list} base={base} />
+  const rows = (list.bookings ?? []).slice(0, DESK_ROWS)
   return (
     <TableCard.Root untitled className="flex flex-col">
       <TableCard.Header title={list.title} contentTrailing={<CardLink href={`${base}/booking-management`}>Booking Management</CardLink>} />
@@ -332,7 +219,7 @@ function BookingListCard({ list, base }: { list: ListSpec; base: string }) {
         <div className="overflow-x-auto">
           <table className="data-table min-w-[560px]">
             <thead>
-              <tr>{GM_HEAD.map((h) => <th key={h}>{h}</th>)}</tr>
+              <tr>{DESK_HEAD.map((h) => <th key={h}>{h}</th>)}</tr>
             </thead>
             <tbody className="ff-regular text-sm text-white">
               {rows.map((b) => (
@@ -356,12 +243,47 @@ function BookingListCard({ list, base }: { list: ListSpec; base: string }) {
   )
 }
 
-function GeneralManagerSkeleton() {
+/** The Fleet Manager's vehicles that need something before their next job. */
+function VehicleListCard({ list, base }: { list: ListSpec; base: string }) {
+  const rows = (list.vehicles ?? []).slice(0, DESK_ROWS)
+  return (
+    <TableCard.Root untitled className="flex flex-col">
+      <TableCard.Header title={list.title} contentTrailing={<CardLink href={`${base}/vehicle-management`}>Vehicle Management</CardLink>} />
+      {rows.length === 0 ? (
+        <p className="flex items-center gap-2 px-4 py-6 text-sm text-[#818181] md:px-6">
+          <CheckCircle2 size={16} /> {list.empty}
+        </p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="data-table min-w-[420px]">
+            <thead>
+              <tr><th>Plate number</th><th>Needs</th></tr>
+            </thead>
+            <tbody className="ff-regular text-sm text-white">
+              {rows.map((v) => (
+                <tr key={v.truck_id + v.reason}>
+                  <td className="whitespace-nowrap">
+                    <Link href={`${base}/vehicle-management`} className="transition-opacity [@media(hover:hover)]:hover:opacity-80">
+                      {v.plate_number}
+                    </Link>
+                  </td>
+                  <td className="text-[#ffea00]">{v.reason}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </TableCard.Root>
+  )
+}
+
+function DeskSkeleton({ role }: { role: DeskRole }) {
   return (
     <div className="flex flex-col gap-5 lg:gap-6" aria-busy="true" aria-label="Loading dashboard">
-      <MetricRowSkeleton cards={SKELETON_COUNTS.general_manager.cards} cols={GM_METRIC_COLS} />
-      <div className="grid grid-cols-1 gap-5 lg:gap-6 xl:grid-cols-2">
-        {Array.from({ length: SKELETON_COUNTS.general_manager.lists }).map((_, i) => (
+      <MetricRowSkeleton cards={SKELETON_COUNTS[role].cards} cols={DESK_METRIC_COLS[role]} />
+      <div className={DESK_LISTS}>
+        {Array.from({ length: SKELETON_COUNTS[role].lists }).map((_, i) => (
           <TableCard.Root key={i} untitled>
             <div className="flex items-center justify-between gap-4 border-b border-[#424242] px-4 py-5 md:px-6">
               <Skeleton className="h-5 w-44" />
@@ -424,65 +346,22 @@ export default function StaffDashboard({ role }: { role: StaffRole }) {
     )
   }
 
-  // The General Manager's follows the same format, with their own cards and queues.
-  if (role === 'general_manager') {
-    return (
-      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-[#0a0a0a] text-white px-4 py-5 lg:px-8 lg:py-6">
-        <div className="flex w-full flex-col gap-5 lg:gap-6">
-          {error && (
-            <div className="rounded-xl border border-[#f62626]/30 bg-[#f62626]/10 px-4 py-2.5 text-sm text-[#f62626]">{error}</div>
-          )}
-          {!data ? loading && <GeneralManagerSkeleton /> : (
-            <>
-              <MetricRow cards={cardsFor(role, data)} cols={GM_METRIC_COLS} />
-              <div className="grid grid-cols-1 gap-5 lg:gap-6 xl:grid-cols-2">
-                {listsFor(role, data).map((l) => <BookingListCard key={l.title} list={l} base={base} />)}
-              </div>
-            </>
-          )}
-          <div className="h-4" />
-        </div>
-      </div>
-    )
-  }
-
+  // Every other desk follows the same format, each with its own cards and queues.
   return (
-    <div className="flex-1 overflow-y-auto bg-[var(--color-bg)] ff-sc">
-      <div className="w-full space-y-5 px-4 py-4 lg:px-5">
-        <header className="flex items-center justify-between gap-3">
-          <h1 className="font-[family-name:var(--font-alegreya-sc)] text-[17px] 3xl:text-[20px] font-bold text-white">Dashboard</h1>
-        </header>
-
-        {error && !data && (
-          <p className="rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs text-red-300">{error}</p>
+    <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-[#0a0a0a] text-white px-4 py-5 lg:px-8 lg:py-6">
+      <div className="flex w-full flex-col gap-5 lg:gap-6">
+        {error && (
+          <div className="rounded-xl border border-[#f62626]/30 bg-[#f62626]/10 px-4 py-2.5 text-sm text-[#f62626]">{error}</div>
         )}
-
-        {!data ? (
-          loading && <StaffDashboardSkeleton role={role} />
-        ) : (
+        {!data ? loading && <DeskSkeleton role={role} /> : (
           <>
-            <div className={CARD_GRID}>
-              {cardsFor(role, data).map((c, i) => <ShortcutCard key={c.label} card={c} index={i} />)}
+            <MetricRow cards={cardsFor(role, data)} cols={DESK_METRIC_COLS[role]} />
+            <div className={DESK_LISTS}>
+              {listsFor(role, data).map((l) => <ListCard key={l.title} list={l} base={base} />)}
             </div>
-
-            <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
-              {listsFor(role, data).map((l) => <ListPanel key={l.title} list={l} base={base} />)}
-            </div>
-
-            {role === 'operations_manager' && (
-              <SupportTicketsPanel
-                count={data.support_tickets.count}
-                items={data.support_tickets.items}
-                inbox={data.support_tickets.inbox}
-                onChanged={() => { void load() }}
-              />
-            )}
-
-            <p className="flex items-center gap-2 text-xs text-white/45">
-              <PackageCheck size={15} className="shrink-0" /> Updates live as bookings, vehicles and reports change.
-            </p>
           </>
         )}
+        <div className="h-4" />
       </div>
     </div>
   )
