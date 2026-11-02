@@ -30,6 +30,7 @@ import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { pauseReasonLabel } from '@/lib/pause-reasons'
 import { useLiveRoute, LiveRoutePolyline, FollowTruck, remainingStops } from '@/components/map/LiveRoute'
 import { RouteStepper, bookingRouteSteps, dropoffSummary } from '@/components/map/RouteStepper'
+import { formatDuration } from '@/lib/duration'
 
 const GOOGLE_MAPS_KEY    = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
 const GOOGLE_MAPS_MAP_ID = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID
@@ -84,7 +85,7 @@ function TransitBookingRow({
   const delayed         = !pausedReason && !!(booking as { delayed_since?: string | null }).delayed_since
   const delayMin        = (booking as { delay_minutes?: number | null }).delay_minutes ?? null
   const color           = pausedReason ? '#ffea00' : delayed ? '#FF7A30' : statusColor(booking.status)
-  const label           = delayed ? `Delayed${delayMin ? ` · ${delayMin} min` : ''}` : fmtStatus(booking.status)
+  const label           = delayed ? `Delayed${delayMin ? ` · ${formatDuration(delayMin)}` : ''}` : fmtStatus(booking.status)
   const origin          = booking.origin?.split(',')[0] ?? '—'
   const lastDestAddress = booking.booking_destinations?.[booking.booking_destinations.length - 1]?.address
   const dest            = lastDestAddress?.split(',')[0] ?? '—'

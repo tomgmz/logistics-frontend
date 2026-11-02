@@ -312,7 +312,7 @@ export default function TransactionHistoryView() {
                 />
               }
               // Names exactly what the server searches (transaction-history.model.ts).
-              search={{ value: search, onChange: setSearch, placeholder: 'Search reference, company or pickup' }}
+              search={{ value: search, onChange: setSearch, placeholder: 'Search reference, company, pickup or delayed' }}
               dateRange={{ value: dateRange, onChange: (r) => { setDateRange(r); setPage(0) } }}
               fields={[
                 { key: 'company', label: 'Company', options: companies.map((c) => ({ value: c.clientId, label: c.companyName })) },

@@ -30,6 +30,8 @@ export interface ReusableModalProps {
   disableBackdropClose?: boolean;
   /** Stacking layer; raise it when opening over a pop-up that sits above z-[70]. */
   zClassName?: string;
+  /** Extra content under the description (e.g. a list of warnings). */
+  children?: ReactNode;
 }
 
 const backdropVariants = {
@@ -92,6 +94,7 @@ export default function ReusableModal({
   onCancel,
   disableBackdropClose = false,
   zClassName = "z-[70]",
+  children,
 }: ReusableModalProps) {
   useEffect(() => {
     if (!open) return;
@@ -180,6 +183,7 @@ export default function ReusableModal({
                   {description}
                 </p>
               )}
+              {children}
             </div>
 
             <div className="flex flex-col-reverse gap-2 px-5 pt-2 pb-7 sm:flex-row sm:justify-end sm:px-7 sm:pb-5 sm:pt-1">
@@ -206,7 +210,7 @@ export default function ReusableModal({
                 }}
                 whileTap={{ scale: 0.96 }}
                 onClick={onConfirm}
-                className="flex items-center justify-center rounded-[8px] text-white cursor-pointer select-none w-full h-[44px] sm:w-[88px] sm:h-[40px]"
+                className="flex items-center justify-center rounded-[8px] text-white cursor-pointer select-none whitespace-nowrap w-full h-[44px] sm:w-auto sm:min-w-[88px] sm:px-4 sm:h-[40px]"
                 style={{
                   backgroundColor: "rgba(255,255,255,0.10)",
                   border: "none",

@@ -19,6 +19,7 @@ import { arrivalWindow, formatArrivalWindow, isPastWindow } from '@/lib/arrival-
 import { RouteStepper, routeSteps } from './RouteStepper'
 import { pauseReasonLabel } from '@/lib/pause-reasons'
 import { continuationDayLabel, openContinuation, pausedPlanState } from '@/lib/pause-continuation'
+import { formatDuration } from '@/lib/duration'
 
 const SC = { fontFamily: "var(--font-alegreya-sc), 'Alegreya Sans SC', sans-serif" } as const
 
@@ -79,17 +80,40 @@ function usePausedMinutes(pausedAt: string | null): number {
   return Number.isFinite(since) ? Math.max(0, Math.floor((now - since) / 60_000)) : 0
 }
 
-function useTruckImage(truckType: string) {
+/** The assigned vehicle, read from the booking as the server returns it. */
+function assignedVehicle(b: BookingDetail | null): { plate: string | null; type: string | null; image: string | null } {
+  const raw   = (b ?? {}) as {
+    truck_assignments?: Array<{ trucks?: { plate_number?: string; truck_models?: { vehicle_type?: string | null; image_url?: string | null } | null } | null }>
+    deliveries?: { is_vendor_supplied?: boolean; vendor_vehicle_plate?: string | null; vendor_vehicle_type?: string | null }
+      | Array<{ is_vendor_supplied?: boolean; vendor_vehicle_plate?: string | null; vendor_vehicle_type?: string | null }>
+  }
+  const truck  = raw.truck_assignments?.[0]?.trucks ?? null
+  const del    = Array.isArray(raw.deliveries) ? raw.deliveries[0] : raw.deliveries
+  const vendor = del?.is_vendor_supplied ? del : null
+  return {
+    plate: truck?.plate_number ?? vendor?.vendor_vehicle_plate ?? b?.driver?.truck?.plate_number ?? null,
+    type:  truck?.truck_models?.vehicle_type ?? vendor?.vendor_vehicle_type ?? null,
+    image: truck?.truck_models?.image_url ?? null,
+  }
+}
+
+/**
+ * The picture: the assigned vehicle's model. Before one is assigned (or for a
+ * vendor vehicle), the first model of the needed vehicle TYPE that has a
+ * picture; models are named by make ("Isuzu NLR"), never by type.
+ */
+function useTruckImage(truckType: string, assignedImage: string | null) {
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [loading,  setLoading]  = useState(true)
 
   useEffect(() => {
-    if (!truckType) return
+    if (assignedImage || !truckType) return
     let active = true
     fetchTruckModels()
       .then(models => {
         if (!active) return
-        const match = models.find(m => m.name.toLowerCase() === truckType.toLowerCase())
+        const type  = truckType.toLowerCase()
+        const match = models.find(m => (m.vehicle_type ?? '').toLowerCase() === type && !!m.image_url)
         setImageUrl(match?.image_url ?? null)
         setLoading(false)
       })
@@ -99,9 +123,9 @@ function useTruckImage(truckType: string) {
         setLoading(false)
       })
     return () => { active = false }
-  }, [truckType])
+  }, [truckType, assignedImage])
 
-  return { imageUrl, loading }
+  return assignedImage ? { imageUrl: assignedImage, loading: false } : { imageUrl, loading }
 }
 
 interface Props {
@@ -139,18 +163,13 @@ export function DetailsPanelContent({
   const destCity   = destStop?.address?.split(',')[0] ?? '—'
   const destFull   = destStop?.address ?? '—'
 
-  const truckType   = bookingDetail?.truck_type_needed          ?? 'To be assigned'
-  const plateNumber = bookingDetail?.driver?.truck?.plate_number ?? '—'
+  const vehicle     = assignedVehicle(bookingDetail)
+  const truckType   = bookingDetail?.truck_type_needed ?? vehicle.type ?? 'To be assigned'
+  const plateNumber = vehicle.plate ?? '—'
   const totalCost   = bookingDetail?.total_cost != null ? `₱${bookingDetail.total_cost}` : '—'
   // The planned arrival at the last stop of the last run, as a window. Before
   // it's planned (no truck yet) this falls back to the scheduled day.
   const plannedAt   = bookingDetail?.estimated_delivery ?? null
-  // A pause (or anything else) can push the expected arrival to another day than
-  // the one booked; say so plainly rather than leave it to the date prefix.
-  const plannedDay  = plannedAt
-    ? new Date(plannedAt).toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
-    : null
-  const movedDay    = !!plannedDay && !!scheduleDate && plannedDay !== scheduleDate.slice(0, 10)
   const windowText  = formatArrivalWindow(plannedAt)
   // Paused: the plan is real only once the office has set when it continues;
   // until then (or once that time passes still paused) it would keep sliding.
@@ -159,7 +178,10 @@ export function DetailsPanelContent({
   const estDelivery = planState === 'tbc'
     ? 'To be confirmed'
     : windowText
-      ? (movedDay || planState === 'planned' ? `Now expected ${windowText}` : windowText)
+      // Always the plan. "Now expected" only for a paused delivery whose
+      // continuation the office has set; a late delivery's new time is the
+      // Estimate Arrival and the Delayed banner, not this card.
+      ? (planState === 'planned' ? `Now expected ${windowText}` : windowText)
       : scheduleDate
 
   // The final stop's live ETA, which is what "estimate arrival" has always meant
@@ -184,11 +206,17 @@ export function DetailsPanelContent({
   ))
   const delayNewWindow = delayedFlag ? formatArrivalWindow(bookingDetail?.delay_expected_at ?? null) : null
 
+  // The live ETA (dropped once older than 15 min, useLiveDriverPosition); else
+  // the server's new time for a late delivery; else, on the road, no estimate.
   const arrivalLabel = pausedAt
     ? 'Paused'
     : destEta
       ? `${formatEtaClock(destEta.eta_at)} · ${formatEta(destEta.eta_seconds)}`
-      : '—'
+      : delayNewWindow
+        ? delayNewWindow
+        : status.toLowerCase() === 'in_transit'
+          ? 'No estimate'
+          : '—'
 
   // Time still to run, live, falling back to the planned duration before the
   // truck starts reporting.
@@ -197,12 +225,12 @@ export function DetailsPanelContent({
     : nextEta
     ? `${formatEta(nextEta.eta_seconds)} to next stop`
     : routeData.total_duration
-      ? `${Math.floor(routeData.total_duration / 60)}HR ${routeData.total_duration % 60}MINS`
+      ? formatDuration(routeData.total_duration)
       : '—'
 
   const subCity = (full: string) => full.split(',').slice(1).join(',').trim() || full
 
-  const { imageUrl: truckImageUrl, loading: truckImageLoading } = useTruckImage(truckType)
+  const { imageUrl: truckImageUrl, loading: truckImageLoading } = useTruckImage(truckType, vehicle.image)
 
   // From the booking's cargo lines. The first line stands in for the product
   // and handling codes, the way the panel has always shown a single product.
@@ -285,7 +313,7 @@ export function DetailsPanelContent({
         >
           <Clock size={15} className="shrink-0" style={{ color: '#FF7A30' }} />
           <span className="text-[12px] leading-snug text-white/85" style={SC}>
-            <span style={{ color: '#FF7A30' }}>Delayed{bookingDetail?.delay_minutes ? ` · about ${bookingDetail.delay_minutes} min` : ''}</span>
+            <span style={{ color: '#FF7A30' }}>Delayed{bookingDetail?.delay_minutes ? ` · about ${formatDuration(bookingDetail.delay_minutes)}` : ''}</span>
             {' '}{delayNewWindow ? `Now expected ${delayNewWindow}.` : 'A new time will show once the truck reports its position.'}
           </span>
         </div>

@@ -5,7 +5,7 @@ import type { ReactNode } from 'react'
 import { Check, Truck } from 'lucide-react'
 import type { BookingDetail } from '@/app/types/maps/routemap.types'
 import type { Truck as TruckType } from '@/app/types/truck.types'
-import { assessFit, type FitAssessment, type VehicleCapacity } from '@/lib/cargo/capacity'
+import { assessFit, floorPositions, type FitAssessment, type VehicleCapacity } from '@/lib/cargo/capacity'
 import { EMPTY_CARGO_SUMMARY, type CargoSummary } from '@/lib/cargo/summary'
 import type { CodingFlag } from '@/lib/number-coding'
 
@@ -23,16 +23,28 @@ const FALLBACK_IMAGE = '/landingpage/aboutSection/wingvan.png'
 /**
  * The load as recorded on the booking.
  *
- * Only the booking-level totals are stored, not the per-group footprints the
- * wizard measured, so the floor-position check has nothing to place and is
- * skipped; weight, volume and the longest item are all still compared.
+ * The totals come from the booking; the footprints from its cargo lines, so the
+ * floor-space and roof checks run here as they do on the server
+ * (logistics-backend lib/cargo-capacity). Read the same way it does: a line with
+ * no size is skipped, every item may be turned onto another face (no per-line
+ * tilt flag is stored), and nothing double-decks on a booking marked non-stackable.
  */
 export function cargoSummaryFromBooking(detail: BookingDetail): CargoSummary {
   const extra = detail as BookingDetail & { required_net_weight_kg?: number | null }
   const gross  = detail.required_weight_kg  ?? 0
   const volume = detail.required_volume_cbm ?? 0
+  const stackable = detail.non_stackable_cargo !== true
+  const footprints = (detail.booking_cargo_items ?? []).flatMap((i) => {
+    const count = i.quantity ?? 0
+    if (!i.length_cm || !i.width_cm || !i.height_cm || count <= 0) return []
+    return [{
+      lengthCm: Number(i.length_cm), widthCm: Number(i.width_cm), heightCm: Number(i.height_cm),
+      count, stackable, tiltable: true,
+    }]
+  })
   return {
     ...EMPTY_CARGO_SUMMARY,
+    footprints,
     totalPieces:     (detail.booking_cargo_items ?? []).reduce((n, i) => n + (i.quantity ?? 0), 0),
     grossWeightKg:   gross,
     netWeightKg:     extra.required_net_weight_kg ?? 0,
@@ -55,6 +67,38 @@ function capacityOf(truck: TruckType): VehicleCapacity | null {
     bedHeightMM:       m.height_mm      ?? null,
     stackableFriendly: m.stackable_friendly,
   }
+}
+
+/**
+ * Why this vehicle may not take the load, one sentence each, for the assign
+ * confirmation. Empty when it fits or there is no capacity on file to judge by.
+ * The stacking note is left out: it is a caution, not a reason the load won't go.
+ */
+export function fitProblems(truck: TruckType, cargo: CargoSummary): string[] {
+  const cap = capacityOf(truck)
+  if (!cap) return []
+  const fit = assessFit(cap, cargo)
+  const problems: string[] = []
+  if (fit.overLength) {
+    problems.push(`Longest item is ${cargo.maxDimensionCm} cm; the body takes ${cap.maxLengthCM} cm.`)
+  } else if (fit.doesNotFit) {
+    const item = cap.bedLengthMM && cap.bedWidthMM
+      ? cargo.footprints.find((f) => floorPositions(cap.bedLengthMM!, cap.bedWidthMM!, f, cap.bedHeightMM) === 0)
+      : undefined
+    problems.push(item
+      ? `An item of ${item.lengthCm}x${item.widthCm}x${item.heightCm} cm does not fit inside this body in any position.`
+      : 'An item will not fit inside this body in any position.')
+  }
+  if (fit.overWeight) {
+    problems.push(`Load is ${cargo.grossWeightKg.toLocaleString()} kg; this vehicle carries ${cap.maxWeightKG.toLocaleString()} kg.`)
+  }
+  if (fit.overVolume) {
+    problems.push(`Load is ${cargo.volumeCbm} CBM; usable capacity is ${fit.usableVolumeCBM.toFixed(1)} CBM.`)
+  }
+  if (fit.overFloorSpace) {
+    problems.push(`Cargo needs ${fit.positionsNeeded} floor positions; the bed holds ${fit.positionsAvailable}.`)
+  }
+  return problems
 }
 
 export default function VehiclePicker({

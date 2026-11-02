@@ -1,6 +1,7 @@
 import { Clock } from 'lucide-react'
 
 import { PALETTE } from '@/lib/palette'
+import { formatDuration } from '@/lib/duration'
 
 const ORANGE = PALETTE.orange
 
@@ -22,7 +23,7 @@ export function delayOf(b: object): { now: boolean; minutes: number | null } | n
   return max > 0 ? { now: false, minutes: max } : null
 }
 
-/** "Delayed · 25 min" while it is late, "Was delayed · up to 40 min" after. */
+/** "Delayed · 25 min" while it is late, "Was delayed · up to 2 hrs" after (formatDuration). */
 export default function DelayedBadge({ booking, className = 'mt-1' }: {
   booking:    object
   className?: string
@@ -30,8 +31,8 @@ export default function DelayedBadge({ booking, className = 'mt-1' }: {
   const d = delayOf(booking)
   if (!d) return null
   const label = d.now
-    ? `Delayed${d.minutes ? ` · ${d.minutes} min` : ''}`
-    : `Was delayed · up to ${d.minutes} min`
+    ? `Delayed${d.minutes ? ` · ${formatDuration(d.minutes)}` : ''}`
+    : `Was delayed · up to ${formatDuration(d.minutes ?? 0)}`
   return (
     <span
       title={d.now ? 'Running late against the planned arrival' : 'Ran late against the planned arrival during this delivery'}

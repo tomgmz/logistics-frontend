@@ -70,11 +70,12 @@ import {
 import type { RouteDistance, SecondDriverRecord } from '@/lib/services/admin/assignment.service'
 import ReusableModal, { RemarksModal } from '@/components/layout/ReusableModal'
 import TripPlanner from './TripPlanner'
-import VehiclePicker, { cargoSummaryFromBooking } from './VehiclePicker'
+import VehiclePicker, { cargoSummaryFromBooking, fitProblems } from './VehiclePicker'
 import CompletionPanel from '@/components/transactions/CompletionPanel'
 import { formatPlateNumber, plateError } from '@/lib/validation/plate'
 import ProblemReportedBadge, { hasOpenClientIssue } from '@/components/transactions/ProblemReportedBadge'
 import ResubmittedBadge, { resubmissionsOf } from '@/components/transactions/ResubmittedBadge'
+import SharedDelayedBadge from '@/components/transactions/DelayedBadge'
 import ResubmissionChanges from '@/components/transactions/ResubmissionChanges'
 import ReplaceCrewPanel from '@/components/transactions/ReplaceCrewPanel'
 import StopTimesPanel from '@/components/transactions/StopTimesPanel'
@@ -102,6 +103,7 @@ import {
 } from './BookingDetailParts'
 
 import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
+import { formatDuration } from '@/lib/duration'
 
 const BOOKING_STATUSES: AdminBookingLifecycleStatus[] = [
   'pending',
@@ -261,7 +263,7 @@ function DelayedBadge({ minutes }: { minutes: number | null }) {
       style={{ color: '#FF7A30', borderColor: '#FF7A3055', background: '#FF7A3014' }}
     >
       <Clock size={9} />
-      Delayed{minutes ? ` · ${minutes} min` : ''}
+      Delayed{minutes ? ` · ${formatDuration(minutes)}` : ''}
     </span>
   )
 }
@@ -1327,6 +1329,15 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
   const [vendorDrivers, setVendorDrivers]       = useState<VendorDriverUser[]>([])
   const [vendorDriversLoading, setVendorDriversLoading] = useState(false)
 
+  // Why the picked company vehicle may not take the load. The assign
+  // confirmation lists these, so the warning comes before the save rather than
+  // as a toast after it. A vendor vehicle has no capacity on file to judge by.
+  const assignFitProblems = useMemo(() => {
+    if (assignVendorMode || !detail || !assignTruckId) return []
+    const truck = trucks.find((t) => t.truck_id === assignTruckId)
+    return truck ? fitProblems(truck, cargoSummaryFromBooking(detail)) : []
+  }, [assignVendorMode, detail, assignTruckId, trucks])
+
   // Read fresh each time the vendor picker is opened, so a driver just added in
   // User Management (or one whose access was just revoked) is reflected.
   useEffect(() => {
@@ -1804,6 +1815,8 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     const rule       = crewRule(routeDistance)
     const keepSecond = rule.second !== 'hidden'
     const helperName = rule.helper ? assignHelperName.trim() || null : null
+    // The confirmation already showed these, so the reply's warning needs no toast.
+    const warnedBeforeSave = assignFitProblems.length > 0
     setAssignBusy(true)
     try {
       const result = assignVendorMode
@@ -1833,9 +1846,11 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
       assignmentService.getAll().then(setAllAssignments).catch(() => null)
       // The assignment stands either way — operations may know something the
       // recorded figures do not — but an overloaded vehicle must not go by
-      // silently. It is on the audit log too, not just this toast.
+      // silently. It is on the audit log too. The toast is only the fallback for
+      // a problem the confirmation could not see (the server also measures each
+      // cargo line against the bed).
       const warning = result?.capacity_warning
-      if (warning?.reasons?.length) {
+      if (warning?.reasons?.length && !warnedBeforeSave) {
         appToast.warn(
           `Assigned, but this vehicle may not fit the load. ${warning.reasons[0]}`,
           { action: 'assign', entityId: selectedId },
@@ -2074,18 +2089,38 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
 
       <ReusableModal
         open={confirmAssign}
-        title={committedAssignment.driverId ? 'Change the driver and vehicle?' : 'Assign this driver and vehicle?'}
-        description={
-          committedAssignment.driverId
-            ? 'The booking will move to the crew you picked, and the drivers will be notified.'
-            : 'The crew you picked will be assigned to this booking, and the drivers will be notified.'
+        title={
+          assignFitProblems.length > 0
+            ? 'This vehicle may not fit the load'
+            : committedAssignment.driverId ? 'Change the driver and vehicle?' : 'Assign this driver and vehicle?'
         }
-        confirmLabel="Yes"
-        cancelLabel="No"
+        description={
+          assignFitProblems.length > 0
+            ? 'You can still assign it if you know the load will go, but check first:'
+            : committedAssignment.driverId
+              ? 'The booking will move to the crew you picked, and the drivers will be notified.'
+              : 'The crew you picked will be assigned to this booking, and the drivers will be notified.'
+        }
+        confirmLabel={assignFitProblems.length > 0 ? 'Assign anyway' : 'Yes'}
+        cancelLabel={assignFitProblems.length > 0 ? 'Go back' : 'No'}
         zClassName="z-[80]"
         onConfirm={() => { setConfirmAssign(false); void handleAssign() }}
         onCancel={() => setConfirmAssign(false)}
-      />
+      >
+        {assignFitProblems.length > 0 && (
+          <ul className="mt-3 m-0 pl-0 list-none flex flex-col gap-1.5">
+            {assignFitProblems.map((p) => (
+              <li
+                key={p}
+                className="rounded-md border px-2.5 py-1.5 text-[13px] leading-snug break-words"
+                style={{ color: '#f62626', background: 'rgba(246,38,38,0.12)', borderColor: 'rgba(246,38,38,0.35)' }}
+              >
+                {p}
+              </li>
+            ))}
+          </ul>
+        )}
+      </ReusableModal>
 
       <ReusableModal
         open={!!deleteAskId}
@@ -2113,7 +2148,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
           <TableCard.Root className="flex-[1_0_auto] lg:flex-1 lg:min-h-0 flex flex-col">
             <FilterBar
               layout="split"
-              search={{ value: search, onChange: (v) => { setSearch(v); setPage(0) }, placeholder: 'Search reference, company, pickup or drop-off' }}
+              search={{ value: search, onChange: (v) => { setSearch(v); setPage(0) }, placeholder: 'Search reference, company, pickup, drop-off or delayed' }}
               // Untitled UI's "Select dates": the schedule-date window, filtered on the server.
               dateRange={{ value: dateRange, onChange: (r) => { setDateRange(r); setPage(0) } }}
               leading={!forcedStatus && (
@@ -2257,6 +2292,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                     {detail && !detailLoading && (
                       <>
                         <ResubmittedBadge className="" count={resubmissionsOf(detail)} />
+                        <SharedDelayedBadge className="" booking={detail} />
                         <Tag color={statusColor(detail.status)} size="md">{fmtStatus(detail.status)}</Tag>
                       </>
                     )}
@@ -2556,6 +2592,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                           currentVendorDriverUserId={currentAssignment?.vendor_driver_user_id ?? null}
                           currentVendorPlate={currentAssignment?.vendor_vehicle_plate ?? null}
                           currentVendorType={currentAssignment?.vendor_vehicle_type ?? null}
+                          cargo={cargoSummaryFromBooking(detail)}
                           onReplaced={() => {
                             void refreshDetail(detail.booking_id)
                             void loadPage(true)

@@ -32,6 +32,7 @@ import BookingDocuments from '@/components/transactions/BookingDocuments'
 import { StatusBadge, getStatusMeta } from '@/components/transactions/TransactionStatus'
 import ProblemReportedBadge, { hasOpenClientIssue } from '@/components/transactions/ProblemReportedBadge'
 import ResubmittedBadge, { resubmissionsOf } from '@/components/transactions/ResubmittedBadge'
+import DelayedBadge from '@/components/transactions/DelayedBadge'
 import ResubmissionChanges from '@/components/transactions/ResubmissionChanges'
 import {
   formatDate, getDropoffs,
@@ -154,6 +155,7 @@ function BookingCard({ booking, onSelect }: {
             <ProblemReportedBadge className="" note={booking.client_issue_note as string | null | undefined} />
           )}
           <ResubmittedBadge className="" count={resubmissionsOf(booking)} />
+          <DelayedBadge className="" booking={booking} />
         </div>
         <StatusTag status={booking.status} />
       </div>
@@ -304,6 +306,7 @@ export default function BookingHistoryModule() {
               <ProblemReportedBadge className="" note={selected.client_issue_note as string | null | undefined} />
             )}
             <ResubmittedBadge className="" count={resubmissionsOf(selected)} />
+            <DelayedBadge className="" booking={selected} />
             <StatusBadge status={selected.status} />
           </div>
         )}
@@ -347,7 +350,7 @@ export default function BookingHistoryModule() {
                   />
                 }
                 // Names exactly what the server searches (booking.model.ts, client scope).
-                search={{ value: search, onChange: setSearch, placeholder: 'Search reference, pickup or drop-off' }}
+                search={{ value: search, onChange: setSearch, placeholder: 'Search reference, pickup, drop-off or delayed' }}
                 // "Select Date": the scheduled-date window.
                 dateRange={{
                   value: dateFrom || dateTo ? { from: dateFrom || dateTo, to: dateTo || dateFrom } : null,

@@ -17,6 +17,8 @@ import { writeAccess } from '@/components/layout/ModuleAccess'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { appToast } from '@/lib/toast'
 import ReusableModal from '@/components/layout/ReusableModal'
+import { fitProblems } from '@/app/admin/booking-management/VehiclePicker'
+import type { CargoSummary } from '@/lib/cargo/summary'
 import { formatDateTime } from './transaction-format'
 import { PALETTE } from '@/lib/palette'
 import { BORDER_C, CYAN, MUTED } from './transaction-theme'
@@ -60,6 +62,7 @@ export default function ReplaceCrewPanel({
   bookingId, reference, inTransit, paused, canReplace, allowed = true, drivers, trucks,
   currentDriverId, currentSecondDriverId, currentTruckId, currentHelperName = null,
   currentIsVendor = false, currentVendorDriverUserId = null, currentVendorPlate = null, currentVendorType = null,
+  cargo = null,
   onReplaced,
 }: {
   bookingId:              string
@@ -82,6 +85,8 @@ export default function ReplaceCrewPanel({
   currentVendorDriverUserId?: string | null
   currentVendorPlate?:        string | null
   currentVendorType?:         string | null
+  /** The booking's recorded load, to warn before sending a vehicle that may not take it. */
+  cargo?:                 CargoSummary | null
   onReplaced:             () => void
 }) {
   const [history, setHistory] = useState<CrewReplacement[]>([])
@@ -209,6 +214,11 @@ export default function ReplaceCrewPanel({
   const truckChanged = vendor
     ? !currentIsVendor || plate.trim().toUpperCase() !== (currentVendorPlate ?? '').toUpperCase()
     : truckId !== (currentTruckId ?? '')
+  // Why a newly picked company vehicle may not take the load; listed in the
+  // confirmation. Not for the vehicle already on the trip (it was accepted when
+  // assigned), and not for a vendor vehicle (no capacity on file).
+  const pickedTruck = !vendor && truckChanged ? trucks.find((t) => t.truck_id === truckId) : undefined
+  const fitWarnings = pickedTruck && cargo ? fitProblems(pickedTruck, cargo) : []
   // A helper rides only where there is no second driver.
   const showHelper = secondRequired !== true && !hasSecond
 
@@ -488,14 +498,32 @@ export default function ReplaceCrewPanel({
 
       <ReusableModal
         open={confirming}
-        title="Replace the crew?"
-        description="The new crew takes over this paused trip, and the drivers and the client will be notified."
-        confirmLabel="Yes"
-        cancelLabel="No"
+        title={fitWarnings.length > 0 ? 'This vehicle may not fit the load' : 'Replace the crew?'}
+        description={
+          fitWarnings.length > 0
+            ? 'You can still send it if you know the load will go, but check first:'
+            : 'The new crew takes over this paused trip, and the drivers and the client will be notified.'
+        }
+        confirmLabel={fitWarnings.length > 0 ? 'Replace anyway' : 'Yes'}
+        cancelLabel={fitWarnings.length > 0 ? 'Go back' : 'No'}
         zClassName="z-[80]"
         onConfirm={() => { setConfirming(false); void submit() }}
         onCancel={() => setConfirming(false)}
-      />
+      >
+        {fitWarnings.length > 0 && (
+          <ul className="mt-3 m-0 pl-0 list-none flex flex-col gap-1.5">
+            {fitWarnings.map((p) => (
+              <li
+                key={p}
+                className="rounded-md border px-2.5 py-1.5 text-[13px] leading-snug break-words"
+                style={{ color: '#f62626', background: 'rgba(246,38,38,0.12)', borderColor: 'rgba(246,38,38,0.35)' }}
+              >
+                {p}
+              </li>
+            ))}
+          </ul>
+        )}
+      </ReusableModal>
     </div>
   )
 }

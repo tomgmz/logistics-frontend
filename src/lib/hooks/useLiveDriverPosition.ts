@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import authApi from '@/lib/api/auth.api'
+import { formatDuration } from '@/lib/duration'
 
 /**
  * Where the truck is, live, for one booking.
@@ -53,6 +54,13 @@ export interface StopEta {
  */
 const STALE_AFTER_MS = 2 * 60 * 1000
 
+/**
+ * An ETA older than this is no ETA: the truck stopped reporting, so its clock
+ * time is history, not a prediction. Same limit the server's delay check uses
+ * (delay.scheduler FRESH_ETA_MS), so the panel and the Delayed flag agree.
+ */
+const ETA_FRESH_MS = 15 * 60 * 1000
+
 /** Fallback cadence, used only while the realtime channel is not connected. */
 const POLL_MS = 30_000
 
@@ -87,6 +95,8 @@ export function useLiveDriverPosition(
   const [subscribed, setSubscribed] = useState(false)
   const [eased,      setEased]      = useState<{ lat: number; lng: number } | null>(null)
   const [etaStops,   setEtaStops]   = useState<StopEta[] | null>(null)
+  /** When the server computed `etaStops` (ms). A broadcast is fresh on arrival. */
+  const [etaAtMs,    setEtaAtMs]    = useState<number | null>(null)
   // The clock is held in state and advanced by a timer, rather than read during
   // render: `ageMs` has to keep climbing between fixes (otherwise the map would
   // claim "updated 4s ago" indefinitely), and reading a clock while rendering is
@@ -123,9 +133,12 @@ export function useLiveDriverPosition(
     authApi
       .get(`/booking/${bookingId}/live-position`)
       .then((res) => {
-        const row = res.data?.data as (DriverPosition & { eta_stops?: StopEta[] | null }) | null
+        const row = res.data?.data as (DriverPosition & { eta_stops?: StopEta[] | null; eta_computed_at?: string | null }) | null
         accept(row)
-        if (row?.eta_stops) setEtaStops(row.eta_stops)
+        if (row?.eta_stops) {
+          setEtaStops(row.eta_stops)
+          setEtaAtMs(row.eta_computed_at ? Date.parse(row.eta_computed_at) : null)
+        }
       })
       .catch(() => {})
 
@@ -137,7 +150,10 @@ export function useLiveDriverPosition(
       .on('broadcast', { event: 'driver_eta' }, (msg) => {
         if (cancelled) return
         const payload = msg.payload as { eta_stops?: StopEta[] }
-        if (payload?.eta_stops) setEtaStops(payload.eta_stops)
+        if (payload?.eta_stops) {
+          setEtaStops(payload.eta_stops)
+          setEtaAtMs(Date.now())
+        }
       })
       .subscribe((status) => {
         if (!cancelled) setSubscribed(status === 'SUBSCRIBED')
@@ -159,12 +175,15 @@ export function useLiveDriverPosition(
       authApi
         .get(`/booking/${bookingId}/live-position`)
         .then((res) => {
-          const next = res.data?.data as (DriverPosition & { eta_stops?: StopEta[] | null }) | null
+          const next = res.data?.data as (DriverPosition & { eta_stops?: StopEta[] | null; eta_computed_at?: string | null }) | null
           if (!next) return
           setLatest((prev) =>
             prev && Date.parse(next.recorded_at) <= Date.parse(prev.recorded_at) ? prev : next,
           )
-          if (next.eta_stops) setEtaStops(next.eta_stops)
+          if (next.eta_stops) {
+            setEtaStops(next.eta_stops)
+            setEtaAtMs(next.eta_computed_at ? Date.parse(next.eta_computed_at) : null)
+          }
         })
         .catch(() => {})
     }, POLL_MS)
@@ -220,8 +239,11 @@ export function useLiveDriverPosition(
   // server's recomputations — the client sees "18 min" tick down to "17 min"
   // rather than a number frozen until the next Routes call. Re-derived from the
   // one-second tick, which is why it is not memoised.
+  // A stale ETA (or one with no computed time) is dropped, so the panel says
+  // there is no estimate instead of showing a clock time from days ago.
+  const etaFresh  = etaAtMs !== null && (!now || now - etaAtMs <= ETA_FRESH_MS)
   const etaByStop = new Map<string, StopEta>()
-  if (active && etaStops) {
+  if (active && etaStops && etaFresh) {
     for (const stop of etaStops) {
       const remaining = now ? Math.round((Date.parse(stop.eta_at) - now) / 1000) : stop.eta_seconds
       etaByStop.set(stop.destination_id, { ...stop, eta_seconds: Math.max(0, remaining) })
@@ -239,14 +261,11 @@ export function useLiveDriverPosition(
   }
 }
 
-/** "12 min" / "1 h 40 m" / "arriving" — how an ETA is written on the panel. */
+/** "12 min" / "1 hr" / "2 days" / "arriving" — how an ETA is written (formatDuration). */
 export function formatEta(seconds: number | null | undefined): string | null {
   if (seconds === null || seconds === undefined) return null
   if (seconds < 60) return 'arriving'
-  const minutes = Math.round(seconds / 60)
-  if (minutes < 60) return `${minutes} min`
-  const hours = Math.floor(minutes / 60)
-  return `${hours} h ${minutes % 60} m`
+  return formatDuration(seconds / 60)
 }
 
 /**
@@ -260,13 +279,11 @@ export function formatEtaClock(etaAt: string | null | undefined): string | null 
   return at.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Manila' })
 }
 
-/** "just now" / "8s ago" / "4m ago" — the map's freshness line. */
+/** "just now" / "8s ago" / "4 min ago" / "3 hrs ago" / "10 days ago" — the map's freshness line. */
 export function formatAge(ageMs: number | null): string {
   if (ageMs === null) return 'no position yet'
   const seconds = Math.max(0, Math.floor(ageMs / 1000))
   if (seconds < 5)  return 'just now'
   if (seconds < 60) return `${seconds}s ago`
-  const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return `${minutes}m ago`
-  return `${Math.floor(minutes / 60)}h ago`
+  return `${formatDuration(seconds / 60)} ago`
 }
