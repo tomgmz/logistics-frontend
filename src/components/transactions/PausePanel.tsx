@@ -15,6 +15,8 @@ import { phDay } from '@/lib/ph-date'
 import { formatDateTime } from './transaction-format'
 import { AMBER, BORDER_C, GREEN, MUTED } from './transaction-theme'
 import { PALETTE } from '@/lib/palette'
+import { codingFlagFor } from '@/lib/number-coding'
+import { OFFICE_CLOSE_HOUR, OFFICE_HOURS_LABEL, OFFICE_OPEN_HOUR } from '@/lib/office-hours'
 import { MapPointLink } from '@/components/map/LocationMapModal'
 
 /**
@@ -68,7 +70,34 @@ function dayLabel(ymd: string): string {
   })
 }
 
-export default function PausePanel({ bookingId, pausedAt, inTransit, canControl, allowed = true, onUpdated }: {
+/**
+ * What the continuation day changes, re-checked like the original day was at
+ * assignment: MMDA number coding for the vehicle on the route, and whether the
+ * driver's call time falls outside receiving hours (Mon–Sat, 8 AM–5 PM).
+ * Warnings only, as at assignment.
+ */
+function continuationWarnings(
+  date: string, time: string,
+  plate: string | null | undefined,
+  route: { origin?: string | null; booking_destinations?: Array<{ address?: string | null }> | null } | undefined,
+): string[] {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return []
+  const out: string[] = []
+  const coding = route ? codingFlagFor(plate, { ...route, schedule_date: date, call_time: time || null }) : null
+  if (coding) {
+    out.push(`Number coding: ${plate} is coded on ${coding.day}s in ${coding.cities.join(', ')} (${coding.hours})` +
+      (coding.callTimeCoded ? ', and the call time falls inside it.' : '.'))
+  }
+  const weekday = new Date(`${date}T00:00:00Z`).getUTCDay()
+  const hour = /^\d{2}:\d{2}/.test(time) ? Number(time.slice(0, 2)) : null
+  if (weekday === 0) out.push(`${dayLabel(date)} is a Sunday, outside receiving hours (${OFFICE_HOURS_LABEL}).`)
+  else if (hour != null && (hour < OFFICE_OPEN_HOUR || hour >= OFFICE_CLOSE_HOUR)) {
+    out.push(`The call time is outside receiving hours (${OFFICE_HOURS_LABEL}).`)
+  }
+  return out
+}
+
+export default function PausePanel({ bookingId, pausedAt, inTransit, canControl, allowed = true, onUpdated, plate, route }: {
   bookingId:  string
   /** The booking's own `paused_at` — a change re-reads the history. */
   pausedAt:   string | null | undefined
@@ -79,6 +108,10 @@ export default function PausePanel({ bookingId, pausedAt, inTransit, canControl,
   /** The Booking Management tier allows it. Read Only sees the controls disabled. */
   allowed?:   boolean
   onUpdated:  () => void
+  /** The fleet vehicle's plate, for the number-coding re-check on the new day. */
+  plate?:     string | null
+  /** Origin and drop-offs, for the same check. */
+  route?:     { origin?: string | null; booking_destinations?: Array<{ address?: string | null }> | null }
 }) {
   const role = useAuthStore((s) => s.user?.role ?? '')
   const [pauses, setPauses]   = useState<BookingPause[]>([])
@@ -237,6 +270,11 @@ export default function PausePanel({ bookingId, pausedAt, inTransit, canControl,
                 </button>
               )}
             </div>
+            {!planning && open.expected_resume_date && continuationWarnings(
+              open.expected_resume_date.slice(0, 10), open.expected_resume_call_time?.slice(0, 5) ?? '', plate, route,
+            ).map((w) => (
+              <p key={w} className="text-[12px]" style={{ color: PALETTE.orange }}>{w}</p>
+            ))}
             {continuationOverdue && !planning && (
               <p className="text-[12px] font-semibold" style={{ color: PALETTE.orange }}>
                 That call time has passed and the delivery is still paused. Resume it, or set a new date.
@@ -259,6 +297,9 @@ export default function PausePanel({ bookingId, pausedAt, inTransit, canControl,
                   </label>
                 </div>
                 <p className="text-[11px]" style={{ color: MUTED }}>
+                  {continuationWarnings(planDate, planTime, plate, route).map((w) => (
+                    <span key={w} className="block mb-1 font-semibold" style={{ color: PALETTE.orange }}>{w}</span>
+                  ))}
                   The planned arrival moves to that day and call time. The client is told the date and the new expected arrival; the driver the date and the call time, with a reminder an hour before.
                 </p>
                 <div className="flex flex-wrap gap-2">

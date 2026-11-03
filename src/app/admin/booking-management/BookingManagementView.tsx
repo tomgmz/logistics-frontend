@@ -34,7 +34,7 @@ import { supabase } from '@/lib/supabase'
 import { pickDriver, pickTruck, type CrewSelection, type PairFilled } from '@/lib/crew-pairing'
 import { codingFlagFor, type CodingFlag } from '@/lib/number-coding'
 import { formatPhDateTime, submittedAfterCloseToday } from '@/lib/office-hours'
-import { licenseExpiryState } from '@/lib/license-expiry'
+import { licenseExpiryState, licenseFlagForDelivery } from '@/lib/license-expiry'
 import { statusColor } from '@/components/map/status.colors'
 import { useModuleAccess, writeAccess } from '@/components/layout/ModuleAccess'
 import type { BookingDetail } from '@/app/types/maps/routemap.types'
@@ -429,6 +429,22 @@ function vendorDriverBusyNote(u: VendorDriverUser, bookingId: string): string | 
   if (!b || b.booking_id === bookingId) return null
   const ref = b.reference_number ?? 'another booking'
   return b.awaiting_return ? ` — not back at the parking from ${ref}` : ` — on ${ref}`
+}
+
+/** License warnings for the main and second driver on this delivery (licenseFlagForDelivery). */
+function crewLicenseFlags(a: AssignmentRecord | undefined, scheduleDate: string | null | undefined) {
+  if (!a || a.is_vendor_supplied) return []
+  const main = (a as { drivers?: { license_expiry?: string | null; users?: { first_name?: string | null; last_name?: string | null } | null } | null }).drivers
+  const crew = [
+    { who: main, role: 'main driver' },
+    { who: a.second_driver ?? null, role: 'second driver' },
+  ]
+  return crew.flatMap(({ who, role }) => {
+    if (!who) return []
+    const name = [who.users?.first_name, who.users?.last_name].filter(Boolean).join(' ') || `The ${role}`
+    const flag = licenseFlagForDelivery(name, who.license_expiry, scheduleDate)
+    return flag ? [flag] : []
+  })
 }
 
 /** "Expired" / "expires in 12 days" for the dropdown, or nothing when in date. */
@@ -2238,6 +2254,14 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                               </span>
                               {r.pause_reason && <PausedBadge reason={r.pause_reason} />}
                               {r.delayed !== undefined && <DelayedBadge minutes={r.delayed} />}
+                              {['assigned', 'in_transit'].includes(r.status) &&
+                                crewLicenseFlags(allAssignments.find((x) => x.booking_id === r.booking_id), r.schedule_date).length > 0 && (
+                                <span title="A crew member's license expires before, during or within 7 days of this delivery"
+                                  className="flex w-fit items-center gap-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border mt-1"
+                                  style={{ color: '#FFEA00', borderColor: '#FFEA0055', background: '#FFEA0014' }}>
+                                  License expiring
+                                </span>
+                              )}
                               {r.breakdown && (
                                 <span title="The driver reported a breakdown: pause the delivery or close it"
                                   className="flex w-fit items-center gap-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border mt-1"
@@ -2529,6 +2553,16 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                           />
                         )}
 
+                        {/* A crew license that lapses before, during or just after this
+                            delivery (an expired one is already refused at assignment). */}
+                        {!['completed', 'cancelled', 'rejected'].includes(normalizeBookingStatus(detail.status)) &&
+                          crewLicenseFlags(currentAssignment, detail.schedule_date).map((f) => (
+                          <div key={f.text} className="rounded-xl border px-3.5 py-2.5 text-[13px] text-white/85"
+                            style={{ borderColor: f.tone === 'red' ? '#F6262666' : '#FFEA0055', background: f.tone === 'red' ? '#F6262612' : '#FFEA000d' }}>
+                            <span className="font-bold" style={{ color: f.tone === 'red' ? '#F62626' : '#FFEA00' }}>License · </span>{f.text}
+                          </div>
+                        ))}
+
                         {/* A breakdown the driver reported, waiting for the office: pause
                             it (note pre-filled) or close it if the truck moves on. */}
                         {(() => {
@@ -2555,6 +2589,8 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                           canControl={(roleView === 'admin' || roleView === 'operations_manager') && !bookingReadOnly}
                           allowed={canEdit}
                           onUpdated={() => { void refreshDetail(detail.booking_id); void loadPage(true) }}
+                          plate={currentAssignment?.trucks?.plate_number ?? currentAssignment?.vendor_vehicle_plate ?? null}
+                          route={detail}
                         />
 
                         {/* Who has been at the wheel, and swapping the main and second

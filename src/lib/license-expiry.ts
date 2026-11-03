@@ -43,3 +43,30 @@ export function licenseExpiryState(
 export function needsLicenseUpdate(expiry: string | null | undefined, now?: Date | number): boolean {
   return licenseExpiryState(expiry, now).kind !== 'ok'
 }
+
+/**
+ * A crew member's license against THIS delivery: expired by the delivery day,
+ * expiring on it or during the trip, or within 7 days of it. The delivery day is
+ * the scheduled day, or today when the delivery is already running late into a
+ * later day. Null when the license is fine for this delivery (or has no date).
+ *
+ * An expired license already blocks assignment on the server; this flags the
+ * near misses and the ones that lapse while the truck is out.
+ */
+export function licenseFlagForDelivery(
+  name: string,
+  expiry: string | null | undefined,
+  scheduleDate: string | null | undefined,
+  now: Date | number = Date.now(),
+): { tone: 'red' | 'amber'; text: string } | null {
+  if (!expiry || !/^\d{4}-\d{2}-\d{2}/.test(expiry)) return null
+  const exp   = expiry.slice(0, 10)
+  const today = phDay(now)
+  const sched = scheduleDate && /^\d{4}-\d{2}-\d{2}/.test(scheduleDate) ? scheduleDate.slice(0, 10) : today
+  const day   = sched > today ? sched : today
+  if (exp < day)  return { tone: 'red',   text: `${name}'s license expired on ${exp}. Record the renewal or replace the driver.` }
+  if (exp === day) return { tone: 'red',  text: `${name}'s license expires today (${exp}), during this delivery.` }
+  const left = daysBetween(day, exp)
+  if (left <= 7)  return { tone: 'amber', text: `${name}'s license expires on ${exp}, ${left} day${left === 1 ? '' : 's'} after this delivery. Remind them to renew.` }
+  return null
+}
