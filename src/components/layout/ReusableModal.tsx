@@ -25,6 +25,8 @@ export interface ReusableModalProps {
   description?: string;
   confirmLabel?: string;
   cancelLabel?: string;
+  /** Only the confirm button (a notice with one way out). Esc/backdrop still call onCancel. */
+  hideCancel?: boolean;
   onConfirm?: () => void;
   onCancel?: () => void;
   disableBackdropClose?: boolean;
@@ -90,6 +92,7 @@ export default function ReusableModal({
   description,
   confirmLabel = "Yes",
   cancelLabel = "No",
+  hideCancel = false,
   onConfirm,
   onCancel,
   disableBackdropClose = false,
@@ -187,7 +190,7 @@ export default function ReusableModal({
             </div>
 
             <div className="flex flex-col-reverse gap-2 px-5 pt-2 pb-7 sm:flex-row sm:justify-end sm:px-7 sm:pb-5 sm:pt-1">
-              <motion.button
+              {!hideCancel && <motion.button
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.96 }}
                 onClick={onCancel}
@@ -201,7 +204,7 @@ export default function ReusableModal({
                 }}
               >
                 {cancelLabel}
-              </motion.button>
+              </motion.button>}
 
               <motion.button
                 whileHover={{

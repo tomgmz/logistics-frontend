@@ -564,7 +564,7 @@ export default function MapLocationPicker({
         zClassName="z-[120]"
         title="Can't Use This Location"
         description={placeError ?? undefined}
-        cancelLabel="Close"
+        hideCancel
         confirmLabel="Choose Another"
         onCancel={() => setPlaceError(null)}
         onConfirm={() => setPlaceError(null)}
