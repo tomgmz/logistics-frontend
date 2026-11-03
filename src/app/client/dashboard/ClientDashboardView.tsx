@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import {
-  AlertCircle, Truck, Clock, CheckCircle2, MapPin, Plus, ChevronRight, XCircle,
+  AlertCircle, AlertTriangle, Truck, Clock, CheckCircle2, MapPin, Plus, ChevronRight, XCircle,
 } from 'lucide-react'
 
 import { bookingService } from '@/lib/services/client/booking.service'
@@ -11,11 +11,11 @@ import { useAuthStore } from '@/lib/store/auth.store'
 import type { BookingWithRelations, BookingDestination } from '@/lib/store/slice/routeMap.slice'
 import { type BookingStatus, asBookingStatus } from '@/app/types/maps/routemap.types'
 import { bookingRef } from '@/lib/booking'
-import { bookingStatusColor } from '@/lib/palette'
+import { bookingStatusColor, PALETTE } from '@/lib/palette'
+import { hasOpenClientIssue } from '@/components/transactions/ProblemReportedBadge'
 import { isAwaitingResubmit } from '@/lib/booking-resubmit'
 import RejectionPanel from '@/components/transactions/RejectionPanel'
 import { getApiErrorMessage } from '@/lib/api-error'
-import { RouteStepper, countSteps } from '@/components/map/RouteStepper'
 import { TableCard } from '@/components/ui/untitled/table-card'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { CardLink, MetricRow, MetricRowSkeleton } from '@/components/dashboard/AdminDashboard'
@@ -117,8 +117,11 @@ function phToday(): string {
 
 // ── presentational ─────────────────────────────────────────────────────────
 
-function StatusBadge({ status }: { status: string }) {
-  const m = statusMeta(status)
+function StatusBadge({ status, problem = false }: { status: string; problem?: boolean }) {
+  // A reported problem replaces "please confirm": the client already answered.
+  const m = problem
+    ? { label: 'Delivered — Problem Reported', color: PALETTE.red, icon: <AlertTriangle size={11} /> }
+    : statusMeta(status)
   return (
     <span
       className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-sm whitespace-nowrap"
@@ -163,7 +166,7 @@ function ActiveShipmentRow({ booking }: { booking: BookingWithRelations }) {
           {bookingRef(booking)}
         </Link>
       </td>
-      <td><StatusBadge status={booking.status} /></td>
+      <td><StatusBadge status={booking.status} problem={hasOpenClientIssue(booking as unknown as Record<string, unknown>)} /></td>
       <td className="whitespace-nowrap">
         {formatDate(booking.schedule_date)}
         {typeof booking.call_time === 'string' && <span style={{ color: MUTED }}> · {booking.call_time}</span>}
@@ -175,11 +178,8 @@ function ActiveShipmentRow({ booking }: { booking: BookingWithRelations }) {
           <span className="shrink-0" style={{ color: MUTED }}>→ {stops.length} {stops.length === 1 ? 'stop' : 'stops'}</span>
         </span>
       </td>
-      <td className="min-w-[180px]">
-        <div className="flex items-center gap-2">
-          <div className="min-w-0 flex-1"><RouteStepper steps={countSteps(progress.done, progress.total)} compact /></div>
-          <span className="shrink-0 font-mono text-xs">{progress.done}/{progress.total}</span>
-        </div>
+      <td className="whitespace-nowrap">
+        <span className="font-mono text-xs">{progress.done}/{progress.total}</span>
       </td>
       <td className="whitespace-nowrap">
         {driver

@@ -82,6 +82,7 @@ import StopTimesPanel from '@/components/transactions/StopTimesPanel'
 import PausePanel from '@/components/transactions/PausePanel'
 import DrivingShiftsPanel from '@/components/transactions/DrivingShiftsPanel'
 import BreakdownPanel from '@/components/transactions/BreakdownPanel'
+import OfficeProgressPanel from '@/components/transactions/OfficeProgressPanel'
 import { pauseReasonLabel } from '@/lib/services/admin/pause.service'
 import type { BookingWithRelations } from '@/lib/store/slice/routeMap.slice'
 import { useRecordLock, useRecordLocks } from '@/lib/hooks/useRecordLock'
@@ -2591,6 +2592,18 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                           onUpdated={() => { void refreshDetail(detail.booking_id); void loadPage(true) }}
                           plate={currentAssignment?.trucks?.plate_number ?? currentAssignment?.vendor_vehicle_plate ?? null}
                           route={detail}
+                        />
+
+                        {/* The driver can't (phone stolen or dead): the office confirms
+                            the next step for them, or records a problem on the road.
+                            Locked until unlocked, like the crew Edit button. */}
+                        <OfficeProgressPanel
+                          bookingId={detail.booking_id}
+                          status={normalizeBookingStatus(detail.status)}
+                          fleetReturned={!!(detail as { fleet_return_at?: string | null }).fleet_return_at}
+                          canAct={(roleView === 'admin' || roleView === 'operations_manager') && !bookingReadOnly}
+                          allowed={canEdit}
+                          onUpdated={() => { void refreshDetail(detail.booking_id); void loadPage(true) }}
                         />
 
                         {/* Who has been at the wheel, and swapping the main and second

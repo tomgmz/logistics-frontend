@@ -49,6 +49,9 @@ import {
   hasAnyErrors,
   getGroupErrors,
   dropoffsNearPickup,
+  distanceMeters,
+  SAME_LOCATION_METERS,
+  NEAR_DROPOFF_METERS,
   type GroupErrors,
   type RouteCoords,
 } from '@/lib/validation/bookingValidation'
@@ -738,6 +741,8 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
   const [infoOpen,   setInfoOpen]   = useState(false)
   // Drop-offs close to the pickup, waiting on the client to confirm the pins.
   const [nearDropoffs, setNearDropoffs] = useState<{ index: number; meters: number }[]>([])
+  // A removal waiting on "are you sure?" (drop-off, filled-in product, file).
+  const [pendingRemove, setPendingRemove] = useState<{ title: string; description: string; run: () => void } | null>(null)
 
   // iOS Safari never focuses a tapped button, so blur alone would not close it.
   useEffect(() => {
@@ -760,15 +765,16 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
     return Promise.all([
       cargoCatalogService.getCommodities(),
       cargoCatalogService.getProducts(),
-      cargoCatalogService.getHandlingCodes('standard'),
-      cargoCatalogService.getHandlingCodes('additional'),
+      // One list for both pickers: standard and additional codes were the same
+      // thing, so System Maintenance no longer tells them apart (2026-11-04).
+      cargoCatalogService.getHandlingCodes(),
     ])
-      .then(([comms, prods, std, add]) => {
+      .then(([comms, prods, codes]) => {
         if (!catalogMounted.current) return
         setCommodities(comms)
         setProductsCatalog(prods)
-        setShcStandardList(std)
-        setShcAdditionalList(add)
+        setShcStandardList(codes)
+        setShcAdditionalList(codes)
       })
       .catch(() => {
         if (!quiet) appToast.error('Unable to load cargo catalog')
@@ -865,8 +871,58 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
     handleUpdateGroup(dropoffIndex, groupId, { [field]: value })
   }
 
-  const handleRemoveGroup = (dropoffIndex: number, groupId: string) =>
-    dispatch(removeGroupAction({ dropoffIndex, groupId }))
+  // An untouched product goes straight away; one with anything typed in asks first.
+  const handleRemoveGroup = (dropoffIndex: number, groupId: string, label: string) => {
+    const run = () => dispatch(removeGroupAction({ dropoffIndex, groupId }))
+    const group = sections.find((s) => s.dropoffIndex === dropoffIndex)?.groups.find((g) => g.id === groupId)
+    const blank = makeDefaultGroup()
+    const filled = !!group && (Object.keys(blank) as (keyof ItemGroup)[])
+      .some((k) => k !== 'id' && typeof blank[k] === 'string' && group[k] !== blank[k])
+    if (!filled) { run(); return }
+    setPendingRemove({
+      title: `Remove ${label}?`,
+      description: `What you entered for ${label} will be lost.`,
+      run,
+    })
+  }
+
+  const askRemoveDropoff = (i: number) => setPendingRemove({
+    title: `Remove Drop-off ${i + 1}?`,
+    description: dropoffs[i]?.trim()
+      ? `${dropoffs[i]}\n\nIts cargo details are removed with it.`
+      : 'Its cargo details are removed with it.',
+    run: () => dispatch(removeDropoff(i)),
+  })
+
+  /**
+   * Same place as another stop = refused; within NEAR_DROPOFF_METERS = allowed,
+   * named in the confirmation. The pickup is checked against every drop-off, a
+   * drop-off against the pickup and the other drop-offs.
+   */
+  const checkMapPlace = (place: ResolvedPlace): { error?: string; warning?: string } => {
+    if (!mapTarget) return {}
+    const here = { lat: place.latitude, lng: place.longitude }
+    const norm = (a: string) => a.trim().toLowerCase().replace(/\s+/g, ' ')
+    const fmt = (m: number) => (m < 100 ? `${Math.round(m)} m` : `${Math.round(m / 10) * 10} m`)
+    const others: { name: string; address: string; lat: number | null; lng: number | null }[] = []
+    if (mapTarget.kind === 'dropoff') others.push({ name: 'the pickup location', address: pickup, lat: pickupLat, lng: pickupLng })
+    dropoffs.forEach((d, i) => {
+      if (mapTarget.kind === 'dropoff' && i === mapTarget.index) return
+      others.push({ name: `Drop-off ${i + 1}`, address: d, ...(dropoffCoords[i] ?? { lat: null, lng: null }) })
+    })
+    const near: string[] = []
+    for (const o of others) {
+      if (!o.address.trim()) continue
+      const meters = distanceMeters(here, { lat: o.lat, lng: o.lng })
+      if (norm(o.address) === norm(place.address) || (meters != null && meters < SAME_LOCATION_METERS)) {
+        return { error: `This is the same place as ${o.name}. Choose a different location.` }
+      }
+      if (meters != null && meters < NEAR_DROPOFF_METERS) near.push(`${o.name} (${fmt(meters)} away)`)
+    }
+    return near.length
+      ? { warning: `This is very close to ${near.join(' and ')}. Check that both pins are correct.` }
+      : {}
+  }
 
   const handleAddGroup = (dropoffIndex: number) => {
     const newGroup: ItemGroup = {
@@ -1021,12 +1077,23 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                 onClose={() => setMapTarget(null)}
                 initialValue={mapInitialValue}
                 initialCoords={mapInitialCoords}
+                checkPlace={checkMapPlace}
               />
             </motion.div>
           )}
         </AnimatePresence>,
         document.body,
       )}
+
+      <ReusableModal
+        open={!!pendingRemove}
+        title={pendingRemove?.title ?? ''}
+        description={pendingRemove?.description}
+        cancelLabel="Keep"
+        confirmLabel="Remove"
+        onCancel={() => setPendingRemove(null)}
+        onConfirm={() => { pendingRemove?.run(); setPendingRemove(null) }}
+      />
 
       <ReusableModal
         open={nearDropoffs.length > 0}
@@ -1116,7 +1183,9 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                   </div>
                   {i > 0 && (
                     <button
-                      onClick={() => dispatch(removeDropoff(i))}
+                      type="button"
+                      aria-label={`Remove drop-off ${i + 1}`}
+                      onClick={() => askRemoveDropoff(i)}
                       className="hover:text-red-400 transition-colors cursor-pointer shrink-0"
                     >
                       <X size={13} />
@@ -1253,7 +1322,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                                 </span>
                                 {idx > 0 && (
                                   <button type="button" aria-label="Remove product"
-                                    onClick={() => handleRemoveGroup(section.dropoffIndex, g.id)}
+                                    onClick={() => handleRemoveGroup(section.dropoffIndex, g.id, `Product #${idx + 1}`)}
                                     className="flex items-center justify-center w-6 h-6 rounded-full
                                                border border-white/10 hover:border-red-400/40 hover:text-red-400
                                                transition-colors cursor-pointer">
@@ -1273,7 +1342,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                               />
 
                               {mode === 'loose' && (
-                                <div className="mt-3 grid grid-cols-[90px_1fr] gap-x-2 gap-y-3 lg:flex lg:items-start lg:gap-2">
+                                <div className="mt-3 flex flex-col gap-3 lg:flex-row lg:items-start lg:gap-2">
                                   <div className="flex flex-col gap-1">
                                     <label className="ff-regular booking-text text-xs whitespace-nowrap">Pieces<Req /></label>
                                     <TextField value={g.pieces}
@@ -1281,7 +1350,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                                       onBlur={() => touchField(`${g.id}:pieces`)}
                                       inputProps={{ inputMode: 'numeric' }}
                                       placeholder="0" variant="outlined" error={!!gErr.pieces}
-                                      sx={{ ...fieldSx(INPUT_BG_CARD, BORDER_CARD, !!gErr.pieces), width: { xs: 90, lg: 120 } }} />
+                                      sx={{ ...fieldSx(INPUT_BG_CARD, BORDER_CARD, !!gErr.pieces), width: { xs: "100%", lg: 120 } }} />
                                     {gErr.pieces && <FormHelperText sx={HELPER_SX}>{gErr.pieces}</FormHelperText>}
                                   </div>
 
@@ -1546,7 +1615,11 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                       <span className="ff-sc booking-text text-[10px] text-white/40">already attached</span>
                     </div>
                   </div>
-                  <button type="button" onClick={() => dispatch(removeExistingDocument(url))}
+                  <button type="button" onClick={() => setPendingRemove({
+                    title: 'Remove File?',
+                    description: `"${documentName(url)}" will be removed from this booking when you resubmit.`,
+                    run: () => dispatch(removeExistingDocument(url)),
+                  })}
                     className="hover:text-red-400 transition-colors cursor-pointer shrink-0">
                     <X size={13} />
                   </button>
@@ -1571,7 +1644,11 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                       </span>
                     </div>
                   </div>
-                  <button type="button" onClick={() => removeFile(i)}
+                  <button type="button" aria-label={`Remove ${file.name}`} onClick={() => setPendingRemove({
+                    title: 'Remove File?',
+                    description: `"${file.name}" will not be uploaded with this booking.`,
+                    run: () => removeFile(i),
+                  })}
                     className="hover:text-red-400 transition-colors cursor-pointer shrink-0">
                     <X size={13} />
                   </button>
@@ -1852,11 +1929,16 @@ function ProductFieldsRow({
 
   const productOptions = productsForCommodity.map((p) => ({
     id:    p.product_id,
-    label: p.name + (p.unit ? ` — ${p.unit}` : ''),
+    label: p.name,
   }))
 
-  const shcStandardOptions   = shcStandardList.map((h)   => ({ id: h.handling_code_id, label: h.code }))
-  const shcAdditionalOptions = shcAdditionalList.map((h) => ({ id: h.handling_code_id, label: h.code }))
+  // "GEN (General)", not the bare acronym. The additional picker leaves out
+  // the code already chosen as the main one.
+  const codeLabel = (h: HandlingCode) => (h.name ? `${h.code} (${h.name})` : h.code)
+  const shcStandardOptions   = shcStandardList.map((h) => ({ id: h.handling_code_id, label: codeLabel(h) }))
+  const shcAdditionalOptions = shcAdditionalList
+    .filter((h) => h.handling_code_id !== group.shcId)
+    .map((h) => ({ id: h.handling_code_id, label: codeLabel(h) }))
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1.6fr_1.6fr_1fr_1fr] gap-3 items-start">

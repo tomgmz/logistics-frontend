@@ -133,7 +133,7 @@ const initialState: BookingState = {
   pickupLng: null,
   dropoffs: [''],
   dropoffCoords: [{ lat: null, lng: null }],
-  mode: 'loose',
+  mode: 'palletized',
   sections: [{ dropoffIndex: 0, groups: [makeDefaultGroup()] }],
   allNonTiltable: false,
   allNonStackable: false,

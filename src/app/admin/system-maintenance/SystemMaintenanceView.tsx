@@ -21,7 +21,7 @@ import type {
   CreateLandlinePrefixPayload,
   CreateProductPayload,
   HandlingCode,
-  HandlingCodeType,
+
   LandlinePrefix,
   Product,
   UpdateLandlinePrefixPayload,
@@ -43,16 +43,16 @@ const TABS = [
 ] as const
 type TabKey = (typeof TABS)[number]['key']
 
-type HandlingForm    = { code: string; name: string; description: string; type: HandlingCodeType }
-type CommodityForm   = { name: string; description: string; category: string }
-type ProductForm     = { commodity_id: string; name: string; description: string; unit: string }
-type LandlineForm    = { prefix: string; city: string; region: string }
+type HandlingForm    = { code: string; name: string; description: string }
+type CommodityForm   = { name: string }
+type ProductForm     = { commodity_id: string; name: string }
+type LandlineForm    = { prefix: string; city: string }
 type VehicleTypeForm = { name: string; description: string; is_active: boolean }
 
-const initHandling:    HandlingForm    = { code: '', name: '', description: '', type: 'standard' }
-const initCommodity:   CommodityForm   = { name: '', description: '', category: '' }
-const initProduct:     ProductForm     = { commodity_id: '', name: '', description: '', unit: '' }
-const initLandline:    LandlineForm    = { prefix: '', city: '', region: '' }
+const initHandling:    HandlingForm    = { code: '', name: '', description: '' }
+const initCommodity:   CommodityForm   = { name: '' }
+const initProduct:     ProductForm     = { commodity_id: '', name: '' }
+const initLandline:    LandlineForm    = { prefix: '', city: '' }
 const initVehicleType: VehicleTypeForm = { name: '', description: '', is_active: true }
 
 const VEHICLE_TYPE_NAME_MAX = 60
@@ -231,7 +231,6 @@ export default function SystemMaintenanceView() {
       code:        hForm.code.trim().toUpperCase(),
       name:        hForm.name.trim(),
       description: hForm.description.trim() || undefined,
-      type:        hForm.type,
     }
     try {
       setSaving(true)
@@ -252,10 +251,14 @@ export default function SystemMaintenanceView() {
       appToast.error('Commodity name is required.')
       return
     }
+    // Same check the server makes (case and outer spaces ignored).
+    const taken = commodities.find(c => c.name.trim().toLowerCase() === cForm.name.trim().toLowerCase())
+    if (taken) {
+      appToast.error(`Commodity "${taken.name}" already exists.`)
+      return
+    }
     const payload: CreateCommodityPayload = {
-      name:        cForm.name.trim(),
-      description: cForm.description.trim() || undefined,
-      category:    cForm.category.trim() || undefined,
+      name: cForm.name.trim(),
     }
     try {
       setSaving(true)
@@ -278,14 +281,12 @@ export default function SystemMaintenanceView() {
       return
     }
     if (!pForm.name.trim()) {
-      appToast.error('Product name is required.')
+      appToast.error('Product is required.')
       return
     }
     const payload: CreateProductPayload = {
       commodity_id: pForm.commodity_id,
       name:         pForm.name.trim(),
-      description:  pForm.description.trim() || undefined,
-      unit:         pForm.unit.trim() || undefined,
     }
     try {
       setSaving(true)
@@ -323,7 +324,6 @@ export default function SystemMaintenanceView() {
         const payload: UpdateLandlinePrefixPayload = {
           prefix: lForm.prefix.trim(),
           city:   lForm.city.trim(),
-          region: lForm.region.trim() || null,
         }
         const updated = await systemMaintenanceService.updateLandlinePrefix(editingPrefix.prefix_id, payload)
         refreshTable()
@@ -333,7 +333,6 @@ export default function SystemMaintenanceView() {
         const payload: CreateLandlinePrefixPayload = {
           prefix: lForm.prefix.trim(),
           city:   lForm.city.trim(),
-          region: lForm.region.trim() || null,
         }
         const created = await systemMaintenanceService.createLandlinePrefix(payload)
         refreshTable()
@@ -457,7 +456,7 @@ export default function SystemMaintenanceView() {
   function startEditLandline(pfx: LandlinePrefix) {
     cancelEdit()
     setEditingPrefix(pfx)
-    setLForm({ prefix: pfx.prefix, city: pfx.city, region: pfx.region ?? '' })
+    setLForm({ prefix: pfx.prefix, city: pfx.city })
     setSheetOpen(true)
   }
 
@@ -502,24 +501,6 @@ export default function SystemMaintenanceView() {
             placeholder="e.g. General Cargo"
           />
         </Field>
-        <Field label="Type">
-          <div className="grid grid-cols-2 gap-2">
-            {(['standard', 'additional'] as const).map((option) => (
-              <button
-                key={option}
-                type="button"
-                onClick={() => setHForm(p => ({ ...p, type: option }))}
-                aria-pressed={hForm.type === option}
-                className={`min-h-[44px] rounded-lg border px-3 py-2 text-sm font-semibold transition-colors
-                  ${hForm.type === option
-                    ? 'border-[#4DF9ED] bg-[#4DF9ED]/15 text-white'
-                    : 'border-white/10 bg-[#0a0a0a] text-white/70 hover:border-white/30'}`}
-              >
-                {option === 'standard' ? 'Standard' : 'Additional'}
-              </button>
-            ))}
-          </div>
-        </Field>
         <Field label="Description (optional)">
           <textarea
             value={hForm.description}
@@ -542,22 +523,6 @@ export default function SystemMaintenanceView() {
             placeholder="e.g. Electronics"
           />
         </Field>
-        <Field label="Category (optional)">
-          <input
-            value={cForm.category}
-            onChange={e => setCForm(p => ({ ...p, category: e.target.value }))}
-            className={inputCls}
-            placeholder="e.g. Consumer Goods"
-          />
-        </Field>
-        <Field label="Description (optional)">
-          <textarea
-            value={cForm.description}
-            onChange={e => setCForm(p => ({ ...p, description: e.target.value }))}
-            className={`${inputCls} min-h-[90px] resize-none`}
-            placeholder="Optional details"
-          />
-        </Field>
         <SubmitBtn label="Add commodity" busy={saving} onClick={() => void submitCommodity()} />
       </div>
     )
@@ -574,33 +539,17 @@ export default function SystemMaintenanceView() {
             <option value="">Select commodity…</option>
             {commodities.map(c => (
               <option key={c.commodity_id} value={c.commodity_id}>
-                {c.name}{c.category ? ` — ${c.category}` : ''}
+                {c.name}
               </option>
             ))}
           </select>
         </Field>
-        <Field label="Product name *">
+        <Field label="Product *">
           <input
             value={pForm.name}
             onChange={e => setPForm(p => ({ ...p, name: e.target.value }))}
             className={inputCls}
             placeholder="e.g. LCD Monitor"
-          />
-        </Field>
-        <Field label="Unit (optional)">
-          <input
-            value={pForm.unit}
-            onChange={e => setPForm(p => ({ ...p, unit: e.target.value }))}
-            className={inputCls}
-            placeholder="e.g. pcs, kg, bundle"
-          />
-        </Field>
-        <Field label="Description (optional)">
-          <textarea
-            value={pForm.description}
-            onChange={e => setPForm(p => ({ ...p, description: e.target.value }))}
-            className={`${inputCls} min-h-[90px] resize-none`}
-            placeholder="Optional details"
           />
         </Field>
         <SubmitBtn label="Add product" busy={saving} onClick={() => void submitProduct()} />
@@ -711,15 +660,6 @@ export default function SystemMaintenanceView() {
             />
           </Field>
 
-          <Field label="Region (optional)">
-            <input
-              value={lForm.region}
-              onChange={e => setLForm(p => ({ ...p, region: e.target.value }))}
-              className={inputCls}
-              placeholder="e.g. NCR"
-            />
-          </Field>
-
           <SubmitBtn
             label={editingPrefix ? 'Save changes' : 'Add prefix'}
             icon={!editingPrefix}
@@ -762,9 +702,6 @@ export default function SystemMaintenanceView() {
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
               <span className="font-mono text-sm font-bold text-[#4DF9ED] break-all">{hc.code}</span>
               <span className="min-w-0 text-sm text-white/70 break-words">{hc.name}</span>
-              <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] uppercase tracking-[0.2em] text-white/70">
-                {hc.type === 'additional' ? 'Additional' : 'Standard'}
-              </span>
             </div>
             {hc.description && <p className="mt-1.5 text-xs text-white/35 break-words">{hc.description}</p>}
           </div>
@@ -779,11 +716,9 @@ export default function SystemMaintenanceView() {
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-white break-words">{c.name}</p>
-                {c.category && <p className="text-xs text-white/40 mt-0.5 break-words">{c.category}</p>}
               </div>
               <ActiveBadge active={c.is_active} />
             </div>
-            {c.description && <p className="mt-1.5 text-xs text-white/35 break-words">{c.description}</p>}
           </div>
         ))}
       </div>
@@ -798,13 +733,10 @@ export default function SystemMaintenanceView() {
                 <p className="text-sm font-semibold text-white break-words">{prod.name}</p>
                 <p className="text-xs text-white/40 mt-0.5 break-words">
                   {prod.commodities?.name ?? '—'}
-                  {prod.commodities?.category ? ` · ${prod.commodities.category}` : ''}
-                  {prod.unit ? ` · ${prod.unit}` : ''}
                 </p>
               </div>
               <ActiveBadge active={prod.is_active} />
             </div>
-            {prod.description && <p className="mt-1.5 text-xs text-white/35 break-words">{prod.description}</p>}
           </div>
         ))}
       </div>
@@ -862,7 +794,6 @@ export default function SystemMaintenanceView() {
                   </span>
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-white break-words">{pfx.city}</p>
-                    {pfx.region && <p className="text-xs text-white/40 mt-0.5 break-words">{pfx.region}</p>}
                   </div>
                 </div>
                 <RowButtons

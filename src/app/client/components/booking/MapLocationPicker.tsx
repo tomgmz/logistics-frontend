@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
+import ReusableModal from '@/components/layout/ReusableModal'
 import {
   loadGoogleMapsScript,
   usePlacesAutocomplete,
@@ -44,6 +45,12 @@ export interface MapLocationPickerProps {
    * confirm as is, instead of jumping to the device's location.
    */
   initialCoords?: { lat: number; lng: number } | null
+  /**
+   * Checks the pin against the booking's other stops before it is set.
+   * error = it can't be used (same place as another stop); warning = allowed,
+   * shown in the confirmation (very close to another stop).
+   */
+  checkPlace?: (place: ResolvedPlace) => { error?: string; warning?: string }
 }
 
 const LocationIcon = ({ color }: { color: string }) => (
@@ -99,6 +106,7 @@ export default function MapLocationPicker({
   onClose,
   initialValue = '',
   initialCoords = null,
+  checkPlace,
 }: MapLocationPickerProps) {
   const mapDivRef   = useRef<HTMLDivElement>(null)
   const mapRef      = useRef<google.maps.Map | null>(null)
@@ -119,6 +127,11 @@ export default function MapLocationPicker({
   const [searchQuery, setSearchQuery] = useState(initialValue)
   const [showSugg,    setShowSugg]    = useState(false)
   const [outOfBounds, setOutOfBounds] = useState(false)
+  const [placeError,  setPlaceError]  = useState<string | null>(null)
+  const [pending,     setPending]     = useState<{ place: ResolvedPlace; warning?: string } | null>(null)
+
+  // A moved pin is a new place: its old error no longer applies.
+  useEffect(() => { setPlaceError(null) }, [coords?.lat, coords?.lng])
 
   const { suggestions, onInputChange, resolvePlace } = usePlacesAutocomplete({
     includedPrimaryTypes:  [],
@@ -319,10 +332,14 @@ export default function MapLocationPicker({
 
   const canConfirm = !!coords && !!address && !isGeocoding && !outOfBounds
 
+  // Set → checked against the other stops → asked to confirm → set.
   const handleConfirm = useCallback(() => {
     if (!canConfirm) return
-    onConfirm({ address, latitude: coords!.lat, longitude: coords!.lng })
-  }, [canConfirm, address, coords, onConfirm])
+    const place = { address, latitude: coords!.lat, longitude: coords!.lng }
+    const check = checkPlace?.(place) ?? {}
+    if (check.error) { setPlaceError(check.error); return }
+    setPending({ place, warning: check.warning })
+  }, [canConfirm, address, coords, checkPlace])
 
   return (
     <div
@@ -506,6 +523,11 @@ export default function MapLocationPicker({
               <p className="text-sm font-medium leading-snug" style={{ color: RED }}>
                 Location must be within the Philippines
               </p>
+            ) : placeError && !isGeocoding ? (
+              <>
+                <p className="text-sm font-medium leading-snug text-white break-words">{address}</p>
+                <p role="alert" className="mt-1 text-xs font-medium leading-snug" style={{ color: RED }}>{placeError}</p>
+              </>
             ) : isGeocoding ? (
               <div className="flex items-center gap-2">
                 <div
@@ -542,6 +564,25 @@ export default function MapLocationPicker({
           {confirmText}
         </button>
       </div>
+
+      {/* Over the full-screen map (z-[100]). */}
+      <ReusableModal
+        open={!!pending}
+        zClassName="z-[120]"
+        title={mode === 'pickup' ? 'Set Pickup Location?' : 'Set Drop-off Location?'}
+        description={pending
+          ? `${pending.place.address}${pending.warning ? `\n\n${pending.warning}` : ''}`
+          : undefined}
+        cancelLabel="Back"
+        confirmLabel="Set Location"
+        onCancel={() => setPending(null)}
+        onConfirm={() => {
+          if (!pending) return
+          const place = pending.place
+          setPending(null)
+          onConfirm(place)
+        }}
+      />
     </div>
   )
 }

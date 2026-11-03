@@ -172,7 +172,7 @@ export default function ReusableModal({
               {description && (
                 <p
                   id="modal-description"
-                  className="mt-2 m-0 text-white/75 break-words"
+                  className="mt-2 m-0 text-white/75 break-words whitespace-pre-line"
                   style={{
                     fontFamily: "'Alegreya Sans', sans-serif",
                     fontWeight: 400,
