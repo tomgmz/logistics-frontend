@@ -5,6 +5,7 @@ import CheckCircleIcon  from '@mui/icons-material/CheckCircle'
 import PlaceIcon        from '@mui/icons-material/Place'
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'
 import { bookingStatusColor } from '@/lib/palette'
+import { PROBLEM_STATUS_COLOR, PROBLEM_STATUS_LABEL } from '@/components/transactions/ProblemReportedBadge'
 
 export type BookingStatus =
   | 'PENDING' | 'ASSIGNED' | 'IN_TRANSIT' | 'IN TRANSIT'
@@ -23,9 +24,11 @@ const STATUS_MAP: Record<string, { label: string; color: string; bg: string; bor
     return [key, { label, color, bg: `${color}1f`, border: `${color}4d` }]
   }))
 
-export function StatusBadge({ status }: { status: string }) {
+export function StatusBadge({ status, problem = false }: { status: string; problem?: boolean }) {
   const key = status.toUpperCase().replace(/-/g, '_')
-  const cfg = STATUS_MAP[key] ?? STATUS_MAP.PENDING
+  const cfg = problem && key === 'DELIVERED'
+    ? { label: PROBLEM_STATUS_LABEL, color: PROBLEM_STATUS_COLOR, bg: `${PROBLEM_STATUS_COLOR}18`, border: `${PROBLEM_STATUS_COLOR}55` }
+    : STATUS_MAP[key] ?? STATUS_MAP.PENDING
 
   return (
     <span

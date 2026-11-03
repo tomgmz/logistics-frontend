@@ -10,6 +10,7 @@ import ArrowForwardIcon   from '@mui/icons-material/ArrowForward'
 import RefreshIcon        from '@mui/icons-material/Refresh'
 import type { BookingWithRelations }         from '@/lib/store/slice/routeMap.slice'
 import { StatusBadge }                       from './RouteMapComponents'
+import { hasOpenClientIssue }                from '@/components/transactions/ProblemReportedBadge'
 import { DetailsPanelContent }               from './DetailsPanelContent'
 import { RouteStepper, bookingRouteSteps, dropoffSummary }   from './RouteStepper'
 import { DirectionsRenderer }                from './DirectionsRenderer'
@@ -591,7 +592,7 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
       >
         <div className="h-14 flex items-center justify-end px-4 flex-shrink-0 border-b"
           style={{ borderColor: 'var(--color-surface-dark)' }}>
-          {routeData && bookingDetail && <StatusBadge status={bookingDetail.status ?? 'pending'} />}
+          {routeData && bookingDetail && <StatusBadge status={bookingDetail.status ?? 'pending'} problem={hasOpenClientIssue(bookingDetail as unknown as Record<string, unknown>)} />}
         </div>
 
         <div className="flex-1 relative min-h-0">{mapContent}</div>

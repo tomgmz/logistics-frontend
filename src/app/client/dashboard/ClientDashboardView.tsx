@@ -11,8 +11,8 @@ import { useAuthStore } from '@/lib/store/auth.store'
 import type { BookingWithRelations, BookingDestination } from '@/lib/store/slice/routeMap.slice'
 import { type BookingStatus, asBookingStatus } from '@/app/types/maps/routemap.types'
 import { bookingRef } from '@/lib/booking'
-import { bookingStatusColor, PALETTE } from '@/lib/palette'
-import { hasOpenClientIssue } from '@/components/transactions/ProblemReportedBadge'
+import { bookingStatusColor } from '@/lib/palette'
+import { hasOpenClientIssue, PROBLEM_STATUS_COLOR, PROBLEM_STATUS_LABEL } from '@/components/transactions/ProblemReportedBadge'
 import { isAwaitingResubmit } from '@/lib/booking-resubmit'
 import RejectionPanel from '@/components/transactions/RejectionPanel'
 import { getApiErrorMessage } from '@/lib/api-error'
@@ -120,7 +120,7 @@ function phToday(): string {
 function StatusBadge({ status, problem = false }: { status: string; problem?: boolean }) {
   // A reported problem replaces "please confirm": the client already answered.
   const m = problem
-    ? { label: 'Delivered — Problem Reported', color: PALETTE.red, icon: <AlertTriangle size={11} /> }
+    ? { label: PROBLEM_STATUS_LABEL, color: PROBLEM_STATUS_COLOR, icon: <AlertTriangle size={11} /> }
     : statusMeta(status)
   return (
     <span

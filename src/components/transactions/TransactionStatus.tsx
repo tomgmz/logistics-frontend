@@ -1,8 +1,9 @@
 'use client'
 
 import {
-  MapPin, Truck, Clock, Check, CheckCircle2, XCircle, AlertCircle, Loader2, PackageCheck,
+  MapPin, Truck, Clock, Check, CheckCircle2, XCircle, AlertCircle, AlertTriangle, Loader2, PackageCheck,
 } from 'lucide-react'
+import { PROBLEM_STATUS_COLOR, PROBLEM_STATUS_LABEL } from './ProblemReportedBadge'
 
 import { type BookingStatus, asBookingStatus } from '@/app/types/maps/routemap.types'
 import type { BookingWithRelations } from '@/lib/store/slice/routeMap.slice'
@@ -40,8 +41,12 @@ const UNKNOWN_META = {
   label: 'Unknown', color: MUTED, bg: `${MUTED}18`, icon: <AlertCircle size={12} />,
 }
 
-export function getStatusMeta(status: string) {
+/** `problem`: an open client-reported problem (hasOpenClientIssue) on a delivered booking. */
+export function getStatusMeta(status: string, problem = false) {
   const normalized = asBookingStatus(status)
+  if (problem && normalized === 'DELIVERED') {
+    return { label: PROBLEM_STATUS_LABEL, color: PROBLEM_STATUS_COLOR, bg: `${PROBLEM_STATUS_COLOR}18`, icon: <AlertTriangle size={12} /> }
+  }
   return normalized !== 'UNKNOWN'
     ? STATUS_META[normalized]
     : UNKNOWN_META
@@ -75,8 +80,8 @@ export function getStepState(
   return 'upcoming'
 }
 
-export function StatusBadge({ status }: { status: string }) {
-  const m = getStatusMeta(status)
+export function StatusBadge({ status, problem = false }: { status: string; problem?: boolean }) {
+  const m = getStatusMeta(status, problem)
   return (
     <span
       className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-sm"

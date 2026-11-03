@@ -14,6 +14,14 @@ export function hasOpenClientIssue(b: Record<string, unknown>): boolean {
     && !b.client_issue_resolved_at
 }
 
+/**
+ * What the booking's status reads while that problem is open, everywhere the
+ * Delivered status shows ("Delivered — Please Confirm" would be wrong: the
+ * client already answered).
+ */
+export const PROBLEM_STATUS_LABEL = 'Delivered — Problem Reported'
+export const PROBLEM_STATUS_COLOR = ERROR
+
 /** List and header badge for the same. The note goes in the tooltip. */
 export default function ProblemReportedBadge({ note, className = 'mt-1' }: {
   note?:      string | null

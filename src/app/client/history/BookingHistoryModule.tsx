@@ -30,7 +30,7 @@ import RejectionPanel from '@/components/transactions/RejectionPanel'
 import CompletionPanel from '@/components/transactions/CompletionPanel'
 import BookingDocuments from '@/components/transactions/BookingDocuments'
 import { StatusBadge, getStatusMeta } from '@/components/transactions/TransactionStatus'
-import ProblemReportedBadge, { hasOpenClientIssue } from '@/components/transactions/ProblemReportedBadge'
+import { hasOpenClientIssue } from '@/components/transactions/ProblemReportedBadge'
 import ResubmittedBadge, { resubmissionsOf } from '@/components/transactions/ResubmittedBadge'
 import DelayedBadge from '@/components/transactions/DelayedBadge'
 import ResubmissionChanges from '@/components/transactions/ResubmissionChanges'
@@ -100,11 +100,11 @@ function SkeletonCard() {
 }
 
 /** The status as the Figma tags it: coloured outline, tinted fill, no icon. */
-function StatusTag({ status }: { status: string }) {
-  const m = getStatusMeta(status)
+function StatusTag({ status, problem = false }: { status: string; problem?: boolean }) {
+  const m = getStatusMeta(status, problem)
   // Delivered (awaiting the client's confirmation) is white in the Figma, not
-  // the green Completed uses.
-  const delivered = asBookingStatus(status) === 'DELIVERED'
+  // the green Completed uses. A reported problem keeps its red.
+  const delivered = asBookingStatus(status) === 'DELIVERED' && !problem
   const color = delivered ? '#ffffff' : m.color
   return (
     <span className="ff-sc !text-xs sm:!text-sm leading-none px-1.5 py-1 rounded-[5px] border whitespace-nowrap"
@@ -151,13 +151,10 @@ function BookingCard({ booking, onSelect }: {
             <HistoryIcon name="calendar.svg" size={16} />
             <span className="truncate">Scheduled {formatDate(schedDate)}</span>
           </div>
-          {hasOpenClientIssue(booking) && (
-            <ProblemReportedBadge className="" note={booking.client_issue_note as string | null | undefined} />
-          )}
           <ResubmittedBadge className="" count={resubmissionsOf(booking)} />
           <DelayedBadge className="" booking={booking} />
         </div>
-        <StatusTag status={booking.status} />
+        <StatusTag status={booking.status} problem={hasOpenClientIssue(booking)} />
       </div>
 
       <div className="flex flex-col gap-1.5">
@@ -302,12 +299,9 @@ export default function BookingHistoryModule() {
         </h1>
         {view === 'detail' && selected && (
           <div className="ml-auto flex items-center gap-2">
-            {hasOpenClientIssue(selected) && (
-              <ProblemReportedBadge className="" note={selected.client_issue_note as string | null | undefined} />
-            )}
             <ResubmittedBadge className="" count={resubmissionsOf(selected)} />
             <DelayedBadge className="" booking={selected} />
-            <StatusBadge status={selected.status} />
+            <StatusBadge status={selected.status} problem={hasOpenClientIssue(selected)} />
           </div>
         )}
       </div>

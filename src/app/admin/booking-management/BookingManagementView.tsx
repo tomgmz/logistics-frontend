@@ -73,7 +73,7 @@ import TripPlanner from './TripPlanner'
 import VehiclePicker, { cargoSummaryFromBooking, fitProblems } from './VehiclePicker'
 import CompletionPanel from '@/components/transactions/CompletionPanel'
 import { formatPlateNumber, plateError } from '@/lib/validation/plate'
-import ProblemReportedBadge, { hasOpenClientIssue } from '@/components/transactions/ProblemReportedBadge'
+import ProblemReportedBadge, { hasOpenClientIssue, PROBLEM_STATUS_COLOR, PROBLEM_STATUS_LABEL } from '@/components/transactions/ProblemReportedBadge'
 import ResubmittedBadge, { resubmissionsOf } from '@/components/transactions/ResubmittedBadge'
 import SharedDelayedBadge from '@/components/transactions/DelayedBadge'
 import ResubmissionChanges from '@/components/transactions/ResubmissionChanges'
@@ -2221,7 +2221,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                     <tbody className="ff-regular text-[13px] 3xl:text-[16px] text-[#818181]">
                       {listRows.map((r) => {
                         const active = selectedId === r.booking_id
-                        const c      = statusColor(r.status)
+                        const c      = r.issue_open ? PROBLEM_STATUS_COLOR : statusColor(r.status)
                         return (
                           <tr
                             key={r.booking_id}
@@ -2251,7 +2251,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                                 className="inline-flex items-center justify-center whitespace-nowrap rounded-[5px] border p-1 text-[12px] 3xl:text-[16px] leading-none"
                                 style={{ color: c, borderColor: c, background: `${c}2e` }}
                               >
-                                {fmtStatus(r.status)}
+                                {r.issue_open ? PROBLEM_STATUS_LABEL : fmtStatus(r.status)}
                               </span>
                               {r.pause_reason && <PausedBadge reason={r.pause_reason} />}
                               {r.delayed !== undefined && <DelayedBadge minutes={r.delayed} />}
@@ -2270,7 +2270,6 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                                   Breakdown · needs decision
                                 </span>
                               )}
-                              {r.issue_open && <ProblemReportedBadge note={r.issue_note} />}
                               <ResubmittedBadge count={r.resubmissions} />
                             </td>
                             <td className="whitespace-nowrap text-white">{r.schedule_date ?? '—'}</td>

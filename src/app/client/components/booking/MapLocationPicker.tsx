@@ -127,11 +127,9 @@ export default function MapLocationPicker({
   const [searchQuery, setSearchQuery] = useState(initialValue)
   const [showSugg,    setShowSugg]    = useState(false)
   const [outOfBounds, setOutOfBounds] = useState(false)
+  // Set Location → a pop-up: the reason it can't be used, or the confirmation.
   const [placeError,  setPlaceError]  = useState<string | null>(null)
   const [pending,     setPending]     = useState<{ place: ResolvedPlace; warning?: string } | null>(null)
-
-  // A moved pin is a new place: its old error no longer applies.
-  useEffect(() => { setPlaceError(null) }, [coords?.lat, coords?.lng])
 
   const { suggestions, onInputChange, resolvePlace } = usePlacesAutocomplete({
     includedPrimaryTypes:  [],
@@ -523,11 +521,6 @@ export default function MapLocationPicker({
               <p className="text-sm font-medium leading-snug" style={{ color: RED }}>
                 Location must be within the Philippines
               </p>
-            ) : placeError && !isGeocoding ? (
-              <>
-                <p className="text-sm font-medium leading-snug text-white break-words">{address}</p>
-                <p role="alert" className="mt-1 text-xs font-medium leading-snug" style={{ color: RED }}>{placeError}</p>
-              </>
             ) : isGeocoding ? (
               <div className="flex items-center gap-2">
                 <div
@@ -566,6 +559,16 @@ export default function MapLocationPicker({
       </div>
 
       {/* Over the full-screen map (z-[100]). */}
+      <ReusableModal
+        open={!!placeError}
+        zClassName="z-[120]"
+        title="Can't Use This Location"
+        description={placeError ?? undefined}
+        cancelLabel="Close"
+        confirmLabel="Choose Another"
+        onCancel={() => setPlaceError(null)}
+        onConfirm={() => setPlaceError(null)}
+      />
       <ReusableModal
         open={!!pending}
         zClassName="z-[120]"
