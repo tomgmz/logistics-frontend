@@ -1206,7 +1206,7 @@ export default function UserFormModal({
                     {...scanned('license_number').input}
                     className={scanned('license_number').lockedClass}
                     value={form.license_number as string}
-                    onChange={e => set('license_number', e.target.value)}
+                    onChange={e => set('license_number', e.target.value.toUpperCase().replace(/\s+/g, ''))}
                     placeholder="N01-23-456789"
                     error={fe.license_number}
                   />
