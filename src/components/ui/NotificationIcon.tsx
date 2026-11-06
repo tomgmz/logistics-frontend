@@ -71,6 +71,7 @@ const ACTIONABLE_TYPES = new Set([
   "support.ticket_resolved",
   "support.ticket_logged",
   "vehicle.registration_expiring",
+  "it_admin.handover",
 ]);
 
 // The filter dropdown lists only the groups a role can actually receive, so

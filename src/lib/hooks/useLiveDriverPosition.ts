@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { subscribeBroadcast } from '@/lib/realtime/sharedBroadcast'
 import authApi from '@/lib/api/auth.api'
 import { formatDuration } from '@/lib/duration'
 
@@ -63,6 +63,8 @@ const ETA_FRESH_MS = 15 * 60 * 1000
 
 /** Fallback cadence, used only while the realtime channel is not connected. */
 const POLL_MS = 30_000
+/** Safety read while the channel claims to be up (see the catch-up poll). */
+const CATCHUP_MS = 60_000
 
 /** How long the marker takes to glide to a newly received position. */
 const EASE_MS = 900
@@ -142,36 +144,43 @@ export function useLiveDriverPosition(
       })
       .catch(() => {})
 
-    const channel = supabase
-      .channel(`tracking:booking:${bookingId}`)
-      .on('broadcast', { event: 'driver_position' }, (msg) => {
-        accept(msg.payload as DriverPosition)
-      })
-      .on('broadcast', { event: 'driver_eta' }, (msg) => {
-        if (cancelled) return
-        const payload = msg.payload as { eta_stops?: StopEta[] }
-        if (payload?.eta_stops) {
-          setEtaStops(payload.eta_stops)
-          setEtaAtMs(Date.now())
-        }
-      })
-      .subscribe((status) => {
-        if (!cancelled) setSubscribed(status === 'SUBSCRIBED')
-      })
+    // Shared, ref-counted channel: a fresh supabase.channel() + removeChannel()
+    // per effect run raced the async teardown and went silent (sharedBroadcast).
+    const unsubscribe = subscribeBroadcast(
+      `tracking:booking:${bookingId}`,
+      {
+        driver_position: (payload) => accept(payload as DriverPosition),
+        driver_eta: (payload) => {
+          if (cancelled) return
+          const p = payload as { eta_stops?: StopEta[] }
+          if (p?.eta_stops) {
+            setEtaStops(p.eta_stops)
+            setEtaAtMs(Date.now())
+          }
+        },
+      },
+      (ok) => { if (!cancelled) setSubscribed(ok) },
+    )
 
     return () => {
       cancelled = true
       setSubscribed(false)
       easedRef.current = null
-      supabase.removeChannel(channel)
+      unsubscribe()
     }
   }, [bookingId, active])
 
-  /* ── Fallback poll: only while the channel is down ────────────────────── */
+  /* ── Catch-up poll ────────────────────────────────────────────────────────
+   * Every POLL_MS while the channel is down. While it is up, a slower
+   * CATCHUP_MS read anyway, plus one the moment the tab is shown again: a
+   * socket in a backgrounded tab (or after the laptop slept) can report
+   * "subscribed" while broadcasts sent meanwhile are simply gone, and without
+   * this the truck and its line only moved again on a page refresh. */
   useEffect(() => {
-    if (!active || !bookingId || subscribed) return
+    if (!active || !bookingId) return
 
-    const id = setInterval(() => {
+    const read = () => {
+      if (document.visibilityState !== 'visible') return
       authApi
         .get(`/booking/${bookingId}/live-position`)
         .then((res) => {
@@ -186,9 +195,15 @@ export function useLiveDriverPosition(
           }
         })
         .catch(() => {})
-    }, POLL_MS)
+    }
 
-    return () => clearInterval(id)
+    const id = setInterval(read, subscribed ? CATCHUP_MS : POLL_MS)
+    const onVisible = () => { if (document.visibilityState === 'visible') read() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      clearInterval(id)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [bookingId, active, subscribed])
 
   /* ── Ease the marker across, rather than teleporting it ───────────────── */

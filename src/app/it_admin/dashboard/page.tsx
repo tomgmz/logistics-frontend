@@ -681,7 +681,7 @@ function attentionItems(s: ItDashboardSummary): string[] {
   for (const v of s.services) if (v.status === 'failing') items.push(`${v.label} is failing`)
   const locked = s.security.locked_accounts.length
   if (locked) items.push(`${locked} locked account${locked === 1 ? '' : 's'}`)
-  if (!s.accounts.it_admin) items.push('No active IT Administrator')
+  if (!s.accounts.it_admin && !s.accounts.it_standin) items.push('No active IT Administrator')
   return items
 }
 

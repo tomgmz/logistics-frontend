@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { Room, RoomEvent, Track, type RemoteTrack } from 'livekit-client'
 import { AlertCircle, Phone, PhoneOff, Mic, MicOff } from 'lucide-react'
 
-import { supabase } from '@/lib/supabase'
+import { subscribeBroadcast } from '@/lib/realtime/sharedBroadcast'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { emergencyCallService, type IncomingCall } from '@/lib/services/emergencyCall.service'
 import { useRingtone, useTitleFlash, useElapsed } from './callHooks'
@@ -80,14 +80,12 @@ export default function EmergencyCallProvider() {
 
     emergencyCallService.ringing().then((calls) => calls.forEach(addRinging)).catch(() => {})
 
-    const channel = supabase
-      .channel(`calls:user:${userId}`)
-      .on('broadcast', { event: 'incoming_call' }, (msg) => addRinging(msg.payload as IncomingCall))
-      .on('broadcast', { event: 'call_taken' },  (msg) => dropRinging((msg.payload as { call_id: string }).call_id))
-      .on('broadcast', { event: 'call_closed' }, (msg) => dropRinging((msg.payload as { call_id: string }).call_id))
-      .subscribe()
-
-    return () => { supabase.removeChannel(channel) }
+    // Shared, ref-counted channel (sharedBroadcast).
+    return subscribeBroadcast(`calls:user:${userId}`, {
+      incoming_call: (p) => addRinging(p as IncomingCall),
+      call_taken:    (p) => dropRinging((p as { call_id: string }).call_id),
+      call_closed:   (p) => dropRinging((p as { call_id: string }).call_id),
+    })
   }, [userId, addRinging, dropRinging])
 
   // Drop ringers that outlived any real ring, in case a close event was missed.

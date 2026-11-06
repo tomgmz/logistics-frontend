@@ -22,6 +22,9 @@ export function moduleFlags(
 ): ModuleFlags {
   if (!user) return { ...EMPTY_FLAGS }
   if (!isManagedRole(user.role)) return { ...ALL_FLAGS }
+  // The Company Administrator standing in for a departed IT Administrator has
+  // the IT Administrator's bypass, as on the server (moduleGuard).
+  if (user.it_standin) return { ...ALL_FLAGS }
   if (!hasCustomPerms(user)) return { ...ALL_FLAGS }
 
   const row = user.module_permissions!.find((p) => p.module_key === moduleKey)

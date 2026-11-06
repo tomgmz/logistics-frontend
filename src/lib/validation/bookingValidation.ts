@@ -167,11 +167,14 @@ export function validateGroup(group: ItemGroup, mode: CargoMode): GroupErrors {
     if (!isPositiveNumber(group.palletWidth))        errors.palletWidth        = 'Required'
     if (!isPositiveNumber(group.palletHeight))       errors.palletHeight       = 'Required'
     if (!isNonNegNumber(group.grossWeightPerPallet)) errors.grossWeightPerPallet = 'Required'
-    if (!isNonNegNumber(group.netWeightPerPallet))   errors.netWeightPerPallet   = 'Required'
+    // Net weight is optional; when given it must be a valid number not above gross.
+    const hasNet = (group.netWeightPerPallet ?? '').trim() !== ''
+    if (hasNet && !isNonNegNumber(group.netWeightPerPallet)) errors.netWeightPerPallet = 'Enter a valid weight'
 
     const gross = Number(group.grossWeightPerPallet)
     const net   = Number(group.netWeightPerPallet)
     if (
+      hasNet &&
       !errors.grossWeightPerPallet &&
       !errors.netWeightPerPallet   &&
       net > gross

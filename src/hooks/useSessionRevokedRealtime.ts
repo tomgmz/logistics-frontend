@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
+import { subscribeBroadcast } from '@/lib/realtime/sharedBroadcast'
 import proxyApi, { getMe } from '@/lib/api/auth.api'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { showAccessChangedToast } from '@/components/ui/AccessChangedToast'
@@ -29,22 +29,18 @@ export function useSessionRevokedRealtime(): void {
   useEffect(() => {
     if (!userId) return
 
-    const channel = supabase
-      .channel(`session:user:${userId}`)
-      .on('broadcast', { event: 'session_revoked' }, () => {
+    // Shared, ref-counted channel (sharedBroadcast).
+    return subscribeBroadcast(`session:user:${userId}`, {
+      session_revoked: () => {
         // The interceptor does the sign-out; nothing to do with the result.
         void proxyApi.get('/notifications/unread-count').catch(() => {})
-      })
-      .on('broadcast', { event: 'permissions_changed' }, () => {
+      },
+      permissions_changed: () => {
         void getMe()
           .then((user) => useAuthStore.getState().setUser(user))
           .catch(() => {})
         showAccessChangedToast()
-      })
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
+      },
+    })
   }, [userId])
 }

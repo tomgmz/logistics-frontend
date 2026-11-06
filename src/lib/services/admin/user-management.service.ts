@@ -206,7 +206,7 @@ export const itAdminService = {
   /** The signed-in IT Admin's place in a handover. */
   handoverStatus: () => get<ITAdminHandoverStatus>(`${B}/it-admins/handover`),
   /** Start the 30-day render; with `successor`, also add them now. */
-  startHandover: (p: { reason: string; successor?: ITAdminSuccessorPayload | null }) =>
+  startHandover: (p: { reason: string; standin_id: string; successor?: ITAdminSuccessorPayload | null }) =>
     post<unknown>(`${B}/it-admins/handover/start`, p),
   /** Add the replacement later (an account with an emailed temporary password). */
   addSuccessor: (p: ITAdminSuccessorPayload) => post<AdminUser>(`${B}/it-admins/handover/successor`, p),
@@ -216,6 +216,17 @@ export const itAdminService = {
   replaceSuccessor: () => del(`${B}/it-admins/handover/successor`),
   /** Stop the handover before anyone confirmed; the caller keeps the role. */
   cancelHandover: () => post<unknown>(`${B}/it-admins/handover/cancel`, {}),
+  /** Active Company Administrators who can be named stand-in (2026-11-06). */
+  standinCandidates: () => get<StandinCandidate[]>(`${B}/it-admins/handover/standin-candidates`),
+  /** Change the Company Administrator who takes over after the 30 days (required, never cleared). */
+  setStandin: async (standinId: string) => {
+    const { data } = await proxyApi.put<ApiResponse<unknown>>(`${B}/it-admins/handover/standin`, { standin_id: standinId })
+    return data.data
+  },
+}
+
+export interface StandinCandidate {
+  user_id: string; email: string; first_name: string | null; last_name: string | null
 }
 
 /** The replacement IT Administrator's details. */
@@ -223,6 +234,8 @@ export type ITAdminSuccessorPayload = Omit<CreateITAdminPayload, 'created_by'>
 
 export interface ITAdminHandoverStatus {
   render_days: number
+  /** 'outgoing' = the resigning IT Admin; 'standin' = the Company Administrator who took over. */
+  viewer?: 'outgoing' | 'standin' | null
   /** The caller's handover in progress, or null while they simply hold the role. */
   handover: {
     handover_id:   string
@@ -236,6 +249,10 @@ export interface ITAdminHandoverStatus {
       user_id: string; email: string; first_name: string | null; last_name: string | null
       temp_password_expires_at: string | null
     } | null
+    /** Company Administrator who takes over if nobody confirms by render_due_at (2026-11-06). */
+    standin?: StandinCandidate | null
+    /** True once the stand-in has taken over (the outgoing IT Admin is archived then). */
+    standin_active?: boolean
   } | null
 }
 

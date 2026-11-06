@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
+import { subscribeBroadcast } from '@/lib/realtime/sharedBroadcast'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { useNotificationStore } from '@/lib/store/notification.store'
 import type { AppNotification } from '@/lib/services/notification.service'
@@ -21,16 +21,13 @@ export function useNotificationsRealtime(): void {
     // Initial load.
     hydrate().catch(() => {})
 
-    const channel = supabase
-      .channel(`notifications:user:${userId}`)
-      .on('broadcast', { event: 'new_notification' }, (msg) => {
-        const row = msg.payload as AppNotification
+    // Shared, ref-counted channel (sharedBroadcast) so a re-subscribe can't
+    // pick up a channel that is still being torn down.
+    return subscribeBroadcast(`notifications:user:${userId}`, {
+      new_notification: (payload) => {
+        const row = payload as AppNotification
         if (row?.notification_id) pushNew(row)
-      })
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
+      },
+    })
   }, [userId, hydrate, pushNew])
 }

@@ -198,6 +198,11 @@ export interface AuthUser {
   role:       string
   status:     string
   must_change_password: boolean
+  /**
+   * From /auth/me: this Company Administrator is standing in for a departed IT
+   * Administrator (2026-11-06) and may use the IT Administrator pages.
+   */
+  it_standin?: boolean
   module_permissions?: ModulePermission[]
   clients?: {
     client_id:       string

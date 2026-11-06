@@ -30,7 +30,7 @@ import {
   Clock,
 } from 'lucide-react'
 
-import { supabase } from '@/lib/supabase'
+import { subscribeBroadcast } from '@/lib/realtime/sharedBroadcast'
 import { pickDriver, pickTruck, type CrewSelection, type PairFilled } from '@/lib/crew-pairing'
 import { codingFlagFor, type CodingFlag } from '@/lib/number-coding'
 import { formatPhDateTime, submittedAfterCloseToday } from '@/lib/office-hours'
@@ -1434,18 +1434,16 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
   useEffect(() => {
     if (!scheduleDay) return
 
-    const channel = supabase
-      .channel('fleet:availability')
-      .on('broadcast', { event: 'driver_availability_changed' }, (msg) => {
+    // Shared, ref-counted channel (sharedBroadcast).
+    return subscribeBroadcast('fleet:availability', {
+      driver_availability_changed: (payload) => {
         // A write only ever rewrites one month, so a booking scheduled outside
         // it cannot have been affected.
-        const month = (msg.payload as { month?: string })?.month
+        const month = (payload as { month?: string })?.month
         if (month && month !== scheduleDay.slice(0, 7)) return
         void reloadAssignableDrivers()
-      })
-      .subscribe()
-
-    return () => { void supabase.removeChannel(channel) }
+      },
+    })
   }, [scheduleDay, reloadAssignableDrivers])
 
   useEffect(() => {

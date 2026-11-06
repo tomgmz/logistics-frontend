@@ -101,8 +101,9 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
 
   const coerce = useCallback((r: GroupMessageRaw): GroupMessage => toGroupMessage(r), [])
 
-  // Load group metadata + messages
-  useEffect(() => {
+  // Load group metadata + messages. Re-run on group_updated, so the members
+  // list (joined / invite pending) follows accepts, declines and removals live.
+  const loadGroup = useCallback(() => {
     messagingService.getGroups()
       .then(raw => {
         const found = raw.find(g => g.group_id === groupId)
@@ -111,6 +112,7 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
       .catch(() => {})
       .finally(() => setLG(false))
   }, [groupId])
+  useEffect(() => { loadGroup() }, [loadGroup])
 
   const fetchMessages = useCallback(async () => {
     try {
@@ -163,6 +165,7 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
     onGroupReadReceipt: ({ user_id, read_at }) => {
       setMembers(prev => prev.map(m => m.user_id === user_id ? { ...m, last_read_at: read_at } : m))
     },
+    onGroupUpdated: (p) => { if (p.group_id === groupId) loadGroup() },
     onReactionToggle: payload => setMessages(prev => applyReactionToggle(prev, payload)),
     onTyping: (uid, isTypingNow) => {
       if (uid === currentUserId) return

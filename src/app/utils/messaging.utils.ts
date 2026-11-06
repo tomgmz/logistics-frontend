@@ -64,6 +64,9 @@ export function groupEventText(
     const who = meta.user_id === currentUserId ? 'you' : meta.name || nameOf(meta.user_id) || 'someone'
     return `${actor} removed ${who} from the group.`
   }
+  if (meta.event === 'joined') {
+    return meta.user_id === currentUserId ? 'You joined the group.' : `${meta.name || nameOf(meta.user_id) || 'Someone'} joined the group.`
+  }
   return msg.body
 }
 

@@ -36,6 +36,8 @@ const OFF_ROUTE_M = 50
 const MAX_ACCURACY_ALLOWANCE_M = 50
 /** Off-route fixes in a row before refetching — one bad fix is not a reroute. */
 const OFF_ROUTE_FIXES = 2
+/** One fix this far off the line is enough on its own. */
+const FAR_OFF_ROUTE_M = 150
 /** Floor between two fetches, whatever triggers them. */
 const MIN_REFETCH_MS = 20_000
 /** Below this speed the device's heading is noise, so it is not sent. */
@@ -138,7 +140,10 @@ export function useLiveRoute({
       const near      = nearestOnPath(pathRef.current, here)
       const tolerance = OFF_ROUTE_M + Math.min(latest.accuracy_m ?? 0, MAX_ACCURACY_ALLOWANCE_M)
       offRouteRun.current = near && near.distanceM > tolerance ? offRouteRun.current + 1 : 0
-      if (offRouteRun.current >= OFF_ROUTE_FIXES) reason = 'off-route'
+      // Pings can be minutes apart (app backgrounded, weak signal), so waiting
+      // for a second fix could leave the old line up for minutes. A fix this
+      // far off the line is no GPS wobble: reroute on it alone.
+      if (offRouteRun.current >= OFF_ROUTE_FIXES || (near && near.distanceM > FAR_OFF_ROUTE_M)) reason = 'off-route'
     }
 
     if (!reason || inFlight.current) return

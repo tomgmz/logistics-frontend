@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Loader2, ShieldAlert, X } from 'lucide-react'
 import ReusableModal, { RemarksModal } from '@/components/layout/ReusableModal'
-import { itAdminService } from '@/lib/services/admin/user-management.service'
+import { itAdminService, type StandinCandidate } from '@/lib/services/admin/user-management.service'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { validateForm } from '@/lib/validation/user-management.validation'
@@ -87,11 +87,20 @@ export default function ItAdminTransitionModal({
   // Start mode only: the replacement is already known, so add them now.
   const [withSuccessor, setWithSuccessor] = useState(false)
   const needsSuccessor = mode === 'add' || withSuccessor
+  // Start mode: the Company Administrator who takes over on day 30 if nobody has
+  // confirmed. Required (2026-11-06), so the IT Admin can't stay past the render time.
+  const [standinId,  setStandinId]  = useState('')
+  const [candidates, setCandidates] = useState<StandinCandidate[] | null>(null)
+
+  useEffect(() => {
+    if (!open || mode !== 'start' || candidates) return
+    itAdminService.standinCandidates().then(setCandidates).catch(() => setCandidates([]))
+  }, [open, mode, candidates])
 
   useBodyScrollLock(open || confirming)
 
   useEffect(() => {
-    if (!open) { setForm(EMPTY); setErrors({}); setApiError(''); setConfirming(false); setBusy(false); setWithSuccessor(false) }
+    if (!open) { setForm(EMPTY); setErrors({}); setApiError(''); setConfirming(false); setBusy(false); setWithSuccessor(false); setStandinId('') }
   }, [open])
 
   const set = (key: keyof FormState, value: string) => {
@@ -114,6 +123,10 @@ export default function ItAdminTransitionModal({
 
   /** Validate the replacement's details (when given), then ask for confirmation. */
   const handleReview = () => {
+    if (mode === 'start' && !standinId) {
+      setErrors((e) => ({ ...e, standin: 'Choose the Company Administrator who stands in after the render time.' }))
+      return
+    }
     if (needsSuccessor) {
       // Same schema as any IT Admin account.
       const found = validateForm('it-admins', false, payload())
@@ -134,7 +147,7 @@ export default function ItAdminTransitionModal({
     try {
       await appToast.promise(
         mode === 'start'
-          ? itAdminService.startHandover({ reason: reason!.trim(), successor: needsSuccessor ? payload() : null })
+          ? itAdminService.startHandover({ reason: reason!.trim(), standin_id: standinId, successor: needsSuccessor ? payload() : null })
           : itAdminService.addSuccessor(payload()),
         {
           loading: mode === 'start' ? 'Starting the handover…' : 'Adding your replacement…',
@@ -208,9 +221,35 @@ export default function ItAdminTransitionModal({
                     Your <span className="font-semibold">{renderDays}-day render time</span> starts
                     {mode === 'start' ? ' now' : ' (already running)'}. You stay the IT Administrator until your
                     replacement signs in and sets their own password; then your account is archived and
-                    signed out. With no replacement yet, you stay on past {renderDays} days.
+                    signed out. If nobody has done so by day {renderDays}, your stand-in takes over and your
+                    account is archived then.
                   </div>
                 </div>
+
+                {mode === 'start' && (
+                  <Field label="Stand-in after the render time" required error={errors.standin}
+                    hint="a Company Administrator">
+                    {candidates !== null && candidates.length === 0 ? (
+                      <p className="text-[13px] text-red-300">
+                        There is no active Company Administrator to name. One is needed before the handover can start.
+                      </p>
+                    ) : (
+                      <select
+                        className={inputBase}
+                        value={standinId}
+                        onChange={(e) => { setStandinId(e.target.value); setErrors((er) => ({ ...er, standin: '' })) }}
+                        aria-label="Company Administrator stand-in"
+                      >
+                        <option value="">{candidates === null ? 'Loading…' : 'Choose a Company Administrator'}</option>
+                        {(candidates ?? []).map((c) => (
+                          <option key={c.user_id} value={c.user_id}>
+                            {[c.first_name, c.last_name].filter(Boolean).join(' ') || c.email} ({c.email})
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </Field>
+                )}
 
                 {mode === 'start' && (
                   <label className="flex cursor-pointer items-center gap-2.5 text-[13px] text-white">

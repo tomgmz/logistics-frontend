@@ -1469,7 +1469,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                                   </div>
 
                                   <div className="flex flex-col gap-1 w-full sm:w-[230px]">
-                                    <label className="ff-regular booking-text text-xs whitespace-nowrap">Net weight per pallet<Req /></label>
+                                    <label className="ff-regular booking-text text-xs whitespace-nowrap">Net weight per pallet <span className="opacity-60">(optional)</span></label>
                                     <div className="flex gap-1.5 items-start">
                                       <div className="flex flex-col gap-0.5 flex-1 min-w-0">
                                         <TextField fullWidth value={g.netWeightPerPallet}

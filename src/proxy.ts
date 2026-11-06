@@ -150,8 +150,15 @@ async function route(req: NextRequest): Promise<NextResponse> {
     return res
   }
 
+  // A Company Administrator may open the IT Administrator portal: the one
+  // standing in for a departed IT Administrator (2026-11-06) works there. This
+  // routes on an unverified token like the rest of this file, so it grants
+  // nothing: the it_admin layout sends any other Company Administrator back to
+  // /admin, and the API refuses them (authorize / moduleGuard check it_standin).
+  const adminInItPortal = role === 'admin' && (pathname === '/it_admin' || pathname.startsWith('/it_admin/'))
+
   // User is on the wrong portal for their role — redirect
-  if (!pathname.startsWith(allowedPrefix)) {
+  if (!adminInItPortal && !pathname.startsWith(allowedPrefix)) {
     const dashboardUrl    = req.nextUrl.clone()
     dashboardUrl.pathname = allowedPrefix
     return NextResponse.redirect(dashboardUrl)
