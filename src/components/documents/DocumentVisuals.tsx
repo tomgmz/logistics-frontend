@@ -1,5 +1,6 @@
 'use client'
 
+import { ProtectedImg } from '@/components/ui/FileViewer'
 import { FileText, FileSpreadsheet, File as FileIcon, Image as ImageIcon } from 'lucide-react'
 import {
   DOCUMENT_TYPE_LABELS,
@@ -41,8 +42,7 @@ export function DocumentThumb({ doc, size = 40, big = false }: { doc: ThumbDoc; 
       style={big ? { width: '100%', aspectRatio: '4 / 3' } : { width: size, height: size }}
     >
       {thumb ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={thumb} alt="" loading="lazy" className="w-full h-full object-cover" />
+        <ProtectedImg src={thumb} alt="" loading="lazy" className="w-full h-full object-cover" />
       ) : (
         <FallbackIcon doc={doc} size={big ? 36 : Math.round(size * 0.45)} />
       )}

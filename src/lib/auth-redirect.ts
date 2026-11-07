@@ -22,7 +22,7 @@ export const SIGNED_OUT_PARAM = 'signedout'
  * their password over and over.
  */
 export const SIGNED_OUT_REASON_PARAM = 'reason'
-export type SignedOutReason = 'inactive'
+export type SignedOutReason = 'inactive' | 'contract_ended'
 
 /**
  * The first sign-out navigation wins. Whatever ends the session also clears the

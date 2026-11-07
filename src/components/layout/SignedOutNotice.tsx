@@ -20,6 +20,9 @@ import { appToast } from '@/lib/toast'
 const INACTIVE_MESSAGE =
   'Your account is no longer active. Signing in again will not restore access — please contact your Administrator.'
 
+const CONTRACT_MESSAGE =
+  "Your company's contract with 8338 has ended and the 7-day viewing period is over. Contact 8338 to renew it; you can sign in again once it is renewed."
+
 const DEFAULT_MESSAGE = 'You have been signed out.'
 
 export default function SignedOutNotice() {
@@ -34,6 +37,8 @@ export default function SignedOutNotice() {
       // Longer than a routine error: it is the one that changes what the user
       // should do next, and it takes a moment to read.
       appToast.error(INACTIVE_MESSAGE, { action: 'signed-out', duration: 8000 })
+    } else if (reason === 'contract_ended') {
+      appToast.error(CONTRACT_MESSAGE, { action: 'signed-out', duration: 10000 })
     } else {
       appToast.info(DEFAULT_MESSAGE, { action: 'signed-out' })
     }

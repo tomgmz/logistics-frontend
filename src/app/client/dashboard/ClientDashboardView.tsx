@@ -14,6 +14,7 @@ import { bookingRef } from '@/lib/booking'
 import { bookingStatusColor } from '@/lib/palette'
 import { hasOpenClientIssue, PROBLEM_STATUS_COLOR, PROBLEM_STATUS_LABEL } from '@/components/transactions/ProblemReportedBadge'
 import { isAwaitingResubmit } from '@/lib/booking-resubmit'
+import { useBookingClosed } from '@/lib/contract-status'
 import RejectionPanel from '@/components/transactions/RejectionPanel'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { TableCard } from '@/components/ui/untitled/table-card'
@@ -134,6 +135,8 @@ function StatusBadge({ status, problem = false }: { status: string; problem?: bo
 
 /** CardLink's shape in cyan with a plus, for starting a booking. */
 function NewBookingLink() {
+  // Contract ended: no new bookings (the banner says why).
+  if (useBookingClosed()) return null
   return (
     <Link
       href="/client/booking"
@@ -202,6 +205,7 @@ function ActiveShipmentRow({ booking }: { booking: BookingWithRelations }) {
 }
 
 function ActiveShipmentsCard({ active }: { active: BookingWithRelations[] }) {
+  const bookingClosed = useBookingClosed()
   return (
     <TableCard.Root untitled>
       <TableCard.Header
@@ -223,7 +227,7 @@ function ActiveShipmentsCard({ active }: { active: BookingWithRelations[] }) {
               <tr>
                 <td colSpan={HEAD.length} style={{ color: MUTED }}>
                   No active shipments right now.{' '}
-                  <Link href="/client/booking" className="underline underline-offset-2" style={{ color: CYAN }}>Book a delivery</Link>
+                  {!bookingClosed && <Link href="/client/booking" className="underline underline-offset-2" style={{ color: CYAN }}>Book a delivery</Link>}
                 </td>
               </tr>
             ) : active.slice(0, MAX_ROWS).map((b) => <ActiveShipmentRow key={b.booking_id} booking={b} />)}

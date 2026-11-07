@@ -176,8 +176,8 @@ export function previewKind(url: string): PreviewKind {
 /**
  * Saves the file instead of opening it. File links are signed and expire, so
  * the name cannot be forced through the URL; the file is fetched and saved
- * from a blob instead. If the fetch is refused (storage CORS not set for this
- * site, very old browser), it opens in a new tab, where it can still be saved.
+ * from a blob instead. Files never open in a new tab (the storage link must
+ * not be exposed), so a refused fetch (storage CORS, expired link) is a toast.
  */
 export async function downloadFile(url: string, fileName: string): Promise<void> {
   try {
@@ -189,7 +189,8 @@ export async function downloadFile(url: string, fileName: string): Promise<void>
     if (!res.ok) throw new Error(String(res.status))
     saveBlob(await res.blob(), fileName)
   } catch {
-    window.open(url, '_blank', 'noopener')
+    const { default: toast } = await import('react-hot-toast')
+    toast.error('The file could not be downloaded. Refresh the page and try again.')
   }
 }
 

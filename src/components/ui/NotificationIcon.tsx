@@ -71,6 +71,8 @@ const ACTIONABLE_TYPES = new Set([
   "support.ticket_resolved",
   "support.ticket_logged",
   "vehicle.registration_expiring",
+  "client.contract_expiring",
+  "client.contract_expiring_staff",
   "it_admin.handover",
 ]);
 
@@ -118,6 +120,8 @@ const FIELD_LABELS: Record<string, string> = {
   requested_role:    "Requested role",
   window:            "Window",
   registration_expiry: "Registration valid until",
+  company_name:      "Company",
+  contract_valid_until: "Contract valid until",
 };
 // Readable values for coded payload fields, so nothing shows abbreviated
 // (e.g. "ops_pending"). Unknown codes fall back to expandCode() + humanize.
@@ -161,7 +165,7 @@ const VALUE_LABELS: Record<string, Record<string, string>> = {
   },
 };
 // Shown exactly as sent: a plate or a name must not be re-cased or "expanded".
-const AS_IS_FIELDS = new Set(["reference_number", "plate_number", "driver_name"]);
+const AS_IS_FIELDS = new Set(["reference_number", "plate_number", "driver_name", "company_name"]);
 const HIDDEN_FIELDS = new Set(["action_url", "type", "handler_group", "latitude", "longitude"]);
 
 function detailFields(n: AppNotification): { label: string; value: string }[] {

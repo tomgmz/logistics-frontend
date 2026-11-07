@@ -16,6 +16,7 @@ import {
   type DriverReport,
   type ReportStatus,
 } from '@/app/types/driver-report.types'
+import { FileViewButton, ProtectedImg } from '@/components/ui/FileViewer'
 
 function fmtWhen(iso: string | null | undefined): string {
   if (!iso) return '—'
@@ -187,22 +188,20 @@ function DetailContent({ report, banner }: { report: DriverReport; banner?: Reac
           <p className="text-[11px] font-bold uppercase tracking-wide text-white/40 mb-1.5">Attachments</p>
           <div className="grid grid-cols-3 gap-2">
             {report.photo_urls.map((url) => (
-              <a key={url} href={url} target="_blank" rel="noopener noreferrer">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={url} alt="Report photo" className="w-full aspect-square object-cover rounded-lg border border-white/10 bg-black/30" loading="lazy" />
-              </a>
+              <FileViewButton key={url} url={url} name="Report photo" className="block w-full">
+                <ProtectedImg src={url} alt="Report photo" className="w-full aspect-square object-cover rounded-lg border border-white/10 bg-black/30" loading="lazy" />
+              </FileViewButton>
             ))}
             {report.video_urls.map((url, i) => (
-              <a
+              <FileViewButton
                 key={url}
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex flex-col items-center justify-center gap-1 aspect-square rounded-lg border border-white/10 bg-white/[0.04] text-white/60 hover:text-white"
+                url={url}
+                name={`Video ${i + 1}`}
+                className="w-full flex flex-col items-center justify-center gap-1 aspect-square rounded-lg border border-white/10 bg-white/[0.04] text-white/60 hover:text-white"
               >
                 <Video size={20} />
                 <span className="text-[10px]">Video {i + 1}</span>
-              </a>
+              </FileViewButton>
             ))}
           </div>
         </div>

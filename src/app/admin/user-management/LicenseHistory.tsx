@@ -5,6 +5,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react'
 
 import { driverService, type DriverLicenseHistoryRow } from '@/lib/services/admin/user-management.service'
 import { formatDateTime } from '@/app/utils/timeFormat'
+import { FileViewButton } from '@/components/ui/FileViewer'
 
 /**
  * The licenses a driver held before the current one: every renewal, corrected
@@ -45,7 +46,7 @@ export default function LicenseHistory({ userId }: { userId: string }) {
                 <p className="mt-1 text-[11px] text-[#818181]">
                   Replaced {formatDateTime(r.replaced_at)}{by ? ` by ${by}` : ''}
                   {r.license_image_url && (
-                    <> · <a href={r.license_image_url} target="_blank" rel="noopener noreferrer" className="text-[#4df9ed] underline-offset-2 [@media(hover:hover)]:hover:underline">old card</a></>
+                    <> · <FileViewButton url={r.license_image_url} name="Previous license card" className="text-[#4df9ed] underline-offset-2 [@media(hover:hover)]:hover:underline">old card</FileViewButton></>
                   )}
                 </p>
                 {r.change_note && <p className="mt-1 whitespace-pre-wrap text-[11px] text-white/70">{r.change_note}</p>}

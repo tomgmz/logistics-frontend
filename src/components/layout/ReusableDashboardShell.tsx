@@ -42,6 +42,8 @@ export default function ReusableDashboardShell({ children, navItems }: ReusableD
   // matching link, so a sub-page takes its module's name).
   const title = useMemo(() => {
     const path = pathname ?? ''
+    // The Profile page is reached from the user card, not a menu item.
+    if (/^\/[^/]+\/profile\/?$/.test(path)) return 'Profile'
     return navItems
       .filter((item) => path === item.href || path.startsWith(item.href.replace(/\/$/, '') + '/'))
       .sort((a, b) => b.href.length - a.href.length)[0]?.label

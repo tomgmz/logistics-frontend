@@ -7,6 +7,7 @@ import type { OdometerReading, TruckService } from '@/app/types/truck.types'
 import { adminFetchTruckUpkeep } from '@/lib/services/admin/trucks.service'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { fmtDay, fmtKm } from './upkeep-ui'
+import { FileViewButton } from '@/components/ui/FileViewer'
 
 const READING_LABEL: Record<OdometerReading['kind'], string> = {
   initial:   'Initial reading',
@@ -24,9 +25,9 @@ function who(p: { first_name: string | null; last_name: string | null } | null):
 function PhotoLink({ url, label }: { url: string | null; label: string }) {
   if (!url) return null
   return (
-    <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[10px] text-[var(--color-cyan)] hover:underline">
+    <FileViewButton url={url} name={label} className="inline-flex items-center gap-1 text-[10px] text-[var(--color-cyan)] hover:underline">
       <ImageIcon size={11} /> {label}
-    </a>
+    </FileViewButton>
   )
 }
 

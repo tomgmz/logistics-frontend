@@ -19,10 +19,11 @@ import {
   SquareDashed,
   Ruler,
   FileText,
-  ExternalLink,
+  Eye,
 } from 'lucide-react'
 
 import { PALETTE } from '@/lib/palette'
+import { FileViewButton } from '@/components/ui/FileViewer'
 
 /** Panel surfaces and greys from the design. Not badge colours, so not in the palette. */
 export const PANEL_BG    = '#2a2828'
@@ -251,15 +252,14 @@ export function StopCard({
 
 export function DocumentRow({ url, filename }: { url: string; filename: string }) {
   return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className={`${CARD_CLASS} flex items-center gap-3 min-h-[48px] px-4 py-2 group transition-colors hover:border-[#4df9ed]/50`}
+    <FileViewButton
+      url={url}
+      name={filename}
+      className={`${CARD_CLASS} w-full flex items-center gap-3 min-h-[48px] px-4 py-2 group transition-colors hover:border-[#4df9ed]/50`}
     >
       <FileText size={18} strokeWidth={2} className="shrink-0 text-[#818181]" />
       <span className="flex-1 min-w-0 truncate text-lg text-white">{filename}</span>
-      <ExternalLink size={18} strokeWidth={2} className="shrink-0 text-[#818181] group-hover:text-white transition-colors" />
-    </a>
+      <Eye size={18} strokeWidth={2} className="shrink-0 text-[#818181] group-hover:text-white transition-colors" />
+    </FileViewButton>
   )
 }

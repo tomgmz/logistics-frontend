@@ -61,6 +61,7 @@ import type { ResolvedPlace } from '@/lib/hooks/usePlacesAutoComplete'
 import { nowDate } from '@/app/utils/serverTime'
 import { OFFICE_HOURS_LABEL, isWithinOfficeHours } from '@/lib/office-hours'
 import { phDayPlusMonth, phEarliestBookableDay } from '@/lib/ph-date'
+import { FileViewButton } from '@/components/ui/FileViewer'
 
 interface Props {
   onNext: () => void
@@ -1608,10 +1609,10 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                   <div className="flex items-center gap-2 flex-1 min-w-0 mr-2">
                     <File size={13} className="text-white/40 shrink-0" />
                     <div className="flex flex-col flex-1 min-w-0">
-                      <a href={url} target="_blank" rel="noopener noreferrer"
+                      <FileViewButton url={url} name={documentName(url)}
                         className="ff-sc booking-text text-xs text-white/80 truncate hover:underline">
                         {documentName(url)}
-                      </a>
+                      </FileViewButton>
                       <span className="ff-sc booking-text text-[10px] text-white/40">already attached</span>
                     </div>
                   </div>

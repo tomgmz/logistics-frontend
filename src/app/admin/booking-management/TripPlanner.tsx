@@ -27,6 +27,7 @@ import { getApiErrorMessage } from '@/lib/api-error'
 import { STOWAGE_FACTOR } from '@/lib/cargo/capacity'
 import DriverCallTime from './DriverCallTime'
 import { writeAccess } from '@/components/layout/ModuleAccess'
+import { FileViewButton } from '@/components/ui/FileViewer'
 
 /**
  * How many runs the assigned vehicle makes, which drop-offs each serves, and
@@ -727,10 +728,9 @@ export default function TripPlanner({ detail, canEdit, allowed = true, capacity 
                   {/* Proof that THIS run was loaded. Each run has its own — a single
                       photo cannot evidence the second time the truck was filled. */}
                   {trip.pickup_proof_photo_url ? (
-                    <a
-                      href={trip.pickup_proof_photo_url}
-                      target="_blank"
-                      rel="noreferrer"
+                    <FileViewButton
+                      url={trip.pickup_proof_photo_url}
+                      name="Proof of loading"
                       className="inline-flex items-center gap-1.5 text-[11px] text-white/45 hover:text-white transition-colors"
                     >
                       <Camera size={12} /> Proof of loading
@@ -739,7 +739,7 @@ export default function TripPlanner({ detail, canEdit, allowed = true, capacity 
                             timeZone: 'Asia/Manila', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
                           })}`
                         : ''}
-                    </a>
+                    </FileViewButton>
                   ) : trip.status !== 'pending' ? (
                     <p className="text-[11px] text-white/30">No proof of loading on file.</p>
                   ) : null}

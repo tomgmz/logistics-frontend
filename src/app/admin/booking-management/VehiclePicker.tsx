@@ -170,6 +170,8 @@ export default function VehiclePicker({
                   fill
                   sizes="80px"
                   className="object-contain"
+                  // Sealed file links change every time window; optimizing them would re-fetch each one.
+                  unoptimized
                 />
               </div>
               <div className="min-w-0 flex-1 pr-5">

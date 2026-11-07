@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { getMe, isAccountInactive, isSessionDead, refreshSession, type AuthUser } from '@/lib/api/auth.api'
+import { getMe, isSessionDead, refreshSession, signedOutReasonOf, type AuthUser } from '@/lib/api/auth.api'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { readPersisted } from '@/lib/secure-storage'
 import { syncServerTime } from '@/app/utils/serverTime'
@@ -206,7 +206,7 @@ export default function AuthRehydrator() {
             pathnameRef.current === p ||
             pathnameRef.current.startsWith(p + '/')
         )
-        if (!isPublic) goHomeSignedOut(isAccountInactive(err) ? 'inactive' : undefined)
+        if (!isPublic) goHomeSignedOut(signedOutReasonOf(err))
       }
     }
 

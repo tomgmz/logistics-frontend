@@ -348,7 +348,7 @@ export function DetailsPanelContent({
           </div>
         ) : truckImageUrl ? (
           <motion.div className="relative w-full h-full" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
-            <Image src={truckImageUrl} alt={truckType} fill className="object-contain" priority />
+            <Image src={truckImageUrl} alt={truckType} fill className="object-contain" priority unoptimized />
           </motion.div>
         ) : (
           <div className="w-full h-full flex items-center justify-center">

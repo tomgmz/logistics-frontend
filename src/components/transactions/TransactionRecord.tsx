@@ -19,6 +19,7 @@ import { formatArrivalWindow } from '@/lib/arrival-window'
 import { pausedPlanState } from '@/lib/pause-continuation'
 import { CARD_CLASS, SectionHeading, Tag } from '@/app/admin/booking-management/BookingDetailParts'
 import { BORDER_C, CYAN, MUTED, ERROR, AMBER, GREEN } from './transaction-theme'
+import { FileViewButton, ProtectedImg } from '@/components/ui/FileViewer'
 
 /**
  * The staff-only half of a transaction: everything attached to the booking that
@@ -85,17 +86,16 @@ function humanize(v: string | null | undefined): string {
   return v.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
-/** A photo that opens full size in a new tab. */
+/** A photo that opens full size in the in-page viewer. */
 function Photo({ url, caption }: { url: string; caption?: string }) {
   return (
-    <a href={url} target="_blank" rel="noopener noreferrer"
+    <FileViewButton url={url} name={caption ?? 'Photo'}
       className="group flex flex-col gap-1 w-[104px] shrink-0">
-      {/* eslint-disable-next-line @next/next/no-img-element -- signed storage links, any host shape */}
-      <img src={url} alt={caption ?? 'Photo'} loading="lazy"
+      <ProtectedImg src={url} alt={caption ?? 'Photo'} loading="lazy"
         className="h-[78px] w-[104px] rounded-md border object-cover transition-opacity group-hover:opacity-80"
         style={{ borderColor: BORDER_C }} />
       {caption && <span className="text-[10px] leading-tight" style={{ color: MUTED }}>{caption}</span>}
-    </a>
+    </FileViewButton>
   )
 }
 
@@ -332,11 +332,10 @@ function ReportsSection({ reports }: { reports: RecordReport[] }) {
           {r.video_urls.length > 0 && (
             <div className="flex flex-col gap-1">
               {r.video_urls.map((u, i) => (
-                <a key={u} href={u} target="_blank" rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-[11px] font-bold hover:opacity-70"
-                  style={{ color: CYAN }}>
-                  <Video size={12} /> Video {i + 1}
-                </a>
+                <FileViewButton key={u} url={u} name={`Video ${i + 1}`}
+                  className="text-[11px] font-bold hover:opacity-70">
+                  <span style={{ color: CYAN }} className="inline-flex items-center gap-1.5"><Video size={12} /> Video {i + 1}</span>
+                </FileViewButton>
               ))}
             </div>
           )}

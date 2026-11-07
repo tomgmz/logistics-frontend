@@ -11,7 +11,9 @@ const nextConfig = {
         hostname: 'www.figma.com',
         pathname: '/api/mcp/asset/**',
       },
-      // Private file storage: signed, expiring links (see backend lib/storage.ts).
+      // Private file storage: older API builds still hand out R2 signed links;
+      // since 2026-11-07 file links are sealed links to the API (images using
+      // them are `unoptimized`, so no host is needed here).
       {
         protocol: 'https',
         hostname: '*.r2.cloudflarestorage.com',

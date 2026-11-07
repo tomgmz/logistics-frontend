@@ -3,7 +3,9 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Download, ExternalLink, MapPinOff, FileQuestion } from 'lucide-react'
+import { X, Download, MapPinOff } from 'lucide-react'
+
+import { FilePreview } from '@/components/ui/FileViewer'
 
 import { formatDateTime } from '@/app/utils/timeFormat'
 import { roleLabel } from '@/lib/roles'
@@ -12,7 +14,6 @@ import {
   documentTypeLabel,
   downloadFile,
   fileSizeLabel,
-  previewKind,
   type LibraryDocument,
 } from '@/app/types/documents.types'
 import { DocumentTypeBadge, ReviewStatusBadge } from './DocumentVisuals'
@@ -22,35 +23,6 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
     <div className="flex items-start justify-between gap-4 py-2 border-b border-white/[0.05] last:border-0">
       <span className="text-[11px] font-bold uppercase tracking-wide text-white/40 shrink-0">{label}</span>
       <span className="text-sm text-white/80 text-right min-w-0 break-words">{children}</span>
-    </div>
-  )
-}
-
-function Preview({ doc }: { doc: LibraryDocument }) {
-  const kind = previewKind(doc.file_url)
-  if (kind === 'image') {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img src={doc.file_url} alt={doc.file_name} className="max-h-full max-w-full object-contain" />
-    )
-  }
-  if (kind === 'pdf') {
-    return <iframe src={doc.file_url} title={doc.file_name} className="w-full h-full bg-white" />
-  }
-  return (
-    <div className="flex flex-col items-center gap-3 text-center px-6">
-      <FileQuestion size={40} className="text-white/25" />
-      <p className="text-sm text-white/50">This file type can&apos;t be previewed in the browser.</p>
-      <a
-        href={doc.file_url}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={(e) => { e.preventDefault(); void downloadFile(doc.file_url, doc.file_name) }}
-        className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold text-black"
-        style={{ background: 'var(--color-cyan)' }}
-      >
-        <Download size={14} /> Download to open
-      </a>
     </div>
   )
 }
@@ -101,27 +73,15 @@ export default function DocumentPreviewModal({
                 </p>
               </div>
               <div className="flex items-center gap-1 shrink-0">
-                <a
-                  href={doc.file_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-2 rounded-lg hover:bg-white/5 text-white/60"
-                  title="Open in a new tab"
-                  aria-label="Open in a new tab"
-                >
-                  <ExternalLink size={17} />
-                </a>
-                <a
-                  href={doc.file_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(e) => { e.preventDefault(); void downloadFile(doc.file_url, doc.file_name) }}
+                <button
+                  type="button"
+                  onClick={() => { void downloadFile(doc.file_url, doc.file_name) }}
                   className="p-2 rounded-lg hover:bg-white/5 text-white/60"
                   title="Download"
                   aria-label="Download"
                 >
                   <Download size={17} />
-                </a>
+                </button>
                 <button type="button" onClick={onClose} className="p-2 rounded-lg hover:bg-white/5 text-white/50" aria-label="Close">
                   <X size={18} />
                 </button>
@@ -129,8 +89,8 @@ export default function DocumentPreviewModal({
             </div>
 
             <div className="flex-1 min-h-0 flex flex-col lg:flex-row">
-              <div className="flex-1 min-h-[240px] bg-black/60 flex items-center justify-center overflow-hidden">
-                <Preview doc={doc} />
+              <div className="flex-1 min-h-[240px] bg-black/60 flex items-center justify-center overflow-hidden" onContextMenu={(e) => e.preventDefault()}>
+                <FilePreview url={doc.file_url} name={doc.file_name} onDownload={() => { void downloadFile(doc.file_url, doc.file_name) }} />
               </div>
 
               <aside className="lg:w-[340px] shrink-0 border-t lg:border-t-0 lg:border-l border-white/[0.07] flex flex-col min-h-0 max-h-[45%] lg:max-h-none">

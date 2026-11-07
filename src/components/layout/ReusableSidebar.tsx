@@ -3,7 +3,6 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { LogOut } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import { ASSETS } from '@/lib/data'
@@ -13,6 +12,7 @@ import { useAuthStore } from '@/lib/store/auth.store'
 import ReusableModal from '@/components/layout/ReusableModal'
 import SigningOutOverlay from '@/components/layout/SigningOutOverlay'
 import { roleLabel } from '@/lib/roles'
+import { ROLE_ROUTES } from '@/constants/roles'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 
 // Figma 3241:1835 (collapsed) and 3241:1930 (open); the rail is slimmer than
@@ -87,6 +87,12 @@ export default function ReusableSidebar({
   const clearUser = useAuthStore((state) => state.clearUser)
   const [logoutModalOpen, setLogoutModalOpen] = useState(false)
   const [signingOut,      setSigningOut]      = useState(false)
+
+  // The Profile page sits in the user's own portal (a Company Administrator
+  // standing in for IT still has theirs under /admin).
+  const portal        = user?.role ? ROLE_ROUTES[user.role] : undefined
+  const profileHref   = portal ? `${portal}/profile` : null
+  const profileActive = !!profileHref && pathname === profileHref
 
   const handleLogout = async () => {
     // Swap the confirm modal for the full-screen loader; it stays up until the
@@ -270,40 +276,69 @@ export default function ReusableSidebar({
               ))}
             </nav>
 
-            <button
-              type="button"
-              onClick={() => setLogoutModalOpen(true)}
-              title={sidebarOpen ? undefined : 'Sign out'}
-              className="group flex h-[46px] w-full shrink-0 items-center gap-[18px] pl-[26px] text-left text-white transition-colors hover:text-red-400"
-            >
-              <LogOut size={20} className="shrink-0" />
-              <span className={`font-[family-name:var(--font-alegreya-sc)] text-[16px] whitespace-nowrap transition-opacity ${sidebarOpen ? 'opacity-100' : 'opacity-0'}`}>
-                Sign out
-              </span>
-            </button>
-
-            {/* Who is signed in: a card when open, just the avatar on the rail. */}
-            <div className="mt-3 shrink-0 px-[11px]">
+            {/* Who is signed in, with Sign out under it (Figma 1744:763). The
+                top of the card opens the Profile page; Sign out asks first.
+                On the rail only the avatar and the sign-out arrow show, one
+                above the other, each still one tap. */}
+            <div className="mt-3 shrink-0 px-[11px] pb-[4px]">
               <div
-                className={`flex h-[70px] items-center gap-[14px] rounded-[10px] border-[0.5px] pl-[9px] transition-colors ${
+                className={`rounded-[10px] border-[0.5px] pb-[9px] transition-colors ${
                   sidebarOpen ? 'border-[#424242] bg-[#141414]' : 'border-transparent'
                 }`}
               >
-                <div className="flex size-[30px] shrink-0 items-center justify-center rounded-full bg-[var(--color-cyan)]">
-                  <span className="font-card !text-[0.75rem] font-bold text-[var(--color-bg)]">
-                    {user?.first_name?.[0]?.toUpperCase() ?? 'A'}
+                <ProfileLink
+                  href={profileHref}
+                  active={profileActive}
+                  expanded={sidebarOpen}
+                  onNavigate={() => { if (isMobile) setSidebarOpen(false) }}
+                >
+                  <div
+                    className={`flex size-[30px] shrink-0 items-center justify-center rounded-full bg-[var(--color-cyan)] transition-shadow ${
+                      profileActive ? 'ring-2 ring-[#4DF9ED]/50 ring-offset-2 ring-offset-[#141414]' : ''
+                    }`}
+                  >
+                    <span className="font-card !text-[0.75rem] font-bold text-[var(--color-bg)]">
+                      {user?.first_name?.[0]?.toUpperCase() ?? 'A'}
+                    </span>
+                  </div>
+                  <div className={`min-w-0 transition-opacity ${sidebarOpen ? 'opacity-100' : 'opacity-0'}`}>
+                    <p
+                      className={`ff-regular truncate text-[16px] leading-[22px] transition-colors ${
+                        profileActive ? 'text-[#4DF9ED]' : 'text-white [@media(hover:hover)]:group-hover:text-[#4DF9ED]'
+                      }`}
+                    >
+                      {user?.first_name && user?.last_name
+                        ? `${user.first_name} ${user.last_name}`
+                        : user?.email ?? 'User'}
+                    </p>
+                    <p className="ff-regular truncate text-[16px] leading-[22px] text-[#818181]">
+                      {roleLabel(user?.role)}
+                    </p>
+                  </div>
+                </ProfileLink>
+
+                {/* The Figma's divider: a #424242 line fading out at both ends. */}
+                <img
+                  src="/icons/ui/sidebar-divider.svg"
+                  alt=""
+                  aria-hidden
+                  width={248}
+                  height={1}
+                  className={`ml-[12px] block h-px w-[248px] max-w-none transition-opacity ${sidebarOpen ? 'opacity-100' : 'opacity-0'}`}
+                />
+
+                <button
+                  type="button"
+                  onClick={() => setLogoutModalOpen(true)}
+                  title={sidebarOpen ? undefined : 'Sign out'}
+                  aria-label="Sign out"
+                  className="flex h-[46px] w-full items-center gap-[18px] rounded-[8px] pl-[12px] text-left text-[#F62626] transition-colors [@media(hover:hover)]:hover:bg-[#F62626]/10 active:bg-[#F62626]/15"
+                >
+                  <img src="/icons/ui/sign-out.svg" alt="" aria-hidden width={20} height={20} className="block size-[20px] shrink-0" />
+                  <span className={`ff-regular text-[16px] leading-[22px] whitespace-nowrap transition-opacity ${sidebarOpen ? 'opacity-100' : 'opacity-0'}`}>
+                    Sign out
                   </span>
-                </div>
-                <div className={`min-w-0 transition-opacity ${sidebarOpen ? 'opacity-100' : 'opacity-0'}`}>
-                  <p className="ff-regular truncate text-[16px] leading-[22px] text-white">
-                    {user?.first_name && user?.last_name
-                      ? `${user.first_name} ${user.last_name}`
-                      : user?.email ?? 'User'}
-                  </p>
-                  <p className="ff-regular truncate text-[16px] leading-[22px] text-[#818181]">
-                    {roleLabel(user?.role)}
-                  </p>
-                </div>
+                </button>
               </div>
             </div>
           </motion.div>
@@ -322,6 +357,35 @@ export default function ReusableSidebar({
 
       <SigningOutOverlay open={signingOut} />
     </>
+  )
+}
+
+/**
+ * The avatar, name and role at the top of the user card: opens the Profile
+ * page. While on it the name turns cyan and the avatar gets a ring, as a
+ * selected menu item does.
+ */
+function ProfileLink({ href, active, expanded, onNavigate, children }: {
+  href: string | null
+  active: boolean
+  expanded: boolean
+  onNavigate: () => void
+  children: React.ReactNode
+}) {
+  const className = 'group flex h-[70px] w-full items-center gap-[14px] rounded-[10px] pl-[10px] text-left'
+  if (!href) return <div className={className}>{children}</div>
+  return (
+    <Link
+      href={href}
+      prefetch={false}
+      onClick={onNavigate}
+      aria-label="Profile"
+      aria-current={active ? 'page' : undefined}
+      title={expanded ? undefined : 'Profile'}
+      className={className}
+    >
+      {children}
+    </Link>
   )
 }
 

@@ -105,6 +105,7 @@ import {
 
 import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
 import { formatDuration } from '@/lib/duration'
+import { FileViewButton, ProtectedImg } from '@/components/ui/FileViewer'
 
 const BOOKING_STATUSES: AdminBookingLifecycleStatus[] = [
   'pending',
@@ -1204,16 +1205,14 @@ function ProofPhoto({
   url, at, label,
 }: { url: string; at?: string | null; label: string }) {
   return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noopener noreferrer"
+    <FileViewButton
+      url={url}
+      name={label}
       title={`${label} — open full size`}
-      className="flex items-center gap-2.5 rounded-lg border border-white/[0.08] bg-black/20 p-2
+      className="w-full flex items-center gap-2.5 rounded-lg border border-white/[0.08] bg-black/20 p-2
                  hover:border-[var(--color-cyan)]/40 transition-colors group"
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
+      <ProtectedImg
         src={url}
         alt={label}
         className="h-12 w-12 shrink-0 rounded-md object-cover border border-white/10"
@@ -1226,7 +1225,7 @@ function ProofPhoto({
           {at ? new Date(at).toLocaleString() : 'Photo on file'}
         </span>
       </span>
-    </a>
+    </FileViewButton>
   )
 }
 

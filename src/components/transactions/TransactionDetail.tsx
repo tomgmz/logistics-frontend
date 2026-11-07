@@ -3,7 +3,7 @@
 import { motion, Variants } from 'framer-motion'
 import {
   History, MapPin, Truck, Package, Calendar, Hash,
-  AlertCircle, Download, FileText, MessageSquare,
+  AlertCircle, Download, Eye, FileText, MessageSquare,
 } from 'lucide-react'
 
 import type { BookingWithRelations } from '@/lib/store/slice/routeMap.slice'
@@ -16,6 +16,8 @@ import {
   getDriverName, getPlateNumber, getTruckModel,
 } from './transaction-format'
 import { BG_PANEL, BG_CARD, BORDER, BORDER_C, CYAN, MUTED, ERROR } from './transaction-theme'
+import { FileViewButton } from '@/components/ui/FileViewer'
+import { downloadFile } from '@/app/types/documents.types'
 
 /**
  * The full view of one transaction: route, cargo, assignment, per-stop status,
@@ -255,12 +257,17 @@ export default function TransactionDetail({ booking, animated = true, showCrew =
                   <FileText size={13} style={{ color: MUTED }} className="shrink-0" />
                   <span className="text-xs text-white/80 truncate">{fileNameFromUrl(url)}</span>
                 </div>
-                <a href={url} target="_blank" rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider
-                             transition-opacity hover:opacity-70 shrink-0"
-                  style={{ color: CYAN }}>
-                  <Download size={12} /> Download
-                </a>
+                <div className="flex items-center gap-3 shrink-0">
+                  <FileViewButton url={url} name={fileNameFromUrl(url)}
+                    className="text-xs font-bold uppercase tracking-wider transition-opacity hover:opacity-70">
+                    <span style={{ color: CYAN }} className="flex items-center gap-1"><Eye size={12} /> View</span>
+                  </FileViewButton>
+                  <button type="button" onClick={() => { void downloadFile(url, fileNameFromUrl(url)) }}
+                    className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider transition-opacity hover:opacity-70"
+                    style={{ color: CYAN }}>
+                    <Download size={12} /> Download
+                  </button>
+                </div>
               </div>
             ))}
           </div>

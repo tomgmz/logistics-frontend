@@ -7,6 +7,7 @@ import { Pencil, XCircle } from 'lucide-react'
 import type { BookingWithRelations } from '@/lib/store/slice/routeMap.slice'
 import { bookingService } from '@/lib/services/client/booking.service'
 import { isAwaitingResubmit } from '@/lib/booking-resubmit'
+import { useBookingClosed } from '@/lib/contract-status'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { appToast } from '@/lib/toast'
 import { BORDER_C, CYAN, ERROR, MUTED } from './transaction-theme'
@@ -26,6 +27,8 @@ export default function RejectionPanel({ booking, onUpdated, compact = false }: 
 }) {
   const [busy,       setBusy]       = useState(false)
   const [confirming, setConfirming] = useState(false)
+  // Contract ended: cancelling still works, resubmitting does not.
+  const bookingClosed = useBookingClosed()
 
   if (!isAwaitingResubmit(booking)) return null
 
@@ -65,11 +68,13 @@ export default function RejectionPanel({ booking, onUpdated, compact = false }: 
     </div>
   ) : (
     <div className="flex flex-wrap gap-2">
-      <Link href={`/client/booking?resubmit=${encodeURIComponent(bookingId)}`}
-        className={`inline-flex items-center gap-1.5 rounded-lg font-bold ${btn}`}
-        style={{ background: CYAN, color: '#000' }}>
-        <Pencil size={compact ? 12 : 14} /> Edit &amp; Resubmit
-      </Link>
+      {!bookingClosed && (
+        <Link href={`/client/booking?resubmit=${encodeURIComponent(bookingId)}`}
+          className={`inline-flex items-center gap-1.5 rounded-lg font-bold ${btn}`}
+          style={{ background: CYAN, color: '#000' }}>
+          <Pencil size={compact ? 12 : 14} /> Edit &amp; Resubmit
+        </Link>
+      )}
       <button type="button" onClick={() => setConfirming(true)}
         className={`inline-flex items-center gap-1.5 rounded-lg border font-bold cursor-pointer ${btn}`}
         style={{ borderColor: `${ERROR}66`, color: ERROR }}>

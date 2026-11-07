@@ -11,7 +11,13 @@ import { useEffect, useRef } from 'react'
  * freshly signed links; nothing else about the screen changes.
  */
 
-const R2_LINK = /https:\/\/[a-z0-9]+\.r2\.cloudflarestorage\.com\/[^"\s\\]+/g
+// R2 signed links (older API) and sealed links to GET /api/files (since
+// 2026-11-07: backend lib/file-links.ts, which hides the storage location).
+const R2_LINK = /https?:\/\/(?:[a-z0-9]+\.r2\.cloudflarestorage\.com\/|[^"\s\\/]+\/api\/files\/)[^"\s\\]+/g
+
+function isFileLink(v: string): boolean {
+  return v.includes('.r2.cloudflarestorage.com/') || v.includes('/api/files/')
+}
 const MARGIN_MS    = 60_000
 const MIN_DELAY_MS = 30_000
 
@@ -19,6 +25,9 @@ const MIN_DELAY_MS = 30_000
 export function signedLinkExpiry(url: string): number | null {
   try {
     const q    = new URL(url).searchParams
+    // Sealed link: the expiry rides along in plain sight as `e` (unix seconds).
+    const e    = Number(q.get('e'))
+    if (q.has('t') && Number.isFinite(e) && e > 0) return e * 1000
     const date = q.get('X-Amz-Date')            // 20261030T120000Z
     const secs = Number(q.get('X-Amz-Expires'))
     const m    = date && /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/.exec(date)
@@ -62,7 +71,7 @@ export function withFreshLinks<T>(current: T, fresh: unknown): T {
 
   const swap = (v: unknown): unknown => {
     if (typeof v === 'string') {
-      if (!v.includes('.r2.cloudflarestorage.com/')) return v
+      if (!isFileLink(v)) return v
       try { return byPath.get(new URL(v).pathname) ?? v } catch { return v }
     }
     if (Array.isArray(v)) {

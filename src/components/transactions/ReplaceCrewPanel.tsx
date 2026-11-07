@@ -22,6 +22,7 @@ import type { CargoSummary } from '@/lib/cargo/summary'
 import { formatDateTime } from './transaction-format'
 import { PALETTE } from '@/lib/palette'
 import { BORDER_C, CYAN, MUTED } from './transaction-theme'
+import { FileViewButton } from '@/components/ui/FileViewer'
 
 const ORANGE = PALETTE.orange
 
@@ -325,7 +326,7 @@ export default function ReplaceCrewPanel({
                       <span className="text-[11px]" style={{ color: r.transfer_confirmed_at ? MUTED : ORANGE }}>
                         {r.transfer_confirmed_at
                           ? <>Load moved to the new vehicle {formatDateTime(r.transfer_confirmed_at)}
-                              {r.transfer_photo_url && <> · <a className="underline" href={r.transfer_photo_url} target="_blank" rel="noreferrer">photo</a></>}</>
+                              {r.transfer_photo_url && <> · <FileViewButton className="underline" url={r.transfer_photo_url} name="Load transfer photo">photo</FileViewButton></>}</>
                           : 'Waiting for the new driver to confirm the load was moved to the new vehicle.'}
                       </span>
                     )}

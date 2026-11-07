@@ -86,6 +86,19 @@ export function isAccountInactive(err: unknown): boolean {
     && (err as AxiosError<{ code?: string }>).response?.data?.code === 'ACCOUNT_INACTIVE'
 }
 
+/** The session ended because the client's contract ended 8+ days ago (2026-11-07). */
+export function isContractEnded(err: unknown): boolean {
+  return isSessionDead(err)
+    && (err as AxiosError<{ code?: string }>).response?.data?.code === 'CONTRACT_ENDED'
+}
+
+/** The signed-out notice to show for a refused refresh, if any. */
+export function signedOutReasonOf(err: unknown): 'inactive' | 'contract_ended' | undefined {
+  if (isAccountInactive(err)) return 'inactive'
+  if (isContractEnded(err))   return 'contract_ended'
+  return undefined
+}
+
 const REFRESHED_AT_KEY = 'auth-refreshed-at'
 let refreshInFlight: Promise<void> | null = null
 
@@ -171,7 +184,7 @@ proxyApi.interceptors.response.use(
         // just this request; the user stays signed in.
         if (!isSessionDead(refreshError)) return Promise.reject(error)
         broadcastLogout()
-        goHomeSignedOut(isAccountInactive(refreshError) ? 'inactive' : undefined)
+        goHomeSignedOut(signedOutReasonOf(refreshError))
         return Promise.reject(refreshError)
       }
       return proxyApi(originalRequest!)
@@ -355,6 +368,39 @@ export async function logout(): Promise<void> {
 
 export async function logoutAll(): Promise<void> {
   await nextApi.post('/api/auth/logout-all')
+}
+
+/** The signed-in account as the Profile page shows it (2026-11-07). */
+export interface Profile {
+  user_id:       string
+  email:         string
+  phone:         string | null
+  role:          string
+  status:        string
+  first_name:    string | null
+  middle_name:   string | null
+  last_name:     string | null
+  suffix:        string | null
+  created_at:    string
+  last_login_at: string | null
+  /** Clients only. */
+  company_name?: string | null
+  contract?:     ProfileContract
+}
+
+/** A client's contract on the Profile page (days counted in Philippine time). */
+export interface ProfileContract {
+  state:        'ok' | 'grace' | 'ended'
+  valid_until:  string | null
+  access_until: string | null
+  today:        string
+  /** Days from today to valid_until; negative once it has passed. */
+  days_left:    number | null
+}
+
+export async function getProfile(): Promise<Profile> {
+  const { data } = await proxyApi.get('/auth/profile')
+  return data.data as Profile
 }
 
 function getDeviceInfo(): string {

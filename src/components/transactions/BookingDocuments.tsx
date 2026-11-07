@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { Camera, Download, ExternalLink, FileText, Loader2 } from 'lucide-react'
+import { Camera, Download, Eye, FileText, Loader2 } from 'lucide-react'
 
 import {
   bookingService,
@@ -16,6 +16,7 @@ import { DocumentThumb, DocumentTypeBadge } from '@/components/documents/Documen
 import { SectionHeader } from './TransactionDetail'
 import { formatDateTime } from './transaction-format'
 import { BG_PANEL, BG_CARD, BORDER, BORDER_C, CYAN, MUTED, ERROR } from './transaction-theme'
+import { FileViewButton } from '@/components/ui/FileViewer'
 
 /**
  * Every file on one booking that its client may see, for the client's own
@@ -35,9 +36,9 @@ function FileRow({ doc }: { doc: ClientBookingDocument }) {
   return (
     <div className="flex items-center gap-3 rounded-lg px-3 py-2 border"
       style={{ background: BG_CARD, borderColor: BORDER_C }}>
-      <a href={doc.file_url} target="_blank" rel="noopener noreferrer" className="shrink-0 hover:opacity-80">
+      <FileViewButton url={doc.file_url} name={doc.file_name} className="shrink-0 hover:opacity-80">
         <DocumentThumb doc={doc} size={48} />
-      </a>
+      </FileViewButton>
       <div className="flex flex-col gap-1 flex-1 min-w-0">
         <div className="flex items-center gap-2 min-w-0">
           <DocumentTypeBadge type={doc.doc_type} />
@@ -48,17 +49,17 @@ function FileRow({ doc }: { doc: ClientBookingDocument }) {
         <span className="text-xs text-white/80 truncate">{doc.detail ?? doc.file_name}</span>
       </div>
       <div className="flex items-center gap-1 shrink-0">
-        <a href={doc.file_url} target="_blank" rel="noopener noreferrer"
-          className="p-2 rounded-lg hover:bg-white/5" style={{ color: MUTED }}
-          title="Open in a new tab" aria-label={`Open ${doc.file_name} in a new tab`}>
-          <ExternalLink size={14} />
-        </a>
-        <a href={doc.file_url} target="_blank" rel="noopener noreferrer"
-          onClick={(e) => { e.preventDefault(); void downloadFile(doc.file_url, doc.file_name) }}
+        <FileViewButton url={doc.file_url} name={doc.file_name}
+          className="p-2 rounded-lg hover:bg-white/5"
+          title="View" ariaLabel={`View ${doc.file_name}`}>
+          <Eye size={14} style={{ color: MUTED }} />
+        </FileViewButton>
+        <button type="button"
+          onClick={() => { void downloadFile(doc.file_url, doc.file_name) }}
           className="p-2 rounded-lg hover:bg-white/5" style={{ color: CYAN }}
           title="Download" aria-label={`Download ${doc.file_name}`}>
           <Download size={14} />
-        </a>
+        </button>
       </div>
     </div>
   )
