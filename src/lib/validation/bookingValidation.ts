@@ -177,9 +177,10 @@ export function validateGroup(group: ItemGroup, mode: CargoMode): GroupErrors {
       hasNet &&
       !errors.grossWeightPerPallet &&
       !errors.netWeightPerPallet   &&
-      net > gross
+      net >= gross
     ) {
-      errors.netWeightPerPallet = 'Net weight cannot exceed gross weight'
+      // Gross = goods + packaging + the pallet itself, so net is always less.
+      errors.netWeightPerPallet = 'Net weight must be less than gross weight'
     }
   }
 

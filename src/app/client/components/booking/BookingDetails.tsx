@@ -21,7 +21,7 @@ import {
   makeDefaultGroup,
   removeExistingDocument,
 } from '@/lib/store/slice/booking.slice'
-import type { CargoMode, ItemGroup } from '@/lib/store/slice/booking.slice'
+import type { CargoMode, ItemGroup, WeightUnit } from '@/lib/store/slice/booking.slice'
 import { documentName, draftFingerprint } from '@/lib/booking-resubmit'
 
 // Stable empty list, so the selector below does not hand back a new array
@@ -2058,10 +2058,10 @@ function DimensionUnitSelect() {
   )
 }
 
-function WeightUnitSelect({ value, onChange }: { value: 'kg' | 'lbs'; onChange: (u: 'kg' | 'lbs') => void }) {
+function WeightUnitSelect({ value, onChange }: { value: WeightUnit; onChange: (u: WeightUnit) => void }) {
   return (
     <Select value={value} IconComponent={SelectChevron}
-      onChange={(e: SelectChangeEvent) => onChange(e.target.value as 'kg' | 'lbs')}
+      onChange={(e: SelectChangeEvent) => onChange(e.target.value as WeightUnit)}
       sx={{ ...selectSx(INPUT_BG_CARD, BORDER_CARD), width: 72, flexShrink: 0 }} MenuProps={MENU_PROPS}>
       <MenuItem value="kg">KG</MenuItem>
       <MenuItem value="lbs">LBS</MenuItem>

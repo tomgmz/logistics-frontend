@@ -3,6 +3,8 @@ import { draftFingerprint, type ResubmitDraft } from '@/lib/booking-resubmit'
 
 export type CargoMode   = 'loose' | 'palletized'
 export type ServiceType = 'fmcg' | null
+/** Weight units the client can type in; everything is converted to kg before sending. */
+export type WeightUnit  = 'kg' | 'lbs'
 
 export interface ItemGroup {
   id: string
@@ -11,7 +13,7 @@ export interface ItemGroup {
   looseWidth: string
   looseHeight: string
   weight: string
-  weightUnit: 'kg' | 'lbs'
+  weightUnit: WeightUnit
   perItem: 'Per Item' | 'Total'
   nonTiltable: boolean
   nonStackable: boolean
@@ -20,7 +22,7 @@ export interface ItemGroup {
   palletLength: string
   palletWidth: string
   palletHeight: string
-  palletWeightUnit: 'kg' | 'lbs'
+  palletWeightUnit: WeightUnit
   grossWeightPerPallet: string
   netWeightPerPallet: string
   stackable: boolean
