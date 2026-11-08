@@ -9,7 +9,7 @@ import { Download, FileQuestion, ImageOff, Loader2, X } from 'lucide-react'
 
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 import { downloadFile } from '@/app/types/documents.types'
-import { useStoredFile } from '@/lib/files/fileAccess'
+import { isSealedFileLink, useStoredFile } from '@/lib/files/fileAccess'
 
 /*
  * Every file in the web app (photos, PDFs, videos, documents) opens HERE,
@@ -59,18 +59,46 @@ const blockMenu = (e: SyntheticEvent) => e.preventDefault()
 /** Classes that stop iOS long-press "Open in New Tab" / "Save Image" and text selection. */
 const NO_CALLOUT = 'select-none [-webkit-touch-callout:none] [-webkit-user-drag:none]'
 
+/** Starts loading a picture this far before it scrolls into view. */
+const PRELOAD_MARGIN = '300px'
+
+/**
+ * True once `el` is on screen or within PRELOAD_MARGIN of it (and stays true).
+ * Browsers without IntersectionObserver report true straight away.
+ */
+function useNearViewport(el: Element | null): boolean {
+  const [near, setNear] = useState(() => typeof window !== 'undefined' && typeof IntersectionObserver === 'undefined')
+  useEffect(() => {
+    if (near || !el || typeof IntersectionObserver === 'undefined') return
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) { setNear(true); io.disconnect() }
+    }, { rootMargin: PRELOAD_MARGIN })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [el, near])
+  return near
+}
+
 /**
  * An <img> for a stored file: loaded through a single-use pass (a sealed link
  * can't be put in src directly), and it can't be right-clicked, long-pressed
  * or dragged out to a new tab. Any other src (blob:, data:, a static icon)
  * is shown as it is. Use it for every picture of a stored file.
+ *
+ * A stored file loads only when it comes within 300 px of the screen (as a
+ * browser's own lazy loading would), so a long list doesn't fetch every
+ * picture on open (2026-11-08).
  */
-export function ProtectedImg({ className = '', alt = '', src, ...rest }: ImgHTMLAttributes<HTMLImageElement>) {
-  const file = useStoredFile(typeof src === 'string' ? src : null)
+export function ProtectedImg({ className = '', alt = '', src, style, ...rest }: ImgHTMLAttributes<HTMLImageElement>) {
+  const link = typeof src === 'string' ? src : null
+  const [box, setBox] = useState<HTMLSpanElement | null>(null)
+  const near = useNearViewport(isSealedFileLink(link) ? box : null)
+  // A local preview or static icon shows at once; a stored file waits until it's near the screen.
+  const file = useStoredFile(isSealedFileLink(link) && !near ? null : link)
   if (!file.src) {
-    // Loading, or the file could not be read: a quiet placeholder the same size.
+    // Not near the screen yet, loading, or unreadable: a quiet placeholder the same size.
     return (
-      <span aria-label={alt || undefined} role={alt ? 'img' : undefined}
+      <span ref={setBox} aria-label={alt || undefined} role={alt ? 'img' : undefined} style={style}
         className={`${className} inline-flex items-center justify-center bg-white/[0.04] text-white/25`}>
         {file.failed && <ImageOff size={16} />}
       </span>
@@ -80,6 +108,7 @@ export function ProtectedImg({ className = '', alt = '', src, ...rest }: ImgHTML
     // eslint-disable-next-line @next/next/no-img-element -- page-local blob: URL of a stored file
     <img
       {...rest}
+      style={style}
       src={file.src}
       alt={alt}
       draggable={false}
