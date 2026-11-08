@@ -15,12 +15,27 @@
 export const STAFF_DOCUMENT_TYPES = [
   'contract',
   'proof_of_delivery',
+  'vehicle_registration',
+  'vehicle_insurance',
   'other',
 ] as const
 export type StaffDocumentType = (typeof STAFF_DOCUMENT_TYPES)[number]
 
 /** What can be picked when uploading to a booking. */
 export const BOOKING_DOCUMENT_TYPES = ['proof_of_delivery', 'other'] as const satisfies readonly StaffDocumentType[]
+
+/** What can be picked when uploading to a vehicle (its Fleet folder). */
+export const VEHICLE_DOCUMENT_TYPES = ['vehicle_registration', 'vehicle_insurance', 'other'] as const satisfies readonly StaffDocumentType[]
+
+/** Where an upload is filed. */
+export type UploadTarget = 'booking' | 'client' | 'vehicle'
+
+export interface VehicleOption {
+  truck_id:     string
+  plate_number: string | null
+  /** Model and type. */
+  description:  string | null
+}
 
 /** The longest type an uploader may type in for Other (the backend's OTHER_LABEL_MAX). */
 export const OTHER_LABEL_MAX = 60
@@ -46,6 +61,8 @@ export const DOCUMENT_TYPE_LABELS: Record<LibraryDocumentType, string> = {
   proof_of_delivery:    'Proof of Delivery',
   other:                'Other',
   contract:             'Contract',
+  vehicle_registration: 'Vehicle Registration',
+  vehicle_insurance:    'Insurance',
 }
 
 /** A row's type as shown: Other reads "Other: <what was typed>". */

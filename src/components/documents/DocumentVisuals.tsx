@@ -59,6 +59,8 @@ const TYPE_TONE: Record<LibraryDocumentType, string> = {
   proof_of_delivery:    '#4df9ed',
   other:                '#4df9ed',
   contract:             '#ff7a30',
+  vehicle_registration: '#8a38f5',
+  vehicle_insurance:    '#8a38f5',
 }
 
 /** `label` overrides the type's name, e.g. "Other: Invoice" (documentTypeLabel). */

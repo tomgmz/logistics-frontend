@@ -316,7 +316,8 @@ function VehicleDetailsModal({
 // it owes before it can go out (the 'upkeep' key is the old name, kept for
 // links). Models is not a tab; the header's Manage Models button opens it in a
 // pop-up ('models' survives only so old ?tab=models links still open it).
-type VehicleTab = 'vehicles' | 'models' | 'upkeep'
+// 'archived': the archived vehicles, the only place they are listed (2026-11-08).
+type VehicleTab = 'vehicles' | 'models' | 'upkeep' | 'archived'
 
 /** The header's Manage Models picture, as a Button icon. */
 function ManageModelsIcon({ className }: { className?: string }) {
@@ -327,7 +328,7 @@ function ManageModelsIcon({ className }: { className?: string }) {
 /** ?tab= value -> tab. 'maintenance' is the old name, kept so earlier links still land. */
 function tabFromParam(v: string | null): VehicleTab | null {
   if (v === 'maintenance') return 'upkeep'
-  return v === 'vehicles' || v === 'models' || v === 'upkeep' ? v : null
+  return v === 'vehicles' || v === 'models' || v === 'upkeep' || v === 'archived' ? v : null
 }
 
 // Reads ?tab= (the fleet manager's report notification opens Maintenance) once.
@@ -349,6 +350,7 @@ export default function VehicleManagementView() {
   // 10 rows on phones, 20 from tablet up (lib/hooks/useTablePageSize).
   const PAGE_SIZE = useTablePageSize()
   const [tab, setTab] = useState<VehicleTab>('vehicles')
+  const archivedTab = tab === 'archived'
   // The maintenance queue lives here, not in the tab: the tab badge and the
   // Vehicles rows' maintenance tags read the same list.
   const [upkeep,        setUpkeep]        = useState<MaintenanceTruck[]>([])
@@ -435,7 +437,9 @@ export default function VehicleManagementView() {
       const res = await adminFetchTrucksPaginated({
         page:     page + 1,
         limit:    PAGE_SIZE,
-        status:   statusFilter,
+        // The Archived tab is the only list that asks for archived vehicles;
+        // with any other status (or 'all') the server leaves them out.
+        status:   archivedTab ? 'archived' : statusFilter,
         search:   debouncedSearch,
       })
       setTrucks(res.rows)
@@ -448,7 +452,7 @@ export default function VehicleManagementView() {
     } finally {
       if (!quiet) setListLoading(false)
     }
-  }, [page, statusFilter, debouncedSearch, PAGE_SIZE])
+  }, [page, statusFilter, debouncedSearch, PAGE_SIZE, archivedTab])
 
   useEffect(() => { void loadModels() }, [loadModels])
 
@@ -852,7 +856,7 @@ export default function VehicleManagementView() {
         title:        'Archive vehicle?',
         description:  `${archiveTarget.plate_number} will be removed from the fleet list and can no longer be assigned to bookings.`
           + (archiveTarget.assigned_driver_id ? ' Its regular driver will be unpaired.' : '')
-          + ' Its booking and inspection history is kept, and it stays under the Archived filter.',
+          + ' Its booking and inspection history is kept, and it stays on the Archived tab.',
         confirmLabel: actionBusy ? 'Archiving…' : 'Archive',
         onConfirm:    () => { void executeArchive() },
       }
@@ -870,9 +874,19 @@ export default function VehicleManagementView() {
       items={[
         { id: 'vehicles' as const, label: 'Vehicles' },
         { id: 'upkeep' as const,   label: blockingCount > 0 ? `Maintenance (${blockingCount})` : 'Maintenance' },
+        { id: 'archived' as const, label: 'Archived' },
       ]}
-      selectedKey={tab === 'upkeep' ? 'upkeep' : 'vehicles'}
-      onSelectionChange={(key) => { setFocusId(null); switchTab(key) }}
+      selectedKey={tab === 'upkeep' || tab === 'archived' ? tab : 'vehicles'}
+      onSelectionChange={(key) => {
+        setFocusId(null)
+        // Vehicles and Archived share the table: each starts on page 1, unfiltered.
+        // The other list's rows are cleared so they never flash under this tab.
+        if (key !== tab) {
+          setPage(0); setStatusFilter('all'); setSearch('')
+          if ((key === 'archived') !== archivedTab) { setTrucks([]); setListLoading(true) }
+        }
+        switchTab(key)
+      }}
     />
   )
   const trailing = (
@@ -951,16 +965,17 @@ export default function VehicleManagementView() {
         />
       )}
 
-      {tab === 'vehicles' && (
+      {(tab === 'vehicles' || tab === 'archived') && (
         <TableCard.Root className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0">
           <FilterBar
             layout="split"
             // Names exactly what the server searches (truck.model.ts).
-            search={{ value: search, onChange: (v) => { setSearch(v); setPage(0) }, placeholder: 'Search plate, model or status' }}
+            search={{ value: search, onChange: (v) => { setSearch(v); setPage(0) }, placeholder: tab === 'archived' ? 'Search plate or model' : 'Search plate, model or status' }}
             leading={switcher}
-            fields={[{
+            // Archived is not a status here: it is its own tab.
+            fields={tab === 'archived' ? [] : [{
               key: 'status', label: 'Status', single: true,
-              options: STATUSES.map((s) => ({ value: s, label: fmtLabel(s) })),
+              options: STATUSES.filter((s) => s !== 'archived').map((s) => ({ value: s, label: fmtLabel(s) })),
             }]}
             values={statusFilter === 'all' ? [] : [{ field: 'status', op: 'is' as const, value: statusFilter }]}
             onChange={(v) => { setStatusFilter(v.find((r) => r.field === 'status')?.value ?? 'all'); setPage(0) }}
@@ -988,14 +1003,16 @@ export default function VehicleManagementView() {
               {/* "Add your first vehicle" only when the fleet really is empty —
                   not when a search or status filter just hides everything. */}
               <p className="text-sm text-white/45">
-                {debouncedSearch || statusFilter !== 'all' ? 'No vehicles match your filters.' : 'No vehicles yet.'}
+                {debouncedSearch || statusFilter !== 'all'
+                  ? 'No vehicles match your filters.'
+                  : tab === 'archived' ? 'No archived vehicles.' : 'No vehicles yet.'}
               </p>
               <ClearFiltersLink
                 show={!!debouncedSearch || statusFilter !== 'all'}
                 onClear={() => { setSearch(''); setStatusFilter('all'); setPage(0) }}
                 className="mt-0"
               />
-              {canCreate && !debouncedSearch && statusFilter === 'all' && (
+              {canCreate && tab !== 'archived' && !debouncedSearch && statusFilter === 'all' && (
                 <button type="button" onClick={openCreate} className="text-[var(--color-cyan)] text-sm font-bold">
                   Add your first vehicle
                 </button>

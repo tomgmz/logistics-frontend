@@ -113,7 +113,8 @@ export async function adminFetchTruckModels(): Promise<TruckModel[]> {
 
 /** One page of the Models table, searched on the server; `meta.unfiltered` is the count before searching. */
 export async function adminFetchTruckModelsPage(
-  params: PageRequest & { search?: string },
+  // archived 'only': the archived models (Manage Models' Archived tab).
+  params: PageRequest & { search?: string; archived?: 'only' },
 ): Promise<PagedResponse<TruckModel, { unfiltered: number }>> {
   const { data } = await authApi.get<PagedResponse<TruckModel, { unfiltered: number }>>(`${ADMIN}/truck-models`, { params })
   return { data: data.data, meta: data.meta }

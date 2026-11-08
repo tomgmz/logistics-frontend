@@ -25,6 +25,7 @@ import { ModelThumb, fmtDimensions, kgToTons } from './vehicle-ui'
 
 import FilterBar from '@/components/ui/FilterBar'
 import { TableCard } from '@/components/ui/untitled/table-card'
+import { TabsMinimal } from '@/components/ui/untitled/tabs'
 import { Button } from '@/components/ui/untitled/button'
 import { Plus as PlusIcon } from '@untitledui/icons'
 import Pagination from '@/components/ui/Pagination'
@@ -100,14 +101,28 @@ type FieldErrors = Partial<Record<keyof ModelFormState | 'image', string>>
 export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props) {
   const [search,      setSearch]      = useState('')
   const debouncedSearch = useDebouncedValue(search.trim())
+  // Models / Archived: archived models are listed on their own tab only (2026-11-08).
+  const [view,        setView]        = useState<'models' | 'archived'>('models')
+  const archivedView = view === 'archived'
 
   // Server-side pages, searched on the server (10 rows on phones, 20 from tablet up).
   const table = useServerTable(
-    (q) => adminFetchTruckModelsPage({ ...q, ...(debouncedSearch && { search: debouncedSearch }) }),
-    debouncedSearch,
+    async (q) => {
+      const res = await adminFetchTruckModelsPage({
+        ...q,
+        ...(debouncedSearch && { search: debouncedSearch }),
+        ...(archivedView && { archived: 'only' as const }),
+      })
+      return { ...res, meta: { ...res.meta, view } }
+    },
+    `${view}|${debouncedSearch}`,
     { errorMessage: 'Request failed. Please try again.' },
   )
-  const { rows: models, loading: listLoading, error: listError, page, setPage, pageSize: PAGE_SIZE, total, totalPages } = table
+  const { loading, error: listError, page, setPage, pageSize: PAGE_SIZE, total, totalPages } = table
+  // Rows from the other tab (a reply still on its way) never show under this one.
+  const viewReady   = table.meta?.view === view
+  const listLoading = loading || !viewReady
+  const models      = viewReady ? table.rows : []
   const modelCount = table.meta?.unfiltered ?? 0
 
   const [formMode,     setFormMode]    = useState<FormMode>(null)
@@ -276,6 +291,8 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
     const actions: RowAction[] = [
       { label: 'View Details', icon: <Eye size={13} />, onSelect: () => setViewModel(m) },
     ]
+    // An archived model is read-only (there is no restore).
+    if (m.archived_at) return actions
     if (canEdit) {
       actions.push({
         label: 'Update Details', icon: <Pencil size={13} />, onSelect: () => openEdit(m),
@@ -389,7 +406,18 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
             layout="split"
             // Names exactly what the server searches (truck-model.controller.ts).
             search={{ value: search, onChange: setSearch, placeholder: 'Search model, type or use' }}
-            trailing={canCreate && (
+            leading={
+              <TabsMinimal
+                label="Model lists"
+                items={[
+                  { id: 'models' as const,   label: 'Models' },
+                  { id: 'archived' as const, label: 'Archived' },
+                ]}
+                selectedKey={view}
+                onSelectionChange={(k) => { setView(k); setSearch('') }}
+              />
+            }
+            trailing={canCreate && !archivedView && (
               <Button size="toolbar" color="accent" iconLeading={PlusIcon} onClick={openCreate}>
                 Add Model
               </Button>
@@ -415,10 +443,12 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
             <div className="flex-1 flex flex-col items-center justify-center gap-4 py-12 text-center px-4">
               <TruckIcon size={40} className="text-white/20" />
               <p className="text-sm text-white/45">
-                {modelCount === 0 ? 'No truck models yet.' : 'No models match your search.'}
+                {modelCount === 0
+                  ? (archivedView ? 'No archived models.' : 'No truck models yet.')
+                  : 'No models match your search.'}
               </p>
               <ClearFiltersLink show={modelCount > 0} onClear={() => setSearch('')} className="mt-0" />
-              {modelCount === 0 && canCreate && (
+              {modelCount === 0 && canCreate && !archivedView && (
                 <button type="button" onClick={openCreate} className="text-[var(--color-cyan)] text-sm font-bold">
                   Add the first model
                 </button>
@@ -437,6 +467,7 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
                     <th>max weight</th>
                     <th className="hidden md:table-cell">max volume</th>
                     <th className="hidden lg:table-cell">stackable</th>
+                    {archivedView && <th className="whitespace-nowrap">archived on</th>}
                     <th className="text-right">actions</th>
                   </tr>
                 </thead>
@@ -460,6 +491,13 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
                           ? <span className="text-[#3af626]">Yes</span>
                           : <span className="text-[#818181]">No</span>}
                       </td>
+                      {archivedView && (
+                        <td className="whitespace-nowrap">
+                          {m.archived_at
+                            ? new Date(m.archived_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
+                            : '—'}
+                        </td>
+                      )}
                       <td>
                         <div className="flex items-center justify-end gap-1.5">
                           <RecordLockBadge holder={modelLocks.get(m.model_id)} />
@@ -813,6 +851,7 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
                     ['Suitable for',    viewModel.suitable_for || '—'],
                     ['Stackable',       viewModel.stackable_friendly ? 'Yes' : 'No'],
                     ['Added',           viewModel.created_at ? new Date(viewModel.created_at).toLocaleString() : '—'],
+                    ...(viewModel.archived_at ? [['Archived', new Date(viewModel.archived_at).toLocaleString()] as const] : []),
                   ] as const).map(([label, value]) => (
                     <div key={label} className="flex items-start justify-between gap-4 py-2 border-b border-white/[0.05] last:border-0">
                       <span className="text-[11px] font-bold uppercase tracking-wide text-white/40 shrink-0">{label}</span>
@@ -830,7 +869,7 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
                 >
                   Close
                 </button>
-                {canEdit && (
+                {canEdit && !viewModel.archived_at && (
                 <button
                   type="button"
                   disabled={modelLocks.has(viewModel.model_id)}

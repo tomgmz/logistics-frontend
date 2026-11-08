@@ -13,6 +13,7 @@ import {
   type DocumentPage,
   type LibraryDocument,
   type StaffDocumentType,
+  type VehicleOption,
   documentTypeLabel,
   downloadFile,
   saveBlob,
@@ -95,16 +96,23 @@ export async function searchClientsForUpload(search: string): Promise<ClientOpti
   return data?.data ?? []
 }
 
-/** Types typed in for Other before, most used first. */
-export async function fetchOtherLabels(): Promise<string[]> {
-  const { data } = await proxyApi.get<{ data: string[] }>(`${B}/other-labels`)
+/** The vehicle picker for uploading a vehicle's paperwork. */
+export async function searchVehiclesForUpload(search: string): Promise<VehicleOption[]> {
+  const { data } = await proxyApi.get<{ data: VehicleOption[] }>(`${B}/vehicles`, { params: { search } })
   return data?.data ?? []
 }
 
-/** A booking upload (Proof of Delivery, Other + its type) or a client's contract. */
+/** Types typed in for Other before (on bookings, or on vehicles), most used first. */
+export async function fetchOtherLabels(target: 'booking' | 'vehicle' = 'booking'): Promise<string[]> {
+  const { data } = await proxyApi.get<{ data: string[] }>(`${B}/other-labels`, { params: target === 'vehicle' ? { for: 'vehicle' } : {} })
+  return data?.data ?? []
+}
+
+/** A booking upload (Proof of Delivery, Other + its type), a client's contract, or a vehicle's paperwork. */
 export async function uploadDocuments(input: {
   bookingId?:   string | null
   clientId?:    string | null
+  truckId?:     string | null
   documentType: StaffDocumentType
   otherLabel?:  string | null
   notes:        string
@@ -114,6 +122,7 @@ export async function uploadDocuments(input: {
   const form = new FormData()
   if (input.bookingId) form.append('booking_id', input.bookingId)
   if (input.clientId)  form.append('client_id', input.clientId)
+  if (input.truckId)   form.append('truck_id', input.truckId)
   form.append('document_type', input.documentType)
   if (input.documentType === 'other' && input.otherLabel?.trim()) form.append('other_label', input.otherLabel.trim())
   if (input.notes.trim()) form.append('notes', input.notes.trim())

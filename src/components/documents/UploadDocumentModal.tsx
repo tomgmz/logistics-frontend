@@ -4,15 +4,18 @@ import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, UploadCloud, Search, FileText, Trash2, Check } from 'lucide-react'
 
-import { fetchOtherLabels, searchBookingsForUpload, searchClientsForUpload, uploadDocuments } from '@/lib/services/admin/documents.service'
+import { fetchOtherLabels, searchBookingsForUpload, searchClientsForUpload, searchVehiclesForUpload, uploadDocuments } from '@/lib/services/admin/documents.service'
 import {
+  BOOKING_DOCUMENT_TYPES,
   DOCUMENT_TYPE_LABELS,
   OTHER_LABEL_MAX,
-  STAFF_DOCUMENT_TYPES,
+  VEHICLE_DOCUMENT_TYPES,
   fileSizeLabel,
   type BookingOption,
   type ClientOption,
   type StaffDocumentType,
+  type UploadTarget,
+  type VehicleOption,
 } from '@/app/types/documents.types'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
@@ -27,16 +30,32 @@ function titleCase(s: string): string {
   return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
+const TYPES_FOR: Record<UploadTarget, readonly StaffDocumentType[]> = {
+  booking: BOOKING_DOCUMENT_TYPES,
+  client:  ['contract'],
+  vehicle: VEHICLE_DOCUMENT_TYPES,
+}
+
+const TARGET_LABELS: Record<UploadTarget, string> = {
+  booking: 'Booking',
+  client:  'Client',
+  vehicle: 'Vehicle',
+}
+
 /**
- * Staff upload. The type decides where it goes: Proof of Delivery and Other
- * onto a booking (Other with a typed-in type, suggested from earlier ones),
- * a Contract onto a client, in that client's Contract folder.
+ * Staff upload, filed on a booking (Proof of Delivery, Other), a client (a
+ * Contract, in that client's Contract folder) or a vehicle (Vehicle
+ * Registration, Insurance, Other, in the vehicle's Fleet folder). Other takes
+ * a typed-in type, suggested from earlier ones on the same kind of target.
+ * `vehicleOnly` (the Fleet Manager) offers vehicles only.
  */
 export default function UploadDocumentModal({
   open,
   initialBooking,
   initialClient,
+  initialTruck,
   initialType = 'proof_of_delivery',
+  vehicleOnly = false,
   onClose,
   onUploaded,
 }: {
@@ -45,10 +64,17 @@ export default function UploadDocumentModal({
   initialBooking?: BookingOption | null
   /** Pre-selects the client inside a client's folder (for a contract). */
   initialClient?:  ClientOption | null
+  /** Pre-selects the vehicle inside a vehicle's folder. */
+  initialTruck?:   VehicleOption | null
   initialType?:    StaffDocumentType
+  vehicleOnly?:    boolean
   onClose:         () => void
   onUploaded:      () => void
 }) {
+  const [target,   setTarget]   = useState<UploadTarget>('booking')
+  const [truck,         setTruck]         = useState<VehicleOption | null>(null)
+  const [truckQuery,    setTruckQuery]    = useState('')
+  const [truckOptions,  setTruckOptions]  = useState<VehicleOption[]>([])
   const [booking,  setBooking]  = useState<BookingOption | null>(null)
   const [query,    setQuery]    = useState('')
   const [options,  setOptions]  = useState<BookingOption[]>([])
@@ -68,21 +94,47 @@ export default function UploadDocumentModal({
   // Fresh form every time it opens.
   useEffect(() => {
     if (!open) return
+    const t: UploadTarget = vehicleOnly || initialTruck || initialType === 'vehicle_registration' || initialType === 'vehicle_insurance' ? 'vehicle'
+      : initialType === 'contract' ? 'client'
+      : 'booking'
+    setTarget(t)
     setBooking(initialBooking ?? null)
     setQuery('')
     setClient(initialClient ?? null)
     setClientQuery('')
+    setTruck(initialTruck ?? null)
+    setTruckQuery('')
     setOtherLabel('')
-    setDocType(initialType)
+    setDocType(TYPES_FOR[t].includes(initialType) ? initialType : TYPES_FOR[t][0])
     setNotes('')
     setFiles([])
-  }, [open, initialBooking, initialClient, initialType])
+  }, [open, initialBooking, initialClient, initialTruck, initialType, vehicleOnly])
 
-  const isContract = docType === 'contract'
+  function changeTarget(t: UploadTarget) {
+    setTarget(t)
+    setDocType((d) => (TYPES_FOR[t].includes(d) ? d : TYPES_FOR[t][0]))
+  }
+
+  const isContract = target === 'client'
+  const isVehicle  = target === 'vehicle'
+
+  // Debounced vehicle search; an empty query lists vehicles by plate.
+  useEffect(() => {
+    if (!open || !isVehicle || truck) return
+    let cancelled = false
+    setSearching(true)
+    const t = window.setTimeout(() => {
+      searchVehiclesForUpload(truckQuery)
+        .then((rows) => { if (!cancelled) setTruckOptions(rows) })
+        .catch(() => { if (!cancelled) setTruckOptions([]) })
+        .finally(() => { if (!cancelled) setSearching(false) })
+    }, 250)
+    return () => { cancelled = true; window.clearTimeout(t) }
+  }, [open, isVehicle, truck, truckQuery])
 
   // Debounced booking search; an empty query lists the most recent bookings.
   useEffect(() => {
-    if (!open || isContract || booking) return
+    if (!open || target !== 'booking' || booking) return
     let cancelled = false
     setSearching(true)
     const t = window.setTimeout(() => {
@@ -92,7 +144,7 @@ export default function UploadDocumentModal({
         .finally(() => { if (!cancelled) setSearching(false) })
     }, 250)
     return () => { cancelled = true; window.clearTimeout(t) }
-  }, [open, isContract, booking, query])
+  }, [open, target, booking, query])
 
   // Debounced client search, for a contract.
   useEffect(() => {
@@ -108,13 +160,14 @@ export default function UploadDocumentModal({
     return () => { cancelled = true; window.clearTimeout(t) }
   }, [open, isContract, client, clientQuery])
 
-  // Types typed for Other before, read once when Other is chosen.
+  // Types typed for Other before on the same kind of target, read when Other is chosen.
   useEffect(() => {
     if (!open || docType !== 'other') return
     let cancelled = false
-    fetchOtherLabels().then((l) => { if (!cancelled) setLabelHints(l) }).catch(() => {})
+    setLabelHints([])
+    fetchOtherLabels(isVehicle ? 'vehicle' : 'booking').then((l) => { if (!cancelled) setLabelHints(l) }).catch(() => {})
     return () => { cancelled = true }
-  }, [open, docType])
+  }, [open, docType, isVehicle])
   const typed = otherLabel.trim().toLowerCase()
   const hints = labelHints
     .filter((l) => l.toLowerCase() !== typed && (!typed || l.toLowerCase().includes(typed)))
@@ -149,8 +202,9 @@ export default function UploadDocumentModal({
     setBusy(true)
     try {
       const { document_ids } = await uploadDocuments({
-        bookingId:    isContract ? null : booking?.booking_id,
+        bookingId:    target === 'booking' ? booking?.booking_id : null,
         clientId:     isContract ? client?.client_id : null,
+        truckId:      isVehicle ? truck?.truck_id : null,
         documentType: docType,
         otherLabel:   docType === 'other' ? otherLabel : null,
         notes,
@@ -160,8 +214,10 @@ export default function UploadDocumentModal({
       appToast.success(
         isContract
           ? `${n} added to the contracts of ${client?.company_name ?? 'the client'}. Awaiting review.`
+          : isVehicle
+          ? `${n} added to ${truck?.plate_number ?? 'the vehicle'}. Awaiting review.`
           : `${n} attached to ${booking?.reference_number ?? 'the booking'}. Awaiting review.`,
-        { action: 'document-upload', entityId: isContract ? client?.client_id : booking?.booking_id },
+        { action: 'document-upload', entityId: isContract ? client?.client_id : isVehicle ? truck?.truck_id : booking?.booking_id },
       )
       onUploaded()
       onClose()
@@ -172,7 +228,7 @@ export default function UploadDocumentModal({
     }
   }
 
-  const canSubmit = (isContract ? !!client : !!booking)
+  const canSubmit = (isContract ? !!client : isVehicle ? !!truck : !!booking)
     && (docType !== 'other' || !!otherLabel.trim())
     && files.length > 0 && !busy
 
@@ -201,7 +257,7 @@ export default function UploadDocumentModal({
               <div>
                 <h2 className="text-base font-bold text-white">Upload Document</h2>
                 <p className="text-[11px] text-white/40 mt-0.5">
-                  {isContract ? 'Add a contract to a client.' : 'Attach paperwork to a booking.'} It will wait for another reviewer to approve it.
+                  {isContract ? 'Add a contract to a client.' : isVehicle ? 'Add paperwork to a vehicle.' : 'Attach paperwork to a booking.'} It will wait for another reviewer to approve it.
                 </p>
               </div>
               <button type="button" disabled={busy} onClick={onClose} className="p-2 rounded-lg hover:bg-white/5 text-white/50" aria-label="Close">
@@ -210,6 +266,28 @@ export default function UploadDocumentModal({
             </div>
 
             <div className="p-5 space-y-5 overflow-y-auto min-h-0">
+              {/* Where it is filed (the Fleet Manager files on vehicles only) */}
+              {!vehicleOnly && (
+                <div>
+                  <span className="block text-[11px] font-bold uppercase tracking-wide text-white/45 mb-1.5">File On</span>
+                  <div className="grid grid-cols-3 gap-1 rounded-xl border border-white/10 bg-[#111] p-1" role="radiogroup" aria-label="File on">
+                    {(['booking', 'client', 'vehicle'] as const).map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        role="radio"
+                        aria-checked={target === t}
+                        disabled={busy}
+                        onClick={() => changeTarget(t)}
+                        className={`rounded-lg px-2 py-2 text-sm font-semibold transition-colors ${target === t ? 'bg-[var(--color-cyan)] text-black' : 'text-white/70 [@media(hover:hover)]:hover:bg-white/5'}`}
+                      >
+                        {TARGET_LABELS[t]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Type */}
               <div>
                 <label htmlFor="doc-type" className="block text-[11px] font-bold uppercase tracking-wide text-white/45 mb-1.5">Document Type</label>
@@ -220,7 +298,7 @@ export default function UploadDocumentModal({
                   onChange={(e) => setDocType(e.target.value as StaffDocumentType)}
                   className="w-full rounded-xl border border-white/10 bg-[#111] px-3 py-2.5 text-sm text-white/85 outline-none focus:border-[var(--color-cyan)]/50"
                 >
-                  {STAFF_DOCUMENT_TYPES.map((t) => (
+                  {TYPES_FOR[target].map((t) => (
                     <option key={t} value={t}>{DOCUMENT_TYPE_LABELS[t]}</option>
                   ))}
                 </select>
@@ -269,8 +347,55 @@ export default function UploadDocumentModal({
                 </div>
               )}
 
+              {/* Vehicle (Vehicle Registration, Insurance, Other) */}
+              {isVehicle && (
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wide text-white/45 mb-1.5">Vehicle</label>
+                  {truck ? (
+                    <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--color-cyan)]/35 bg-[rgba(77,249,237,0.06)] px-3 py-2.5">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-white">{truck.plate_number ?? 'No plate on record'}</p>
+                        {truck.description && <p className="text-[11px] text-white/45 truncate">{truck.description}</p>}
+                      </div>
+                      <button type="button" disabled={busy} onClick={() => setTruck(null)} className="text-xs font-semibold text-[var(--color-cyan)] hover:underline shrink-0">
+                        Change
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="overflow-hidden rounded-xl border border-white/10 bg-black/20">
+                      <div className="flex items-center gap-2 px-3 py-2 border-b border-white/[0.06]">
+                        <Search size={14} className="text-white/35" />
+                        <input
+                          value={truckQuery}
+                          onChange={(e) => setTruckQuery(e.target.value)}
+                          placeholder="Search by plate…"
+                          className="bg-transparent outline-none text-sm flex-1 text-white/85 placeholder:text-white/30"
+                        />
+                      </div>
+                      <div className="max-h-48 overflow-y-auto">
+                        {searching && truckOptions.length === 0 ? (
+                          <p className="px-3 py-3 text-xs text-white/40">Searching…</p>
+                        ) : truckOptions.length === 0 ? (
+                          <p className="px-3 py-3 text-xs text-white/40">No vehicles match.</p>
+                        ) : truckOptions.map((o) => (
+                          <button
+                            key={o.truck_id}
+                            type="button"
+                            onClick={() => setTruck(o)}
+                            className="w-full text-left px-3 py-2 hover:bg-white/5"
+                          >
+                            <span className="block text-sm text-white/85">{o.plate_number ?? 'No plate on record'}</span>
+                            {o.description && <span className="block text-[11px] text-white/40 truncate">{o.description}</span>}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Booking (Proof of Delivery, Other) */}
-              {!isContract && (
+              {target === 'booking' && (
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wide text-white/45 mb-1.5">Booking</label>
                 {booking ? (

@@ -38,7 +38,7 @@ import { TabsMinimal } from '@/components/ui/untitled/tabs'
 import { UserPlus01 as UserPlusIcon } from '@untitledui/icons'
 import StatTiles from '@/components/ui/StatTiles'
 import FilterBar, {
-  allowedValues, matchesFilter, optionsFrom, type FilterField, type FilterValues,
+  matchesFilter, optionsFrom, type FilterField, type FilterValues,
 } from '@/components/ui/FilterBar'
 import { useServerTable } from '@/lib/hooks/useServerTable'
 // No IT Administrator tab: IT Administrators are the IT Administrator's own
@@ -58,7 +58,9 @@ export type UserManagementMode = 'company-admin' | 'it-admin'
 // role='driver' too, but they are passkey-only subcontractors — no password, not
 // company crew — so they get their own list and their own access actions. Both
 // kinds are added and edited through the same driver form.
-type TabValue = UserMgmtTab | 'vendor-drivers' | 'all'
+// 'archived': every archived client and driver. Archived accounts show there
+// and nowhere else (2026-11-08).
+type TabValue = UserMgmtTab | 'vendor-drivers' | 'all' | 'archived'
 
 const DRIVER_TABS: { key: 'drivers' | 'vendor-drivers'; label: string }[] = [
   { key: 'drivers',        label: 'Company Drivers' },
@@ -69,6 +71,7 @@ const TABS: { key: TabValue; label: string }[] = [
   { key: 'all',        label: 'All Users' },
   { key: 'clients',    label: 'Clients'   },
   { key: 'drivers',    label: 'Drivers'   },
+  { key: 'archived',   label: 'Archived'  },
 ]
 
 type NewAccountType = 'clients' | 'company-driver' | 'vendor-driver'
@@ -79,6 +82,7 @@ const SEARCH_PLACEHOLDER: Record<TabValue, string> = {
   clients:          'Search name, email, phone or company',
   drivers:          'Search name, email or phone',
   'vendor-drivers': 'Search name, email, phone or vendor',
+  archived:         'Search name, email, phone or company',
 }
 
 const NEW_ACCOUNT_TYPES: AccountTypeOption<NewAccountType>[] = [
@@ -97,22 +101,9 @@ const muiTheme = createTheme({
 
 // Rows per page: 10 on a phone, 20 on anything wider (the user's call, 2026-10-25).
 
-// "Archived" is one of the Status filter's options. Archived accounts come from
-// their own list, so the Status filter decides which lists to read:
-//   none: current accounts only (no Status filter, or Archived not in it)
-//   only: Archived is the one status picked
-//   both: Archived plus some current status, both lists merged
-type ArchivedMode = 'none' | 'only' | 'both'
-
-// What an unfiltered list holds. "Status is not Active" means the other current
-// statuses: archived accounts only show when Archived is picked by name.
+// What the other tabs hold: every status but Archived. Archived accounts have
+// their own tab (asked for as Status = Archived on the All list).
 const CURRENT_STATUSES: UserStatus[] = ['active', 'inactive', 'deactivated', 'permanently_locked']
-
-function archivedModeOf(f: FilterValues): ArchivedMode {
-  const status = allowedValues(f, 'status', CURRENT_STATUSES)
-  if (!status?.includes('archived')) return 'none'
-  return status.length === 1 ? 'only' : 'both'
-}
 
 /** Company driver, vendor driver or anyone else: what the pop-ups say about passkeys. */
 function accountKind(u: AnyUser): AccountKind {
@@ -507,7 +498,7 @@ function LicenseExpiryBadge({ expiry }: { expiry: string | null }) {
 }
 
 function renderCells(user: AnyUser, tab: TabValue) {
-  if (tab === 'all') {
+  if (tab === 'all' || tab === 'archived') {
     const name = [user.first_name, user.middle_name, user.last_name, user.suffix].filter(Boolean).join(' ') || '—'
     return (
       <>
@@ -590,6 +581,7 @@ const ACCOUNT_NOUN: Record<TabValue, string> = {
   clients:          'Client',
   drivers:          'Company Driver',
   'vendor-drivers': 'Vendor Driver',
+  archived:         'User',
 }
 
 // The resets panel brings its own table, so only the directory tabs are here.
@@ -598,10 +590,11 @@ const HEADERS: Record<TabValue, string[]> = {
   clients:     ['Name', 'Email', 'Company', 'Status', 'Last Login'],
   drivers:     ['Name', 'License #', 'Expiry', 'Driver Status', 'Acct. Status'],
   'vendor-drivers': ['Name', 'Vendor', 'Email', 'Expiry', 'App Access', 'Acct. Status'],
+  archived:    ['Name', 'Email', 'Phone', 'Role', 'Status'],
 }
 
-// The Filters panel. Archived is a status like the rest (see ArchivedMode).
-const STATUS_OPTIONS = ([...CURRENT_STATUSES, 'archived'] as UserStatus[])
+// The Filters panel's statuses. Archived is not one of them: it has its own tab.
+const STATUS_OPTIONS = CURRENT_STATUSES
   .map((s) => ({ value: s, label: STATUS_CFG[s].label }))
 
 const LICENSE_OPTIONS = [
@@ -630,12 +623,12 @@ function filterFields(tab: TabValue, rows: AnyUser[], archivedOnly: boolean): Fi
     : STATUS_OPTIONS.filter((o) => o.value !== 'inactive')
   const status: FilterField[] = [{ key: 'status', label: 'Account Status', options: statusOptions }]
   const license: FilterField = { key: 'license', label: 'License', options: LICENSE_OPTIONS }
+  const role: FilterField = { key: 'role', label: 'Role', options: [{ value: 'client', label: 'Client' }, { value: 'driver', label: 'Driver' }] }
   switch (tab) {
+    case 'archived':
+      return [role]
     case 'all':
-      return [
-        { key: 'role', label: 'Role', options: [{ value: 'client', label: 'Client' }, { value: 'driver', label: 'Driver' }] },
-        ...status,
-      ]
+      return [role, ...status]
     case 'clients':
       return [...status, { key: 'company', label: 'Company', options: optionsFrom(rows.map((u) => (u as ClientUser).clients?.company_name)) }]
     case 'drivers':
@@ -680,11 +673,8 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
   const [showTypePicker,   setShowTypePicker]   = useState(false)
   // The confirm pop-up in front of Activate / Deactivate / Archive / Restore / Revoke.
   const [confirmAction,    setConfirmAction]    = useState<AccountConfirm | null>(null)
-  // Archived accounts are picked in the Status filter; their rows get a Restore action.
-  // "Status: All" means every status, archived included.
-  const archivedMode: ArchivedMode = !filters.some((r) => r.field === 'status') ? 'both' : archivedModeOf(filters)
-  // Only archived accounts on screen: the old "Archived view" wording and rules.
-  const showArchived = archivedMode === 'only'
+  // Archived accounts live on the Archived tab only; their rows get a Restore action.
+  const showArchived = activeTab === 'archived'
 
   // This module's tier for a managed role: Read Only disables every write control.
   const access = useModuleAccess()
@@ -718,11 +708,16 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
   const table = useServerTable(
     async (q) => {
       const tab = activeTab
+      // The Archived tab is the All list asked for with Status = Archived; the
+      // other tabs never send Archived, so they hold current accounts only.
+      const sent: FilterValues = tab === 'archived'
+        ? [...filters.filter((r) => r.field !== 'status'), { field: 'status', op: 'is', value: 'archived' }]
+        : filters.filter((r) => r.field !== 'status' || r.value !== 'archived')
       const [res, statsResult] = await Promise.all([
         userService.getDirectory({
           ...q,
-          tab,
-          ...(filters.length && { filters: JSON.stringify(filters) }),
+          tab: tab === 'archived' ? 'all' : tab,
+          ...(sent.length && { filters: JSON.stringify(sent) }),
           ...(search && { search }),
         }),
         userService.getStats('client,driver'),
@@ -752,10 +747,10 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
 
   // Both pages filter by account status only, in Untitled UI's dropdowns filter
   // bar (the user's call, 2026-10-25). One status at a time, read "Status:
-  // Active"; "All" means every status, archived included.
+  // Active"; "All" means every current status. The Archived tab filters by role.
   const filterDefs = filterFields(activeTab, users, showArchived)
-    .filter((f) => f.key === 'status')
-    .map((f) => ({ ...f, label: 'Status', single: true }))
+    .filter((f) => f.key === (showArchived ? 'role' : 'status'))
+    .map((f) => ({ ...f, label: showArchived ? 'Role' : 'Status', single: true }))
   const licenseOnly = matchesFilter(filters, 'license', 'attention') && !matchesFilter(filters, 'license', 'ok')
 
   // New filters go back to page 1 (useServerTable).
@@ -872,8 +867,7 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
             {sectionTabs}
 
             {/* The table format's filter row (Figma 3234:1482): search, the
-                All Users / Clients / Drivers switch, Filters (Archived is a status
-                there), Refresh, and Add User at the far right. The IT
+                All Users / Clients / Drivers / Archived switch, Filters, Refresh, and Add User at the far right. The IT
                 Administrator adds nobody here. */}
             <FilterBar
               layout="split"

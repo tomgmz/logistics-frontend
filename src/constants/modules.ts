@@ -125,7 +125,7 @@ export const MODULES_BY_ROLE: Record<ManagedRole, ModuleKey[]> = {
     'transaction-history',
     'document-management',
   ],
-  fleet_manager: ['booking-management', 'vehicle-management', 'transit-tracking', 'reports'],
+  fleet_manager: ['booking-management', 'vehicle-management', 'transit-tracking', 'reports', 'document-management'],
   operations_manager: ['booking-management', 'vehicle-management', 'document-management', 'transit-tracking', 'reports', 'support-tickets'],
 }
 
@@ -160,6 +160,8 @@ export const ROLE_MODULE_DEFAULTS: Record<ManagedRole, Partial<Record<ModuleKey,
     'transit-tracking':   'read',
     // Vehicle-related reports only — scoped by the server, not this tier.
     'reports':            'all',
+    // Vehicle files only — scoped by the server, not this tier.
+    'document-management': 'all',
   },
   operations_manager: {
     'booking-management':  'all',

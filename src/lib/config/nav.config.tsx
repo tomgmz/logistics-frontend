@@ -27,6 +27,7 @@ export const NAV_ITEMS_BY_ROLE: Record<string, { href: string; label: string; ic
     { href: '/fleet_admin/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
     { href: '/fleet_admin/vehicle-management', label: 'Vehicle Management', icon: <Truck size={20} /> },
     { href: '/fleet_admin/transit-tracking', label: 'Transit Tracking', icon: <MapPin size={20} /> },
+    { href: '/fleet_admin/document-management', label: 'Document Management', icon: <Files size={20} /> },
   ],
   general_manager: [
     { href: '/general_manager/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },

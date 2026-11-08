@@ -51,7 +51,8 @@ type AdminMgmtTab = Extract<
 // The dropdown below filters the directory by role. Password resets are a queue
 // you act on, not a slice of the directory, so they are a top-level section
 // instead - see ModuleSectionTabs.
-type TabValue = AdminMgmtTab | 'all'
+// 'archived': every archived staff account; they show there and nowhere else (2026-11-08).
+type TabValue = AdminMgmtTab | 'all' | 'archived'
 
 // Kept for the ?tab=password-resets deep-link a reset notification sends.
 const RESETS_DEEPLINK = 'password-resets'
@@ -62,6 +63,15 @@ const TABS: { key: TabValue; label: string }[] = [
   { key: 'general-managers',   label: 'General Managers'    },
   { key: 'fleet-admins',       label: 'Fleet Managers'      },
   { key: 'operations-admins',  label: 'Operations Managers' },
+  { key: 'archived',           label: 'Archived' },
+]
+
+// The Archived tab's Role filter.
+const ROLE_OPTIONS = [
+  { value: 'admin',              label: 'Company Administrator' },
+  { value: 'general_manager',    label: 'General Manager' },
+  { value: 'fleet_manager',      label: 'Fleet Manager' },
+  { value: 'operations_manager', label: 'Operations Manager' },
 ]
 
 const NEW_ACCOUNT_TYPES: AccountTypeOption<AdminMgmtTab>[] = [
@@ -109,9 +119,7 @@ const SERVICE_FOR_TAB = {
 } as const
 
 // Archived accounts come from /admin/users?status=archived (the per-role lists
-// hide them).
-
-// "Status: All" means every status, archived included.
+// hide them), on the Archived tab only. "Status: All" means every current status.
 function displayName(u: AnyUser): string {
   return [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email
 }
@@ -150,8 +158,9 @@ const STATUS_CFG: Record<UserStatus, { label: string; cls: string }> = {
 
 // The Status dropdown's choices, in the badge order. No Revoked (status 'inactive'): only a vendor
 // driver whose app access was revoked is ever Inactive, never a staff account.
+// No Archived either: archived accounts have their own tab.
 const STATUS_OPTIONS = (Object.keys(STATUS_CFG) as UserStatus[])
-  .filter((s) => s !== 'inactive')
+  .filter((s) => s !== 'inactive' && s !== 'archived')
   .map((s) => ({ value: s, label: STATUS_CFG[s].label }))
 
 // Figma 3234:1321: the role pill is an outline in the role's colour with white
@@ -281,7 +290,7 @@ function ArchivedRowMenu({ user, onView, onRestore, lockedBy }: {
 }
 
 function EmptyState({ tab, onAdd, archived = false, filtered, onClear }: { tab: TabValue; onAdd: () => void; archived?: boolean; filtered: boolean; onClear: () => void }) {
-  const label = tab === 'all' ? 'administrator accounts' : TABS.find(t => t.key === tab)?.label.toLowerCase() ?? tab
+  const label = tab === 'all' || tab === 'archived' ? 'administrator accounts' : TABS.find(t => t.key === tab)?.label.toLowerCase() ?? tab
   return (
     <div className="flex flex-col items-center justify-center py-24 text-center">
       <div className="mb-4 rounded-full border border-[#424242] bg-[#1b1b1b] p-4">
@@ -292,7 +301,7 @@ function EmptyState({ tab, onAdd, archived = false, filtered, onClear }: { tab: 
         {archived ? `No archived ${label}.` : `No ${label} match your current filters.`}
       </p>
       <ClearFiltersLink show={filtered} onClear={onClear} className="mt-4" />
-      {tab !== 'all' && !archived && (
+      {tab !== 'all' && tab !== 'archived' && !archived && (
         <button
           onClick={onAdd}
           className="mt-6 flex items-center gap-2 rounded-lg bg-[#4df9ed] px-4 py-2 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5]"
@@ -313,6 +322,7 @@ const HEADERS: Record<TabValue, string[]> = {
   'general-managers':  SHARED_HEADERS,
   'fleet-admins':      SHARED_HEADERS,
   'operations-admins': SHARED_HEADERS,
+  archived:            SHARED_HEADERS,
 }
 
 function renderCells(user: AnyUser) {
@@ -354,10 +364,12 @@ export default function AdminManagementClient() {
   const [permUser,         setPermUser]         = useState<AnyUser | null>(null)
   const userLocks = useRecordLocks('user')
   // The Status dropdown: one status at a time; none picked is "Status: All", every
-  // status including archived. Archived rows get a Restore action.
+  // current status. On the Archived tab the same dropdown picks a role instead.
+  // Archived rows get a Restore action.
   const [statusFilter,     setStatusFilter]     = useState<FilterValues>([])
-  const statusPick   = statusFilter.find((r) => r.field === 'status')?.value ?? null
-  const showArchived = statusPick === 'archived'
+  const showArchived = activeTab === 'archived'
+  const statusPick   = showArchived ? 'archived' : statusFilter.find((r) => r.field === 'status')?.value ?? null
+  const rolePick     = showArchived ? statusFilter.find((r) => r.field === 'role')?.value ?? null : null
   const isResetsTab = section === 'password-resets'
   // Clients & Drivers: the Company Admin's directory in IT Administrator mode
   // (status, restore and vendor passkey access; no add or edit).
@@ -386,15 +398,22 @@ export default function AdminManagementClient() {
   // stat tiles are re-read with it. `meta.tab` keeps a response for a tab
   // already left off the screen. The resets panel and Clients & Drivers load
   // their own data.
-  const directoryTab = activeTab === 'all' ? 'all-admins' : activeTab
+  const directoryTab = activeTab === 'all' || activeTab === 'archived' ? 'all-admins' : activeTab
+  // The archived list and the current All list share the server's tab, so the
+  // response is matched to the page tab, not the server's.
+  const viewTab = activeTab
+  const sent = [
+    ...(statusPick ? [{ field: 'status', op: 'is', value: statusPick }] : []),
+    ...(rolePick   ? [{ field: 'role',   op: 'is', value: rolePick }]   : []),
+  ]
   const table = useServerTable(
     async (q) => {
-      const tab = directoryTab
+      const tab = viewTab
       const [res, statsResult] = await Promise.all([
         userService.getDirectory({
           ...q,
-          tab,
-          ...(statusPick && { filters: JSON.stringify([{ field: 'status', op: 'is', value: statusPick }]) }),
+          tab: directoryTab,
+          ...(sent.length && { filters: JSON.stringify(sent) }),
           ...(search && { search }),
         }),
         userService.getStats(ADMIN_ROLE_FILTER),
@@ -402,13 +421,13 @@ export default function AdminManagementClient() {
       setStats({ total: statsResult.total, active: statsResult.active, archived: statsResult.archived })
       return { data: res.data, meta: { ...res.meta, tab } }
     },
-    `${directoryTab}|${statusPick ?? ''}|${search}`,
+    `${viewTab}|${statusPick ?? ''}|${rolePick ?? ''}|${search}`,
     {
       enabled:      !isResetsTab && !isPeopleTab,
       errorMessage: 'Failed to load accounts. Check your connection or permissions.',
     },
   )
-  const tableReady = table.meta?.tab === directoryTab
+  const tableReady = table.meta?.tab === viewTab
   const loading    = table.loading || !tableReady
   const fetching   = table.fetching
   const error      = table.error
@@ -439,7 +458,7 @@ export default function AdminManagementClient() {
   }, [isResetsTab, reloadTable])
 
   function handleStatusChange(user: AnyUser, status: UserStatus) {
-    const serviceTab = activeTab === 'all'
+    const serviceTab = activeTab === 'all' || activeTab === 'archived'
       ? tabFromRole(user.role)
       : activeTab
     // Every status change is confirmed in a pop-up first.
@@ -485,7 +504,7 @@ export default function AdminManagementClient() {
   }
 
   function openEdit(user: AnyUser, viewOnly = false) {
-    const tab = activeTab === 'all'
+    const tab = activeTab === 'all' || activeTab === 'archived'
       ? tabFromRole(user.role)
       : activeTab
     setFormTab(tab)
@@ -563,13 +582,20 @@ export default function AdminManagementClient() {
                   label="Administrator role"
                   items={TABS.map((t) => ({ id: t.key, label: t.label }))}
                   selectedKey={activeTab}
-                  onSelectionChange={setActiveTab}
+                  onSelectionChange={(k: TabValue) => {
+                    // Status (current tabs) and Role (Archived) don't carry across.
+                    if ((k === 'archived') !== (activeTab === 'archived')) setStatusFilter([])
+                    setActiveTab(k)
+                  }}
                 />
               }
               // Names exactly what the server searches (user-directory.service.ts).
               search={{ value: searchInput, onChange: setSearchInput, placeholder: 'Search name, email or phone' }}
               // One status at a time, as before; now inside the Filters panel.
-              fields={[{ key: 'status', label: 'Status', single: true, options: STATUS_OPTIONS }]}
+              // The Archived tab picks a role instead.
+              fields={showArchived
+                ? [{ key: 'role', label: 'Role', single: true, options: ROLE_OPTIONS }]
+                : [{ key: 'status', label: 'Status', single: true, options: STATUS_OPTIONS }]}
               values={statusFilter}
               onChange={setStatusFilter}
               trailing={
