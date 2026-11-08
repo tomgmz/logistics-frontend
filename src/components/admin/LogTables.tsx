@@ -11,6 +11,7 @@ import {
 } from '@/lib/services/admin/system-logs.service'
 import { formatDate, formatTime, formatDateTime } from '@/app/utils/timeFormat'
 import { expandCode, roleLabel } from '@/lib/roles'
+import { auditActionLabel, systemSourceLabel } from '@/lib/log-labels'
 
 /**
  * The two log tables in the table format (Figma 3234:594 System Logs,
@@ -29,10 +30,18 @@ export const AUDIT_TYPE_OPTIONS: FilterOption[] = [
   { value: 'driver_activity',   label: 'Driver Activity' },
   { value: 'booking',           label: 'Booking' },
 ]
-// Older audit rows say "A crew member"; the UI never says crew (user 2026-11-07).
-const noCrew = (s: string) => s.replace(/A crew member/g, 'A driver')
 
-const AUDIT_TYPE_LABEL = Object.fromEntries(AUDIT_TYPE_OPTIONS.map((o) => [o.value, o.label])) as Record<string, string>
+const AUDIT_TYPE_LABEL: Record<string, string> = {
+  ...Object.fromEntries(AUDIT_TYPE_OPTIONS.map((o) => [o.value, o.label])),
+  // Types older rows still carry (not offered as filters).
+  vehicle_creation:     'Vehicle Activity',
+  delivery_activity:    'Delivery Activity',
+  maintenance_activity: 'Maintenance',
+  user_activity:        'User Activity',
+}
+
+/** The Type column's words, also used by the export. */
+export const auditTypeLabel = (t: string) => AUDIT_TYPE_LABEL[t] ?? expandCode(t).replace(/_/g, ' ')
 
 // Newest first unless the Filters panel says otherwise.
 export const SORT_OPTIONS: FilterOption[] = [
@@ -139,8 +148,9 @@ export function AuditLogTable({ logs, loading, pageSize, selectedId, onSelect }:
                 {AUDIT_TYPE_LABEL[log.log_type] ?? expandCode(log.log_type).replace(/_/g, ' ')}
               </span>
             </td>
-            <td><span className={CODE_PILL}>{expandCode(log.action)}</span></td>
-            <td className="max-w-[420px] truncate" title={log.description ? noCrew(log.description) : undefined}>{log.description ? noCrew(log.description) : '—'}</td>
+            <td><span className={CODE_PILL}>{auditActionLabel(log.action)}</span></td>
+            {/* The server sends the description already readable (lib/log-text.ts). */}
+            <td className="max-w-[420px] truncate" title={log.description ?? undefined}>{log.description || '—'}</td>
           </tr>
         ))}
       </tbody>
@@ -178,7 +188,7 @@ export function SystemLogTable({ logs, loading, pageSize, selectedId, onSelect }
                 {SYSTEM_LOG_EVENT_LABEL[log.event_type] ?? log.event_type.replace(/_/g, ' ')}
               </span>
             </td>
-            <td><span className={CODE_PILL}>{log.source}</span></td>
+            <td><span className={CODE_PILL} title={log.source}>{systemSourceLabel(log.source)}</span></td>
             <td className="max-w-[420px] truncate" title={log.message}>{log.message}</td>
             <td className={`ff-sc text-right ${log.resolved ? 'text-[#3af626]' : 'text-[#f62626]'}`}>
               {log.resolved ? 'Yes' : 'No'}
@@ -228,8 +238,8 @@ export function auditDetailRows(log: AuditLog): [string, string][] {
     ['Log ID',      log.log_id],
     ['Timestamp',   formatDateTime(log.timestamp)],
     ['Type',        AUDIT_TYPE_LABEL[log.log_type] ?? expandCode(log.log_type).replace(/_/g, ' ')],
-    ['Action',      expandCode(log.action)],
-    ['Description', log.description ? noCrew(log.description) : '—'],
+    ['Action',      auditActionLabel(log.action)],
+    ['Description', log.description || '—'],
     ['User',        userName(log)],
     ['Role',        roleLabel(log.users?.role) || '—'],
   ]
@@ -241,7 +251,7 @@ export function systemDetailRows(log: SystemLog): [string, string][] {
     ['Timestamp', formatDateTime(log.timestamp)],
     ['Level',     SYSTEM_LOG_LEVEL_LABEL[log.log_level] ?? log.log_level],
     ['Event',     SYSTEM_LOG_EVENT_LABEL[log.event_type] ?? log.event_type],
-    ['Source',    log.source],
+    ['Source',    systemSourceLabel(log.source)],
     ['Message',   log.message],
     ['Resolved',  log.resolved ? 'Yes' : 'No'],
   ]

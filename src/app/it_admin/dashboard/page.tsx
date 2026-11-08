@@ -28,6 +28,7 @@ import ItAdminHandoverPanel from '@/components/admin/ItAdminHandoverPanel'
 import { TableCard } from '@/components/ui/untitled/table-card'
 import { TabsMinimal } from '@/components/ui/untitled/tabs'
 import { Skeleton } from '@/components/ui/Skeleton'
+import { systemSourceLabel } from '@/lib/log-labels'
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Scheduler staleness is a function of time, not of any row changing. */
@@ -423,7 +424,7 @@ function ProblemsCard({ data, now, onResolve, resolving }: {
             <td className={`${TD} whitespace-nowrap`}><Pill label={LEVEL_LABEL[row.log_level]} color={LEVEL_COLOR[row.log_level]} /></td>
             <td className={TD}>
               <p className="whitespace-nowrap text-white">{EVENT_LABEL[row.event_type] ?? row.event_type}</p>
-              <p className="font-mono text-xs text-[#818181] break-all">{row.source}</p>
+              <p className="text-xs text-[#818181] break-words">{systemSourceLabel(row.source)}</p>
             </td>
             <td className={`${TD} text-white break-words`}>{row.message}</td>
             <td className={`${TD} whitespace-nowrap`} title={formatDateTime(row.timestamp)}>

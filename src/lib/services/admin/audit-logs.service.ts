@@ -1,4 +1,7 @@
 import proxyApi from '@/lib/api/auth.api'
+import { auditActionLabel } from '@/lib/log-labels'
+import { roleLabel } from '@/lib/roles'
+import { auditTypeLabel } from '@/components/admin/LogTables'
 import { downloadXlsx, manilaCellDate, manilaDateStamp, type XlsxColumn } from '@/lib/xlsx-export'
 
 export type LogType =
@@ -108,12 +111,12 @@ export const AUDIT_EXPORT_ROW_CAP = 10_000
 
 const AUDIT_XLSX_COLUMNS: XlsxColumn<AuditLog>[] = [
   { label: 'Timestamp (PHT)', width: 20, value: (l) => manilaCellDate(l.timestamp) },
-  { label: 'Type',            width: 18, value: (l) => l.log_type },
-  { label: 'Action',          width: 28, value: (l) => l.action },
+  { label: 'Type',            width: 18, value: (l) => auditTypeLabel(l.log_type) },
+  { label: 'Action',          width: 28, value: (l) => auditActionLabel(l.action) },
   { label: 'Description',     width: 70, value: (l) => l.description },
   { label: 'User',            width: 24, value: (l) =>
       [l.users?.first_name, l.users?.last_name].filter(Boolean).join(' ') || null },
-  { label: 'Role',            width: 18, value: (l) => l.users?.role },
+  { label: 'Role',            width: 18, value: (l) => roleLabel(l.users?.role) || null },
   { label: 'User ID',         width: 38, value: (l) => l.user_id },
   { label: 'Log ID',          width: 38, value: (l) => l.log_id },
 ]

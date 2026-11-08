@@ -1,4 +1,5 @@
 import proxyApi from '@/lib/api/auth.api'
+import { systemSourceLabel } from '@/lib/log-labels'
 import { downloadXlsx, manilaCellDate, manilaDateStamp, type XlsxColumn } from '@/lib/xlsx-export'
 
 /**
@@ -123,7 +124,7 @@ const SYSTEM_XLSX_COLUMNS: XlsxColumn<SystemLog>[] = [
   { label: 'Timestamp (PHT)', width: 20, value: (l) => manilaCellDate(l.timestamp) },
   { label: 'Level',           width: 10, value: (l) => SYSTEM_LOG_LEVEL_LABEL[l.log_level] ?? l.log_level },
   { label: 'Event Type',      width: 14, value: (l) => SYSTEM_LOG_EVENT_LABEL[l.event_type] ?? l.event_type },
-  { label: 'Source',          width: 32, value: (l) => l.source },
+  { label: 'Source',          width: 32, value: (l) => systemSourceLabel(l.source) },
   { label: 'Message',         width: 70, value: (l) => l.message },
   { label: 'Resolved',        width: 10, value: (l) => (l.resolved ? 'Yes' : 'No') },
   { label: 'User ID',         width: 38, value: (l) => l.user_id },
