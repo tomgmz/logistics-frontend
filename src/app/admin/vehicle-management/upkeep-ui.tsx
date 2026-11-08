@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Camera, X } from 'lucide-react'
 import type { ServiceStatus } from '@/app/types/truck.types'
 import type { RegistrationStatus } from '@/lib/registration-expiry'
+import { ProtectedImg } from '@/components/ui/FileViewer'
 
 /** Shared bits for odometer readings and routine service. */
 
@@ -114,8 +115,7 @@ export function PhotoField({
       <div className="mt-1 flex items-center gap-3">
         {preview ? (
           <div className="relative">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={preview} alt={label} className="w-20 h-20 object-cover rounded-lg border border-white/10" />
+            <ProtectedImg src={preview} alt={label} className="w-20 h-20 object-cover rounded-lg border border-white/10" />
             {!disabled && (
               <button
                 type="button"

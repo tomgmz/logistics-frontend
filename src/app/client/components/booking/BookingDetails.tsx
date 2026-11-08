@@ -62,6 +62,7 @@ import { nowDate } from '@/app/utils/serverTime'
 import { OFFICE_HOURS_LABEL, isWithinOfficeHours } from '@/lib/office-hours'
 import { phDayPlusMonth, phEarliestBookableDay } from '@/lib/ph-date'
 import { FileViewButton } from '@/components/ui/FileViewer'
+import { fetchStoredFile } from '@/lib/files/fileAccess'
 
 interface Props {
   onNext: () => void
@@ -1004,9 +1005,9 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
     if (keptHashes.current.has(key)) return keptHashes.current.get(key) ?? null
     let h: string | null = null
     try {
-      // no-store: a cached copy loaded without CORS would be refused here.
-      const res = await fetch(url, { cache: 'no-store' })
-      if (res.ok) h = await fingerprint(await res.arrayBuffer())
+      // Through a single-use pass (lib/files/fileAccess): the link alone opens nothing.
+      const res = await fetchStoredFile(url)
+      h = await fingerprint(await res.arrayBuffer())
     } catch { /* the server still checks it at Confirm */ }
     keptHashes.current.set(key, h)
     return h

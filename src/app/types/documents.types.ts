@@ -181,10 +181,13 @@ export function previewKind(url: string): PreviewKind {
  */
 export async function downloadFile(url: string, fileName: string): Promise<void> {
   try {
-    // no-store: the thumbnail already loaded this exact link through <img>,
-    // which sends no Origin, and storage answers that without CORS headers or
-    // `Vary: Origin`. Read from the browser cache, that copy fails CORS here,
-    // so ask storage directly.
+    // Through a single-use pass (lib/files/fileAccess): the link alone opens
+    // nothing. A file already shown on the page is reused, not fetched again.
+    const { loadStoredFile, isSealedFileLink } = await import('@/lib/files/fileAccess')
+    if (isSealedFileLink(url)) {
+      saveBlob((await loadStoredFile(url)).blob, fileName)
+      return
+    }
     const res = await fetch(url, { cache: 'no-store' })
     if (!res.ok) throw new Error(String(res.status))
     saveBlob(await res.blob(), fileName)

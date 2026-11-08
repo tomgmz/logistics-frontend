@@ -5,10 +5,11 @@ import {
   type ImgHTMLAttributes, type MouseEvent as ReactMouseEvent, type ReactNode, type SyntheticEvent,
 } from 'react'
 import { createPortal } from 'react-dom'
-import { Download, FileQuestion, Loader2, X } from 'lucide-react'
+import { Download, FileQuestion, ImageOff, Loader2, X } from 'lucide-react'
 
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 import { downloadFile } from '@/app/types/documents.types'
+import { useStoredFile } from '@/lib/files/fileAccess'
 
 /*
  * Every file in the web app (photos, PDFs, videos, documents) opens HERE,
@@ -22,8 +23,10 @@ import { downloadFile } from '@/app/types/documents.types'
  *    thumbnails (ProtectedImg);
  *  - PDFs open with the browser's PDF toolbar hidden (#toolbar=0; Chrome/Edge).
  *
- * This is a deterrent, not DRM: someone with the browser's developer tools can
- * still find the signed link. Those links expire (15 min – 2 h) anyway.
+ * Since 2026-11-08 the links are also tied to the signed-in account and open
+ * nothing on their own (lib/files/fileAccess.ts loads them with a single-use
+ * pass), so a link copied out of the developer tools is useless. A screenshot
+ * is still always possible.
  */
 
 type Kind = 'image' | 'pdf' | 'video' | 'other'
@@ -57,14 +60,27 @@ const blockMenu = (e: SyntheticEvent) => e.preventDefault()
 const NO_CALLOUT = 'select-none [-webkit-touch-callout:none] [-webkit-user-drag:none]'
 
 /**
- * An <img> that can't be right-clicked, long-pressed or dragged out to a new tab.
- * Use it for every thumbnail of a stored file.
+ * An <img> for a stored file: loaded through a single-use pass (a sealed link
+ * can't be put in src directly), and it can't be right-clicked, long-pressed
+ * or dragged out to a new tab. Any other src (blob:, data:, a static icon)
+ * is shown as it is. Use it for every picture of a stored file.
  */
-export function ProtectedImg({ className = '', alt = '', ...rest }: ImgHTMLAttributes<HTMLImageElement>) {
+export function ProtectedImg({ className = '', alt = '', src, ...rest }: ImgHTMLAttributes<HTMLImageElement>) {
+  const file = useStoredFile(typeof src === 'string' ? src : null)
+  if (!file.src) {
+    // Loading, or the file could not be read: a quiet placeholder the same size.
+    return (
+      <span aria-label={alt || undefined} role={alt ? 'img' : undefined}
+        className={`${className} inline-flex items-center justify-center bg-white/[0.04] text-white/25`}>
+        {file.failed && <ImageOff size={16} />}
+      </span>
+    )
+  }
   return (
-    // eslint-disable-next-line @next/next/no-img-element -- signed storage links, any host shape
+    // eslint-disable-next-line @next/next/no-img-element -- page-local blob: URL of a stored file
     <img
       {...rest}
+      src={file.src}
       alt={alt}
       draggable={false}
       onContextMenu={blockMenu}
@@ -73,51 +89,24 @@ export function ProtectedImg({ className = '', alt = '', ...rest }: ImgHTMLAttri
   )
 }
 
-/** Loads the file into a page-local blob: URL. Falls back to the link itself if storage refuses the fetch (CORS). */
-function useBlobFile(url: string) {
-  // Keyed by the link, so a new link (a refreshed signature) reads as loading
-  // without resetting state inside the effect.
-  const [state, setState] = useState<{ for: string; src: string | null; blob: Blob | null; failed: boolean }>(
-    { for: '', src: null, blob: null, failed: false },
-  )
-
-  useEffect(() => {
-    let alive = true
-    let objectUrl: string | null = null
-    const ctrl = new AbortController()
-    // no-store: a thumbnail <img> may have cached this link without CORS headers.
-    fetch(url, { cache: 'no-store', signal: ctrl.signal })
-      .then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.blob() })
-      .then((b) => {
-        if (!alive) return
-        objectUrl = URL.createObjectURL(b)
-        setState({ for: url, src: objectUrl, blob: b, failed: false })
-      })
-      .catch(() => { if (alive) setState({ for: url, src: null, blob: null, failed: true }) })
-    return () => {
-      alive = false
-      ctrl.abort()
-      // Delay: Safari may still be reading the blob for a download started from the viewer.
-      if (objectUrl) { const u = objectUrl; setTimeout(() => URL.revokeObjectURL(u), 60_000) }
-    }
-  }, [url])
-
-  return state.for === url ? state : { src: null, blob: null, failed: false }
-}
-
 /**
  * The file itself, sized to its box. Shared by the full-screen viewer and
  * Document Management's preview pop-up.
  */
 export function FilePreview({ url, name, onDownload }: { url: string; name: string; onDownload?: () => void }) {
-  const { src, blob, failed } = useBlobFile(url)
+  const { src, blob, failed } = useStoredFile(url)
   const [zoomed, setZoomed] = useState(false)
   const kind = kindOf(url, blob?.type)
+  const shown = src
 
-  // Storage refused the fetch: images and videos still show from the link
-  // (inside the page, menus blocked); a PDF too, with the toolbar hidden.
-  const shown = src ?? (failed ? url : null)
-
+  if (failed) {
+    return (
+      <div className="flex flex-col items-center gap-2 px-6 text-center">
+        <ImageOff size={36} className="text-white/25" />
+        <p className="text-sm text-white/50">This file could not be opened. Close it, refresh the page and try again.</p>
+      </div>
+    )
+  }
   if (!shown) {
     return <Loader2 size={28} className="animate-spin text-white/40" aria-label="Loading file" />
   }

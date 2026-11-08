@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import {
-  AlertCircle, AlertTriangle, Truck, Clock, CheckCircle2, MapPin, Plus, ChevronRight, XCircle,
+  AlertCircle, Truck, Clock, CheckCircle2, MapPin, Plus, ChevronRight, XCircle,
 } from 'lucide-react'
 
 import { bookingService } from '@/lib/services/client/booking.service'
@@ -12,7 +12,7 @@ import type { BookingWithRelations, BookingDestination } from '@/lib/store/slice
 import { type BookingStatus, asBookingStatus } from '@/app/types/maps/routemap.types'
 import { bookingRef } from '@/lib/booking'
 import { bookingStatusColor } from '@/lib/palette'
-import { hasOpenClientIssue, PROBLEM_STATUS_COLOR, PROBLEM_STATUS_LABEL } from '@/components/transactions/ProblemReportedBadge'
+import ProblemReportedBadge, { hasOpenClientIssue } from '@/components/transactions/ProblemReportedBadge'
 import { isAwaitingResubmit } from '@/lib/booking-resubmit'
 import { useBookingClosed } from '@/lib/contract-status'
 import RejectionPanel from '@/components/transactions/RejectionPanel'
@@ -119,16 +119,19 @@ function phToday(): string {
 // ── presentational ─────────────────────────────────────────────────────────
 
 function StatusBadge({ status, problem = false }: { status: string; problem?: boolean }) {
-  // A reported problem replaces "please confirm": the client already answered.
-  const m = problem
-    ? { label: PROBLEM_STATUS_LABEL, color: PROBLEM_STATUS_COLOR, icon: <AlertTriangle size={11} /> }
-    : statusMeta(status)
+  // With a reported problem the status reads plain "Delivered" (not "please
+  // confirm": the client already answered) and the problem is a substatus under it.
+  const base = statusMeta(status)
+  const m = problem ? { ...base, label: 'Delivered' } : base
   return (
-    <span
-      className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-sm whitespace-nowrap"
-      style={{ color: m.color, background: `${m.color}1f`, border: `1px solid ${m.color}` }}
-    >
-      {m.icon}{m.label}
+    <span className="inline-flex flex-col items-start">
+      <span
+        className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-sm whitespace-nowrap"
+        style={{ color: m.color, background: `${m.color}1f`, border: `1px solid ${m.color}` }}
+      >
+        {m.icon}{m.label}
+      </span>
+      {problem && <ProblemReportedBadge />}
     </span>
   )
 }

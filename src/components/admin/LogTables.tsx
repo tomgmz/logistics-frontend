@@ -29,6 +29,9 @@ export const AUDIT_TYPE_OPTIONS: FilterOption[] = [
   { value: 'driver_activity',   label: 'Driver Activity' },
   { value: 'booking',           label: 'Booking' },
 ]
+// Older audit rows say "A crew member"; the UI never says crew (user 2026-11-07).
+const noCrew = (s: string) => s.replace(/A crew member/g, 'A driver')
+
 const AUDIT_TYPE_LABEL = Object.fromEntries(AUDIT_TYPE_OPTIONS.map((o) => [o.value, o.label])) as Record<string, string>
 
 // Newest first unless the Filters panel says otherwise.
@@ -137,7 +140,7 @@ export function AuditLogTable({ logs, loading, pageSize, selectedId, onSelect }:
               </span>
             </td>
             <td><span className={CODE_PILL}>{expandCode(log.action)}</span></td>
-            <td className="max-w-[420px] truncate" title={log.description ?? undefined}>{log.description ?? '—'}</td>
+            <td className="max-w-[420px] truncate" title={log.description ? noCrew(log.description) : undefined}>{log.description ? noCrew(log.description) : '—'}</td>
           </tr>
         ))}
       </tbody>
@@ -226,7 +229,7 @@ export function auditDetailRows(log: AuditLog): [string, string][] {
     ['Timestamp',   formatDateTime(log.timestamp)],
     ['Type',        AUDIT_TYPE_LABEL[log.log_type] ?? expandCode(log.log_type).replace(/_/g, ' ')],
     ['Action',      expandCode(log.action)],
-    ['Description', log.description ?? '—'],
+    ['Description', log.description ? noCrew(log.description) : '—'],
     ['User',        userName(log)],
     ['Role',        roleLabel(log.users?.role) || '—'],
   ]

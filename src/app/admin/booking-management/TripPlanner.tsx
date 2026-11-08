@@ -395,7 +395,7 @@ export default function TripPlanner({ detail, canEdit, allowed = true, capacity 
 
       <p className="text-[11px] leading-relaxed text-white/35">
         One vehicle, one or more runs. When the load is bigger than the body the same truck returns
-        to the pickup point and goes out again with the rest — it is never crewed with a second vehicle.
+        to the pickup point and goes out again with the rest — it is never split onto a second vehicle.
       </p>
 
       <DriverCallTime

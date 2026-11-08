@@ -1,6 +1,5 @@
 'use client'
 
-import Image from 'next/image'
 import type { ReactNode } from 'react'
 import { Check, Truck } from 'lucide-react'
 import type { BookingDetail } from '@/app/types/maps/routemap.types'
@@ -8,6 +7,7 @@ import type { Truck as TruckType } from '@/app/types/truck.types'
 import { assessFit, floorPositions, type FitAssessment, type VehicleCapacity } from '@/lib/cargo/capacity'
 import { EMPTY_CARGO_SUMMARY, type CargoSummary } from '@/lib/cargo/summary'
 import type { CodingFlag } from '@/lib/number-coding'
+import { ProtectedImg } from '@/components/ui/FileViewer'
 
 /**
  * The vehicle choice that used to be the client's "Vehicle" booking step.
@@ -164,14 +164,11 @@ export default function VehiclePicker({
 
             <div className="flex gap-3">
               <div className="relative w-20 h-14 shrink-0">
-                <Image
+                {/* A stored model picture loads through a pass (lib/files/fileAccess). */}
+                <ProtectedImg
                   src={m?.image_url || FALLBACK_IMAGE}
                   alt={m?.name ?? truck.plate_number}
-                  fill
-                  sizes="80px"
-                  className="object-contain"
-                  // Sealed file links change every time window; optimizing them would re-fetch each one.
-                  unoptimized
+                  className="absolute inset-0 h-full w-full object-contain"
                 />
               </div>
               <div className="min-w-0 flex-1 pr-5">

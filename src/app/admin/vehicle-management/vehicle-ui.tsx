@@ -3,6 +3,7 @@
 import { memo, useState } from 'react'
 import { Truck as TruckIcon } from 'lucide-react'
 import type { Truck, TruckInspection } from '@/app/types/truck.types'
+import { ProtectedImg } from '@/components/ui/FileViewer'
 
 /** Display helpers shared by the Vehicle Management tabs. */
 
@@ -41,8 +42,7 @@ export const ModelThumb = memo(function ModelThumb({
     )
   }
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
+    <ProtectedImg
       src={imageUrl}
       alt={label}
       width={size}

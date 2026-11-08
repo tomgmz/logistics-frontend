@@ -24,6 +24,11 @@ const CODE_TOKENS: [RegExp, string][] = [
   [/(^|_)admin(?=_|$)/g,    '$1administrator'],
   [/(^|_)gm(?=_|$)/g,       '$1general_manager'],
   [/(^|_)ops(?=_|$)/g,      '$1operations_manager'],
+  // Older rows used "crew"; the UI never says crew (user 2026-11-07).
+  [/(^|_)crew_reserved$/g,       '$1driver_vehicle_reserved'],
+  [/(^|_)crew_released$/g,       '$1driver_vehicle_released'],
+  [/(^|_)crew_roles_swapped$/g,  '$1drivers_swapped'],
+  [/(^|_)crew_replaced$/g,       '$1driver_vehicle_replaced'],
 ]
 
 export function expandCode(code: string | null | undefined): string {

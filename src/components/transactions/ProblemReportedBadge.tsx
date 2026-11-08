@@ -15,14 +15,11 @@ export function hasOpenClientIssue(b: Record<string, unknown>): boolean {
 }
 
 /**
- * What the booking's status reads while that problem is open, everywhere the
- * Delivered status shows ("Delivered — Please Confirm" would be wrong: the
- * client already answered).
+ * "Problem Reported" is a SUBSTATUS of Delivered (user 2026-11-07): the status
+ * pill keeps reading "Delivered" in its own colour, and this red line sits
+ * directly under it wherever a booking status shows. The note goes in the
+ * tooltip.
  */
-export const PROBLEM_STATUS_LABEL = 'Delivered — Problem Reported'
-export const PROBLEM_STATUS_COLOR = ERROR
-
-/** List and header badge for the same. The note goes in the tooltip. */
 export default function ProblemReportedBadge({ note, className = 'mt-1' }: {
   note?:      string | null
   className?: string
@@ -30,11 +27,11 @@ export default function ProblemReportedBadge({ note, className = 'mt-1' }: {
   return (
     <span
       title={note ? `Problem reported by the client: ${note}` : 'Problem reported by the client'}
-      className={`flex w-fit items-center gap-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border ${className}`}
-      style={{ color: ERROR, borderColor: `${ERROR}55`, background: `${ERROR}14` }}
+      className={`flex w-fit items-center gap-1 whitespace-nowrap text-[10px] font-bold uppercase tracking-wide leading-none ${className}`}
+      style={{ color: ERROR }}
     >
-      <AlertTriangle size={9} />
-      Problem reported
+      <AlertTriangle size={10} aria-hidden />
+      Problem Reported
     </span>
   )
 }

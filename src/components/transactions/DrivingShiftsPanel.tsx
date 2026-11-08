@@ -102,7 +102,7 @@ export default function DrivingShiftsPanel({ bookingId, inTransit, hasSecondDriv
 
       {current && (
         <p className="text-[13px] text-white">
-          {current.driver_name ?? 'A crew member'} <span style={{ color: MUTED }}>since {formatDateTime(current.started_at)} ({span(current.started_at, null)})</span>
+          {current.driver_name ?? 'A driver'} <span style={{ color: MUTED }}>since {formatDateTime(current.started_at)} ({span(current.started_at, null)})</span>
         </p>
       )}
 
@@ -110,7 +110,7 @@ export default function DrivingShiftsPanel({ bookingId, inTransit, hasSecondDriv
         <ul className="flex flex-col gap-1">
           {shifts.map((s) => (
             <li key={s.shift_id} className="flex flex-wrap items-baseline justify-between gap-x-3 text-[12px]">
-              <span className="text-white/85">{s.driver_name ?? 'Crew member'} <span style={{ color: MUTED }}>· {SOURCE[s.source]}</span></span>
+              <span className="text-white/85">{s.driver_name ?? 'Driver'} <span style={{ color: MUTED }}>· {SOURCE[s.source]}</span></span>
               <span style={{ color: MUTED }}>
                 {formatDateTime(s.started_at)} – {s.ended_at ? formatDateTime(s.ended_at) : 'now'} · {span(s.started_at, s.ended_at)}
                 {s.clock_adjusted && ' (phone clock corrected)'}

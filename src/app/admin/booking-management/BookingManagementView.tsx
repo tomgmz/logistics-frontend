@@ -73,7 +73,7 @@ import TripPlanner from './TripPlanner'
 import VehiclePicker, { cargoSummaryFromBooking, fitProblems } from './VehiclePicker'
 import CompletionPanel from '@/components/transactions/CompletionPanel'
 import { formatPlateNumber, plateError } from '@/lib/validation/plate'
-import ProblemReportedBadge, { hasOpenClientIssue, PROBLEM_STATUS_COLOR, PROBLEM_STATUS_LABEL } from '@/components/transactions/ProblemReportedBadge'
+import ProblemReportedBadge, { hasOpenClientIssue } from '@/components/transactions/ProblemReportedBadge'
 import ResubmittedBadge, { resubmissionsOf } from '@/components/transactions/ResubmittedBadge'
 import SharedDelayedBadge from '@/components/transactions/DelayedBadge'
 import ResubmissionChanges from '@/components/transactions/ResubmissionChanges'
@@ -2112,8 +2112,8 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
           assignFitProblems.length > 0
             ? 'You can still assign it if you know the load will go, but check first:'
             : committedAssignment.driverId
-              ? 'The booking will move to the crew you picked, and the drivers will be notified.'
-              : 'The crew you picked will be assigned to this booking, and the drivers will be notified.'
+              ? 'The booking will move to the vehicle and driver you picked, and the drivers will be notified.'
+              : 'The vehicle and driver you picked will be assigned to this booking, and the drivers will be notified.'
         }
         confirmLabel={assignFitProblems.length > 0 ? 'Assign anyway' : 'Yes'}
         cancelLabel={assignFitProblems.length > 0 ? 'Go back' : 'No'}
@@ -2218,7 +2218,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                     <tbody className="ff-regular text-[13px] 3xl:text-[16px] text-[#818181]">
                       {listRows.map((r) => {
                         const active = selectedId === r.booking_id
-                        const c      = r.issue_open ? PROBLEM_STATUS_COLOR : statusColor(r.status)
+                        const c      = statusColor(r.status)
                         return (
                           <tr
                             key={r.booking_id}
@@ -2248,13 +2248,14 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                                 className="inline-flex items-center justify-center whitespace-nowrap rounded-[5px] border p-1 text-[12px] 3xl:text-[16px] leading-none"
                                 style={{ color: c, borderColor: c, background: `${c}2e` }}
                               >
-                                {r.issue_open ? PROBLEM_STATUS_LABEL : fmtStatus(r.status)}
+                                {fmtStatus(r.status)}
                               </span>
+                              {r.issue_open && <ProblemReportedBadge note={r.issue_note} />}
                               {r.pause_reason && <PausedBadge reason={r.pause_reason} />}
                               {r.delayed !== undefined && <DelayedBadge minutes={r.delayed} />}
                               {['assigned', 'in_transit'].includes(r.status) &&
                                 crewLicenseFlags(allAssignments.find((x) => x.booking_id === r.booking_id), r.schedule_date).length > 0 && (
-                                <span title="A crew member's license expires before, during or within 7 days of this delivery"
+                                <span title="A driver's license expires before, during or within 7 days of this delivery"
                                   className="flex w-fit items-center gap-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border mt-1"
                                   style={{ color: '#FFEA00', borderColor: '#FFEA0055', background: '#FFEA0014' }}>
                                   License expiring
@@ -2314,7 +2315,12 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                       <>
                         <ResubmittedBadge className="" count={resubmissionsOf(detail)} />
                         <SharedDelayedBadge className="" booking={detail} />
-                        <Tag color={statusColor(detail.status)} size="md">{fmtStatus(detail.status)}</Tag>
+                        <span className="inline-flex flex-col items-start">
+                          <Tag color={statusColor(detail.status)} size="md">{fmtStatus(detail.status)}</Tag>
+                          {hasOpenClientIssue(detail as unknown as Record<string, unknown>) && (
+                            <ProblemReportedBadge note={(detail as { client_issue_note?: string | null }).client_issue_note} />
+                          )}
+                        </span>
                       </>
                     )}
                     <button type="button" onClick={closeDetail} className="p-2 rounded-lg hover:bg-white/5 text-[#818181] hover:text-white transition-colors" aria-label="Close">
@@ -2340,17 +2346,10 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                       {/* Booking info */}
                       <BookingInfoCard
                         reference={bookingRef(detail)}
-                        extras={(detail.created_at || hasOpenClientIssue(detail as unknown as Record<string, unknown>)) && (
-                          <div className="space-y-1.5">
-                            {detail.created_at && (
-                              <div className="flex flex-wrap items-center gap-2 text-xs text-[#818181]">
-                                <span>Submitted {formatPhDateTime(detail.created_at)}</span>
-                                {showAfterHours(detail.status, detail.created_at) && <AfterHoursBadge />}
-                              </div>
-                            )}
-                            {hasOpenClientIssue(detail as unknown as Record<string, unknown>) && (
-                              <ProblemReportedBadge className="" note={(detail as { client_issue_note?: string | null }).client_issue_note} />
-                            )}
+                        extras={detail.created_at && (
+                          <div className="flex flex-wrap items-center gap-2 text-xs text-[#818181]">
+                            <span>Submitted {formatPhDateTime(detail.created_at)}</span>
+                            {showAfterHours(detail.status, detail.created_at) && <AfterHoursBadge />}
                           </div>
                         )}
                         origin={detail.origin}
@@ -2485,7 +2484,14 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                       <section className="space-y-3">
                         <SectionHeading
                           icon={<CalendarRange size={18} strokeWidth={2} />}
-                          right={<Tag color={statusColor(detail.status)}>{fmtStatus(detail.status)}</Tag>}
+                          right={
+                            <span className="inline-flex flex-col items-end">
+                              <Tag color={statusColor(detail.status)}>{fmtStatus(detail.status)}</Tag>
+                              {hasOpenClientIssue(detail as unknown as Record<string, unknown>) && (
+                                <ProblemReportedBadge note={(detail as { client_issue_note?: string | null }).client_issue_note} />
+                              )}
+                            </span>
+                          }
                         >
                           Booking Status
                         </SectionHeading>

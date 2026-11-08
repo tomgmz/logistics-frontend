@@ -1,6 +1,5 @@
 'use client'
 
-import Image                   from 'next/image'
 import { motion }              from 'framer-motion'
 import { useState, useEffect } from 'react'
 import {
@@ -20,6 +19,7 @@ import { RouteStepper, routeSteps } from './RouteStepper'
 import { pauseReasonLabel } from '@/lib/pause-reasons'
 import { continuationDayLabel, openContinuation, pausedPlanState } from '@/lib/pause-continuation'
 import { formatDuration } from '@/lib/duration'
+import { ProtectedImg } from '@/components/ui/FileViewer'
 
 const SC = { fontFamily: "var(--font-alegreya-sc), 'Alegreya Sans SC', sans-serif" } as const
 
@@ -348,7 +348,7 @@ export function DetailsPanelContent({
           </div>
         ) : truckImageUrl ? (
           <motion.div className="relative w-full h-full" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
-            <Image src={truckImageUrl} alt={truckType} fill className="object-contain" priority unoptimized />
+            <ProtectedImg src={truckImageUrl} alt={truckType} className="absolute inset-0 h-full w-full object-contain" />
           </motion.div>
         ) : (
           <div className="w-full h-full flex items-center justify-center">

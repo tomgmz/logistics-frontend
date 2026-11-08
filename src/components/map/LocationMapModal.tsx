@@ -3,6 +3,7 @@
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { APIProvider, Map, AdvancedMarker } from '@vis.gl/react-google-maps'
+import { PH_RESTRICTION, PH_MIN_ZOOM } from '@/lib/philippines-map'
 import { X } from 'lucide-react'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 
@@ -70,6 +71,8 @@ export function LocationMapModal({ point, onClose }: { point: MapPoint | null; o
           <APIProvider apiKey={GOOGLE_MAPS_KEY}>
             <Map
               mapId={GOOGLE_MAPS_MAP_ID}
+              restriction={PH_RESTRICTION}
+              minZoom={PH_MIN_ZOOM}
               defaultCenter={center}
               defaultZoom={16}
               gestureHandling="greedy"

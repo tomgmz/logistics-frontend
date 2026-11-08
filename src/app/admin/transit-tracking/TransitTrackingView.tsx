@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps'
+import { PH_RESTRICTION, PH_MIN_ZOOM } from '@/lib/philippines-map'
 import SearchIcon from '@mui/icons-material/Search'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import CloseIcon from '@mui/icons-material/Close'
@@ -369,6 +370,8 @@ export default function TransitTrackingView() {
   const mapInner = (
     <Map
       mapId={GOOGLE_MAPS_MAP_ID}
+      restriction={PH_RESTRICTION}
+      minZoom={PH_MIN_ZOOM}
       defaultCenter={DEFAULT_CENTER}
       defaultZoom={11}
       gestureHandling="greedy"

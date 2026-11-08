@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import ReusableModal from '@/components/layout/ReusableModal'
+import { PH_RESTRICTION, PH_MIN_ZOOM } from '@/lib/philippines-map'
 import {
   loadGoogleMapsScript,
   usePlacesAutocomplete,
@@ -188,7 +189,8 @@ export default function MapLocationPicker({
       const map = new google.maps.Map(mapDivRef.current, {
         center:           saved ?? DEFAULT_CENTER,
         zoom:             saved ? 17 : 15,
-        minZoom:          6,
+        minZoom:          PH_MIN_ZOOM,
+        restriction:      PH_RESTRICTION,
         disableDefaultUI: true,
         gestureHandling:  'greedy',
         clickableIcons:   true,

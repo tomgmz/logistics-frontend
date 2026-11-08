@@ -17,6 +17,7 @@ import {
   downloadFile,
   saveBlob,
 } from '@/app/types/documents.types'
+import { fetchStoredFile } from '@/lib/files/fileAccess'
 
 /**
  * Document Management. Viewing needs the document-management module's
@@ -230,9 +231,8 @@ export async function downloadDocuments(
     while (next < named.length) {
       const { d, name } = named[next++]
       try {
-        // no-store: a cached thumbnail copy of this link would fail CORS (see downloadFile).
-        const res = await fetch(d.file_url, { cache: 'no-store' })
-        if (!res.ok) throw new Error(String(res.status))
+        // Through a single-use pass (lib/files/fileAccess): the link alone opens nothing.
+        const res = await fetchStoredFile(d.file_url)
         fetched.set(name, new Uint8Array(await res.arrayBuffer()))
       } catch {
         // Left out; the list marks it.

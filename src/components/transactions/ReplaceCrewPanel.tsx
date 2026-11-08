@@ -243,13 +243,13 @@ export default function ReplaceCrewPanel({
             helper_name:      showHelper ? helper.trim() || null : null,
             reason_note:      note.trim(),
           })
-      appToast.success('Crew replaced. The drivers and the client have been told.', { action: 'assign', entityId: bookingId })
+      appToast.success('Driver or vehicle replaced. The drivers and the client have been told.', { action: 'assign', entityId: bookingId })
       setOpen(false)
       setEditing(false)
       await load()
       onReplaced()
     } catch (err) {
-      appToast.error(getApiErrorMessage(err, 'Could not replace the crew.'), { action: 'assign', entityId: bookingId })
+      appToast.error(getApiErrorMessage(err, 'Could not replace the driver or vehicle.'), { action: 'assign', entityId: bookingId })
     } finally {
       setBusy(false)
     }
@@ -285,7 +285,7 @@ export default function ReplaceCrewPanel({
           <p className="text-[12px] leading-snug" style={{ color: MUTED }}>
             {paused
               ? 'The delivery is paused. Press Edit, then send another driver or vehicle (8338 or a vendor), change the second driver, or add a helper. The delivery continues from where it stopped and everything done so far stays on record.'
-              : 'Available only while the delivery is paused (pause it above, for example for a breakdown). The driver already started, so the crew can’t simply be changed.'}
+              : 'Available only while the delivery is paused (pause it above, for example for a breakdown). The driver already started, so the driver or vehicle can’t simply be changed.'}
           </p>
           <div>
             <button type="button" disabled={!paused || !editing || busy} onClick={() => void openPicker()} {...writeAccess(allowed)}
@@ -303,7 +303,7 @@ export default function ReplaceCrewPanel({
           <button type="button" onClick={() => setShowHistory((v) => !v)}
             className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-white/50 cursor-pointer bg-transparent border-none p-0">
             {showHistory ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-            Crew history ({history.length})
+            Replacement history ({history.length})
           </button>
           {showHistory && (
             <ul className="mt-2 flex flex-col gap-3 list-none p-0 m-0">
@@ -358,7 +358,7 @@ export default function ReplaceCrewPanel({
 
             <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-5 py-4 flex flex-col gap-3">
               {/* Where the new crew comes from. */}
-              <div role="radiogroup" aria-label="Crew from" className="grid grid-cols-2 gap-1 rounded-lg border border-white/10 p-1">
+              <div role="radiogroup" aria-label="Replacement from" className="grid grid-cols-2 gap-1 rounded-lg border border-white/10 p-1">
                 {([['company', '8338 fleet'], ['vendor', 'Vendor']] as const).map(([key, label]) => (
                   <button key={key} type="button" role="radio" aria-checked={source === key} disabled={busy}
                     onClick={() => setSource(key)}
@@ -499,11 +499,11 @@ export default function ReplaceCrewPanel({
 
       <ReusableModal
         open={confirming}
-        title={fitWarnings.length > 0 ? 'This vehicle may not fit the load' : 'Replace the crew?'}
+        title={fitWarnings.length > 0 ? 'This vehicle may not fit the load' : 'Replace the driver or vehicle?'}
         description={
           fitWarnings.length > 0
             ? 'You can still send it if you know the load will go, but check first:'
-            : 'The new crew takes over this paused trip, and the drivers and the client will be notified.'
+            : 'The new driver or vehicle takes over this paused trip, and the drivers and the client will be notified.'
         }
         confirmLabel={fitWarnings.length > 0 ? 'Replace anyway' : 'Yes'}
         cancelLabel={fitWarnings.length > 0 ? 'Go back' : 'No'}

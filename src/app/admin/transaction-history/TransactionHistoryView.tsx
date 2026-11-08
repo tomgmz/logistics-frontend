@@ -21,7 +21,7 @@ import StaffTransactionDetail from '@/components/transactions/StaffTransactionDe
 import TransactionRecord from '@/components/transactions/TransactionRecord'
 import { getStatusMeta } from '@/components/transactions/TransactionStatus'
 import { PANEL_BG, Tag } from '@/app/admin/booking-management/BookingDetailParts'
-import { hasOpenClientIssue } from '@/components/transactions/ProblemReportedBadge'
+import ProblemReportedBadge, { hasOpenClientIssue } from '@/components/transactions/ProblemReportedBadge'
 import ResubmittedBadge, { resubmissionsOf } from '@/components/transactions/ResubmittedBadge'
 import DelayedBadge from '@/components/transactions/DelayedBadge'
 import ResubmissionChanges from '@/components/transactions/ResubmissionChanges'
@@ -377,7 +377,7 @@ export default function TransactionHistoryView() {
                         const drops  = getDropoffs(b)
                         const route  = [b.origin as string | undefined, drops[0]]
                           .filter(Boolean).join(' → ')
-                        const meta   = getStatusMeta(b.status, hasOpenClientIssue(b))
+                        const meta   = getStatusMeta(b.status)
                         return (
                           <tr key={id} role="button" tabIndex={0}
                             onClick={() => setSelected(b)}
@@ -412,6 +412,7 @@ export default function TransactionHistoryView() {
                                 <span aria-hidden className="size-1.5 rounded-full" style={{ background: meta.color }} />
                                 {meta.label}
                               </span>
+                              {hasOpenClientIssue(b) && <ProblemReportedBadge note={b.client_issue_note as string | null | undefined} />}
                               <ResubmittedBadge count={resubmissionsOf(b)} />
                               <DelayedBadge booking={b} />
                             </td>
@@ -457,9 +458,14 @@ export default function TransactionHistoryView() {
                   <div className="flex items-center gap-1.5 min-w-0">
                     <ResubmittedBadge className="" count={resubmissionsOf(selected)} />
                     <DelayedBadge className="" booking={selected} />
-                    <Tag color={getStatusMeta(selected.status, hasOpenClientIssue(selected)).color} size="md">
-                      {getStatusMeta(selected.status, hasOpenClientIssue(selected)).label}
-                    </Tag>
+                    <span className="inline-flex flex-col items-start">
+                      <Tag color={getStatusMeta(selected.status).color} size="md">
+                        {getStatusMeta(selected.status).label}
+                      </Tag>
+                      {hasOpenClientIssue(selected) && (
+                        <ProblemReportedBadge note={selected.client_issue_note as string | null | undefined} />
+                      )}
+                    </span>
                     <button type="button" onClick={() => setSelected(null)} aria-label="Close"
                       className="p-2 rounded-lg hover:bg-white/5 text-[#818181] hover:text-white transition-colors cursor-pointer">
                       <X size={19} strokeWidth={2} />

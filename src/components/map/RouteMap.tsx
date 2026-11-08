@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { APIProvider, Map, AdvancedMarker }  from '@vis.gl/react-google-maps'
+import { PH_RESTRICTION, PH_MIN_ZOOM } from '@/lib/philippines-map'
 import { OptimizedStop, OptimizeRouteResponse } from '@/app/types/maps/routemap.types'
 import { motion, AnimatePresence }           from 'framer-motion'
 import LocalShippingIcon  from '@mui/icons-material/LocalShipping'
@@ -347,6 +348,8 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
   const mapContent = routeData ? (
     <Map
       mapId={GOOGLE_MAPS_MAP_ID}
+      restriction={PH_RESTRICTION}
+      minZoom={PH_MIN_ZOOM}
       defaultCenter={{ lat: routeData.origin.latitude, lng: routeData.origin.longitude }}
       defaultZoom={11}
       gestureHandling="greedy"

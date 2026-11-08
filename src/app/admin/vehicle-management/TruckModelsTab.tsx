@@ -31,6 +31,7 @@ import Pagination from '@/components/ui/Pagination'
 import { useVehicleTypeOptions } from '@/lib/hooks/useVehicleTypes'
 import { useServerTable } from '@/lib/hooks/useServerTable'
 import { useDebouncedValue } from '@/lib/hooks/useDebouncedValue'
+import { ProtectedImg } from '@/components/ui/FileViewer'
 
 
 interface ModelFormState {
@@ -525,8 +526,7 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
                   >
                     {imagePreview ? (
                       <>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={imagePreview} alt="Preview" className="w-full h-40 object-cover rounded-xl" />
+                        <ProtectedImg src={imagePreview} alt="Preview" className="w-full h-40 object-cover rounded-xl" />
                         <div className="absolute inset-0 bg-black/50 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center gap-2 rounded-xl">
                           <Upload size={18} className="text-white" />
                           <span className="text-sm font-semibold text-white">Change image</span>
@@ -785,8 +785,7 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
               <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain scrollbar-none [-webkit-overflow-scrolling:touch]">
               <div className="p-4 space-y-4">
                 {viewModel.image_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={viewModel.image_url} alt={viewModel.name} className="w-full h-44 object-cover rounded-xl border border-white/10 bg-black/30" />
+                  <ProtectedImg src={viewModel.image_url} alt={viewModel.name} className="w-full h-44 object-cover rounded-xl border border-white/10 bg-black/30" />
                 ) : (
                   <div className="w-full h-44 rounded-xl border border-white/10 bg-white/[0.04] flex items-center justify-center">
                     <TruckIcon size={40} className="text-white/20" />

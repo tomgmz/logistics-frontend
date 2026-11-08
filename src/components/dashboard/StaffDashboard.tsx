@@ -67,7 +67,7 @@ function cardsFor(role: StaffRole, d: Data): CardSpec[] {
     count: q.gm_pending.count, href: `${base}/booking-management`, icon: <CalendarCheck size={16} />, tone: 'amber',
   }
   const opsCard: CardSpec = {
-    label: 'Needs vehicle and driver', hint: 'Approved bookings to crew',
+    label: 'Needs vehicle and driver', hint: 'Approved bookings to assign',
     count: q.ops_pending.count, href: `${base}/booking-management`, icon: <Truck size={16} />, tone: 'amber',
   }
   const issuesCard: CardSpec = {
@@ -100,7 +100,7 @@ function cardsFor(role: StaffRole, d: Data): CardSpec[] {
     case 'operations_manager':
       return [
         opsCard,
-        { label: 'Dispatching today', hint: 'Crewed bookings leaving today', count: q.dispatch_today.count,
+        { label: 'Dispatching today', hint: 'Assigned bookings leaving today', count: q.dispatch_today.count,
           href: `${base}/booking-management`, icon: <Clock size={16} />, tone: 'cyan' },
         { label: 'In transit', hint: 'Follow them on the map', count: q.in_transit.count,
           href: `${base}/transit-tracking`, icon: <MapPin size={16} />, tone: 'cyan' },
@@ -163,7 +163,7 @@ function listsFor(role: StaffRole, d: Data): ListSpec[] {
       ]
     case 'operations_manager':
       return [
-        { title: 'Choose a vehicle and driver', empty: 'Every approved booking is crewed.', bookings: q.ops_pending.items, total: q.ops_pending.count },
+        { title: 'Choose a vehicle and driver', empty: 'Every approved booking has a vehicle and driver.', bookings: q.ops_pending.items, total: q.ops_pending.count },
         { title: 'Client reported a problem', empty: 'No open problems.', bookings: q.open_issues.items, total: q.open_issues.count },
         // Running 15+ min past the planned arrival (an older backend sends no queue).
         { title: 'Delayed deliveries', empty: 'Every delivery on the road is on time.', bookings: q.delayed?.items ?? [], total: q.delayed?.count ?? 0 },

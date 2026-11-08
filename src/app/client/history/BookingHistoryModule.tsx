@@ -30,7 +30,7 @@ import RejectionPanel from '@/components/transactions/RejectionPanel'
 import CompletionPanel from '@/components/transactions/CompletionPanel'
 import BookingDocuments from '@/components/transactions/BookingDocuments'
 import { StatusBadge, getStatusMeta } from '@/components/transactions/TransactionStatus'
-import { hasOpenClientIssue } from '@/components/transactions/ProblemReportedBadge'
+import ProblemReportedBadge, { hasOpenClientIssue } from '@/components/transactions/ProblemReportedBadge'
 import ResubmittedBadge, { resubmissionsOf } from '@/components/transactions/ResubmittedBadge'
 import DelayedBadge from '@/components/transactions/DelayedBadge'
 import ResubmissionChanges from '@/components/transactions/ResubmissionChanges'
@@ -101,15 +101,18 @@ function SkeletonCard() {
 
 /** The status as the Figma tags it: coloured outline, tinted fill, no icon. */
 function StatusTag({ status, problem = false }: { status: string; problem?: boolean }) {
-  const m = getStatusMeta(status, problem)
+  const m = getStatusMeta(status)
   // Delivered (awaiting the client's confirmation) is white in the Figma, not
-  // the green Completed uses. A reported problem keeps its red.
-  const delivered = asBookingStatus(status) === 'DELIVERED' && !problem
+  // the green Completed uses. A reported problem is a substatus under it.
+  const delivered = asBookingStatus(status) === 'DELIVERED'
   const color = delivered ? '#ffffff' : m.color
   return (
-    <span className="ff-sc !text-xs sm:!text-sm leading-none px-1.5 py-1 rounded-[5px] border whitespace-nowrap"
-      style={{ color, borderColor: color, background: delivered ? 'rgba(255,255,255,0.2)' : `${color}1f` }}>
-      {m.label}
+    <span className="inline-flex flex-col items-end">
+      <span className="ff-sc !text-xs sm:!text-sm leading-none px-1.5 py-1 rounded-[5px] border whitespace-nowrap"
+        style={{ color, borderColor: color, background: delivered ? 'rgba(255,255,255,0.2)' : `${color}1f` }}>
+        {m.label}
+      </span>
+      {problem && delivered && <ProblemReportedBadge />}
     </span>
   )
 }

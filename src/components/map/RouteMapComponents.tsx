@@ -5,7 +5,7 @@ import CheckCircleIcon  from '@mui/icons-material/CheckCircle'
 import PlaceIcon        from '@mui/icons-material/Place'
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'
 import { bookingStatusColor } from '@/lib/palette'
-import { PROBLEM_STATUS_COLOR, PROBLEM_STATUS_LABEL } from '@/components/transactions/ProblemReportedBadge'
+import ProblemReportedBadge from '@/components/transactions/ProblemReportedBadge'
 
 export type BookingStatus =
   | 'PENDING' | 'ASSIGNED' | 'IN_TRANSIT' | 'IN TRANSIT'
@@ -26,17 +26,19 @@ const STATUS_MAP: Record<string, { label: string; color: string; bg: string; bor
 
 export function StatusBadge({ status, problem = false }: { status: string; problem?: boolean }) {
   const key = status.toUpperCase().replace(/-/g, '_')
-  const cfg = problem && key === 'DELIVERED'
-    ? { label: PROBLEM_STATUS_LABEL, color: PROBLEM_STATUS_COLOR, bg: `${PROBLEM_STATUS_COLOR}18`, border: `${PROBLEM_STATUS_COLOR}55` }
-    : STATUS_MAP[key] ?? STATUS_MAP.PENDING
+  const cfg = STATUS_MAP[key] ?? STATUS_MAP.PENDING
 
+  // An open client problem is a substatus under Delivered, not a status of its own.
   return (
-    <span
-      className="inline-flex items-center gap-1.5 text-[10px] font-bold tracking-widest px-2.5 py-1 rounded-full border whitespace-nowrap"
-      style={{ color: cfg.color, background: cfg.bg, borderColor: cfg.border }}
-    >
-      <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: cfg.color }} />
-      {cfg.label.toUpperCase()}
+    <span className="inline-flex flex-col items-end">
+      <span
+        className="inline-flex items-center gap-1.5 text-[10px] font-bold tracking-widest px-2.5 py-1 rounded-full border whitespace-nowrap"
+        style={{ color: cfg.color, background: cfg.bg, borderColor: cfg.border }}
+      >
+        <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: cfg.color }} />
+        {cfg.label.toUpperCase()}
+      </span>
+      {problem && key === 'DELIVERED' && <ProblemReportedBadge />}
     </span>
   )
 }

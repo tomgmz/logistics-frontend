@@ -1550,7 +1550,7 @@ export default function VehicleManagementView() {
                       })}
                     </select>
                     <p className="text-[10px] text-white/25 mt-1">
-                      Who normally drives this vehicle. Operations still picks the crew per booking —
+                      Who normally drives this vehicle. Operations still picks the driver per booking —
                       this fills it in for them, it does not lock the vehicle to one person.
                     </p>
                   </label>

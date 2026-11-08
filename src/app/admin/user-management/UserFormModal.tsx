@@ -46,6 +46,7 @@ import { useRecordLock } from '@/lib/hooks/useRecordLock'
 import { useSignedLinkRefresh } from '@/lib/hooks/useSignedLinkRefresh'
 import RecordLockBanner, { RecordLockBadge } from '@/components/ui/RecordLockBanner'
 import { writeAccess } from '@/components/layout/ModuleAccess'
+import { ProtectedImg } from '@/components/ui/FileViewer'
 
 interface UserFormModalProps {
   tab: UserTab
@@ -859,8 +860,7 @@ export default function UserFormModal({
                     onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setLicenseActions(v => !v) } }}
                     className="relative mb-3 cursor-pointer overflow-hidden rounded-lg border border-[#424242] outline-none focus-visible:border-[#4df9ed]"
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
+                    <ProtectedImg
                       src={licensePreview ?? storedLicenseUrl!}
                       alt="License preview"
                       className="h-32 w-full object-cover"
@@ -1345,8 +1345,7 @@ export default function UserFormModal({
           >
             <X size={20} />
           </button>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <ProtectedImg
             src={licensePreview ?? storedLicenseUrl!}
             alt="Driver license"
             onClick={e => e.stopPropagation()}
