@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { AlertTriangle, CheckCircle2, PackageCheck } from 'lucide-react'
 
-import type { BookingWithRelations } from '@/lib/store/slice/routeMap.slice'
+import type { BookingWithRelations } from '@/lib/types/booking-relations'
 import { bookingService } from '@/lib/services/client/booking.service'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { appToast } from '@/lib/toast'

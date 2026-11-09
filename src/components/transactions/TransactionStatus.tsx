@@ -6,7 +6,7 @@ import {
 import ProblemReportedBadge from './ProblemReportedBadge'
 
 import { type BookingStatus, asBookingStatus } from '@/app/types/maps/routemap.types'
-import type { BookingWithRelations } from '@/lib/store/slice/routeMap.slice'
+import type { BookingWithRelations } from '@/lib/types/booking-relations'
 import { bookingStatusColor } from '@/lib/palette'
 import { formatDateTime } from './transaction-format'
 import { CYAN, MUTED, ERROR, AMBER, GREEN, BORDER_C } from './transaction-theme'

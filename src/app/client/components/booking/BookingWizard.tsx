@@ -6,10 +6,10 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Check, XCircle } from 'lucide-react'
 import StepBookingDetails from './BookingDetails'
 import StepReview from './ReviewBooking'
-import { useAppDispatch, useAppSelector } from '@/lib/hooks/hooks'
-import { setStep, resetBooking, loadResubmitDraft } from '@/lib/store/slice/booking.slice'
+import { useBookingStore } from '@/lib/store/booking.store'
+import { setStep, resetBooking, loadResubmitDraft } from '@/lib/store/booking.store'
 import { bookingService } from '@/lib/services/client/booking.service'
-import type { BookingWithRelations } from '@/lib/store/slice/routeMap.slice'
+import type { BookingWithRelations } from '@/lib/types/booking-relations'
 import { bookingToResubmitDraft, isAwaitingResubmit } from '@/lib/booking-resubmit'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { appToast } from '@/lib/toast'
@@ -37,17 +37,16 @@ function ResubmitLoader({ onLoaded, onLoading }: {
   onLoaded:  () => void
   onLoading: (loading: boolean) => void
 }) {
-  const dispatch     = useAppDispatch()
   const router       = useRouter()
   const id           = useSearchParams().get('resubmit')
-  const loadedId     = useAppSelector((s) => s.booking.resubmit?.bookingId ?? null)
+  const loadedId     = useBookingStore((s) => s.resubmit?.bookingId ?? null)
   const loadedIdRef  = useRef(loadedId)
   loadedIdRef.current = loadedId
 
   useEffect(() => {
     if (!id) {
       if (loadedIdRef.current) {
-        dispatch(resetBooking())
+        resetBooking()
         onLoaded()
       }
       return
@@ -66,7 +65,7 @@ function ResubmitLoader({ onLoaded, onLoading }: {
           router.replace('/client/booking')
           return
         }
-        dispatch(loadResubmitDraft(bookingToResubmitDraft(booking)))
+        loadResubmitDraft(bookingToResubmitDraft(booking))
         onLoaded()
       } catch (err) {
         if (cancelled) return
@@ -77,21 +76,20 @@ function ResubmitLoader({ onLoaded, onLoading }: {
       }
     })()
     return () => { cancelled = true }
-  }, [id, dispatch, router, onLoaded, onLoading])
+  }, [id, router, onLoaded, onLoading])
 
   return null
 }
 
 export default function BookingWizard() {
-  const dispatch = useAppDispatch()
   const router   = useRouter()
-  const step     = useAppSelector((s) => s.booking.step)
-  const service  = useAppSelector((s) => s.booking.service)
-  const resubmit = useAppSelector((s) => s.booking.resubmit)
+  const step     = useBookingStore((s) => s.step)
+  const service  = useBookingStore((s) => s.service)
+  const resubmit = useBookingStore((s) => s.resubmit)
   // The form is restored from this tab's draft before anything reads it, so a
   // reload neither flashes an empty form nor lets ResubmitLoader refetch over
   // the client's edits.
-  const rehydrated = useAppSelector((s) => s.booking._persist?.rehydrated ?? false)
+  const rehydrated = useBookingStore((s) => s.hydrated)
   const [loadingDraft, setLoadingDraft] = useState(false)
 
   const [dir,          setDir]          = useState(1)
@@ -116,20 +114,20 @@ export default function BookingWizard() {
 
   const goNext = () => {
     setDir(1)
-    dispatch(setStep(step + 1))
+    setStep(step + 1)
   }
   const goBack = () => {
     setDir(-1)
-    dispatch(setStep(step - 1))
+    setStep(step - 1)
   }
 
   const handleNewBooking = useCallback(() => {
     setPendingFiles([])
-    dispatch(resetBooking())
+    resetBooking()
     setWizardKey(k => k + 1)
     // Drop a ?resubmit= left over from correcting a rejected booking.
     router.replace('/client/booking')
-  }, [dispatch, router])
+  }, [router])
 
   // A booking loaded for correction starts the wizard over, without any files
   // queued for the previous one.
@@ -171,7 +169,7 @@ export default function BookingWizard() {
                 onClick={() => {
                   if (s.id < step) {
                     setDir(-1)
-                    dispatch(setStep(s.id))
+                    setStep(s.id)
                   }
                 }}
               />

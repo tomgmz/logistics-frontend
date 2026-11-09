@@ -20,6 +20,7 @@ import { pauseReasonLabel } from '@/lib/pause-reasons'
 import { continuationDayLabel, openContinuation, pausedPlanState } from '@/lib/pause-continuation'
 import { formatDuration } from '@/lib/duration'
 import { ProtectedImg } from '@/components/ui/FileViewer'
+import { cachedFetch } from '@/lib/query/useApiQuery'
 
 const SC = { fontFamily: "var(--font-alegreya-sc), 'Alegreya Sans SC', sans-serif" } as const
 
@@ -109,7 +110,13 @@ function useTruckImage(truckType: string, assignedImage: string | null) {
   useEffect(() => {
     if (assignedImage || !truckType) return
     let active = true
-    fetchTruckModels()
+    const pick = (models: Awaited<ReturnType<typeof fetchTruckModels>>) => {
+      const type  = truckType.toLowerCase()
+      const match = models.find(m => (m.vehicle_type ?? '').toLowerCase() === type && !!m.image_url)
+      setImageUrl(match?.image_url ?? null)
+      setLoading(false)
+    }
+    cachedFetch(['truck-models', 'details-panel'], () => fetchTruckModels(), pick)
       .then(models => {
         if (!active) return
         const type  = truckType.toLowerCase()

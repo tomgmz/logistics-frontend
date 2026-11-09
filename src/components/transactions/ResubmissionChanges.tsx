@@ -10,6 +10,7 @@ import { roleLabel } from '@/lib/roles'
 import { SectionHeader } from './TransactionDetail'
 import { formatDateTime, fileNameFromUrl } from './transaction-format'
 import { BG_PANEL, BG_CARD, BORDER, BORDER_C, CYAN, MUTED, ERROR } from './transaction-theme'
+import { cachedFetch } from '@/lib/query/useApiQuery'
 
 /**
  * The old and resubmitted values of a booking the client corrected after a
@@ -165,7 +166,8 @@ export default function ResubmissionChanges({ bookingId, resubmissionCount }: {
   useEffect(() => {
     if (!resubmitted) return
     let cancelled = false
-    bookingService.fetchBookingRevisions(bookingId)
+    cachedFetch(['booking', bookingId, 'revisions'], () => bookingService.fetchBookingRevisions(bookingId),
+      (rows) => { setRevisions(rows ?? []); setError(null) })
       .then((rows) => { if (!cancelled) { setRevisions(rows ?? []); setError(null) } })
       .catch((e) => { if (!cancelled) setError(getApiErrorMessage(e, 'Could not load the earlier values of this booking.')) })
     return () => { cancelled = true }

@@ -79,7 +79,7 @@ import { Plus } from '@untitledui/icons'
 import { useVehicleTypeOptions } from '@/lib/hooks/useVehicleTypes'
 import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
 import { useCachedFetch } from '@/lib/hooks/useCachedFetch'
-import { readCache, writeCache } from '@/lib/cache/queryCache'
+import { cachedData, storeData } from '@/lib/query/useApiQuery'
 
 type FormMode    = 'create' | 'edit' | null
 type ConfirmKind = 'save' | 'archive' | null
@@ -420,10 +420,10 @@ export default function VehicleManagementView() {
   const loadModels = useCallback(async (quiet = false) => {
     try {
       if (!quiet) setListError(null)
-      const cached = quiet ? undefined : readCache<Awaited<ReturnType<typeof adminFetchTruckModels>>>('vehicle-management|models')
+      const cached = quiet ? undefined : cachedData<Awaited<ReturnType<typeof adminFetchTruckModels>>>(['page', 'vehicle-management|models'])
       if (cached) setModels(cached)
       const mList = await adminFetchTruckModels()
-      writeCache('vehicle-management|models', mList)
+      storeData(['page', 'vehicle-management|models'], mList)
       setModels(mList)
     } catch (e) {
       if (!quiet) setListError(getApiErrorMessage(e, 'Request failed. Please try again.'))
@@ -453,13 +453,13 @@ export default function VehicleManagementView() {
       setListMeta({ total: res.meta.total, totalPages: res.meta.totalPages })
     }
     // A page seen before shows at once; the read below refreshes it quietly.
-    const cached = quiet ? undefined : readCache<PageRes>(cacheKey)
+    const cached = quiet ? undefined : cachedData<PageRes>(['page', cacheKey])
     if (cached) { apply(cached); quiet = true; setListLoading(false) }
     try {
       if (!quiet) setListLoading(true)
       setListError(null)
       const res = await adminFetchTrucksPaginated(query)
-      writeCache(cacheKey, res)
+      storeData(['page', cacheKey], res)
       apply(res)
       if (res.meta.totalPages >= 1 && page > res.meta.totalPages - 1) {
         setPage(res.meta.totalPages - 1)
@@ -475,12 +475,12 @@ export default function VehicleManagementView() {
 
   const loadUpkeep = useCallback(async (quiet = false) => {
     try {
-      const cached = quiet ? undefined : readCache<Awaited<ReturnType<typeof adminFetchMaintenanceQueue>>>('vehicle-management|upkeep')
+      const cached = quiet ? undefined : cachedData<Awaited<ReturnType<typeof adminFetchMaintenanceQueue>>>(['page', 'vehicle-management|upkeep'])
       if (cached) { setUpkeep(cached); quiet = true; setUpkeepLoading(false) }
       if (!quiet) setUpkeepLoading(true)
       setUpkeepError(null)
       const queue = await adminFetchMaintenanceQueue()
-      writeCache('vehicle-management|upkeep', queue)
+      storeData(['page', 'vehicle-management|upkeep'], queue)
       setUpkeep(queue)
     } catch (e) {
       if (!quiet) setUpkeepError(getApiErrorMessage(e, 'Could not load the maintenance list. Please try again.'))

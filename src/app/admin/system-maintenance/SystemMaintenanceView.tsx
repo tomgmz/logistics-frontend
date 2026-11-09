@@ -32,7 +32,7 @@ import RefreshButton from '@/components/ui/RefreshButton'
 import Pagination from '@/components/ui/Pagination'
 import { useServerTable } from '@/lib/hooks/useServerTable'
 import { useDebouncedValue } from '@/lib/hooks/useDebouncedValue'
-import { readCache, writeCache } from '@/lib/cache/queryCache'
+import { cachedData, storeData } from '@/lib/query/useApiQuery'
 
 
 const TABS = [
@@ -166,7 +166,7 @@ export default function SystemMaintenanceView() {
     // Coming back: the last dropdown lists show at once (the table has its own
     // cache) and everything is re-read behind them without the page spinner.
     if (!quiet) {
-      const cached = readCache<{ comms: Awaited<ReturnType<typeof systemMaintenanceService.getCommodities>>; types: Awaited<ReturnType<typeof systemMaintenanceService.getVehicleTypes>> }>('system-maintenance|lists')
+      const cached = cachedData<{ comms: Awaited<ReturnType<typeof systemMaintenanceService.getCommodities>>; types: Awaited<ReturnType<typeof systemMaintenanceService.getVehicleTypes>> }>(['page', 'system-maintenance|lists'])
       if (cached) { setCommodities(cached.comms); setVehicleTypes(cached.types); quiet = true }
     }
     try {
@@ -176,7 +176,7 @@ export default function SystemMaintenanceView() {
         systemMaintenanceService.getVehicleTypes(),
         table.reload(true),
       ])
-      writeCache('system-maintenance|lists', { comms, types })
+      storeData(['page', 'system-maintenance|lists'], { comms, types })
       setCommodities(comms)
       setVehicleTypes(types)
     } catch (e: unknown) {

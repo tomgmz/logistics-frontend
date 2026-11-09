@@ -9,20 +9,14 @@ import LocalShippingIcon  from '@mui/icons-material/LocalShipping'
 import SearchIcon         from '@mui/icons-material/Search'
 import ArrowForwardIcon   from '@mui/icons-material/ArrowForward'
 import RefreshIcon        from '@mui/icons-material/Refresh'
-import type { BookingWithRelations }         from '@/lib/store/slice/routeMap.slice'
+import type { BookingWithRelations }         from '@/lib/types/booking-relations'
 import { StatusBadge }                       from './RouteMapComponents'
 import { hasOpenClientIssue }                from '@/components/transactions/ProblemReportedBadge'
 import { DetailsPanelContent }               from './DetailsPanelContent'
 import { RouteStepper, bookingRouteSteps, dropoffSummary }   from './RouteStepper'
 import { DirectionsRenderer }                from './DirectionsRenderer'
-import { useAppDispatch, useAppSelector }    from '@/lib/hooks/hooks'
 import { useAuthStore }                      from '@/lib/store/auth.store'
-import {
-  fetchBookings,
-  fetchRouteAndDetail,
-  clearSelection,
-  setSelectedId,
-} from '@/lib/store/slice/routeMap.slice'
+import { useRouteMap } from '@/lib/hooks/useRouteMap'
 import { statusColor } from './status.colors'
 import { bookingRef } from '@/lib/booking'
 import { useLiveDriverPosition } from '@/lib/hooks/useLiveDriverPosition'
@@ -194,28 +188,29 @@ function EmptyMapState() {
 }
 
 export default function RouteMap({ initialBookingId }: { initialBookingId?: string }) {
-  const dispatch = useAppDispatch()
+  const routeMap = useRouteMap(initialBookingId ?? null)
+  const { loadBookings: rmLoad, select: rmSelect, clear: rmClear, refreshRoute: rmRefresh, reloadRoute: rmReload } = routeMap
 
   const [totalDuration, setTotalDuration] = useState<number>(0)
 
   const user = useAuthStore((s) => s.user)
 
-  const allBookings     = useAppSelector((s) => s.routeMap.bookings)
+  const allBookings     = routeMap.bookings
   // A cancelled booking (rejected, or withdrawn) never moves, so there is
   // nothing to track. It stays visible in Transaction History.
   const bookings        = useMemo(
     () => allBookings.filter((b) => String(b.status).toLowerCase() !== 'cancelled'),
     [allBookings],
   )
-  const listLoading     = useAppSelector((s) => s.routeMap.listLoading)
-  const listError       = useAppSelector((s) => s.routeMap.listError)
-  const selectedId      = useAppSelector((s) => s.routeMap.selectedId)
-  const routeData       = useAppSelector((s) => s.routeMap.routeData)
-  const bookingDetail   = useAppSelector((s) => s.routeMap.bookingDetail)
-  const stops           = useAppSelector((s) => s.routeMap.stops)
-  const encodedPolyline = useAppSelector((s) => s.routeMap.encodedPolyline)
-  const detailLoading   = useAppSelector((s) => s.routeMap.detailLoading)
-  const detailError     = useAppSelector((s) => s.routeMap.detailError)
+  const listLoading     = routeMap.listLoading
+  const listError       = routeMap.listError
+  const selectedId      = routeMap.selectedId
+  const routeData       = routeMap.routeData
+  const bookingDetail   = routeMap.bookingDetail
+  const stops           = routeMap.stops
+  const encodedPolyline = routeMap.encodedPolyline
+  const detailLoading   = routeMap.detailLoading
+  const detailError     = routeMap.detailError
 
   const [search,          setSearch]          = useState('')
   const [activeFilter,    setActiveFilter]    = useState<FilterKey>('All')
@@ -259,8 +254,8 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
   const latestPoint = live.latest ? { lat: live.latest.latitude, lng: live.latest.longitude } : null
 
   const loadBookings = useCallback(() => {
-    dispatch(fetchBookings(user))
-  }, [dispatch, user])
+    rmLoad()
+  }, [rmLoad])
 
   useEffect(() => {
     if (!user) return
@@ -275,21 +270,14 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
     loadBookings()
   })
 
-  useEffect(() => {
-    if (!initialBookingId) return
-    dispatch(setSelectedId(initialBookingId))
-    dispatch(fetchRouteAndDetail(initialBookingId))
-  }, [initialBookingId, dispatch])
-
   // The driver loaded a run, confirmed a drop-off or chose which one to do
   // next: re-read the route so the stepper shows where the truck is heading.
-  useRouteChanged(selectedId, () => { if (selectedId) dispatch(fetchRouteAndDetail(selectedId)) })
+  useRouteChanged(selectedId, () => { rmRefresh() })
 
   const selectBooking = useCallback(
     (bookingId: string) => {
       if (selectedId === bookingId) return
-      dispatch(setSelectedId(bookingId))
-      dispatch(fetchRouteAndDetail(bookingId))
+      rmSelect(bookingId)
       setTotalDuration(0)
       setDetailPanelOpen(true)
       setFollowing(true)
@@ -297,14 +285,14 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
         setMobileView('map')
       }
     },
-    [dispatch, selectedId],
+    [rmSelect, selectedId],
   )
 
   const handleClearSelection = useCallback(() => {
-    dispatch(clearSelection())
+    rmClear()
     setMobileView('list')
     setDetailPanelOpen(true)
-  }, [dispatch])
+  }, [rmClear])
 
   const resolvedDuration = encodedPolyline
     ? (routeData?.total_duration ?? 0) * 60
@@ -336,7 +324,7 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
     <div className="p-6 text-center">
       <p className="text-red-400 text-sm mb-3">{detailError}</p>
       <button
-        onClick={() => selectedId && dispatch(fetchRouteAndDetail(selectedId))}
+        onClick={() => { void rmReload() }}
         className="text-[13px] border px-4 py-2 rounded-lg transition-colors"
         style={{ color: 'var(--color-cyan)', borderColor: 'rgba(77,249,237,0.3)' }}
       >

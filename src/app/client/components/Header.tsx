@@ -4,12 +4,11 @@ import { motion } from 'framer-motion'
 import { Bell, MessageCircle, Menu } from 'lucide-react'
 import Image from 'next/image'
 import { ASSETS } from '@/lib/data'
-import { useAppDispatch, useAppSelector } from '@/lib/hooks/hooks'
-import { setSidebarOpen } from '@/lib/store/slice/booking.slice'
+import { useBookingStore } from '@/lib/store/booking.store'
+import { setSidebarOpen } from '@/lib/store/booking.store'
 
 export default function Header() {
-  const dispatch    = useAppDispatch()
-  const sidebarOpen = useAppSelector((s) => s.booking.sidebarOpen)
+  const sidebarOpen = useBookingStore((s) => s.sidebarOpen)
 
   return (
     <motion.header
@@ -21,7 +20,7 @@ export default function Header() {
     >
       <div className="flex items-center gap-3">
         <button
-          onClick={() => dispatch(setSidebarOpen(!sidebarOpen))}
+          onClick={() => setSidebarOpen(!sidebarOpen)}
           className="lg:hidden p-2 rounded-lg hover:bg-white/5 text-white transition-colors"
         >
           <Menu size={20} />

@@ -18,6 +18,7 @@ import { PALETTE } from '@/lib/palette'
 import { codingFlagFor } from '@/lib/number-coding'
 import { OFFICE_CLOSE_HOUR, OFFICE_HOURS_LABEL, OFFICE_OPEN_HOUR } from '@/lib/office-hours'
 import { MapPointLink } from '@/components/map/LocationMapModal'
+import { cachedFetch } from '@/lib/query/useApiQuery'
 
 /**
  * Staff view of the pauses on one booking: a way to pause a delivery in
@@ -128,7 +129,7 @@ export default function PausePanel({ bookingId, pausedAt, inTransit, canControl,
 
   const load = useCallback(async () => {
     try {
-      setPauses(await pauseService.list(bookingId))
+      setPauses(await cachedFetch(['booking', bookingId, 'pauses'], () => pauseService.list(bookingId), setPauses))
     } catch {
       // Read-only extra; the booking still renders without it.
       setPauses([])

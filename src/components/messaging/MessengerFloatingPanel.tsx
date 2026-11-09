@@ -15,6 +15,7 @@ import { useIsMobile } from '@/lib/hooks/useIsMobile'
 import { toConversation, toGroup } from '@/app/types/messaging/messaging.types'
 import { formatConversationTime } from '@/app/utils/messaging.utils'
 import type { Conversation, Group } from '@/app/types/messaging/messaging.types'
+import { cachedData, storeData } from '@/lib/query/useApiQuery'
 
 type Tab = 'All' | 'Unread'
 type PanelItem =
@@ -37,7 +38,9 @@ export default function MessengerFloatingPanel() {
   const [tab, setTab]                     = useState<Tab>('All')
 
   const fetchAll = useCallback(async () => {
-    setLoading(true)
+    // Opened before: show the last lists at once (TanStack Query cache).
+    const cached = cachedData<{ convs: Conversation[]; grps: Group[] }>(['messaging', 'panel'])
+    if (cached) { setConversations(cached.convs); setGroups(cached.grps) } else setLoading(true)
     try {
       const [rawConvs, rawGroups] = await Promise.all([
         messagingService.getConversations(),
@@ -45,6 +48,7 @@ export default function MessengerFloatingPanel() {
       ])
       const convs  = rawConvs.map(toConversation)
       const grps   = rawGroups.map(toGroup)
+      storeData(['messaging', 'panel'], { convs, grps })
       setConversations(convs)
       setGroups(grps)
       const pendingInvites = grps.filter(g => g.my_status === 'pending').length

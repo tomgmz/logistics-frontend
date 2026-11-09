@@ -1,5 +1,5 @@
 import proxyApi, { initCsrf } from '@/lib/api/auth.api'
-import type { BookingWithRelations } from '@/lib/store/slice/routeMap.slice'
+import type { BookingWithRelations } from '@/lib/types/booking-relations'
 
 interface ApiResponse<T> {
   status: string

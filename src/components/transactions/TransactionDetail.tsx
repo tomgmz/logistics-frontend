@@ -6,7 +6,7 @@ import {
   AlertCircle, Download, Eye, FileText, MessageSquare,
 } from 'lucide-react'
 
-import type { BookingWithRelations } from '@/lib/store/slice/routeMap.slice'
+import type { BookingWithRelations } from '@/lib/types/booking-relations'
 import { bookingRef } from '@/lib/booking'
 import { StatusBadge, StatusTimeline } from './TransactionStatus'
 import { hasOpenClientIssue } from './ProblemReportedBadge'

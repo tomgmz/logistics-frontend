@@ -106,6 +106,7 @@ function DmItem({ conv, index, isSelected, currentUserId, onSelect, isOnline }: 
       transition={{ delay: index * 0.03, duration: 0.2 }}
       whileTap={{ scale: 0.98 }}
       onClick={() => onSelect(conv)}
+      data-testid="conversation-item"
       className={`relative w-full flex items-center gap-3 px-3 py-3 rounded-xl mb-0.5 text-left transition-colors cursor-pointer ${isSelected ? 'glass-surface border border-[var(--color-cyan)]/20' : 'hover:bg-white/[0.04] border border-transparent'}`}
     >
       <div className="relative shrink-0">
@@ -148,6 +149,7 @@ function GroupItem({ group, index, isSelected, onSelect }: {
       transition={{ delay: index * 0.03, duration: 0.2 }}
       whileTap={{ scale: 0.98 }}
       onClick={() => onSelect(group)}
+      data-testid="conversation-item"
       className={`relative w-full flex items-center gap-3 px-3 py-3 rounded-xl mb-0.5 text-left transition-colors cursor-pointer ${isSelected ? 'glass-surface border border-[var(--color-cyan)]/20' : 'hover:bg-white/[0.04] border border-transparent'}`}
     >
       <div className="relative shrink-0">

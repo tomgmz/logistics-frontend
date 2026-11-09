@@ -52,7 +52,7 @@ import {
 } from '@/lib/services/admin/assignment.service'
 import { driverService } from '@/lib/services/admin/user-management.service'
 import { adminFetchTrucks } from '@/lib/services/admin/trucks.service'
-import { readCache, writeCache } from '@/lib/cache/queryCache'
+import { cachedData, storeData } from '@/lib/query/useApiQuery'
 import type { DriverUser } from '@/app/types/admin/user-management.types'
 import { isAssignable, type Truck as TruckType } from '@/app/types/truck.types'
 import { BLOWBAGETS_ITEMS } from '@/lib/blowbagets'
@@ -85,7 +85,7 @@ import DrivingShiftsPanel from '@/components/transactions/DrivingShiftsPanel'
 import BreakdownPanel from '@/components/transactions/BreakdownPanel'
 import OfficeProgressPanel from '@/components/transactions/OfficeProgressPanel'
 import { pauseReasonLabel } from '@/lib/services/admin/pause.service'
-import type { BookingWithRelations } from '@/lib/store/slice/routeMap.slice'
+import type { BookingWithRelations } from '@/lib/types/booking-relations'
 import { useRecordLock, useRecordLocks } from '@/lib/hooks/useRecordLock'
 import RecordLockBanner, { RecordLockBadge } from '@/components/ui/RecordLockBanner'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
@@ -1389,16 +1389,16 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
   useEffect(() => {
     // The fleet and assignment lists are large; show the last copy at once on
     // a return visit and re-read both behind it.
-    const cachedTrucks = readCache<TruckType[]>('booking-management|trucks')
-    const cachedAssign = readCache<AssignmentRecord[]>('booking-management|assignments')
+    const cachedTrucks = cachedData<TruckType[]>(['page', 'booking-management|trucks'])
+    const cachedAssign = cachedData<AssignmentRecord[]>(['page', 'booking-management|assignments'])
     if (cachedTrucks) setTrucks(cachedTrucks)
     if (cachedAssign) setAllAssignments(cachedAssign)
     void Promise.all([
       adminFetchTrucks()
-        .then((t) => { writeCache('booking-management|trucks', t); setTrucks(t) })
+        .then((t) => { storeData(['page', 'booking-management|trucks'], t); setTrucks(t) })
         .catch(() => { if (!cachedTrucks) setTrucks([]) }),
       assignmentService.getAll()
-        .then((a) => { writeCache('booking-management|assignments', a); setAllAssignments(a) })
+        .then((a) => { storeData(['page', 'booking-management|assignments'], a); setAllAssignments(a) })
         .catch(() => { if (!cachedAssign) setAllAssignments([]) }),
     ])
   }, [])
@@ -1480,13 +1480,13 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     }
     // Coming back to this page (or a page seen before): show the last answer
     // at once and re-read quietly behind it.
-    const cached = quiet ? undefined : readCache<PageRes>(cacheKey)
+    const cached = quiet ? undefined : cachedData<PageRes>(['page', cacheKey])
     if (cached) { apply(cached); quiet = true; setListLoading(false) }
     try {
       if (!quiet) setListLoading(true)
       setListError(null)
       const res = await bookingService.fetchBookingsAdminPaginated(query)
-      writeCache(cacheKey, res)
+      storeData(['page', cacheKey], res)
       apply(res)
       if (res.meta.totalPages >= 1 && page > res.meta.totalPages - 1) {
         setPage(res.meta.totalPages - 1)

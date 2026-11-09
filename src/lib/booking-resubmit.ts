@@ -1,5 +1,5 @@
-import type { BookingWithRelations } from '@/lib/store/slice/routeMap.slice'
-import { makeDefaultGroup, type DropoffSection, type ItemGroup } from '@/lib/store/slice/booking.slice'
+import type { BookingWithRelations } from '@/lib/types/booking-relations'
+import { makeDefaultGroup, type DropoffSection, type ItemGroup } from '@/lib/store/booking.store'
 
 /**
  * Whether a booking is an 8338 rejection still waiting on the client — the

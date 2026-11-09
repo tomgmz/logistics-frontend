@@ -1,7 +1,7 @@
 /**
  * The client booking draft survives a reload of the same tab, and nothing more.
  *
- * The form itself is the Redux `booking` slice, persisted by redux-persist into
+ * The form itself is the Zustand booking store (booking.store.ts), saved into
  * sessionStorage (one copy per tab, gone when the tab closes). The attached
  * documents are File objects, which JSON storage cannot hold, so they go to
  * IndexedDB under an id kept in that same tab's sessionStorage. IndexedDB is
@@ -24,21 +24,6 @@ function session(): Storage | null {
   } catch {
     return null
   }
-}
-
-/** redux-persist storage engine over sessionStorage; a no-op on the server. */
-export const sessionDraftStorage = {
-  getItem(key: string): Promise<string | null> {
-    try { return Promise.resolve(session()?.getItem(key) ?? null) } catch { return Promise.resolve(null) }
-  },
-  setItem(key: string, value: string): Promise<void> {
-    try { session()?.setItem(key, value) } catch { /* full or blocked: the draft just won't survive */ }
-    return Promise.resolve()
-  },
-  removeItem(key: string): Promise<void> {
-    try { session()?.removeItem(key) } catch { /* ignore */ }
-    return Promise.resolve()
-  },
 }
 
 function tabId(): string | null {
@@ -122,9 +107,11 @@ export async function saveDraftFiles(files: File[]): Promise<void> {
 
 /**
  * Drops this tab's draft at once. Synchronous for the form, so it is gone even
- * when a sign-out navigates away before redux-persist's next write.
+ * when a sign-out navigates away before the store's next write. Also removes a
+ * draft saved by the older Redux build (`persist:booking`).
  */
 export function clearBookingDraft(): void {
+  try { session()?.removeItem(`${BOOKING_PERSIST_KEY}-form`) } catch { /* ignore */ }
   try { session()?.removeItem(`persist:${BOOKING_PERSIST_KEY}`) } catch { /* ignore */ }
   void saveDraftFiles([])
 }

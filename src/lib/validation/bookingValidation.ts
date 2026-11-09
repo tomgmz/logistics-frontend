@@ -1,4 +1,4 @@
-import type { CargoMode, ItemGroup, DropoffSection } from '@/lib/store/slice/booking.slice'
+import type { CargoMode, ItemGroup, DropoffSection } from '@/lib/store/booking.store'
 import { nowDate } from '@/app/utils/serverTime'
 import { phDay, phDayPlusMonth, phEarliestBookableDay, phTimeHHMM, SAME_DAY_LATEST_CALL_TIME } from '@/lib/ph-date'
 

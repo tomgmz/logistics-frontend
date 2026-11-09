@@ -23,6 +23,7 @@ import MessageInput from './MessageInput'
 import MessageBubble from './MessageBubble'
 import { MessageDateDivider, TypingMessage } from './MessageItem'
 import { roleLabel, nameWithRole } from '@/lib/roles'
+import { cachedFetch } from '@/lib/query/useApiQuery'
 
 const BUBBLE_W   = 338
 const BUBBLE_GAP = 10
@@ -97,8 +98,11 @@ export default function MessengerChatBubble({ conversationId, index }: Props) {
 
   const fetchMessages = useCallback(async () => {
     try {
-      const raw = await messagingService.getMessages(conversationId)
-      setMessages(raw.map(toMessage))
+      // Opened before: that history shows at once, then the fresh read replaces it.
+      const msgs = await cachedFetch(['messaging', 'bubble-dm', conversationId],
+        async () => (await messagingService.getMessages(conversationId)).map(toMessage),
+        (m) => { setMessages(m); setLMsgs(false) })
+      setMessages(msgs)
     } catch { /* silent */ }
     finally { setLMsgs(false) }
   }, [conversationId])

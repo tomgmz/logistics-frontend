@@ -138,6 +138,49 @@ for (const role of ROLES) {
       }
     })
 
+    test('Messages opens, and shows the inbox from the cache on return', async ({}, info) => {
+      test.skip(!page, 'Read Only account runs in chromium only')
+      test.skip(role === 'client', 'clients read messages in the help assistant, not /messages')
+      const ITEM = page.locator('[data-testid="conversation-item"]')
+
+      drain(watch)
+      await page.goto(`${portal}/dashboard`)
+      await settle(page)
+      // Open Messages the way a person does (header button), not by reload.
+      await page.getByRole('button', { name: 'Messages' }).first().click()
+      await page.waitForURL((u) => u.pathname === '/messages')
+      await settle(page)
+      const seen = drain(watch)
+      expect.soft(seen.pageErrors, 'Messages: script errors').toEqual([])
+      expect.soft(seen.serverErrors, 'Messages: server errors').toEqual([])
+      expect.soft(await page.getByText(ERROR_TEXT).count(), 'Messages: error message on screen').toBe(0)
+
+      const hasInbox = await ITEM.first().waitFor({ state: 'visible', timeout: 20_000 }).then(() => true, () => false)
+      if (!hasInbox) { info.annotations.push({ type: 'note', description: 'no conversations for this seed account' }); return }
+      const firstItem = (await ITEM.first().innerText()).split(/[\t\r\n]+/).map((t) => t.trim()).find(Boolean) ?? ''
+
+      // Away to the dashboard and back, with every data request held for 4 s:
+      // the inbox showing before then can only come from the cache.
+      // Messages has no sidebar; Back returns to the dashboard without a reload.
+      await page.goBack()
+      await page.waitForURL((u) => u.pathname === `${portal}/dashboard`)
+      await settle(page)
+      const isData = (u: URL) => u.port === '4000' || u.pathname.startsWith('/api/proxy/')
+      const hold = async (r: import('@playwright/test').Route) => {
+        await new Promise((ok) => setTimeout(ok, 4_000))
+        await r.continue().catch(() => {})
+      }
+      await page.route(isData, hold)
+      try {
+        await page.getByRole('button', { name: 'Messages' }).first().click()
+        await page.waitForURL((u) => u.pathname === '/messages')
+        await expect.soft(ITEM.filter({ hasText: firstItem }).first(), 'Messages: inbox shown from the cache')
+          .toBeVisible({ timeout: 2_500 })
+      } finally {
+        await page.unroute(isData, hold)
+      }
+    })
+
     if (role === 'admin_readonly') {
       test('Read Only: action buttons are disabled', async () => {
         test.skip(!page, 'Read Only account runs in chromium only')

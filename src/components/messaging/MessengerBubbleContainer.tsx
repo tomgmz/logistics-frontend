@@ -13,6 +13,7 @@ import { toConversation, toGroup, toGroupMessage, toMessage } from '@/app/types/
 import type { Conversation, Group, GroupMessage, Message } from '@/app/types/messaging/messaging.types'
 import MessengerChatBubble  from './MessengerChatBubble'
 import MessengerGroupBubble from './MessengerGroupBubble'
+import { cachedData, cachedFetch } from '@/lib/query/useApiQuery'
 
 export function MessengerBubbleContainer() {
   const { openChats } = useMessengerStore()
@@ -55,31 +56,47 @@ function MinimizedBubbleItem({ chat, stackIndex }: { chat: ChatEntry; stackIndex
     async function load() {
       try {
         if (chat.kind === 'dm') {
+          // From the shared cache at once when seen before, then fresh.
+          const show = (rawConvs: Awaited<ReturnType<typeof messagingService.getConversations>>, rawMsgs: Awaited<ReturnType<typeof messagingService.getMessages>>) => {
+            const found = rawConvs.find(c => c.conversation_id === chat.id)
+            if (found) setConv(toConversation(found))
+            const mapped = rawMsgs.map(toMessage) as Message[]
+            if (mapped.length) {
+              const last = mapped[mapped.length - 1]
+              setPreview(last.sender_id === currentUserId ? `You: ${last.body}` : last.body)
+            }
+          }
+          const k1 = ['messaging', 'raw-convs'] as const, k2 = ['messaging', 'raw-dm', chat.id] as const
+          const c1 = cachedData<Awaited<ReturnType<typeof messagingService.getConversations>>>(k1)
+          const c2 = cachedData<Awaited<ReturnType<typeof messagingService.getMessages>>>(k2)
+          if (c1 && c2) show(c1, c2)
           const [rawConvs, rawMsgs] = await Promise.all([
-            messagingService.getConversations(),
-            messagingService.getMessages(chat.id),
+            cachedFetch(k1, () => messagingService.getConversations()),
+            cachedFetch(k2, () => messagingService.getMessages(chat.id)),
           ])
           if (cancelled) return
-          const found = rawConvs.find(c => c.conversation_id === chat.id)
-          if (found) setConv(toConversation(found))
-          const mapped = rawMsgs.map(toMessage) as Message[]
-          if (mapped.length) {
-            const last = mapped[mapped.length - 1]
-            setPreview(last.sender_id === currentUserId ? `You: ${last.body}` : last.body)
-          }
+          show(rawConvs, rawMsgs)
         } else {
+          // From the shared cache at once when seen before, then fresh.
+          const show = (rawGroups: Awaited<ReturnType<typeof messagingService.getGroups>>, rawMsgs: Awaited<ReturnType<typeof messagingService.getGroupMessages>>) => {
+            const found = rawGroups.find(g => g.group_id === chat.id)
+            if (found) setGroup(toGroup(found))
+            const mapped = rawMsgs.map(toGroupMessage) as GroupMessage[]
+            if (mapped.length) {
+              const last = mapped[mapped.length - 1]
+              setPreview(last.sender_id === currentUserId ? `You: ${last.body}` : last.body)
+            }
+          }
+          const k1 = ['messaging', 'raw-groups'] as const, k2 = ['messaging', 'raw-group', chat.id] as const
+          const c1 = cachedData<Awaited<ReturnType<typeof messagingService.getGroups>>>(k1)
+          const c2 = cachedData<Awaited<ReturnType<typeof messagingService.getGroupMessages>>>(k2)
+          if (c1 && c2) show(c1, c2)
           const [rawGroups, rawMsgs] = await Promise.all([
-            messagingService.getGroups(),
-            messagingService.getGroupMessages(chat.id),
+            cachedFetch(k1, () => messagingService.getGroups()),
+            cachedFetch(k2, () => messagingService.getGroupMessages(chat.id)),
           ])
           if (cancelled) return
-          const found = rawGroups.find(g => g.group_id === chat.id)
-          if (found) setGroup(toGroup(found))
-          const mapped = rawMsgs.map(toGroupMessage) as GroupMessage[]
-          if (mapped.length) {
-            const last = mapped[mapped.length - 1]
-            setPreview(last.sender_id === currentUserId ? `You: ${last.body}` : last.body)
-          }
+          show(rawGroups, rawMsgs)
         }
       } catch { /* silent */ }
     }

@@ -1,7 +1,7 @@
 import type {
   BookingWithRelations,
   BookingDestination,
-} from '@/lib/store/slice/routeMap.slice'
+} from '@/lib/types/booking-relations'
 
 /**
  * Formatters and field readers shared by the client and staff transaction

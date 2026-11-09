@@ -28,6 +28,7 @@ import { STOWAGE_FACTOR } from '@/lib/cargo/capacity'
 import DriverCallTime from './DriverCallTime'
 import { writeAccess } from '@/components/layout/ModuleAccess'
 import { FileViewButton } from '@/components/ui/FileViewer'
+import { cachedFetch } from '@/lib/query/useApiQuery'
 
 /**
  * How many runs the assigned vehicle makes, which drop-offs each serves, and
@@ -160,7 +161,7 @@ export default function TripPlanner({ detail, canEdit, allowed = true, capacity 
   const refresh = useCallback(async () => {
     setLoading(true)
     try {
-      setTrips(await tripService.getTrips(bookingId))
+      setTrips(await cachedFetch(['trips', bookingId], () => tripService.getTrips(bookingId), (t) => { setTrips(t); setLoading(false) }))
       setLoadError(null)
     } catch (e) {
       setLoadError(getApiErrorMessage(e, 'The trip plan could not be loaded.'))

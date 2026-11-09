@@ -19,6 +19,7 @@ import {
 } from '@/app/types/documents.types'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
+import { cachedFetch } from '@/lib/query/useApiQuery'
 
 // Mirrors the backend's uploadDocuments middleware.
 const MAX_FILES = 3
@@ -165,7 +166,9 @@ export default function UploadDocumentModal({
     if (!open || docType !== 'other') return
     let cancelled = false
     setLabelHints([])
-    fetchOtherLabels(isVehicle ? 'vehicle' : 'booking').then((l) => { if (!cancelled) setLabelHints(l) }).catch(() => {})
+    const kind = isVehicle ? 'vehicle' : 'booking'
+    cachedFetch(['document-labels', kind], () => fetchOtherLabels(kind), setLabelHints)
+      .then((l) => { if (!cancelled) setLabelHints(l) }).catch(() => {})
     return () => { cancelled = true }
   }, [open, docType, isVehicle])
   const typed = otherLabel.trim().toLowerCase()

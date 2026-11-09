@@ -23,6 +23,7 @@ import {
 } from '@/lib/services/support.service'
 import { useIsMobile } from '@/lib/hooks/useIsMobile'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
+import { cachedFetch } from '@/lib/query/useApiQuery'
 
 /**
  * The help assistant: an FAQ chatbot, and a ticket to our team when it can't
@@ -187,14 +188,14 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
     if (!ticketOpen || bookings.length > 0) return
     const clientId = user?.clients?.client_id
     if (!clientId) return
-    authApi.get(`/booking/client/${clientId}`)
-      .then((res) => {
-        const rows = (res.data?.data ?? []) as Array<{ booking_id: string; reference_number?: string | null; schedule_date?: string | null; status: string }>
-        setBookings(rows.slice(0, 30).map((b) => ({
-          booking_id: b.booking_id,
-          label: `${bookingRef(b)}${b.schedule_date ? ` · ${b.schedule_date}` : ''} · ${b.status.replace(/_/g, ' ')}`,
-        })))
-      })
+    type Row = { booking_id: string; reference_number?: string | null; schedule_date?: string | null; status: string }
+    const apply = (rows: Row[]) => setBookings(rows.slice(0, 30).map((b) => ({
+      booking_id: b.booking_id,
+      label: `${bookingRef(b)}${b.schedule_date ? ` · ${b.schedule_date}` : ''} · ${b.status.replace(/_/g, ' ')}`,
+    })))
+    cachedFetch(['help', 'ticket-bookings', clientId],
+      async () => ((await authApi.get(`/booking/client/${clientId}`)).data?.data ?? []) as Row[], apply)
+      .then(apply)
       .catch(() => setBookings([]))
   }, [ticketOpen, bookings.length, user])
 

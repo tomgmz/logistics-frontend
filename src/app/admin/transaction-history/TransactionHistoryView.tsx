@@ -10,7 +10,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { AnimatePresence, motion } from 'framer-motion'
 import { AlertCircle, Download, X } from 'lucide-react'
 
-import type { BookingWithRelations } from '@/lib/store/slice/routeMap.slice'
+import type { BookingWithRelations } from '@/lib/types/booking-relations'
 import { bookingRef } from '@/lib/booking'
 import { bookingService } from '@/lib/services/client/booking.service'
 import { useModuleAccess } from '@/components/layout/ModuleAccess'
@@ -41,7 +41,7 @@ import { TabsMinimal } from '@/components/ui/untitled/tabs'
 import { Button } from '@/components/ui/untitled/button'
 import type { DateRange } from '@/components/ui/untitled/date-range-picker'
 import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
-import { readCache, writeCache } from '@/lib/cache/queryCache'
+import { cachedData, storeData } from '@/lib/query/useApiQuery'
 /**
  * Transaction history for staff — the client's own history widened across every
  * company.
@@ -175,7 +175,7 @@ export default function TransactionHistoryView() {
     const cacheKey = `transaction-history|${JSON.stringify(query)}`
     type ListRes = Awaited<ReturnType<typeof transactionHistoryService.list>>
     // A page seen before shows at once; the read below refreshes it quietly.
-    const cached = quiet ? undefined : readCache<ListRes>(cacheKey)
+    const cached = quiet ? undefined : cachedData<ListRes>(['page', cacheKey])
     if (cached) { setRows(cached.rows); setMeta(cached.meta); setLoading(false); quiet = true }
     if (!quiet) {
       setLoading(true)
@@ -185,7 +185,7 @@ export default function TransactionHistoryView() {
       // The cards above the table read the same response's status counts, so
       // they can never describe a different query than the table.
       const list = await transactionHistoryService.list(query)
-      writeCache(cacheKey, list)
+      storeData(['page', cacheKey], list)
       setRows(list.rows)
       setMeta(list.meta)
       if (list.meta.totalPages >= 1 && page > list.meta.totalPages - 1) {

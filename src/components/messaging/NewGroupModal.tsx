@@ -6,6 +6,7 @@ import { X, Search, Loader2, Users, Check } from 'lucide-react'
 import { messagingService } from '@/lib/services/messaging.service'
 import type { MessagableUser } from '@/lib/services/messaging.service'
 import { roleLabel, matchesPersonSearch } from '@/lib/roles'
+import { cachedFetch } from '@/lib/query/useApiQuery'
 
 interface NewGroupModalProps {
   onClose: () => void
@@ -23,8 +24,8 @@ export default function NewGroupModal({ onClose, onGroupCreated }: NewGroupModal
   const searchRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    messagingService.getMessagableUsers()
-      // Clients talk one-to-one only; the API refuses them in groups.
+    // Clients talk one-to-one only; the API refuses them in groups.
+    cachedFetch(['messaging', 'contacts'], () => messagingService.getMessagableUsers(), (us) => { setUsers(us.filter(u => u.role !== 'client')); setLoading(false) })
       .then(us => setUsers(us.filter(u => u.role !== 'client')))
       .catch(() => setError('Could not load contacts'))
       .finally(() => setLoading(false))

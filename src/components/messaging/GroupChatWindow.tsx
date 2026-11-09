@@ -22,6 +22,7 @@ import type {
   ReactionTogglePayload,
 } from '@/app/types/messaging/messaging.types'
 import { toGroupMessage, PHOTO_PLACEHOLDER } from '@/app/types/messaging/messaging.types'
+import { cachedData, storeData } from '@/lib/query/useApiQuery'
 
 interface ReplyTo     { messageId: string; content: string; senderName: string }
 
@@ -132,11 +133,16 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
 
   const fetchMessages = useCallback(async () => {
     if (isPending) { setLoading(false); return }
+    // Opened before: show that history at once (TanStack Query cache), then
+    // the fresh read replaces it. Only fresh reads are saved.
+    const key    = ['messaging', 'group', group.id] as const
+    const cached = cachedData<GroupMessage[]>(key)
     try {
       setError(null)
-      setLoading(true)
+      if (cached) { setMessages(cached); setLoading(false) } else setLoading(true)
       const raw  = await messagingService.getGroupMessages(group.id)
       const msgs = raw.map(coerce)
+      storeData(key, msgs)
       setMessages(msgs)
       if (msgs.length) messagingService.markGroupRead(group.id).catch(() => {})
     } catch (err) {

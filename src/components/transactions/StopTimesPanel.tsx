@@ -20,6 +20,7 @@ import { formatDateTime } from './transaction-format'
 import { PALETTE } from '@/lib/palette'
 import { BORDER_C, CYAN, MUTED } from './transaction-theme'
 import { writeAccess } from '@/components/layout/ModuleAccess'
+import { cachedFetch } from '@/lib/query/useApiQuery'
 
 const ORANGE = PALETTE.orange
 
@@ -125,7 +126,8 @@ export default function StopTimesPanel({ bookingId, staff = false, canEdit = fal
   useEffect(() => {
     let cancelled = false
     // A read-only extra; the booking still renders without it.
-    fetchTimeline().then((rows) => { if (!cancelled) setTrips(rows ?? []) }).catch(() => {})
+    cachedFetch(['booking', bookingId, 'stop-times', staff ? 'staff' : 'client'], fetchTimeline, (rows) => setTrips(rows ?? []))
+      .then((rows) => { if (!cancelled) setTrips(rows ?? []) }).catch(() => {})
     return () => { cancelled = true }
   }, [fetchTimeline])
   // An arrival or a driver's tap lands while the page is open.

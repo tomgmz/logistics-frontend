@@ -17,6 +17,7 @@ import { SectionHeader } from './TransactionDetail'
 import { formatDateTime } from './transaction-format'
 import { BG_PANEL, BG_CARD, BORDER, BORDER_C, CYAN, MUTED, ERROR } from './transaction-theme'
 import { FileViewButton } from '@/components/ui/FileViewer'
+import { cachedFetch } from '@/lib/query/useApiQuery'
 
 /**
  * Every file on one booking that its client may see, for the client's own
@@ -89,7 +90,8 @@ export default function BookingDocuments({ bookingId }: { bookingId: string }) {
 
   useEffect(() => {
     let cancelled = false
-    bookingService.fetchBookingDocuments(bookingId)
+    cachedFetch(['booking', bookingId, 'documents'], () => bookingService.fetchBookingDocuments(bookingId),
+      (rows) => { setDocs(rows ?? []); setError(null) })
       .then((rows) => { if (!cancelled) { setDocs(rows ?? []); setError(null) } })
       .catch((e) => { if (!cancelled) setError(getApiErrorMessage(e, 'Could not load the documents for this booking.')) })
     return () => { cancelled = true }

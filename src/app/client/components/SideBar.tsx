@@ -8,8 +8,8 @@ import '../components/booking/BookingDetails.css'
 import { useEffect, useState } from 'react'
 import { logout } from '@/lib/api/auth.api'
 import { useAuthStore } from '@/lib/store/auth.store'
-import { useAppDispatch, useAppSelector } from '@/lib/hooks/hooks'
-import { setSidebarOpen } from '@/lib/store/slice/booking.slice'
+import { useBookingStore } from '@/lib/store/booking.store'
+import { setSidebarOpen } from '@/lib/store/booking.store'
 import ReusableModal from '@/components/layout/ReusableModal'
 import SigningOutOverlay from '@/components/layout/SigningOutOverlay'
 import { History, CalendarCheck, MapPin, CreditCard } from 'lucide-react'
@@ -38,8 +38,7 @@ function useIsMobile() {
 export default function Sidebar() {
   const pathname        = usePathname()
   const isMobile        = useIsMobile()
-  const dispatch        = useAppDispatch()
-  const sidebarOpen     = useAppSelector((s) => s.booking.sidebarOpen)
+  const sidebarOpen     = useBookingStore((s) => s.sidebarOpen)
   // Open over the page on phones: keep the page under it still (iOS).
   useBodyScrollLock(isMobile && sidebarOpen)
   const user            = useAuthStore((state) => state.user)
@@ -47,7 +46,7 @@ export default function Sidebar() {
   const [logoutModalOpen, setLogoutModalOpen] = useState(false)
   const [signingOut,      setSigningOut]      = useState(false)
 
-  const open = (val: boolean) => dispatch(setSidebarOpen(val))
+  const open = (val: boolean) => setSidebarOpen(val)
 
   const handleLogout = async () => {
     // Swap the confirm modal for the full-screen loader; it stays up until the
@@ -75,8 +74,8 @@ export default function Sidebar() {
   }
 
   useEffect(() => {
-    if (isMobile) dispatch(setSidebarOpen(false))
-  }, [pathname, isMobile, dispatch])
+    if (isMobile) setSidebarOpen(false)
+  }, [pathname, isMobile])
 
   return (
     <>

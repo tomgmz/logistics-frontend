@@ -6,6 +6,7 @@ import { getProfile, type Profile, type ProfileContract } from '@/lib/api/auth.a
 import { roleLabel } from '@/lib/roles'
 import { formatContractDay } from '@/lib/contract-status'
 import { Skeleton } from '@/components/ui/Skeleton'
+import { cachedFetch } from '@/lib/query/useApiQuery'
 
 /**
  * The Profile page (2026-11-07), opened from the user card in the sidebar.
@@ -49,7 +50,7 @@ export default function ProfileView() {
   const [loadError, setLoadError] = useState(false)
 
   const fetchProfile = useCallback(() => {
-    getProfile().then(setProfile, () => setLoadError(true))
+    cachedFetch(['profile'], () => getProfile(), setProfile).then(setProfile, () => setLoadError(true))
   }, [])
 
   useEffect(() => { fetchProfile() }, [fetchProfile])

@@ -16,6 +16,7 @@ import PhotoSendDialog, { MAX_PHOTO_BYTES } from '@/components/messaging/PhotoSe
 import MessageItem from '@/components/messaging/MessageItem'
 import { BookingMentionMenu, useBookingMentionPicker } from '@/components/messaging/BookingMention'
 import JumpToLatest from '@/components/messaging/JumpToLatest'
+import { cachedData, cachedFetch } from '@/lib/query/useApiQuery'
 
 /**
  * The client's messages, inside the help assistant rather than the staff
@@ -79,14 +80,20 @@ export function useClientMessages(userId: string | undefined, visible: boolean) 
 
   const refresh = useCallback(async () => {
     if (!userId) return
-    setLoading(true)
+    // Seen before: the lists show at once (cache), then refresh.
+    const apply = ([convs, ds]: [
+      Awaited<ReturnType<typeof messagingService.getConversations>>,
+      Awaited<ReturnType<typeof messagingService.getMessagableUsers>>,
+    ]) => { setConversations(convs); setDrivers(ds) }
+    const key    = ['messaging', 'client-inbox'] as const
+    const cached = cachedData<Parameters<typeof apply>[0]>(key)
+    if (cached) apply(cached); else setLoading(true)
     try {
-      const [convs, ds] = await Promise.all([
+      const fresh = await cachedFetch(key, () => Promise.all([
         messagingService.getConversations(),
         messagingService.getMessagableUsers(),
-      ])
-      setConversations(convs)
-      setDrivers(ds)
+      ]))
+      apply(fresh)
     } catch { /* keep the last list */ }
     finally { setLoading(false) }
   }, [userId])
@@ -102,11 +109,13 @@ export function useClientMessages(userId: string | undefined, visible: boolean) 
   const openConversation = useCallback(async (conversationId: string) => {
     setThread({ kind: 'conversation', id: conversationId })
     setSendError(null)
-    setMessages([])
-    setThreadLoading(true)
+    const key    = ['messaging', 'client-thread', conversationId] as const
+    const cached = cachedData<Awaited<ReturnType<typeof messagingService.getMessages>>>(key)
+    setMessages(cached ?? [])
+    setThreadLoading(!cached)
     setConversations((prev) => prev.map((c) => (c.conversation_id === conversationId ? { ...c, unread_count: 0 } : c)))
     try {
-      setMessages(await messagingService.getMessages(conversationId, { limit: 50 }))
+      setMessages(await cachedFetch(key, () => messagingService.getMessages(conversationId, { limit: 50 })))
       void messagingService.markAsRead(conversationId).catch(() => {})
     } catch { /* the thread shows empty */ }
     finally { setThreadLoading(false) }

@@ -24,6 +24,7 @@ import { useMessagingRealtime } from '@/lib/hooks/useMessagingRealtime'
 import MessageItem, { MessageDateDivider, TypingMessage } from './MessageItem'
 import MessageInput from './MessageInput'
 import type { DeleteScope } from './ConfirmDeleteDialog'
+import { cachedFetch } from '@/lib/query/useApiQuery'
 
 const BUBBLE_W   = 338
 const BUBBLE_GAP = 10
@@ -116,8 +117,10 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
 
   const fetchMessages = useCallback(async () => {
     try {
-      const raw  = await messagingService.getGroupMessages(groupId)
-      const msgs = raw.map(coerce)
+      // Opened before: that history shows at once, then the fresh read replaces it.
+      const msgs = await cachedFetch(['messaging', 'bubble-group', groupId],
+        async () => (await messagingService.getGroupMessages(groupId)).map(coerce),
+        (m) => { setMessages(m); setLM(false) })
       setMessages(msgs)
       if (msgs.length) messagingService.markGroupRead(groupId).catch(() => {})
     } catch { /* silent */ }

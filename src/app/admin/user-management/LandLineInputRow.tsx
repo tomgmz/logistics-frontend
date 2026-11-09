@@ -3,6 +3,7 @@
 import { useEffect, useState, type InputHTMLAttributes } from 'react'
 import { systemMaintenanceService, type LandlinePrefix } from '@/lib/services/admin/system-maintenance.service'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
+import { cachedFetch } from '@/lib/query/useApiQuery'
 
 const inputBase =
   'w-full rounded-[10px] border border-[#424242] bg-[#2a2a2a99] px-3 py-2 text-[13px] text-white placeholder-[#555] outline-none transition-colors duration-150 focus:border-[#4df9ed] hover:border-[#4df9ed50]'
@@ -56,7 +57,8 @@ export default function LandlineInputRow({ value, onChange, error }: LandlineInp
   const [areaCodes, setAreaCodes] = useState<LandlinePrefix[]>([])
 
   function loadPrefixes() {
-    systemMaintenanceService.getLandlinePrefixes()
+    cachedFetch(['landline-prefixes'], () => systemMaintenanceService.getLandlinePrefixes(),
+      prefixes => setAreaCodes(prefixes.filter(p => p.is_active)))
       .then(prefixes => setAreaCodes(prefixes.filter(p => p.is_active)))
       .catch(() => {})
   }

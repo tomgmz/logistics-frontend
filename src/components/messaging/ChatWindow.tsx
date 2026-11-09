@@ -21,6 +21,7 @@ import type {
 } from '@/app/types/messaging/messaging.types'
 import { toMessage, PHOTO_PLACEHOLDER } from '@/app/types/messaging/messaging.types'
 import { roleLabel, nameWithRole } from '@/lib/roles'
+import { cachedData, storeData } from '@/lib/query/useApiQuery'
 
 interface ReplyTo { messageId: string; content: string; senderName: string }
 
@@ -106,11 +107,18 @@ export default function ChatWindow({ conversation, draftUser, currentUserId, isP
   const fetchMessages = useCallback(async () => {
     // A draft has no conversation yet — nothing to load.
     if (!convId) { setMessages([]); setLoading(false); return }
+    // Opened before: show that history at once (TanStack Query cache), then
+    // the fresh read replaces it. Only fresh reads are saved, so one chat's
+    // messages can never be saved under another.
+    const key    = ['messaging', 'dm', convId] as const
+    const cached = cachedData<Message[]>(key)
     try {
       setError(null)
-      setLoading(true)
-      const raw = await messagingService.getMessages(convId)
-      setMessages(raw.map(toMessage2))
+      if (cached) { setMessages(cached); setLoading(false) } else setLoading(true)
+      const raw  = await messagingService.getMessages(convId)
+      const msgs = raw.map(toMessage2)
+      storeData(key, msgs)
+      setMessages(msgs)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load messages')
     } finally {

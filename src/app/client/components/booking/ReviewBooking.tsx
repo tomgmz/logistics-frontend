@@ -5,9 +5,9 @@ import { isAxiosError } from 'axios'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Truck } from 'lucide-react'
 import Image from 'next/image'
-import { useAppSelector, useAppDispatch } from '@/lib/hooks/hooks'
-import type { ServiceType, DropoffSection, CargoMode } from '@/lib/store/slice/booking.slice'
-import { resetBooking } from '@/lib/store/slice/booking.slice'
+import { useBookingStore } from '@/lib/store/booking.store'
+import type { ServiceType, DropoffSection, CargoMode } from '@/lib/store/booking.store'
+import { resetBooking } from '@/lib/store/booking.store'
 import { bookingService } from '@/lib/services/client/booking.service'
 import { calcCargoSummary, palletizedGroup, looseGroup } from '@/lib/cargo/summary'
 import type { CargoItemPayload } from '@/lib/services/client/booking.service'
@@ -83,7 +83,6 @@ function buildCargoItems(
 }
 
 export default function StepReview({ selectedService, pendingFiles, onBack, onNewBooking, onClearFiles }: Props) {
-  const dispatch = useAppDispatch()
 
   const [loading,        setLoading]        = useState(false)
   const [submitted,      setSubmitted]      = useState(false)
@@ -94,18 +93,18 @@ export default function StepReview({ selectedService, pendingFiles, onBack, onNe
 
   // Set when correcting a rejected booking: it is resubmitted in place instead
   // of booked anew, and keeps whichever of its documents the client left on it.
-  const resubmit      = useAppSelector((s) => s.booking.resubmit)
+  const resubmit      = useBookingStore((s) => s.resubmit)
   const keptDocuments = resubmit?.existingDocuments ?? []
 
-  const pickupLat     = useAppSelector((s) => s.booking.pickupLat)
-  const pickupLng     = useAppSelector((s) => s.booking.pickupLng)
-  const dropoffCoords = useAppSelector((s) => s.booking.dropoffCoords)
-  const date          = useAppSelector((s) => s.booking.date)
-  const time          = useAppSelector((s) => s.booking.time)
-  const pickup        = useAppSelector((s) => s.booking.pickup)
-  const dropoffs      = useAppSelector((s) => s.booking.dropoffs)
-  const mode          = useAppSelector((s) => s.booking.mode)
-  const sections      = useAppSelector((s) => s.booking.sections)
+  const pickupLat     = useBookingStore((s) => s.pickupLat)
+  const pickupLng     = useBookingStore((s) => s.pickupLng)
+  const dropoffCoords = useBookingStore((s) => s.dropoffCoords)
+  const date          = useBookingStore((s) => s.date)
+  const time          = useBookingStore((s) => s.time)
+  const pickup        = useBookingStore((s) => s.pickup)
+  const dropoffs      = useBookingStore((s) => s.dropoffs)
+  const mode          = useBookingStore((s) => s.mode)
+  const sections      = useBookingStore((s) => s.sections)
 
   const allGroups = sections.flatMap((s) => s.groups)
 
@@ -236,7 +235,7 @@ export default function StepReview({ selectedService, pendingFiles, onBack, onNe
 
       setBookingId(bookingReference)
       setWasResubmit(!!resubmit)
-      dispatch(resetBooking())
+      resetBooking()
       onClearFiles()
       setSubmitted(true)
 

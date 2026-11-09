@@ -56,7 +56,12 @@ export async function signIn(browser: Browser, info: TestInfo, role: Role) {
 
   const page: Page = await context.newPage()
   const watch: Watch = { pageErrors: [], serverErrors: [], denied: [] }
-  page.on('pageerror', (e) => watch.pageErrors.push(e.message))
+  page.on('pageerror', (e) => {
+    // WebKit reports a Next.js prefetch (?_rsc=) cancelled by leaving the page
+    // as an error; Chrome and Firefox don't. Not an app fault, so not counted.
+    if (/_rsc=.*access control checks/.test(e.message)) return
+    watch.pageErrors.push(e.message)
+  })
   page.on('response', (res) => {
     const url = res.url()
     if (!/\/api\//.test(url)) return

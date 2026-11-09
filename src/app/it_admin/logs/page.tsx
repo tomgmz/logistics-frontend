@@ -34,6 +34,7 @@ import {
 } from '@/lib/services/admin/system-logs.service'
 
 import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
+import { cachedData, storeData } from '@/lib/query/useApiQuery'
 // Types now come from the service — see system-logs.service.ts. They used to be
 // declared here because there was no system-logs endpoint to type against.
 export type { SystemLogLevel, SystemLogEventType, SystemLogStats }
@@ -115,13 +116,18 @@ function AuditLogsTab({ switcher }: { switcher: ReactNode }) {
 
   const fetchLogs = useCallback(async () => {
     clearPending()
-    setLoading(true)
+    // A page seen before shows at once; the read below refreshes it.
+    const key    = ['it-logs', 'audit', filterKey, page, PAGE_SIZE] as const
+    const cached = cachedData<Awaited<ReturnType<typeof auditLogService.getAll>>>(key)
+    if (cached) { setLogs(cached.data); setTotal(cached.total); setLoading(false) } else setLoading(true)
     setError(null)
     try {
       const res = await auditLogService.getAll({ ...JSON.parse(filterKey), page, limit: PAGE_SIZE })
+      storeData(key, res)
       setLogs(res.data)
       setTotal(res.total)
     } catch (e: unknown) {
+      if (cached) return
       const err = e as { response?: { data?: { message?: string } }; message?: string }
       setError(err.response?.data?.message ?? err.message ?? 'Failed to fetch logs')
     } finally {
@@ -270,17 +276,22 @@ function SystemLogsTab({ switcher }: { switcher: ReactNode }) {
     let cancelled = false
     clearPending()
     const run = async () => {
-      setLoading(true)
+      // A page seen before shows at once; the read below refreshes it.
+      const key    = ['it-logs', 'system', filterKey, page, PAGE_SIZE] as const
+      const cached = cachedData<Awaited<ReturnType<typeof systemLogService.getAll>>>(key)
+      if (cached) { setLogs(cached.data); setTotal(cached.total); setLoading(false) } else setLoading(true)
       setError(null)
       try {
         // Paginated server-side: system logs are written by machines and this
         // table grows far faster than the audit one.
         const res = await systemLogService.getAll({ ...JSON.parse(filterKey), page, limit: PAGE_SIZE })
+        storeData(key, res)
         if (!cancelled) {
           setLogs(res.data)
           setTotal(res.total)
         }
       } catch (e: unknown) {
+        if (cached) return
         const err = e as { response?: { data?: { message?: string } }; message?: string }
         if (!cancelled) setError(err.response?.data?.message ?? err.message ?? 'Failed to fetch system logs')
       } finally {

@@ -1,4 +1,4 @@
-import type { CargoMode, DropoffSection, ItemGroup } from '@/lib/store/slice/booking.slice'
+import type { CargoMode, DropoffSection, ItemGroup } from '@/lib/store/booking.store'
 
 /**
  * The one cargo summary calculation.

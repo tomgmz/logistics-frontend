@@ -11,6 +11,7 @@ import { messagingService } from '@/lib/services/messaging.service'
 import { toConversation, toMessage, toGroup, toGroupMessage } from '@/app/types/messaging/messaging.types'
 import type { Conversation, Message, Group, GroupMessage } from '@/app/types/messaging/messaging.types'
 import type { ChatEntry } from '@/lib/store/messenger.store'
+import { cachedData, cachedFetch } from '@/lib/query/useApiQuery'
 
 const BUBBLE_SIZE = 56
 const BUBBLE_GAP = 10
@@ -38,25 +39,41 @@ function MinimizedBubbleItem({ chat, stackIndex }: MinimizedBubbleItemProps) {
     async function load() {
       try {
         if (chat.kind === 'dm') {
+          // From the shared cache at once when seen before, then fresh.
+          const show = (rawConvs: Awaited<ReturnType<typeof messagingService.getConversations>>, rawMsgs: Awaited<ReturnType<typeof messagingService.getMessages>>) => {
+            const found = rawConvs.find(c => c.conversation_id === chat.id)
+            if (found) setConv(toConversation(found))
+            const mapped = rawMsgs.map(toMessage)
+            if (mapped.length > 0) setLatestMsg(mapped[mapped.length - 1])
+          }
+          const k1 = ['messaging', 'raw-convs'] as const, k2 = ['messaging', 'raw-dm', chat.id] as const
+          const c1 = cachedData<Awaited<ReturnType<typeof messagingService.getConversations>>>(k1)
+          const c2 = cachedData<Awaited<ReturnType<typeof messagingService.getMessages>>>(k2)
+          if (c1 && c2) show(c1, c2)
           const [rawConvs, rawMsgs] = await Promise.all([
-            messagingService.getConversations(),
-            messagingService.getMessages(chat.id),
+            cachedFetch(k1, () => messagingService.getConversations()),
+            cachedFetch(k2, () => messagingService.getMessages(chat.id)),
           ])
           if (cancelled) return
-          const found = rawConvs.find(c => c.conversation_id === chat.id)
-          if (found) setConv(toConversation(found))
-          const mapped = rawMsgs.map(toMessage)
-          if (mapped.length > 0) setLatestMsg(mapped[mapped.length - 1])
+          show(rawConvs, rawMsgs)
         } else {
+          // From the shared cache at once when seen before, then fresh.
+          const show = (rawGroups: Awaited<ReturnType<typeof messagingService.getGroups>>, rawMsgs: Awaited<ReturnType<typeof messagingService.getGroupMessages>>) => {
+            const found = rawGroups.find(g => g.group_id === chat.id)
+            if (found) setGroup(toGroup(found))
+            const mapped = rawMsgs.map(toGroupMessage)
+            if (mapped.length > 0) setLatestMsg(mapped[mapped.length - 1])
+          }
+          const k1 = ['messaging', 'raw-groups'] as const, k2 = ['messaging', 'raw-group', chat.id] as const
+          const c1 = cachedData<Awaited<ReturnType<typeof messagingService.getGroups>>>(k1)
+          const c2 = cachedData<Awaited<ReturnType<typeof messagingService.getGroupMessages>>>(k2)
+          if (c1 && c2) show(c1, c2)
           const [rawGroups, rawMsgs] = await Promise.all([
-            messagingService.getGroups(),
-            messagingService.getGroupMessages(chat.id),
+            cachedFetch(k1, () => messagingService.getGroups()),
+            cachedFetch(k2, () => messagingService.getGroupMessages(chat.id)),
           ])
           if (cancelled) return
-          const found = rawGroups.find(g => g.group_id === chat.id)
-          if (found) setGroup(toGroup(found))
-          const mapped = rawMsgs.map(toGroupMessage)
-          if (mapped.length > 0) setLatestMsg(mapped[mapped.length - 1])
+          show(rawGroups, rawMsgs)
         }
       } catch {
         // silent

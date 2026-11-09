@@ -23,6 +23,7 @@ import { formatDateTime } from './transaction-format'
 import { PALETTE } from '@/lib/palette'
 import { BORDER_C, CYAN, MUTED } from './transaction-theme'
 import { FileViewButton } from '@/components/ui/FileViewer'
+import { cachedFetch } from '@/lib/query/useApiQuery'
 
 const ORANGE = PALETTE.orange
 
@@ -132,7 +133,9 @@ export default function ReplaceCrewPanel({
   }, [open, bookingId])
 
   const load = useCallback(async () => {
-    try { setHistory(await assignmentService.getReplacements(bookingId)) } catch { setHistory([]) }
+    try {
+      setHistory(await cachedFetch(['booking', bookingId, 'replacements'], () => assignmentService.getReplacements(bookingId), setHistory))
+    } catch { setHistory([]) }
   }, [bookingId])
   useEffect(() => { void load() }, [load, paused])
 

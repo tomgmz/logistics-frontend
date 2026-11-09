@@ -10,7 +10,7 @@ import ReusableModal from "../layout/ReusableModal";
 import { now } from "@/app/utils/serverTime";
 import { useIsMobile } from "@/lib/hooks/useIsMobile";
 import { expandCode, roleLabel } from "@/lib/roles";
-import { useNotificationStore, NOTIFICATIONS_PAGE_SIZE } from "@/lib/store/notification.store";
+import { useNotifications, NOTIFICATIONS_PAGE_SIZE } from "@/lib/query/notifications";
 import { useNotificationsRealtime } from "@/hooks/useNotificationsRealtime";
 import { useSessionRevokedRealtime } from "@/hooks/useSessionRevokedRealtime";
 import Pagination from "@/components/ui/Pagination";
@@ -367,17 +367,7 @@ export default function NotificationIcon() {
   // Mounted with the header in every signed-in portal, like the bell itself.
   useSessionRevokedRealtime();
 
-  const notifications = useNotificationStore((s) => s.items);
-  const unreadCount = useNotificationStore((s) => s.unreadCount);
-  const markRead = useNotificationStore((s) => s.markRead);
-  const markAllRead = useNotificationStore((s) => s.markAllRead);
-  const page        = useNotificationStore((s) => s.page);
-  const total       = useNotificationStore((s) => s.total);
-  const totalPages  = useNotificationStore((s) => s.totalPages);
-  const pageLoading = useNotificationStore((s) => s.pageLoading);
-  const goToPage    = useNotificationStore((s) => s.goToPage);
-  const filter      = useNotificationStore((s) => s.filter);
-  const setFilter   = useNotificationStore((s) => s.setFilter);
+  const { items: notifications, unreadCount, markRead, markAllRead, page, total, totalPages, pageLoading, goToPage, filter, setFilter } = useNotifications();
   const role        = useAuthStore((s) => s.user?.role ?? "");
   const filterOptions = FILTERS_BY_ROLE[role] ?? DEFAULT_FILTERS;
 

@@ -12,15 +12,9 @@ import LocalShippingIcon from '@mui/icons-material/LocalShipping'
 import { DirectionsRenderer } from '@/components/map/DirectionsRenderer'
 import { DetailsPanelContent } from '@/components/map/DetailsPanelContent'
 import { statusColor } from '@/components/map/status.colors'
-import { useAppDispatch, useAppSelector } from '@/lib/hooks/hooks'
 import { useAuthStore } from '@/lib/store/auth.store'
-import {
-  fetchBookings,
-  fetchRouteAndDetail,
-  clearSelection,
-  setSelectedId,
-  type BookingWithRelations,
-} from '@/lib/store/slice/routeMap.slice'
+import { useRouteMap } from '@/lib/hooks/useRouteMap'
+import type { BookingWithRelations } from '@/lib/types/booking-relations'
 import type { OptimizedStop, OptimizeRouteResponse } from '@/app/types/maps/routemap.types'
 import { bookingRef } from '@/lib/booking'
 import { useLiveDriverPosition } from '@/lib/hooks/useLiveDriverPosition'
@@ -220,24 +214,25 @@ function FitBounds({ fitKey, points }: { fitKey: string | null; points: { lat: n
 }
 
 export default function TransitTrackingView() {
-  const dispatch = useAppDispatch()
+  const routeMap = useRouteMap()
+  const { loadBookings: rmLoad, select: rmSelect, clear: rmClear, refreshRoute: rmRefresh, reloadRoute: rmReload } = routeMap
   const user     = useAuthStore((s) => s.user)
 
-  const bookings        = useAppSelector((s) => s.routeMap.bookings)
+  const bookings        = routeMap.bookings
   // Which trucks on the fleet map are paused, so their label says so.
   const pausedBookingIds = useMemo(
     () => new Set(bookings.filter((b) => (b as { paused_at?: string | null }).paused_at).map((b) => String(b.booking_id))),
     [bookings],
   )
-  const listLoading     = useAppSelector((s) => s.routeMap.listLoading)
-  const listError       = useAppSelector((s) => s.routeMap.listError)
-  const selectedId      = useAppSelector((s) => s.routeMap.selectedId)
-  const routeData       = useAppSelector((s) => s.routeMap.routeData)
-  const bookingDetail   = useAppSelector((s) => s.routeMap.bookingDetail)
-  const stops           = useAppSelector((s) => s.routeMap.stops)
-  const encodedPolyline = useAppSelector((s) => s.routeMap.encodedPolyline)
-  const detailLoading   = useAppSelector((s) => s.routeMap.detailLoading)
-  const detailError     = useAppSelector((s) => s.routeMap.detailError)
+  const listLoading     = routeMap.listLoading
+  const listError       = routeMap.listError
+  const selectedId      = routeMap.selectedId
+  const routeData       = routeMap.routeData
+  const bookingDetail   = routeMap.bookingDetail
+  const stops           = routeMap.stops
+  const encodedPolyline = routeMap.encodedPolyline
+  const detailLoading   = routeMap.detailLoading
+  const detailError     = routeMap.detailError
 
   const [search,        setSearch]        = useState('')
   const [activeFilter,  setActiveFilter]  = useState<FilterKey>('Active')
@@ -249,10 +244,9 @@ export default function TransitTrackingView() {
   const fleet = useFleetPositions()
 
   const loadBookings = useCallback(() => {
-    dispatch(fetchBookings(user))
-  }, [dispatch, user])
+    rmLoad()
+  }, [rmLoad])
 
-  useEffect(() => { dispatch(clearSelection()) }, [dispatch])
   useEffect(() => { if (!user) return; loadBookings() }, [loadBookings, user])
   // Live: a pause starting or ending, a stop confirmed — the cards follow
   // without a reload (DB triggers broadcast on live:bookings).
@@ -273,23 +267,22 @@ export default function TransitTrackingView() {
 
   // The driver loaded a run, confirmed a drop-off or chose which one to do
   // next: re-read the route so the stepper shows where the truck is heading.
-  useRouteChanged(selectedId, () => { if (selectedId) dispatch(fetchRouteAndDetail(selectedId)) })
+  useRouteChanged(selectedId, () => { rmRefresh() })
 
   const selectBooking = useCallback((bookingId: string) => {
     if (selectedId === bookingId) return
-    dispatch(setSelectedId(bookingId))
-    dispatch(fetchRouteAndDetail(bookingId))
+    rmSelect(bookingId)
     setTotalDuration(0)
     setDetailOpen(true)
     setMapMode('single')
     setFollowing(true)
-  }, [dispatch, selectedId])
+  }, [rmSelect, selectedId])
 
   const clearSelected = useCallback(() => {
-    dispatch(clearSelection())
+    rmClear()
     setDetailOpen(true)
     setMapMode('all')
-  }, [dispatch])
+  }, [rmClear])
 
   const encoded          = routeData ? getEncodedPolyline(routeData) : null
   const resolvedDuration = encoded ? (routeData?.total_duration ?? 0) * 60 : totalDuration
@@ -340,7 +333,7 @@ export default function TransitTrackingView() {
       <p className="text-red-400 text-sm mb-3">{detailError}</p>
       <button
         type="button"
-        onClick={() => selectedId && dispatch(fetchRouteAndDetail(selectedId))}
+        onClick={() => { void rmReload() }}
         className="text-[13px] border px-4 py-2 rounded-lg transition-colors"
         style={{ color: 'var(--color-cyan)', borderColor: 'rgba(77,249,237,0.3)' }}
       >

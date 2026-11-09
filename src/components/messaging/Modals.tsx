@@ -6,6 +6,7 @@ import { X, Search, Loader2, Users, Check, MessageCirclePlus } from 'lucide-reac
 import { messagingService } from '@/lib/services/messaging.service'
 import type { MessagableUser } from '@/lib/services/messaging.service'
 import { roleLabel, matchesPersonSearch } from '@/lib/roles'
+import { cachedFetch } from '@/lib/query/useApiQuery'
 
 function ModalShell({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
   return (
@@ -42,7 +43,7 @@ export function NewConversationModal({ onClose, onConversationReady }: NewConver
   const searchRef               = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    messagingService.getMessagableUsers()
+    cachedFetch(['messaging', 'contacts'], () => messagingService.getMessagableUsers(), (us) => { setUsers(us); setLoading(false) })
       .then(setUsers)
       .catch(() => setError('Could not load contacts'))
       .finally(() => setLoading(false))
@@ -124,7 +125,7 @@ export function NewGroupModal({ onClose, onGroupCreated }: NewGroupModalProps) {
   const searchRef               = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    messagingService.getMessagableUsers()
+    cachedFetch(['messaging', 'contacts'], () => messagingService.getMessagableUsers(), (us) => { setUsers(us); setLoading(false) })
       .then(setUsers)
       .catch(() => setError('Could not load contacts'))
       .finally(() => setLoading(false))

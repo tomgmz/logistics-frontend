@@ -7,7 +7,7 @@ import {
   Plus, X, Check, Info, File,
   ChevronLeft, ChevronRight,
 } from 'lucide-react'
-import { useAppDispatch, useAppSelector } from '@/lib/hooks/hooks'
+import { useBookingStore } from '@/lib/store/booking.store'
 import {
   setDate, setTime, setPickup,
   setPickupCoords,
@@ -20,8 +20,8 @@ import {
   setAllStackable, setAllOversize,
   makeDefaultGroup,
   removeExistingDocument,
-} from '@/lib/store/slice/booking.slice'
-import type { CargoMode, ItemGroup, WeightUnit } from '@/lib/store/slice/booking.slice'
+} from '@/lib/store/booking.store'
+import type { CargoMode, ItemGroup, WeightUnit } from '@/lib/store/booking.store'
 import { documentName, draftFingerprint } from '@/lib/booking-resubmit'
 
 // Stable empty list, so the selector below does not hand back a new array
@@ -64,6 +64,7 @@ import ContractEndedBanner from '@/components/client/ContractEndedBanner'
 import { phDayPlusMonth, phEarliestBookableDay } from '@/lib/ph-date'
 import { FileViewButton } from '@/components/ui/FileViewer'
 import { fetchStoredFile } from '@/lib/files/fileAccess'
+import { cachedFetch } from '@/lib/query/useApiQuery'
 
 interface Props {
   onNext: () => void
@@ -697,24 +698,23 @@ function LocationField({
 }
 
 export default function StepBookingDetails({ onNext, onBack, files, onFilesChange }: Props) {
-  const dispatch = useAppDispatch()
 
-  const date         = useAppSelector((s) => s.booking.date)
-  const time         = useAppSelector((s) => s.booking.time)
-  const pickup       = useAppSelector((s) => s.booking.pickup)
-  const dropoffs     = useAppSelector((s) => s.booking.dropoffs)
-  const mode         = useAppSelector((s) => s.booking.mode)
-  const sections     = useAppSelector(selectSections)
+  const date         = useBookingStore((s) => s.date)
+  const time         = useBookingStore((s) => s.time)
+  const pickup       = useBookingStore((s) => s.pickup)
+  const dropoffs     = useBookingStore((s) => s.dropoffs)
+  const mode         = useBookingStore((s) => s.mode)
+  const sections     = useBookingStore(selectSections)
   // Documents already on a rejected booking being corrected. They count toward
   // the required document and the three-file limit, like newly chosen ones.
-  const keptDocs     = useAppSelector((s) => s.booking.resubmit?.existingDocuments) ?? NO_DOCS
+  const keptDocs     = useBookingStore((s) => s.resubmit?.existingDocuments) ?? NO_DOCS
   const docCount     = files.length + keptDocs.length
 
   // Correcting a rejected booking: nothing to resubmit until something changed.
-  const resubmitBaseline = useAppSelector((s) => s.booking.resubmit?.baseline ?? null)
-  const pickupLat        = useAppSelector((s) => s.booking.pickupLat)
-  const pickupLng        = useAppSelector((s) => s.booking.pickupLng)
-  const dropoffCoords    = useAppSelector((s) => s.booking.dropoffCoords)
+  const resubmitBaseline = useBookingStore((s) => s.resubmit?.baseline ?? null)
+  const pickupLat        = useBookingStore((s) => s.pickupLat)
+  const pickupLng        = useBookingStore((s) => s.pickupLng)
+  const dropoffCoords    = useBookingStore((s) => s.dropoffCoords)
   const unchanged = resubmitBaseline !== null
     && files.length === 0
     && draftFingerprint({
@@ -765,20 +765,26 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
   const catalogMounted = useRef(true)
   // quiet = a live re-read: a failure keeps the lists already on screen, no toast.
   function loadCatalog(quiet = false) {
-    return Promise.all([
+    const apply = ([comms, prods, codes]: [
+      Awaited<ReturnType<typeof cargoCatalogService.getCommodities>>,
+      Awaited<ReturnType<typeof cargoCatalogService.getProducts>>,
+      Awaited<ReturnType<typeof cargoCatalogService.getHandlingCodes>>,
+    ]) => {
+      if (!catalogMounted.current) return
+      setCommodities(comms)
+      setProductsCatalog(prods)
+      setShcStandardList(codes)
+      setShcAdditionalList(codes)
+    }
+    // Opened before: the pickers fill at once from the cache, then refresh.
+    return cachedFetch(['catalog', 'booking-form'], () => Promise.all([
       cargoCatalogService.getCommodities(),
       cargoCatalogService.getProducts(),
       // One list for both pickers: standard and additional codes were the same
       // thing, so System Maintenance no longer tells them apart (2026-11-04).
       cargoCatalogService.getHandlingCodes(),
-    ])
-      .then(([comms, prods, codes]) => {
-        if (!catalogMounted.current) return
-        setCommodities(comms)
-        setProductsCatalog(prods)
-        setShcStandardList(codes)
-        setShcAdditionalList(codes)
-      })
+    ]), apply)
+      .then(apply)
       .catch(() => {
         if (!quiet) appToast.error('Unable to load cargo catalog')
       })
@@ -797,7 +803,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
   const computedAllStackable    = allGroups.length > 0 && allGroups.every((g) => g.stackable)
   const computedAllOversize     = allGroups.length > 0 && allGroups.every((g) => g.oversize)
 
-  const summary = useAppSelector(selectCargoSummary)
+  const summary = useBookingStore(selectCargoSummary)
 
   const routeCoords: RouteCoords = {
     pickup:   { lat: pickupLat, lng: pickupLng },
@@ -863,10 +869,10 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
     return `${list} away from the pickup location. Please check that the pickup and drop-off locations are correct.`
   })()
 
-  const handleAddDropoff = () => dispatch(addDropoff())
+  const handleAddDropoff = () => addDropoff()
 
   const handleUpdateGroup = (dropoffIndex: number, groupId: string, patch: Partial<ItemGroup>) =>
-    dispatch(updateGroupAction({ dropoffIndex, groupId, patch }))
+    updateGroupAction({ dropoffIndex, groupId, patch })
 
   /** A typed value for one product field: marks it touched so its error shows live. */
   const setGroupField = (dropoffIndex: number, groupId: string, field: keyof GroupErrors, value: string) => {
@@ -876,7 +882,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
 
   // An untouched product goes straight away; one with anything typed in asks first.
   const handleRemoveGroup = (dropoffIndex: number, groupId: string, label: string) => {
-    const run = () => dispatch(removeGroupAction({ dropoffIndex, groupId }))
+    const run = () => removeGroupAction({ dropoffIndex, groupId })
     const group = sections.find((s) => s.dropoffIndex === dropoffIndex)?.groups.find((g) => g.id === groupId)
     const blank = makeDefaultGroup()
     const filled = !!group && (Object.keys(blank) as (keyof ItemGroup)[])
@@ -894,7 +900,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
     description: dropoffs[i]?.trim()
       ? `${dropoffs[i]}\n\nIts cargo details are removed with it.`
       : 'Its cargo details are removed with it.',
-    run: () => dispatch(removeDropoff(i)),
+    run: () => removeDropoff(i),
   })
 
   /**
@@ -934,7 +940,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
         ? { nonTiltable: computedAllNonTiltable, nonStackable: computedAllNonStackable }
         : { stackable: computedAllStackable, oversize: computedAllOversize }),
     }
-    dispatch(addGroupAction({ dropoffIndex, newGroup }))
+    addGroupAction({ dropoffIndex, newGroup })
   }
 
   const handleMapConfirm = useCallback(
@@ -942,15 +948,15 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
       if (!mapTarget) return
       touchField(mapTarget.kind === 'pickup' ? 'pickup' : `dropoff:${mapTarget.index}`)
       if (mapTarget.kind === 'pickup') {
-        dispatch(setPickup(place.address))
-        dispatch(setPickupCoords({ lat: place.latitude, lng: place.longitude }))
+        setPickup(place.address)
+        setPickupCoords({ lat: place.latitude, lng: place.longitude })
       } else {
-        dispatch(updateDropoff({ index: mapTarget.index, value: place.address }))
-        dispatch(updateDropoffCoords({ index: mapTarget.index, lat: place.latitude, lng: place.longitude }))
+        updateDropoff({ index: mapTarget.index, value: place.address })
+        updateDropoffCoords({ index: mapTarget.index, lat: place.latitude, lng: place.longitude })
       }
       setMapTarget(null)
     },
-    [dispatch, mapTarget],
+    [mapTarget],
   )
 
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -1128,7 +1134,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
               <span className="ff-sc booking-text text-xs">Date<Req /></span>
               <DatePickerPopup
                 value={date}
-                onChange={(v) => { touchField('date'); dispatch(setDate(v)) }}
+                onChange={(v) => { touchField('date'); setDate(v) }}
                 hasError={!!errors.schedule?.date}
                 errorMsg={errors.schedule?.date}
               />
@@ -1138,7 +1144,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
               <span className="ff-sc booking-text text-xs">Time<Req /></span>
               <TimePickerPopup
                 value={time}
-                onChange={(v) => { touchField('time'); dispatch(setTime(v)) }}
+                onChange={(v) => { touchField('time'); setTime(v) }}
                 hasError={!!errors.schedule?.time}
                 errorMsg={errors.schedule?.time}
               />
@@ -1269,7 +1275,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
 
           <div className="flex items-center gap-6">
             {(['palletized', 'loose'] as CargoMode[]).map((m) => (
-              <button key={m} type="button" onClick={() => dispatch(setMode(m))}
+              <button key={m} type="button" onClick={() => setMode(m)}
                 className={`pb-1 ff-sc booking-text text-sm capitalize text-white border-b-2 transition-colors cursor-pointer
                   ${mode === m ? 'border-[var(--color-cyan)]' : 'border-transparent'}`}>
                 {m.charAt(0).toUpperCase() + m.slice(1)}
@@ -1298,13 +1304,13 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                           <div className="flex items-center gap-4 sm:gap-6 ml-auto">
                             {mode === 'loose' ? (
                               <>
-                                <CheckRow checked={computedAllNonTiltable}  onChange={(v) => dispatch(setAllNonTiltable(v))}  label="All Non-tiltable"  />
-                                <CheckRow checked={computedAllNonStackable} onChange={(v) => dispatch(setAllNonStackable(v))} label="All Non-stackable" />
+                                <CheckRow checked={computedAllNonTiltable}  onChange={(v) => setAllNonTiltable(v)}  label="All Non-tiltable"  />
+                                <CheckRow checked={computedAllNonStackable} onChange={(v) => setAllNonStackable(v)} label="All Non-stackable" />
                               </>
                             ) : (
                               <>
-                                <CheckRow checked={computedAllStackable} onChange={(v) => dispatch(setAllStackable(v))} label="All Stackable" />
-                                <CheckRow checked={computedAllOversize}  onChange={(v) => dispatch(setAllOversize(v))}  label="All Oversize"  />
+                                <CheckRow checked={computedAllStackable} onChange={(v) => setAllStackable(v)} label="All Stackable" />
+                                <CheckRow checked={computedAllOversize}  onChange={(v) => setAllOversize(v)}  label="All Oversize"  />
                               </>
                             )}
                           </div>
@@ -1624,7 +1630,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                   <button type="button" onClick={() => setPendingRemove({
                     title: 'Remove File?',
                     description: `"${documentName(url)}" will be removed from this booking when you resubmit.`,
-                    run: () => dispatch(removeExistingDocument(url)),
+                    run: () => removeExistingDocument(url),
                   })}
                     className="hover:text-red-400 transition-colors cursor-pointer shrink-0">
                     <X size={13} />

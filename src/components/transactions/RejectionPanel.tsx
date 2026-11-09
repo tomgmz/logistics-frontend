@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { Pencil, XCircle } from 'lucide-react'
 
-import type { BookingWithRelations } from '@/lib/store/slice/routeMap.slice'
+import type { BookingWithRelations } from '@/lib/types/booking-relations'
 import { bookingService } from '@/lib/services/client/booking.service'
 import { isAwaitingResubmit } from '@/lib/booking-resubmit'
 import { useBookingClosed } from '@/lib/contract-status'

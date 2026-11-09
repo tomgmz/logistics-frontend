@@ -8,7 +8,7 @@ import {
 
 import { bookingService } from '@/lib/services/client/booking.service'
 import { useAuthStore } from '@/lib/store/auth.store'
-import type { BookingWithRelations, BookingDestination } from '@/lib/store/slice/routeMap.slice'
+import type { BookingWithRelations, BookingDestination } from '@/lib/types/booking-relations'
 import { type BookingStatus, asBookingStatus } from '@/app/types/maps/routemap.types'
 import { bookingRef } from '@/lib/booking'
 import { bookingStatusColor } from '@/lib/palette'
@@ -21,7 +21,7 @@ import { TableCard } from '@/components/ui/untitled/table-card'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { CardLink, MetricRow, MetricRowSkeleton } from '@/components/dashboard/AdminDashboard'
 import type { CardSpec } from '@/components/dashboard/StaffDashboard'
-import { readCache, writeCache } from '@/lib/cache/queryCache'
+import { cachedData, storeData } from '@/lib/query/useApiQuery'
 
 /**
  * The client's dashboard, in the same Untitled UI dashboard-04 format as the
@@ -326,13 +326,13 @@ export default function ClientDashboardView() {
     if (!clientId) { setLoading(false); return }
     // Coming back: the last list shows at once and is re-read behind it.
     const key    = `client-dashboard|${clientId}`
-    const cached = readCache<BookingWithRelations[]>(key)
+    const cached = cachedData<BookingWithRelations[]>(['page', key])
     if (cached) { setBookings(cached); setLoading(false) }
     else setLoading(true)
     setError(null)
     try {
       const fresh = await bookingService.fetchBookingsByClient(clientId)
-      writeCache(key, fresh)
+      storeData(['page', key], fresh)
       setBookings(fresh)
     } catch (err) {
       if (cached) return

@@ -21,7 +21,7 @@ import { bookingService } from '@/lib/services/client/booking.service'
 import { useAuthStore }    from '@/lib/store/auth.store'
 import type {
   BookingWithRelations,
-} from '@/lib/store/slice/routeMap.slice'
+} from '@/lib/types/booking-relations'
 import { type BookingStatus, asBookingStatus } from '@/app/types/maps/routemap.types'
 import { bookingRef } from '@/lib/booking'
 

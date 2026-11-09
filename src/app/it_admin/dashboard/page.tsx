@@ -29,7 +29,7 @@ import { TableCard } from '@/components/ui/untitled/table-card'
 import { TabsMinimal } from '@/components/ui/untitled/tabs'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { systemSourceLabel } from '@/lib/log-labels'
-import { readCache, writeCache } from '@/lib/cache/queryCache'
+import { cachedData, storeData } from '@/lib/query/useApiQuery'
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Scheduler staleness is a function of time, not of any row changing. */
@@ -337,11 +337,11 @@ function TrendSection({ level, reloadKey }: { level: TrendLevel; reloadKey: stri
   useEffect(() => {
     let live = true
     const key = `it-dashboard|trend|${range}|${level}`
-    const cached = readCache<ItDashboardTrend>(key)
+    const cached = cachedData<ItDashboardTrend>(['page', key])
     // After this render (not inside it): show the last trend for this range/level.
     if (cached) queueMicrotask(() => { if (live) setTrend(cached) })
     itDashboardService.getTrend(range, level)
-      .then((t) => { writeCache(key, t); if (live) { setTrend(t); setFailed(false) } })
+      .then((t) => { storeData(['page', key], t); if (live) { setTrend(t); setFailed(false) } })
       .catch(() => { if (live) setFailed(true) })
     return () => { live = false }
   }, [range, level, reloadKey])
@@ -806,12 +806,12 @@ export default function ItAdminDashboard() {
     inFlight.current = true
     // Coming back: the last summary shows at once and is re-read behind it.
     type Summary = Awaited<ReturnType<typeof itDashboardService.getSummary>>
-    const cached = readCache<Summary>('it-dashboard|summary')
+    const cached = cachedData<Summary>(['page', 'it-dashboard|summary'])
     if (cached) setSummary((cur) => cur ?? cached)
     else setLoading(true)
     try {
       const data = await itDashboardService.getSummary()
-      writeCache('it-dashboard|summary', data)
+      storeData(['page', 'it-dashboard|summary'], data)
       setSummary(data)
       setError(null)
       setNow(Date.now())

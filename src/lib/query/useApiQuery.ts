@@ -60,3 +60,42 @@ export function invalidateScoped(prefix: QueryKey) {
   const scope = u?.user_id ? `${u.user_id}:${u.it_standin ? 'standin' : 'self'}` : null
   return queryClient.invalidateQueries({ queryKey: scopedKey(scope, prefix) })
 }
+
+function currentScope(): string | null {
+  const u = useAuthStore.getState().user
+  return u?.user_id ? `${u.user_id}:${u.it_standin ? 'standin' : 'self'}` : null
+}
+
+/**
+ * For screens that load in their own code (live re-reads, local edits): the
+ * last answer kept for `key` under the signed-in account, from the same
+ * TanStack Query cache as every useApiQuery. Data holding file links older
+ * than 5 min is not returned (those links expire at 10–15).
+ */
+export function cachedData<T>(key: QueryKey): T | undefined {
+  const scope = currentScope()
+  if (!scope) return undefined
+  const state = queryClient.getQueryState<T>(scopedKey(scope, key))
+  if (state?.data === undefined) return undefined
+  if (Date.now() - state.dataUpdatedAt > FILE_DATA_MAX_MS && holdsFileLink(state.data)) return undefined
+  return state.data
+}
+
+/** Keep a fresh answer for `key` under the signed-in account (see cachedData). */
+export function storeData<T>(key: QueryKey, data: T): void {
+  const scope = currentScope()
+  if (!scope) return
+  queryClient.setQueryData<T>(scopedKey(scope, key), data)
+}
+
+/**
+ * For a load written as `fetch().then(apply)`: applies the answer kept for
+ * `key` (if any) at once, then fetches, keeps and returns the fresh one (the
+ * caller applies it as before). So a panel or picker opened before shows its
+ * data immediately and is brought up to date behind it.
+ */
+export function cachedFetch<T>(key: QueryKey, fetcher: () => Promise<T>, applyCached?: (data: T) => void): Promise<T> {
+  const cached = cachedData<T>(key)
+  if (cached !== undefined && applyCached) applyCached(cached)
+  return fetcher().then((fresh) => { storeData(key, fresh); return fresh })
+}

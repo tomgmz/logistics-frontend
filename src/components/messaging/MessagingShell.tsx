@@ -25,18 +25,25 @@ import NewConversationModal from './NewConversationModal'
 import NewGroupModal     from './NewGroupModal'
 import SiteFooter        from '@/components/layout/SiteFooter'
 import { useSetMessagingChatOpen } from './MessagingChromeContext'
+import { cachedData, storeData } from '@/lib/query/useApiQuery'
+
+// The inbox as last shown (TanStack Query cache): back on Messages it shows at
+// once, and the fresh read and realtime events update it as before.
+const INBOX_KEY = ['messaging', 'inbox'] as const
+type Inbox = { conversations: Conversation[]; groups: Group[] }
 
 export default function MessagingShell() {
   const { user }        = useAuthStore()
   const currentUserId   = user?.user_id ?? ''
 
-  const [conversations, setConversations] = useState<Conversation[]>([])
-  const [groups, setGroups]               = useState<Group[]>([])
+  const [cachedInbox]                     = useState(() => cachedData<Inbox>(INBOX_KEY))
+  const [conversations, setConversations] = useState<Conversation[]>(() => cachedInbox?.conversations ?? [])
+  const [groups, setGroups]               = useState<Group[]>(() => cachedInbox?.groups ?? [])
   const [selectedConvId, setSelectedConvId]   = useState<string | null>(null)
   const [selectedGroup, setSelectedGroup]     = useState<Group | null>(null)
   const [draftUser, setDraftUser]             = useState<MessagableUser | null>(null)
   const [search, setSearch]               = useState('')
-  const [loading, setLoading]             = useState(true)
+  const [loading, setLoading]             = useState(!cachedInbox)
   const [error, setError]                 = useState<string | null>(null)
   const [showNewDm, setShowNewDm]         = useState(false)
   const [showNewGroup, setShowNewGroup]   = useState(false)
@@ -64,6 +71,12 @@ export default function MessagingShell() {
   }, [])
 
   useEffect(() => { fetchAll() }, [fetchAll])
+
+  // Keep the cached inbox in step with what is shown (fresh reads and
+  // realtime changes alike).
+  useEffect(() => {
+    if (!loading) storeData<Inbox>(INBOX_KEY, { conversations, groups })
+  }, [conversations, groups, loading])
 
   // Global user channel — keeps sidebar in sync across tabs / devices
   useMessagingRealtime({

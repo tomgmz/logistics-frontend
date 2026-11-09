@@ -2,7 +2,7 @@
 
 import { AlertCircle, Calendar, FileText, History, MapPin, Package, Truck } from 'lucide-react'
 
-import type { BookingWithRelations } from '@/lib/store/slice/routeMap.slice'
+import type { BookingWithRelations } from '@/lib/types/booking-relations'
 import { bookingRef } from '@/lib/booking'
 import { PALETTE } from '@/lib/palette'
 import {

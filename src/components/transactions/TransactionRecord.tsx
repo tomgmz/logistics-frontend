@@ -6,7 +6,7 @@ import {
   Route as RouteIcon, ShieldCheck, Truck, User, Video,
 } from 'lucide-react'
 
-import type { BookingWithRelations } from '@/lib/store/slice/routeMap.slice'
+import type { BookingWithRelations } from '@/lib/types/booking-relations'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { roleLabel } from '@/lib/roles'
 import {

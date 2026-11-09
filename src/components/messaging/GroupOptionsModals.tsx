@@ -8,6 +8,7 @@ import { appToast } from '@/lib/toast'
 import { roleLabel, matchesPersonSearch } from '@/lib/roles'
 import { getApiErrorMessage } from '@/lib/api-error'
 import type { Group, GroupMember } from '@/app/types/messaging/messaging.types'
+import { cachedFetch } from '@/lib/query/useApiQuery'
 
 export type GroupOptionsView = 'members' | 'add' | 'rename' | 'requests'
 
@@ -185,9 +186,11 @@ function AddMembersModal({ group, isCreator, onClose, onDone }: {
 
   useEffect(() => {
     const inGroup = new Set(group.members.filter(m => m.status !== 'declined').map(m => m.user_id))
-    messagingService.getMessagableUsers()
-      // Clients talk one-to-one only; the API refuses them in groups.
-      .then(us => setUsers(us.filter(u => u.role !== 'client' && !inGroup.has(u.user_id))))
+    const apply = (us: Awaited<ReturnType<typeof messagingService.getMessagableUsers>>) =>
+      setUsers(us.filter(u => u.role !== 'client' && !inGroup.has(u.user_id)))
+    // Clients talk one-to-one only; the API refuses them in groups.
+    cachedFetch(['messaging', 'contacts'], () => messagingService.getMessagableUsers(), (us) => { apply(us); setLoading(false) })
+      .then(apply)
       .catch(() => setError('Could not load contacts'))
       .finally(() => setLoading(false))
     setTimeout(() => searchRef.current?.focus(), 80)
