@@ -116,7 +116,7 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
       return { ...res, meta: { ...res.meta, view } }
     },
     `${view}|${debouncedSearch}`,
-    { errorMessage: 'Request failed. Please try again.' },
+    { errorMessage: 'Request failed. Please try again.', cacheKey: 'vehicle-models' },
   )
   const { loading, error: listError, page, setPage, pageSize: PAGE_SIZE, total, totalPages } = table
   // Rows from the other tab (a reply still on its way) never show under this one.

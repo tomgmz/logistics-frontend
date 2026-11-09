@@ -745,7 +745,7 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
       return { data: res.data, meta: { ...res.meta, tab } }
     },
     `${activeTab}|${JSON.stringify(filters)}|${search}`,
-    { errorMessage: 'Failed to load users. Check your connection or permissions.' },
+    { errorMessage: 'Failed to load users. Check your connection or permissions.', cacheKey: 'user-management' },
   )
   const tableReady = table.meta?.tab === activeTab
   const loading    = table.loading || !tableReady

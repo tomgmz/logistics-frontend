@@ -78,6 +78,8 @@ import { Button } from '@/components/ui/untitled/button'
 import { Plus } from '@untitledui/icons'
 import { useVehicleTypeOptions } from '@/lib/hooks/useVehicleTypes'
 import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
+import { useCachedFetch } from '@/lib/hooks/useCachedFetch'
+import { readCache, writeCache } from '@/lib/cache/queryCache'
 
 type FormMode    = 'create' | 'edit' | null
 type ConfirmKind = 'save' | 'archive' | null
@@ -368,7 +370,9 @@ export default function VehicleManagementView() {
   // The full driver roster, for the "regular driver" picker. Deliberately NOT
   // the per-booking assignable pool: pairing says who normally drives this
   // vehicle, a standing fact that does not depend on any one day's calendar.
-  const [drivers, setDrivers] = useState<DriverUser[]>([])
+  // The regular-driver picker: the last list shows at once on a return visit.
+  const driverList = useCachedFetch<DriverUser[]>('vehicle-management|drivers', () => driverService.getAll())
+  const drivers    = driverList.data ?? []
 
   const [listLoading, setListLoading] = useState(true)
   const [listError,   setListError]   = useState<string | null>(null)
@@ -416,7 +420,10 @@ export default function VehicleManagementView() {
   const loadModels = useCallback(async (quiet = false) => {
     try {
       if (!quiet) setListError(null)
+      const cached = quiet ? undefined : readCache<Awaited<ReturnType<typeof adminFetchTruckModels>>>('vehicle-management|models')
+      if (cached) setModels(cached)
       const mList = await adminFetchTruckModels()
+      writeCache('vehicle-management|models', mList)
       setModels(mList)
     } catch (e) {
       if (!quiet) setListError(getApiErrorMessage(e, 'Request failed. Please try again.'))
@@ -431,19 +438,29 @@ export default function VehicleManagementView() {
   // `quiet`: a live refresh re-reads in place — no spinner, and a transient
   // failure leaves the rows on screen instead of replacing them with an error.
   const loadTrucksPage = useCallback(async (quiet = false) => {
+    const query = {
+      page:     page + 1,
+      limit:    PAGE_SIZE,
+      // The Archived tab is the only list that asks for archived vehicles;
+      // with any other status (or 'all') the server leaves them out.
+      status:   archivedTab ? 'archived' : statusFilter,
+      search:   debouncedSearch,
+    }
+    type PageRes = Awaited<ReturnType<typeof adminFetchTrucksPaginated>>
+    const cacheKey = `vehicle-management|vehicles|${JSON.stringify(query)}`
+    const apply = (res: PageRes) => {
+      setTrucks(res.rows)
+      setListMeta({ total: res.meta.total, totalPages: res.meta.totalPages })
+    }
+    // A page seen before shows at once; the read below refreshes it quietly.
+    const cached = quiet ? undefined : readCache<PageRes>(cacheKey)
+    if (cached) { apply(cached); quiet = true; setListLoading(false) }
     try {
       if (!quiet) setListLoading(true)
       setListError(null)
-      const res = await adminFetchTrucksPaginated({
-        page:     page + 1,
-        limit:    PAGE_SIZE,
-        // The Archived tab is the only list that asks for archived vehicles;
-        // with any other status (or 'all') the server leaves them out.
-        status:   archivedTab ? 'archived' : statusFilter,
-        search:   debouncedSearch,
-      })
-      setTrucks(res.rows)
-      setListMeta({ total: res.meta.total, totalPages: res.meta.totalPages })
+      const res = await adminFetchTrucksPaginated(query)
+      writeCache(cacheKey, res)
+      apply(res)
       if (res.meta.totalPages >= 1 && page > res.meta.totalPages - 1) {
         setPage(res.meta.totalPages - 1)
       }
@@ -458,9 +475,13 @@ export default function VehicleManagementView() {
 
   const loadUpkeep = useCallback(async (quiet = false) => {
     try {
+      const cached = quiet ? undefined : readCache<Awaited<ReturnType<typeof adminFetchMaintenanceQueue>>>('vehicle-management|upkeep')
+      if (cached) { setUpkeep(cached); quiet = true; setUpkeepLoading(false) }
       if (!quiet) setUpkeepLoading(true)
       setUpkeepError(null)
-      setUpkeep(await adminFetchMaintenanceQueue())
+      const queue = await adminFetchMaintenanceQueue()
+      writeCache('vehicle-management|upkeep', queue)
+      setUpkeep(queue)
     } catch (e) {
       if (!quiet) setUpkeepError(getApiErrorMessage(e, 'Could not load the maintenance list. Please try again.'))
     } finally {
@@ -530,7 +551,7 @@ export default function VehicleManagementView() {
   })
   // The regular-driver picker follows new, renamed and archived drivers.
   useLiveTable(['live:users'], () => {
-    void driverService.getAll().then(setDrivers).catch(() => {})
+    void driverList.reload(true)
   })
 
   const switchTab = useCallback((next: VehicleTab) => {
@@ -540,10 +561,6 @@ export default function VehicleManagementView() {
     if (next === 'vehicles') url.searchParams.delete('tab')
     else url.searchParams.set('tab', next)
     window.history.replaceState(window.history.state, '', url)
-  }, [])
-
-  useEffect(() => {
-    void driverService.getAll().then(setDrivers).catch(() => setDrivers([]))
   }, [])
 
   useEffect(() => {

@@ -22,6 +22,7 @@ import FilterBar, { type FilterValues } from '@/components/ui/FilterBar'
 import { TableCard } from '@/components/ui/untitled/table-card'
 import type { DateRange } from '@/components/ui/untitled/date-range-picker'
 import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
+import { readCache, writeCache } from '@/lib/cache/queryCache'
 
 /** The value a Filters-panel rule picked for `field` ("is" rules only). */
 const pick = (v: FilterValues, field: string) => v.find((r) => r.field === field && r.op === 'is')?.value
@@ -68,13 +69,20 @@ export default function AuditLogsPage() {
 
   const fetchLogs = useCallback(async () => {
     clearPending()
-    setLoading(true)
+    type Res = Awaited<ReturnType<typeof auditLogService.getAll>>
+    const cacheKey = `audit-logs|${filterKey}|${page}|${PAGE_SIZE}`
+    // A page seen before shows at once; the read below refreshes it quietly.
+    const cached = readCache<Res>(cacheKey)
+    if (cached) { setLogs(cached.data); setTotal(cached.total) }
+    else setLoading(true)
     setError(null)
     try {
       const res = await auditLogService.getAll({ ...JSON.parse(filterKey), page, limit: PAGE_SIZE })
+      writeCache(cacheKey, res)
       setLogs(res.data)
       setTotal(res.total)
     } catch (e: unknown) {
+      if (cached) return
       const err = e as { response?: { data?: { message?: string } }; message?: string }
       setError(err.response?.data?.message ?? err.message ?? 'Failed to fetch logs')
     } finally {

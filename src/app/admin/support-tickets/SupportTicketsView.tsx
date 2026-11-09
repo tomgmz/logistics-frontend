@@ -208,7 +208,7 @@ export default function SupportTicketsView() {
       return res
     },
     `${statusFilter}|${debouncedSearch}`,
-    { errorMessage: 'Could not load tickets. Please try again.' },
+    { errorMessage: 'Could not load tickets. Please try again.', cacheKey: 'support-tickets' },
   )
   const { rows: tickets, loading, error, page, setPage, pageSize: PAGE_SIZE, total, totalPages } = table
   const load = table.reload

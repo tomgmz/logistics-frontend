@@ -116,7 +116,7 @@ export default function ReportsView() {
       ...(debouncedSearch && { search: debouncedSearch }),
     }),
     `${statusFilter}|${typeFilter}|${debouncedSearch}`,
-    { errorMessage: 'Could not load reports. Please try again.' },
+    { errorMessage: 'Could not load reports. Please try again.', cacheKey: 'driver-reports' },
   )
   const { rows: reports, loading, error, page, setPage, pageSize: PAGE_SIZE, total, totalPages } = table
   const load = table.reload

@@ -299,7 +299,7 @@ export default function UpkeepTab({
       ...(focusId && { focus: focusId }),
     }),
     `${groupFilter}|${debouncedSearch}|${focusId ?? ''}`,
-    { errorMessage: 'Could not load the maintenance list. Please try again.' },
+    { errorMessage: 'Could not load the maintenance list. Please try again.', cacheKey: 'vehicle-upkeep' },
   )
   const { page, setPage, pageSize: PAGE_SIZE, total, totalPages } = table
   const pageRows: Problem[] = useMemo(() => table.rows.map((p) => ({

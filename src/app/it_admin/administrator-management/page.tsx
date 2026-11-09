@@ -427,6 +427,7 @@ export default function AdminManagementClient() {
     {
       enabled:      !isResetsTab && !isPeopleTab,
       errorMessage: 'Failed to load accounts. Check your connection or permissions.',
+      cacheKey:     'administrator-management',
     },
   )
   const tableReady = table.meta?.tab === viewTab

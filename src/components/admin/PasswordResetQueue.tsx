@@ -141,7 +141,7 @@ export default function PasswordResetQueue({
       ...(dateRange       && { from: dateRange.from, to: dateRange.to }),
     }),
     `${JSON.stringify(filters)}|${debouncedSearch}|${dateRange?.from ?? ''}|${dateRange?.to ?? ''}`,
-    { errorMessage: 'Failed to load reset requests.' },
+    { errorMessage: 'Failed to load reset requests.', cacheKey: 'password-resets' },
   )
   const { rows: pageRows, loading, error, page, setPage, pageSize, total, totalPages } = table
 

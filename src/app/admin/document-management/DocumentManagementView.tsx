@@ -268,7 +268,7 @@ function DocumentLibrary({ fleetOnly }: { fleetOnly: boolean }) {
       ? fetchFoldersPage('bookings', { ...q, client_id: nav.clientId, search })
       : fetchFoldersPage('vehicles', { ...q, search }),
     `${navKey}|${search}`,
-    { enabled: !isFiles, errorMessage: 'Could not load folders. Please try again.' },
+    { enabled: !isFiles, errorMessage: 'Could not load folders. Please try again.', cacheKey: 'document-folders' },
   )
   const folders       = folderTable.rows
   const folderLoading = folderTable.loading

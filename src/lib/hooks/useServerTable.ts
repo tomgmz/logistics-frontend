@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTablePageSize } from './useTablePageSize'
 import { getApiErrorMessage } from '@/lib/api-error'
+import { readCache, writeCache } from '@/lib/cache/queryCache'
 
 /**
  * Server-side pagination for a web table: the server filters, sorts and counts,
@@ -19,6 +20,10 @@ import { getApiErrorMessage } from '@/lib/api-error'
  *
  * `loading` is only the first load (or a retry after an error); later fetches
  * keep the rows on screen and set `fetching`, so paging does not flash a spinner.
+ *
+ * `cacheKey` (a name unique to this table) turns on the page cache
+ * (lib/cache/queryCache): a page seen before shows at once, without a spinner,
+ * while it is re-read behind it. Two tables on one screen need different names.
  */
 
 export interface PageMeta {
@@ -44,7 +49,8 @@ export function useServerTable<T, X extends object = object>(
   {
     enabled = true,
     errorMessage = 'Could not load this list. Please try again.',
-  }: { enabled?: boolean; errorMessage?: string } = {},
+    cacheKey,
+  }: { enabled?: boolean; errorMessage?: string; cacheKey?: string } = {},
 ) {
   const pageSize = useTablePageSize()
   const [page, setPage]         = useState(1)
@@ -73,6 +79,18 @@ export function useServerTable<T, X extends object = object>(
   // re-read keeps the rows already on screen instead of showing an error.
   const reload = useCallback(async (quiet = false) => {
     const id = ++seq.current
+    const key = cacheKey ? `table|${cacheKey}|${filterKey}|${page}|${pageSize}` : null
+    // A page seen before: show it now and re-read quietly behind it.
+    const cached = key && !quiet ? readCache<PagedResponse<T, X>>(key) : undefined
+    if (cached) {
+      loadedRef.current = true
+      errorRef.current  = null
+      setRows(cached.data)
+      setMeta(cached.meta)
+      setError(null)
+      setLoading(false)
+      quiet = true
+    }
     if (!quiet) {
       if (!loadedRef.current || errorRef.current) setLoading(true)
       setFetching(true)
@@ -82,6 +100,7 @@ export function useServerTable<T, X extends object = object>(
     try {
       const res = await fetchRef.current({ page, limit: pageSize })
       if (id !== seq.current) return
+      if (key) writeCache(key, res)
       loadedRef.current = true
       setRows(res.data)
       setMeta(res.meta)
@@ -98,7 +117,7 @@ export function useServerTable<T, X extends object = object>(
       }
     }
     // filterKey: fetchPage closes over the filters, so a new key means a new read.
-  }, [page, pageSize, filterKey, errorMessage]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [page, pageSize, filterKey, errorMessage, cacheKey])
 
   useEffect(() => { if (enabled) void reload() }, [reload, enabled])
 

@@ -221,7 +221,7 @@ export default function BookingHistoryModule() {
       ...(dateTo   && { date_to: dateTo }),
     }),
     `${activeTab}|${debouncedSearch}|${dateFrom}|${dateTo}`,
-    { enabled: !!clientId, errorMessage: 'Failed to load bookings. Please try again.' },
+    { enabled: !!clientId, errorMessage: 'Failed to load bookings. Please try again.', cacheKey: 'client-history' },
   )
   const { rows: bookings, setRows: setBookings, error, page, setPage, total, totalPages } = table
   const loading = !!clientId && table.loading

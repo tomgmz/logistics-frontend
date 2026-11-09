@@ -118,7 +118,7 @@ export default function SystemMaintenanceView() {
       return { data: res.data, meta: { ...res.meta, tab: t } }
     },
     `${tab}|${debouncedSearch}|${tab === 'products' ? pForm.commodity_id : ''}`,
-    { errorMessage: 'Failed to load data' },
+    { errorMessage: 'Failed to load data', cacheKey: 'system-maintenance' },
   )
   const { page, setPage, pageSize: PAGE_SIZE, totalPages } = table
   const tableReady = table.meta?.tab === tab

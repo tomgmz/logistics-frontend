@@ -41,6 +41,7 @@ import { TabsMinimal } from '@/components/ui/untitled/tabs'
 import { Button } from '@/components/ui/untitled/button'
 import type { DateRange } from '@/components/ui/untitled/date-range-picker'
 import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
+import { readCache, writeCache } from '@/lib/cache/queryCache'
 /**
  * Transaction history for staff — the client's own history widened across every
  * company.
@@ -170,6 +171,12 @@ export default function TransactionHistoryView() {
   // already on screen instead of replacing them with an error.
   const load = useCallback(async (quiet = false) => {
     clearPending()
+    const query    = { ...filters, page: page + 1, limit: PAGE_SIZE }
+    const cacheKey = `transaction-history|${JSON.stringify(query)}`
+    type ListRes = Awaited<ReturnType<typeof transactionHistoryService.list>>
+    // A page seen before shows at once; the read below refreshes it quietly.
+    const cached = quiet ? undefined : readCache<ListRes>(cacheKey)
+    if (cached) { setRows(cached.rows); setMeta(cached.meta); setLoading(false); quiet = true }
     if (!quiet) {
       setLoading(true)
       setError(null)
@@ -177,7 +184,8 @@ export default function TransactionHistoryView() {
     try {
       // The cards above the table read the same response's status counts, so
       // they can never describe a different query than the table.
-      const list = await transactionHistoryService.list({ ...filters, page: page + 1, limit: PAGE_SIZE })
+      const list = await transactionHistoryService.list(query)
+      writeCache(cacheKey, list)
       setRows(list.rows)
       setMeta(list.meta)
       if (list.meta.totalPages >= 1 && page > list.meta.totalPages - 1) {

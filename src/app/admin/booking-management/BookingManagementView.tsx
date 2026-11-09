@@ -52,6 +52,7 @@ import {
 } from '@/lib/services/admin/assignment.service'
 import { driverService } from '@/lib/services/admin/user-management.service'
 import { adminFetchTrucks } from '@/lib/services/admin/trucks.service'
+import { readCache, writeCache } from '@/lib/cache/queryCache'
 import type { DriverUser } from '@/app/types/admin/user-management.types'
 import { isAssignable, type Truck as TruckType } from '@/app/types/truck.types'
 import { BLOWBAGETS_ITEMS } from '@/lib/blowbagets'
@@ -1386,9 +1387,19 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
   }, [assignEditMode, selectedId])
 
   useEffect(() => {
+    // The fleet and assignment lists are large; show the last copy at once on
+    // a return visit and re-read both behind it.
+    const cachedTrucks = readCache<TruckType[]>('booking-management|trucks')
+    const cachedAssign = readCache<AssignmentRecord[]>('booking-management|assignments')
+    if (cachedTrucks) setTrucks(cachedTrucks)
+    if (cachedAssign) setAllAssignments(cachedAssign)
     void Promise.all([
-      adminFetchTrucks().then(setTrucks).catch(() => setTrucks([])),
-      assignmentService.getAll().then(setAllAssignments).catch(() => setAllAssignments([])),
+      adminFetchTrucks()
+        .then((t) => { writeCache('booking-management|trucks', t); setTrucks(t) })
+        .catch(() => { if (!cachedTrucks) setTrucks([]) }),
+      assignmentService.getAll()
+        .then((a) => { writeCache('booking-management|assignments', a); setAllAssignments(a) })
+        .catch(() => { if (!cachedAssign) setAllAssignments([]) }),
     ])
   }, [])
 
@@ -1449,23 +1460,34 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
   const [dateRange, setDateRange] = useState<DateRange | null>(null)
 
   const loadPage = useCallback(async (quiet = false) => {
-    try {
-      if (!quiet) setListLoading(true)
-      setListError(null)
-      const res = await bookingService.fetchBookingsAdminPaginated({
-        page:   page + 1,
-        limit:  PAGE_SIZE,
-        status: forcedStatus ?? statusFilter,
-        search: debouncedSearch,
-        dateFrom: dateRange?.from,
-        dateTo:   dateRange?.to,
-      })
+    const query = {
+      page:   page + 1,
+      limit:  PAGE_SIZE,
+      status: forcedStatus ?? statusFilter,
+      search: debouncedSearch,
+      dateFrom: dateRange?.from,
+      dateTo:   dateRange?.to,
+    }
+    type PageRes = Awaited<ReturnType<typeof bookingService.fetchBookingsAdminPaginated>>
+    const cacheKey = `booking-management|${JSON.stringify(query)}`
+    const apply = (res: PageRes) => {
       setRawBookings(res.rows)
       setListMeta({
         total:        res.meta.total,
         totalPages:   res.meta.totalPages,
         statusCounts: res.meta.statusCounts,
       })
+    }
+    // Coming back to this page (or a page seen before): show the last answer
+    // at once and re-read quietly behind it.
+    const cached = quiet ? undefined : readCache<PageRes>(cacheKey)
+    if (cached) { apply(cached); quiet = true; setListLoading(false) }
+    try {
+      if (!quiet) setListLoading(true)
+      setListError(null)
+      const res = await bookingService.fetchBookingsAdminPaginated(query)
+      writeCache(cacheKey, res)
+      apply(res)
       if (res.meta.totalPages >= 1 && page > res.meta.totalPages - 1) {
         setPage(res.meta.totalPages - 1)
       }
