@@ -4,6 +4,7 @@ import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
 import Pagination from '@/components/ui/Pagination'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { useState, useEffect, useCallback, type ReactNode } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Users, UserPlus,
@@ -55,8 +56,9 @@ type UserMgmtTab = Extract<UserTab, 'clients' | 'drivers'>
 export type UserManagementMode = 'company-admin' | 'it-admin'
 //
 // Drivers split into two tabs under the one dropdown entry. Vendor drivers are
-// role='driver' too, but they are passkey-only subcontractors — no password, not
-// company crew — so they get their own list and their own access actions. Both
+// role='driver' too, but they are subcontractors, not company crew, so they get
+// their own list and their own access actions. They sign in like company drivers
+// (password, emailed code, optional passkey) since 2026-11-09. Both
 // kinds are added and edited through the same driver form.
 // 'archived': every archived client and driver. Archived accounts show there
 // and nowhere else (2026-11-08).
@@ -88,7 +90,7 @@ const SEARCH_PLACEHOLDER: Record<TabValue, string> = {
 const NEW_ACCOUNT_TYPES: AccountTypeOption<NewAccountType>[] = [
   { key: 'clients',        label: 'Client',                  hint: 'A company that books deliveries.' },
   { key: 'company-driver', label: 'Company Driver',          hint: '8338 Logistics driver. Signs in with a password.' },
-  { key: 'vendor-driver',  label: 'Vendor Driver',           hint: 'Supplied by a vendor. Signs in with a passkey.' },
+  { key: 'vendor-driver',  label: 'Vendor Driver',           hint: 'Supplied by a vendor. Signs in with a password.' },
 ]
 
 const muiTheme = createTheme({
@@ -254,7 +256,7 @@ function RowMenu({ user, mode, onView, onEdit, onStatusChange, lockedBy }: RowMe
   return <RowActionMenu actions={actions} heading={displayName(user)} subheading={user.email} iconSize={18} />
 }
 
-/** Where a vendor driver's passkey sign-in stands, in one badge. */
+/** Where a vendor driver's app access stands, in one badge. */
 function AccessBadge({ access }: { access: VendorDriverUser['access'] | undefined }) {
   // A row without access state is not a vendor account (or not loaded yet).
   if (!access) return <span className="text-sm text-[#818181]">—</span>
@@ -264,8 +266,8 @@ function AccessBadge({ access }: { access: VendorDriverUser['access'] | undefine
       ? { label: `Passkey set up${access.passkey_count > 1 ? ` (${access.passkey_count})` : ''}`,
           cls: 'bg-[#4df9ed]/10 text-[#4df9ed] border-[#4df9ed]/30' }
       : access.invite_pending
-        ? { label: 'Setup link sent', cls: 'bg-orange-500/15 text-orange-400 border-orange-500/30' }
-        : { label: 'Not set up',      cls: 'bg-[#818181]/10 text-[#818181] border-[#818181]/30' }
+        ? { label: 'Passkey link sent', cls: 'bg-orange-500/15 text-orange-400 border-orange-500/30' }
+        : { label: 'Password only',     cls: 'bg-[#818181]/10 text-[#818181] border-[#818181]/30' }
   return (
     <span
       title={access.last_used_at ? `Last used ${formatDateTime(access.last_used_at)}` : undefined}
@@ -324,7 +326,8 @@ function ArchivedRowMenu({ user, mode, onView, onRestore, lockedBy }: {
 
 /**
  * Actions for a vendor driver: the shared view/edit form, plus the access actions
- * a passkey-only account needs instead of a password reset.
+ * (passkey link, revoke, restore). Password resets go through the reset queue,
+ * as for a company driver.
  */
 function VendorRowMenu({ user, mode, onDone, onView, onEdit, confirm, lockedBy }: {
   user:      VendorDriverUser
@@ -355,13 +358,13 @@ function VendorRowMenu({ user, mode, onDone, onView, onEdit, confirm, lockedBy }
 
   const resend = () => run(
     externalDriverService.reinvite(user.user_id),
-    'Sending setup link…', 'Setup link sent to the driver.', 'Could not send the setup link.',
+    'Sending passkey setup link…', 'Passkey setup link sent to the driver.', 'Could not send the setup link.',
   )
 
   const revoke = () => confirm({
     title:        `Revoke ${displayName(user)}'s app access?`,
-    description:  'Their passkeys stop working immediately and they are signed out. ' +
-                  'You can restore access later; they will need to set up sign-in again.',
+    description:  'They are signed out and cannot sign in (password, emailed code or passkey). ' +
+                  'Their passkeys stop working for good. You can restore access later.',
     confirmLabel: 'Revoke Access',
     run: () => run(
       externalDriverService.revoke(user.user_id),
@@ -371,21 +374,21 @@ function VendorRowMenu({ user, mode, onDone, onView, onEdit, confirm, lockedBy }
 
   const restore = () => confirm({
     title:        `Restore ${displayName(user)}'s app access?`,
-    description:  'Their account is turned back on and a new setup link is emailed to them.',
+    description:  'Their account is turned back on. They sign in with their password or an emailed code; their old passkeys stay off.',
     confirmLabel: 'Restore Access',
     run: () => run(
       externalDriverService.restore(user.user_id),
-      'Restoring access…', 'Access restored. A new setup link was sent.', 'Could not restore access.',
+      'Restoring access…', 'Access restored. They can sign in with their password or an emailed code.', 'Could not restore access.',
     ),
   })
 
   const accessActions: RowAction[] = !itMode || !user.access ? [] : user.access.account_active
     ? [
-        { label: 'Resend Setup Link', icon: <Send size={15} />, onSelect: () => void resend(), section: 'App access', description: 'Email a new passkey setup link' },
-        { label: 'Revoke Access', icon: <ShieldOff size={15} />, tone: 'danger', onSelect: revoke, section: 'App access', description: 'End their passkeys and sign them out' },
+        { label: 'Send Passkey Link', icon: <Send size={15} />, onSelect: () => void resend(), section: 'App access', description: 'Email an optional passkey setup link' },
+        { label: 'Revoke Access', icon: <ShieldOff size={15} />, tone: 'danger', onSelect: revoke, section: 'App access', description: 'Sign them out and block every sign-in' },
       ]
     : [
-        { label: 'Restore Access', icon: <RotateCcw size={15} />, tone: 'accent', onSelect: restore, section: 'App access', description: 'Turn access back on with a new setup link' },
+        { label: 'Restore Access', icon: <RotateCcw size={15} />, tone: 'accent', onSelect: restore, section: 'App access', description: 'Turn their sign-in back on' },
       ]
 
   const actions: RowAction[] = [
@@ -604,8 +607,8 @@ const LICENSE_OPTIONS = [
 
 const ACCESS_OPTIONS = [
   { value: 'enrolled',   label: 'Passkey set up' },
-  { value: 'invited',    label: 'Setup link sent' },
-  { value: 'not_set_up', label: 'Not set up' },
+  { value: 'invited',    label: 'Passkey link sent' },
+  { value: 'not_set_up', label: 'Password only' },
   { value: 'revoked',    label: 'Revoked' },
 ]
 
@@ -656,10 +659,14 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
   // The IT Administrator's staff live on their own tab of their page.
   const tabs = TABS
 
+  // A notification can open this page on one account: ?search=<email>
+  // ("Email not delivered" links here).
+  const linkedSearch = useSearchParams().get('search') ?? ''
+
   // Opens on All Users: every client and driver account at once.
   const [activeTab,        setActiveTab]        = useState<TabValue>('all')
-  const [searchInput,      setSearchInput]      = useState('')
-  const [search,           setSearch]           = useState('')
+  const [searchInput,      setSearchInput]      = useState(linkedSearch)
+  const [search,           setSearch]           = useState(linkedSearch)
   // The Filters panel's applied values. They belong to the tab (and view) they
   // were set on, so switching either clears them.
   const [filters,          setFilters]          = useState<FilterValues>([])
@@ -692,6 +699,18 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
     setActiveTab(tab)
   }, [activeTab])
 
+
+  // Another notification tapped while already on this page: show its account.
+  const [lastLinkedSearch, setLastLinkedSearch] = useState(linkedSearch)
+  if (linkedSearch !== lastLinkedSearch) {
+    setLastLinkedSearch(linkedSearch)
+    if (linkedSearch) {
+      setFilters([])
+      setActiveTab('all')
+      setSearchInput(linkedSearch)
+      setSearch(linkedSearch)
+    }
+  }
 
   // Debounce search
   useEffect(() => {
@@ -793,7 +812,7 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
             {
               loading: 'Restoring account…',
               success: vendor
-                ? `${displayName(user)} restored. Send a new setup link from Vendor Drivers so they can sign in.`
+                ? `${displayName(user)} restored. They sign in with their password and can set up a new passkey.`
                 : `${displayName(user)} restored and can sign in again.`,
               error:   (e) => getApiErrorMessage(e, 'Failed to restore the account.'),
             },

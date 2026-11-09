@@ -590,7 +590,7 @@ function ForgotPasswordStep({
               {approverLabel(role)} has been notified and will email you a reset link.
             </span>
             <span className="text-white/40 text-[0.76rem]">
-              The link works once and expires an hour after it is sent. You can close this window —
+              The link works once and expires 5 minutes after it is sent, so open it soon. You can close this window —
               check your email.
             </span>
           </div>

@@ -60,6 +60,7 @@ import ReusableModal from '@/components/layout/ReusableModal'
 import type { ResolvedPlace } from '@/lib/hooks/usePlacesAutoComplete'
 import { nowDate } from '@/app/utils/serverTime'
 import { OFFICE_HOURS_LABEL, isWithinOfficeHours } from '@/lib/office-hours'
+import ContractEndedBanner from '@/components/client/ContractEndedBanner'
 import { phDayPlusMonth, phEarliestBookableDay } from '@/lib/ph-date'
 import { FileViewButton } from '@/components/ui/FileViewer'
 import { fetchStoredFile } from '@/lib/files/fileAccess'
@@ -1108,6 +1109,9 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
       />
 
       <div className="flex-1 overflow-auto p-4 lg:p-6 flex flex-col gap-3 sm:gap-6">
+
+        {/* Contract validity sits above the office hours here; the layout's copy is off on this page. */}
+        <ContractEndedBanner inline />
 
         <OfficeHoursNotice />
 

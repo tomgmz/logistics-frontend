@@ -640,7 +640,7 @@ export default function UserFormModal({
         isEdit
           ? `${formLabel} updated successfully.`
           : isVendorDriver
-            ? `New ${formLabel} added. A setup link for the app was emailed to them.`
+            ? `New ${formLabel} added. Their sign-in password was emailed to them.`
             : `New ${formLabel} account created.`,
         { action: isEdit ? 'edit-user' : 'create-user', entityId: user?.user_id ?? 'new' },
       )

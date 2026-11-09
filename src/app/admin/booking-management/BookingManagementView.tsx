@@ -462,13 +462,9 @@ function licenseNote(expiry: string | null | undefined): string {
 /**
  * App access for a vendor driver who was given an account.
  *
- * Two buttons, and they are not the same action. "Resend setup link" is for a
- * driver who never enrolled or has a new phone — it leaves any working passkey
- * alone. "Revoke access" is offboarding: every passkey dies, the session is
- * killed, the account is deactivated. Once revoked, both give way to "Restore
- * access", which reactivates the account and sends a new setup link — the old
- * passkeys stay dead. The vendor snapshot on the delivery is untouched by all
- * of them, because that is the record of who drove.
+ * Since 2026-11-09 a vendor driver signs in like a company driver (password or
+ * emailed code); a passkey is optional. The vendor snapshot on the delivery is
+ * untouched by any access change, because that is the record of who drove.
  */
 function ExternalDriverAccessRow({ userId }: { userId: string }) {
   const [access, setAccess] = useState<ExternalDriverAccess | null>(null)
@@ -492,7 +488,7 @@ function ExternalDriverAccessRow({ userId }: { userId: string }) {
         (access.last_used_at ? ` · last used ${new Date(access.last_used_at).toLocaleString()}` : '')
       : access.invite_pending
         ? `Setup link sent — not yet used${access.invite_expires_at ? ` · expires ${new Date(access.invite_expires_at).toLocaleString()}` : ''}`
-        : 'No app access set up'
+        : 'App access active · password or emailed code'
 
   return (
     <div className="mt-2 pt-2 border-t border-white/[0.06] space-y-1.5">

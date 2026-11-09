@@ -69,7 +69,7 @@ export interface DriverUser extends BaseUser {
     status: DriverAvailability
     license_image_url: string | null
     profile_image_url: string | null
-    /** True for a vendor driver (passkey sign-in, never company crew). */
+    /** True for a vendor driver (never company crew; signs in like a company driver). */
     is_external?:      boolean
     /** The vendor a vendor driver comes from; null for company drivers. */
     vendor_name?:      string | null

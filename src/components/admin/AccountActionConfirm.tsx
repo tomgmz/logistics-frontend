@@ -29,9 +29,9 @@ const PASSKEY_NOTE: Record<Exclude<AccountKind, 'other'>, Partial<Record<UserSta
     archived:    'Their passkeys are removed. If the account is restored, they sign in with their password and can set up a new passkey.',
   },
   'vendor-driver': {
-    active:      'They sign in with the passkey they already set up. No new setup is needed.',
+    active:      'They sign in with their password, or with the passkey they already set up. No new setup is needed.',
     deactivated: 'Their passkeys are kept but cannot be used while deactivated. When activated again, the same passkey works.',
-    archived:    'Their passkeys are removed. If the account is restored, they need a new setup link to sign in.',
+    archived:    'Their passkeys are removed. If the account is restored, they sign in with their password and can set up a new passkey.',
   },
 }
 
@@ -47,7 +47,7 @@ export function statusConfirmCopy(name: string, status: UserStatus, kind: Accoun
 /** What a restored archived account can sign in with, per kind. */
 export function restoreConfirmDescription(kind: AccountKind): string {
   if (kind === 'vendor-driver') {
-    return 'The account comes back as Active. Their old passkeys no longer work: send them a new setup link from Vendor Drivers so they can sign in.'
+    return 'The account comes back as Active. Their old passkeys no longer work: they sign in with their password and can set up a new passkey from the account menu.'
   }
   if (kind === 'company-driver') {
     return 'The account comes back as Active. Their old passkeys no longer work: they sign in with their password and can set up a new passkey from the account menu.'

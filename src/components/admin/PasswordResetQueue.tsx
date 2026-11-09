@@ -59,9 +59,9 @@ const CANCELLABLE: ResetRequestStatus[] = ['pending']
 const STATUS_OPTIONS = (Object.keys(STATUS_CFG) as ResetRequestStatus[])
   .map((s) => ({ value: s, label: STATUS_CFG[s].label }))
 
-// Every role that can ask for a reset, listed even before any of them has. Company
-// drivers reset by email link; vendor drivers have no password (passkey only), and
-// the IT Administrator resets their own by emailed code, so neither is here.
+// Every role that can ask for a reset, listed even before any of them has. 'driver'
+// covers company and vendor drivers (vendor drivers have a password since
+// 2026-11-09). The IT Administrator resets their own by emailed code, so is not here.
 const ROLE_OPTIONS = ['client', 'driver', 'admin', 'general_manager', 'operations_manager', 'fleet_manager']
   .map((r) => ({ value: r, label: ROLE_LABELS[r] }))
 
@@ -380,7 +380,7 @@ export default function PasswordResetQueue({
             ? `${pending.request.status === 'expired'
                  ? `The previous link expired unused. A fresh one will be emailed to ${pending.request.email}, and the old one stops working.`
                  : `A one-time reset link will be emailed to ${pending.request.email}.`
-               } It works once and expires 60 minutes after it is sent. Once sent, this request can no longer be rejected.`
+               } It works once and expires 5 minutes after it is sent. Once sent, this request can no longer be rejected.`
             : pending
               ? `${fullName(pending.request)} will not get a reset link, and this cannot be undone. They can request again from the sign-in screen.`
               : undefined

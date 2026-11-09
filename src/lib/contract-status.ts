@@ -45,6 +45,13 @@ export function useBookingClosed(): boolean {
   return state === 'grace' || state === 'ended'
 }
 
+/** Days from today (Philippine time) to `YYYY-MM-DD`; 0 on the day, negative after. */
+export function contractDaysLeft(day: string): number {
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit' })
+    .format(new Date())
+  return Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000)
+}
+
 /** "December 1, 2026" from `YYYY-MM-DD`, without a timezone shift. */
 export function formatContractDay(day: string): string {
   const [y, m, d] = day.split('-').map(Number)
