@@ -60,10 +60,19 @@ function subscribe(topic: LiveTopic, listener: Listener): () => void {
   }
 }
 
+/** A tab hidden at least this long re-reads when shown again (see below). */
+const STALE_AFTER_HIDDEN_MS = 30_000
+
 /**
  * Calls `onChange` after rows on any of `topics` change. A burst (one save can
  * touch several rows) is coalesced into a single call. While the tab is hidden,
  * changes are remembered and replayed once when it is shown again.
+ *
+ * Also calls it (once) when the tab comes back after 30 s or more hidden, and
+ * when the connection comes back online: a browser can pause a background
+ * tab's socket, so signals sent meanwhile never arrive at all. Same idea as
+ * refetch-on-focus / on-reconnect in SWR and TanStack Query; callers already
+ * re-read quietly here, so nothing flashes.
  */
 export function useLiveTable(
   topics: LiveTopic[],
@@ -79,6 +88,7 @@ export function useLiveTable(
     if (!enabled) return
     let timer: number | undefined
     let missed = false
+    let hiddenAt: number | null = document.visibilityState === 'visible' ? null : Date.now()
 
     const fire = () => {
       if (document.visibilityState !== 'visible') { missed = true; return }
@@ -86,17 +96,30 @@ export function useLiveTable(
       timer = window.setTimeout(() => onChangeRef.current(), debounceMs)
     }
     const onVisible = () => {
-      if (document.visibilityState === 'visible' && missed) {
+      if (document.visibilityState !== 'visible') {
+        hiddenAt ??= Date.now()
+        return
+      }
+      const longAway = hiddenAt !== null && Date.now() - hiddenAt >= STALE_AFTER_HIDDEN_MS
+      hiddenAt = null
+      if (missed || longAway) {
         missed = false
         onChangeRef.current()
       }
     }
+    // Back online: signals sent while offline were lost.
+    const onOnline = () => {
+      if (document.visibilityState === 'visible') onChangeRef.current()
+      else missed = true
+    }
 
     const unsubs = (key.split('|') as LiveTopic[]).map((t) => subscribe(t, fire))
     document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('online', onOnline)
     return () => {
       window.clearTimeout(timer)
       document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('online', onOnline)
       unsubs.forEach((u) => u())
     }
   }, [key, enabled, debounceMs])

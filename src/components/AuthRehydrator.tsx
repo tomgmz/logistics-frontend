@@ -154,15 +154,25 @@ export default function AuthRehydrator() {
     }
 
     async function rehydrate() {
+      // Someone can sign in through the form while this start-up check is
+      // still running (slow phone, slow server). Its answer then describes the
+      // page BEFORE that sign-in, so it must not clear the user they just set
+      // (it did: the sign-in window closed and the landing page stayed).
+      const userAtStart = useAuthStore.getState().user
+      const signedInMeanwhile = () => {
+        const now = useAuthStore.getState().user
+        return !!now && now !== userAtStart
+      }
+
       try {
         const persisted    = await readPersisted<{ state?: { user?: unknown } }>(localStorage.getItem('auth-user'), 'auth-user')
         const hasLocalUser = !!persisted?.state?.user
         if (!hasLocalUser) {
-          if (!cancelled) clearUser()
+          if (!cancelled && !signedInMeanwhile()) clearUser()
           return
         }
       } catch {
-        if (!cancelled) clearUser()
+        if (!cancelled && !signedInMeanwhile()) clearUser()
         return
       }
 
@@ -179,7 +189,7 @@ export default function AuthRehydrator() {
         // back, so sign out now and say why.
         const code = axios.isAxiosError(err) ? (err.response?.data as { code?: string } | undefined)?.code : undefined
         if (code === 'ACCOUNT_INACTIVE') {
-          if (cancelled) return
+          if (cancelled || signedInMeanwhile()) return
           clearUser()
           goHomeSignedOut('inactive')
           return
@@ -196,7 +206,7 @@ export default function AuthRehydrator() {
         openChannel(user.user_id)
         return
       } catch (err) {
-        if (cancelled) return
+        if (cancelled || signedInMeanwhile()) return
         // A temporary failure (backend unreachable or waking up) keeps the
         // stored user; only a 401 means the session is over.
         if (!isSessionDead(err)) return

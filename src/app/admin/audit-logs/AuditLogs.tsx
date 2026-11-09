@@ -73,7 +73,7 @@ export default function AuditLogsPage() {
     const cacheKey = `audit-logs|${filterKey}|${page}|${PAGE_SIZE}`
     // A page seen before shows at once; the read below refreshes it quietly.
     const cached = readCache<Res>(cacheKey)
-    if (cached) { setLogs(cached.data); setTotal(cached.total) }
+    if (cached) { setLogs(cached.data); setTotal(cached.total); setLoading(false) }
     else setLoading(true)
     setError(null)
     try {
