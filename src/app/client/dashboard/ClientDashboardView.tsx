@@ -21,6 +21,7 @@ import { TableCard } from '@/components/ui/untitled/table-card'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { CardLink, MetricRow, MetricRowSkeleton } from '@/components/dashboard/AdminDashboard'
 import type { CardSpec } from '@/components/dashboard/StaffDashboard'
+import { readCache, writeCache } from '@/lib/cache/queryCache'
 
 /**
  * The client's dashboard, in the same Untitled UI dashboard-04 format as the
@@ -323,11 +324,18 @@ export default function ClientDashboardView() {
 
   const load = useCallback(async () => {
     if (!clientId) { setLoading(false); return }
-    setLoading(true)
+    // Coming back: the last list shows at once and is re-read behind it.
+    const key    = `client-dashboard|${clientId}`
+    const cached = readCache<BookingWithRelations[]>(key)
+    if (cached) { setBookings(cached); setLoading(false) }
+    else setLoading(true)
     setError(null)
     try {
-      setBookings(await bookingService.fetchBookingsByClient(clientId))
+      const fresh = await bookingService.fetchBookingsByClient(clientId)
+      writeCache(key, fresh)
+      setBookings(fresh)
     } catch (err) {
+      if (cached) return
       setError(getApiErrorMessage(err))
     } finally {
       setLoading(false)

@@ -19,6 +19,7 @@ import {
   type DashboardBooking,
   type DashboardVehicle,
 } from '@/lib/services/admin/staff-dashboard.service'
+import { readCache, writeCache } from '@/lib/cache/queryCache'
 
 /**
  * The staff dashboards.
@@ -311,10 +312,16 @@ export default function StaffDashboard({ role }: { role: StaffRole }) {
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
+    // Coming back: the last figures show at once and are re-read behind them.
+    const cached = readCache<Data>('staff-dashboard')
+    if (cached) { setData((cur) => cur ?? cached); setLoading(false) }
     try {
-      setData(await fetchStaffDashboard())
+      const fresh = await fetchStaffDashboard()
+      writeCache('staff-dashboard', fresh)
+      setData(fresh)
       setError(null)
     } catch (e) {
+      if (cached) return
       setError(getApiErrorMessage(e, 'Could not load the dashboard.'))
     } finally {
       setLoading(false)
