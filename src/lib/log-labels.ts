@@ -124,6 +124,8 @@ const SYSTEM_SOURCE_LABEL: Record<string, string> = {
   'log-event':                     'Audit log writer',
   brevo:                           'Email (Brevo)',
   'brevo-mailer':                  'Email (Brevo)',
+  'brevo.delivery':                'Email delivery',
+  'brevo.webhook':                 'Email delivery webhook',
   'livekit.config':                'Emergency call setup',
   'livekit.connect':               'Emergency call connection',
   'maps.routes':                   'Google Maps routes',

@@ -344,6 +344,8 @@ export default function AdminManagementClient() {
   // A password-reset notification deep-links here as ?tab=password-resets&request=…
   const deepLinkTab    = searchParams.get('tab')
   const focusRequestId = searchParams.get('request')
+  // "Email not delivered" opens the directory on that account: ?search=<email>
+  const linkedSearch   = searchParams.get('search') ?? ''
 
   const [section,          setSection]          = useState<ModuleSection>(
     deepLinkTab === RESETS_DEEPLINK ? 'password-resets' : 'directory',
@@ -351,8 +353,8 @@ export default function AdminManagementClient() {
   // Opens on All Administrators: every staff account at once.
   const [activeTab,        setActiveTab]        = useState<TabValue>('all')
   const [resetCount,       setResetCount]       = useState(0)
-  const [searchInput,      setSearchInput]      = useState('')
-  const [search,           setSearch]           = useState('')
+  const [searchInput,      setSearchInput]      = useState(linkedSearch)
+  const [search,           setSearch]           = useState(linkedSearch)
   const [stats,            setStats]            = useState({ total: 0, active: 0, archived: 0 })
   const [showForm,         setShowForm]         = useState(false)
   const [editUser,         setEditUser]         = useState<AnyUser | null>(null)
@@ -448,6 +450,19 @@ export default function AdminManagementClient() {
     setLastViewKey(viewKey)
     setSearch('')
     setSearchInput('')
+  }
+  // Another "Email not delivered" tapped while already here: show that account.
+  const [lastLinkedSearch, setLastLinkedSearch] = useState(linkedSearch)
+  if (linkedSearch !== lastLinkedSearch) {
+    setLastLinkedSearch(linkedSearch)
+    if (linkedSearch) {
+      setSection('directory')
+      setActiveTab('all')
+      // Mark the view as already seen, so the reset above keeps this search.
+      setLastViewKey(`all|directory|${statusPick ?? ''}`)
+      setSearchInput(linkedSearch)
+      setSearch(linkedSearch)
+    }
   }
 
   /** Reload whichever user list is showing. A no-op on the resets panel, which owns its own data. */
