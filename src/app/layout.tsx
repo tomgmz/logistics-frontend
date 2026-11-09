@@ -4,6 +4,7 @@ import CsrfInit from '@/components/CsrfInit';
 import IosViewportFix from '@/components/IosViewportFix';
 import { alegreyaSansSC, alegreyaSans, aboreto, fredoka, leagueSpartan, eurostile } from '@/app/fonts';
 import StoreProvider from '@/lib/store/StoreProvider';
+import QueryProvider from '@/lib/query/QueryProvider';
 import AuthRehydrator from '@/components/AuthRehydrator';
 import AppToaster from '@/components/ui/AppToaster';
 import './globals.css';
@@ -42,10 +43,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body suppressHydrationWarning className={`bg-[#0a0a0a] text-white overflow-x-hidden ${alegreyaSansSC.className}`}>
         <CsrfInit />
         <IosViewportFix />
-        <StoreProvider>
-          <AuthRehydrator />
-          <ThemeRegistry>{children}</ThemeRegistry>
-        </StoreProvider>
+        <QueryProvider>
+          <StoreProvider>
+            <AuthRehydrator />
+            <ThemeRegistry>{children}</ThemeRegistry>
+          </StoreProvider>
+        </QueryProvider>
         <AppToaster />
       </body>
     </html>

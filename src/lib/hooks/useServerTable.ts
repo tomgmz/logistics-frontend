@@ -1,9 +1,11 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type SetStateAction } from 'react'
+import { keepPreviousData } from '@tanstack/react-query'
 import { useTablePageSize } from './useTablePageSize'
 import { getApiErrorMessage } from '@/lib/api-error'
-import { readCache, writeCache } from '@/lib/cache/queryCache'
+import { queryClient } from '@/lib/query/client'
+import { useApiQuery, useAccountScope, scopedKey } from '@/lib/query/useApiQuery'
 
 /**
  * Server-side pagination for a web table: the server filters, sorts and counts,
@@ -21,9 +23,10 @@ import { readCache, writeCache } from '@/lib/cache/queryCache'
  * `loading` is only the first load (or a retry after an error); later fetches
  * keep the rows on screen and set `fetching`, so paging does not flash a spinner.
  *
- * `cacheKey` (a name unique to this table) turns on the page cache
- * (lib/cache/queryCache): a page seen before shows at once, without a spinner,
- * while it is re-read behind it. Two tables on one screen need different names.
+ * Built on TanStack Query (lib/query). `cacheKey` (a name unique to this
+ * table) keeps its pages after the screen closes: a page seen before shows at
+ * once while it is re-read behind it. Two tables on one screen need different
+ * names; a table without one keeps nothing.
  */
 
 export interface PageMeta {
@@ -53,12 +56,7 @@ export function useServerTable<T, X extends object = object>(
   }: { enabled?: boolean; errorMessage?: string; cacheKey?: string } = {},
 ) {
   const pageSize = useTablePageSize()
-  const [page, setPage]         = useState(1)
-  const [rows, setRows]         = useState<T[]>([])
-  const [meta, setMeta]         = useState<(PageMeta & X) | null>(null)
-  const [loading, setLoading]   = useState(true)
-  const [fetching, setFetching] = useState(false)
-  const [error, setError]       = useState<string | null>(null)
+  const [page, setPage] = useState(1)
 
   // New filters or a new page size start again from page 1 — set during render
   // so the fetch below never runs with the old page and the new filters.
@@ -71,55 +69,56 @@ export function useServerTable<T, X extends object = object>(
 
   const fetchRef = useRef(fetchPage)
   useEffect(() => { fetchRef.current = fetchPage })
-  const seq       = useRef(0)
-  const loadedRef = useRef(false)
-  const errorRef  = useRef<string | null>(null)
 
-  // `quiet` re-reads in place (live updates, polling): no spinner, and a failed
-  // re-read keeps the rows already on screen instead of showing an error.
+  // A table without a name gets one of its own, so two tables never share data.
+  const ownId = useId()
+  const key   = ['table', cacheKey ?? `unnamed:${ownId}`, filterKey, page, pageSize] as const
+
+  const query = useApiQuery<PagedResponse<T, X>>(
+    key,
+    () => fetchRef.current({ page, limit: pageSize }),
+    {
+      enabled,
+      // Paging and filtering keep the previous rows on screen (no spinner).
+      placeholderData: keepPreviousData,
+      ...(cacheKey ? {} : { gcTime: 0 }),
+    },
+  )
+
+  const data = query.data
+  const meta = (data?.meta ?? null) as (PageMeta & X) | null
+  const rows = useMemo(() => data?.data ?? [], [data])
+
+  // The server answers a page past the end with the last page; follow it
+  // (during render, like the reset above; placeholder rows belong to the
+  // previous page, so they are not followed).
+  const serverPage = query.isPlaceholderData ? undefined : meta?.page
+  if (serverPage && serverPage !== page) setPage(serverPage)
+
+  const scope   = useAccountScope()
+  const fullKey = JSON.stringify(scopedKey(scope, key))
+  // Local edits to the rows on screen (e.g. after a save), kept in the cache.
+  const setRows = useCallback((next: SetStateAction<T[]>) => {
+    queryClient.setQueryData<PagedResponse<T, X>>(JSON.parse(fullKey), (cur) => {
+      if (!cur) return cur
+      const rowsNow = typeof next === 'function' ? (next as (p: T[]) => T[])(cur.data) : next
+      return { ...cur, data: rowsNow }
+    })
+  }, [fullKey])
+
+  // `quiet` re-reads in place (live updates): no spinner, and a failed re-read
+  // keeps the rows on screen. A plain reload (Refresh) shows as `fetching`.
+  const refetch = query.refetch
+  const [manualReloads, setManualReloads] = useState(0)
   const reload = useCallback(async (quiet = false) => {
-    const id = ++seq.current
-    const key = cacheKey ? `table|${cacheKey}|${filterKey}|${page}|${pageSize}` : null
-    // A page seen before: show it now and re-read quietly behind it.
-    const cached = key && !quiet ? readCache<PagedResponse<T, X>>(key) : undefined
-    if (cached) {
-      loadedRef.current = true
-      errorRef.current  = null
-      setRows(cached.data)
-      setMeta(cached.meta)
-      setError(null)
-      setLoading(false)
-      quiet = true
-    }
-    if (!quiet) {
-      if (!loadedRef.current || errorRef.current) setLoading(true)
-      setFetching(true)
-      setError(null)
-      errorRef.current = null
-    }
-    try {
-      const res = await fetchRef.current({ page, limit: pageSize })
-      if (id !== seq.current) return
-      if (key) writeCache(key, res)
-      loadedRef.current = true
-      setRows(res.data)
-      setMeta(res.meta)
-      if (res.meta.page && res.meta.page !== page) setPage(res.meta.page)
-    } catch (e) {
-      if (id !== seq.current || quiet) return
-      const msg = getApiErrorMessage(e, errorMessage)
-      errorRef.current = msg
-      setError(msg)
-    } finally {
-      if (id === seq.current) {
-        setLoading(false)
-        setFetching(false)
-      }
-    }
-    // filterKey: fetchPage closes over the filters, so a new key means a new read.
-  }, [page, pageSize, filterKey, errorMessage, cacheKey])
+    if (quiet) { await refetch(); return }
+    setManualReloads((n) => n + 1)
+    try { await refetch() } finally { setManualReloads((n) => n - 1) }
+  }, [refetch])
 
-  useEffect(() => { if (enabled) void reload() }, [reload, enabled])
+  const error = query.isError && data === undefined
+    ? getApiErrorMessage(query.error, errorMessage)
+    : null
 
   return {
     rows,
@@ -130,8 +129,11 @@ export function useServerTable<T, X extends object = object>(
     page,
     setPage,
     pageSize,
-    loading,
-    fetching,
+    loading:    query.isPending,
+    // As before TanStack: a visible load only (a new page or filter, a
+    // Refresh, or nothing on screen yet), never the quiet background re-read
+    // behind cached rows; screens show their skeleton while this is true.
+    fetching:   query.isFetching && (query.isPlaceholderData || data === undefined || manualReloads > 0),
     error,
     reload,
   }

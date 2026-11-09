@@ -6,9 +6,16 @@ import { forwardedIpHeaders } from '@/lib/server/ip-forward'
 export const API_URL = process.env.NEXT_PUBLIC_API_URL!
 export const isProd  = process.env.NODE_ENV === 'production'
 
+// Browser tests serve the BUILT app on plain http://localhost, where WebKit
+// drops `Secure` cookies (Chrome and Firefox make an exception for localhost).
+// Only that setup turns Secure off: it needs the test flag AND a localhost API,
+// so a deployed build (https API, no flag) always sets Secure.
+const localHttpTest = process.env.E2E_LOCAL_HTTP === '1' && /^http:\/\/localhost[:/]/.test(API_URL ?? '')
+const secureCookies = isProd && !localHttpTest
+
 export const accessTokenCookieOptions = {
   httpOnly: true,
-  secure:   isProd,
+  secure:   secureCookies,
   sameSite: 'strict' as const,
   path:     '/',
   maxAge:   15 * 60,
@@ -16,7 +23,7 @@ export const accessTokenCookieOptions = {
 
 export const refreshTokenCookieOptions = {
   httpOnly: true,
-  secure:   isProd,
+  secure:   secureCookies,
   sameSite: 'strict' as const,
   path:     '/',
   maxAge:   7 * 24 * 60 * 60,
@@ -24,7 +31,7 @@ export const refreshTokenCookieOptions = {
 
 export const cookieClearOptions = {
   httpOnly: true,
-  secure:   isProd,
+  secure:   secureCookies,
   sameSite: 'strict' as const,
   path:     '/',
   maxAge:   0,
@@ -32,7 +39,7 @@ export const cookieClearOptions = {
 
 export const mustChangePwCookieOptions = {
   httpOnly: false,
-  secure:   isProd,
+  secure:   secureCookies,
   sameSite: 'strict' as const,
   path:     '/',
   maxAge:   60 * 60,
