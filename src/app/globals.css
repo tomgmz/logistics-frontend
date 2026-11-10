@@ -356,6 +356,19 @@
     font-family: var(--font-alegreya), 'Alegreya Sans', sans-serif;
   }
 
+  /* Messages (Figma 2026-11-10): Darker Grotesque for everything inside, the
+     inner .ff-body / .ff-sc / .ff-chat included, so components keep their
+     classes. .ff-keep-sc opts a heading back into Alegreya Sans SC. */
+  .ff-darker,
+  .ff-darker .ff-body,
+  .ff-darker .ff-sc,
+  .ff-darker .ff-chat {
+    font-family: var(--font-darker), 'Darker Grotesque', sans-serif;
+  }
+  .ff-darker .ff-keep-sc {
+    font-family: var(--font-alegreya-sc), 'Alegreya Sans SC', sans-serif;
+  }
+
   /* Regular Alegreya Sans where the Figma uses it instead of the small caps
      face. On a container it also overrides any .ff-sc inside, so children's
      classes don't need touching. Popups portaled to <body> (MUI menus) sit

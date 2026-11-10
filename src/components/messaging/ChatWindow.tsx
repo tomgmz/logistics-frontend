@@ -2,7 +2,7 @@
 
 import { useStickToBottom } from '@/lib/hooks/useStickToBottom'
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { ArrowLeft, Loader2 } from 'lucide-react'
+import { Loader2, ChevronLeft } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { messagingService } from '@/lib/services/messaging.service'
 import type { MessageRow } from '@/lib/services/messaging.service'
@@ -267,25 +267,26 @@ export default function ChatWindow({ conversation, draftUser, currentUserId, isP
   return (
     <div className="flex flex-col h-full min-h-0">
       {/* Header */}
-      <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-white/[0.07] bg-[var(--color-bg)]">
-        <button type="button" onClick={onBack} className="lg:hidden p-1.5 rounded-lg hover:bg-white/5 text-white/50 hover:text-white transition-colors">
-          <ArrowLeft size={17} />
+      {/* Figma (Messaging.png): chevron (phone width), ringed initials, name + status. */}
+      <div className="ff-darker shrink-0 flex items-center gap-2.5 px-4 pt-3 pb-2.5 bg-[#0a0a0a] border-b border-white/[0.06]">
+        <button type="button" onClick={onBack} aria-label="Back" className="lg:hidden p-1 rounded-lg hover:bg-white/5 text-white transition-colors">
+          <ChevronLeft size={24} />
         </button>
         <div className="relative shrink-0">
-          <div className="w-9 h-9 rounded-full bg-[var(--color-surface-dark)] border border-white/10 flex items-center justify-center">
-            <span className="font-card text-[0.62rem] text-white/75">{initials}</span>
+          <div className="w-[42px] h-[42px] rounded-full bg-[#111212] border border-white/60 flex items-center justify-center">
+            <span className="text-[17px] font-medium text-white">{initials}</span>
           </div>
           {isOnline && <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-[var(--color-green)] border-2 border-[var(--color-bg)]" />}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="ff-body text-sm text-white leading-tight truncate">{nameWithRole(participant.first_name, participant.last_name, participant.role)}</p>
+          <p className="text-[22px] font-medium text-white leading-6 truncate">{nameWithRole(participant.first_name, participant.last_name, participant.role)}</p>
           <AnimatePresence mode="wait">
             {isOtherTyping ? (
-              <motion.p key="typing" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.15 }} className="ff-body text-[11px] text-[var(--color-cyan)] flex items-center gap-1">
+              <motion.p key="typing" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.15 }} className="text-[14px] font-medium text-[var(--color-cyan)] flex items-center gap-1">
                 <TypingDots />typing…
               </motion.p>
             ) : (
-              <motion.p key="status" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.15 }} className="ff-body text-[11px]">
+              <motion.p key="status" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.15 }} className="text-[14px] font-medium">
                 {isOnline
                   ? <span className="text-[var(--color-green)]">Active now</span>
                   : <span className="text-[var(--color-muted)] capitalize">{roleLabel(participant.role)}</span>}
@@ -296,7 +297,7 @@ export default function ChatWindow({ conversation, draftUser, currentUserId, isP
       </div>
 
       {/* Messages */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-4 py-5 [&::-webkit-scrollbar]:w-[3px] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-white/20 bg-[var(--color-surface)]">
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 py-5 [&::-webkit-scrollbar]:w-[3px] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-white/20 bg-[#0a0a0a]">
         {loading && <div className="flex items-center justify-center h-full"><Loader2 size={18} className="animate-spin text-[var(--color-cyan)]/40" /></div>}
         {!loading && error && (
           <div className="flex flex-col items-center justify-center h-full gap-2">

@@ -21,7 +21,7 @@ interface MessageBubbleProps {
   compact?:         boolean
 }
 
-/** A direct message, drawn by the shared Untitled UI MessageItem. */
+/** A direct message, drawn by the shared MessageItem (Figma Messages design). */
 export default function MessageBubble({
   message, isMine, currentUserId, sender, showSenderName = true, showSeen = false,
   onReply, onReact, onDelete, replyToSenderName, compact,
@@ -50,6 +50,8 @@ export default function MessageBubble({
       onReact={onReact ? (emoji) => onReact(message.id, emoji) : undefined}
       onReply={onReply ? () => onReply(message) : undefined}
       onDelete={onDelete ? (scope) => onDelete(message.id, scope) : undefined}
+      // A direct chat: the design shows no avatar or name beside their bubbles.
+      hideIdentity
       compact={compact}
     />
   )

@@ -1,5 +1,8 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
+import { ROLE_ROUTES } from '@/constants/roles'
+import { lastPage } from '@/lib/navigation/lastPage'
 import { useState, useEffect, useCallback } from 'react'
 import { MessageCircle, Loader2 } from 'lucide-react'
 import { matchesPersonSearch } from '@/lib/roles'
@@ -21,8 +24,7 @@ import type {
 import ConversationList  from './ConversationList'
 import ChatWindow        from './ChatWindow'
 import GroupChatWindow   from './GroupChatWindow'
-import NewConversationModal from './NewConversationModal'
-import NewGroupModal     from './NewGroupModal'
+import NewMessageDialog, { type NewMessageTab } from './NewMessageDialog'
 import SiteFooter        from '@/components/layout/SiteFooter'
 import { useSetMessagingChatOpen } from './MessagingChromeContext'
 import { cachedData, storeData } from '@/lib/query/useApiQuery'
@@ -35,6 +37,17 @@ type Inbox = { conversations: Conversation[]; groups: Group[] }
 
 export default function MessagingShell() {
   const { user }        = useAuthStore()
+
+  // Back: to the module you came from (lib/navigation/lastPage); the portal
+  // home when Messages was opened straight from a link or nothing in your own
+  // portal was remembered (e.g. the landing page, or another account's page).
+  const goBack = () => {
+    const home    = ROLE_ROUTES[user?.role ?? ''] ?? '/'
+    const allowed = [home, ...(user?.it_standin ? [ROLE_ROUTES.it_admin] : [])]
+    const prev    = lastPage()
+    const ok      = !!prev && allowed.some(base => prev === base || prev.startsWith(base + '/') || prev.startsWith(base + '?'))
+    router.push(ok ? prev! : home)
+  }
   const currentUserId   = user?.user_id ?? ''
 
   const [cachedInbox]                     = useState(() => cachedData<Inbox>(INBOX_KEY))
@@ -46,8 +59,9 @@ export default function MessagingShell() {
   const [search, setSearch]               = useState('')
   const [loading, setLoading]             = useState(!cachedInbox)
   const [error, setError]                 = useState<string | null>(null)
-  const [showNewDm, setShowNewDm]         = useState(false)
-  const [showNewGroup, setShowNewGroup]   = useState(false)
+  // New Message (Figma): one dialog, opened on the DIRECT or GROUP tab.
+  const [newMessageTab, setNewMessageTab] = useState<NewMessageTab | null>(null)
+  const router = useRouter()
 
   // App-wide online presence (shared channel) — drives online dots + chat header status.
   const onlineUserIds = useGlobalPresence(currentUserId)
@@ -199,7 +213,7 @@ export default function MessagingShell() {
   }
 
   const handleConvReady = async (conversationId: string) => {
-    setShowNewDm(false)
+    setNewMessageTab(null)
     setDraftUser(null)
     await fetchAll()
     setSelectedConvId(conversationId)
@@ -208,14 +222,14 @@ export default function MessagingShell() {
   }
 
   const handleDraftReady = (user: MessagableUser) => {
-    setShowNewDm(false)
+    setNewMessageTab(null)
     setSelectedConvId(null)
     setSelectedGroup(null)
     setDraftUser(user)
   }
 
   const handleGroupCreated = async (groupId: string) => {
-    setShowNewGroup(false)
+    setNewMessageTab(null)
     const rawGroups  = await messagingService.getGroups().catch(() => [])
     const mapped     = rawGroups.map(toGroup)
     setGroups(mapped)
@@ -254,7 +268,7 @@ export default function MessagingShell() {
     <>
       <div className="flex flex-1 min-h-0 h-full overflow-hidden">
         {/* Sidebar */}
-        <div className={`shrink-0 border-r border-white/[0.07] bg-[var(--color-bg)] flex flex-col w-full lg:w-[300px] ${hasActiveChat ? 'hidden lg:flex' : 'flex'}`}>
+        <div className={`shrink-0 border-r border-white/[0.12] bg-[#0a0a0a] flex flex-col w-full lg:w-[290px] ${hasActiveChat ? 'hidden lg:flex' : 'flex'}`}>
           <ConversationList
             items={filtered}
             selectedConvId={selectedConvId}
@@ -263,15 +277,16 @@ export default function MessagingShell() {
             onSearchChange={setSearch}
             onSelectDm={selectDm}
             onSelectGroup={selectGroup}
-            onNewConversation={() => setShowNewDm(true)}
-            onNewGroup={() => setShowNewGroup(true)}
+            onNewConversation={() => setNewMessageTab('direct')}
+            onNewGroup={() => setNewMessageTab('group')}
             currentUserId={currentUserId}
             onlineUserIds={onlineUserIds}
+            onBack={goBack}
           />
         </div>
 
         {/* Chat panel */}
-        <div className={`flex-1 min-w-0 flex flex-col ${hasActiveChat ? 'flex' : 'hidden lg:flex'} bg-[var(--color-surface)]`}>
+        <div className={`flex-1 min-w-0 flex flex-col ${hasActiveChat ? 'flex' : 'hidden lg:flex'} bg-[#0a0a0a]`}>
           <div className="flex-1 min-h-0 flex flex-col">
           {selectedGroup ? (
             <GroupChatWindow
@@ -307,7 +322,7 @@ export default function MessagingShell() {
               onConversationCreated={handleDraftCreated}
             />
           ) : (
-            <EmptyState onNewConversation={() => setShowNewDm(true)} onNewGroup={() => setShowNewGroup(true)} />
+            <EmptyState onNewConversation={() => setNewMessageTab('direct')} onNewGroup={() => setNewMessageTab('group')} />
           )}
           </div>
           {/* Under the chat pane only — never under the conversation list. */}
@@ -315,8 +330,15 @@ export default function MessagingShell() {
         </div>
       </div>
 
-      {showNewDm    && <NewConversationModal onClose={() => setShowNewDm(false)}    onConversationReady={handleConvReady} onDraftReady={handleDraftReady} />}
-      {showNewGroup && <NewGroupModal        onClose={() => setShowNewGroup(false)} onGroupCreated={handleGroupCreated} />}
+      {newMessageTab && (
+        <NewMessageDialog
+          initialTab={newMessageTab}
+          onClose={() => setNewMessageTab(null)}
+          onConversationReady={handleConvReady}
+          onDraftReady={handleDraftReady}
+          onGroupCreated={handleGroupCreated}
+        />
+      )}
     </>
   )
 }

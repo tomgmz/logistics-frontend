@@ -117,7 +117,7 @@ function MinimizedBubbleItem({ chat, stackIndex }: { chat: ChatEntry; stackIndex
       exit={{ opacity: 0, scale: 0.6, x: 20 }}
       transition={{ type: 'spring', stiffness: 380, damping: 28 }}
       style={{ bottom: bottomPos, right: RIGHT_OFFSET }}
-      className="fixed z-40 flex items-center"
+      className="ff-darker fixed z-40 flex items-center"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >

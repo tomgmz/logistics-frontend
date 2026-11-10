@@ -1,4 +1,4 @@
-import { Aboreto, Fredoka, League_Spartan, Alegreya_Sans_SC, Alegreya_Sans } from 'next/font/google';
+import { Aboreto, Fredoka, League_Spartan, Alegreya_Sans_SC, Alegreya_Sans, Darker_Grotesque } from 'next/font/google';
 import localFont from 'next/font/local';
 
 export const alegreyaSansSC = Alegreya_Sans_SC({
@@ -54,4 +54,11 @@ export const eurostile = localFont({
   variable: '--font-eurostile',
   display: 'swap',
   fallback: ['Arial Black', 'Impact', 'sans-serif'],
+});
+// Darker Grotesque - Messages (Figma, 2026-11-10: inbox, chats, new message)
+export const darkerGrotesque = Darker_Grotesque({
+  weight: ['400', '500', '600', '700', '800'],
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-darker',
 });

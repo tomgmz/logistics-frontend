@@ -134,7 +134,7 @@ export default function MessengerFloatingPanel() {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -8, scale: 0.96 }}
           transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-          className={`fixed z-50 bg-[var(--color-bg)] shadow-2xl overflow-hidden flex flex-col ${
+          className={`ff-darker fixed z-50 bg-[var(--color-bg)] shadow-2xl overflow-hidden flex flex-col ${
             isMobile
               ? 'inset-0 w-full h-full max-h-none rounded-none border-0'
               : 'top-[88px] right-4 w-[340px] max-h-[520px] border border-white/[0.08] rounded-2xl'

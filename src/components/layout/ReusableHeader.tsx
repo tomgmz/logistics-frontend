@@ -1,14 +1,13 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { MessageCircle, Menu, ArrowLeft } from 'lucide-react'
+import { MessageCircle, Menu } from 'lucide-react'
 import Image from 'next/image'
 import { useRouter, usePathname } from 'next/navigation'
 import { ASSETS } from '@/lib/data'
 import NotificationIcon from '@/components/ui/NotificationIcon'
 import { useMessengerStore } from '@/lib/store/messenger.store'
 import { useAuthStore } from '@/lib/store/auth.store'
-import { ROLE_ROUTES } from '@/constants/roles'
 
 interface ReusableHeaderProps {
   sidebarOpen: boolean
@@ -24,7 +23,6 @@ export default function ReusableHeader({ onToggleSidebar, title }: ReusableHeade
   const user = useAuthStore(s => s.user)
 
   const isMessagesPage = pathname === '/messages'
-  const backHref = ROLE_ROUTES[user?.role ?? ''] ?? '/'
 
   return (
     <motion.header
@@ -35,14 +33,8 @@ export default function ReusableHeader({ onToggleSidebar, title }: ReusableHeade
                  px-4 lg:pl-[19px] lg:pr-[23px] border-b border-white/[0.07] bg-[var(--color-bg)]"
     >
       <div className="flex min-w-0 items-center gap-3">
-        {isMessagesPage ? (
-          <button
-            onClick={() => router.push(backHref)}
-            className="p-2 rounded-lg hover:bg-white/5 text-white/50 hover:text-white transition-colors"
-          >
-            <ArrowLeft size={20} />
-          </button>
-        ) : (
+        {/* Messages: no back arrow here (Figma); the sidebar's green arrow is it. */}
+        {!isMessagesPage && (
           <button
             onClick={onToggleSidebar}
             className="lg:hidden p-2 rounded-lg hover:bg-white/5 text-white transition-colors"

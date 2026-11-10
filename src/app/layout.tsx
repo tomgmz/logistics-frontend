@@ -2,9 +2,10 @@ import type { Metadata, Viewport } from 'next';
 import ThemeRegistry from '@/components/ui/ThemeRegistry';
 import CsrfInit from '@/components/CsrfInit';
 import IosViewportFix from '@/components/IosViewportFix';
-import { alegreyaSansSC, alegreyaSans, aboreto, fredoka, leagueSpartan, eurostile } from '@/app/fonts';
+import { alegreyaSansSC, alegreyaSans, aboreto, fredoka, leagueSpartan, eurostile, darkerGrotesque } from '@/app/fonts';
 import StoreProvider from '@/lib/store/StoreProvider';
 import QueryProvider from '@/lib/query/QueryProvider';
+import { LastPageTracker } from '@/lib/navigation/lastPage';
 import AuthRehydrator from '@/components/AuthRehydrator';
 import AppToaster from '@/components/ui/AppToaster';
 import './globals.css';
@@ -38,7 +39,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html 
       lang="en" 
-      className={cn("scroll-smooth", alegreyaSansSC.variable, alegreyaSans.variable, aboreto.variable, fredoka.variable, leagueSpartan.variable, eurostile.variable, "font-sans", geist.variable)}
+      className={cn("scroll-smooth", alegreyaSansSC.variable, alegreyaSans.variable, aboreto.variable, fredoka.variable, leagueSpartan.variable, eurostile.variable, darkerGrotesque.variable, "font-sans", geist.variable)}
     >
       <body suppressHydrationWarning className={`bg-[#0a0a0a] text-white overflow-x-hidden ${alegreyaSansSC.className}`}>
         <CsrfInit />
@@ -46,6 +47,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <QueryProvider>
           <StoreProvider>
             <AuthRehydrator />
+            <LastPageTracker />
             <ThemeRegistry>{children}</ThemeRegistry>
           </StoreProvider>
         </QueryProvider>

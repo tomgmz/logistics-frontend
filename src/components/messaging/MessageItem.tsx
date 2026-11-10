@@ -7,28 +7,27 @@ import { formatMessageTime } from '@/app/utils/messaging.utils'
 import type { MessageReaction } from '@/app/types/messaging/messaging.types'
 import { useLongPress } from '@/lib/hooks/useLongPress'
 import { QUICK_REACTIONS } from './EmojiPicker'
-import ReadTicks from './ReadTicks'
 import MessagePhoto from './MessagePhoto'
 import ConfirmDeleteDialog, { type DeleteScope } from './ConfirmDeleteDialog'
 import { BookingMentionCards } from './BookingMention'
 
 /*
- * One chat message, after Untitled UI's message item
- * (untitledui.com/react/components/messaging), drawn in our palette:
+ * One chat message, per the Figma Messages design (docs/figma/messaging,
+ * 2026-11-10), the same as the driver app:
  *
- *             ┌ bubble ──────────────── [😀… | ↩ | 🗑] ┐
- *             │ ▌ quoted reply                         │
- *             │ text / photo                           │
- *   (avatar)  └ squared bottom corner, sender's side ──┘
- *             (👍 2) (❤️)
- *             Name · 10:41 AM
+ *                       You replied to [name]
+ *                            ( quoted message )
+ *            (            your message, teal pill )   [😀… | ↩ | 🗑]
+ *                                    [time]  read
+ *   ( their message, grey pill )
+ *   [time]
  *
- * As the thread always had it: name and time under the bubble, at the bottom
- * left for others and the bottom right for you ("You", then sent / seen);
- * the name and avatar on the last message of a run. Only the actions Messages already has are on the
- * bar (react, reply, remove); a mouse opens it on hover, touch with a long
- * press. Every chat surface (full page, floating bubbles, groups, the
- * client's inbox) draws its messages with this.
+ * Pill bubbles; the time (and "read" on yours) only under the last bubble of
+ * a run; a reaction chip on the bubble's lower inner corner. A direct chat
+ * shows no avatar or name (hideIdentity); a group keeps them. The action bar
+ * is unchanged: a mouse opens it on hover, touch with a long press. Every chat
+ * surface (full page, floating bubbles, groups, the client's inbox) draws its
+ * messages with this, in Darker Grotesque.
  */
 
 interface ReactionGroup { emoji: string; count: number; reacted: boolean }
@@ -55,10 +54,10 @@ export function MessageAvatar({ initials, online, compact = false }: { initials:
 
 export function MessageDateDivider({ label }: { label: string }) {
   return (
-    <div className="my-4 flex w-full shrink-0 items-center gap-x-2">
-      <div className="h-px flex-1 bg-white/[0.08]" />
-      <span className="ff-body text-sm font-medium text-white/45">{label}</span>
-      <div className="h-px flex-1 bg-white/[0.08]" />
+    <div className="ff-darker my-4 flex w-full shrink-0 items-center gap-x-3">
+      <div className="h-0 flex-1 border-t border-dashed border-white/35" />
+      <span className="text-[15px] font-medium text-white/45">{label}</span>
+      <div className="h-0 flex-1 border-t border-dashed border-white/35" />
     </div>
   )
 }
@@ -118,12 +117,14 @@ interface MessageItemProps {
   compact?:       boolean
   /** Under the message at the far right of the thread, e.g. a group's "seen by" avatars. */
   footer?:        ReactNode
+  /** A direct chat: no avatar or name beside the other person's bubbles. */
+  hideIdentity?:  boolean
 }
 
 export default function MessageItem({
   messageId, isMine, currentUserId, senderName, showName = true, initials = '?', online,
   createdAt, body, attachmentUrl, stamped, seen, pending = false, replyTo,
-  reactions = [], onReact, onReply, onDelete, compact = false, footer,
+  reactions = [], onReact, onReply, onDelete, compact = false, footer, hideIdentity = false,
 }: MessageItemProps) {
   const [open, setOpen]                         = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
@@ -145,27 +146,38 @@ export default function MessageItem({
     setOpen(false)
   }
 
-  const textSize = compact ? 'text-[13px]' : 'text-[15px]'
+  const textSize = compact ? 'text-[15px]' : 'text-[17px]'
   const isPhoto  = !!attachmentUrl
 
-  // Under the bubble, on the sender's side: name · time and your sent / seen.
-  const meta = (
-    <div className={`ff-body flex items-center gap-1 px-0.5 ${isMine ? 'justify-end self-end' : 'justify-start self-start'}`}>
-      {showName && (
-        <span className="min-w-0 truncate text-xs font-medium text-white/60">{isMine ? 'You' : senderName}</span>
+  // Last bubble of a run: (name ·) time, and "read" on yours.
+  const meta = showName ? (
+    <div className={`flex items-center gap-1.5 px-0.5 ${isMine ? 'justify-end self-end' : 'justify-start self-start'}`}>
+      {!hideIdentity && !isMine && (
+        <>
+          <span className="min-w-0 truncate text-[13px] font-semibold text-white/70">{senderName}</span>
+          <span className="text-[13px] text-white/30">·</span>
+        </>
       )}
-      {showName && <span className="text-xs text-white/30">·</span>}
-      <time className="shrink-0 text-xs text-white/40" dateTime={createdAt}>{formatMessageTime(createdAt)}</time>
-      {isMine && seen !== undefined && <ReadTicks seen={seen && !pending} size={13} />}
+      <time className="shrink-0 text-[13px] font-medium text-white/45" dateTime={createdAt}>
+        {pending ? 'sending…' : formatMessageTime(createdAt)}
+      </time>
+      {isMine && seen && !pending && <span className="text-[13px] font-semibold text-[var(--color-cyan)]">read</span>}
     </div>
-  )
+  ) : null
+
+  // "You replied to Ali" / "Ali replied to you" over the quoted message.
+  const replyLabel = replyTo
+    ? isMine
+      ? `You replied to ${replyTo.name === 'You' ? 'yourself' : replyTo.name ?? 'a message'}`
+      : `${(senderName ?? '').split(/\s+/)[0] || 'They'} replied to ${replyTo.name === 'You' ? 'you' : replyTo.name ?? 'a message'}`
+    : null
 
   return (
     <>
     <motion.li
       initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.15 }}
       data-msg-id={messageId}
-      className={`relative flex list-none items-end gap-3 ${isMine
+      className={`ff-darker relative flex list-none items-end gap-2.5 ${isMine
         ? `self-end ${compact ? 'pl-6' : 'pl-10'}`
         : `self-start ${compact ? 'pr-6' : 'pr-8 lg:pr-10'}`} max-w-full`}
     >
@@ -179,7 +191,7 @@ export default function MessageItem({
         />
       )}
 
-      {!isMine && (showName
+      {!isMine && !hideIdentity && (showName
         ? <MessageAvatar initials={initials} online={online} compact={compact} />
         : <div className={`shrink-0 ${compact ? 'w-6' : 'w-8'}`} />)}
 
@@ -187,23 +199,25 @@ export default function MessageItem({
           the bar moves nothing, so going from the bubble to a reaction never
           closes and reopens it. */}
       <article
-        className={`flex min-w-0 flex-1 flex-col gap-1.5 ${pending ? 'opacity-60' : ''}`}
+        className={`flex min-w-0 flex-1 flex-col gap-1 ${isMine ? 'items-end' : 'items-start'} ${pending ? 'opacity-60' : ''}`}
         onPointerEnter={onEnter}
         onPointerLeave={onLeave}
       >
+        {replyTo && (
+          <>
+            <span className="max-w-full truncate px-1 text-[13px] font-medium text-white/45">{replyLabel}</span>
+            <blockquote className="-mb-4 max-w-[min(100%,420px)] truncate rounded-[22px] border border-[#5a5a5a] bg-[#1f1f1f] px-5 pt-1.5 pb-5 text-[17px] font-medium text-white/85">
+              {replyTo.content}
+            </blockquote>
+          </>
+        )}
         <div
-          className={`group/msg relative ff-body rounded-lg ring-1 ring-white/[0.08] ring-inset ${textSize} leading-relaxed text-white [overflow-wrap:anywhere] whitespace-pre-line
-            ${isMine ? 'self-end rounded-br-none bg-[var(--color-bg)]' : 'self-start rounded-bl-none bg-white/[0.06]'}
-            ${isPhoto && !replyTo ? 'p-1.5' : 'px-3 py-2'} ${isMine && !isPhoto ? 'pr-4' : ''}
+          className={`group/msg relative rounded-[22px] border ${textSize} font-medium leading-snug text-white [overflow-wrap:anywhere] whitespace-pre-line
+            ${isMine ? 'self-end border-[var(--color-cyan)] bg-[#063a37]' : 'self-start border-[#5a5a5a] bg-[#1f1f1f]'}
+            ${isPhoto ? 'p-1.5 rounded-[18px]' : compact ? 'px-4 py-1.5' : 'px-5 py-2'}
             max-w-full pointer-coarse:select-none [-webkit-touch-callout:none]`}
           {...(hasActions ? longPress(() => setOpen(true), () => setOpen(false)) : {})}
         >
-          {replyTo && (
-            <blockquote className="relative mb-1.5 rounded-lg bg-[var(--color-bg)] px-3 py-2 text-sm text-white/55 ring-1 ring-white/[0.08] ring-inset before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:border-l-[3px] before:border-[var(--color-cyan)]">
-              {replyTo.name && <span className="block truncate text-xs font-medium text-[var(--color-cyan)]">{replyTo.name}</span>}
-              <span className="line-clamp-2">{replyTo.content}</span>
-            </blockquote>
-          )}
           <MessagePhoto body={body} attachmentUrl={attachmentUrl} stamped={stamped} />
 
           {/* Action bar: floats over the bubble's top corner, so the reactions
@@ -245,14 +259,14 @@ export default function MessageItem({
         <BookingMentionCards text={body} alignEnd={isMine} compact={compact} />
 
         {grouped.length > 0 && (
-          <ul className={`flex flex-wrap gap-1 ${isMine ? 'justify-end' : 'justify-start'}`}>
+          <ul className={`relative z-[1] -mt-3.5 flex flex-wrap gap-1 px-1 ${isMine ? 'self-start' : 'self-end'}`}>
             {grouped.map(r => (
               <li key={r.emoji}>
                 <button
                   type="button" onClick={() => onReact?.(r.emoji)} disabled={!onReact}
-                  className={`ff-body flex h-6 items-center gap-1 rounded-2xl px-2 py-0.5 text-sm ring-1 ring-inset transition-colors ${r.reacted
-                    ? 'bg-[var(--color-cyan)]/15 ring-[var(--color-cyan)]/35 text-[var(--color-cyan)]'
-                    : 'bg-white/[0.06] ring-white/[0.08] text-white/60 hover:bg-white/10'}`}
+                  className={`flex h-[22px] items-center gap-1 rounded-full border border-[var(--color-cyan)] px-2 text-[13px] font-semibold transition-colors ${r.reacted
+                    ? 'bg-[#0a4d49] text-[var(--color-cyan)]'
+                    : 'bg-[#063a37] text-white hover:bg-[#0a4d49]'}`}
                 >
                   <span className="leading-none">{r.emoji}</span>
                   {r.count > 1 && <span className="text-xs">{r.count}</span>}
