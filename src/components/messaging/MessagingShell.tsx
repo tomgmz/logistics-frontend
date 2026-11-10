@@ -26,6 +26,7 @@ import NewGroupModal     from './NewGroupModal'
 import SiteFooter        from '@/components/layout/SiteFooter'
 import { useSetMessagingChatOpen } from './MessagingChromeContext'
 import { cachedData, storeData } from '@/lib/query/useApiQuery'
+import { dmChatKey, groupChatKey, markChatStale, markAllChatsStale } from './chatFreshness'
 
 // The inbox as last shown (TanStack Query cache): back on Messages it shows at
 // once, and the fresh read and realtime events update it as before.
@@ -82,6 +83,9 @@ export default function MessagingShell() {
   useMessagingRealtime({
     currentUserId,
     onNewMessage: (raw: MessageRow) => {
+      // A closed chat changed: its next open reads fresh (the open one gets
+      // the message on its own channel).
+      if (raw.conversation_id !== selectedConvId) markChatStale(dmChatKey(raw.conversation_id))
       // Unknown conversation (e.g. a brand-new DM whose first message just arrived):
       // pull the full list so it appears without a manual reload.
       let known = false
@@ -101,6 +105,7 @@ export default function MessagingShell() {
       if (!known) fetchAll()
     },
     onGroupMessage: (raw) => {
+      if (raw.group_id !== selectedGroup?.id) markChatStale(groupChatKey(raw.group_id))
       let known = false
       setGroups(prev => {
         known = prev.some(g => g.id === raw.group_id)
@@ -119,7 +124,25 @@ export default function MessagingShell() {
     },
     onGroupInvite: () => fetchAll(),
     onGroupUpdated: () => fetchAll(),
-    onMessageUnsent: () => fetchAll(),
+    onMessageUnsent: ({ conversation_id, group_id }) => {
+      if (conversation_id) markChatStale(dmChatKey(conversation_id))
+      if (group_id)        markChatStale(groupChatKey(group_id))
+      fetchAll()
+    },
+    // A reaction changed a chat: one that isn't open reads fresh on its next
+    // open (the 30-second reuse would otherwise show it without the reaction).
+    // The open chat applies the reaction itself, as before. An older server
+    // sends no chat id for a direct chat; then every closed direct chat reads
+    // fresh next time, which is correct, just less precise.
+    onReactionToggle: ({ conversation_id, group_id }) => {
+      if (group_id) {
+        if (group_id !== selectedGroup?.id) markChatStale(groupChatKey(group_id))
+      } else if (conversation_id) {
+        if (conversation_id !== selectedConvId) markChatStale(dmChatKey(conversation_id))
+      } else {
+        markAllChatsStale('dm:', selectedConvId ? dmChatKey(selectedConvId) : null)
+      }
+    },
   })
 
   const unified: UnifiedListItem[] = [
@@ -142,7 +165,9 @@ export default function MessagingShell() {
     setSelectedGroup(null)
     setDraftUser(null)
     setConversations(prev => prev.map(c => c.id === conv.id ? { ...c, unread_count: 0 } : c))
-    messagingService.markAsRead(conv.id).catch(() => {})
+    // Only when there is something to mark: every messaging call shares one
+    // per-user rate limit, and clicking through chats used to send this twice.
+    if (conv.unread_count > 0) messagingService.markAsRead(conv.id).catch(() => {})
   }
 
   const selectGroup = (g: Group) => {
@@ -150,6 +175,7 @@ export default function MessagingShell() {
     setSelectedConvId(null)
     setDraftUser(null)
     setGroups(prev => prev.map(gr => gr.id === g.id ? { ...gr, unread_count: 0 } : gr))
+    if (g.unread_count > 0 && g.my_status === 'accepted') messagingService.markGroupRead(g.id).catch(() => {})
   }
 
   const handleBack = () => { setSelectedConvId(null); setSelectedGroup(null); setDraftUser(null) }

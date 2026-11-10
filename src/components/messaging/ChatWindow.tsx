@@ -20,6 +20,7 @@ import type {
   ReactionTogglePayload,
 } from '@/app/types/messaging/messaging.types'
 import { toMessage, PHOTO_PLACEHOLDER } from '@/app/types/messaging/messaging.types'
+import { dmChatKey, isChatFresh, markChatFresh } from './chatFreshness'
 import { roleLabel, nameWithRole } from '@/lib/roles'
 import { cachedData, storeData } from '@/lib/query/useApiQuery'
 
@@ -104,20 +105,33 @@ export default function ChatWindow({ conversation, draftUser, currentUserId, isP
   const isSeen = (m: Message) => !m.id.startsWith('optimistic-') && isReadBy(otherLastReadAt, m.created_at)
   const pendingIds                            = useRef<Set<string>>(new Set())
 
-  const fetchMessages = useCallback(async () => {
+  // Which conversation `messages` holds, so a copy is never saved under another.
+  const loadedFor   = useRef<string | null>(null)
+  const messagesRef = useRef<Message[]>(messages)
+  messagesRef.current = messages
+
+  // `reuseFresh`: on open, a chat read in the last 30 s is shown from the cache
+  // without asking again (chatFreshness). Retry and error recovery always read.
+  const fetchMessages = useCallback(async (reuseFresh = false) => {
     // A draft has no conversation yet — nothing to load.
     if (!convId) { setMessages([]); setLoading(false); return }
     // Opened before: show that history at once (TanStack Query cache), then
-    // the fresh read replaces it. Only fresh reads are saved, so one chat's
-    // messages can never be saved under another.
+    // the fresh read replaces it.
     const key    = ['messaging', 'dm', convId] as const
     const cached = cachedData<Message[]>(key)
+    if (reuseFresh && cached && isChatFresh(dmChatKey(convId))) {
+      loadedFor.current = convId
+      setMessages(cached); setError(null); setLoading(false)
+      return
+    }
     try {
       setError(null)
       if (cached) { setMessages(cached); setLoading(false) } else setLoading(true)
       const raw  = await messagingService.getMessages(convId)
       const msgs = raw.map(toMessage2)
       storeData(key, msgs)
+      markChatFresh(dmChatKey(convId))
+      loadedFor.current = convId
       setMessages(msgs)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load messages')
@@ -126,8 +140,18 @@ export default function ChatWindow({ conversation, draftUser, currentUserId, isP
     }
   }, [convId])
 
-  useEffect(() => { fetchMessages() }, [fetchMessages])
-  useEffect(() => { if (convId) messagingService.markAsRead(convId).catch(() => {}) }, [convId])
+  useEffect(() => { fetchMessages(true) }, [fetchMessages])
+  // On close, keep what was on screen (sends, reactions, live messages) so a
+  // quick return within the fresh window shows it. Not once the window has
+  // passed: the next open reads fresh anyway. Marking read on open is done by
+  // the list (MessagingShell), only when the chat has unread messages.
+  useEffect(() => {
+    if (!convId) return
+    return () => {
+      if (loadedFor.current !== convId || !isChatFresh(dmChatKey(convId))) return
+      storeData(['messaging', 'dm', convId], messagesRef.current.filter(m => !m.id.startsWith('optimistic-')))
+    }
+  }, [convId])
   // Opens on your first unread message; after that follows only while you're at the bottom.
   const myLastReadAt = conversation
     ? (conversation.participant_a_id === currentUserId ? conversation.participant_a_last_read_at : conversation.participant_b_last_read_at)
@@ -277,7 +301,7 @@ export default function ChatWindow({ conversation, draftUser, currentUserId, isP
         {!loading && error && (
           <div className="flex flex-col items-center justify-center h-full gap-2">
             <p className="ff-body text-white/30 text-xs">{error}</p>
-            <button type="button" onClick={fetchMessages} className="ff-body text-xs text-[var(--color-cyan)]/60 hover:text-[var(--color-cyan)] transition-colors">Retry</button>
+            <button type="button" onClick={() => fetchMessages()}className="ff-body text-xs text-[var(--color-cyan)]/60 hover:text-[var(--color-cyan)] transition-colors">Retry</button>
           </div>
         )}
         {!loading && !error && dateGroups.length === 0 && (

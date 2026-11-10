@@ -277,7 +277,7 @@ export type UnifiedListItem =
 export interface ReadReceiptPayload      { conversation_id: string; reader_id: string; last_read_at: string }
 export interface GroupReadReceiptPayload { group_id: string; user_id: string; read_at: string }
 export interface GroupInvitePayload      { group_id: string; group_name: string }
-export interface ReactionTogglePayload   { message_id: string; user_id: string; emoji: string; action: 'added' | 'removed'; group_id?: string }
+export interface ReactionTogglePayload   { message_id: string; user_id: string; emoji: string; action: 'added' | 'removed'; group_id?: string; conversation_id?: string }
 /** A booking offered in the "@" mention list. */
 export interface MentionableBooking {
   booking_id:       string

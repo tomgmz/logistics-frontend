@@ -22,6 +22,7 @@ import type {
   ReactionTogglePayload,
 } from '@/app/types/messaging/messaging.types'
 import { toGroupMessage, PHOTO_PLACEHOLDER } from '@/app/types/messaging/messaging.types'
+import { groupChatKey, isChatFresh, markChatFresh } from './chatFreshness'
 import { cachedData, storeData } from '@/lib/query/useApiQuery'
 
 interface ReplyTo     { messageId: string; content: string; senderName: string }
@@ -104,7 +105,11 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
   // Only the creator renames the group and changes who is in it; everyone else asks.
   const isCreator = group.created_by === currentUserId
   const [requests, setRequests] = useState<GroupMemberRequest[]>([])
-  // Reloaded whenever the group is (a new request or a decision broadcasts group_updated).
+  // Read on open, then again only when this group's requests may have changed:
+  // a group_updated broadcast for it (new request, decision) or a change made
+  // from the options here. Not on every new group object from a list refresh.
+  const [requestsVersion, setRequestsVersion] = useState(0)
+  const reloadRequests = useCallback(() => setRequestsVersion(v => v + 1), [])
   useEffect(() => {
     if (!isCreator) { setRequests([]); return }
     let cancelled = false
@@ -112,7 +117,7 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
       .then(rs => { if (!cancelled) setRequests(rs ?? []) })
       .catch(() => {})
     return () => { cancelled = true }
-  }, [group, isCreator])
+  }, [group.id, isCreator, requestsVersion])
 
   const typingTimeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const pendingIds     = useRef<Set<string>>(new Set())
@@ -131,26 +136,49 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
 
   const coerce = useCallback((r: GroupMessageRaw): GroupMessage => toGroupMessage(r), [])
 
-  const fetchMessages = useCallback(async () => {
+  // Which group `messages` holds, so a copy is never saved under another.
+  const loadedFor   = useRef<string | null>(null)
+  const messagesRef = useRef<GroupMessage[]>(messages)
+  messagesRef.current = messages
+
+  // `reuseFresh`: on open, a group read in the last 30 s is shown from the
+  // cache without asking again (chatFreshness). Retry/recovery always read.
+  // Marking read on open is done by the list (MessagingShell), only when the
+  // group has unread messages.
+  const fetchMessages = useCallback(async (reuseFresh = false) => {
     if (isPending) { setLoading(false); return }
     // Opened before: show that history at once (TanStack Query cache), then
-    // the fresh read replaces it. Only fresh reads are saved.
+    // the fresh read replaces it.
     const key    = ['messaging', 'group', group.id] as const
     const cached = cachedData<GroupMessage[]>(key)
+    if (reuseFresh && cached && isChatFresh(groupChatKey(group.id))) {
+      loadedFor.current = group.id
+      setMessages(cached); setError(null); setLoading(false)
+      return
+    }
     try {
       setError(null)
       if (cached) { setMessages(cached); setLoading(false) } else setLoading(true)
       const raw  = await messagingService.getGroupMessages(group.id)
       const msgs = raw.map(coerce)
       storeData(key, msgs)
+      markChatFresh(groupChatKey(group.id))
+      loadedFor.current = group.id
       setMessages(msgs)
-      if (msgs.length) messagingService.markGroupRead(group.id).catch(() => {})
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load messages')
     } finally { setLoading(false) }
   }, [group.id, isPending, coerce])
 
-  useEffect(() => { fetchMessages() }, [fetchMessages])
+  useEffect(() => { fetchMessages(true) }, [fetchMessages])
+  // On close, keep what was on screen for a quick return (see ChatWindow).
+  useEffect(() => {
+    const id = group.id
+    return () => {
+      if (loadedFor.current !== id || !isChatFresh(groupChatKey(id))) return
+      storeData(['messaging', 'group', id], messagesRef.current.filter(m => !m.id.startsWith('optimistic-')))
+    }
+  }, [group.id])
   // Opens on your first unread message; after that follows only while you're at the bottom.
   const { scrollToLatest, atLatest } = useStickToBottom(bottomRef, group.id, [messages, typingUsers], {
     ready: !loading, messages, currentUserId,
@@ -182,6 +210,7 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
       })
       if (raw.sender_id !== currentUserId) messagingService.markGroupRead(group.id).catch(() => {})
     },
+    onGroupUpdated: ({ group_id }) => { if (group_id === group.id) reloadRequests() },
     onGroupReadReceipt: ({ user_id, read_at }) => {
       // Update local member last_read_at so seen-by updates in real time
       setMembers(prev => prev.map(m => m.user_id === user_id ? { ...m, last_read_at: read_at } : m))
@@ -305,7 +334,7 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
         currentUserId={currentUserId}
         requests={requests}
         onClose={() => setOptionsView(null)}
-        onChanged={() => onGroupChanged?.()}
+        onChanged={() => { reloadRequests(); onGroupChanged?.() }}
       />
 
       {/* The creator's requests waiting for a decision. */}
@@ -360,7 +389,7 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
             {!loading && error && (
               <div className="flex flex-col items-center justify-center h-full gap-2">
                 <p className="ff-body text-white/30 text-xs">{error}</p>
-                <button type="button" onClick={fetchMessages} className="ff-body text-xs text-[var(--color-cyan)]/60 hover:text-[var(--color-cyan)] transition-colors">Retry</button>
+                <button type="button" onClick={() => fetchMessages()}className="ff-body text-xs text-[var(--color-cyan)]/60 hover:text-[var(--color-cyan)] transition-colors">Retry</button>
               </div>
             )}
             {!loading && !error && (
