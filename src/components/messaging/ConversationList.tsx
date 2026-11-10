@@ -3,7 +3,7 @@
 import { nameWithRole } from '@/lib/roles'
 
 import { motion } from 'framer-motion'
-import { ArrowLeft, MessageCirclePlus, Search, Users } from 'lucide-react'
+import { ArrowLeft, MessageCirclePlus, Search } from 'lucide-react'
 import type { Conversation, Group, UnifiedListItem } from '@/app/types/messaging/messaging.types'
 import { formatConversationTime } from '@/app/utils/messaging.utils'
 
@@ -16,7 +16,6 @@ interface ConversationListProps {
   onSelectDm:         (c: Conversation) => void
   onSelectGroup:      (g: Group) => void
   onNewConversation:  () => void
-  onNewGroup:         () => void
   currentUserId:      string
   onlineUserIds?:     string[]
   /** The green back arrow beside MESSAGES (Figma); hidden when not given. */
@@ -25,7 +24,7 @@ interface ConversationListProps {
 
 export default function ConversationList({
   items, selectedConvId, selectedGroupId, search, onSearchChange,
-  onSelectDm, onSelectGroup, onNewConversation, onNewGroup,
+  onSelectDm, onSelectGroup, onNewConversation,
   currentUserId, onlineUserIds = [], onBack,
 }: ConversationListProps) {
   return (
@@ -42,16 +41,12 @@ export default function ConversationList({
             )}
             <h2 className="ff-keep-sc text-white text-[1.35rem] font-bold leading-none">Messages</h2>
           </div>
-          <div className="flex items-center gap-1">
-            <button type="button" onClick={onNewConversation} title="New message" aria-label="New message"
-              className="p-1.5 rounded-lg text-[var(--color-cyan)] hover:bg-white/5 transition-colors">
-              <MessageCirclePlus size={16} />
-            </button>
-            <button type="button" onClick={onNewGroup} title="New group" aria-label="New group"
-              className="p-1.5 rounded-lg text-[var(--color-cyan)] hover:bg-white/5 transition-colors">
-              <Users size={16} />
-            </button>
-          </div>
+          {/* One button: the New Message dialog has both DIRECT and GROUP tabs
+              (user 2026-11-10: the separate new-group icon was removed). */}
+          <button type="button" onClick={onNewConversation} title="New message" aria-label="New message"
+            className="p-1.5 rounded-lg text-[var(--color-cyan)] hover:bg-white/5 transition-colors">
+            <MessageCirclePlus size={16} />
+          </button>
         </div>
         <div className="relative">
           <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/60 pointer-events-none" />

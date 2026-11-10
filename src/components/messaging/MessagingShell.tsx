@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { ROLE_ROUTES } from '@/constants/roles'
 import { lastPage } from '@/lib/navigation/lastPage'
 import { useState, useEffect, useCallback } from 'react'
-import { MessageCircle, Loader2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { matchesPersonSearch } from '@/lib/roles'
 import { messagingService } from '@/lib/services/messaging.service'
 import { useAuthStore } from '@/lib/store/auth.store'
@@ -278,7 +278,6 @@ export default function MessagingShell() {
             onSelectDm={selectDm}
             onSelectGroup={selectGroup}
             onNewConversation={() => setNewMessageTab('direct')}
-            onNewGroup={() => setNewMessageTab('group')}
             currentUserId={currentUserId}
             onlineUserIds={onlineUserIds}
             onBack={goBack}
@@ -322,7 +321,7 @@ export default function MessagingShell() {
               onConversationCreated={handleDraftCreated}
             />
           ) : (
-            <EmptyState onNewConversation={() => setNewMessageTab('direct')} onNewGroup={() => setNewMessageTab('group')} />
+            <EmptyState />
           )}
           </div>
           {/* Under the chat pane only — never under the conversation list. */}
@@ -343,20 +342,11 @@ export default function MessagingShell() {
   )
 }
 
-function EmptyState({ onNewConversation, onNewGroup }: { onNewConversation: () => void; onNewGroup: () => void }) {
+/** No chat open: just the words (user 2026-11-10: no buttons, no icon). */
+function EmptyState() {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center p-8">
-      <div className="w-14 h-14 rounded-full glass border border-white/10 flex items-center justify-center">
-        <MessageCircle size={24} className="text-[var(--color-cyan)]/40" />
-      </div>
-      <div className="space-y-1">
-        <p className="font-spartan text-white/50 text-xs tracking-[0.2em] uppercase">Select a conversation</p>
-        <p className="ff-body text-white/20 text-xs">Choose from your list or start a new one</p>
-      </div>
-      <div className="flex items-center gap-2">
-        <button type="button" onClick={onNewConversation} className="ff-body text-xs px-4 py-2 rounded-xl bg-[var(--color-cyan)]/10 text-[var(--color-cyan)] border border-[var(--color-cyan)]/20 hover:bg-[var(--color-cyan)]/15 transition-colors">New conversation</button>
-        <button type="button" onClick={onNewGroup}        className="ff-body text-xs px-4 py-2 rounded-xl bg-white/[0.04] text-white/50 border border-white/[0.08] hover:bg-white/[0.07] hover:text-white/70 transition-colors">New group</button>
-      </div>
+    <div className="flex flex-1 items-center justify-center p-8">
+      <p className="text-[17px] font-medium text-white/45">No message selected</p>
     </div>
   )
 }

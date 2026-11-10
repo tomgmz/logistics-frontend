@@ -46,6 +46,29 @@ export default function NewMessageDialog({ initialTab, onClose, onConversationRe
   const [groupName, setGroupName] = useState('')
   const [creating, setCreating]   = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
+  const stripRef  = useRef<HTMLDivElement>(null)
+  const hasMembers = selected.size > 0
+
+  // Members strip: a mouse wheel (up / down) scrolls it sideways (user
+  // 2026-11-10). A trackpad's own sideways swipe is left alone, and at either
+  // end the wheel is not held. Native listener: React's wheel handler is
+  // passive, so it could not stop the vertical scroll.
+  useEffect(() => {
+    const el = stripRef.current
+    if (!el || !hasMembers) return
+    const onWheel = (e: WheelEvent) => {
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return
+      const max = el.scrollWidth - el.clientWidth
+      if (max <= 0) return
+      const atStart = el.scrollLeft <= 0 && e.deltaY < 0
+      const atEnd   = el.scrollLeft >= max - 1 && e.deltaY > 0
+      if (atStart || atEnd) return
+      e.preventDefault()
+      el.scrollLeft += e.deltaY
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [hasMembers])
 
   useEffect(() => {
     cachedFetch(['messaging', 'contacts'], () => messagingService.getMessagableUsers(), (us) => { setUsers(us); setLoading(false) })
@@ -190,7 +213,7 @@ export default function NewMessageDialog({ initialTab, onClose, onConversationRe
               {members.length === 0 ? (
                 <p className="text-white/45 text-[13px] font-medium ml-[3px] mb-2">Tick the people to add.</p>
               ) : (
-                <div className="flex gap-[22px] overflow-x-auto pl-[11px] pr-2 pt-1 pb-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <div ref={stripRef} className="flex gap-[22px] overflow-x-auto overscroll-x-contain pl-[11px] pr-2 pt-1 pb-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                   {members.map(u => (
                     <div key={u.user_id} className="flex flex-col items-center w-10 shrink-0">
                       <span className="relative w-[35px] h-[35px] rounded-full border-[1.5px] border-[var(--color-cyan)] bg-[#0e1010] flex items-center justify-center text-[15px] font-medium text-white">
