@@ -131,6 +131,12 @@ function cardsFor(role: StaffRole, d: Data): CardSpec[] {
           href: `${base}/vehicle-management`, icon: <Truck size={16} />, tone: 'amber' },
         reportsCard,
         ticketsCard,
+        // Only while one waits, so the usual six-card layout is unchanged.
+        ...((q.late_confirmations?.count ?? 0) > 0 ? [{
+          label: 'Late confirmations to check', hint: 'Accept or dismiss in the booking',
+          count: q.late_confirmations!.count, href: `${base}/booking-management`,
+          icon: <AlertTriangle size={16} />, tone: 'red' as const,
+        }] : []),
       ]
   }
 }
@@ -168,6 +174,9 @@ function listsFor(role: StaffRole, d: Data): ListSpec[] {
         { title: 'Client reported a problem', empty: 'No open problems.', bookings: q.open_issues.items, total: q.open_issues.count },
         // Running 15+ min past the planned arrival (an older backend sends no queue).
         { title: 'Delayed deliveries', empty: 'Every delivery on the road is on time.', bookings: q.delayed?.items ?? [], total: q.delayed?.count ?? 0 },
+        // Late pickup / drop-off confirmations from a previous main driver's
+        // phone (after a swap), waiting for Accept or Dismiss in the booking.
+        { title: 'Late confirmations to check', empty: 'No late confirmations waiting.', bookings: q.late_confirmations?.items ?? [], total: q.late_confirmations?.count ?? 0 },
       ]
     case 'fleet_manager':
       return [
@@ -185,7 +194,7 @@ function listsFor(role: StaffRole, d: Data): ListSpec[] {
 const SKELETON_COUNTS: Record<StaffRole, { cards: number; lists: number }> = {
   admin:              { cards: 6, lists: 0 },
   general_manager:    { cards: 4, lists: 2 },
-  operations_manager: { cards: 6, lists: 3 },
+  operations_manager: { cards: 6, lists: 4 },
   fleet_manager:      { cards: 5, lists: 3 },
 }
 

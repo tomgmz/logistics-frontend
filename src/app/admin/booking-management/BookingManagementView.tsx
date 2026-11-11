@@ -313,6 +313,8 @@ interface ListRow {
   delayed: number | null | undefined
   /** The driver reported a breakdown and the office hasn't paused or closed it. */
   breakdown: boolean
+  /** Late confirmations from a previous main driver waiting for Accept / Dismiss (staff only). */
+  late_pending: number
   /** True while the client's reported problem is unresolved. */
   issue_open: boolean
   issue_note: string | null
@@ -339,6 +341,7 @@ function toRows(raw: Record<string, unknown>[]): ListRow[] {
       // undefined = not delayed; a paused delivery is explained by its pause.
       delayed:           b.delayed_since && !b.paused_at ? (typeof b.delay_minutes === 'number' ? b.delay_minutes : null) : undefined,
       breakdown:         !!b.breakdown_reported_at && !b.paused_at,
+      late_pending:      typeof b.late_pending === 'number' ? b.late_pending : 0,
       issue_open:        hasOpenClientIssue(b),
       issue_note:        typeof b.client_issue_note === 'string' ? b.client_issue_note : null,
       resubmissions:     resubmissionsOf(b),
@@ -2286,6 +2289,13 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                                   className="flex w-fit items-center gap-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border mt-1"
                                   style={{ color: '#F62626', borderColor: '#F6262655', background: '#F6262614' }}>
                                   Breakdown · needs decision
+                                </span>
+                              )}
+                              {r.late_pending > 0 && (
+                                <span title="The previous main driver's phone sent a confirmation after the drivers were changed: accept or dismiss it in the booking"
+                                  className="flex w-fit items-center gap-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border mt-1"
+                                  style={{ color: '#FF7A30', borderColor: '#FF7A3055', background: '#FF7A3014' }}>
+                                  Late confirmation{r.late_pending > 1 ? `s · ${r.late_pending}` : ''} · needs decision
                                 </span>
                               )}
                               <ResubmittedBadge count={r.resubmissions} />
