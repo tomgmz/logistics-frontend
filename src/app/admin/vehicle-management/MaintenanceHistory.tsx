@@ -4,9 +4,9 @@ import { useEffect, useState } from 'react'
 import { ImageIcon } from 'lucide-react'
 
 import type { OdometerReading, TruckService } from '@/app/types/truck.types'
-import { adminFetchTruckUpkeep } from '@/lib/services/admin/trucks.service'
+import { adminFetchTruckMaintenance } from '@/lib/services/admin/trucks.service'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
-import { fmtDay, fmtKm } from './upkeep-ui'
+import { fmtDay, fmtKm } from './maintenance-ui'
 import { FileViewButton } from '@/components/ui/FileViewer'
 
 const READING_LABEL: Record<OdometerReading['kind'], string> = {
@@ -32,7 +32,7 @@ function PhotoLink({ url, label }: { url: string | null; label: string }) {
 }
 
 /** Service history and odometer readings, newest first, for the vehicle details. */
-export default function UpkeepHistory({ truckId }: { truckId: string }) {
+export default function MaintenanceHistory({ truckId }: { truckId: string }) {
   const [services, setServices] = useState<TruckService[]>([])
   const [readings, setReadings] = useState<OdometerReading[]>([])
   const [loading,  setLoading]  = useState(true)
@@ -41,7 +41,7 @@ export default function UpkeepHistory({ truckId }: { truckId: string }) {
   useEffect(() => {
     // Mounted per vehicle (keyed by the caller), so it starts in the loading state.
     let cancelled = false
-    adminFetchTruckUpkeep(truckId)
+    adminFetchTruckMaintenance(truckId)
       .then((h) => { if (!cancelled) { setServices(h.services); setReadings(h.readings) } })
       .catch(() => { if (!cancelled) setFailed(true) })
       .finally(() => { if (!cancelled) setLoading(false) })
@@ -51,7 +51,7 @@ export default function UpkeepHistory({ truckId }: { truckId: string }) {
   // Live: a reading or service recorded elsewhere shows up here. A failed quiet
   // re-read keeps what is on screen.
   useLiveTable(['live:trucks'], () => {
-    adminFetchTruckUpkeep(truckId)
+    adminFetchTruckMaintenance(truckId)
       .then((h) => { setServices(h.services); setReadings(h.readings); setFailed(false) })
       .catch(() => {})
   })

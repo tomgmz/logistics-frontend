@@ -47,6 +47,9 @@ export interface UserStatsResponse {
   total:    number
   active:   number
   inactive: number
+  /** Older servers do not send these two. */
+  deactivated?: number
+  locked?:      number
   archived: number
 }
 

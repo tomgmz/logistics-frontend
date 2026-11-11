@@ -653,14 +653,14 @@ function AccountsCard({ data }: { data: ItDashboardSummary['accounts'] }) {
         title="Accounts"
         contentTrailing={<CardLink href="/it_admin/administrator-management">Manage</CardLink>}
       />
-      <Table head={['Role', 'Active', 'Revoked', 'Locked', 'Archived']} minWidth="min-w-[520px]">
+      {/* Archived accounts are counted in the Archive module (2026-11-11). */}
+      <Table head={['Role', 'Active', 'Revoked', 'Locked']} minWidth="min-w-[420px]">
         {data.by_role.map((r) => (
           <tr key={r.role}>
             <td className="px-4 md:px-6 py-3 text-white whitespace-nowrap">{roleLabel(r.role)}</td>
             <td className="px-4 md:px-6 py-3 font-mono text-white">{r.active}</td>
             <td className="px-4 md:px-6 py-3 font-mono" style={{ color: r.inactive ? COLOR.amber : COLOR.muted }}>{r.inactive}</td>
             <td className="px-4 md:px-6 py-3 font-mono" style={{ color: r.permanently_locked ? COLOR.critical : COLOR.muted }}>{r.permanently_locked}</td>
-            <td className="px-4 md:px-6 py-3 font-mono text-[#818181]">{r.archived}</td>
           </tr>
         ))}
       </Table>

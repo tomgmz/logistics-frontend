@@ -10,7 +10,7 @@ import {
   Users, UserPlus,
   Pencil, Eye, ShieldCheck, ShieldOff, Archive,
   AlertTriangle,
-  KeyRound, Send, RotateCcw, Flag, ArchiveRestore,
+  KeyRound, Send, ArchiveRestore,
 } from 'lucide-react'
 import { createTheme, ThemeProvider } from '@mui/material/styles'
 import type {
@@ -60,8 +60,8 @@ export type UserManagementMode = 'company-admin' | 'it-admin'
 // their own list and their own access actions. They sign in like company drivers
 // (password, emailed code, optional passkey) since 2026-11-09. Both
 // kinds are added and edited through the same driver form.
-// 'archived': every archived client and driver. Archived accounts show there
-// and nowhere else (2026-11-08).
+// 'archived': every archived client and driver, shown only by the Archive
+// module (`archive` prop, 2026-11-11), never as a tab on this page.
 type TabValue = UserMgmtTab | 'vendor-drivers' | 'all' | 'archived'
 
 const DRIVER_TABS: { key: 'drivers' | 'vendor-drivers'; label: string }[] = [
@@ -73,7 +73,6 @@ const TABS: { key: TabValue; label: string }[] = [
   { key: 'all',        label: 'All Users' },
   { key: 'clients',    label: 'Clients'   },
   { key: 'drivers',    label: 'Drivers'   },
-  { key: 'archived',   label: 'Archived'  },
 ]
 
 type NewAccountType = 'clients' | 'company-driver' | 'vendor-driver'
@@ -105,7 +104,9 @@ const muiTheme = createTheme({
 
 // What the other tabs hold: every status but Archived. Archived accounts have
 // their own tab (asked for as Status = Archived on the All list).
-const CURRENT_STATUSES: UserStatus[] = ['active', 'inactive', 'deactivated', 'permanently_locked']
+// 'inactive' (shown as Revoked) is gone since 2026-11-11: vendor drivers are
+// deactivated like company drivers.
+const CURRENT_STATUSES: UserStatus[] = ['active', 'deactivated', 'permanently_locked']
 
 /** Company driver, vendor driver or anyone else: what the pop-ups say about passkeys. */
 function accountKind(u: AnyUser): AccountKind {
@@ -178,7 +179,8 @@ function LastLogin({ iso }: { iso: string | null }) {
 
 const STATUS_CFG: Record<UserStatus, { label: string; cls: string }> = {
   active:             { label: 'Active',      cls: 'bg-[#4df9ed]/[0.24] text-[#4df9ed] border-[#4df9ed]' },
-  inactive:           { label: 'Revoked',     cls: 'bg-[#8a38f5]/[0.12] text-[#8a38f5] border-[#8a38f5]' },
+  // No longer set (vendor drivers are deactivated since 2026-11-11); kept for an old row.
+  inactive:           { label: 'Inactive',    cls: 'bg-[#8a38f5]/[0.12] text-[#8a38f5] border-[#8a38f5]' },
   deactivated:        { label: 'Deactivated', cls: 'bg-[#ff7a30]/20 text-[#ff7a30] border-[#ff7a30]'     },
   archived:           { label: 'Archived',    cls: 'bg-[#ffea00]/20 text-[#ffea00] border-[#ffea00]'     },
   permanently_locked: { label: 'Locked',      cls: 'bg-[#f62626]/20 text-[#f62626] border-[#f62626]'     },
@@ -260,9 +262,8 @@ function RowMenu({ user, mode, onView, onEdit, onStatusChange, lockedBy }: RowMe
 function AccessBadge({ access }: { access: VendorDriverUser['access'] | undefined }) {
   // A row without access state is not a vendor account (or not loaded yet).
   if (!access) return <span className="text-sm text-[#818181]">—</span>
-  const cfg = !access.account_active
-    ? { label: 'Revoked',          cls: 'bg-red-500/15 text-red-400 border-red-500/30' }
-    : access.enrolled
+  // Whether they can sign in shows in the Status column (Deactivated).
+  const cfg = access.enrolled
       ? { label: `Passkey set up${access.passkey_count > 1 ? ` (${access.passkey_count})` : ''}`,
           cls: 'bg-[#4df9ed]/10 text-[#4df9ed] border-[#4df9ed]/30' }
       : access.invite_pending
@@ -274,28 +275,6 @@ function AccessBadge({ access }: { access: VendorDriverUser['access'] | undefine
       className={`t-badge gap-1 ${cfg.cls}`}
     >
       <KeyRound size={10} /> {cfg.label}
-    </span>
-  )
-}
-
-/**
- * The flag on a vendor account whose access was revoked: automatically once the
- * booking they drove was completed, or by hand. Says when and why, so whoever
- * picks a vendor crew next knows to ask the IT Administrator to restore access.
- */
-function RevokedFlag({ user }: { user: VendorDriverUser }) {
-  if (!user.access || user.access.account_active) return null
-  const at     = user.drivers?.access_revoked_at ?? null
-  const reason = user.drivers?.access_revoked_reason ?? null
-  return (
-    <span
-      title={at ? `Revoked ${formatDateTime(at)}` : undefined}
-      className="font-[family-name:var(--font-alegreya-sc)] mt-1 inline-flex max-w-[260px] items-center gap-1 rounded-md border border-red-500/30 bg-red-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-red-300"
-    >
-      <Flag size={10} className="shrink-0" />
-      <span className="truncate">
-        Flagged: access revoked{reason ? ` (${reason})` : ''}{at ? ` · ${formatDate(at)}` : ''}
-      </span>
     </span>
   )
 }
@@ -329,18 +308,18 @@ function ArchivedRowMenu({ user, mode, onView, onRestore, lockedBy }: {
  * (passkey link, revoke, restore). Password resets go through the reset queue,
  * as for a company driver.
  */
-function VendorRowMenu({ user, mode, onDone, onView, onEdit, confirm, lockedBy }: {
+function VendorRowMenu({ user, mode, onDone, onView, onEdit, onStatusChange, lockedBy }: {
   user:      VendorDriverUser
   mode:      UserManagementMode
-  /** Opens the page's confirm pop-up; the action runs only once it is confirmed. */
-  confirm:   (action: AccountConfirm) => void
   onDone:    () => Promise<void> | void
   onView:    () => void
   onEdit:    () => void
+  /** Activate / Deactivate / Archive, as for a company driver (confirmed first). */
+  onStatusChange: (s: UserStatus) => void
   lockedBy?: string
 }) {
   const { canEdit } = useModuleAccess()
-  // Passkey access (re-invite, revoke, restore) is the IT Administrator's;
+  // The passkey link and the account status are the IT Administrator's;
   // editing the driver's details stays with the Company Administrator.
   const itMode = mode === 'it-admin'
   if (lockedBy) return <LockedRow holder={lockedBy} onView={onView} />
@@ -361,35 +340,18 @@ function VendorRowMenu({ user, mode, onDone, onView, onEdit, confirm, lockedBy }
     'Sending passkey setup link…', 'Passkey setup link sent to the driver.', 'Could not send the setup link.',
   )
 
-  const revoke = () => confirm({
-    title:        `Revoke ${displayName(user)}'s app access?`,
-    description:  'They are signed out and cannot sign in (password, emailed code or passkey). ' +
-                  'Their passkeys stop working for good. You can restore access later.',
-    confirmLabel: 'Revoke Access',
-    run: () => run(
-      externalDriverService.revoke(user.user_id),
-      'Revoking access…', 'Access revoked.', 'Could not revoke access.',
-    ),
-  })
-
-  const restore = () => confirm({
-    title:        `Restore ${displayName(user)}'s app access?`,
-    description:  'Their account is turned back on. They sign in with their password or an emailed code; their old passkeys stay off.',
-    confirmLabel: 'Restore Access',
-    run: () => run(
-      externalDriverService.restore(user.user_id),
-      'Restoring access…', 'Access restored. They can sign in with their password or an emailed code.', 'Could not restore access.',
-    ),
-  })
-
-  const accessActions: RowAction[] = !itMode || !user.access ? [] : user.access.account_active
-    ? [
-        { label: 'Send Passkey Link', icon: <Send size={15} />, onSelect: () => void resend(), section: 'App access', description: 'Email an optional passkey setup link' },
-        { label: 'Revoke Access', icon: <ShieldOff size={15} />, tone: 'danger', onSelect: revoke, section: 'App access', description: 'Sign them out and block every sign-in' },
-      ]
-    : [
-        { label: 'Restore Access', icon: <RotateCcw size={15} />, tone: 'accent', onSelect: restore, section: 'App access', description: 'Turn their sign-in back on' },
-      ]
+  // No Revoke / Restore since 2026-11-11: a vendor driver signs in with a
+  // password or emailed code like a company driver, and is deactivated or
+  // archived the same way.
+  const accessActions: RowAction[] = !itMode ? [] : [
+    ...(user.status === 'active'
+      ? [{ label: 'Send Passkey Link', icon: <Send size={15} />, onSelect: () => void resend(), section: 'App access', description: 'Email an optional passkey setup link' }]
+      : []),
+    ...STATUS_ACTIONS.filter((x) => x.status !== user.status).map((x) => ({
+      label: x.label, icon: x.icon, tone: x.tone, section: 'Account', description: x.description,
+      onSelect: () => onStatusChange(x.status),
+    })),
+  ]
 
   const actions: RowAction[] = [
     { label: 'View Details', icon: <Eye size={15} />, onSelect: onView, section: 'Details', description: 'Open the driver read-only' },
@@ -560,7 +522,6 @@ function renderCells(user: AnyUser, tab: TabValue) {
         <>
           <td>
             <p className={NAME_TEXT}>{name}</p>
-            <RevokedFlag user={u} />
           </td>
           <td className={TD_MUTED}>{u.drivers?.vendor_name || '—'}</td>
           <td className={TD_MUTED}><EmailText value={u.email} /></td>
@@ -609,7 +570,6 @@ const ACCESS_OPTIONS = [
   { value: 'enrolled',   label: 'Passkey set up' },
   { value: 'invited',    label: 'Passkey link sent' },
   { value: 'not_set_up', label: 'Password only' },
-  { value: 'revoked',    label: 'Revoked' },
 ]
 
 /** "on_trip" → "On Trip". */
@@ -619,12 +579,7 @@ function humanize(v: string): string {
 
 /** Company, vendor and driver-status choices come from the accounts loaded. */
 function filterFields(tab: TabValue, rows: AnyUser[], archivedOnly: boolean): FilterField[] {
-  // Only a vendor driver whose app access was revoked is ever Inactive (shown as Revoked), so the
-  // option is offered only where vendor drivers are listed.
-  const statusOptions = tab === 'vendor-drivers' || tab === 'all'
-    ? STATUS_OPTIONS
-    : STATUS_OPTIONS.filter((o) => o.value !== 'inactive')
-  const status: FilterField[] = [{ key: 'status', label: 'Account Status', options: statusOptions }]
+  const status: FilterField[] = [{ key: 'status', label: 'Account Status', options: STATUS_OPTIONS }]
   const license: FilterField = { key: 'license', label: 'License', options: LICENSE_OPTIONS }
   const role: FilterField = { key: 'role', label: 'Role', options: [{ value: 'client', label: 'Client' }, { value: 'driver', label: 'Driver' }] }
   switch (tab) {
@@ -650,10 +605,16 @@ function filterFields(tab: TabValue, rows: AnyUser[], archivedOnly: boolean): Fi
   }
 }
 
-export default function UserManagementClient({ mode = 'company-admin', sectionTabs }: {
+export default function UserManagementClient({ mode = 'company-admin', sectionTabs, archive }: {
   mode?:        UserManagementMode
   /** The IT Admin page's own section tabs, drawn where this page's would be. */
   sectionTabs?: ReactNode
+  /**
+   * The Archive module's tab switcher. When given, this is the archived
+   * clients and drivers list only: that switcher in place of the account tabs,
+   * no Add User, and an "Archived" count only.
+   */
+  archive?:     ReactNode
 }) {
   const itMode = mode === 'it-admin'
   // The IT Administrator's staff live on their own tab of their page.
@@ -664,13 +625,13 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
   const linkedSearch = useSearchParams().get('search') ?? ''
 
   // Opens on All Users: every client and driver account at once.
-  const [activeTab,        setActiveTab]        = useState<TabValue>('all')
+  const [activeTab,        setActiveTab]        = useState<TabValue>(archive ? 'archived' : 'all')
   const [searchInput,      setSearchInput]      = useState(linkedSearch)
   const [search,           setSearch]           = useState(linkedSearch)
   // The Filters panel's applied values. They belong to the tab (and view) they
   // were set on, so switching either clears them.
   const [filters,          setFilters]          = useState<FilterValues>([])
-  const [stats,            setStats]            = useState({ total: 0, active: 0, archived: 0 })
+  const [stats,            setStats]            = useState({ total: 0, active: 0, deactivated: 0, locked: 0 })
   const [showForm,         setShowForm]         = useState(false)
   const [editUser,         setEditUser]         = useState<AnyUser | null>(null)
   const [formViewOnly,     setFormViewOnly]     = useState(false)
@@ -680,7 +641,7 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
   const [showTypePicker,   setShowTypePicker]   = useState(false)
   // The confirm pop-up in front of Activate / Deactivate / Archive / Restore / Revoke.
   const [confirmAction,    setConfirmAction]    = useState<AccountConfirm | null>(null)
-  // Archived accounts live on the Archived tab only; their rows get a Restore action.
+  // Archived accounts live in the Archive module only; their rows get a Restore action.
   const showArchived = activeTab === 'archived'
 
   // This module's tier for a managed role: Read Only disables every write control.
@@ -706,7 +667,7 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
     setLastLinkedSearch(linkedSearch)
     if (linkedSearch) {
       setFilters([])
-      setActiveTab('all')
+      setActiveTab(archive ? 'archived' : 'all')
       setSearchInput(linkedSearch)
       setSearch(linkedSearch)
     }
@@ -727,7 +688,7 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
   const table = useServerTable(
     async (q) => {
       const tab = activeTab
-      // The Archived tab is the All list asked for with Status = Archived; the
+      // The archived list (Archive module) is the All list asked for with Status = Archived; the
       // other tabs never send Archived, so they hold current accounts only.
       const sent: FilterValues = tab === 'archived'
         ? [...filters.filter((r) => r.field !== 'status'), { field: 'status', op: 'is', value: 'archived' }]
@@ -741,7 +702,7 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
         }),
         userService.getStats('client,driver'),
       ])
-      setStats({ total: statsResult.total, active: statsResult.active, archived: statsResult.archived })
+      setStats({ total: statsResult.total, active: statsResult.active, deactivated: statsResult.deactivated ?? 0, locked: statsResult.locked ?? 0 })
       return { data: res.data, meta: { ...res.meta, tab } }
     },
     `${activeTab}|${JSON.stringify(filters)}|${search}`,
@@ -766,7 +727,7 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
 
   // Both pages filter by account status only, in Untitled UI's dropdowns filter
   // bar (the user's call, 2026-10-25). One status at a time, read "Status:
-  // Active"; "All" means every current status. The Archived tab filters by role.
+  // Active"; "All" means every current status. The archived list filters by role.
   const filterDefs = filterFields(activeTab, users, showArchived)
     .filter((f) => f.key === (showArchived ? 'role' : 'status'))
     .map((f) => ({ ...f, label: showArchived ? 'Role' : 'Status', single: true }))
@@ -846,9 +807,22 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
     setShowForm(true)
   }
 
-  // "Create User" asks for the account type first; the form opens once one is picked.
+  // On All Users the button asks for the account type first; on a type's own tab
+  // (Clients, Drivers, Vendor Drivers) it opens that type's form straight away.
+  const tabAccountType: NewAccountType | null =
+    activeTab === 'clients'        ? 'clients'
+    : activeTab === 'drivers'        ? 'company-driver'
+    : activeTab === 'vendor-drivers' ? 'vendor-driver'
+    : null
+  const addLabel =
+    tabAccountType === 'clients'        ? 'Add Client'
+    : tabAccountType === 'company-driver' ? 'Add Driver'
+    : tabAccountType === 'vendor-driver'  ? 'Add Vendor Driver'
+    : 'Add User'
+
   function openCreate() {
-    setShowTypePicker(true)
+    if (tabAccountType) createAccount(tabAccountType)
+    else setShowTypePicker(true)
   }
 
   function createAccount(type: NewAccountType) {
@@ -871,11 +845,13 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
         <div className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0 px-3 py-3 sm:px-4 lg:px-5 3xl:px-6 lg:pt-3 lg:pb-4 3xl:pb-5 gap-3 3xl:gap-4 lg:overflow-hidden">
 
           {/* Stats (Figma 3234:1482). */}
-          <StatTiles tiles={[
-            { label: 'Total Users', value: stats.total,    color: 'text-[#3af626]' },
-            { label: 'Active',      value: stats.active,   color: 'text-[#4df9ed]' },
-            { label: 'Archived',    value: stats.archived, color: 'text-[#ffea00]' },
-          ]} />
+          {/* No count cards in the Archive module (user, 2026-11-11). */}
+          {!archive && <StatTiles tiles={[
+            { label: 'Total Users', value: stats.total,       color: 'text-[#3af626]' },
+            { label: 'Active',      value: stats.active,      color: 'text-[#4df9ed]' },
+            { label: 'Deactivated', value: stats.deactivated, color: 'text-[#ff7a30]' },
+            { label: 'Locked',      value: stats.locked,      color: 'text-[#f62626]' },
+          ]} />}
 
           {/* Table card */}
           <TableCard.Root className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0">
@@ -883,7 +859,7 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
             {/* The IT Administrator's page passes its section tabs. The Company
                 Administrator's has no other section since password resets moved
                 to the IT Administrator (2026-10-24), so no tab row at all. */}
-            {sectionTabs}
+            {!archive && sectionTabs}
 
             {/* The table format's filter row (Figma 3234:1482): search, the
                 All Users / Clients / Drivers / Archived switch, Filters, Refresh, and Add User at the far right. The IT
@@ -895,19 +871,19 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
               fields={filterDefs}
               values={filters}
               onChange={applyFilters}
-              trailing={!itMode && (
+              trailing={!itMode && !archive && (
                 <Button size="toolbar" color="accent" iconLeading={UserPlusIcon} onClick={openCreate} {...writeAccess(access.canCreate)}>
-                  Add User
+                  {addLabel}
                 </Button>
               )}
-              leading={
+              leading={archive ?? (
                 <TabsMinimal
                   label="Accounts"
                   items={tabs.map((t) => ({ id: t.key, label: t.label }))}
                   selectedKey={dropdownTab}
                   onSelectionChange={switchTab}
                 />
-              }
+              )}
             />
 
             {isDriverTab && (
@@ -1005,7 +981,7 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
                               <VendorRowMenu
                                 user={user as VendorDriverUser}
                                 mode={mode}
-                                confirm={setConfirmAction}
+                                onStatusChange={(s) => handleStatusChange(user, s)}
                                 onDone={refetchCurrentTab}
                                 onView={() => openEdit(user, true)}
                                 onEdit={() => openEdit(user)}

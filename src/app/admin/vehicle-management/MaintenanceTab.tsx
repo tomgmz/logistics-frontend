@@ -13,11 +13,11 @@ import { ROLE_ROUTES } from '@/constants/roles'
 
 import type { MaintenanceReason, MaintenanceTruck, Truck } from '@/app/types/truck.types'
 import { incidentLabel, type DriverReport } from '@/app/types/driver-report.types'
-import { adminFetchUpkeepPage, adminUpdateTruck, flaggedBookingNotice } from '@/lib/services/admin/trucks.service'
+import { adminFetchMaintenancePage, adminUpdateTruck, flaggedBookingNotice } from '@/lib/services/admin/trucks.service'
 import { BLOWBAGETS_ITEMS } from '@/lib/blowbagets'
 import BlowbagetsInspectionModal from './BlowbagetsInspectionModal'
 import RecordServiceModal from './RecordServiceModal'
-import { fmtDay, fmtKm } from './upkeep-ui'
+import { fmtDay, fmtKm } from './maintenance-ui'
 import DriverReportDetailModal from '@/components/reports/DriverReportDetailModal'
 import ReusableModal from '@/components/layout/ReusableModal'
 import { useRecordLocks } from '@/lib/hooks/useRecordLock'
@@ -176,7 +176,7 @@ function detailsOf(t: MaintenanceTruck, reason: MaintenanceReason): string {
   return details
 }
 
-/** When the problem started, for the oldest-first order (mirrors the server's upkeep-problems.ts). */
+/** When the problem started, for the oldest-first order (mirrors the server's maintenance-problems.ts). */
 function sinceOf(t: MaintenanceTruck, reason: MaintenanceReason): string | null {
   switch (reason) {
     case 'return_odometer_due':
@@ -226,7 +226,7 @@ export function toProblems(trucks: MaintenanceTruck[]): Problem[] {
 }
 
 
-export default function UpkeepTab({
+export default function MaintenanceTab({
   rows,
   loading,
   error,
@@ -292,14 +292,14 @@ export default function UpkeepTab({
   const focusId         = focusTruck?.truck_id ?? null
   const debouncedSearch = useDebouncedValue(search.trim())
   const table = useServerTable(
-    (q) => adminFetchUpkeepPage({
+    (q) => adminFetchMaintenancePage({
       ...q,
       group: groupFilter,
       ...(debouncedSearch && { search: debouncedSearch }),
       ...(focusId && { focus: focusId }),
     }),
     `${groupFilter}|${debouncedSearch}|${focusId ?? ''}`,
-    { errorMessage: 'Could not load the maintenance list. Please try again.', cacheKey: 'vehicle-upkeep' },
+    { errorMessage: 'Could not load the maintenance list. Please try again.', cacheKey: 'vehicle-maintenance' },
   )
   const { page, setPage, pageSize: PAGE_SIZE, total, totalPages } = table
   const pageRows: Problem[] = useMemo(() => table.rows.map((p) => ({
@@ -397,7 +397,7 @@ export default function UpkeepTab({
       <TableCard.Root className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0">
         <FilterBar
           layout="split"
-          // Names exactly what the server searches (upkeep-problems.ts).
+          // Names exactly what the server searches (maintenance-problems.ts).
           search={{ value: search, onChange: (v) => { onSearchChange(v); setPage(1) }, placeholder: 'Search plate, model or driver' }}
           leading={switcher}
           fields={[{

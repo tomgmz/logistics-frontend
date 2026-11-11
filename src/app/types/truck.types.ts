@@ -72,6 +72,13 @@ export interface Truck {
   registration_expiry?:      string | null
   /** Worked out by the server (lib/registration-expiry); expired blocks assignment. */
   registration_status?:      RegistrationStatus
+  /** The booking this vehicle is out on: assigned until confirmed back at the yard. Older servers omit it. */
+  current_booking?: {
+    booking_id:       string
+    reference_number: string | null
+    status:           string
+    schedule_date:    string | null
+  } | null
   created_at:   string
   updated_at:   string
 }
@@ -172,7 +179,7 @@ export function needsReinspection(
 }
 
 /**
- * What a vehicle owes before it can go out — the Upkeep tab, one row per reason
+ * What a vehicle owes before it can go out — the Maintenance tab, one row per reason
  * (a vehicle can carry several):
  *   return_odometer_due — the after-delivery odometer is still owed
  *   recheck_due         — back from a job since its last pass

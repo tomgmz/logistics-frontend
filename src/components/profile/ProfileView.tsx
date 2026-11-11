@@ -37,12 +37,16 @@ function fullName(p: Profile): string {
   return name || p.email
 }
 
-/** Who can change the name, email and mobile number for this role. */
+/**
+ * Who can change the name, email and mobile number for this role. Every staff
+ * account (Company Administrator, General Manager, Operations Manager, Fleet
+ * Manager) is edited on the IT Administrator's User Management page; only
+ * clients and drivers are edited by a Company Administrator.
+ */
 function detailsOwner(role: string): string | null {
-  if (role === 'admin') return 'Ask the IT Administrator to change these.'
   if (role === 'it_admin') return null
   if (role === 'client') return 'Contact 8338 Logistics to change these.'
-  return 'Ask a Company Administrator to change these.'
+  return 'Ask the IT Administrator to change these.'
 }
 
 export default function ProfileView() {

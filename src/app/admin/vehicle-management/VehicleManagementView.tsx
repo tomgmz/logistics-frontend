@@ -29,6 +29,7 @@ import {
   InspectionBadge,
   TABLE_TAG,
   breakdownLabel,
+  bookingNote,
 } from './vehicle-ui'
 import { assignedDriverName, needsReinspection, type Truck, type MaintenanceTruck, type CreateTruckInput, type UpdateTruckInput } from '@/app/types/truck.types'
 import type { TruckModel } from '@/app/types/truck-model'
@@ -46,10 +47,10 @@ import type { DriverUser } from '@/app/types/admin/user-management.types'
 import ReusableModal from '@/components/layout/ReusableModal'
 import { useModuleAccess } from '@/components/layout/ModuleAccess'
 import TruckModelsTab from './TruckModelsTab'
-import UpkeepTab, { toProblems, NEED_GROUPS, NEED_GROUP_ORDER, type NeedGroup } from './UpkeepTab'
+import MaintenanceTab, { toProblems, NEED_GROUPS, NEED_GROUP_ORDER, type NeedGroup } from './MaintenanceTab'
 import OdometerModal from './OdometerModal'
 import RecordServiceModal from './RecordServiceModal'
-import UpkeepHistory from './UpkeepHistory'
+import MaintenanceHistory from './MaintenanceHistory'
 import {
   OdometerInput,
   PhotoField,
@@ -61,7 +62,7 @@ import {
   fmtDay,
   phToday,
   inputCls,
-} from './upkeep-ui'
+} from './maintenance-ui'
 import { useRecordLock, useRecordLocks } from '@/lib/hooks/useRecordLock'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import RecordLockBanner, { RecordLockBadge } from '@/components/ui/RecordLockBanner'
@@ -246,6 +247,7 @@ function VehicleDetailsModal({
                     <InspectionBadge inspection={truck.latest_inspection ?? null} dueRecheck={needsReinspection(truck)} />
                   </span>
                 </DetailRow>
+                <DetailRow label="Current booking">{bookingNote(truck)?.replace(/^On /, '') ?? 'None'}</DetailRow>
                 <DetailRow label="Last back in yard">{fmtDate(truck.last_fleet_return_at)}</DetailRow>
                 <DetailRow label="Odometer">
                   {fmtKm(truck.odometer_km)}
@@ -284,7 +286,7 @@ function VehicleDetailsModal({
                 <DetailRow label="Last updated">{fmtDate(truck.updated_at)}</DetailRow>
               </div>
 
-              <UpkeepHistory key={truck.truck_id} truckId={truck.truck_id} />
+              <MaintenanceHistory key={truck.truck_id} truckId={truck.truck_id} />
             </div>
 
             <div className="flex justify-end gap-2 px-4 py-3 border-t border-white/[0.07]">
@@ -315,11 +317,11 @@ function VehicleDetailsModal({
 }
 
 // Two tabs, one job each: Vehicles is what each vehicle is, Maintenance is what
-// it owes before it can go out (the 'upkeep' key is the old name, kept for
-// links). Models is not a tab; the header's Manage Models button opens it in a
+// it owes before it can go out. Models is not a tab; the header's Manage Models button opens it in a
 // pop-up ('models' survives only so old ?tab=models links still open it).
-// 'archived': the archived vehicles, the only place they are listed (2026-11-08).
-type VehicleTab = 'vehicles' | 'models' | 'upkeep' | 'archived'
+// 'archived': the archived vehicles, shown only by the Archive module
+// (components/archive/ArchiveModule.tsx, 2026-11-11), never on this page.
+type VehicleTab = 'vehicles' | 'models' | 'maintenance' | 'archived'
 
 /** The header's Manage Models picture, as a Button icon. */
 function ManageModelsIcon({ className }: { className?: string }) {
@@ -327,10 +329,9 @@ function ManageModelsIcon({ className }: { className?: string }) {
   return <img src="/icons/vehicle-management/manage-models.svg" alt="" width={24} height={24} draggable={false} className={className} />
 }
 
-/** ?tab= value -> tab. 'maintenance' is the old name, kept so earlier links still land. */
+/** ?tab= value -> tab. */
 function tabFromParam(v: string | null): VehicleTab | null {
-  if (v === 'maintenance') return 'upkeep'
-  return v === 'vehicles' || v === 'models' || v === 'upkeep' || v === 'archived' ? v : null
+  return v === 'vehicles' || v === 'models' || v === 'maintenance' || v === 'archived' ? v : null
 }
 
 // Reads ?tab= (the fleet manager's report notification opens Maintenance) once.
@@ -348,17 +349,24 @@ function TabDeepLink({ onTab }: { onTab: (t: VehicleTab) => void }) {
   return null
 }
 
-export default function VehicleManagementView() {
+export default function VehicleManagementView({ archive }: {
+  /**
+   * The Archive module's tab switcher. When given, the page is the archived
+   * vehicles list only: that switcher in place of this page's tabs, no Manage
+   * Models / Add Vehicle, and a row opens its details.
+   */
+  archive?: ReactNode
+} = {}) {
   // 10 rows on phones, 20 from tablet up (lib/hooks/useTablePageSize).
   const PAGE_SIZE = useTablePageSize()
-  const [tab, setTab] = useState<VehicleTab>('vehicles')
+  const [tab, setTab] = useState<VehicleTab>(archive ? 'archived' : 'vehicles')
   const archivedTab = tab === 'archived'
   // The maintenance queue lives here, not in the tab: the tab badge and the
   // Vehicles rows' maintenance tags read the same list.
-  const [upkeep,        setUpkeep]        = useState<MaintenanceTruck[]>([])
-  const [upkeepLoading, setUpkeepLoading] = useState(true)
-  const [upkeepError,   setUpkeepError]   = useState<string | null>(null)
-  const [upkeepSearch,  setUpkeepSearch]  = useState('')
+  const [maintenance,        setMaintenance]        = useState<MaintenanceTruck[]>([])
+  const [maintenanceLoading, setMaintenanceLoading] = useState(true)
+  const [maintenanceError,   setMaintenanceError]   = useState<string | null>(null)
+  const [maintenanceSearch,  setMaintenanceSearch]  = useState('')
   // The vehicle clicked on the Vehicles tab; the Maintenance tab highlights it.
   const [focusId,       setFocusId]       = useState<string | null>(null)
   // Manage Models: a pop-up over the page, not a tab.
@@ -441,7 +449,7 @@ export default function VehicleManagementView() {
     const query = {
       page:     page + 1,
       limit:    PAGE_SIZE,
-      // The Archived tab is the only list that asks for archived vehicles;
+      // The Archive module is the only list that asks for archived vehicles;
       // with any other status (or 'all') the server leaves them out.
       status:   archivedTab ? 'archived' : statusFilter,
       search:   debouncedSearch,
@@ -473,35 +481,36 @@ export default function VehicleManagementView() {
 
   useEffect(() => { void loadModels() }, [loadModels])
 
-  const loadUpkeep = useCallback(async (quiet = false) => {
+  const loadMaintenance = useCallback(async (quiet = false) => {
     try {
-      const cached = quiet ? undefined : cachedData<Awaited<ReturnType<typeof adminFetchMaintenanceQueue>>>(['page', 'vehicle-management|upkeep'])
-      if (cached) { setUpkeep(cached); quiet = true; setUpkeepLoading(false) }
-      if (!quiet) setUpkeepLoading(true)
-      setUpkeepError(null)
+      const cached = quiet ? undefined : cachedData<Awaited<ReturnType<typeof adminFetchMaintenanceQueue>>>(['page', 'vehicle-management|maintenance'])
+      if (cached) { setMaintenance(cached); quiet = true; setMaintenanceLoading(false) }
+      if (!quiet) setMaintenanceLoading(true)
+      setMaintenanceError(null)
       const queue = await adminFetchMaintenanceQueue()
-      storeData(['page', 'vehicle-management|upkeep'], queue)
-      setUpkeep(queue)
+      storeData(['page', 'vehicle-management|maintenance'], queue)
+      setMaintenance(queue)
     } catch (e) {
-      if (!quiet) setUpkeepError(getApiErrorMessage(e, 'Could not load the maintenance list. Please try again.'))
+      if (!quiet) setMaintenanceError(getApiErrorMessage(e, 'Could not load the maintenance list. Please try again.'))
     } finally {
-      if (!quiet) setUpkeepLoading(false)
+      if (!quiet) setMaintenanceLoading(false)
     }
   }, [])
 
-  useEffect(() => { void loadUpkeep() }, [loadUpkeep])
+  // The archived list needs no maintenance queue (archived vehicles owe nothing).
+  useEffect(() => { if (!archive) void loadMaintenance() }, [loadMaintenance, archive])
 
   // truck_id -> which of the three needs it has open, for the Vehicles rows'
   // maintenance column. No entry means nothing owed: "Passed".
   const needsByTruck = useMemo(() => {
     const map = new Map<string, Set<NeedGroup>>()
-    for (const p of toProblems(upkeep)) {
+    for (const p of toProblems(maintenance)) {
       const set = map.get(p.truck.truck_id) ?? new Set<NeedGroup>()
       set.add(p.group)
       map.set(p.truck.truck_id, set)
     }
     return map
-  }, [upkeep])
+  }, [maintenance])
   // The maintenance queue leaves Inactive vehicles out, so theirs is worked out
   // from the vehicle itself: inspection missing, failed or expired -> Blowbagets;
   // service not up to date -> Vehicle Maintenance. (Their driver reports are not
@@ -519,30 +528,30 @@ export default function VehicleManagementView() {
   // so an edit made from the Maintenance tab shows straight away.
   const [focusSnapshot, setFocusSnapshot] = useState<Truck | null>(null)
   const focusTruck = focusId
-    ? trucks.find((t) => t.truck_id === focusId) ?? upkeep.find((t) => t.truck_id === focusId) ?? focusSnapshot
+    ? trucks.find((t) => t.truck_id === focusId) ?? maintenance.find((t) => t.truck_id === focusId) ?? focusSnapshot
     : null
 
   /** Vehicles row click: open Maintenance with this vehicle first and highlighted. */
   function openInMaintenance(t: Truck) {
-    setUpkeepSearch('')
+    setMaintenanceSearch('')
     setFocusSnapshot(t)
     setFocusId(t.truck_id)
-    switchTab('upkeep')
+    switchTab('maintenance')
   }
 
   const viewTruck = viewSnapshot
-    ? trucks.find((t) => t.truck_id === viewSnapshot.truck_id) ?? upkeep.find((t) => t.truck_id === viewSnapshot.truck_id) ?? viewSnapshot
+    ? trucks.find((t) => t.truck_id === viewSnapshot.truck_id) ?? maintenance.find((t) => t.truck_id === viewSnapshot.truck_id) ?? viewSnapshot
     : null
 
-  const blockingCount = useMemo(() => toProblems(upkeep).filter((p) => p.blocking).length, [upkeep])
+  const blockingCount = useMemo(() => toProblems(maintenance).filter((p) => p.blocking).length, [maintenance])
 
   // Live: someone else's edit, an inspection, a reading, a driver's return or
-  // report — the vehicle list and the upkeep queue follow on their own. The
+  // report — the vehicle list and the maintenance queue follow on their own. The
   // Vehicles page is re-read on either tab: the Maintenance tab's focused row
   // and the details pop-up read from it too.
   useLiveTable(['live:trucks'], () => {
     void loadTrucksPage(true)
-    void loadUpkeep(true)
+    if (!archive) void loadMaintenance(true)
   })
   // A renamed or re-pictured model shows in the rows and the vehicle form.
   useLiveTable(['live:truck_models'], () => {
@@ -568,8 +577,8 @@ export default function VehicleManagementView() {
   }, [loadTrucksPage])
 
   const refreshAll = useCallback(async () => {
-    await Promise.all([loadModels(), loadTrucksPage(), loadUpkeep()])
-  }, [loadModels, loadTrucksPage, loadUpkeep])
+    await Promise.all([loadModels(), loadTrucksPage(), loadMaintenance()])
+  }, [loadModels, loadTrucksPage, loadMaintenance])
 
   const pageCount = Math.max(1, listMeta?.totalPages ?? 1)
   const pageSafe  = Math.min(page, pageCount - 1)
@@ -681,7 +690,7 @@ export default function VehicleManagementView() {
     const lastKm        = parseKm(form.last_service_odometer_km)
 
     // Registration: required for a new vehicle; on an older one it is asked for
-    // (Upkeep flags it) but saving other changes is not held up by it.
+    // (Maintenance flags it) but saving other changes is not held up by it.
     if (isCreate && !form.registration_expiry) {
       setFormError('Enter the date the registration is valid until.'); return false
     }
@@ -835,7 +844,7 @@ export default function VehicleManagementView() {
         onSelect: () => setOdometerTruck(t),
         disabled: !!lockedBy, title: lockedTitle,
       })
-      // BLOWBAGETS lives on the Upkeep tab now. Record Service stays here too,
+      // BLOWBAGETS lives on the Maintenance tab now. Record Service stays here too,
       // for a vehicle serviced early while nothing is due.
       actions.push({
         label: 'Record Service', icon: <Wrench size={13} />,
@@ -873,7 +882,7 @@ export default function VehicleManagementView() {
         title:        'Archive vehicle?',
         description:  `${archiveTarget.plate_number} will be removed from the fleet list and can no longer be assigned to bookings.`
           + (archiveTarget.assigned_driver_id ? ' Its regular driver will be unpaired.' : '')
-          + ' Its booking and inspection history is kept, and it stays on the Archived tab.',
+          + ' Its booking and inspection history is kept, and it is listed under Archive.',
         confirmLabel: actionBusy ? 'Archiving…' : 'Archive',
         onConfirm:    () => { void executeArchive() },
       }
@@ -885,28 +894,23 @@ export default function VehicleManagementView() {
   // The table format's filter row (as on User Management): the Vehicles /
   // Maintenance switch after the search, Manage Models and Add Vehicle at the
   // far right. Both tabs draw the same switch and buttons.
-  const switcher = (
+  const switcher = archive ?? (
     <TabsMinimal
       label="Vehicle management sections"
       items={[
         { id: 'vehicles' as const, label: 'Vehicles' },
-        { id: 'upkeep' as const,   label: blockingCount > 0 ? `Maintenance (${blockingCount})` : 'Maintenance' },
-        { id: 'archived' as const, label: 'Archived' },
+        { id: 'maintenance' as const,   label: blockingCount > 0 ? `Maintenance (${blockingCount})` : 'Maintenance' },
       ]}
-      selectedKey={tab === 'upkeep' || tab === 'archived' ? tab : 'vehicles'}
+      selectedKey={tab === 'maintenance' ? tab : 'vehicles'}
       onSelectionChange={(key) => {
         setFocusId(null)
-        // Vehicles and Archived share the table: each starts on page 1, unfiltered.
-        // The other list's rows are cleared so they never flash under this tab.
-        if (key !== tab) {
-          setPage(0); setStatusFilter('all'); setSearch('')
-          if ((key === 'archived') !== archivedTab) { setTrucks([]); setListLoading(true) }
-        }
+        // Each tab starts on page 1, unfiltered.
+        if (key !== tab) { setPage(0); setStatusFilter('all'); setSearch('') }
         switchTab(key)
       }}
     />
   )
-  const trailing = (
+  const trailing = archive ? undefined : (
     <>
       <Button size="toolbar" color="tool" iconLeading={ManageModelsIcon} onClick={() => setModelsOpen(true)} aria-haspopup="dialog">
         Manage Models
@@ -923,7 +927,8 @@ export default function VehicleManagementView() {
     <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-60px)] overflow-y-auto overflow-x-hidden lg:overflow-hidden ff-sc bg-[#0a0a0a] text-white">
 
       <Suspense fallback={null}>
-        <TabDeepLink onTab={(t) => (t === 'models' ? setModelsOpen(true) : setTab(t))} />
+        {/* ?tab=archived is no longer a tab here: it opens Vehicles. */}
+        {!archive && <TabDeepLink onTab={(t) => (t === 'models' ? setModelsOpen(true) : setTab(t === 'archived' ? 'vehicles' : t))} />}
       </Suspense>
 
       {/* Manage Models pop-up. z-60: the models' own form (z-66), row menus (z-65)
@@ -964,17 +969,17 @@ export default function VehicleManagementView() {
       </AnimatePresence>
 
       <div className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0 px-3 py-3 sm:px-4 lg:px-5 3xl:px-6 lg:pt-3 lg:pb-4 3xl:pb-5 gap-3 3xl:gap-4 lg:overflow-hidden">
-      {tab === 'upkeep' && (
-        <UpkeepTab
+      {tab === 'maintenance' && (
+        <MaintenanceTab
           switcher={switcher}
           trailing={trailing}
-          rows={upkeep}
-          loading={upkeepLoading}
-          error={upkeepError}
-          onReload={() => { void loadUpkeep(); void loadTrucksPage(true) }}
+          rows={maintenance}
+          loading={maintenanceLoading}
+          error={maintenanceError}
+          onReload={() => { void loadMaintenance(); void loadTrucksPage(true) }}
           canEdit={canEdit}
-          search={upkeepSearch}
-          onSearchChange={setUpkeepSearch}
+          search={maintenanceSearch}
+          onSearchChange={setMaintenanceSearch}
           onSetUpSchedule={(t) => openEdit(t)}
           onRecordOdometer={(t) => setOdometerTruck(t)}
           focusTruck={focusTruck}
@@ -1064,10 +1069,10 @@ export default function VehicleManagementView() {
                           key={t.truck_id}
                           role="button"
                           tabIndex={0}
-                          title="Open in the Maintenance tab"
-                          onClick={() => openInMaintenance(t)}
+                          title={archive ? 'View details' : 'Open in the Maintenance tab'}
+                          onClick={() => (archive ? setViewTruck(t) : openInMaintenance(t))}
                           onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openInMaintenance(t) }
+                            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (archive) setViewTruck(t); else openInMaintenance(t) }
                           }}
                           className="cursor-pointer transition-colors [@media(hover:hover)]:hover:bg-[#2a2a2a]/40"
                         >
@@ -1116,6 +1121,10 @@ export default function VehicleManagementView() {
                             {breakdownLabel(t) && (
                               <p className="mt-1 text-[11px] whitespace-nowrap" style={{ color: st.color }}>{breakdownLabel(t)}</p>
                             )}
+                            {/* Which booking it is out on (2026-11-11). */}
+                            {bookingNote(t) && (
+                              <p className="mt-1 text-[11px] whitespace-nowrap text-white/60">{bookingNote(t)}</p>
+                            )}
                           </td>
                           {/* Maintenance: Passed when nothing is owed, otherwise one tag per need. */}
                           <td>
@@ -1163,13 +1172,13 @@ export default function VehicleManagementView() {
       <OdometerModal
         truck={odometerTruck}
         onClose={() => setOdometerTruck(null)}
-        onRecorded={() => { void loadTrucksPage(); void loadUpkeep() }}
+        onRecorded={() => { void loadTrucksPage(); void loadMaintenance() }}
       />
 
       <RecordServiceModal
         truck={serviceTruck}
         onClose={() => setServiceTruck(null)}
-        onRecorded={() => { void loadTrucksPage(); void loadUpkeep() }}
+        onRecorded={() => { void loadTrucksPage(); void loadMaintenance() }}
       />
 
       <VehicleDetailsModal

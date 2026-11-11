@@ -11,7 +11,7 @@ import RecordLockBanner from '@/components/ui/RecordLockBanner'
 import ReusableModal from '@/components/layout/ReusableModal'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
-import { OdometerInput, PhotoField, parseKm, fmtKm, fmtDay, phToday, inputCls } from './upkeep-ui'
+import { OdometerInput, PhotoField, parseKm, fmtKm, fmtDay, phToday, inputCls } from './maintenance-ui'
 
 /**
  * Log a routine service. Restarts both counters (km and months) from the

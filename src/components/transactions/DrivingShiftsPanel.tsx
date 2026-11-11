@@ -23,6 +23,25 @@ import { BORDER_C, CYAN, MUTED } from './transaction-theme'
  * reports the truck's position. Only with a second driver, while in transit.
  */
 
+interface SwapPreview {
+  open_stops: Array<{
+    trip_stop_id: string; trip_number: number; trip_loaded: boolean
+    stop_number: number | null; address: string | null
+    arrived_at: string | null; started_at: string | null
+  }>
+  main_last_heard_at:   string | null
+  second_last_heard_at: string | null
+  pending_late:         number
+}
+
+/** "12 min ago", red past 15 minutes (the phone is probably off or out of signal). */
+function heard(at: string | null): { text: string; stale: boolean } {
+  if (!at) return { text: 'never on this delivery', stale: true }
+  const min = Math.max(0, Math.round((Date.now() - Date.parse(at)) / 60_000))
+  const text = min < 1 ? 'just now' : min < 60 ? `${min} min ago` : `${span(at, null)} ago`
+  return { text, stale: min > 15 }
+}
+
 interface Shift {
   shift_id:    string
   driver_id:   string
@@ -58,6 +77,15 @@ export default function DrivingShiftsPanel({ bookingId, inTransit, hasSecondDriv
   const [shifts,   setShifts]   = useState<Shift[]>([])
   const [swapping, setSwapping] = useState(false)
   const [busy,     setBusy]     = useState(false)
+  const [preview,  setPreview]  = useState<SwapPreview | null>(null)
+
+  // What the swap dialog shows: read fresh each time it opens.
+  useEffect(() => {
+    if (!swapping) { setPreview(null); return }
+    proxyApi.get<{ data: SwapPreview }>(`/admin/assignments/${bookingId}/swap-preview`)
+      .then(({ data }) => setPreview(data.data ?? null))
+      .catch(() => setPreview(null))
+  }, [swapping, bookingId])
 
   const load = useCallback(() => {
     proxyApi.get<{ data: Shift[] }>(`/admin/assignments/${bookingId}/driving-shifts`)
@@ -123,7 +151,7 @@ export default function DrivingShiftsPanel({ bookingId, inTransit, hasSecondDriv
       <RemarksModal
         open={swapping}
         title="Swap main and second driver?"
-        description="Use this when the main driver's phone is dead or lost. The second driver's phone confirms the stops and photos from now on. Anything still waiting to sync on the old main driver's phone will be refused, so check the stops first."
+        description="Use this when the main driver's phone is dead or lost. The second driver's phone confirms the stops and photos from now on."
         remarksLabel="Reason"
         remarksPlaceholder="e.g. Main driver's phone died after drop-off 2."
         confirmLabel={busy ? 'Swapping…' : 'Swap drivers'}
@@ -132,7 +160,50 @@ export default function DrivingShiftsPanel({ bookingId, inTransit, hasSecondDriv
         disableBackdropClose={busy}
         onConfirm={(reason) => { void swap(reason) }}
         onCancel={() => { if (!busy) setSwapping(false) }}
-      />
+      >
+        <div className="mt-3 flex flex-col gap-2 text-[12px] text-white/80">
+          {!preview ? (
+            <p style={{ color: MUTED }}>Checking the drop-offs…</p>
+          ) : (
+            <>
+              <p>
+                Main driver&apos;s phone last heard from:{' '}
+                <span style={{ color: heard(preview.main_last_heard_at).stale ? '#f62626' : 'inherit', fontWeight: 700 }}>
+                  {heard(preview.main_last_heard_at).text}
+                </span>
+                {' · '}second driver&apos;s: {heard(preview.second_last_heard_at).text}
+              </p>
+              {preview.open_stops.length > 0 ? (
+                <div>
+                  <p className="font-bold text-white">Drop-offs not yet recorded ({preview.open_stops.length})</p>
+                  <ul className="mt-1 flex flex-col gap-0.5 max-h-40 overflow-y-auto">
+                    {preview.open_stops.map((o) => (
+                      <li key={o.trip_stop_id} className="break-words">
+                        Trip {o.trip_number} · Stop {o.stop_number ?? '?'}{o.address ? ` — ${o.address}` : ''}
+                        <span style={{ color: MUTED }}>
+                          {o.started_at ? ` · started ${formatDateTime(o.started_at)}`
+                            : o.arrived_at ? ` · arrived ${formatDateTime(o.arrived_at)}`
+                            : !o.trip_loaded ? ' · run not loaded yet' : ' · not started'}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <p style={{ color: MUTED }}>Every drop-off is recorded.</p>
+              )}
+              <p style={{ color: MUTED }}>
+                If the old main driver&apos;s phone sends a drop-off confirmation later, it is recorded when it was done before the swap,
+                within 100 m and with its photo; otherwise it comes to you here to accept or dismiss. Nothing is lost.
+                You can also record a drop-off yourself under Complete for the driver.
+              </p>
+              {preview.pending_late > 0 && (
+                <p style={{ color: '#ff7a30' }}>{preview.pending_late === 1 ? '1 late confirmation is' : `${preview.pending_late} late confirmations are`} already waiting for a decision.</p>
+              )}
+            </>
+          )}
+        </div>
+      </RemarksModal>
     </div>
   )
 }

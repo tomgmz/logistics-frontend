@@ -193,16 +193,25 @@ function FolderIcon({ fleet = false }: { fleet?: boolean }) {
   )
 }
 
-export default function DocumentManagementView({ fleetOnly = false }: { fleetOnly?: boolean } = {}) {
+export default function DocumentManagementView({ fleetOnly = false, archive }: {
+  fleetOnly?: boolean
+  /**
+   * The Archive module's tab switcher. When given, this is the archived
+   * documents list only (every folder): that switcher in place of the All /
+   * Clients / Fleet tabs, no breadcrumbs, no upload. A folder link opens
+   * Document Management itself.
+   */
+  archive?:   React.ReactNode
+} = {}) {
   // useSearchParams needs its own Suspense boundary under the app router.
   return (
     <Suspense fallback={null}>
-      <DocumentLibrary fleetOnly={fleetOnly} />
+      <DocumentLibrary fleetOnly={fleetOnly} archive={archive} />
     </Suspense>
   )
 }
 
-function DocumentLibrary({ fleetOnly }: { fleetOnly: boolean }) {
+function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?: React.ReactNode }) {
   const pathname     = usePathname()
   const router       = useRouter()
   const searchParams = useSearchParams()
@@ -212,13 +221,19 @@ function DocumentLibrary({ fleetOnly }: { fleetOnly: boolean }) {
 
   // The top of the library: Fleet for the Fleet Manager, else every folder.
   const home: Nav = useMemo(() => (fleetOnly ? { level: 'fleet' } : { level: 'root' }), [fleetOnly])
-  const nav     = useMemo(() => {
+  const nav     = useMemo((): Nav => {
+    if (archive) return { level: 'archived' }
     const n = navFrom(new URLSearchParams(searchParams?.toString() ?? ''))
+    // Archived documents are listed only in the Archive module (2026-11-11);
+    // an old ?archived=1 link opens the top of the library.
+    if (n.level === 'archived') return home
     // A client/booking link opened by the Fleet Manager lands on Fleet instead.
-    return fleetOnly && n.level !== 'fleet' && n.level !== 'vehicle' && n.level !== 'review' && n.level !== 'archived' ? home : n
-  }, [searchParams, fleetOnly, home])
+    return fleetOnly && n.level !== 'fleet' && n.level !== 'vehicle' && n.level !== 'review' ? home : n
+  }, [searchParams, fleetOnly, home, archive])
   const isFiles = nav.level === 'booking' || nav.level === 'vehicle' || nav.level === 'review' || nav.level === 'contract' || nav.level === 'archived'
-  const go      = useCallback((n: Nav) => router.push(`${pathname}${navQuery(n)}`), [router, pathname])
+  // From the Archive module, a folder opens in Document Management itself.
+  const libraryPath = archive ? `/${portal}/document-management` : pathname
+  const go      = useCallback((n: Nav) => router.push(`${libraryPath}${navQuery(n)}`), [router, libraryPath])
 
   // ── The top-level lists: the root's rows, and the names in the breadcrumb ──
   const [clients,  setClients]  = useState<DocumentFolder[]>([])
@@ -342,7 +357,7 @@ function DocumentLibrary({ fleetOnly }: { fleetOnly: boolean }) {
     group:         nav.level === 'vehicle' ? 'fleet' : nav.level === 'contract' ? 'client' : undefined,
     date_from:     dateRange?.from,
     date_to:       dateRange?.to,
-    // Archived documents are listed on the Archived tab only.
+    // Archived documents are listed in the Archive module only.
     archived:      nav.level === 'archived' ? 'only' : 'hide',
     sort,
   }), [search, types, review, nav, dateRange, sort])
@@ -436,8 +451,9 @@ function DocumentLibrary({ fleetOnly }: { fleetOnly: boolean }) {
   // The Company Administrator and the General Manager open the booking in
   // Transaction History; the Operations Manager has no such page, so theirs is
   // Booking Management.
+  // The Fleet Manager has no booking page (2026-11-11), so no Open Booking there.
   const bookingHref = (d: LibraryDocument | null) =>
-    !d?.booking_id ? null
+    !d?.booking_id || portal === 'fleet_admin' ? null
       : portal === 'admin' || portal === 'general_manager' ? `/${portal}/transaction-history?booking=${d.booking_id}`
       : `/${portal}/booking-management?booking=${d.booking_id}`
 
@@ -685,8 +701,8 @@ function DocumentLibrary({ fleetOnly }: { fleetOnly: boolean }) {
   return (
     <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-60px)] overflow-y-auto overflow-x-hidden lg:overflow-hidden ff-sc bg-[var(--color-bg)]">
       <div className="flex flex-[1_0_auto] lg:flex-1 lg:min-h-0 flex-col p-3 lg:p-4 gap-3 lg:overflow-hidden">
-        {/* Where you are: Untitled UI's text breadcrumbs. */}
-        <Breadcrumbs
+        {/* Where you are: Untitled UI's text breadcrumbs (not in the Archive module). */}
+        {!archive && <Breadcrumbs
           className="shrink-0"
           homeLabel="Documents"
           onHome={nav.level === home.level ? undefined : () => go(home)}
@@ -694,7 +710,7 @@ function DocumentLibrary({ fleetOnly }: { fleetOnly: boolean }) {
             label:   c.label,
             onClick: c.to && i < crumbs.length - 1 ? () => go(c.to!) : undefined,
           }))}
-        />
+        />}
 
         {/* The table format (Figma 3234:790): no title row (the breadcrumbs say
             where you are), then the filter row with the card's buttons at its
@@ -732,28 +748,26 @@ function DocumentLibrary({ fleetOnly }: { fleetOnly: boolean }) {
                 )}
               </>
             ) : undefined}
-            // All / Clients / Fleet / Archived on the top-level views (a dropdown on phones).
-            leading={topTab && (
+            // All / Clients / Fleet on the top-level views (a dropdown on phones);
+            // the Archive module's own switcher on its archived list.
+            leading={archive ?? (topTab && (
               <TabsMinimal
                 label="Show"
-                // The Fleet Manager: Fleet and Archived only (the server keeps
-                // Archived to vehicle files for them).
+                // The Fleet Manager: Fleet only.
                 items={[
                   ...(fleetOnly ? [] : [
                     { id: 'all' as const,      label: 'All' },
                     { id: 'clients' as const,  label: `Clients (${clients.length})` },
                   ]),
                   { id: 'fleet' as const,    label: `Fleet (${vehicles.length})` },
-                  { id: 'archived' as const, label: 'Archived' },
                 ]}
-                selectedKey={topTab}
+                selectedKey={topTab === 'archived' ? 'all' : topTab}
                 onSelectionChange={(k) => go(
                   k === 'fleet' ? { level: 'fleet' }
-                    : k === 'archived' ? { level: 'archived' }
                     : k === 'clients' ? { level: 'root', only: 'clients' } : { level: 'root' },
                 )}
               />
-            )}
+            ))}
             search={{
               value: searchInput,
               onChange: setSearchInput,
@@ -1069,7 +1083,7 @@ function DocumentLibrary({ fleetOnly }: { fleetOnly: boolean }) {
         open={!!archiveOf}
         title="Archive document?"
         description={archiveOf
-          ? `"${archiveOf.file_name}" will be hidden from the library. The file is kept and can be restored from the Archived tab.`
+          ? `"${archiveOf.file_name}" will be hidden from the library. The file is kept and can be restored from Archive.`
           : undefined}
         confirmLabel={busy ? 'Archiving…' : 'Archive'}
         cancelLabel="Cancel"

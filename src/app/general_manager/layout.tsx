@@ -2,6 +2,7 @@
 
 import { ReactNode, useEffect } from 'react'
 import { CalendarRange, Files, History, Truck, LayoutDashboard } from 'lucide-react'
+import { archiveNavItem } from '@/components/archive/archiveNav'
 import ReusableDashboardShell from '@/components/layout/ReusableDashboardShell'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { goHomeSignedOut } from '@/lib/auth-redirect'
@@ -12,6 +13,8 @@ const NAV_ITEMS = [
   { href: '/general_manager/vehicle-management', label: 'Vehicle Management', icon: <Truck size={20} /> },
   { href: '/general_manager/transaction-history', label: 'Transaction History', icon: <History size={20} /> },
   { href: '/general_manager/document-management', label: 'Document Management', icon: <Files size={20} /> },
+  // Every archived record of this portal, one tab per module (2026-11-11).
+  archiveNavItem('general_manager'),
 ]
 
 export default function GeneralManagerLayout({ children }: { children: ReactNode }) {

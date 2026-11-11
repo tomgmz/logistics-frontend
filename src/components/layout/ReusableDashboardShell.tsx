@@ -11,12 +11,14 @@ import EmergencyCallProvider         from '@/components/calls/EmergencyCallProvi
 import { ModuleAccessProvider, ModuleNoAccess } from './ModuleAccess'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { canViewModule, moduleFlags } from '@/lib/permissions'
-import { ALL_FLAGS, moduleFromHref } from '@/constants/modules'
+import { ALL_FLAGS, moduleFromHref, type ModuleKey } from '@/constants/modules'
 
 interface NavItem {
   href:  string
   label: string
   icon:  ReactNode
+  /** Shown only when the user can see at least one of these modules (e.g. Archive). */
+  anyOf?: ModuleKey[]
 }
 
 interface ReusableDashboardShellProps {
@@ -33,6 +35,7 @@ export default function ReusableDashboardShell({ children, navItems }: ReusableD
   // Dashboard) and non-managed roles are always shown.
   const visibleNavItems = useMemo(() => {
     return navItems.filter((item) => {
+      if (item.anyOf?.length) return item.anyOf.some((m) => canViewModule(user, m))
       const moduleKey = moduleFromHref(item.href)
       return moduleKey === null || canViewModule(user, moduleKey)
     })

@@ -30,8 +30,8 @@ type Step =
  * dead), and recording a problem on the road (truck or goods stolen…).
  * Locked by default, like the crew Edit button: Unlock first, so nobody taps a
  * stop done by accident. Each step asks for a reason, which is kept on the stop
- * and in the audit log. Only the next step in order is offered; the server
- * enforces the same order the driver's app does.
+ * and in the audit log. The next pickup in order, and any drop-off not yet
+ * recorded on a loaded run (any order, so a swap's leftovers can be cleared).
  */
 export default function OfficeProgressPanel({ bookingId, status, fleetReturned, canAct, allowed, onUpdated }: {
   bookingId:     string
@@ -61,7 +61,7 @@ export default function OfficeProgressPanel({ bookingId, status, fleetReturned, 
 
   if (!canAct || (!live && !needsReturn)) return null
 
-  // Only the next step(s) in the order the driver would do them.
+  // The next pickup, the vehicle's return, and any open drop-off on a loaded run.
   const steps: Step[] = []
   if (needsReturn) {
     steps.push({ kind: 'return', id: 'return', label: 'Vehicle is back at the yard' })
@@ -70,10 +70,19 @@ export default function OfficeProgressPanel({ bookingId, status, fleetReturned, 
       .find((t) => t.status !== 'completed' && t.status !== 'cancelled')
     if (current?.status === 'pending') {
       steps.push({ kind: 'pickup', id: current.trip_id, label: `Loaded at pickup (trip ${current.trip_number} of ${trips.length})` })
-    } else if (current?.status === 'in_transit') {
-      for (const s of current.booking_trip_stops ?? []) {
+    }
+    // Every drop-off not yet recorded on a loaded run, in any order (user
+    // 2026-11-11): after a driver swap the office may need to record stop 4
+    // before stop 2. The server only needs the run loaded.
+    const multi = trips.length > 1
+    for (const t of [...trips].sort((a, b) => a.trip_number - b.trip_number)) {
+      if (t.status !== 'in_transit') continue
+      for (const s of t.booking_trip_stops ?? []) {
         if (s.status !== 'pending') continue
-        steps.push({ kind: 'stop', id: s.trip_stop_id, label: `Delivered: ${s.booking_destinations?.address ?? 'drop-off'}` })
+        steps.push({
+          kind: 'stop', id: s.trip_stop_id,
+          label: `Delivered: ${s.booking_destinations?.address ?? 'drop-off'}${multi ? ` (trip ${t.trip_number})` : ''}`,
+        })
       }
     }
   }

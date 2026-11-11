@@ -84,6 +84,8 @@ import PausePanel from '@/components/transactions/PausePanel'
 import DrivingShiftsPanel from '@/components/transactions/DrivingShiftsPanel'
 import BreakdownPanel from '@/components/transactions/BreakdownPanel'
 import OfficeProgressPanel from '@/components/transactions/OfficeProgressPanel'
+import LateConfirmationsPanel from '@/components/transactions/LateConfirmationsPanel'
+import DeliveryEventsPanel from '@/components/transactions/DeliveryEventsPanel'
 import { pauseReasonLabel } from '@/lib/services/admin/pause.service'
 import type { BookingWithRelations } from '@/lib/types/booking-relations'
 import { useRecordLock, useRecordLocks } from '@/lib/hooks/useRecordLock'
@@ -132,11 +134,11 @@ export type BookingRoleView =
   | 'admin'
   | 'general_manager'
   | 'operations_manager'
-  | 'fleet_manager'
 
+// The Fleet Manager has no Booking Management (user 2026-11-11): vehicles are
+// readied in Vehicle Management, not per booking.
 const ROLE_FORCED_STATUS: Partial<Record<BookingRoleView, AdminBookingLifecycleStatus>> = {
   general_manager:    'pending',
-  fleet_manager:      'assigned',
 }
 
 // Operations sees every status EXCEPT pending (a booking only reaches ops once
@@ -483,7 +485,7 @@ function ExternalDriverAccessRow({ userId }: { userId: string }) {
   const status = !access
     ? 'Checking app access…'
     : revoked
-      ? 'App access revoked'
+      ? 'Account deactivated'
     : access.enrolled
       ? `App access active · ${access.passkey_count} passkey${access.passkey_count === 1 ? '' : 's'}` +
         (access.last_used_at ? ` · last used ${new Date(access.last_used_at).toLocaleString()}` : '')
@@ -497,7 +499,7 @@ function ExternalDriverAccessRow({ userId }: { userId: string }) {
         <KeyRound size={11} className="text-white/30 shrink-0" />
         <span>{status}</span>
       </div>
-      {/* Re-inviting, revoking and restoring moved to the IT Administrator (2026-10-24). */}
+      {/* The passkey link and the account status are the IT Administrator's. */}
       <p className="text-[10px] text-white/35">App access is managed by the IT Administrator.</p>
     </div>
   )
@@ -2047,7 +2049,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
    */
   const bookingOpen = !!detail &&
     !['delivered', 'completed', 'cancelled'].includes(String(detail.status ?? '').toLowerCase())
-  const mayEditBooking = roleView !== 'fleet_manager' && canEdit
+  const mayEditBooking = canEdit
   const bookingLock = useRecordLock({
     type:    'booking',
     id:      detail?.booking_id ?? null,
@@ -2539,15 +2541,6 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                           </fieldset>
                         )}
 
-                        {/* Fleet sees where each vehicle went; readiness is managed
-                            per vehicle in Vehicle Management, not per booking. */}
-                        {roleView === 'fleet_manager' && (
-                          <p className="text-xs text-white/40 leading-snug">
-                            Read-only. Run BLOWBAGETS inspections in Vehicle Management — only a vehicle
-                            whose latest inspection passed can be assigned to a booking.
-                          </p>
-                        )}
-
                         {/* The GM's remarks on a rejected booking. */}
                         {d?.gm_status === 'rejected' && d?.rejection_reason && (
                           <div
@@ -2614,6 +2607,16 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                           route={detail}
                         />
 
+                        {/* Drop-off confirmations from the previous main driver's phone
+                            that arrived after a swap and failed the checks: Accept /
+                            Dismiss. Shown whenever the booking has any. */}
+                        <LateConfirmationsPanel
+                          bookingId={detail.booking_id}
+                          canAct={(roleView === 'admin' || roleView === 'operations_manager') && !bookingReadOnly}
+                          allowed={canEdit}
+                          onUpdated={() => { void refreshDetail(detail.booking_id); void loadPage(true) }}
+                        />
+
                         {/* The driver can't (phone stolen or dead): the office confirms
                             the next step for them, or records a problem on the road.
                             Locked until unlocked, like the crew Edit button. */}
@@ -2640,6 +2643,9 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                             assignmentService.getAll().then(setAllAssignments).catch(() => {})
                           }}
                         />
+
+                        {/* Everything that changed on the road, in time order. */}
+                        <DeliveryEventsPanel bookingId={detail.booking_id} />
 
                         {/* On the road the crew can no longer be re-assigned; while the
                             delivery is paused, it can be replaced. Lists every

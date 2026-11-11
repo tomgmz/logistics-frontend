@@ -118,7 +118,7 @@ function cardsFor(role: StaffRole, d: Data): CardSpec[] {
         { label: 'Dispatching tomorrow', hint: 'Re-check these vehicles the day before', count: q.dispatch_tomorrow.count,
           href: `${base}/vehicle-management`, icon: <CalendarCheck size={16} />, tone: 'cyan' },
         { label: 'Failed or service overdue', hint: 'Blocked from assignment', count: v.failed_inspection.count + v.service_overdue.count,
-          href: `${base}/vehicle-management?tab=upkeep`, icon: <Wrench size={16} />, tone: 'red' },
+          href: `${base}/vehicle-management?tab=maintenance`, icon: <Wrench size={16} />, tone: 'red' },
         { ...reportsCard, hint: 'Vehicle-related reports from drivers' },
       ]
     case 'admin':
@@ -209,9 +209,15 @@ const DESK_LISTS = 'grid grid-cols-1 gap-5 lg:gap-6 xl:grid-cols-2 xl:[&>*:last-
 function ListCard({ list, base }: { list: ListSpec; base: string }) {
   if (list.vehicles) return <VehicleListCard list={list} base={base} />
   const rows = (list.bookings ?? []).slice(0, DESK_ROWS)
+  // The Fleet Manager has no Booking Management (2026-11-11): their dispatch
+  // lists are about re-checking vehicles, so they point to Vehicle Management
+  // and the reference is plain text.
+  const fleet = base === BASE.fleet_manager
   return (
     <TableCard.Root untitled className="flex flex-col">
-      <TableCard.Header title={list.title} contentTrailing={<CardLink href={`${base}/booking-management`}>Booking Management</CardLink>} />
+      <TableCard.Header title={list.title} contentTrailing={fleet
+        ? <CardLink href={`${base}/vehicle-management`}>Vehicle Management</CardLink>
+        : <CardLink href={`${base}/booking-management`}>Booking Management</CardLink>} />
       {rows.length === 0 ? (
         <p className="flex items-center gap-2 px-4 py-6 text-sm text-[#818181] md:px-6">
           <CheckCircle2 size={16} /> {list.empty}
@@ -226,9 +232,11 @@ function ListCard({ list, base }: { list: ListSpec; base: string }) {
               {rows.map((b) => (
                 <tr key={b.booking_id}>
                   <td className="whitespace-nowrap">
-                    <Link href={bookingHref(base, b)} className="transition-opacity [@media(hover:hover)]:hover:opacity-80">
-                      {b.reference_number ?? 'Booking'}
-                    </Link>
+                    {fleet ? (b.reference_number ?? 'Booking') : (
+                      <Link href={bookingHref(base, b)} className="transition-opacity [@media(hover:hover)]:hover:opacity-80">
+                        {b.reference_number ?? 'Booking'}
+                      </Link>
+                    )}
                   </td>
                   <td className="max-w-[180px] truncate">{b.client ?? '—'}</td>
                   <td className="max-w-[180px] truncate">{b.origin?.split(',')[0] ?? '—'}</td>

@@ -125,7 +125,8 @@ export const MODULES_BY_ROLE: Record<ManagedRole, ModuleKey[]> = {
     'transaction-history',
     'document-management',
   ],
-  fleet_manager: ['booking-management', 'vehicle-management', 'transit-tracking', 'reports', 'document-management'],
+  // No booking-management (user 2026-11-11): vehicles are readied in Vehicle Management.
+  fleet_manager: ['vehicle-management', 'transit-tracking', 'reports', 'document-management'],
   operations_manager: ['booking-management', 'vehicle-management', 'document-management', 'transit-tracking', 'reports', 'support-tickets'],
 }
 
@@ -153,9 +154,6 @@ export const ROLE_MODULE_DEFAULTS: Record<ManagedRole, Partial<Record<ModuleKey,
     'document-management': 'read',
   },
   fleet_manager: {
-    // Read-only so fleet can open bookings and run the BLOWBAGETS vehicle-
-    // readiness check (fleet-stage actions are role-gated, not can_edit-gated).
-    'booking-management': 'read',
     'vehicle-management': 'all',
     'transit-tracking':   'read',
     // Vehicle-related reports only — scoped by the server, not this tier.

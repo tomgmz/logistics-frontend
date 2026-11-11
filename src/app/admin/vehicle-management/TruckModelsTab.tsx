@@ -1,7 +1,7 @@
 'use client'
 
 import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
-import { useRef, useState } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Upload, Truck as TruckIcon, Pencil, Archive, Eye } from 'lucide-react'
 import type { CreateTruckModelInput, UpdateTruckModelInput } from '@/app/types/truck.types'
@@ -25,7 +25,6 @@ import { ModelThumb, fmtDimensions, kgToTons } from './vehicle-ui'
 
 import FilterBar from '@/components/ui/FilterBar'
 import { TableCard } from '@/components/ui/untitled/table-card'
-import { TabsMinimal } from '@/components/ui/untitled/tabs'
 import { Button } from '@/components/ui/untitled/button'
 import { Plus as PlusIcon } from '@untitledui/icons'
 import Pagination from '@/components/ui/Pagination'
@@ -86,6 +85,11 @@ interface Props {
   canCreate: boolean
   canEdit:   boolean
   canDelete: boolean
+  /**
+   * The Archive module's tab switcher. When given, this is the archived models
+   * list only (no Add Model); otherwise current models only.
+   */
+  archive?:  ReactNode
 }
 
 type FormMode    = 'create' | 'edit' | null
@@ -98,11 +102,11 @@ type FieldErrors = Partial<Record<keyof ModelFormState | 'image', string>>
  * pick their model (type, capacity, image) from here. Models are archived,
  * never deleted, so past bookings keep their details.
  */
-export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props) {
+export default function TruckModelsTab({ canCreate, canEdit, canDelete, archive }: Props) {
   const [search,      setSearch]      = useState('')
   const debouncedSearch = useDebouncedValue(search.trim())
-  // Models / Archived: archived models are listed on their own tab only (2026-11-08).
-  const [view,        setView]        = useState<'models' | 'archived'>('models')
+  // Archived models are listed only in the Archive module (2026-11-11).
+  const view: 'models' | 'archived' = archive ? 'archived' : 'models'
   const archivedView = view === 'archived'
 
   // Server-side pages, searched on the server (10 rows on phones, 20 from tablet up).
@@ -400,23 +404,13 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete }: Props)
 
   return (
     <>
-      <div className="flex flex-1 min-h-0 flex-col p-3 lg:p-4 gap-3 overflow-y-auto overflow-x-hidden lg:overflow-hidden">
+      <div className={`flex flex-1 min-h-0 flex-col gap-3 overflow-y-auto overflow-x-hidden lg:overflow-hidden ${archive ? '' : 'p-3 lg:p-4'}`}>
         <TableCard.Root className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0">
           <FilterBar
             layout="split"
             // Names exactly what the server searches (truck-model.controller.ts).
             search={{ value: search, onChange: setSearch, placeholder: 'Search model, type or use' }}
-            leading={
-              <TabsMinimal
-                label="Model lists"
-                items={[
-                  { id: 'models' as const,   label: 'Models' },
-                  { id: 'archived' as const, label: 'Archived' },
-                ]}
-                selectedKey={view}
-                onSelectionChange={(k) => { setView(k); setSearch('') }}
-              />
-            }
+            leading={archive}
             trailing={canCreate && !archivedView && (
               <Button size="toolbar" color="accent" iconLeading={PlusIcon} onClick={openCreate}>
                 Add Model

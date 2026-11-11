@@ -15,6 +15,7 @@ import {
   Ticket,
   ShieldCheck,
 } from 'lucide-react'
+import { archiveNavItem } from '@/components/archive/archiveNav'
 import ReusableDashboardShell from '@/components/layout/ReusableDashboardShell'
 import { ReactNode, useEffect } from 'react'
 import { useAuthStore } from '@/lib/store/auth.store'
@@ -76,6 +77,8 @@ const adminNavItems = [
     label: 'Tickets',
     icon: <Ticket size={20} />,
   },
+  // Every archived record of this portal, one tab per module (2026-11-11).
+  archiveNavItem('admin'),
 ]
 
 interface AdminShellProps {

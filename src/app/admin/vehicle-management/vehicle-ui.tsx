@@ -115,6 +115,26 @@ export function breakdownLabel(t: Pick<Truck, 'status' | 'maintenance_reason' | 
   return t.maintenance_booking_ref ? `Broke down on ${t.maintenance_booking_ref}` : 'Broke down on a delivery'
 }
 
+/** Where the booking stands, in words, for the vehicle's "On BK-…" note. */
+const BOOKING_STAGE: Record<string, string> = {
+  assigned:   'Assigned',
+  in_transit: 'In Transit',
+  delivered:  'Delivered, not back yet',
+  completed:  'Completed, not back yet',
+}
+
+/**
+ * "On BK-202611-00004 · In Transit" for a vehicle assigned to a booking, from
+ * assignment until it is confirmed back at the yard; null otherwise.
+ */
+export function bookingNote(t: Pick<Truck, 'current_booking'>): string | null {
+  const b = t.current_booking
+  if (!b) return null
+  const ref   = b.reference_number ?? 'a booking'
+  const stage = BOOKING_STAGE[b.status]
+  return stage ? `On ${ref} · ${stage}` : `On ${ref}`
+}
+
 export function TruckStatusBadge({ status }: { status: string }) {
   const st = statusStyle(status)
   return (

@@ -113,7 +113,7 @@ export async function adminFetchTruckModels(): Promise<TruckModel[]> {
 
 /** One page of the Models table, searched on the server; `meta.unfiltered` is the count before searching. */
 export async function adminFetchTruckModelsPage(
-  // archived 'only': the archived models (Manage Models' Archived tab).
+  // archived 'only': the archived models (the Archive module's Models tab).
   params: PageRequest & { search?: string; archived?: 'only' },
 ): Promise<PagedResponse<TruckModel, { unfiltered: number }>> {
   const { data } = await authApi.get<PagedResponse<TruckModel, { unfiltered: number }>>(`${ADMIN}/truck-models`, { params })
@@ -165,8 +165,8 @@ export async function adminArchiveTruckModel(modelId: string): Promise<void> {
  * service, failed BLOWBAGETS, or an open breakdown/accident report from a
  * driver), each with the reasons and the open reports that put it there.
  */
-/** A row of the Upkeep table as the server pages it (the wording is added in UpkeepTab). */
-export interface UpkeepProblemRow {
+/** A row of the Maintenance table as the server pages it (the wording is added in MaintenanceTab). */
+export interface MaintenanceProblemRow {
   key:      string
   truck:    MaintenanceTruck
   reason:   MaintenanceTruck['maintenance_reasons'][number]
@@ -177,11 +177,11 @@ export interface UpkeepProblemRow {
   type:     'inspection' | 'service' | 'report' | 'odometer' | 'registration'
 }
 
-/** One page of the Upkeep table: one row per problem, filtered and ordered on the server. */
-export async function adminFetchUpkeepPage(
+/** One page of the Maintenance table: one row per problem, filtered and ordered on the server. */
+export async function adminFetchMaintenancePage(
   params: PageRequest & { group: string; search?: string; focus?: string },
-): Promise<PagedResponse<UpkeepProblemRow, { focusHasProblems: boolean }>> {
-  const { data } = await authApi.get<PagedResponse<UpkeepProblemRow, { focusHasProblems: boolean }>>(
+): Promise<PagedResponse<MaintenanceProblemRow, { focusHasProblems: boolean }>> {
+  const { data } = await authApi.get<PagedResponse<MaintenanceProblemRow, { focusHasProblems: boolean }>>(
     `${ADMIN}/trucks/maintenance`, { params },
   )
   return { data: data.data, meta: data.meta }
@@ -235,11 +235,11 @@ export async function adminRecordTruckService(
   return data.data
 }
 
-export async function adminFetchTruckUpkeep(
+export async function adminFetchTruckMaintenance(
   truckId: string,
 ): Promise<{ services: TruckService[]; readings: OdometerReading[] }> {
   const { data } = await authApi.get<{ data: { services: TruckService[]; readings: OdometerReading[] } }>(
-    `${ADMIN}/trucks/${truckId}/upkeep`,
+    `${ADMIN}/trucks/${truckId}/maintenance`,
   )
   return data?.data ?? { services: [], readings: [] }
 }

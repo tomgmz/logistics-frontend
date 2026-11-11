@@ -3,6 +3,7 @@
 import { ReactNode, useEffect, useState } from 'react'
 import { ArrowLeft, ListMinus, LayoutDashboard, Users } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { archiveNavItem } from '@/components/archive/archiveNav'
 import ReusableDashboardShell from '@/components/layout/ReusableDashboardShell'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { goHomeSignedOut } from '@/lib/auth-redirect'
@@ -12,6 +13,8 @@ const NAV_ITEMS = [
   { href: '/it_admin/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
   { href: '/it_admin/administrator-management', label: 'User Management', icon: <Users size={20} /> },
   { href: '/it_admin/logs', label: 'Logs', icon: <ListMinus size={20} /> },
+  // Every archived record of this portal, one tab per module (2026-11-11).
+  archiveNavItem('it_admin'),
 ]
 
 // The Company Administrator standing in for a departed IT Administrator

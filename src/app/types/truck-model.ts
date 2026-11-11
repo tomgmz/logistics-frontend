@@ -13,6 +13,6 @@ export interface TruckModel {
   height_mm?:         number | null
   image_url?:         string | null
   created_at?:        string
-  /** Set once archived; archived models are listed only on Manage Models' Archived tab. */
+  /** Set once archived; archived models are listed only on the Archive module's Models tab. */
   archived_at?:       string | null
 }

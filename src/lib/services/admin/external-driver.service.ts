@@ -61,20 +61,4 @@ export const externalDriverService = {
     await initCsrf()
     await proxyApi.post(`/admin/external-drivers/${userId}/reinvite`)
   },
-
-  /** Revokes every passkey, kills the live session, and deactivates the account. */
-  async revoke(userId: string, reason?: string): Promise<{ credentialsRevoked: number }> {
-    await initCsrf()
-    const { data } = await proxyApi.post<ApiResponse<{ credentialsRevoked: number }>>(
-      `/admin/external-drivers/${userId}/revoke`,
-      { reason },
-    )
-    return data.data
-  },
-
-  /** Reactivates a revoked account and emails a new setup link. Old passkeys stay dead. */
-  async restore(userId: string): Promise<void> {
-    await initCsrf()
-    await proxyApi.post(`/admin/external-drivers/${userId}/restore`)
-  },
 }

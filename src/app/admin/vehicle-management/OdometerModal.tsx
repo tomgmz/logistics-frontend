@@ -11,7 +11,7 @@ import RecordLockBanner from '@/components/ui/RecordLockBanner'
 import ReusableModal from '@/components/layout/ReusableModal'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
-import { OdometerInput, PhotoField, parseKm, fmtKm } from './upkeep-ui'
+import { OdometerInput, PhotoField, parseKm, fmtKm } from './maintenance-ui'
 
 /**
  * Update a vehicle's odometer, typed off the dash with a photo. Kept apart from
