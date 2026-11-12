@@ -1,6 +1,6 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { Check, Truck } from 'lucide-react'
 import type { BookingDetail } from '@/app/types/maps/routemap.types'
 import type { Truck as TruckType } from '@/app/types/truck.types'
@@ -8,6 +8,7 @@ import { assessFit, floorPositions, type FitAssessment, type VehicleCapacity } f
 import { EMPTY_CARGO_SUMMARY, type CargoSummary } from '@/lib/cargo/summary'
 import type { CodingFlag } from '@/lib/number-coding'
 import { ProtectedImg } from '@/components/ui/FileViewer'
+import Pagination from '@/components/ui/Pagination'
 
 /**
  * The vehicle choice that used to be the client's "Vehicle" booking step.
@@ -19,6 +20,15 @@ import { ProtectedImg } from '@/components/ui/FileViewer'
  */
 
 const FALLBACK_IMAGE = '/landingpage/aboutSection/wingvan.png'
+
+/** Cards per page (user 2026-11-13: not every vehicle at once). Two columns on desktop. */
+const PAGE_SIZE = 6
+const ALL = '__all__'
+
+/** The tab a vehicle sits under: its vehicle type. */
+function typeOf(t: TruckType): string {
+  return (t.vehicle_type ?? t.truck_model?.vehicle_type ?? '').trim() || 'Other'
+}
 
 /**
  * The load as recorded on the booking.
@@ -116,6 +126,36 @@ export default function VehiclePicker({
   codingOf:   (plate: string | null | undefined) => CodingFlag | null
   onSelect:   (truckId: string) => void
 }) {
+  const [tab, setTab]   = useState<string>(ALL)
+  const [page, setPage] = useState(1)
+
+  // Best fits first, so the likely pick is at the top.
+  const rows = useMemo(() => trucks
+    .map((t) => {
+      const cap = capacityOf(t)
+      return { truck: t, cap, fit: cap ? assessFit(cap, cargo) : null }
+    })
+    .sort((a, b) => rank(a.fit) - rank(b.fit) || a.truck.plate_number.localeCompare(b.truck.plate_number)),
+  [trucks, cargo])
+
+  // One tab per vehicle type, alphabetical, with how many of each.
+  const tabs = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const r of rows) counts.set(typeOf(r.truck), (counts.get(typeOf(r.truck)) ?? 0) + 1)
+    return [...counts.entries()].sort(([a], [b]) => a.localeCompare(b))
+  }, [rows])
+
+  // A tab that no longer has vehicles (the list changed) reads as All.
+  const activeTab  = tab !== ALL && tabs.some(([t]) => t === tab) ? tab : ALL
+  const inTab      = activeTab === ALL ? rows : rows.filter((r) => typeOf(r.truck) === activeTab)
+  const totalPages = Math.max(1, Math.ceil(inTab.length / PAGE_SIZE))
+  const safePage   = Math.min(page, totalPages)
+  const pageRows   = inTab.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+  const selectedRow = rows.find((r) => r.truck.truck_id === selectedId) ?? null
+  const selectedOffPage = !!selectedRow && !pageRows.includes(selectedRow)
+
+  const chooseTab = (t: string) => { setTab(t); setPage(1) }
+
   if (trucks.length === 0) {
     return (
       <div className="rounded-xl border border-white/[0.08] px-4 py-6 text-center">
@@ -127,17 +167,42 @@ export default function VehiclePicker({
     )
   }
 
-  // Best fits first, so the likely pick is at the top.
-  const rows = trucks
-    .map((t) => {
-      const cap = capacityOf(t)
-      return { truck: t, cap, fit: cap ? assessFit(cap, cargo) : null }
-    })
-    .sort((a, b) => rank(a.fit) - rank(b.fit))
-
   return (
+    <div className="space-y-2.5">
+      {/* Vehicle type tabs. Scroll sideways on a phone instead of wrapping. */}
+      {tabs.length > 1 && (
+        <div role="tablist" aria-label="Vehicle type" className="flex gap-1.5 overflow-x-auto pb-1 -mx-0.5 px-0.5">
+          {[[ALL, rows.length] as [string, number], ...tabs].map(([t, n]) => {
+            const active = t === activeTab
+            return (
+              <button
+                key={t}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                disabled={disabled}
+                onClick={() => chooseTab(t)}
+                className="shrink-0 whitespace-nowrap rounded-full border px-3 py-1 text-[11px] font-bold transition-colors disabled:opacity-50"
+                style={active
+                  ? { background: 'rgba(77,249,237,0.14)', borderColor: 'rgba(77,249,237,0.45)', color: 'var(--color-cyan)' }
+                  : { borderColor: 'rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.55)' }}
+              >
+                {t === ALL ? 'All' : t} <span className="opacity-60 tabular-nums">{n}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+
+      {selectedOffPage && selectedRow && (
+        <p className="text-[11px] text-white/50">
+          Selected: <span className="font-bold text-white/80">{selectedRow.truck.plate_number}</span>
+          {' '}({typeOf(selectedRow.truck)})
+        </p>
+      )}
+
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-      {rows.map(({ truck, cap, fit }) => {
+      {pageRows.map(({ truck, cap, fit }) => {
         const selected = truck.truck_id === selectedId
         const coded    = codingOf(truck.plate_number)
         const m        = truck.truck_model
@@ -199,6 +264,20 @@ export default function VehiclePicker({
           </button>
         )
       })}
+    </div>
+
+      {inTab.length > PAGE_SIZE && (
+        <Pagination
+          page={safePage}
+          totalPages={totalPages}
+          total={inTab.length}
+          pageSize={PAGE_SIZE}
+          onPageChange={setPage}
+          disabled={disabled}
+          bar={false}
+          jump={false}
+        />
+      )}
     </div>
   )
 }

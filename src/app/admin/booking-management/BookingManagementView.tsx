@@ -34,7 +34,7 @@ import { subscribeBroadcast } from '@/lib/realtime/sharedBroadcast'
 import { pickDriver, pickTruck, type CrewSelection, type PairFilled } from '@/lib/crew-pairing'
 import { codingFlagFor, type CodingFlag } from '@/lib/number-coding'
 import { formatPhDateTime, submittedAfterCloseToday } from '@/lib/office-hours'
-import { licenseExpiryState, licenseFlagForDelivery } from '@/lib/license-expiry'
+import { licenseFlagForDelivery } from '@/lib/license-expiry'
 import { statusColor } from '@/components/map/status.colors'
 import { useModuleAccess, writeAccess } from '@/components/layout/ModuleAccess'
 import type { BookingDetail } from '@/app/types/maps/routemap.types'
@@ -72,6 +72,7 @@ import type { RouteDistance, SecondDriverRecord } from '@/lib/services/admin/ass
 import ReusableModal, { RemarksModal } from '@/components/layout/ReusableModal'
 import TripPlanner from './TripPlanner'
 import VehiclePicker, { cargoSummaryFromBooking, fitProblems } from './VehiclePicker'
+import DriverPicker, { type DriverPickerOption } from './DriverPicker'
 import CompletionPanel from '@/components/transactions/CompletionPanel'
 import { formatPlateNumber, plateError } from '@/lib/validation/plate'
 import ProblemReportedBadge, { hasOpenClientIssue } from '@/components/transactions/ProblemReportedBadge'
@@ -455,14 +456,27 @@ function crewLicenseFlags(a: AssignmentRecord | undefined, scheduleDate: string 
   })
 }
 
-/** "Expired" / "expires in 12 days" for the dropdown, or nothing when in date. */
-function licenseNote(expiry: string | null | undefined): string {
-  const state = licenseExpiryState(expiry)
-  if (state.kind === 'expired') return ' — ⚠ license expired'
-  if (state.kind === 'expiring') {
-    return state.daysLeft === 0 ? ' — ⚠ license expires today' : ` — ⚠ license expires in ${state.daysLeft} day${state.daysLeft === 1 ? '' : 's'}`
+/** A company driver as a DriverPicker row. */
+function companyOption(dr: DriverUser, warning: string | null): DriverPickerOption {
+  return {
+    value:         dr.drivers?.driver_id ?? dr.user_id,
+    name:          `${dr.first_name ?? ''} ${dr.last_name ?? ''}`.trim() || 'Unnamed driver',
+    detail:        dr.drivers?.license_number ?? null,
+    licenseExpiry: dr.drivers?.license_expiry ?? null,
+    warning,
   }
-  return ''
+}
+
+/** A vendor driver as a DriverPicker row (on another booking = can't be picked). */
+function vendorOption(v: VendorDriverUser, bookingId: string): DriverPickerOption {
+  const busy = vendorDriverBusyNote(v, bookingId)
+  return {
+    value:         v.user_id,
+    name:          vendorDriverName(v),
+    detail:        v.drivers?.vendor_name ?? null,
+    licenseExpiry: v.drivers?.license_expiry ?? null,
+    disabledNote:  busy ? busy.replace(/^[\s—·-]+/, '') : null,
+  }
 }
 
 /**
@@ -852,27 +866,16 @@ function AssignmentPanel({
               <label className="text-[11px] text-white/40 block mb-1">
                 Vendor driver<span className="text-red-400"> *</span>
               </label>
-              <select
+              <DriverPicker
+                ariaLabel="Vendor driver"
+                placeholder="Select vendor driver"
                 value={vendorForm.vendor_driver_user_id}
-                disabled={assignBusy || vendorDriversLoading}
-                onChange={(e) => onVendorFieldChange('vendor_driver_user_id', e.target.value)}
-                className={selectClass}
-              >
-                <option value="">
-                  {vendorDriversLoading ? 'Loading vendor drivers…' : 'Select vendor driver'}
-                </option>
-                {pickableVendorDrivers.map((v) => {
-                  const busy = vendorDriverBusyNote(v, detail.booking_id)
-                  return (
-                    <option key={v.user_id} value={v.user_id} disabled={!!busy}>
-                      {vendorDriverName(v)}
-                      {v.drivers?.vendor_name ? ` · ${v.drivers.vendor_name}` : ''}
-                      {licenseNote(v.drivers?.license_expiry)}
-                      {busy ?? ''}
-                    </option>
-                  )
-                })}
-              </select>
+                disabled={assignBusy}
+                loading={vendorDriversLoading}
+                scheduleDate={detail.schedule_date}
+                onChange={(v) => onVendorFieldChange('vendor_driver_user_id', v)}
+                options={pickableVendorDrivers.map((v) => vendorOption(v, detail.booking_id))}
+              />
               <p className="text-[10px] text-white/35 mt-1 leading-snug">
                 {!vendorDriversLoading && pickableVendorDrivers.length === 0
                   ? 'No vendor drivers yet. Add them in User Management → Drivers → Vendor Drivers.'
@@ -889,27 +892,19 @@ function AssignmentPanel({
             {rule.second !== 'hidden' && (
             <div>
               <label className="text-[11px] text-white/40 block mb-1">{secondDriverLabelText}</label>
-              <select
+              <DriverPicker
+                ariaLabel="Second driver"
+                placeholder="Select second driver"
+                emptyLabel={rule.second === 'required' ? undefined : 'No second driver'}
                 value={vendorForm.second_vendor_driver_user_id}
-                disabled={assignBusy || vendorDriversLoading}
-                onChange={(e) => onVendorFieldChange('second_vendor_driver_user_id', e.target.value)}
-                className={selectClass}
-              >
-                <option value="">{rule.second === 'required' ? 'Select second driver' : 'No second driver'}</option>
-                {pickableVendorDrivers
+                disabled={assignBusy}
+                loading={vendorDriversLoading}
+                scheduleDate={detail.schedule_date}
+                onChange={(v) => onVendorFieldChange('second_vendor_driver_user_id', v)}
+                options={pickableVendorDrivers
                   .filter((v) => v.user_id !== vendorForm.vendor_driver_user_id)
-                  .map((v) => {
-                    const busy = vendorDriverBusyNote(v, detail.booking_id)
-                    return (
-                      <option key={v.user_id} value={v.user_id} disabled={!!busy}>
-                        {vendorDriverName(v)}
-                        {v.drivers?.vendor_name ? ` · ${v.drivers.vendor_name}` : ''}
-                        {licenseNote(v.drivers?.license_expiry)}
-                        {busy ?? ''}
-                      </option>
-                    )
-                  })}
-              </select>
+                  .map((v) => vendorOption(v, detail.booking_id))}
+              />
               <p className="text-[10px] text-white/35 mt-1 leading-snug">{SECOND_DRIVER_HINT}</p>
             </div>
             )}
@@ -980,27 +975,19 @@ function AssignmentPanel({
             </div>
             <div>
               <label className="text-[11px] text-white/40 block mb-1">Driver</label>
-              <select
+              <DriverPicker
+                ariaLabel="Driver"
                 value={assignDriverId}
                 disabled={assignBusy}
-                onChange={(e) => onDriverChange(e.target.value)}
-                className={selectClass}
-              >
-                <option value="">Select driver</option>
-                {drivers.map((dr) => {
+                scheduleDate={detail.schedule_date}
+                onChange={onDriverChange}
+                options={drivers.map((dr) => {
                   const driverId = dr.drivers?.driver_id ?? dr.user_id
                   // Picking a driver fills in their usual vehicle, so its
                   // coding day is worth seeing at this step too.
-                  const coded = codingOf(pairedPlateOf(driverId))
-                  return (
-                    <option key={dr.user_id} value={driverId}>
-                      {dr.first_name} {dr.last_name}
-                      {dr.drivers?.license_number ? ` · ${dr.drivers.license_number}` : ''}
-                      {coded ? ' — ⚠ usual vehicle coded' : ''}
-                    </option>
-                  )
+                  return companyOption(dr, codingOf(pairedPlateOf(driverId)) ? 'Usual vehicle coded' : null)
                 })}
-              </select>
+              />
               {/* The list is only ever the drivers who ticked THIS booking's day
                   on their own calendar, so an empty one means nobody offered to
                   work that day — not a bug, and not something to override here. */}
@@ -1013,22 +1000,18 @@ function AssignmentPanel({
             {rule.second !== 'hidden' && (
             <div>
               <label className="text-[11px] text-white/40 block mb-1">{secondDriverLabelText}</label>
-              <select
+              <DriverPicker
+                ariaLabel="Second driver"
+                placeholder="Select second driver"
+                emptyLabel={rule.second === 'required' ? undefined : 'No second driver'}
                 value={assignSecondDriverId}
                 disabled={assignBusy}
-                onChange={(e) => onSecondDriverChange(e.target.value)}
-                className={selectClass}
-              >
-                <option value="">{rule.second === 'required' ? 'Select second driver' : 'No second driver'}</option>
-                {drivers
+                scheduleDate={detail.schedule_date}
+                onChange={onSecondDriverChange}
+                options={drivers
                   .filter((dr) => (dr.drivers?.driver_id ?? dr.user_id) !== assignDriverId)
-                  .map((dr) => (
-                    <option key={dr.user_id} value={dr.drivers?.driver_id ?? dr.user_id}>
-                      {dr.first_name} {dr.last_name}
-                      {dr.drivers?.license_number ? ` · ${dr.drivers.license_number}` : ''}
-                    </option>
-                  ))}
-              </select>
+                  .map((dr) => companyOption(dr, null))}
+              />
               <p className="text-[10px] text-white/35 mt-1 leading-snug">{SECOND_DRIVER_HINT}</p>
             </div>
             )}

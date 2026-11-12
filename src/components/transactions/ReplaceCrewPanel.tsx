@@ -17,7 +17,9 @@ import { writeAccess } from '@/components/layout/ModuleAccess'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { appToast } from '@/lib/toast'
 import ReusableModal from '@/components/layout/ReusableModal'
-import { fitProblems } from '@/app/admin/booking-management/VehiclePicker'
+import VehiclePicker, { fitProblems } from '@/app/admin/booking-management/VehiclePicker'
+import DriverPicker, { type DriverPickerOption } from '@/app/admin/booking-management/DriverPicker'
+import { EMPTY_CARGO_SUMMARY } from '@/lib/cargo/summary'
 import type { CargoSummary } from '@/lib/cargo/summary'
 import { formatDateTime } from './transaction-format'
 import { PALETTE } from '@/lib/palette'
@@ -266,8 +268,18 @@ export default function ReplaceCrewPanel({
   const driverLabel = (d: DriverUser) => `${d.first_name ?? ''} ${d.last_name ?? ''}`.trim() +
     (d.drivers?.driver_id === currentDriverId ? ' (current driver)' : d.drivers?.driver_id === currentSecondDriverId ? ' (current second driver)' : '')
   const vendorLabel = (v: VendorDriverUser) => vendorName(v) +
-    (v.drivers?.vendor_name ? ` · ${v.drivers.vendor_name}` : '') +
     (v.user_id === currentVendorDriverUserId ? ' (current driver)' : '')
+  // Rows for the driver pickers (alphabetical, searchable, license flags; a
+  // license expired by today is not offered). A replacement happens on the
+  // road, so "the delivery day" is today.
+  const driverRow = (d: DriverUser): DriverPickerOption => ({
+    value: d.drivers!.driver_id, name: driverLabel(d),
+    detail: d.drivers?.license_number ?? null, licenseExpiry: d.drivers?.license_expiry ?? null,
+  })
+  const vendorRow = (v: VendorDriverUser): DriverPickerOption => ({
+    value: v.user_id, name: vendorLabel(v),
+    detail: v.drivers?.vendor_name ?? null, licenseExpiry: v.drivers?.license_expiry ?? null,
+  })
 
   return (
     <div className="flex flex-col gap-2">
@@ -388,27 +400,34 @@ export default function ReplaceCrewPanel({
                 <>
                   <div>
                     <label className="text-[11px] text-white/40 block mb-1">Vendor driver</label>
-                    <select value={vendorId} disabled={busy} onChange={(e) => {
-                      setVendorId(e.target.value)
-                      if (e.target.value && e.target.value === vendorSecondId) setVendorSecondId('')
-                    }} className={selectClass}>
-                      <option value="">Choose a vendor driver</option>
-                      {vendorOptions.map((v) => (
-                        <option key={v.user_id} value={v.user_id}>{vendorLabel(v)}</option>
-                      ))}
-                    </select>
+                    <DriverPicker
+                      ariaLabel="Vendor driver"
+                      placeholder="Choose a vendor driver"
+                      value={vendorId}
+                      disabled={busy}
+                      scheduleDate={null}
+                      onChange={(v) => {
+                        setVendorId(v)
+                        if (v && v === vendorSecondId) setVendorSecondId('')
+                      }}
+                      options={vendorOptions.map(vendorRow)}
+                    />
                   </div>
                   {secondRequired !== false && (
                     <div>
                       <label className="text-[11px] text-white/40 block mb-1">
                         {secondRequired ? <>Second driver<span className="text-red-400"> *</span></> : 'Second driver (optional)'}
                       </label>
-                      <select value={vendorSecondId} disabled={busy} onChange={(e) => setVendorSecondId(e.target.value)} className={selectClass}>
-                        <option value="">None</option>
-                        {vendorOptions.filter((v) => v.user_id !== vendorId).map((v) => (
-                          <option key={v.user_id} value={v.user_id}>{vendorLabel(v)}</option>
-                        ))}
-                      </select>
+                      <DriverPicker
+                        ariaLabel="Second driver"
+                        placeholder="Choose a second driver"
+                        emptyLabel="None"
+                        value={vendorSecondId}
+                        disabled={busy}
+                        scheduleDate={null}
+                        onChange={setVendorSecondId}
+                        options={vendorOptions.filter((v) => v.user_id !== vendorId).map(vendorRow)}
+                      />
                     </div>
                   )}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -431,36 +450,43 @@ export default function ReplaceCrewPanel({
                 <>
                   <div>
                     <label className="text-[11px] text-white/40 block mb-1">Driver</label>
-                    <select value={driverId} disabled={busy} onChange={(e) => setDriverId(e.target.value)} className={selectClass}>
-                      <option value="">Choose a driver</option>
-                      {driverOptions.map((d) => (
-                        <option key={d.drivers!.driver_id} value={d.drivers!.driver_id}>{driverLabel(d)}</option>
-                      ))}
-                    </select>
+                    <DriverPicker
+                      ariaLabel="Driver"
+                      placeholder="Choose a driver"
+                      value={driverId}
+                      disabled={busy}
+                      scheduleDate={null}
+                      onChange={setDriverId}
+                      options={driverOptions.map(driverRow)}
+                    />
                   </div>
                   {secondRequired !== false && (
                     <div>
                       <label className="text-[11px] text-white/40 block mb-1">
                         {secondRequired ? <>Second driver<span className="text-red-400"> *</span></> : 'Second driver (optional)'}
                       </label>
-                      <select value={secondId} disabled={busy} onChange={(e) => setSecondId(e.target.value)} className={selectClass}>
-                        <option value="">None</option>
-                        {driverOptions.filter((d) => d.drivers!.driver_id !== driverId).map((d) => (
-                          <option key={d.drivers!.driver_id} value={d.drivers!.driver_id}>{driverLabel(d)}</option>
-                        ))}
-                      </select>
+                      <DriverPicker
+                        ariaLabel="Second driver"
+                        placeholder="Choose a second driver"
+                        emptyLabel="None"
+                        value={secondId}
+                        disabled={busy}
+                        scheduleDate={null}
+                        onChange={setSecondId}
+                        options={driverOptions.filter((d) => d.drivers!.driver_id !== driverId).map(driverRow)}
+                      />
                     </div>
                   )}
                   <div>
                     <label className="text-[11px] text-white/40 block mb-1">Vehicle</label>
-                    <select value={truckId} disabled={busy} onChange={(e) => setTruckId(e.target.value)} className={selectClass}>
-                      <option value="">Choose a vehicle</option>
-                      {truckOptions.map((t) => (
-                        <option key={t.truck_id} value={t.truck_id}>
-                          {t.plate_number}{t.vehicle_type ? ` · ${t.vehicle_type}` : ''}{t.truck_id === currentTruckId ? ' (current vehicle)' : ''}
-                        </option>
-                      ))}
-                    </select>
+                    <VehiclePicker
+                      trucks={truckOptions}
+                      selectedId={truckId}
+                      cargo={cargo ?? EMPTY_CARGO_SUMMARY}
+                      disabled={busy}
+                      codingOf={() => null}
+                      onSelect={setTruckId}
+                    />
                   </div>
                 </>
               )}
