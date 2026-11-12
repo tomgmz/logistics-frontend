@@ -2,9 +2,8 @@
 
 import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
 import Pagination from '@/components/ui/Pagination'
-import { useLivePending } from '@/lib/hooks/useLiveTable'
+import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { useSignedLinkRefresh, withFreshLinks } from '@/lib/hooks/useSignedLinkRefresh'
-import NewEntriesBar from '@/components/ui/NewEntriesBar'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -163,14 +162,9 @@ export default function TransactionHistoryView() {
     sort,
   }), [statusFilter, debouncedSearch, clientIds, dateBasis, dateFrom, dateTo, sort])
 
-  // Booking changes are counted, not loaded: every stop and status change on
-  // any active booking would otherwise reload this whole history.
-  const { pending, clear: clearPending } = useLivePending(['live:bookings'])
-
   // `quiet` re-reads in place: no spinner, and a failed re-read keeps the rows
   // already on screen instead of replacing them with an error.
   const load = useCallback(async (quiet = false) => {
-    clearPending()
     const query    = { ...filters, page: page + 1, limit: PAGE_SIZE }
     const cacheKey = `transaction-history|${JSON.stringify(query)}`
     type ListRes = Awaited<ReturnType<typeof transactionHistoryService.list>>
@@ -196,7 +190,7 @@ export default function TransactionHistoryView() {
     } finally {
       if (!quiet) setLoading(false)
     }
-  }, [filters, page, clearPending, PAGE_SIZE])
+  }, [filters, page, PAGE_SIZE])
 
   useEffect(() => { void load() }, [load])
 
@@ -213,6 +207,19 @@ export default function TransactionHistoryView() {
       .then((b) => setSelected((cur) => (cur?.booking_id === selectedBookingId ? withFreshLinks(cur, b as BookingWithRelations) : cur)))
       .catch(() => {})
   })
+
+  // Live (user 2026-11-12: no "N new updates — Refresh" bar). A booking change
+  // re-reads this page quietly in place, and the open booking with it. One
+  // save fires several signals (booking, drop-offs, cargo, trips), so they are
+  // coalesced over 1.5 s into one read. Child rows signal their own id, not
+  // the booking's, so the open booking is re-read on any booking signal.
+  useLiveTable(['live:bookings'], () => {
+    void load(true)
+    if (!selectedBookingId) return
+    bookingService.getBookingById(selectedBookingId)
+      .then((b) => setSelected((cur) => (cur?.booking_id === selectedBookingId && b ? b as BookingWithRelations : cur)))
+      .catch(() => {})
+  }, { debounceMs: 1500 })
 
   const openedDeepLink = useRef<string | null>(null)
   const openDeepLink = useCallback((id: string | null) => {
@@ -340,8 +347,6 @@ export default function TransactionHistoryView() {
                 setPage(0)
               }}
             />
-            <NewEntriesBar count={pending} singular="new update" plural="new updates"
-              onRefresh={() => void load(true)} />
             {loading ? (
               <div className="flex flex-1 flex-col items-center justify-center gap-3 py-16">
                 <div className="h-9 w-9 animate-spin rounded-full border-2 border-t-transparent"

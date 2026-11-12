@@ -122,7 +122,11 @@ export default function ReportsView() {
   const load = table.reload
 
   // A driver in trouble should not wait for someone to press Refresh.
-  useLiveTable(['live:driver_reports'], () => { void load(true) })
+  useLiveTable(['live:driver_reports'], () => {
+    void load(true)
+    // A report opened from a link may not be on this page; re-read it too.
+    if (viewId) void fetchDriverReport(viewId).then((r) => setFocused((cur) => (cur && cur.report_id !== viewId ? cur : r))).catch(() => {})
+  })
 
   useEffect(() => {
     const t = window.setInterval(() => {

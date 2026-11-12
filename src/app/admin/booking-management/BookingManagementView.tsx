@@ -1516,22 +1516,38 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     // re-assigning (a picker left open must not stay offering it), and pausing
     // or resuming opens and closes replacing the crew. Re-read it when either
     // moved, and say why the picker closed.
+    //
+    // Any other change (approval, call time, delay, a client edit or
+    // confirmation, a problem reported, someone else assigning) refreshes the
+    // open booking quietly (user 2026-11-12: every side panel live). Child rows
+    // signal their own id, not the booking's, so it re-reads on every signal.
+    // The driver/vehicle choice being made is left alone unless the saved
+    // assignment itself changed and nobody is editing it.
     const openId = selectedId
-    const live   = detail && ['approved', 'assigned', 'in_transit'].includes(String(detail.status))
-    if (openId && detail && live) {
+    if (openId && detail) {
       const wasStatus = detail.status
       const wasPaused = (detail as { paused_at?: string | null }).paused_at ?? null
-      bookingService.getBookingById(openId).then((b) => {
-        if (selectedIdRef.current !== openId) return
-        const now = b as BookingDetail & { paused_at?: string | null }
-        if (now?.status === wasStatus && (now?.paused_at ?? null) === wasPaused) return
-        void refreshDetail(openId)
-        if (now?.status === 'in_transit' && wasStatus !== 'in_transit') {
-          appToast.info('The driver has started this delivery. The driver and vehicle can no longer be changed.', {
-            action: 'assign', entityId: openId,
-          })
+      const live      = ['approved', 'assigned', 'in_transit'].includes(String(wasStatus))
+      void Promise.allSettled([
+        bookingService.getBookingById(openId),
+        assignmentService.getByBookingId(openId),
+      ]).then(([bookingResp, assignmentResp]) => {
+        if (selectedIdRef.current !== openId || bookingResp.status !== 'fulfilled' || !bookingResp.value) return
+        const now = bookingResp.value as BookingDetail & { paused_at?: string | null }
+        if (live && (now.status !== wasStatus || (now.paused_at ?? null) !== wasPaused)) {
+          void refreshDetail(openId)
+          if (now.status === 'in_transit' && wasStatus !== 'in_transit') {
+            appToast.info('The driver has started this delivery. The driver and vehicle can no longer be changed.', {
+              action: 'assign', entityId: openId,
+            })
+          }
+          return
         }
-      }).catch(() => {})
+        setDetail(now)
+        const rec = assignmentResp.status === 'fulfilled' ? assignmentResp.value as { driver_id?: string | null; truck_id?: string | null } | undefined : undefined
+        const moved = !!rec && ((rec.driver_id ?? '') !== committedAssignment.driverId || (rec.truck_id ?? '') !== committedAssignment.truckId)
+        if (moved && !assignEditMode) restoreAssignment(now, rec)
+      })
     }
   })
   useLiveTable(['live:trucks'], () => {

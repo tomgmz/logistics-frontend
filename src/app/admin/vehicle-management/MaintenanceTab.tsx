@@ -19,6 +19,8 @@ import BlowbagetsInspectionModal from './BlowbagetsInspectionModal'
 import RecordServiceModal from './RecordServiceModal'
 import { fmtDay, fmtKm } from './maintenance-ui'
 import DriverReportDetailModal from '@/components/reports/DriverReportDetailModal'
+import { useLiveTable } from '@/lib/hooks/useLiveTable'
+import { fetchDriverReport } from '@/lib/services/admin/driver-reports.service'
 import ReusableModal from '@/components/layout/ReusableModal'
 import { useRecordLocks } from '@/lib/hooks/useRecordLock'
 import { RecordLockBadge } from '@/components/ui/RecordLockBanner'
@@ -267,6 +269,14 @@ export default function MaintenanceTab({
 
   const [inspectTruck, setInspectTruck] = useState<MaintenanceTruck | null>(null)
   const [viewReport,   setViewReport]   = useState<DriverReport | null>(null)
+  // The open report follows changes (status, classification, a note) live.
+  const viewReportId = viewReport?.report_id
+  useLiveTable(['live:driver_reports'], () => {
+    if (!viewReportId) return
+    void fetchDriverReport(viewReportId)
+      .then((r) => setViewReport((cur) => (cur?.report_id === viewReportId ? r : cur)))
+      .catch(() => {})
+  }, { enabled: !!viewReportId })
   const [holdTarget,   setHoldTarget]   = useState<MaintenanceTruck | null>(null)
   const [serviceTruck, setServiceTruck] = useState<MaintenanceTruck | null>(null)
   const [busy,         setBusy]         = useState(false)

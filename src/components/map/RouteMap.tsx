@@ -268,6 +268,9 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
     if (!user) return
     if (user.role === 'client' && !user.clients?.client_id) return
     loadBookings()
+    // The open booking too (pause, delay, status), not only its route
+    // (useRouteChanged below). Reads stored data; no Google call.
+    rmRefresh()
   })
 
   // The driver loaded a run, confirmed a drop-off or chose which one to do

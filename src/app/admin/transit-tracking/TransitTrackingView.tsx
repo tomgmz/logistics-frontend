@@ -250,7 +250,9 @@ export default function TransitTrackingView() {
   useEffect(() => { if (!user) return; loadBookings() }, [loadBookings, user])
   // Live: a pause starting or ending, a stop confirmed — the cards follow
   // without a reload (DB triggers broadcast on live:bookings).
-  useLiveTable(['live:bookings'], () => { if (user) loadBookings() })
+  // The open booking too (pause, delay, call time, status), not only its route
+  // (useRouteChanged below). Reads stored data; no Google call.
+  useLiveTable(['live:bookings'], () => { if (user) { loadBookings(); rmRefresh() } })
 
   const searchFiltered = useMemo(() => {
     const q = search.trim().toLowerCase()
