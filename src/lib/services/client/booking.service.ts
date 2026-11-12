@@ -127,12 +127,15 @@ export interface StepTime {
   clock_adjusted?: boolean
 }
 
-/** One stop visit: arrival (recorded by the phone itself), the driver's
- *  "Start loading/unloading" tap, and the finish (the proof photo). */
+/** One stop visit (2026-11-12): arrival (recorded by the phone itself, or
+ *  "I've arrived" within 300 m), "Start loading/unloading", "Loading/Unloading
+ *  finished", then the proof photo. `finished` is null on a visit an older app
+ *  confirmed (no such step then); `proof` may be missing from an older server. */
 export interface StopTimes {
   arrived:  StepTime | null
   started:  StepTime | null
   finished: StepTime | null
+  proof?:   StepTime | null
 }
 
 export interface TimelineStop extends StopTimes {
@@ -153,7 +156,7 @@ export interface TimelineTrip {
   stops:        TimelineStop[]
 }
 
-export type TimelineStage = 'arrived' | 'started'
+export type TimelineStage = 'arrived' | 'started' | 'finished'
 
 export interface ClientBookingDocument {
   doc_key:     string

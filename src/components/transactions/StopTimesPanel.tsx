@@ -51,12 +51,24 @@ const LOADING_STEPS: Array<[Step, string]> = [
   ['arrived',  'Arrived at pickup'],
   ['started',  'Start loading'],
   ['finished', 'Loading finished'],
+  ['proof',    'Proof of pickup'],
 ]
 const UNLOADING_STEPS: Array<[Step, string]> = [
   ['arrived',  'Arrived at drop-off'],
   ['started',  'Start unloading'],
-  ['finished', 'Delivered'],
+  ['finished', 'Unloading finished'],
+  ['proof',    'Delivered (proof)'],
 ]
+
+/**
+ * The visit's times as this screen reads them. A server before 2026-11-12 sends
+ * no `proof`: its `finished` WAS the proof, and no separate finish existed.
+ */
+function normalized(t: StopTimes): Required<StopTimes> {
+  return t.proof === undefined
+    ? { arrived: t.arrived, started: t.started, finished: null, proof: t.finished }
+    : { arrived: t.arrived, started: t.started, finished: t.finished, proof: t.proof ?? null }
+}
 
 const hasAny = (t: StopTimes) => Object.values(t).some(Boolean)
 
@@ -175,7 +187,7 @@ export default function StopTimesPanel({ bookingId, staff = false, canEdit = fal
             const v     = visits.get(s.trip_stop_id)
             const split = !!v && v.of > 1
             // A delivery on an earlier visit is part of the drop-off, not all of it.
-            const note = split && s.finished
+            const note = split && normalized(s).proof
               ? v!.laterTrip ? `Part delivered · rest on trip ${v!.laterTrip}` : 'Last visit · drop-off complete'
               : null
             const visitText = split ? `visit ${v!.index} of ${v!.of}` : null
@@ -225,8 +237,9 @@ function StopBlock({ title, subtitle, note, steps, times, workLabel, canEdit, al
   allowed:   boolean
   onEdit:    (stage: TimelineStage, label: string) => void
 }) {
-  const work   = span(times.started, times.finished)
-  const atStop = span(times.arrived, times.finished)
+  const t      = normalized(times)
+  const work   = span(t.started, t.finished ?? t.proof)
+  const atStop = span(t.arrived, t.proof ?? t.finished)
   return (
     <div className="flex flex-col gap-1.5">
       <div className="min-w-0">
@@ -236,15 +249,18 @@ function StopBlock({ title, subtitle, note, steps, times, workLabel, canEdit, al
       </div>
       <dl className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1 m-0">
         {steps.map(([key, label]) => {
-          const v = times[key]
-          // The finish is the photo confirmation: never edited here.
-          const editable = canEdit && key !== 'finished'
+          const v = t[key]
+          // The proof is the photo confirmation: never edited here.
+          const editable = canEdit && key !== 'proof'
+          // Confirmed by an app version that had no "finished" step.
+          const notRecorded = !v && key === 'finished' && !!t.proof
           return (
             <div key={key} className="contents">
               <dt className="text-[12px] text-white/70 min-w-0">{label}</dt>
               <dd className="m-0 flex items-center justify-end gap-1.5 text-[12px] text-right">
-                <span className={v ? 'text-white' : ''} style={v ? undefined : { color: MUTED }}>
-                  {v ? formatDateTime(v.at) : '—'}
+                <span className={v ? 'text-white' : ''} style={v ? undefined : { color: MUTED }}
+                  title={notRecorded ? 'The driver’s app was an older version without this step.' : undefined}>
+                  {v ? formatDateTime(v.at) : notRecorded ? 'Not recorded (older app)' : '—'}
                 </span>
                 {v?.corrected && (
                   <span className="text-[10px] font-semibold" style={{ color: MUTED }} title={v.note ?? undefined}>
