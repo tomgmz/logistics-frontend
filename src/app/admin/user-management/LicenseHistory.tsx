@@ -6,6 +6,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react'
 import { driverService, type DriverLicenseHistoryRow } from '@/lib/services/admin/user-management.service'
 import { formatDateTime } from '@/app/utils/timeFormat'
 import { FileViewButton } from '@/components/ui/FileViewer'
+import { useLiveTable } from '@/lib/hooks/useLiveTable'
 
 /**
  * The licenses a driver held before the current one: every renewal, corrected
@@ -23,6 +24,10 @@ export default function LicenseHistory({ userId }: { userId: string }) {
       .catch(() => {})
     return () => { cancelled = true }
   }, [userId])
+  // Live: a renewal saved by someone else joins the history.
+  useLiveTable(['live:users'], () => {
+    driverService.licenseHistory(userId).then((r) => setRows(r ?? [])).catch(() => {})
+  })
 
   if (rows.length === 0) return null
 

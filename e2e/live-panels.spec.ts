@@ -135,3 +135,23 @@ test.describe('side panels are live', () => {
     }, t.text, 'ticket', t.id)
   })
 })
+
+test.describe('client dashboard is live', () => {
+  test.describe.configure({ mode: 'serial' })
+
+  let page: Page
+  test.beforeAll(async ({ browser }, info) => {
+    test.skip(info.project.name !== 'chromium', 'writes seed rows; run once')
+    // client038 is the Chromium project's client (playwright.config.ts).
+    ;({ page } = await signIn(browser, info, 'client'))
+  })
+
+  test('a booking change shows without a reload', async () => {
+    // BK-202611-00017, client038's assigned seed booking.
+    const id = '6575e7ee-c2ac-4ddf-a174-305e8fe035fe'
+    await expectFollows(page, async () => {
+      await page.goto('/client/dashboard')
+      await expect(page.getByText('BK-202611-00017').first()).toBeVisible({ timeout: 30_000 })
+    }, 'Mac Arthur Highway, San Fernando, Pampanga', 'booking', id)
+  })
+})

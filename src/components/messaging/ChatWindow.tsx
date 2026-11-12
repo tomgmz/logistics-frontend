@@ -23,6 +23,7 @@ import { toMessage, PHOTO_PLACEHOLDER } from '@/app/types/messaging/messaging.ty
 import { dmChatKey, isChatFresh, markChatFresh } from './chatFreshness'
 import { roleLabel, nameWithRole } from '@/lib/roles'
 import { cachedData, storeData } from '@/lib/query/useApiQuery'
+import { useCatchUp } from '@/lib/hooks/useLiveTable'
 
 interface ReplyTo { messageId: string; content: string; senderName: string }
 
@@ -132,7 +133,8 @@ export default function ChatWindow({ conversation, draftUser, currentUserId, isP
       storeData(key, msgs)
       markChatFresh(dmChatKey(convId))
       loadedFor.current = convId
-      setMessages(msgs)
+      // Keep bubbles still being sent; the fresh list doesn't have them yet.
+      setMessages(prev => [...msgs, ...prev.filter(m => m.id.startsWith('optimistic-'))])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load messages')
     } finally {
@@ -141,6 +143,8 @@ export default function ChatWindow({ conversation, draftUser, currentUserId, isP
   }, [convId])
 
   useEffect(() => { fetchMessages(true) }, [fetchMessages])
+  // Back from a hidden tab or offline: messages sent meanwhile never arrived live.
+  useCatchUp(() => { void fetchMessages() })
   // On close, keep what was on screen (sends, reactions, live messages) so a
   // quick return within the fresh window shows it. Not once the window has
   // passed: the next open reads fresh anyway. Marking read on open is done by

@@ -10,6 +10,7 @@ import { writeAccess } from '@/components/layout/ModuleAccess'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { appToast } from '@/lib/toast'
 import { PALETTE } from '@/lib/palette'
+import { useLiveTable } from '@/lib/hooks/useLiveTable'
 
 const INCIDENTS = [
   { key: 'truck_stolen',   label: 'Truck stolen' },
@@ -58,6 +59,9 @@ export default function OfficeProgressPanel({ bookingId, status, fleetReturned, 
     tripService.getTrips(bookingId).then(setTrips).catch(() => setTrips([]))
   }, [bookingId])
   useEffect(() => { if (live || needsReturn) load() }, [load, live, needsReturn, status])
+  // Live: each drop-off the driver confirms moves the next step, so the office
+  // never acts on a step that is already done.
+  useLiveTable(['live:bookings'], load, { enabled: live || needsReturn })
 
   if (!canAct || (!live && !needsReturn)) return null
 

@@ -16,6 +16,7 @@ import { toConversation, toGroup } from '@/app/types/messaging/messaging.types'
 import { formatConversationTime } from '@/app/utils/messaging.utils'
 import type { Conversation, Group } from '@/app/types/messaging/messaging.types'
 import { cachedData, storeData } from '@/lib/query/useApiQuery'
+import { useCatchUp } from '@/lib/hooks/useLiveTable'
 
 type Tab = 'All' | 'Unread'
 type PanelItem =
@@ -62,6 +63,8 @@ export default function MessengerFloatingPanel() {
   }, [setTotalUnread])
 
   useEffect(() => { if (isPanelOpen) fetchAll() }, [isPanelOpen, fetchAll])
+  // Back from a hidden tab or offline: changes made meanwhile never arrived live.
+  useCatchUp(() => { void fetchAll() }, { enabled: isPanelOpen })
 
   // Real-time updates in panel
   useMessagingRealtime({

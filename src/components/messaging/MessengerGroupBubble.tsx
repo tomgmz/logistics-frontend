@@ -25,6 +25,7 @@ import MessageItem, { MessageDateDivider, TypingMessage } from './MessageItem'
 import MessageInput from './MessageInput'
 import type { DeleteScope } from './ConfirmDeleteDialog'
 import { cachedFetch } from '@/lib/query/useApiQuery'
+import { useCatchUp } from '@/lib/hooks/useLiveTable'
 
 const BUBBLE_W   = 338
 const BUBBLE_GAP = 10
@@ -121,7 +122,8 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
       const msgs = await cachedFetch(['messaging', 'bubble-group', groupId],
         async () => (await messagingService.getGroupMessages(groupId)).map(coerce),
         (m) => { setMessages(m); setLM(false) })
-      setMessages(msgs)
+      // Keep bubbles still being sent; the fresh list doesn't have them yet.
+      setMessages(prev => [...msgs, ...prev.filter(m => m.id.startsWith('optimistic-'))])
       if (msgs.length) messagingService.markGroupRead(groupId).catch(() => {})
     } catch { /* silent */ }
     finally { setLM(false) }
@@ -131,6 +133,8 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
     if (inviteStatus === 'accepted') fetchMessages()
     else if (inviteStatus) setLM(false)
   }, [fetchMessages, inviteStatus])
+  // Back from a hidden tab or offline: messages sent meanwhile never arrived live.
+  useCatchUp(() => { loadGroup(); if (inviteStatus === 'accepted') void fetchMessages() })
 
   const handleInvite = async (accept: boolean) => {
     setInviteLoading(accept ? 'accept' : 'decline')

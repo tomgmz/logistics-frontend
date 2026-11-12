@@ -24,6 +24,7 @@ import MessageBubble from './MessageBubble'
 import { MessageDateDivider, TypingMessage } from './MessageItem'
 import { roleLabel, nameWithRole } from '@/lib/roles'
 import { cachedFetch } from '@/lib/query/useApiQuery'
+import { useCatchUp } from '@/lib/hooks/useLiveTable'
 
 const BUBBLE_W   = 338
 const BUBBLE_GAP = 10
@@ -102,12 +103,15 @@ export default function MessengerChatBubble({ conversationId, index }: Props) {
       const msgs = await cachedFetch(['messaging', 'bubble-dm', conversationId],
         async () => (await messagingService.getMessages(conversationId)).map(toMessage),
         (m) => { setMessages(m); setLMsgs(false) })
-      setMessages(msgs)
+      // Keep bubbles still being sent; the fresh list doesn't have them yet.
+      setMessages(prev => [...msgs, ...prev.filter(m => m.id.startsWith('optimistic-'))])
     } catch { /* silent */ }
     finally { setLMsgs(false) }
   }, [conversationId])
 
   useEffect(() => { fetchMessages() }, [fetchMessages])
+  // Back from a hidden tab or offline: messages sent meanwhile never arrived live.
+  useCatchUp(() => { void fetchMessages() })
   // Opens on your first unread message; after that follows only while you're at the bottom.
   const { scrollToLatest, atLatest } = useStickToBottom(bottomRef, conversationId, [messages, isTyping], {
     ready: !loadingMsgs && myLastReadAt !== undefined, messages, currentUserId, lastReadAt: myLastReadAt,

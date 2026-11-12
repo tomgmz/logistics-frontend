@@ -7,6 +7,7 @@ import ReusableModal from '@/components/layout/ReusableModal'
 import { itAdminService, type ITAdminHandoverStatus, type StandinCandidate } from '@/lib/services/admin/user-management.service'
 import { extractApiError } from '@/lib/api-error'
 import { appToast } from '@/lib/toast'
+import { useLiveTable } from '@/lib/hooks/useLiveTable'
 
 /** A moment as a Manila date, e.g. "Nov 23, 2026, 3:15 PM". */
 function formatPh(iso: string) {
@@ -90,6 +91,8 @@ export default function ItAdminHandoverPanel() {
   }, [])
 
   useEffect(() => { load() }, [load])
+  // Live: the successor confirming or the stand-in changing shows at once.
+  useLiveTable(['live:users'], load)
 
   async function runStep(step: PendingStep) {
     setPending(null)

@@ -29,6 +29,7 @@ import SiteFooter        from '@/components/layout/SiteFooter'
 import { useSetMessagingChatOpen } from './MessagingChromeContext'
 import { cachedData, storeData } from '@/lib/query/useApiQuery'
 import { dmChatKey, groupChatKey, markChatStale, markAllChatsStale } from './chatFreshness'
+import { useCatchUp } from '@/lib/hooks/useLiveTable'
 
 // The inbox as last shown (TanStack Query cache): back on Messages it shows at
 // once, and the fresh read and realtime events update it as before.
@@ -86,6 +87,8 @@ export default function MessagingShell() {
   }, [])
 
   useEffect(() => { fetchAll() }, [fetchAll])
+  // Back from a hidden tab or offline: changes made meanwhile never arrived live.
+  useCatchUp(() => { void fetchAll() })
 
   // Keep the cached inbox in step with what is shown (fresh reads and
   // realtime changes alike).

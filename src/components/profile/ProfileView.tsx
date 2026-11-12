@@ -7,6 +7,7 @@ import { roleLabel } from '@/lib/roles'
 import { formatContractDay } from '@/lib/contract-status'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { cachedFetch } from '@/lib/query/useApiQuery'
+import { useLiveTable } from '@/lib/hooks/useLiveTable'
 
 /**
  * The Profile page (2026-11-07), opened from the user card in the sidebar.
@@ -58,6 +59,8 @@ export default function ProfileView() {
   }, [])
 
   useEffect(() => { fetchProfile() }, [fetchProfile])
+  // Live: details or a contract date changed by the office show at once.
+  useLiveTable(['live:users'], fetchProfile)
 
   const load = () => { setLoadError(false); fetchProfile() }
 

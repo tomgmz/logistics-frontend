@@ -29,6 +29,7 @@ import DriverCallTime from './DriverCallTime'
 import { writeAccess } from '@/components/layout/ModuleAccess'
 import { FileViewButton } from '@/components/ui/FileViewer'
 import { cachedFetch } from '@/lib/query/useApiQuery'
+import { useLiveTable } from '@/lib/hooks/useLiveTable'
 
 /**
  * How many runs the assigned vehicle makes, which drop-offs each serves, and
@@ -171,6 +172,12 @@ export default function TripPlanner({ detail, canEdit, allowed = true, capacity 
   }, [bookingId])
 
   useEffect(() => { void refresh() }, [refresh])
+  // Live: runs loaded and stops confirmed show without reopening. Quiet (no
+  // spinner), and skipped while a plan is being edited so drafts are kept.
+  useLiveTable(['live:bookings'], () => {
+    if (editing) return
+    tripService.getTrips(bookingId).then(setTrips).catch(() => {})
+  }, { debounceMs: 1500 })
 
   const active  = useMemo(
     () => trips.filter((t) => t.status !== 'cancelled').sort((a, b) => a.trip_number - b.trip_number),

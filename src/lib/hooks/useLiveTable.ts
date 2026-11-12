@@ -149,3 +149,36 @@ export function useLivePending(
   const clear = useCallback(() => setPending(0), [])
   return { pending, clear }
 }
+
+/**
+ * Calls `onCatchUp` when the tab is shown again after 30 s or more hidden, and
+ * when the connection comes back online: a browser can pause a background
+ * tab's socket, so live events sent meanwhile never arrive. For screens fed by
+ * their own live channel (Messages), as useLiveTable does for the live:* topics.
+ */
+export function useCatchUp(onCatchUp: () => void, { enabled = true }: { enabled?: boolean } = {}): void {
+  const ref = useRef(onCatchUp)
+  useEffect(() => { ref.current = onCatchUp })
+
+  useEffect(() => {
+    if (!enabled) return
+    let hiddenAt: number | null = document.visibilityState === 'visible' ? null : Date.now()
+    let missedOnline = false
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') { hiddenAt ??= Date.now(); return }
+      const longAway = hiddenAt !== null && Date.now() - hiddenAt >= STALE_AFTER_HIDDEN_MS
+      hiddenAt = null
+      if (longAway || missedOnline) { missedOnline = false; ref.current() }
+    }
+    const onOnline = () => {
+      if (document.visibilityState === 'visible') ref.current()
+      else missedOnline = true
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('online', onOnline)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('online', onOnline)
+    }
+  }, [enabled])
+}

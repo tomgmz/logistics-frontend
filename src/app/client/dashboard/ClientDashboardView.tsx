@@ -22,6 +22,7 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { CardLink, MetricRow, MetricRowSkeleton } from '@/components/dashboard/AdminDashboard'
 import type { CardSpec } from '@/components/dashboard/StaffDashboard'
 import { cachedData, storeData } from '@/lib/query/useApiQuery'
+import { useLiveTable } from '@/lib/hooks/useLiveTable'
 
 /**
  * The client's dashboard, in the same Untitled UI dashboard-04 format as the
@@ -343,6 +344,9 @@ export default function ClientDashboardView() {
   }, [clientId])
 
   useEffect(() => { void load() }, [load])
+  // Live (2026-11-12): a booking approved, assigned, started, delivered or
+  // delayed shows without a reload. Quiet: the list on screen stays meanwhile.
+  useLiveTable(['live:bookings'], () => { void load() }, { enabled: !!clientId, debounceMs: 1500 })
 
   // Every figure below is derived from the one list already fetched — the
   // dashboard adds no endpoint of its own.

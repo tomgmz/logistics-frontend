@@ -24,6 +24,7 @@ import type {
 import { toGroupMessage, PHOTO_PLACEHOLDER } from '@/app/types/messaging/messaging.types'
 import { groupChatKey, isChatFresh, markChatFresh } from './chatFreshness'
 import { cachedData, storeData } from '@/lib/query/useApiQuery'
+import { useCatchUp } from '@/lib/hooks/useLiveTable'
 
 interface ReplyTo     { messageId: string; content: string; senderName: string }
 
@@ -164,13 +165,16 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
       storeData(key, msgs)
       markChatFresh(groupChatKey(group.id))
       loadedFor.current = group.id
-      setMessages(msgs)
+      // Keep bubbles still being sent; the fresh list doesn't have them yet.
+      setMessages(prev => [...msgs, ...prev.filter(m => m.id.startsWith('optimistic-'))])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load messages')
     } finally { setLoading(false) }
   }, [group.id, isPending, coerce])
 
   useEffect(() => { fetchMessages(true) }, [fetchMessages])
+  // Back from a hidden tab or offline: messages sent meanwhile never arrived live.
+  useCatchUp(() => { void fetchMessages(); reloadRequests() })
   // On close, keep what was on screen for a quick return (see ChatWindow).
   useEffect(() => {
     const id = group.id

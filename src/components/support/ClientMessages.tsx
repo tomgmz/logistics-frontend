@@ -17,6 +17,7 @@ import MessageItem from '@/components/messaging/MessageItem'
 import { BookingMentionMenu, useBookingMentionPicker } from '@/components/messaging/BookingMention'
 import JumpToLatest from '@/components/messaging/JumpToLatest'
 import { cachedData, cachedFetch } from '@/lib/query/useApiQuery'
+import { useCatchUp } from '@/lib/hooks/useLiveTable'
 
 /**
  * The client's messages, inside the help assistant rather than the staff
@@ -101,6 +102,8 @@ export function useClientMessages(userId: string | undefined, visible: boolean) 
   // Loaded once for the unread badge, and again whenever the tab is shown:
   // which drivers can be messaged follows the bookings' status.
   useEffect(() => { void refresh() }, [refresh])
+  // Back from a hidden tab or offline: changes made meanwhile never arrived live.
+  useCatchUp(() => { void refresh() })
   useEffect(() => { if (visible) void refresh() }, [visible, refresh])
 
   const totalUnread = useMemo(() => conversations.reduce((n, c) => n + c.unread_count, 0), [conversations])

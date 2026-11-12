@@ -19,6 +19,7 @@ import { codingFlagFor } from '@/lib/number-coding'
 import { OFFICE_CLOSE_HOUR, OFFICE_HOURS_LABEL, OFFICE_OPEN_HOUR } from '@/lib/office-hours'
 import { MapPointLink } from '@/components/map/LocationMapModal'
 import { cachedFetch } from '@/lib/query/useApiQuery'
+import { useLiveTable } from '@/lib/hooks/useLiveTable'
 
 /**
  * Staff view of the pauses on one booking: a way to pause a delivery in
@@ -137,6 +138,8 @@ export default function PausePanel({ bookingId, pausedAt, inTransit, canControl,
   }, [bookingId])
 
   useEffect(() => { void load() }, [load, pausedAt])
+  // Live: a continuation date or note set by someone else shows at once.
+  useLiveTable(['live:bookings'], () => { void load() })
 
   const open = pauses.find((p) => !p.resumed_at) ?? null
   const past = pauses.filter((p) => !!p.resumed_at)

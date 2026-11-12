@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import {
   AlertCircle, AlertTriangle, Building2, Camera, ClipboardCheck, Package,
   Route as RouteIcon, ShieldCheck, Truck, User, Video,
@@ -533,6 +534,17 @@ export default function TransactionRecord({ booking }: { booking: Booking }) {
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [bookingId])
+
+  // Live (2026-11-12): the booking above this record updates live, so the
+  // record must too. Otherwise a booking approved while the panel is open
+  // reads "approved" with the old record's empty approver, which shows as
+  // "approver not recorded". Same for assignment, completion, trips, reports.
+  // Quiet: the record on screen stays until the fresh one lands.
+  useLiveTable(['live:bookings', 'live:driver_reports'], () => {
+    transactionHistoryService.record(bookingId)
+      .then((r) => { setRecord(r); setError(null) })
+      .catch(() => {})
+  }, { debounceMs: 1500 })
 
   return (
     <div className="flex flex-col gap-[18px]">

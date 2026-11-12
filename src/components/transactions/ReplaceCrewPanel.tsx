@@ -24,6 +24,7 @@ import { PALETTE } from '@/lib/palette'
 import { BORDER_C, CYAN, MUTED } from './transaction-theme'
 import { FileViewButton } from '@/components/ui/FileViewer'
 import { cachedFetch } from '@/lib/query/useApiQuery'
+import { useLiveTable } from '@/lib/hooks/useLiveTable'
 
 const ORANGE = PALETTE.orange
 
@@ -138,6 +139,9 @@ export default function ReplaceCrewPanel({
     } catch { setHistory([]) }
   }, [bookingId])
   useEffect(() => { void load() }, [load, paused])
+  // Live: a replacement made by someone else joins the history (the form is
+  // not touched).
+  useLiveTable(['live:bookings'], () => { void load() })
 
   useBodyScrollLock(open)
   useEffect(() => {
