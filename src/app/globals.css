@@ -365,6 +365,14 @@
   .ff-darker .ff-chat {
     font-family: var(--font-darker), 'Darker Grotesque', sans-serif;
   }
+  /* Table data in Darker Grotesque: a tbody or cell set to regular Alegreya
+     Sans (.ff-body / .ff-regular / .ff-chat) switches too (same layer, more
+     specific). Anything in Alegreya Sans SC stays: .ff-sc, .t-badge and the
+     font-[…alegreya-sc] status cells (user 2026-11-13). */
+  .data-table > tbody:is(.ff-body, .ff-regular, .ff-chat),
+  .data-table > tbody :is(.ff-body, .ff-regular, .ff-chat) {
+    font-family: var(--font-darker), 'Darker Grotesque', sans-serif;
+  }
   .ff-darker .ff-keep-sc {
     font-family: var(--font-alegreya-sc), 'Alegreya Sans SC', sans-serif;
   }
@@ -816,16 +824,18 @@
   /* Headers sit at the left of their column, over the data (browsers centre
      <th> by default). Layered, so a column's own text-right still wins. */
   .data-table > thead > tr > th { text-align: left; }
+  /* Table data in Darker Grotesque (user 2026-11-13); headers and the
+     .t-badge pills stay Alegreya Sans SC. */
   .data-table > tbody {
-    font-family: var(--font-alegreya), 'Alegreya Sans', sans-serif;
+    font-family: var(--font-darker), 'Darker Grotesque', sans-serif;
     font-size: 14px;
     font-weight: 700;
     color: #ffffff;
   }
   /* The row's name (or date): bold cyan, 18px at 1920. */
-  .t-name { font-family: var(--font-alegreya), 'Alegreya Sans', sans-serif; font-weight: 700; font-size: 15px; line-height: 1.15; color: #4df9ed; }
+  .t-name { font-family: var(--font-darker), 'Darker Grotesque', sans-serif; font-weight: 700; font-size: 15px; line-height: 1.15; color: #4df9ed; }
   /* The small second line under it ([Time], [Role]). */
-  .t-sub  { font-family: var(--font-alegreya), 'Alegreya Sans', sans-serif; font-weight: 700; font-size: 12px; line-height: 1.15; color: #ffffff; }
+  .t-sub  { font-family: var(--font-darker), 'Darker Grotesque', sans-serif; font-weight: 700; font-size: 12px; line-height: 1.15; color: #ffffff; }
   /* The pill every status, role and type is drawn in: small caps, 25px, 0.5px border. */
   .t-badge {
     display: inline-flex; align-items: center; justify-content: center;
