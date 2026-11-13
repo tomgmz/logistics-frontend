@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from 'next';
 import ThemeRegistry from '@/components/ui/ThemeRegistry';
 import CsrfInit from '@/components/CsrfInit';
 import IosViewportFix from '@/components/IosViewportFix';
-import WheelAxisLock from '@/components/layout/WheelAxisLock';
 import { alegreyaSansSC, alegreyaSans, aboreto, fredoka, leagueSpartan, eurostile, darkerGrotesque } from '@/app/fonts';
 import StoreProvider from '@/lib/store/StoreProvider';
 import QueryProvider from '@/lib/query/QueryProvider';
@@ -50,7 +49,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         style={{ fontFamily: 'var(--font-alegreya-sc)' }}>
         <CsrfInit />
         <IosViewportFix />
-        <WheelAxisLock />
         <QueryProvider>
           <StoreProvider>
             <AuthRehydrator />
