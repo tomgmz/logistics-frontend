@@ -12,8 +12,8 @@ const theme = createTheme({
     background: { default: '#0a0a0a', paper: '#1b1b1b' },
   },
   typography: {
-    fontFamily: '"Alegreya Sans SC", sans-serif',
-    button: { textTransform: 'none', fontFamily: '"Alegreya Sans SC", sans-serif' },
+    fontFamily: 'var(--font-alegreya-sc), "Alegreya Sans SC", sans-serif',
+    button: { textTransform: 'none', fontFamily: 'var(--font-alegreya-sc), "Alegreya Sans SC", sans-serif' },
   },
   shape: { borderRadius: 15 },
   components: {

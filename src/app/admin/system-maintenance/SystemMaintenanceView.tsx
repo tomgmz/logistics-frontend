@@ -1004,7 +1004,7 @@ export default function SystemMaintenanceView() {
                 </button>
               </div>
               <div
-                className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4"
+                className="sheet-form flex-1 min-h-0 overflow-y-auto overscroll-contain p-4"
                 style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
               >
                 {renderForm()}
@@ -1090,7 +1090,10 @@ function EditingChip({ label, onCancel }: { label: string; onCancel: () => void 
 function SubmitBtn({ label, busy, onClick, disabled = false, icon = true }: {
   label: string; busy: boolean; onClick: () => void; disabled?: boolean; icon?: boolean
 }) {
+  // In the phone/tablet sheet (.sheet-form) the button stays pinned to the
+  // bottom while the form scrolls; inline on desktop it sits after the fields.
   return (
+    <div className="[.sheet-form_&]:sticky [.sheet-form_&]:bottom-0 [.sheet-form_&]:z-10 [.sheet-form_&]:-mx-4 [.sheet-form_&]:-mb-4 [.sheet-form_&]:px-4 [.sheet-form_&]:py-3 [.sheet-form_&]:border-t [.sheet-form_&]:border-white/[0.07] [.sheet-form_&]:bg-[var(--color-surface,#111)]">
     <button
       type="button"
       disabled={busy || disabled}
@@ -1105,6 +1108,7 @@ function SubmitBtn({ label, busy, onClick, disabled = false, icon = true }: {
       {icon && <Plus size={15} />}
       {busy ? 'Saving…' : label}
     </button>
+    </div>
   )
 }
 

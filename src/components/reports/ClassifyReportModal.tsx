@@ -49,7 +49,7 @@ export default function ClassifyReportModal({
             role="dialog"
             aria-modal="true"
             aria-label="Classify report"
-            className="w-full max-w-md rounded-2xl border border-white/10 bg-[var(--color-surface)] shadow-2xl"
+            className="w-full max-w-md max-h-[90dvh] overflow-y-auto overscroll-contain rounded-2xl border border-white/10 bg-[var(--color-surface)] shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.07]">
@@ -100,7 +100,7 @@ export default function ClassifyReportModal({
               </p>
             </div>
 
-            <div className="flex justify-end gap-2 px-4 py-3 border-t border-white/[0.07]">
+            <div className="sticky bottom-0 z-10 bg-[var(--color-surface)] flex justify-end gap-2 px-4 py-3 border-t border-white/[0.07]">
               <button
                 type="button"
                 onClick={onCancel}

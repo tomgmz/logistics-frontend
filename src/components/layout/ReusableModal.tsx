@@ -147,22 +147,23 @@ export default function ReusableModal({
             animate="visible"
             exit="exit"
             onClick={(e) => e.stopPropagation()}
-            className="relative flex flex-col w-full rounded-t-[18px] sm:rounded-[20px] max-w-full sm:max-w-[420px] md:max-w-[480px]"
+            className="relative flex flex-col w-full max-h-[90dvh] rounded-t-[18px] sm:rounded-[20px] max-w-full sm:max-w-[420px] md:max-w-[480px]"
             style={{ backgroundColor: "#424242" }}
           >
             <div
-              className="flex justify-center pt-2.5 pb-1 sm:hidden"
+              className="shrink-0 flex justify-center pt-2.5 pb-1 sm:hidden"
               aria-hidden
             >
               <div className="w-8 h-[3px] rounded-full bg-white/25" />
             </div>
 
-            <div className="px-5 sm:px-7 pt-4 sm:pt-5 pb-3">
+            {/* Only the content scrolls; the buttons below stay in view. */}
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 sm:px-7 pt-4 sm:pt-5 pb-3">
               <h2
                 id="modal-title"
                 className="m-0 text-white break-words"
                 style={{
-                  fontFamily: "'Alegreya Sans SC', sans-serif",
+                  fontFamily: "var(--font-alegreya-sc), 'Alegreya Sans SC', sans-serif",
                   fontWeight: 700,
                   fontSize: "clamp(15px, 3.5vw, 20px)",
                   lineHeight: "1.25",
@@ -189,7 +190,7 @@ export default function ReusableModal({
               {children}
             </div>
 
-            <div className="flex flex-col-reverse gap-2 px-5 pt-2 pb-7 sm:flex-row sm:justify-end sm:px-7 sm:pb-5 sm:pt-1">
+            <div className="shrink-0 flex flex-col-reverse gap-2 px-5 pt-2 pb-7 sm:flex-row sm:justify-end sm:px-7 sm:pb-5 sm:pt-1">
               {!hideCancel && <motion.button
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.96 }}
@@ -198,7 +199,7 @@ export default function ReusableModal({
                 style={{
                   border: "1px solid #818181",
                   background: "transparent",
-                  fontFamily: "'Alegreya Sans SC', sans-serif",
+                  fontFamily: "var(--font-alegreya-sc), 'Alegreya Sans SC', sans-serif",
                   fontWeight: 400,
                   fontSize: "clamp(13px, 2.5vw, 15px)",
                 }}
@@ -217,7 +218,7 @@ export default function ReusableModal({
                 style={{
                   backgroundColor: "rgba(255,255,255,0.10)",
                   border: "none",
-                  fontFamily: "'Alegreya Sans SC', sans-serif",
+                  fontFamily: "var(--font-alegreya-sc), 'Alegreya Sans SC', sans-serif",
                   fontWeight: 400,
                   fontSize: "clamp(13px, 2.5vw, 15px)",
                 }}
@@ -347,22 +348,23 @@ export function RemarksModal({
             animate="visible"
             exit="exit"
             onClick={(e) => e.stopPropagation()}
-            className="relative flex flex-col w-full rounded-t-[18px] sm:rounded-[20px] max-w-full sm:max-w-[420px] md:max-w-[480px]"
+            className="relative flex flex-col w-full max-h-[90dvh] rounded-t-[18px] sm:rounded-[20px] max-w-full sm:max-w-[420px] md:max-w-[480px]"
             style={{ backgroundColor: "#424242" }}
           >
             <div
-              className="flex justify-center pt-2.5 pb-1 sm:hidden"
+              className="shrink-0 flex justify-center pt-2.5 pb-1 sm:hidden"
               aria-hidden
             >
               <div className="w-8 h-[3px] rounded-full bg-white/25" />
             </div>
 
-            <div className="px-5 sm:px-7 pt-4 sm:pt-5 pb-3 space-y-3">
+            {/* Only the content scrolls; the buttons below stay in view. */}
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 sm:px-7 pt-4 sm:pt-5 pb-3 space-y-3">
               <h2
                 id="remarks-modal-title"
                 className="m-0 text-white break-words"
                 style={{
-                  fontFamily: "'Alegreya Sans SC', sans-serif",
+                  fontFamily: "var(--font-alegreya-sc), 'Alegreya Sans SC', sans-serif",
                   fontWeight: 700,
                   fontSize: "clamp(15px, 3.5vw, 20px)",
                   lineHeight: "1.25",
@@ -376,7 +378,7 @@ export function RemarksModal({
                 <p
                   className="m-0 text-white/75 break-words"
                   style={{
-                    fontFamily: "'Alegreya Sans SC', sans-serif",
+                    fontFamily: "var(--font-alegreya-sc), 'Alegreya Sans SC', sans-serif",
                     fontWeight: 400,
                     fontSize: "clamp(12px, 2.8vw, 15px)",
                     lineHeight: "1.55",
@@ -407,7 +409,7 @@ export function RemarksModal({
               </div>
             </div>
 
-            <div className="flex flex-col-reverse gap-2 px-5 pt-2 pb-7 sm:flex-row sm:justify-end sm:px-7 sm:pb-5 sm:pt-1">
+            <div className="shrink-0 flex flex-col-reverse gap-2 px-5 pt-2 pb-7 sm:flex-row sm:justify-end sm:px-7 sm:pb-5 sm:pt-1">
               <motion.button
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.96 }}
@@ -418,7 +420,7 @@ export function RemarksModal({
                 style={{
                   border: "1px solid #818181",
                   background: "transparent",
-                  fontFamily: "'Alegreya Sans SC', sans-serif",
+                  fontFamily: "var(--font-alegreya-sc), 'Alegreya Sans SC', sans-serif",
                   fontWeight: 400,
                   fontSize: "clamp(13px, 2.5vw, 15px)",
                 }}
@@ -451,7 +453,7 @@ export function RemarksModal({
                   border:
                     `1px solid rgba(${toneStyle.rgb},0.35)`,
                   fontFamily:
-                    "'Alegreya Sans SC', sans-serif",
+                    "var(--font-alegreya-sc), 'Alegreya Sans SC', sans-serif",
                   fontWeight: 400,
                   fontSize: "clamp(13px, 2.5vw, 15px)",
                   color: toneStyle.solid,

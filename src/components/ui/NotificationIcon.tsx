@@ -299,7 +299,7 @@ function NotifDetailModal({
               </button>
             </div>
 
-            <div className="overflow-y-auto px-5 sm:px-6 pb-6 flex flex-col gap-5">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 sm:px-6 pb-6 flex flex-col gap-5">
               <div
                 className="rounded-xl bg-white/[0.04] px-4 py-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm"
                 style={{ fontFamily: "'Darker Grotesque', sans-serif" }}
@@ -346,18 +346,20 @@ function NotifDetailModal({
                   ))}
                 </dl>
               )}
-
-              {url && (
-                <button
-                  onClick={() => onTakeAction(url)}
-                  className="self-center flex items-center justify-center gap-2 w-full sm:w-auto sm:px-8 rounded-xl py-2.5 text-[11px] tracking-widest uppercase font-bold cursor-pointer transition-opacity hover:opacity-85 bg-[var(--color-cyan,#4df9ed)] text-[#0a0a0a] border-none"
-                  style={{ fontFamily: "'Aboreto', sans-serif" }}
-                >
-                  Take action
-                  <ChevronRight size={14} />
-                </button>
-              )}
             </div>
+            {/* Fixed under the scrolling details, never scrolled away. */}
+            {url && (
+              <div className="shrink-0 flex flex-col px-5 sm:px-6 pt-3 pb-6 border-t border-white/[0.06]">
+                  <button
+                    onClick={() => onTakeAction(url)}
+                    className="self-center flex items-center justify-center gap-2 w-full sm:w-auto sm:px-8 rounded-xl py-2.5 text-[11px] tracking-widest uppercase font-bold cursor-pointer transition-opacity hover:opacity-85 bg-[var(--color-cyan,#4df9ed)] text-[#0a0a0a] border-none"
+                    style={{ fontFamily: "'Aboreto', sans-serif" }}
+                  >
+                    Take action
+                    <ChevronRight size={14} />
+                  </button>
+              </div>
+            )}
           </motion.div>
         </motion.div>
       )}

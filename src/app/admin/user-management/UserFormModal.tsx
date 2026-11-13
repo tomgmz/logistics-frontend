@@ -112,6 +112,15 @@ function lockValuesOf(keys: Iterable<string>, state: FormState): Record<string, 
 /** Same license number, ignoring dashes and spaces. */
 const sameLicenseNumber = (a: unknown, b: unknown) =>
   String(a ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '') === String(b ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '')
+/**
+ * Types an LTO license number as A01-23-456789: capitals only, the dashes put
+ * in by themselves (after the 3rd and 5th character, once the next one is
+ * typed, so Backspace over a dash works), nothing past 11 characters.
+ */
+const formatLicenseNumber = (raw: string) => {
+  const c = raw.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 11)
+  return [c.slice(0, 3), c.slice(3, 5), c.slice(5)].filter(Boolean).join('-')
+}
 /** Names compared without accents (a worn Ñ scans as N) or case. */
 const nameKey = (v: unknown) => String(v ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z]+/g, ' ').trim()
 
@@ -1206,7 +1215,8 @@ export default function UserFormModal({
                     {...scanned('license_number').input}
                     className={scanned('license_number').lockedClass}
                     value={form.license_number as string}
-                    onChange={e => set('license_number', e.target.value.toUpperCase().replace(/\s+/g, ''))}
+                    onChange={e => set('license_number', formatLicenseNumber(e.target.value))}
+                    autoCapitalize="characters" spellCheck={false} autoComplete="off" maxLength={13}
                     placeholder="N01-23-456789"
                     error={fe.license_number}
                   />
@@ -1284,7 +1294,7 @@ export default function UserFormModal({
             </fieldset>
 
             {viewing ? (
-            <div className="flex items-center justify-end gap-3 border-t border-[#2a2a2a] pt-5 mt-1">
+            <div className="sticky bottom-0 z-10 -mx-6 -mb-6 px-6 pb-6 bg-[#1b1b1b] flex items-center justify-end gap-3 border-t border-[#2a2a2a] pt-5 mt-1">
               <button
                 type="button"
                 onClick={onClose}
@@ -1306,7 +1316,7 @@ export default function UserFormModal({
               ))}
             </div>
             ) : (
-            <div className="flex justify-end gap-3 border-t border-[#2a2a2a] pt-5 mt-1">
+            <div className="sticky bottom-0 z-10 -mx-6 -mb-6 px-6 pb-6 bg-[#1b1b1b] flex justify-end gap-3 border-t border-[#2a2a2a] pt-5 mt-1">
               <button
                 type="button"
                 onClick={requestCancel}

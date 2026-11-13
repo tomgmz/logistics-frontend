@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Navbar from '@/components/layout/Navbar';
 import SignedOutNotice from '@/components/layout/SignedOutNotice';
 import SiteFooter from '@/components/layout/SiteFooter';
+import LandingMarker from '@/components/layout/LandingMarker';
 import HeroSection from '@/components/sections/HeroSection';
 import AboutSection from '@/components/sections/AboutSection';
 import ServicesSection from '@/components/sections/ServicesSection';
@@ -36,6 +37,7 @@ export default async function HomePage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(WEBSITE_JSON_LD) }}
       />
+      <LandingMarker />
       <SignedOutNotice />
       <Navbar />
       <main>

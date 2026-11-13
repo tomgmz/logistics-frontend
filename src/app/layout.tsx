@@ -40,8 +40,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html 
       lang="en" 
       className={cn("scroll-smooth", alegreyaSansSC.variable, alegreyaSans.variable, aboreto.variable, fredoka.variable, leagueSpartan.variable, eurostile.variable, darkerGrotesque.variable, "font-sans", geist.variable)}
+      // "&" in small caps looks unlike an ampersand: 'Alegreya Amp' (globals.css,
+      // unicode-range U+0026 only) draws it in regular Alegreya Sans, and every
+      // other character falls through to the SC face.
+      style={{ ['--font-alegreya-sc' as string]: `'Alegreya Amp', ${alegreyaSansSC.style.fontFamily}` }}
     >
-      <body suppressHydrationWarning className={`bg-[#0a0a0a] text-white overflow-x-hidden ${alegreyaSansSC.className}`}>
+      <body suppressHydrationWarning className={`bg-[#0a0a0a] text-white overflow-x-hidden ${alegreyaSansSC.className}`}
+        style={{ fontFamily: 'var(--font-alegreya-sc)' }}>
         <CsrfInit />
         <IosViewportFix />
         <QueryProvider>

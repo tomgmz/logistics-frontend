@@ -4,6 +4,78 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/*
+ * 'Alegreya Amp': only the "&" (unicode-range U+0026) from regular Alegreya
+ * Sans, ~3 KB per weight (public/fonts/amp, Google Fonts subset, OFL). Placed
+ * first in every small-caps font list (--font-alegreya-sc in layout.tsx, the
+ * literal 'Alegreya Sans SC' stacks), so SC text shows a real ampersand
+ * (user 2026-11-13). Other characters never load or use it.
+ */
+@font-face {
+  font-family: 'Alegreya Amp';
+  src: url('/fonts/amp/alegreya-sans-amp-300-normal.woff2') format('woff2');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0026;
+}
+@font-face {
+  font-family: 'Alegreya Amp';
+  src: url('/fonts/amp/alegreya-sans-amp-400-normal.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0026;
+}
+@font-face {
+  font-family: 'Alegreya Amp';
+  src: url('/fonts/amp/alegreya-sans-amp-500-normal.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0026;
+}
+@font-face {
+  font-family: 'Alegreya Amp';
+  src: url('/fonts/amp/alegreya-sans-amp-700-normal.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0026;
+}
+@font-face {
+  font-family: 'Alegreya Amp';
+  src: url('/fonts/amp/alegreya-sans-amp-300-italic.woff2') format('woff2');
+  font-weight: 300;
+  font-style: italic;
+  font-display: swap;
+  unicode-range: U+0026;
+}
+@font-face {
+  font-family: 'Alegreya Amp';
+  src: url('/fonts/amp/alegreya-sans-amp-400-italic.woff2') format('woff2');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+  unicode-range: U+0026;
+}
+@font-face {
+  font-family: 'Alegreya Amp';
+  src: url('/fonts/amp/alegreya-sans-amp-500-italic.woff2') format('woff2');
+  font-weight: 500;
+  font-style: italic;
+  font-display: swap;
+  unicode-range: U+0026;
+}
+@font-face {
+  font-family: 'Alegreya Amp';
+  src: url('/fonts/amp/alegreya-sans-amp-700-italic.woff2') format('woff2');
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+  unicode-range: U+0026;
+}
+
 @custom-variant dark (&:is(.dark *));
 /* Screens with little height (laptops, landscape phones): the landing page
    tightens spacing so each section still fits on one screen. */
@@ -849,4 +921,22 @@
     .t-sub   { font-size: 14px; }
     .t-badge { height: 25px; font-size: 15px; }
   }
+}
+
+/*
+ * Every text field on the web in Darker Grotesque (user 2026-11-13): typed
+ * text and placeholder of native inputs, textareas and MUI text fields
+ * (TextField, Autocomplete, date pickers' input). !important on purpose: MUI's
+ * theme, inline styles (sign-in) and Tailwind font classes all set fonts on
+ * inputs, and the rule must reach every one. Checkboxes, radios, sliders,
+ * colour/file pickers and buttons are not text fields and are left alone;
+ * so is the MUI Select's shown value (a dropdown, not typing). The landing
+ * page keeps its own fonts: it sets <html data-landing> (LandingMarker).
+ */
+html:not([data-landing]) input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"], [type="button"], [type="submit"], [type="reset"], [type="image"], [type="hidden"]),
+html:not([data-landing]) textarea,
+html:not([data-landing]) .MuiInputBase-input:not(.MuiSelect-select),
+html:not([data-landing]) input::placeholder,
+html:not([data-landing]) textarea::placeholder {
+  font-family: var(--font-darker), 'Darker Grotesque', sans-serif !important;
 }

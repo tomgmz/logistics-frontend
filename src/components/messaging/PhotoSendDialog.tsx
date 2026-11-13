@@ -122,7 +122,7 @@ function PhotoSendPanel({ file, onCancel, onSend }: {
           <motion.div
             initial={{ opacity: 0, scale: 0.94, y: 12 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.94, y: 12 }}
             transition={{ duration: 0.18 }}
-            className="w-full max-w-md bg-[var(--color-bg)] border border-white/[0.09] rounded-2xl shadow-2xl p-5 flex flex-col gap-4"
+            className="w-full max-w-md max-h-[90dvh] overflow-y-auto overscroll-contain bg-[var(--color-bg)] border border-white/[0.09] rounded-2xl shadow-2xl p-5 flex flex-col gap-4"
           >
             <div className="flex items-center justify-between">
               <h3 id="photo-send-title" className="ff-body text-sm font-semibold text-white">Send a photo</h3>
@@ -157,7 +157,7 @@ function PhotoSendPanel({ file, onCancel, onSend }: {
 
             {error && <p className="ff-body text-xs text-red-400">{error}</p>}
 
-            <div className="flex gap-2">
+            <div className="sticky bottom-0 z-10 -mx-5 -mb-5 px-5 pt-1 pb-5 bg-[var(--color-bg)] flex gap-2">
               <button type="button" onClick={onCancel} disabled={busy}
                 className="flex-1 py-2 rounded-xl border border-white/10 ff-body text-sm text-white/70 hover:text-white transition-colors disabled:opacity-50">
                 Cancel

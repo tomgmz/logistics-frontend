@@ -748,8 +748,8 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete, archive 
 
               </fieldset>
 
-              {/* Footer */}
-              <div className="flex items-center justify-between gap-2 px-4 py-3 border-t border-white/[0.07]">
+              {/* Footer: pinned to the bottom while the form scrolls. */}
+              <div className="sticky bottom-0 z-10 bg-[var(--color-surface)] flex items-center justify-between gap-2 px-4 py-3 border-t border-white/[0.07]">
                 {formMode === 'edit' && editingModel && canDelete && (
                   <button
                     type="button"
