@@ -26,6 +26,7 @@ import { formatArrivalClock, formatArrivalWindow } from '@/lib/arrival-window'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { STOWAGE_FACTOR } from '@/lib/cargo/capacity'
 import DriverCallTime from './DriverCallTime'
+import ReusableModal from '@/components/layout/ReusableModal'
 import { writeAccess } from '@/components/layout/ModuleAccess'
 import { FileViewButton } from '@/components/ui/FileViewer'
 import { cachedFetch } from '@/lib/query/useApiQuery'
@@ -317,6 +318,8 @@ export default function TripPlanner({ detail, canEdit, allowed = true, capacity 
 
   const removeTrip = (key: string) =>
     setDrafts((prev) => (prev.length <= 1 ? prev : prev.filter((d) => d.key !== key)))
+  // The trash button asks first when the trip holds data; it leaves the draft only on Yes.
+  const [confirmRemove, setConfirmRemove] = useState<{ key: string; tripNo: number } | null>(null)
 
   /* ── Validation, mirroring the server ─────────────────────────────────── */
 
@@ -379,6 +382,18 @@ export default function TripPlanner({ detail, canEdit, allowed = true, capacity 
 
   return (
     <div className="rounded-xl border border-white/[0.08] p-3 space-y-3 bg-black/20">
+      <ReusableModal
+        open={!!confirmRemove}
+        title={`Remove trip ${confirmRemove?.tripNo ?? ''}?`}
+        description="Its drop-offs and quantities come off this plan, and those goods show as not on any trip until you put them on another one. Nothing is saved until you save the plan."
+        confirmLabel="Remove trip"
+        cancelLabel="Go back"
+        onCancel={() => setConfirmRemove(null)}
+        onConfirm={() => {
+          if (confirmRemove) removeTrip(confirmRemove.key)
+          setConfirmRemove(null)
+        }}
+      />
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <Repeat size={14} className="text-[var(--color-cyan)] shrink-0" />
@@ -463,7 +478,12 @@ export default function TripPlanner({ detail, canEdit, allowed = true, capacity 
                       {drafts.length > 1 && (
                         <button
                           type="button"
-                          onClick={() => removeTrip(draft.key)}
+                          onClick={() => {
+                            // An empty trip (no drop-off ticked, no quantity) goes at once; one with data asks first.
+                            const empty = draft.destinationIds.length === 0 && !Object.values(draft.qty).some((n) => Number(n) > 0)
+                            if (empty) removeTrip(draft.key)
+                            else setConfirmRemove({ key: draft.key, tripNo })
+                          }}
                           disabled={saving}
                           aria-label={`Remove trip ${tripNo}`}
                           className="p-1 rounded-md text-white/30 hover:text-red-400 transition-colors disabled:opacity-40"
