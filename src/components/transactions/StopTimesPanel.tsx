@@ -122,7 +122,10 @@ export default function StopTimesPanel({ bookingId, staff = false, canEdit = fal
   bookingId: string
   /** Staff read (with correction notes) from the admin route. */
   staff?:    boolean
-  /** Operations Manager / Company Administrator, and nobody else is editing the booking. */
+  /**
+   * Operations Manager / Company Administrator, nobody else is editing the
+   * booking, and the delivery has started (In Transit, Delivered, Completed).
+   */
   canEdit?:  boolean
   /** The Booking Management tier allows it. Read Only sees the edit buttons disabled. */
   allowed?:  boolean
@@ -200,7 +203,8 @@ export default function StopTimesPanel({ bookingId, staff = false, canEdit = fal
                 steps={UNLOADING_STEPS}
                 times={s}
                 workLabel="Unloading took"
-                canEdit={canEdit}
+                // A drop-off can't be reached before its run was loaded (server checks too).
+                canEdit={canEdit && (t.status === 'in_transit' || t.status === 'completed')}
                 allowed={allowed}
                 onEdit={(stage, label) => setEditing({
                   tripId: t.trip_id, tripStopId: s.trip_stop_id, stage, label,

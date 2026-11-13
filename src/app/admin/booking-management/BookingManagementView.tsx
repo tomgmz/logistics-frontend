@@ -2190,9 +2190,12 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
               leading={!forcedStatus && (
                 <TabsMinimal
                   label="Booking status"
-                  // "Delayed" sits after In Transit: in-transit bookings running late now.
-                  items={(['all', ...BOOKING_STATUSES.filter((s) => !hidePending || s !== 'pending')])
-                    .flatMap((key) => (key === 'in_transit' ? [key, 'delayed'] : [key]))
+                  // Tags, not statuses: "Resubmitted" after Pending (or first,
+                  // when Pending is hidden) = corrected by the client after a
+                  // rejection, any status now; "Delayed" after In Transit =
+                  // in-transit bookings running late now.
+                  items={(['all', ...(hidePending ? ['resubmitted'] : []), ...BOOKING_STATUSES.filter((s) => !hidePending || s !== 'pending')])
+                    .flatMap((key) => (key === 'in_transit' ? [key, 'delayed'] : key === 'pending' ? [key, 'resubmitted'] : [key]))
                     .map((key) => ({
                       id: key,
                       label: `${key === 'all' ? (hidePending ? 'All (active)' : 'All') : fmtStatus(key)} (${key === 'all' ? statusCounts.all : statusCounts[key] ?? 0})`,
@@ -2690,7 +2693,10 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                         <StopTimesPanel
                           bookingId={detail.booking_id}
                           staff
-                          canEdit={(roleView === 'admin' || roleView === 'operations_manager') && !bookingReadOnly}
+                          // Stop times are what happened on the road: nothing to
+                          // fill in before the delivery starts (server refuses too).
+                          canEdit={(roleView === 'admin' || roleView === 'operations_manager') && !bookingReadOnly
+                            && ['in_transit', 'delivered', 'completed'].includes(String(detail.status))}
                           allowed={canEdit}
                         />
 

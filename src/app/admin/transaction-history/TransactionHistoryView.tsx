@@ -64,6 +64,8 @@ const ERROR  = '#f62626'
 const TABS: { key: string; label: string }[] = [
   { key: 'all',        label: 'All' },
   { key: 'pending',    label: 'Pending' },
+  // Not a status: corrected and resubmitted by the client at least once (any status now).
+  { key: 'resubmitted', label: 'Resubmitted' },
   { key: 'approved',   label: 'Approved' },
   { key: 'assigned',   label: 'Assigned' },
   { key: 'in_transit', label: 'In Transit' },
