@@ -22,7 +22,10 @@ import { formatDuration } from '@/lib/duration'
 import { ProtectedImg } from '@/components/ui/FileViewer'
 import { cachedFetch } from '@/lib/query/useApiQuery'
 
-const SC = { fontFamily: "var(--font-alegreya-sc), 'Alegreya Sans SC', sans-serif" } as const
+// Text follows the page's --map-font (Transit Tracking: Darker Grotesque),
+// else Alegreya Sans SC; the status line keeps SC everywhere.
+const SC = { fontFamily: "var(--map-font, var(--font-alegreya-sc)), 'Alegreya Sans SC', sans-serif" } as const
+const STATUS_SC = { fontFamily: "var(--font-alegreya-sc), 'Alegreya Sans SC', sans-serif" } as const
 
 const STAGE_ICONS = [
   { Icon: CalendarClock, label: 'Scheduled'  },
@@ -290,7 +293,7 @@ export function DetailsPanelContent({
               {scheduleDate && (
                 <span className="rounded-full flex-shrink-0" style={{ width: 4, height: 4, background: 'var(--color-cyan, #4df9ed)' }} />
               )}
-              <span className="text-[11px] whitespace-nowrap" style={{ ...SC, color: 'var(--color-cyan, #4df9ed)' }}>
+              <span className="text-[11px] whitespace-nowrap" style={{ ...STATUS_SC, color: 'var(--color-cyan, #4df9ed)' }}>
                 {statusLbl}{callTime ? `, ${callTime}` : ''}
               </span>
             </>

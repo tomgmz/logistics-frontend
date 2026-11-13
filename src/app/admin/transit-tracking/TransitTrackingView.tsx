@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { CSSProperties } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps'
 import { PH_RESTRICTION, PH_MIN_ZOOM } from '@/lib/philippines-map'
@@ -36,7 +37,12 @@ const DEFAULT_CENTER = { lat: 14.5995, lng: 120.9842 }
 /** What the map shows: every truck on the road, or one booking's route and truck. */
 type MapMode = 'all' | 'single'
 
+// Status labels stay Alegreya Sans SC; everything else on Transit Tracking is
+// Darker Grotesque (user 2026-11-13), also inside the shared map components
+// through --map-font.
 const SC = { fontFamily: "var(--font-alegreya-sc), 'Alegreya Sans SC', sans-serif" } as const
+const DATA = { fontFamily: "var(--font-darker), 'Darker Grotesque', sans-serif" } as const
+const PAGE_FONT = { ...DATA, ['--map-font' as string]: "var(--font-darker), 'Darker Grotesque'" } as CSSProperties
 
 const FILTERS = ['All', 'Active', 'Pending', 'Completed'] as const
 type FilterKey = (typeof FILTERS)[number]
@@ -122,9 +128,9 @@ function TransitBookingRow({
       </div>
 
       <div className="flex justify-between items-end gap-2">
-        <span className="text-white text-[12px] truncate max-w-[50%]" style={SC}>{origin}</span>
+        <span className="text-white text-[12px] truncate max-w-[50%]" style={DATA}>{origin}</span>
         <div className="text-right min-w-0">
-          <div className="text-white text-[12px] truncate max-w-[120px]" style={SC}>{dest}</div>
+          <div className="text-white text-[12px] truncate max-w-[120px]" style={DATA}>{dest}</div>
           <div className="text-[11px] text-white/45">{booking.schedule_date}</div>
         </div>
       </div>
@@ -441,7 +447,7 @@ export default function TransitTrackingView() {
 
   return (
     <APIProvider apiKey={GOOGLE_MAPS_KEY} libraries={['routes']}>
-      <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-60px)] overflow-hidden" style={SC}>
+      <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-60px)] overflow-hidden" style={PAGE_FONT}>
         {/* No header bar over the map (status badge dropped, as on RouteMap) and
             no Refresh: the list follows live:bookings (trips, stops and
             drop-offs signal it too since 20261030000000). */}

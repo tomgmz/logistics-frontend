@@ -106,9 +106,9 @@ function BookingListItem({
       </div>
 
       <div className="flex justify-between items-end">
-        <span className=" text-white text-[12px] truncate max-w-[50%]" style={{ fontFamily: "var(--font-alegreya-sc), 'Alegreya Sans SC', sans-serif" }}>{origin}</span>
+        <span className=" text-white text-[12px] truncate max-w-[50%]" style={{ fontFamily: "var(--map-font, var(--font-alegreya-sc)), 'Alegreya Sans SC', sans-serif" }}>{origin}</span>
         <div className="text-right">
-          <div className="text-white text-[12px] truncate max-w-[100px]" style={{ fontFamily: "var(--font-alegreya-sc), 'Alegreya Sans SC', sans-serif" }}>{dest}</div>
+          <div className="text-white text-[12px] truncate max-w-[100px]" style={{ fontFamily: "var(--map-font, var(--font-alegreya-sc)), 'Alegreya Sans SC', sans-serif" }}>{dest}</div>
           <div className="text-[11px]" style={{ color: '#9f9c9c' }}>{booking.schedule_date}</div>
         </div>
       </div>
@@ -180,7 +180,7 @@ function EmptyMapState() {
         <LocalShippingIcon sx={{ fontSize: 64, color: 'var(--color-surface-dark)' }} />
       </motion.div>
       <div className="text-center">
-        <p className=" text-gray-600 text-lg font-bold" style={{ fontFamily: "var(--font-alegreya-sc), 'Alegreya Sans SC', sans-serif" }}>Select a booking to track</p>
+        <p className=" text-gray-600 text-lg font-bold" style={{ fontFamily: "var(--map-font, var(--font-alegreya-sc)), 'Alegreya Sans SC', sans-serif" }}>Select a booking to track</p>
         <p className="text-gray-700 text-sm mt-1">Choose a delivery from the list on the left</p>
       </div>
     </div>
@@ -530,7 +530,7 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
 
       <div
         className="hidden lg:flex h-dvh overflow-hidden flex-col"
-        style={{ fontFamily: "var(--font-alegreya-sc), 'Alegreya Sans SC', sans-serif", background: 'var(--color-bg)' }}
+        style={{ fontFamily: "var(--map-font, var(--font-alegreya-sc)), 'Alegreya Sans SC', sans-serif", background: 'var(--color-bg)' }}
       >
         <div className="flex flex-1 overflow-hidden">
           <div
@@ -582,7 +582,7 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
 
       <div
         className="hidden md:flex lg:hidden h-dvh overflow-hidden flex-col"
-        style={{ fontFamily: "var(--font-alegreya-sc), 'Alegreya Sans SC', sans-serif", background: 'var(--color-bg)' }}
+        style={{ fontFamily: "var(--map-font, var(--font-alegreya-sc)), 'Alegreya Sans SC', sans-serif", background: 'var(--color-bg)' }}
       >
         <div className="h-14 flex items-center justify-end px-4 flex-shrink-0 border-b"
           style={{ borderColor: 'var(--color-surface-dark)' }}>
@@ -616,7 +616,7 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
 
       <div
         className="flex md:hidden h-dvh overflow-hidden flex-col"
-        style={{ fontFamily: "var(--font-alegreya-sc), 'Alegreya Sans SC', sans-serif",background: 'var(--color-bg)' }}
+        style={{ fontFamily: "var(--map-font, var(--font-alegreya-sc)), 'Alegreya Sans SC', sans-serif",background: 'var(--color-bg)' }}
       >
         <div className="h-12 flex items-center justify-between px-4 flex-shrink-0 border-b"
           style={{ borderColor: 'var(--color-surface-dark)' }}>
@@ -642,7 +642,7 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
               style={{
                 color:       mobileView === key ? 'var(--color-cyan)' : '#555',
                 borderColor: mobileView === key ? 'var(--color-cyan)' : 'transparent',
-                fontFamily: "var(--font-alegreya-sc), 'Alegreya Sans SC', sans-serif",
+                fontFamily: "var(--map-font, var(--font-alegreya-sc)), 'Alegreya Sans SC', sans-serif",
               }}
             >
               {key === 'list' ? 'Bookings' : 'Map'}
