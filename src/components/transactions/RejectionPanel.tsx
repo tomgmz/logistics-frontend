@@ -6,7 +6,7 @@ import { Pencil, XCircle } from 'lucide-react'
 
 import type { BookingWithRelations } from '@/lib/types/booking-relations'
 import { bookingService } from '@/lib/services/client/booking.service'
-import { isAwaitingResubmit } from '@/lib/booking-resubmit'
+import { canResubmitAgain, isAwaitingResubmit, MAX_RESUBMISSIONS } from '@/lib/booking-resubmit'
 import { useBookingClosed } from '@/lib/contract-status'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { appToast } from '@/lib/toast'
@@ -35,6 +35,8 @@ export default function RejectionPanel({ booking, onUpdated, compact = false }: 
   const bookingId = booking.booking_id as string
   const reason    = booking.rejection_reason as string | null | undefined
   const byGm      = booking.gm_status === 'rejected'
+  // Already resubmitted the most times allowed: only Cancel is left.
+  const limitReached = !canResubmitAgain(booking)
 
   async function close() {
     setBusy(true)
@@ -68,7 +70,7 @@ export default function RejectionPanel({ booking, onUpdated, compact = false }: 
     </div>
   ) : (
     <div className="flex flex-wrap gap-2">
-      {!bookingClosed && (
+      {!bookingClosed && !limitReached && (
         <Link href={`/client/booking?resubmit=${encodeURIComponent(bookingId)}`}
           className={`inline-flex items-center gap-1.5 rounded-lg font-bold ${btn}`}
           style={{ background: CYAN, color: '#000' }}>
@@ -97,7 +99,9 @@ export default function RejectionPanel({ booking, onUpdated, compact = false }: 
       <div className="flex flex-col gap-1">
         {reason && <p className="text-[13px] text-white/85 whitespace-pre-wrap">Reason: {reason}</p>}
         <span className="text-[11px]" style={{ color: MUTED }}>
-          Edit the booking details and resubmit it for another review, or cancel it if you no longer need it.
+          {limitReached
+            ? `This booking was already resubmitted ${MAX_RESUBMISSIONS} times, the most allowed. Cancel it, and make a new booking if you still need the delivery.`
+            : 'Edit the booking details and resubmit it for another review, or cancel it if you no longer need it.'}
         </span>
       </div>
       {actions}

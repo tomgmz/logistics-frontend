@@ -15,6 +15,15 @@ export function isAwaitingResubmit(b: BookingWithRelations): boolean {
     && (b.gm_status === 'rejected' || !!b.cancelled_by)
 }
 
+/** How many times one booking can be corrected and resubmitted (server: MAX_RESUBMISSIONS). */
+export const MAX_RESUBMISSIONS = 3
+
+/** Whether the client may still correct and resubmit it; otherwise only Cancel is left. */
+export function canResubmitAgain(b: BookingWithRelations): boolean {
+  const used = Number((b as { resubmission_count?: unknown }).resubmission_count ?? 0) || 0
+  return isAwaitingResubmit(b) && used < MAX_RESUBMISSIONS
+}
+
 /** What the booking wizard is loaded with to correct a rejected booking. */
 export interface ResubmitDraft {
   bookingId:        string

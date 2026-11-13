@@ -10,7 +10,7 @@ import { useBookingStore } from '@/lib/store/booking.store'
 import { setStep, resetBooking, loadResubmitDraft } from '@/lib/store/booking.store'
 import { bookingService } from '@/lib/services/client/booking.service'
 import type { BookingWithRelations } from '@/lib/types/booking-relations'
-import { bookingToResubmitDraft, isAwaitingResubmit } from '@/lib/booking-resubmit'
+import { bookingToResubmitDraft, canResubmitAgain, isAwaitingResubmit, MAX_RESUBMISSIONS } from '@/lib/booking-resubmit'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { appToast } from '@/lib/toast'
 import { loadDraftFiles, saveDraftFiles } from '@/lib/store/booking-draft'
@@ -62,6 +62,11 @@ function ResubmitLoader({ onLoaded, onLoading }: {
         if (cancelled) return
         if (!booking || !isAwaitingResubmit(booking)) {
           appToast.error('This booking can no longer be edited and resubmitted.')
+          router.replace('/client/booking')
+          return
+        }
+        if (!canResubmitAgain(booking)) {
+          appToast.error(`This booking was already resubmitted ${MAX_RESUBMISSIONS} times, the most allowed. Cancel it and make a new booking instead.`)
           router.replace('/client/booking')
           return
         }

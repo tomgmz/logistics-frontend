@@ -77,6 +77,7 @@ import CompletionPanel from '@/components/transactions/CompletionPanel'
 import { formatPlateNumber, plateError } from '@/lib/validation/plate'
 import ProblemReportedBadge, { hasOpenClientIssue } from '@/components/transactions/ProblemReportedBadge'
 import ResubmittedBadge, { resubmissionsOf } from '@/components/transactions/ResubmittedBadge'
+import { MAX_RESUBMISSIONS } from '@/lib/booking-resubmit'
 import SharedDelayedBadge from '@/components/transactions/DelayedBadge'
 import ResubmissionChanges from '@/components/transactions/ResubmissionChanges'
 import ReplaceCrewPanel from '@/components/transactions/ReplaceCrewPanel'
@@ -2112,7 +2113,13 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
         // Remarks are the point of a rejection on either path: the GM endpoint
         // and the admin status endpoint both store them and send them on to the
         // client with the rejection notification.
-        description="This booking will be cancelled and the client notified. Your remarks are sent to them, so explain why it was not approved."
+        description={
+          'This booking will be cancelled and the client notified. Your remarks are sent to them, so explain why it was not approved.' +
+          // The client's last chance was used: after this they can only cancel it.
+          (detail && resubmissionsOf(detail) >= MAX_RESUBMISSIONS
+            ? ` It was already resubmitted ${MAX_RESUBMISSIONS} times, so the client cannot resubmit it again; they would have to make a new booking.`
+            : '')
+        }
         remarksLabel="Remarks — why this booking was not approved"
         remarksPlaceholder="e.g. Incomplete documents, route not serviceable, margin below threshold…"
         confirmLabel="Reject"
