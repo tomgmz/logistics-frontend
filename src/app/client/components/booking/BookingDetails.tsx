@@ -88,6 +88,19 @@ const PALLET_DIMENSIONS: Record<
   Custom:   { palletLength: '',    palletWidth: '',    palletHeight: '' },
 }
 
+// The pallet type that matches a typed length × width (cm), either way round
+// (a 80 × 120 pallet is the same Euro pallet turned); anything else is Custom.
+function palletTypeFor(length: string, width: string): ItemGroup['palletType'] {
+  const l = Number(length), w = Number(width)
+  if (!length.trim() || !width.trim() || !Number.isFinite(l) || !Number.isFinite(w)) return 'Custom'
+  for (const type of ['Standard', 'Euro', 'Half'] as const) {
+    const p = PALLET_DIMENSIONS[type]
+    const pl = Number(p.palletLength), pw = Number(p.palletWidth)
+    if ((l === pl && w === pw) || (l === pw && w === pl)) return type
+  }
+  return 'Custom'
+}
+
 const MAX_DOC_SIZE_BYTES = 10 * 1024 * 1024
 const MAX_DOC_COUNT      = 3
 const ALLOWED_EXTENSIONS = ['.pdf', '.docx', '.xlsx']
@@ -1454,7 +1467,15 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                                       {(['palletLength', 'palletWidth', 'palletHeight'] as const).map((dim) => (
                                         <div key={dim} className="flex flex-col gap-0.5 flex-1 min-w-0">
                                           <TextField value={g[dim]}
-                                            onChange={(e) => setGroupField(section.dropoffIndex, g.id, dim, decimalOnly(e.target.value))}
+                                            onChange={(e) => {
+                                              const value = decimalOnly(e.target.value)
+                                              if (dim === 'palletHeight') { setGroupField(section.dropoffIndex, g.id, dim, value); return }
+                                              // Length × width decide the pallet type: a preset's size selects it, any other size is Custom.
+                                              const length = dim === 'palletLength' ? value : g.palletLength
+                                              const width  = dim === 'palletWidth'  ? value : g.palletWidth
+                                              touchField(`${g.id}:${dim}`)
+                                              handleUpdateGroup(section.dropoffIndex, g.id, { [dim]: value, palletType: palletTypeFor(length, width) })
+                                            }}
                                             onBlur={() => touchField(`${g.id}:${dim}`)}
                                             inputProps={{ inputMode: 'decimal' }}
                                             placeholder={dim === 'palletLength' ? 'L' : dim === 'palletWidth' ? 'W' : 'H'}
