@@ -36,19 +36,28 @@ export default function PhoneInputRow({
   onChange,
   placeholder = '929-2143-537',
   error,
+  id,
+  prefixClassName,
+  inputClassName,
 }: {
   /** Local digits, without the +63. */
   value: string
   onChange: (digits: string) => void
   placeholder?: string
   error?: string
+  id?: string
+  /** Replace the default look (e.g. the landing page's own field style). */
+  prefixClassName?: string
+  inputClassName?: string
 }) {
   return (
     <div className="flex">
-      <span className="flex items-center rounded-l-[10px] border border-r-0 border-[#424242] bg-[#232323] px-3 text-[13px] font-medium text-[#818181] select-none">
+      <span className={prefixClassName ?? 'flex items-center rounded-l-[10px] border border-r-0 border-[#424242] bg-[#232323] px-3 text-[13px] font-medium text-[#818181] select-none'}>
         +63
       </span>
       <input
+        id={id}
+        aria-invalid={!!error}
         type="tel"
         inputMode="numeric"
         autoComplete="tel-national"
@@ -61,7 +70,7 @@ export default function PhoneInputRow({
         }}
         placeholder={placeholder}
         maxLength={MAX_DIGITS + Math.floor(MAX_DIGITS / 3)}
-        className={`${inputBase} rounded-l-none ${error ? 'border-red-500/60' : ''}`}
+        className={inputClassName ?? `${inputBase} rounded-l-none ${error ? 'border-red-500/60' : ''}`}
       />
     </div>
   )

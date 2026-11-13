@@ -9,9 +9,10 @@ import {
   fieldErrors,
   firstNameField,
   lastNameField,
-  normalizePhMobile,
   optionalMobileField,
+  toNameCase,
 } from '@/lib/validation/fields';
+import PhoneInputRow, { attachCountryCode } from '@/components/ui/PhoneInputRow';
 
 // Same name / email / phone rules as every account in the system; the backend
 // (POST /api/public/contact) checks them again before emailing the company.
@@ -50,14 +51,27 @@ const TEXT_FIELDS: {
   label:        string;
   type:         string;
   autoComplete: string;
-  placeholder?: string;
+  maxLength?:   number;
   optional?:    boolean;
 }[] = [
-  { key: 'first_name', label: 'First Name', type: 'text',  autoComplete: 'given-name' },
-  { key: 'last_name',  label: 'Last Name',  type: 'text',  autoComplete: 'family-name' },
-  { key: 'email',      label: 'Email',      type: 'email', autoComplete: 'email' },
-  { key: 'phone',      label: 'Phone',      type: 'tel',   autoComplete: 'tel', placeholder: '0917 123 4567', optional: true },
+  { key: 'first_name', label: 'First Name', type: 'text',  autoComplete: 'given-name',  maxLength: 50 },
+  { key: 'last_name',  label: 'Last Name',  type: 'text',  autoComplete: 'family-name', maxLength: 50 },
+  { key: 'email',      label: 'Email',      type: 'email', autoComplete: 'email',       maxLength: 254 },
+  { key: 'phone',      label: 'Phone',      type: 'tel',   autoComplete: 'tel', optional: true },
 ];
+
+const NAME_FIELDS = new Set(['first_name', 'last_name']);
+
+/** The form as the schema reads it: the phone box holds only the ten local digits. */
+function toPayload(f: ContactForm) {
+  return {
+    first_name: f.first_name,
+    last_name:  f.last_name,
+    email:      f.email,
+    phone:      f.phone ? attachCountryCode(f.phone) : '',
+    message:    f.message,
+  };
+}
 
 function FieldError({ message }: { message?: string }) {
   if (!message) return null;
@@ -73,10 +87,22 @@ export default function ContactSection() {
   const [sending, setSending] = useState(false);
   const [status, setStatus]   = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
 
-  const set = (key: keyof ContactForm, value: string) => {
-    setForm((f) => ({ ...f, [key]: value }));
-    setErrors((e) => (e[key] ? { ...e, [key]: '' } : e));
+  // Checked as you type, the same way the account forms do: each field shows its
+  // own message (or clears it) on every change.
+  const set = (key: keyof ContactForm, raw: string) => {
+    const value = NAME_FIELDS.has(key) ? toNameCase(raw) : raw;
+    const next  = { ...form, [key]: value };
+    setForm(next);
     setStatus(null);
+    if (key === 'website') return;
+    const checked = contactSchema.safeParse(toPayload(next));
+    const fieldError = checked.success ? undefined : fieldErrors(checked.error)[key];
+    setErrors((e) => {
+      const out = { ...e };
+      if (fieldError) out[key] = fieldError;
+      else delete out[key];
+      return out;
+    });
   };
 
   const borderFor = (key: string) => (errors[key] ? 'border-red-400/60' : 'border-white/[0.10]');
@@ -85,13 +111,7 @@ export default function ContactSection() {
     e.preventDefault();
     if (sending) return;
 
-    const checked = contactSchema.safeParse({
-      first_name: form.first_name,
-      last_name:  form.last_name,
-      email:      form.email,
-      phone:      normalizePhMobile(form.phone),
-      message:    form.message,
-    });
+    const checked = contactSchema.safeParse(toPayload(form));
     if (!checked.success) {
       setErrors(fieldErrors(checked.error));
       return;
@@ -188,22 +208,36 @@ export default function ContactSection() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 short:gap-3 mb-4">
-                {TEXT_FIELDS.map(({ key, label, type, autoComplete, placeholder, optional }) => (
+                {TEXT_FIELDS.map(({ key, label, type, autoComplete, maxLength, optional }) => (
                   <div key={key}>
                     <label htmlFor={`contact-${key}`} className={labelClass}>
                       {label}
                       {optional && <span className="text-white/30 normal-case tracking-normal"> (optional)</span>}
                     </label>
-                    <input
-                      id={`contact-${key}`}
-                      type={type}
-                      autoComplete={autoComplete}
-                      placeholder={placeholder}
-                      value={form[key]}
-                      onChange={(e) => set(key, e.target.value)}
-                      aria-invalid={!!errors[key]}
-                      className={`${inputClass} ${borderFor(key)}`}
-                    />
+                    {key === 'phone' ? (
+                      <PhoneInputRow
+                        id="contact-phone"
+                        value={form.phone}
+                        onChange={(digits) => set('phone', digits)}
+                        error={errors.phone}
+                        prefixClassName={`flex items-center rounded-l-[8px] border border-r-0 ${borderFor('phone')} bg-[#151515] px-3 text-sm text-white/50 select-none`}
+                        inputClassName={`${inputClass} ${borderFor('phone')} rounded-l-none`}
+                      />
+                    ) : (
+                      <input
+                        id={`contact-${key}`}
+                        type={type}
+                        autoComplete={autoComplete}
+                        maxLength={maxLength}
+                        autoCapitalize={NAME_FIELDS.has(key) ? 'words' : key === 'email' ? 'none' : undefined}
+                        spellCheck={key === 'email' ? false : undefined}
+                        inputMode={key === 'email' ? 'email' : undefined}
+                        value={form[key]}
+                        onChange={(e) => set(key, e.target.value)}
+                        aria-invalid={!!errors[key]}
+                        className={`${inputClass} ${borderFor(key)}`}
+                      />
+                    )}
                     <FieldError message={errors[key]} />
                   </div>
                 ))}
