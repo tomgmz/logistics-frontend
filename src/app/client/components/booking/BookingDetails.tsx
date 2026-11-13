@@ -101,6 +101,18 @@ function palletTypeFor(length: string, width: string): ItemGroup['palletType'] {
   return 'Custom'
 }
 
+/** `name` if free, else "base (1).ext", "base (2).ext"… (case-insensitive, like Windows/macOS). */
+function uniqueFileName(name: string, taken: Set<string>): string {
+  if (!taken.has(name.toLowerCase())) return name
+  const dot  = name.lastIndexOf('.')
+  const base = dot > 0 ? name.slice(0, dot) : name
+  const ext  = dot > 0 ? name.slice(dot) : ''
+  for (let n = 1; ; n++) {
+    const candidate = `${base} (${n})${ext}`
+    if (!taken.has(candidate.toLowerCase())) return candidate
+  }
+}
+
 const MAX_DOC_SIZE_BYTES = 10 * 1024 * 1024
 const MAX_DOC_COUNT      = 3
 const ALLOWED_EXTENSIONS = ['.pdf', '.docx', '.xlsx']
@@ -1056,6 +1068,10 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
     const have = new Map<string, string>()
     for (const f of files) { const h = await hashOfFile(f); if (h) have.set(h, f.name) }
     for (const url of keptDocs) { const h = await hashOfKept(url); if (h) have.set(h, documentName(url)) }
+    const taken = new Set<string>([
+      ...files.map((f) => f.name.toLowerCase()),
+      ...keptDocs.map((url) => documentName(url).toLowerCase()),
+    ])
     const added: File[] = []
     for (const f of accepted) {
       const h = await hashOfFile(f)
@@ -1064,8 +1080,13 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
         setDocError(twin === f.name ? `"${f.name}" is already added.` : `"${f.name}" is the same file as "${twin}", which is already added.`)
         continue
       }
-      if (h) have.set(h, f.name)
-      added.push(f)
+      // A different file with a name already in the list gets " (1)", " (2)"… before
+      // its extension, as a browser does for a download: "Reqs (1).docx" → "Reqs (1) (1).docx".
+      const name = uniqueFileName(f.name, taken)
+      taken.add(name.toLowerCase())
+      const file = name === f.name ? f : new globalThis.File([f], name, { type: f.type, lastModified: f.lastModified })
+      if (h) { have.set(h, file.name); fileHashes.current.set(file, h) }
+      added.push(file)
     }
     if (added.length) onFilesChange([...files, ...added])
   }
