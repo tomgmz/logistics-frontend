@@ -200,10 +200,18 @@ export default function BookingWizard() {
         <div className="shrink-0 flex items-start gap-2 px-4 lg:px-6 py-2.5 border-b border-white/[0.07]"
           style={{ background: 'rgba(246,38,38,0.08)' }}>
           <XCircle size={15} className="shrink-0 mt-0.5" style={{ color: '#f62626' }} />
-          <p className="ff-sc booking-text text-xs lg:text-sm text-white/85">
-            This booking was not approved{resubmit.rejectionReason ? <>: <span className="text-white">{resubmit.rejectionReason}</span></> : '.'}
-            {' '}Correct the details below and resubmit it for another review.
-          </p>
+          <div className="min-w-0 flex flex-col gap-1">
+            <p className="ff-sc booking-text text-xs lg:text-sm text-white/85">
+              {resubmit.rejectionReason?.trim()
+                ? 'This booking was not approved due to the following reason:'
+                : 'This booking was not approved.'}
+            </p>
+            {resubmit.rejectionReason?.trim() && (
+              <p className="booking-text text-xs lg:text-sm text-white whitespace-pre-wrap break-words">
+                {resubmit.rejectionReason.trim()}
+              </p>
+            )}
+          </div>
         </div>
       )}
 
