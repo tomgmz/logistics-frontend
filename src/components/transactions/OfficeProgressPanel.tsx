@@ -52,7 +52,10 @@ export default function OfficeProgressPanel({ bookingId, status, fleetReturned, 
   const [type,     setType]     = useState<(typeof INCIDENTS)[number]['key']>('truck_stolen')
   const [busy,     setBusy]     = useState(false)
 
-  const live = status === 'assigned' || status === 'in_transit'
+  // Not on an Assigned booking (user 2026-11-13): the delivery starts only when
+  // the driver presses Start Navigation. Before that, a driver without a phone
+  // signs in on another one, or the office assigns another driver.
+  const live = status === 'in_transit'
   const needsReturn = (status === 'delivered' || status === 'completed') && !fleetReturned
 
   const load = useCallback(() => {
