@@ -1,4 +1,9 @@
+import type { Metadata } from 'next'
 import RouteMapWrapper from '@/components/map/RouteMapWrapper'
+
+export const metadata: Metadata = {
+  title: 'Transit Tracking',
+}
 
 /**
  * The client's Transit Tracking map.

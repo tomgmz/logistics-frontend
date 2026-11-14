@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { AlertTriangle, CheckCircle2, Lock, LockOpen, PackageCheck, Truck, Warehouse } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Lock, LockOpen, Truck, Warehouse } from 'lucide-react'
 
 import proxyApi, { initCsrf } from '@/lib/api/auth.api'
 import { tripService, type Trip } from '@/lib/services/admin/trip.service'
@@ -11,6 +11,8 @@ import { getApiErrorMessage } from '@/lib/api-error'
 import { appToast } from '@/lib/toast'
 import { PALETTE } from '@/lib/palette'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
+import { AssetIcon, CARD_CLASS, TEAL_BUTTON_CLASS, TEAL_BUTTON_STYLE } from '@/app/admin/booking-management/BookingDetailParts'
+import { usePanelSection } from '@/components/ui/PanelReady'
 
 const INCIDENTS = [
   { key: 'truck_stolen',   label: 'Truck stolen' },
@@ -58,8 +60,10 @@ export default function OfficeProgressPanel({ bookingId, status, fleetReturned, 
   const live = status === 'in_transit'
   const needsReturn = (status === 'delivered' || status === 'completed') && !fleetReturned
 
+  const [loaded, setLoaded] = useState(false)
+  usePanelSection((live || needsReturn) && !loaded)
   const load = useCallback(() => {
-    tripService.getTrips(bookingId).then(setTrips).catch(() => setTrips([]))
+    tripService.getTrips(bookingId).then(setTrips).catch(() => setTrips([])).finally(() => setLoaded(true))
   }, [bookingId])
   useEffect(() => { if (live || needsReturn) load() }, [load, live, needsReturn, status])
   // Live: each drop-off the driver confirms moves the next step, so the office
@@ -132,54 +136,54 @@ export default function OfficeProgressPanel({ bookingId, status, fleetReturned, 
     }
   }
 
-  const btn = 'inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer text-left'
   const locked = !unlocked || busy
 
+  // Figma "booking detail frame [ASSIGNED]" (2026-11-14): the design's card,
+  // a small cyan Unlock, and each step as the big teal button.
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3.5 flex flex-col gap-2.5">
+    <div className={`${CARD_CLASS} px-3.5 sm:px-4 pt-3 pb-4 flex flex-col gap-3`}>
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
-          <PackageCheck size={16} className="text-white/60 shrink-0" />
-          <h3 className="text-sm font-bold text-white">Complete for the driver</h3>
+          <AssetIcon name="steering-wheel" />
+          <h3 className="text-base font-bold text-white leading-tight">Complete for the driver</h3>
         </div>
         <button
           type="button"
           onClick={() => setUnlocked((v) => !v)}
           aria-pressed={unlocked}
           {...writeAccess(allowed)}
-          className="inline-flex items-center gap-1 shrink-0 rounded-lg border px-2.5 py-1 text-[11px] font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          style={unlocked
-            ? { borderColor: 'rgba(77,249,237,0.45)', color: 'var(--color-cyan)', background: 'rgba(77,249,237,0.10)' }
-            : { borderColor: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.6)' }}
+          className="inline-flex items-center gap-1 shrink-0 rounded-[5px] border px-1.5 py-0.5 text-sm font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          style={{ borderColor: PALETTE.cyan, color: PALETTE.cyan, background: unlocked ? 'rgba(77,249,237,0.14)' : 'transparent' }}
         >
-          {unlocked ? <LockOpen size={11} /> : <Lock size={11} />}
+          {unlocked ? <Lock size={13} /> : <LockOpen size={13} />}
           {unlocked ? 'Lock' : 'Unlock'}
         </button>
       </div>
-      <p className="text-[11px] text-white/50">
+      <p className="text-xs font-bold uppercase leading-snug text-[#818181]">
         Use only when the driver can&apos;t (phone stolen, lost or dead). No photo or location is recorded; your reason is kept on the stop and in the audit log.
       </p>
 
       {steps.length > 0 ? (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2.5">
           {steps.map((s) => (
             <button key={s.id} type="button" disabled={locked} onClick={() => setStep(s)} {...writeAccess(allowed)}
-              className={`${btn} border border-white/15 text-white/85 [@media(hover:hover)]:hover:text-white`}>
-              {s.kind === 'return' ? <Warehouse size={13} className="shrink-0" />
-                : s.kind === 'pickup' ? <Truck size={13} className="shrink-0" />
-                : <CheckCircle2 size={13} className="shrink-0" />}
+              className={TEAL_BUTTON_CLASS} style={TEAL_BUTTON_STYLE}>
+              {s.kind === 'return' ? <Warehouse size={15} className="shrink-0" />
+                : s.kind === 'pickup' ? <Truck size={15} className="shrink-0" />
+                : <CheckCircle2 size={15} className="shrink-0" />}
               <span className="min-w-0 break-words">{s.label}</span>
             </button>
           ))}
         </div>
       ) : (
-        <p className="text-[12px] text-white/40">Nothing to confirm right now.</p>
+        <p className="text-sm text-[#818181]">Nothing to confirm right now.</p>
       )}
 
       {status === 'in_transit' && openStops && (
         <button type="button" disabled={locked} onClick={() => setIncident(true)} {...writeAccess(allowed)}
-          className={`${btn} w-fit`} style={{ background: PALETTE.red, color: '#fff' }}>
-          <AlertTriangle size={13} /> Report a problem
+          className={TEAL_BUTTON_CLASS}
+          style={{ background: 'rgba(246,38,38,0.10)', borderColor: PALETTE.red, color: PALETTE.red }}>
+          <AlertTriangle size={15} /> Report a problem
         </button>
       )}
 

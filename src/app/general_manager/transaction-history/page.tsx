@@ -1,4 +1,9 @@
+import type { Metadata } from 'next'
 import TransactionHistoryView from '@/app/admin/transaction-history/TransactionHistoryView'
+
+export const metadata: Metadata = {
+  title: 'Transaction History',
+}
 
 // The Company Administrator's Transaction History, shared with the General
 // Manager (2026-10-25). The transaction-history module tier gates both.

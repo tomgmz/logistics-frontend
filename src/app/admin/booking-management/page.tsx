@@ -1,4 +1,9 @@
+import type { Metadata } from 'next'
 import BookingManagementView from './BookingManagementView'
+
+export const metadata: Metadata = {
+  title: 'Booking Management',
+}
 
 export default function BookingManagement() {
   return (

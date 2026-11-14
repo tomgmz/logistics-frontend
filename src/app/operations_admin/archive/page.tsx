@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import ArchiveModule from '@/components/archive/ArchiveModule'
 
 export const metadata: Metadata = {
-  title: 'Archive | 8338 Logistics Services',
+  title: 'Archive',
 }
 
 export default function ArchivePage() {

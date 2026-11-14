@@ -8,6 +8,7 @@ import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { PALETTE } from '@/lib/palette'
 import { formatDateTime } from './transaction-format'
 import { BORDER_C, MUTED } from './transaction-theme'
+import { usePanelSection } from '@/components/ui/PanelReady'
 
 /**
  * Everything that changed on the road, in one list, oldest first: runs loaded,
@@ -42,10 +43,13 @@ export default function DeliveryEventsPanel({ bookingId }: { bookingId: string }
   const [events, setEvents] = useState<DeliveryEvent[]>([])
   const [open,   setOpen]   = useState(false)
 
+  const [loaded, setLoaded] = useState(false)
+  usePanelSection(!loaded)
   const load = useCallback(() => {
     proxyApi.get<{ data: DeliveryEvent[] }>(`/admin/assignments/${bookingId}/events`)
       .then(({ data }) => setEvents(data.data ?? []))
       .catch(() => {})
+      .finally(() => setLoaded(true))
   }, [bookingId])
   useEffect(() => { load() }, [load])
   useLiveTable(['live:bookings'], load)

@@ -1,4 +1,9 @@
+import type { Metadata } from 'next'
 import TransitTrackingView from './TransitTrackingView'
+
+export const metadata: Metadata = {
+  title: 'Transit Tracking',
+}
 
 export default function AdminTransitTrackingPage() {
   return (

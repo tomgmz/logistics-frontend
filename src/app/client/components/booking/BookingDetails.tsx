@@ -1972,14 +1972,16 @@ function ProductFieldsRow({
   shcStandardList: HandlingCode[]
   shcAdditionalList: HandlingCode[]
 }) {
-  const commodityOptions = commodities.map((c) => ({
+  // Inactive entries (System Maintenance) aren't offered, except one this line
+  // already has (a resubmitted or edited booking keeps its choice).
+  const commodityOptions = commodities.filter((c) => c.is_active !== false || c.commodity_id === group.commodityId).map((c) => ({
     id:    c.commodity_id,
     label: c.name + (c.category ? ` — ${c.category}` : ''),
   }))
 
   const productsForCommodity = group.commodityId
-    ? productsCatalog.filter((p) => p.commodity_id === group.commodityId)
-    : productsCatalog
+    ? productsCatalog.filter((p) => p.commodity_id === group.commodityId && (p.is_active !== false || p.product_id === group.productId))
+    : productsCatalog.filter((p) => p.is_active !== false || p.product_id === group.productId)
 
   const productOptions = productsForCommodity.map((p) => ({
     id:    p.product_id,
@@ -1989,9 +1991,12 @@ function ProductFieldsRow({
   // "GEN (General)", not the bare acronym. The additional picker leaves out
   // the code already chosen as the main one.
   const codeLabel = (h: HandlingCode) => (h.name ? `${h.code} (${h.name})` : h.code)
-  const shcStandardOptions   = shcStandardList.map((h) => ({ id: h.handling_code_id, label: codeLabel(h) }))
+  const shcStandardOptions   = shcStandardList
+    .filter((h) => h.is_active !== false || h.handling_code_id === group.shcId)
+    .map((h) => ({ id: h.handling_code_id, label: codeLabel(h) }))
   const shcAdditionalOptions = shcAdditionalList
     .filter((h) => h.handling_code_id !== group.shcId)
+    .filter((h) => h.is_active !== false || h.handling_code_id === group.ashcId)
     .map((h) => ({ id: h.handling_code_id, label: codeLabel(h) }))
 
   return (

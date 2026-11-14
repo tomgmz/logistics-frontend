@@ -23,7 +23,8 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: '8338 Logistics Services',
+  // Each page sets only its own name; the template adds the site name.
+  title: { default: '8338 Logistics Services', template: '%s | 8338 Logistics Services' },
   description:
     'Book, track, and manage deliveries in one place. Real-time updates, seamless booking, and efficient support for all your logistics needs. Serving nationwide Philippines.',
   keywords: 'logistics, freight, delivery, cargo, Philippines, shipping, FMCG, warehousing',

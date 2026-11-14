@@ -1,5 +1,6 @@
 'use client'
-
+
+import { PanelReadyGate, PanelSectionFlag, PanelSpinner } from '@/components/ui/PanelReady'
 import Pagination from '@/components/ui/Pagination'
 import FilterBar from '@/components/ui/FilterBar'
 import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
@@ -106,6 +107,10 @@ import {
   CargoSummaryTiles,
   StopCard,
   DocumentRow,
+  CollapsibleSection,
+  DashedDivider,
+  TEAL_BUTTON_CLASS,
+  TEAL_BUTTON_STYLE,
 } from './BookingDetailParts'
 
 import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
@@ -701,11 +706,11 @@ function AssignmentPanel({
   const crewRowIcon = { size: 18, strokeWidth: 2, className: 'text-white shrink-0' }
 
   return (
-    <div className={`${CARD_CLASS} px-3.5 pt-2 pb-3.5 space-y-2.5`}>
+    <div className={`${CARD_CLASS} px-3.5 sm:px-4 pt-3 pb-4 space-y-3`}>
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-[5px] min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
           <AssetIcon name="steering-wheel" />
-          <h3 className="text-sm font-bold text-[#818181]">Driver and Vehicle Assignment</h3>
+          <h3 className="text-base font-bold text-white leading-tight">Driver and Vehicle Assignment</h3>
         </div>
         {isAssigned && (
           <button
@@ -714,12 +719,10 @@ function AssignmentPanel({
             onClick={toggleEditing}
             aria-pressed={editing}
             {...writeAccess(canEdit)}
-            className="inline-flex items-center gap-1 shrink-0 rounded-lg border px-2.5 py-1 text-[11px] font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            style={editing
-              ? { borderColor: 'rgba(77,249,237,0.45)', color: 'var(--color-cyan)', background: 'rgba(77,249,237,0.10)' }
-              : { borderColor: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.6)' }}
+            className="inline-flex items-center gap-1 shrink-0 rounded-[5px] px-1.5 py-0.5 text-sm font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{ color: PALETTE.cyan, background: editing ? 'rgba(77,249,237,0.14)' : 'transparent' }}
           >
-            <Pencil size={11} />
+            <Pencil size={13} />
             {editing ? 'Done' : 'Edit'}
           </button>
         )}
@@ -757,7 +760,7 @@ function AssignmentPanel({
           {selectedCoding && !pickerOpen && <CodingNotice flag={selectedCoding} plate={selectedPlate!} />}
         </div>
       ) : (
-        <p className="text-xs text-white/45">No vehicle or driver assigned yet.</p>
+        <p className="text-xs font-bold uppercase text-[#818181]">No vehicle or driver assigned yet.</p>
       )}
 
       <button
@@ -766,14 +769,9 @@ function AssignmentPanel({
         onClick={onOpenPicker}
         aria-haspopup="dialog"
         {...writeAccess(canEdit)}
-        className="w-full py-2 rounded-lg text-sm font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-        style={{
-          background: 'rgba(77,249,237,0.12)',
-          border:     '1px solid rgba(77,249,237,0.30)',
-          color:      'var(--color-cyan)',
-        }}
+        className={`${TEAL_BUTTON_CLASS} min-h-[50px] text-lg`}
+        style={TEAL_BUTTON_STYLE}
       >
-        <Truck size={14} />
         {title}
       </button>
 
@@ -1218,7 +1216,7 @@ function ProofPhoto({
 function TransactionDocs({ docs }: { docs: string[] }) {
   return (
     <section>
-      <SectionHeading icon={<History size={18} strokeWidth={2} />}>Transaction Documents</SectionHeading>
+      <SectionHeading tone="bright" icon={<History size={18} strokeWidth={2} />}>Transaction Documents</SectionHeading>
       {docs.length === 0 ? (
         <p className="text-sm text-white/40">No documents attached.</p>
       ) : (
@@ -2039,6 +2037,11 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     (roleView === 'admin' || roleView === 'operations_manager') &&
     ['assigned', 'in_transit', 'delivered', 'completed'].includes(normalizeBookingStatus(detail.status))
 
+  // Stop times exist once a vehicle and its trips do; every role that sees the
+  // booking may read them.
+  const showStopTimes = !!detail &&
+    ['assigned', 'in_transit', 'delivered', 'completed'].includes(normalizeBookingStatus(detail.status))
+
   /**
    * One person edits a booking at a time. Operations and the Company Admin can
    * both crew it, the GM and the admin can both decide it — whoever opens it
@@ -2352,7 +2355,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                   <div className="flex items-center gap-1.5 min-w-0">
                     {detail && !detailLoading && (
                       <>
-                        <ResubmittedBadge className="" count={resubmissionsOf(detail)} />
+                        <ResubmittedBadge className="" tone="red" count={resubmissionsOf(detail)} />
                         <SharedDelayedBadge className="" booking={detail} />
                         <span className="inline-flex flex-col items-start">
                           <Tag color={statusColor(detail.status)} size="md">{fmtStatus(detail.status)}</Tag>
@@ -2369,21 +2372,20 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                 </div>
 
                 <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 pt-[18px] pb-6 space-y-[18px]">
-                  {detailLoading && (
-                    <div className="flex flex-col items-center justify-center py-16 gap-2">
-                      <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--color-cyan)' }} />
-                      <p className="text-sm text-white/45">Loading…</p>
-                    </div>
-                  )}
+                  {detailLoading && <PanelSpinner />}
                   {detailError && !detailLoading && (
                     <p className="text-sm text-red-400 text-center py-8">{detailError}</p>
                   )}
+                  {/* Nothing shows until every section has its first answer
+                      (user 2026-11-14), so the panel doesn't fill in piece by piece. */}
                   {detail && !detailLoading && (
-                    <>
+                    <PanelReadyGate key={detail.booking_id} fallback={<PanelSpinner />} className="space-y-[18px]">
+                      <PanelSectionFlag loading={showAssignment && routeLoading} />
                       <RecordLockBanner lock={bookingLock} noun="booking" />
 
                       {/* Booking info */}
                       <BookingInfoCard
+                        accentReference
                         reference={bookingRef(detail)}
                         extras={detail.created_at && (
                           <div className="flex flex-wrap items-center gap-2 text-xs text-[#818181]">
@@ -2405,7 +2407,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                       {/* Cargo items */}
                       {cargoItems.length > 0 && (
                         <section>
-                          <SectionHeading
+                          <SectionHeading tone="bright"
                             icon={<Boxes size={18} strokeWidth={2} />}
                             right={
                               <span className="text-xs font-bold text-[#818181] whitespace-nowrap">
@@ -2444,7 +2446,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
 
                       {/* Cargo summary */}
                       <section>
-                        <SectionHeading icon={<AssetIcon name="cargo-summary" />}>Cargo Summary</SectionHeading>
+                        <SectionHeading tone="bright" icon={<AssetIcon name="cargo-summary" />}>Cargo Summary</SectionHeading>
                         <CargoSummaryTiles
                           weightKg={d?.required_weight_kg ?? null}
                           volumeCbm={d?.required_volume_cbm ?? null}
@@ -2470,7 +2472,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                       {/* Proof of pickup, photographed by the driver at the origin. */}
                       {d?.pickup_proof_photo_url && (
                         <section>
-                          <SectionHeading icon={<MapPin size={18} strokeWidth={2} />}>Proof of pickup</SectionHeading>
+                          <SectionHeading tone="bright" icon={<MapPin size={18} strokeWidth={2} />}>Proof of pickup</SectionHeading>
                           <ProofPhoto
                             url={d.pickup_proof_photo_url}
                             at={d.pickup_proof_at}
@@ -2481,7 +2483,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
 
                       {/* Delivery stops */}
                       <section>
-                        <SectionHeading icon={<AssetIcon name="delivery-stops" />}>Delivery Stops</SectionHeading>
+                        <SectionHeading tone="bright" icon={<AssetIcon name="delivery-stops" />}>Delivery Stops</SectionHeading>
                         <ul className="space-y-3">
                           {sortedStops.map((dest) => (
                             <StopCard
@@ -2514,26 +2516,13 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                       {/* Transaction documents */}
                       <TransactionDocs docs={d?.transaction_documents ?? []} />
 
-                      {/* What the client changed when resubmitting after a rejection,
-                          so the approver sees the old values next to the new. */}
-                      <ResubmissionChanges key={`rev-${detail.booking_id}`} bookingId={detail.booking_id}
-                        resubmissionCount={resubmissionsOf(detail)} />
-
                       {/* Booking status */}
                       <section className="space-y-3">
-                        <SectionHeading
-                          icon={<CalendarRange size={18} strokeWidth={2} />}
-                          right={
-                            <span className="inline-flex flex-col items-end">
-                              <Tag color={statusColor(detail.status)}>{fmtStatus(detail.status)}</Tag>
-                              {hasOpenClientIssue(detail as unknown as Record<string, unknown>) && (
-                                <ProblemReportedBadge note={(detail as { client_issue_note?: string | null }).client_issue_note} />
-                              )}
-                            </span>
-                          }
-                        >
-                          Booking Status
-                        </SectionHeading>
+                        {!showStageActions && (
+                          <SectionHeading tone="bright" icon={<CalendarRange size={18} strokeWidth={2} />}>
+                            Booking Status
+                          </SectionHeading>
+                        )}
 
                         {showStageActions && (
                           <fieldset disabled={bookingReadOnly} className="flex gap-2.5 min-w-0 border-0 p-0 m-0">
@@ -2542,7 +2531,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                               disabled={pendingStatus || pendingReject}
                               onClick={() => setRejectModalOpen(true)}
                               {...writeAccess(canEdit)}
-                              className="flex-1 min-h-[46px] px-3 py-2 rounded-[10px] border text-base font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                              className="flex-1 min-h-[50px] px-3 py-2 rounded-[10px] border text-lg font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                               style={{ background: 'rgba(246,38,38,0.10)', borderColor: PALETTE.red, color: PALETTE.red }}
                             >
                               {pendingReject ? 'Rejecting…' : 'Reject'}
@@ -2552,8 +2541,8 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                               disabled={pendingStatus || pendingReject}
                               onClick={() => setApproveModalOpen(true)}
                               {...writeAccess(canEdit)}
-                              className="flex-1 min-h-[46px] px-3 py-2 rounded-[10px] border text-base font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                              style={{ background: 'rgba(77,249,237,0.19)', borderColor: PALETTE.cyan, color: PALETTE.cyan }}
+                              className="flex-1 min-h-[50px] px-3 py-2 rounded-[10px] border text-lg font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                              style={TEAL_BUTTON_STYLE}
                             >
                               {pendingStatus ? 'Approving…' : 'Approve'}
                             </button>
@@ -2648,65 +2637,6 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                           onUpdated={() => { void refreshDetail(detail.booking_id); void loadPage(true) }}
                         />
 
-                        {/* Who has been at the wheel, and swapping the main and second
-                            driver when the main driver's phone is dead. */}
-                        <DrivingShiftsPanel
-                          bookingId={detail.booking_id}
-                          inTransit={normalizeBookingStatus(detail.status) === 'in_transit'}
-                          hasSecondDriver={!!committedAssignment.secondDriverId}
-                          canSwap={(roleView === 'admin' || roleView === 'operations_manager') && !bookingReadOnly}
-                          allowed={canEdit}
-                          onSwapped={() => {
-                            void refreshDetail(detail.booking_id)
-                            void loadPage(true)
-                            assignmentService.getAll().then(setAllAssignments).catch(() => {})
-                          }}
-                        />
-
-                        {/* Everything that changed on the road, in time order. */}
-                        <DeliveryEventsPanel bookingId={detail.booking_id} />
-
-                        {/* On the road the crew can no longer be re-assigned; while the
-                            delivery is paused, it can be replaced. Lists every
-                            replacement on the booking too. */}
-                        <ReplaceCrewPanel
-                          bookingId={detail.booking_id}
-                          reference={detail.reference_number ?? null}
-                          inTransit={normalizeBookingStatus(detail.status) === 'in_transit'}
-                          paused={!!(detail as { paused_at?: string | null }).paused_at}
-                          canReplace={(roleView === 'admin' || roleView === 'operations_manager') && !bookingReadOnly}
-                          allowed={canEdit}
-                          drivers={drivers}
-                          trucks={trucks}
-                          currentDriverId={committedAssignment.driverId || null}
-                          currentSecondDriverId={committedAssignment.secondDriverId || null}
-                          currentTruckId={committedAssignment.truckId || null}
-                          currentHelperName={currentAssignment?.helper_name ?? null}
-                          currentIsVendor={!!currentAssignment?.is_vendor_supplied}
-                          currentVendorDriverUserId={currentAssignment?.vendor_driver_user_id ?? null}
-                          currentVendorPlate={currentAssignment?.vendor_vehicle_plate ?? null}
-                          currentVendorType={currentAssignment?.vendor_vehicle_type ?? null}
-                          cargo={cargoSummaryFromBooking(detail)}
-                          onReplaced={() => {
-                            void refreshDetail(detail.booking_id)
-                            void loadPage(true)
-                            assignmentService.getAll().then(setAllAssignments).catch(() => {})
-                            adminFetchTrucks().then(setTrucks).catch(() => {})
-                          }}
-                        />
-
-                        {/* Arrival, start and finish at the loading
-                            and each drop-off, and the total loaded per trip. */}
-                        <StopTimesPanel
-                          bookingId={detail.booking_id}
-                          staff
-                          // Stop times are what happened on the road: nothing to
-                          // fill in before the delivery starts (server refuses too).
-                          canEdit={(roleView === 'admin' || roleView === 'operations_manager') && !bookingReadOnly
-                            && ['in_transit', 'delivered', 'completed'].includes(String(detail.status))}
-                          allowed={canEdit}
-                        />
-
                         {/* Driver / vehicle assignment */}
                         {showAssignment && (
                           <fieldset disabled={bookingReadOnly} className="min-w-0 border-0 p-0 m-0">
@@ -2769,6 +2699,54 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                           />
                           </fieldset>
                         )}
+                        {/* Who has been at the wheel, and swapping the main and second
+                            driver when the main driver's phone is dead. */}
+                        <DrivingShiftsPanel
+                          bookingId={detail.booking_id}
+                          inTransit={normalizeBookingStatus(detail.status) === 'in_transit'}
+                          hasSecondDriver={!!committedAssignment.secondDriverId}
+                          canSwap={(roleView === 'admin' || roleView === 'operations_manager') && !bookingReadOnly}
+                          allowed={canEdit}
+                          onSwapped={() => {
+                            void refreshDetail(detail.booking_id)
+                            void loadPage(true)
+                            assignmentService.getAll().then(setAllAssignments).catch(() => {})
+                          }}
+                        />
+
+                        {/* Everything that changed on the road, in time order. */}
+                        <DeliveryEventsPanel bookingId={detail.booking_id} />
+
+                        {/* On the road the crew can no longer be re-assigned; while the
+                            delivery is paused, it can be replaced. Lists every
+                            replacement on the booking too. */}
+                        <ReplaceCrewPanel
+                          bookingId={detail.booking_id}
+                          reference={detail.reference_number ?? null}
+                          inTransit={normalizeBookingStatus(detail.status) === 'in_transit'}
+                          paused={!!(detail as { paused_at?: string | null }).paused_at}
+                          canReplace={(roleView === 'admin' || roleView === 'operations_manager') && !bookingReadOnly}
+                          allowed={canEdit}
+                          drivers={drivers}
+                          trucks={trucks}
+                          currentDriverId={committedAssignment.driverId || null}
+                          currentSecondDriverId={committedAssignment.secondDriverId || null}
+                          currentTruckId={committedAssignment.truckId || null}
+                          currentHelperName={currentAssignment?.helper_name ?? null}
+                          currentIsVendor={!!currentAssignment?.is_vendor_supplied}
+                          currentVendorDriverUserId={currentAssignment?.vendor_driver_user_id ?? null}
+                          currentVendorPlate={currentAssignment?.vendor_vehicle_plate ?? null}
+                          currentVendorType={currentAssignment?.vendor_vehicle_type ?? null}
+                          cargo={cargoSummaryFromBooking(detail)}
+                          onReplaced={() => {
+                            void refreshDetail(detail.booking_id)
+                            void loadPage(true)
+                            assignmentService.getAll().then(setAllAssignments).catch(() => {})
+                            adminFetchTrucks().then(setTrucks).catch(() => {})
+                          }}
+                        />
+
+
                       </section>
 
                       {/* Delivered: waiting on the client. Staff can only resolve a reported problem. */}
@@ -2777,19 +2755,56 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                           onUpdated={() => { void refreshDetail(detail.booking_id); void loadPage() }} />
                       )}
 
-                      {/* How many runs the assigned vehicle makes. Only once a
-                          vehicle actually exists: until then there is no body to
-                          compare the load against, and nothing to plan around. */}
-                      {showTripPlanner && (
-                        <TripPlanner
-                          key={`${detail.booking_id}:${plannerTick}`}
-                          detail={detail}
-                          canEdit={!bookingReadOnly}
-                          allowed={canEdit}
-                          capacity={plannerCapacity}
-                        />
+                      {/* Figma (2026-11-14): Trips, Stop Times and Changes after
+                          Rejection as cyan sections that open and close. */}
+                      {(showTripPlanner || showStopTimes || resubmissionsOf(detail) > 0) && (
+                        <div>
+                          {!showTripPlanner && !showStopTimes && <DashedDivider />}
+                          {/* How many runs the assigned vehicle makes. Only once a
+                              vehicle actually exists: until then there is no body to
+                              compare the load against, and nothing to plan around. */}
+                          {showTripPlanner && (
+                            <CollapsibleSection key={`trips-${detail.booking_id}`} title="Trips">
+                              <TripPlanner
+                                key={`${detail.booking_id}:${plannerTick}`}
+                                detail={detail}
+                                canEdit={!bookingReadOnly}
+                                allowed={canEdit}
+                                capacity={plannerCapacity}
+                              />
+                            </CollapsibleSection>
+                          )}
+                          {/* Arrival, start and finish at the loading and each
+                              drop-off, per trip. */}
+                          {showStopTimes && (
+                            <CollapsibleSection key={`times-${detail.booking_id}`} title="Stop Times">
+                              <StopTimesPanel
+                                key={`times-${detail.booking_id}`}
+                                bookingId={detail.booking_id}
+                                staff
+                                look="booking"
+                                pickupAddress={detail.origin}
+                                summary={stopTimesSummary(d?.required_weight_kg ?? null, d?.required_volume_cbm ?? null)}
+                                // Stop times are what happened on the road: nothing to
+                                // fill in before the delivery starts (server refuses too).
+                                canEdit={(roleView === 'admin' || roleView === 'operations_manager') && !bookingReadOnly
+                                  && ['in_transit', 'delivered', 'completed'].includes(String(detail.status))}
+                                allowed={canEdit}
+                              />
+                            </CollapsibleSection>
+                          )}
+                          {/* What the client changed when resubmitting after a rejection,
+                              so the approver sees the old values (and files) next to the new. */}
+                          {resubmissionsOf(detail) > 0 && (
+                            <CollapsibleSection key={`rev-${detail.booking_id}`} title="Changes after Rejection"
+                              defaultOpen={showStageActions}>
+                              <ResubmissionChanges key={`rev-${detail.booking_id}`} bookingId={detail.booking_id}
+                                resubmissionCount={resubmissionsOf(detail)} look="booking" />
+                            </CollapsibleSection>
+                          )}
+                        </div>
                       )}
-                    </>
+                    </PanelReadyGate>
                   )}
                 </div>
               </motion.aside>
@@ -2801,3 +2816,12 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
   )
 }
 
+
+/** "1,200 kg · 4.5 CBM" under the Stop Times title. */
+function stopTimesSummary(weightKg: number | null, volumeCbm: number | null): string | null {
+  const parts = [
+    weightKg ? `${weightKg.toLocaleString('en-PH', { maximumFractionDigits: 2 })} kg` : null,
+    volumeCbm ? `${volumeCbm.toLocaleString('en-PH', { maximumFractionDigits: 4 })} CBM` : null,
+  ].filter(Boolean)
+  return parts.length ? parts.join(' · ') : null
+}

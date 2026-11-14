@@ -27,6 +27,7 @@ import { BORDER_C, CYAN, MUTED } from './transaction-theme'
 import { FileViewButton } from '@/components/ui/FileViewer'
 import { cachedFetch } from '@/lib/query/useApiQuery'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
+import { usePanelSection } from '@/components/ui/PanelReady'
 
 const ORANGE = PALETTE.orange
 
@@ -135,10 +136,12 @@ export default function ReplaceCrewPanel({
     return () => { cancelled = true }
   }, [open, bookingId])
 
+  const [loaded, setLoaded] = useState(false)
+  usePanelSection(!loaded)
   const load = useCallback(async () => {
     try {
-      setHistory(await cachedFetch(['booking', bookingId, 'replacements'], () => assignmentService.getReplacements(bookingId), setHistory))
-    } catch { setHistory([]) }
+      setHistory(await cachedFetch(['booking', bookingId, 'replacements'], () => assignmentService.getReplacements(bookingId), (h) => { setHistory(h); setLoaded(true) }))
+    } catch { setHistory([]) } finally { setLoaded(true) }
   }, [bookingId])
   useEffect(() => { void load() }, [load, paused])
   // Live: a replacement made by someone else joins the history (the form is

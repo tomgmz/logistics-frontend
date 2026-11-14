@@ -5,11 +5,11 @@ import {
   AlertTriangle,
   Camera,
   Check,
-  Divide,
+  ChevronsUpDown,
   Lock,
+  Map as MapIcon,
   Minus,
   Plus,
-  Repeat,
   Trash2,
   TriangleAlert,
 } from 'lucide-react'
@@ -22,7 +22,7 @@ import {
 } from '@/lib/services/admin/trip.service'
 import type { BookingDetail } from '@/app/types/maps/routemap.types'
 import { appToast } from '@/lib/toast'
-import { formatArrivalClock, formatArrivalWindow } from '@/lib/arrival-window'
+import { formatArrivalWindow } from '@/lib/arrival-window'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { STOWAGE_FACTOR } from '@/lib/cargo/capacity'
 import DriverCallTime from './DriverCallTime'
@@ -30,7 +30,12 @@ import ReusableModal from '@/components/layout/ReusableModal'
 import { writeAccess } from '@/components/layout/ModuleAccess'
 import { FileViewButton } from '@/components/ui/FileViewer'
 import { cachedFetch } from '@/lib/query/useApiQuery'
+import { PALETTE } from '@/lib/palette'
+import {
+  DesignCard, GREY_BUTTON_STYLE, STOP_STATUS_COLOR, TEAL_BUTTON_CLASS, TEAL_BUTTON_STYLE, Tag,
+} from './BookingDetailParts'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
+import { usePanelSection } from '@/components/ui/PanelReady'
 
 /**
  * How many runs the assigned vehicle makes, which drop-offs each serves, and
@@ -145,6 +150,7 @@ export default function TripPlanner({ detail, canEdit, allowed = true, capacity 
   const [editing, setEditing] = useState(false)
   const [drafts, setDrafts]   = useState<Draft[]>([])
   const [loadError, setLoadError] = useState<string | null>(null)
+  usePanelSection(loading)
 
   const destinations = useMemo(
     () => (detail.booking_destinations ?? []).slice().sort((a, b) => a.sequence_order - b.sequence_order),
@@ -379,9 +385,17 @@ export default function TripPlanner({ detail, canEdit, allowed = true, capacity 
   }
 
   /* ── Render ───────────────────────────────────────────────────────────── */
+  // Figma "Trips", "Trips [has planed trips]", "Trips [slip into trips - planning]" (2026-11-14).
+
+  const loadText = (load: { weightKg: number; volumeCbm: number }) =>
+    `${fmtNum(load.weightKg)} kg · ${fmtNum(load.volumeCbm, 4)} CBM`
 
   return (
-    <div className="rounded-xl border border-white/[0.08] p-3 space-y-3 bg-black/20">
+    <DesignCard
+      icon={<MapIcon size={20} strokeWidth={2} />}
+      title="Trips of the assigned vehicle"
+      info="One vehicle, one or more runs. When the load is bigger than the body the same truck returns to the pickup point and goes out again with the rest. It is never split onto a second vehicle."
+    >
       <ReusableModal
         open={!!confirmRemove}
         title={`Remove trip ${confirmRemove?.tripNo ?? ''}?`}
@@ -394,32 +408,6 @@ export default function TripPlanner({ detail, canEdit, allowed = true, capacity 
           setConfirmRemove(null)
         }}
       />
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <Repeat size={14} className="text-[var(--color-cyan)] shrink-0" />
-          <h3 className="text-[11px] font-bold uppercase tracking-wider text-white/40 truncate">
-            Trips of the assigned vehicle
-          </h3>
-        </div>
-
-        {!editing && canPlan && !loading && !loadError && (
-          <button
-            type="button"
-            onClick={beginEdit}
-            {...writeAccess(allowed)}
-            className="text-[11px] font-bold px-2.5 py-1 rounded-lg border border-white/10
-                       text-white/50 hover:text-white hover:border-white/25 transition-colors shrink-0
-                       disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {active.length > 1 ? 'Edit plan' : 'Split into trips'}
-          </button>
-        )}
-      </div>
-
-      <p className="text-[11px] leading-relaxed text-white/35">
-        One vehicle, one or more runs. When the load is bigger than the body the same truck returns
-        to the pickup point and goes out again with the rest — it is never split onto a second vehicle.
-      </p>
 
       <DriverCallTime
         bookingId={bookingId}
@@ -431,17 +419,17 @@ export default function TripPlanner({ detail, canEdit, allowed = true, capacity 
       />
 
       {loading ? (
-        <p className="text-sm text-white/40">Loading the trip plan…</p>
+        <p className="text-sm text-[#818181]">Loading the trip plan…</p>
       ) : loadError ? (
-        <div className="flex items-start gap-2 text-[12px] text-amber-300/90">
-          <TriangleAlert size={13} className="mt-0.5 shrink-0" />
+        <div className="flex items-start gap-2 text-[13px] text-amber-300/90">
+          <TriangleAlert size={14} className="mt-0.5 shrink-0" />
           <span>{loadError}</span>
         </div>
       ) : editing ? (
         <>
           {started.length > 0 && (
-            <div className="flex items-start gap-2 text-[11px] text-white/40">
-              <Lock size={12} className="mt-0.5 shrink-0" />
+            <div className="flex items-start gap-2 text-xs font-bold uppercase text-[#818181]">
+              <Lock size={13} className="mt-0.5 shrink-0" />
               <span>
                 Trip{started.length > 1 ? 's' : ''} {started.map((t) => t.trip_number).join(', ')}{' '}
                 {started.length > 1 ? 'are' : 'is'} already loaded and stay{started.length > 1 ? '' : 's'} as{' '}
@@ -450,7 +438,7 @@ export default function TripPlanner({ detail, canEdit, allowed = true, capacity 
             </div>
           )}
 
-          <div className="space-y-2">
+          <div className="space-y-3">
             {drafts.map((draft, i) => {
               const tripNo  = started.length + i + 1
               const isEmpty = draft.destinationIds.length === 0
@@ -460,21 +448,13 @@ export default function TripPlanner({ detail, canEdit, allowed = true, capacity 
               return (
                 <div
                   key={draft.key}
-                  className="rounded-lg border p-2.5 space-y-2 bg-black/25"
-                  style={{ borderColor: isEmpty || over ? 'rgba(246,38,38,0.35)' : 'rgba(255,255,255,0.08)' }}
+                  className="rounded-[15px] border bg-[#141414] px-3 sm:px-4 pt-3 pb-4 space-y-3"
+                  style={{ borderColor: isEmpty || over ? 'rgba(246,38,38,0.55)' : '#424242' }}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-white/70">
-                      Trip {tripNo}
-                    </span>
+                    <span className="text-lg font-bold" style={{ color: PALETTE.cyan }}>Trip {tripNo}</span>
                     <div className="flex items-center gap-2 min-w-0">
-                      {(load.weightKg > 0 || load.volumeCbm > 0) && (
-                        <span className="text-[10px] text-white/35 truncate">
-                          {load.weightKg  > 0 ? `${fmtNum(load.weightKg)} kg`   : ''}
-                          {load.weightKg  > 0 && load.volumeCbm > 0 ? ' · ' : ''}
-                          {load.volumeCbm > 0 ? `${fmtNum(load.volumeCbm, 4)} CBM` : ''}
-                        </span>
-                      )}
+                      <span className="text-xs text-[#818181] truncate">{loadText(load)}</span>
                       {drafts.length > 1 && (
                         <button
                           type="button"
@@ -486,22 +466,22 @@ export default function TripPlanner({ detail, canEdit, allowed = true, capacity 
                           }}
                           disabled={saving}
                           aria-label={`Remove trip ${tripNo}`}
-                          className="p-1 rounded-md text-white/30 hover:text-red-400 transition-colors disabled:opacity-40"
+                          className="p-1 rounded-md text-[#818181] [@media(hover:hover)]:hover:text-red-400 transition-colors disabled:opacity-40"
                         >
-                          <Trash2 size={13} />
+                          <Trash2 size={15} />
                         </button>
                       )}
                     </div>
                   </div>
 
                   {over && (
-                    <p className="flex items-start gap-1.5 text-[11px] text-amber-300/90">
-                      <AlertTriangle size={12} className="mt-0.5 shrink-0" /> {over} — move some to another trip.
+                    <p className="flex items-start gap-1.5 text-xs text-amber-300/90">
+                      <AlertTriangle size={13} className="mt-0.5 shrink-0" /> {over}. Move some to another trip.
                     </p>
                   )}
 
                   {/* Which drop-offs this run goes to. */}
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="flex flex-col gap-2">
                     {destinations.map((dest) => {
                       const on = draft.destinationIds.includes(dest.destination_id)
                       return (
@@ -512,17 +492,14 @@ export default function TripPlanner({ detail, canEdit, allowed = true, capacity 
                           onClick={() => toggleStop(draft.key, dest.destination_id)}
                           aria-pressed={on}
                           title={dest.address}
-                          className="text-left text-[11px] font-semibold px-2 py-1.5 rounded-md border
-                                     transition-colors disabled:opacity-40 max-w-full"
+                          className="w-full min-h-[42px] px-3 py-2 rounded-[8px] border text-sm font-bold uppercase transition-colors disabled:opacity-40"
                           style={on
-                            ? { borderColor: 'var(--color-cyan)', color: 'var(--color-cyan)', background: 'rgba(77,249,237,0.10)' }
-                            : { borderColor: 'rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.35)' }}
+                            ? { borderColor: PALETTE.cyan, color: PALETTE.cyan, background: '#244543' }
+                            : { borderColor: '#818181', color: '#818181', background: 'transparent' }}
                         >
-                          <span className="flex items-center gap-1.5 min-w-0">
-                            {on && <Check size={11} className="shrink-0" />}
-                            <span className="truncate max-w-[180px]">
-                              Drop-off {destNo.get(dest.destination_id)} — {dest.address}
-                            </span>
+                          <span className="flex items-center justify-center gap-2 min-w-0">
+                            <Check size={15} className="shrink-0" />
+                            <span className="truncate">Drop off {destNo.get(dest.destination_id)} - {dest.address}</span>
                           </span>
                         </button>
                       )
@@ -537,23 +514,23 @@ export default function TripPlanner({ detail, canEdit, allowed = true, capacity 
                       const destLines = linesFor(destId)
                       const hasLeft   = destLines.some((l) => unallocated(l) > EPS)
                       return (
-                        <div key={destId} className="rounded-md border border-white/[0.06] p-2 space-y-1.5">
+                        <div key={destId} className="rounded-[10px] border border-[#424242] px-3 sm:px-4 py-3 space-y-2.5">
                           <div className="flex items-center justify-between gap-2">
-                            <span className="text-[11px] font-bold text-white/60">Drop-off {destNo.get(destId)}</span>
+                            <span className="text-base font-bold text-white">Drop off {destNo.get(destId)}</span>
                             {hasLeft && (
                               <button
                                 type="button"
                                 onClick={() => takeRemaining(draft.key, destId)}
                                 disabled={saving}
-                                className="text-[10px] font-bold px-2 py-0.5 rounded border border-white/10
-                                           text-white/50 hover:text-white transition-colors disabled:opacity-40"
+                                className="text-xs font-bold px-2 py-0.5 rounded-[5px] border transition-colors disabled:opacity-40"
+                                style={{ borderColor: PALETTE.cyan, color: PALETTE.cyan }}
                               >
                                 All remaining
                               </button>
                             )}
                           </div>
                           {destLines.length === 0 ? (
-                            <p className="text-[11px] text-white/30">No cargo listed for this drop-off.</p>
+                            <p className="text-sm text-[#818181]">No cargo listed for this drop-off.</p>
                           ) : destLines.map((l) => (
                             <QtyRow
                               key={l.itemId}
@@ -569,7 +546,7 @@ export default function TripPlanner({ detail, canEdit, allowed = true, capacity 
                     })}
 
                   {isEmpty && (
-                    <p className="text-[11px] text-red-300/80">
+                    <p className="text-xs text-red-300/85">
                       A trip with no drop-off is a run to nowhere. Pick at least one.
                     </p>
                   )}
@@ -578,43 +555,29 @@ export default function TripPlanner({ detail, canEdit, allowed = true, capacity 
             })}
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {started.length + drafts.length < MAX_TRIPS && (
-              <button
-                type="button"
-                onClick={addTrip}
-                disabled={saving}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border border-dashed
-                           border-white/15 text-[11px] font-bold text-white/45
-                           hover:text-white hover:border-white/30 transition-colors disabled:opacity-40"
-              >
-                <Plus size={13} /> Add another trip
+              <button type="button" onClick={addTrip} disabled={saving} className={DASHED_BTN}>
+                <Plus size={16} /> Add another trip
               </button>
             )}
             {drafts.length > 1 && (
-              <button
-                type="button"
-                onClick={splitEvenly}
-                disabled={saving}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border border-dashed
-                           border-white/15 text-[11px] font-bold text-white/45
-                           hover:text-white hover:border-white/30 transition-colors disabled:opacity-40"
-              >
-                <Divide size={13} /> Split evenly across {drafts.length} trips
+              <button type="button" onClick={splitEvenly} disabled={saving} className={DASHED_BTN}>
+                <ChevronsUpDown size={16} /> Split evenly across trips
               </button>
             )}
           </div>
 
           {/* Still to plan, or planned twice, per line. */}
           {offLines.length > 0 && (
-            <div className="rounded-md border border-red-400/25 p-2 space-y-1">
-              <p className="flex items-center gap-1.5 text-[11px] font-bold text-red-300/90">
-                <AlertTriangle size={12} className="shrink-0" /> Not adding up yet
+            <div className="rounded-[10px] border border-red-400/30 p-2.5 space-y-1">
+              <p className="flex items-center gap-1.5 text-xs font-bold text-red-300/90">
+                <AlertTriangle size={13} className="shrink-0" /> Not adding up yet
               </p>
               {offLines.map((l) => {
                 const left = unallocated(l)
                 return (
-                  <p key={l.itemId} className="text-[11px] text-red-300/80">
+                  <p key={l.itemId} className="text-xs text-red-300/80">
                     Drop-off {destNo.get(l.destinationId)} · {l.label}:{' '}
                     {left > 0
                       ? `${fmtNum(left, 3)} of ${fmtNum(l.total, 3)} ${l.unit} not on any trip`
@@ -626,74 +589,56 @@ export default function TripPlanner({ detail, canEdit, allowed = true, capacity 
           )}
 
           {emptyStops.length > 0 && (
-            <p className="text-[11px] text-red-300/80">
+            <p className="text-xs text-red-300/80">
               {emptyStops.map((s) => `Trip ${s.trip} goes to drop-off ${destNo.get(s.id)} with nothing for it`).join('; ')}.
             </p>
           )}
 
           {unserved.length > 0 && (
-            <div className="flex items-start gap-2 text-[11px] text-red-300/85">
+            <div className="flex items-start gap-2 text-xs text-red-300/85">
               <AlertTriangle size={13} className="mt-0.5 shrink-0" />
               <span>
-                {unserved.length} drop-off{unserved.length > 1 ? 's are' : ' is'} not on any trip —
-                nobody would ever be sent{unserved.length > 1 ? ' to them' : ' to it'}:{' '}
+                {unserved.length} drop-off{unserved.length > 1 ? 's are' : ' is'} not on any trip.
+                Nobody would ever be sent{unserved.length > 1 ? ' to them' : ' to it'}:{' '}
                 {unserved.map((d) => d.address).join('; ')}
               </span>
             </div>
           )}
 
-          <p className="text-[11px] text-white/30">
+          <p className="text-xs font-bold uppercase leading-snug text-[#818181]">
             The driver can load more or less at the pickup; whatever is left goes on the next trip
             automatically, and a drop-off is only delivered once every trip bound for it has unloaded.
           </p>
 
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setEditing(false)}
-              disabled={saving}
-              className="flex-1 py-2 rounded-lg border border-white/10 text-[12px] font-bold
-                         text-white/50 hover:text-white hover:border-white/25 transition-colors disabled:opacity-40"
-            >
+          <div className="grid grid-cols-2 gap-2.5">
+            <button type="button" onClick={() => setEditing(false)} disabled={saving}
+              className={TEAL_BUTTON_CLASS} style={GREY_BUTTON_STYLE}>
               Cancel
             </button>
-            <button
-              type="button"
-              onClick={() => void save()}
-              disabled={saving || !valid}
-              className="flex-1 py-2 rounded-lg text-[12px] font-bold transition-colors disabled:opacity-40"
-              style={{ background: 'rgba(77,249,237,0.14)', color: 'var(--color-cyan)' }}
-            >
-              {saving ? 'Saving…' : `Save plan (${started.length + drafts.length} trip${started.length + drafts.length > 1 ? 's' : ''})`}
+            <button type="button" onClick={() => void save()} disabled={saving || !valid}
+              className={TEAL_BUTTON_CLASS} style={TEAL_BUTTON_STYLE}>
+              {saving ? 'Saving…' : 'Save Plan'}
             </button>
           </div>
         </>
       ) : (
         <>
           {started.length > 0 && pending.length > 0 && (
-            <div className="flex items-start gap-2 text-[11px] text-white/40">
-              <Lock size={12} className="mt-0.5 shrink-0" />
+            <div className="flex items-start gap-2 text-xs font-bold uppercase text-[#818181]">
+              <Lock size={13} className="mt-0.5 shrink-0" />
               <span>Loaded trips stay as they are. The trips not loaded yet can still be re-planned.</span>
             </div>
           )}
 
-          <ul className="space-y-2">
+          <ul className="space-y-3">
             {active.map((trip) => {
               const load = loadOf(lines, (id) => tripQty(trip).get(id) ?? 0)
               return (
-                <li key={trip.trip_id} className="rounded-lg border border-white/[0.08] p-2.5 space-y-2 bg-black/25">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-white/70">
-                      Trip {trip.trip_number}
-                    </span>
+                <li key={trip.trip_id} className="rounded-[15px] border border-[#424242] bg-[#141414] px-3 sm:px-4 pt-3 pb-2 space-y-1">
+                  <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+                    <span className="text-lg font-bold" style={{ color: PALETTE.cyan }}>Trip {trip.trip_number}</span>
                     <div className="flex items-center gap-2 min-w-0">
-                      {(load.weightKg > 0 || load.volumeCbm > 0) && (
-                        <span className="text-[10px] text-white/35 truncate">
-                          {load.weightKg  > 0 ? `${fmtNum(load.weightKg)} kg`   : ''}
-                          {load.weightKg  > 0 && load.volumeCbm > 0 ? ' · ' : ''}
-                          {load.volumeCbm > 0 ? `${fmtNum(load.volumeCbm, 4)} CBM` : ''}
-                        </span>
-                      )}
+                      <span className="text-xs text-[#818181] truncate">{loadText(load)}</span>
                       <TripStatusPill status={trip.status} />
                     </div>
                   </div>
@@ -701,48 +646,46 @@ export default function TripPlanner({ detail, canEdit, allowed = true, capacity 
                   {/* Planned by the server from predicted traffic plus unloading and
                       reloading allowances, chained run to run. */}
                   {trip.planned_departure_at && (
-                    <p className="text-[11px] text-white/40">
-                      {trip.pickup_proof_at ? 'Left' : 'Leaves'} {formatArrivalClock(trip.planned_departure_at)}
-                      {trip.planned_return_at && <> · back ~{formatArrivalClock(trip.planned_return_at)}</>}
+                    <p className="text-sm font-bold text-[#818181]">
+                      {trip.pickup_proof_at ? 'Left' : 'Leaves by'}:{' '}
+                      <span className="text-white">{fmtDayTime(trip.pickup_proof_at ?? trip.planned_departure_at)}</span>
+                      {trip.planned_return_at && (
+                        <>
+                          <span className="mx-2">·</span>Back by:{' '}
+                          <span className="text-white">{fmtDayTime(trip.planned_return_at)}</span>
+                        </>
+                      )}
                     </p>
                   )}
 
-                  <ul className="space-y-1.5">
+                  <ul>
                     {(trip.booking_trip_stops ?? [])
                       .slice()
                       .sort((a, b) => a.sequence_order - b.sequence_order)
                       .map((stop) => (
-                        <li key={stop.trip_stop_id} className="space-y-0.5">
-                          <div className="flex items-start justify-between gap-2">
-                            <span className="text-[12px] text-white/70 leading-snug min-w-0 break-words">
+                        <li key={stop.trip_stop_id} className="pt-3">
+                          <div className="flex items-start justify-between gap-2 pb-2.5 border-b border-[#424242]">
+                            <span className="text-base font-bold text-white leading-snug min-w-0 break-words">
                               Drop-off {destNo.get(stop.destination_id) ?? ''} — {stop.booking_destinations?.address ?? '—'}
-                              {stop.status === 'pending' && stop.planned_arrival_at && (
-                                <span className="block text-[11px] text-white/35">
-                                  Planned {formatArrivalWindow(stop.planned_arrival_at)}
-                                </span>
-                              )}
                             </span>
-                            <span
-                              className="shrink-0 text-[10px] font-bold uppercase"
-                              style={{
-                                color: stop.status === 'delivered' ? 'var(--color-cyan)'
-                                     : stop.status === 'failed'    ? '#f62626'
-                                     : 'rgba(255,255,255,0.3)',
-                              }}
-                            >
-                              {stop.status}
-                            </span>
+                            <Tag color={STOP_STATUS_COLOR[stop.status] ?? null}>{stop.status.toLowerCase()}</Tag>
                           </div>
+                          {stop.status === 'pending' && stop.planned_arrival_at && (
+                            <p className="py-2 border-b border-[#424242] text-sm font-bold text-[#818181]">
+                              Planned on:<span className="ml-3 text-white">{formatArrivalWindow(stop.planned_arrival_at)}</span>
+                            </p>
+                          )}
                           {(stop.booking_trip_cargo ?? []).map((c) => {
                             const line = lines.find((l) => l.itemId === c.item_id)
                             const planned = Number(c.planned_qty)
                             const loadedQ = c.loaded_qty == null ? null : Number(c.loaded_qty)
                             return (
-                              <p key={c.trip_cargo_id} className="text-[11px] text-white/45 pl-2">
-                                {line?.label ?? 'Cargo'} — {fmtNum(loadedQ ?? planned, 3)} {line?.unit ?? ''}
-                                {line && line.total !== (loadedQ ?? planned) && (
-                                  <span className="text-white/30"> of {fmtNum(line.total, 3)}</span>
-                                )}
+                              <p key={c.trip_cargo_id} className="py-2 border-b border-[#424242] text-sm font-bold text-[#818181] break-words">
+                                {line?.label ?? 'Cargo'} —{' '}
+                                <span className="text-white">
+                                  {fmtNum(loadedQ ?? planned, 3)} {line?.unit ?? ''}
+                                  {line && <> of {fmtNum(line.total, 3)}</>}
+                                </span>
                                 {loadedQ != null && Math.abs(loadedQ - planned) > EPS && (
                                   <span className="text-amber-300/80"> · planned {fmtNum(planned, 3)}</span>
                                 )}
@@ -759,17 +702,13 @@ export default function TripPlanner({ detail, canEdit, allowed = true, capacity 
                     <FileViewButton
                       url={trip.pickup_proof_photo_url}
                       name="Proof of loading"
-                      className="inline-flex items-center gap-1.5 text-[11px] text-white/45 hover:text-white transition-colors"
+                      className="inline-flex items-center gap-1.5 pt-2 text-xs text-[#818181] [@media(hover:hover)]:hover:text-white transition-colors"
                     >
-                      <Camera size={12} /> Proof of loading
-                      {trip.pickup_proof_at
-                        ? ` · ${new Date(trip.pickup_proof_at).toLocaleString('en-PH', {
-                            timeZone: 'Asia/Manila', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
-                          })}`
-                        : ''}
+                      <Camera size={13} /> Proof of loading
+                      {trip.pickup_proof_at ? ` · ${fmtDayTime(trip.pickup_proof_at)}` : ''}
                     </FileViewButton>
                   ) : trip.status !== 'pending' ? (
-                    <p className="text-[11px] text-white/30">No proof of loading on file.</p>
+                    <p className="pt-2 text-xs text-[#818181]">No proof of loading on file.</p>
                   ) : null}
                 </li>
               )
@@ -777,18 +716,38 @@ export default function TripPlanner({ detail, canEdit, allowed = true, capacity 
           </ul>
 
           {active.length === 1 && started.length === 0 && (
-            <p className="text-[11px] text-white/30">
-              Currently one run carrying everything. Split it only if the load will not fit the
+            <p className="text-xs font-bold uppercase leading-snug text-[#818181]">
+              Currently one trip carrying everything. Split it only if the load will not fit the
               vehicle in a single trip.
             </p>
           )}
+
+          {canPlan && (
+            <button type="button" onClick={beginEdit} {...writeAccess(allowed)}
+              className={`${TEAL_BUTTON_CLASS} min-h-[52px] text-lg`} style={TEAL_BUTTON_STYLE}>
+              {active.length > 1 ? 'Edit Plan' : 'Split Into Trips'}
+            </button>
+          )}
         </>
       )}
-    </div>
+    </DesignCard>
   )
 }
 
-/** One cargo line's quantity on a run: − / number / + and what is left of it. */
+const DASHED_BTN =
+  'flex items-center justify-center gap-2 min-h-[42px] px-3 py-2 rounded-[6px] border border-dashed border-[#818181] ' +
+  'text-sm font-bold uppercase text-[#818181] transition-colors [@media(hover:hover)]:hover:text-white ' +
+  '[@media(hover:hover)]:hover:border-white disabled:opacity-40'
+
+/** "Oct 2, 3:10 PM" in Philippine time, always with the day. */
+function fmtDayTime(iso: string | null | undefined): string {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return '—'
+  return d.toLocaleString('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+}
+
+/** One cargo line's quantity on a run: "[product] · 6 pcs of 10" and − / number / +. */
 function QtyRow({ line, value, max, disabled, onChange }: {
   line: Line
   value: number
@@ -797,22 +756,17 @@ function QtyRow({ line, value, max, disabled, onChange }: {
   onChange: (v: number) => void
 }) {
   const step = line.divisible && Number.isInteger(line.total) ? 1 : line.divisible ? 0.5 : 1
+  const box = 'w-9 h-9 flex items-center justify-center rounded-[6px] border border-[#424242] text-[#818181] disabled:opacity-30'
   return (
-    <div className="flex items-center justify-between gap-2">
-      <span className="text-[11px] text-white/60 min-w-0 truncate" title={line.label}>
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <span className="text-sm font-bold text-[#818181] min-w-0 break-words" title={line.label}>
         {line.label}
-        <span className="text-white/30"> · {fmtNum(line.total, 3)} {line.unit} booked</span>
+        <span className="text-white"> · {fmtNum(value, 3)} {line.unit} of {fmtNum(line.total, 3)}</span>
       </span>
       <div className="flex items-center gap-1 shrink-0">
-        <button
-          type="button"
-          aria-label={`Less ${line.label}`}
-          disabled={disabled || value <= 0}
-          onClick={() => onChange(Math.max(0, value - step))}
-          className="w-7 h-7 flex items-center justify-center rounded border border-white/10 text-white/50
-                     disabled:opacity-30"
-        >
-          <Minus size={12} />
+        <button type="button" aria-label={`Less ${line.label}`} disabled={disabled || value <= 0}
+          onClick={() => onChange(Math.max(0, value - step))} className={box}>
+          <Minus size={15} />
         </button>
         <input
           type="number"
@@ -824,18 +778,12 @@ function QtyRow({ line, value, max, disabled, onChange }: {
           disabled={disabled || !line.divisible && max < 1 && value === 0}
           onChange={(e) => onChange(e.target.value === '' ? 0 : Number(e.target.value))}
           aria-label={`${line.label} on this trip`}
-          className="w-16 h-7 rounded border border-white/10 bg-black/30 text-center text-[16px] sm:text-[12px]
-                     text-white tabular-nums focus:outline-none focus:border-[var(--color-cyan)]"
+          className="w-[72px] h-9 rounded-[6px] border border-[#424242] bg-black text-center text-base text-white tabular-nums
+                     focus:outline-none focus:border-[var(--color-cyan)]"
         />
-        <button
-          type="button"
-          aria-label={`More ${line.label}`}
-          disabled={disabled || value >= max - EPS}
-          onClick={() => onChange(Math.min(max, value + step))}
-          className="w-7 h-7 flex items-center justify-center rounded border border-white/10 text-white/50
-                     disabled:opacity-30"
-        >
-          <Plus size={12} />
+        <button type="button" aria-label={`More ${line.label}`} disabled={disabled || value >= max - EPS}
+          onClick={() => onChange(Math.min(max, value + step))} className={box}>
+          <Plus size={15} />
         </button>
       </div>
     </div>
@@ -844,16 +792,13 @@ function QtyRow({ line, value, max, disabled, onChange }: {
 
 function TripStatusPill({ status }: { status: Trip['status'] }) {
   const tone =
-    status === 'completed'  ? { label: 'Completed',  color: 'var(--color-green)' } :
-    status === 'in_transit' ? { label: 'Out now',    color: 'var(--color-cyan)' } :
-    status === 'cancelled'  ? { label: 'Cancelled',  color: '#f62626'           } :
-                              { label: 'Not loaded', color: 'rgba(255,255,255,0.35)' }
-
+    status === 'completed'  ? { label: 'Completed',  color: PALETTE.green } :
+    status === 'in_transit' ? { label: 'Out now',    color: PALETTE.cyan  } :
+    status === 'cancelled'  ? { label: 'Cancelled',  color: PALETTE.red   } :
+                              { label: 'Not Loaded', color: '#ffffff'     }
   return (
-    <span
-      className="shrink-0 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded border"
-      style={{ color: tone.color, borderColor: `${tone.color === 'var(--color-cyan)' ? 'rgba(77,249,237,0.35)' : tone.color}44` }}
-    >
+    <span className="shrink-0 rounded-[6px] border px-2 py-0.5 text-sm leading-none whitespace-nowrap"
+      style={{ color: tone.color, borderColor: tone.color }}>
       {tone.label}
     </span>
   )

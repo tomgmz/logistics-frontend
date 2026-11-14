@@ -13,6 +13,7 @@ import { appToast } from '@/lib/toast'
 import { PALETTE } from '@/lib/palette'
 import { formatDateTime } from './transaction-format'
 import { BORDER_C, MUTED } from './transaction-theme'
+import { usePanelSection } from '@/components/ui/PanelReady'
 
 /**
  * Late drop-off confirmations: sent from the previous main driver's phone after
@@ -70,10 +71,13 @@ export default function LateConfirmationsPanel({ bookingId, canAct, allowed, onU
   const [dismiss, setDismiss] = useState<LateConfirmation | null>(null)
   const [busy,    setBusy]    = useState(false)
 
+  const [loaded, setLoaded] = useState(false)
+  usePanelSection(!loaded)
   const load = useCallback(() => {
     proxyApi.get<{ data: LateConfirmation[] }>(`/admin/assignments/${bookingId}/late-confirmations`)
       .then(({ data }) => setRows(data.data ?? []))
       .catch(() => {})
+      .finally(() => setLoaded(true))
   }, [bookingId])
   useEffect(() => { load() }, [load])
   useLiveTable(['live:bookings'], load)

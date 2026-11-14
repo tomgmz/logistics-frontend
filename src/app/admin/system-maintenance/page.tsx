@@ -1,4 +1,9 @@
+import type { Metadata } from 'next'
 import SystemMaintenanceView from './SystemMaintenanceView'
+
+export const metadata: Metadata = {
+  title: 'System Maintenance',
+}
 
 export default function SystemMaintenancePage() {
   return (

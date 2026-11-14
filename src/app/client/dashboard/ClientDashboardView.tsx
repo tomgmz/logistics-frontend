@@ -253,11 +253,11 @@ function AttentionCard({ rejected, onUpdated }: {
     <TableCard.Root untitled id="needs-attention" className="scroll-mt-4">
       <TableCard.Header title="Needs your attention" />
       {rejected.length === 0 ? (
-        <p className="flex items-center gap-2 px-4 py-6 text-sm md:px-6" style={{ color: MUTED }}>
+        <p className="ff-darker flex items-center gap-2 px-4 py-6 text-sm md:px-6" style={{ color: MUTED }}>
           <CheckCircle2 size={16} /> Nothing needs you right now.
         </p>
       ) : (
-        <ul className="ff-regular divide-y divide-[#424242]">
+        <ul className="ff-darker divide-y divide-[#424242]">
           {rejected.slice(0, MAX_ROWS).map((b) => {
             const reason = b.rejection_reason as string | undefined
             return (
@@ -270,7 +270,7 @@ function AttentionCard({ rejected, onUpdated }: {
                   >
                     {bookingRef(b)}
                   </Link>
-                  <span className="ml-auto text-xs font-semibold uppercase tracking-wider" style={{ color: ERROR }}>Rejected</span>
+                  <span className="ff-keep-sc ml-auto text-xs font-semibold uppercase tracking-wider" style={{ color: ERROR }}>Rejected</span>
                 </div>
                 <p className="text-sm leading-snug" style={{ color: MUTED }}>
                   {reason ? `Reason: ${reason}` : 'This booking was turned down.'}

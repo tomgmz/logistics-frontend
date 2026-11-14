@@ -1,5 +1,10 @@
+import type { Metadata } from 'next'
 import { Suspense } from 'react'
 import ChangePasswordPage from './ChangePasswordPage'
+
+export const metadata: Metadata = {
+  title: 'Change Password',
+}
 
 export default function ChangePasswordPageWrapper() {
   return (

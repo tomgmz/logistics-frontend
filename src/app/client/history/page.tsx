@@ -1,4 +1,9 @@
+import type { Metadata } from 'next'
 import BookingHistoryModule from "./BookingHistoryModule"
+
+export const metadata: Metadata = {
+  title: 'Transaction History',
+}
 
 export default function HistoryPage() {
   return (

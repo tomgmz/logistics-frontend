@@ -1,12 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import { AlarmClock } from 'lucide-react'
 
 import { tripService } from '@/lib/services/admin/trip.service'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { writeAccess } from '@/components/layout/ModuleAccess'
+import { PALETTE } from '@/lib/palette'
+import { GREY_BUTTON_STYLE, TEAL_BUTTON_CLASS, TEAL_BUTTON_STYLE } from './BookingDetailParts'
 
 /**
  * The driver's call time: when operations wants the driver at the pickup point.
@@ -92,107 +93,68 @@ export default function DriverCallTime({ bookingId, clientCallTime, driverCallTi
     }
   }
 
+  // Figma "Trips" (2026-11-14): the value in cyan when set, red "No call time
+  // set" when the driver follows the client; the full-width teal button.
+  const smallBtn = 'flex-1 min-w-[80px] min-h-[40px] py-2 rounded-[10px] border text-sm font-bold transition-colors disabled:opacity-40'
   return (
-    <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-2.5 space-y-2">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <AlarmClock size={14} className="text-[var(--color-cyan)] shrink-0" />
-          <span className="text-[12px] font-bold text-white/70">Driver Call Time</span>
-          {!editing && (
-            <span className="text-[12px] font-bold text-white">
-              {saved ? formatCallClock(saved) : formatCallClock(clientCallTime)}
-            </span>
-          )}
-        </div>
-
-        {!editing && canChange && (
-          <button
-            type="button"
-            onClick={begin}
-            {...writeAccess(allowed)}
-            className="text-[11px] font-bold px-2.5 py-1 rounded-lg border border-white/10
-                       text-white/50 hover:text-white hover:border-white/25 transition-colors shrink-0
-                       disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {saved ? 'Change' : 'Set call time'}
-          </button>
+    <div className="rounded-[15px] border border-[#424242] bg-[#2a2828] px-3.5 sm:px-4 py-3 space-y-3">
+      <p className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-base font-bold">
+        <span className="text-white">Driver Call Time:</span>
+        {!editing && (
+          <span style={{ color: saved ? PALETTE.cyan : PALETTE.red }}>
+            {saved ? formatCallClock(saved) : 'No call time set'}
+          </span>
         )}
-      </div>
+      </p>
 
-      {editing ? (
+      {editing && (
         <>
           <div className="flex flex-wrap items-center gap-2">
-            <select
-              aria-label="Hour"
-              value={draft.hour}
-              disabled={saving}
-              onChange={(e) => setDraft((d) => ({ ...d, hour: Number(e.target.value) }))}
-              className={selectClass}
-            >
+            <select aria-label="Hour" value={draft.hour} disabled={saving}
+              onChange={(e) => setDraft((d) => ({ ...d, hour: Number(e.target.value) }))} className={selectClass}>
               {HOURS.map((h) => <option key={h} value={h}>{h}</option>)}
             </select>
             <span className="text-white/40">:</span>
-            <select
-              aria-label="Minute"
-              value={draft.minute}
-              disabled={saving}
-              onChange={(e) => setDraft((d) => ({ ...d, minute: Number(e.target.value) }))}
-              className={selectClass}
-            >
+            <select aria-label="Minute" value={draft.minute} disabled={saving}
+              onChange={(e) => setDraft((d) => ({ ...d, minute: Number(e.target.value) }))} className={selectClass}>
               {MINUTES.map((m) => <option key={m} value={m}>{String(m).padStart(2, '0')}</option>)}
             </select>
-            <select
-              aria-label="AM or PM"
-              value={draft.pm ? 'PM' : 'AM'}
-              disabled={saving}
-              onChange={(e) => setDraft((d) => ({ ...d, pm: e.target.value === 'PM' }))}
-              className={selectClass}
-            >
+            <select aria-label="AM or PM" value={draft.pm ? 'PM' : 'AM'} disabled={saving}
+              onChange={(e) => setDraft((d) => ({ ...d, pm: e.target.value === 'PM' }))} className={selectClass}>
               <option value="AM">AM</option>
               <option value="PM">PM</option>
             </select>
           </div>
-
           <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => setEditing(false)}
-              disabled={saving}
-              className="flex-1 min-w-[80px] py-2 rounded-lg border border-white/10 text-[12px] font-bold
-                         text-white/50 hover:text-white hover:border-white/25 transition-colors disabled:opacity-40"
-            >
+            <button type="button" onClick={() => setEditing(false)} disabled={saving} className={smallBtn} style={GREY_BUTTON_STYLE}>
               Cancel
             </button>
             {saved && (
-              <button
-                type="button"
-                onClick={() => void save(null)}
-                disabled={saving}
-                className="flex-1 min-w-[120px] py-2 rounded-lg border border-white/10 text-[12px] font-bold
-                           text-white/50 hover:text-white hover:border-white/25 transition-colors disabled:opacity-40"
-              >
+              <button type="button" onClick={() => void save(null)} disabled={saving} className={`${smallBtn} min-w-[120px]`} style={GREY_BUTTON_STYLE}>
                 Use Client&apos;s Time
               </button>
             )}
-            <button
-              type="button"
-              onClick={() => void save(join(draft.hour, draft.minute, draft.pm))}
-              disabled={saving}
-              className="flex-1 min-w-[80px] py-2 rounded-lg text-[12px] font-bold transition-colors disabled:opacity-40"
-              style={{ background: 'rgba(77,249,237,0.14)', color: 'var(--color-cyan)' }}
-            >
+            <button type="button" onClick={() => void save(join(draft.hour, draft.minute, draft.pm))} disabled={saving}
+              className={smallBtn} style={TEAL_BUTTON_STYLE}>
               {saving ? 'Saving…' : 'Save'}
             </button>
           </div>
         </>
-      ) : null}
+      )}
 
-      <p className="text-[11px] leading-relaxed text-white/35">
+      <p className="text-xs font-bold uppercase leading-snug text-[#818181]">
         {saved
           ? `Client's call time: ${formatCallClock(clientCallTime)}. `
-          : 'Not set, so the driver follows the client\'s call time. '}
+          : `Not set, so the driver follows the client's call time (${formatCallClock(clientCallTime)}). `}
         The driver is notified in the app 1 hour before and can still start the delivery early.
       </p>
+
+      {!editing && canChange && (
+        <button type="button" onClick={begin} {...writeAccess(allowed)}
+          className={`${TEAL_BUTTON_CLASS} min-h-[40px] text-sm`} style={TEAL_BUTTON_STYLE}>
+          {saved ? 'Change' : 'Set Call Time'}
+        </button>
+      )}
     </div>
   )
 }

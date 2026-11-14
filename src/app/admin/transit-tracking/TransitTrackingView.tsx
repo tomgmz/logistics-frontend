@@ -27,6 +27,7 @@ import { pauseReasonLabel } from '@/lib/pause-reasons'
 import { useLiveRoute, LiveRoutePolyline, FollowTruck, remainingStops } from '@/components/map/LiveRoute'
 import { RouteStepper, bookingRouteSteps, dropoffSummary } from '@/components/map/RouteStepper'
 import { formatDuration } from '@/lib/duration'
+import StatusFilterDropdown, { filterByStatus, type StatusFilter } from '@/components/map/StatusFilterDropdown'
 
 const GOOGLE_MAPS_KEY    = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
 const GOOGLE_MAPS_MAP_ID = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID
@@ -44,17 +45,6 @@ const SC = { fontFamily: "var(--font-alegreya-sc), 'Alegreya Sans SC', sans-seri
 const DATA = { fontFamily: "var(--font-darker), 'Darker Grotesque', sans-serif" } as const
 const PAGE_FONT = { ...DATA, ['--map-font' as string]: "var(--font-darker), 'Darker Grotesque'" } as CSSProperties
 
-const FILTERS = ['All', 'Active', 'Pending', 'Completed'] as const
-type FilterKey = (typeof FILTERS)[number]
-
-function filterBookings(bookings: BookingWithRelations[], filter: FilterKey) {
-  switch (filter) {
-    case 'Active':    return bookings.filter((b) => b.status === 'in_transit' || b.status === 'assigned')
-    case 'Pending':   return bookings.filter((b) => b.status === 'pending')
-    case 'Completed': return bookings.filter((b) => b.status === 'completed' || b.status === 'cancelled')
-    default:          return bookings
-  }
-}
 
 function fmtStatus(s: string) {
   return s.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())
@@ -241,7 +231,7 @@ export default function TransitTrackingView() {
   const detailError     = routeMap.detailError
 
   const [search,        setSearch]        = useState('')
-  const [activeFilter,  setActiveFilter]  = useState<FilterKey>('Active')
+  const [activeFilter,  setActiveFilter]  = useState<StatusFilter>('all')
   const [detailOpen,    setDetailOpen]    = useState(true)
   const [totalDuration, setTotalDuration] = useState(0)
   const [mapMode,       setMapMode]       = useState<MapMode>('all')
@@ -271,7 +261,7 @@ export default function TransitTrackingView() {
     )
   }, [bookings, search])
 
-  const filteredList = useMemo(() => filterBookings(searchFiltered, activeFilter), [searchFiltered, activeFilter])
+  const filteredList = useMemo(() => filterByStatus(searchFiltered, activeFilter), [searchFiltered, activeFilter])
 
   // The driver loaded a run, confirmed a drop-off or chose which one to do
   // next: re-read the route so the stepper shows where the truck is heading.
@@ -453,49 +443,23 @@ export default function TransitTrackingView() {
             drop-offs signal it too since 20261030000000). */}
         <div className="flex flex-1 min-h-0 flex-col lg:flex-row overflow-hidden">
           <aside className="w-full lg:w-[300px] shrink-0 flex flex-col border-b lg:border-b-0 lg:border-r border-white/[0.07] bg-[var(--color-bg)] min-h-0 max-h-[42dvh] lg:max-h-none">
-            <div className="p-2.5 flex-shrink-0">
-              <div className="flex items-center gap-2 rounded-[10px] px-3 py-2" style={{ background: '#2a2828' }}>
+            {/* Same search + "Status: …" picker as the client's tracking map
+                (user 2026-11-14). Status words stay Alegreya Sans SC. */}
+            <div className="px-3 pt-3 pb-2 flex-shrink-0">
+              <div className="flex items-center gap-2 rounded-[10px] px-3 py-2.5" style={{ background: '#2a2828' }}>
                 <SearchIcon sx={{ fontSize: 16, color: '#9f9c9c' }} />
                 <input
                   value={search}
-                  onChange={(e) => { setSearch(e.target.value); setActiveFilter('All') }}
-                  placeholder="Search bookings…"
-                  className="bg-transparent border-none outline-none text-sm flex-1 text-white/70 placeholder:text-white/35"
+                  onChange={(e) => { setSearch(e.target.value); setActiveFilter('all') }}
+                  placeholder="Search"
+                  className="bg-transparent border-none outline-none text-sm flex-1"
+                  style={{ color: '#9f9c9c' }}
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-1 px-2.5 pb-2 flex-shrink-0">
-              {FILTERS.map((f) => {
-                const isActive = activeFilter === f
-                const count    = filterBookings(searchFiltered, f).length
-                return (
-                  <button
-                    key={f}
-                    type="button"
-                    onClick={() => setActiveFilter(f)}
-                    className="flex items-center justify-center gap-1 py-1.5 rounded-lg text-[11px] font-bold transition-all border"
-                    style={{
-                      background:  isActive ? 'rgba(77,249,237,0.12)' : 'transparent',
-                      borderColor: isActive ? 'rgba(77,249,237,0.35)' : 'var(--color-surface-dark)',
-                      color:       isActive ? 'var(--color-cyan)' : '#555',
-                    }}
-                  >
-                    {f}
-                    {count > 0 && (
-                      <span
-                        className="rounded-full min-w-[16px] h-4 flex items-center justify-center px-1 text-[10px] font-black leading-none"
-                        style={{
-                          background: isActive ? 'rgba(77,249,237,0.2)' : '#222',
-                          color:      isActive ? 'var(--color-cyan)' : '#666',
-                        }}
-                      >
-                        {count}
-                      </span>
-                    )}
-                  </button>
-                )
-              })}
+            <div className="px-3 pb-2.5 flex-shrink-0" style={SC}>
+              <StatusFilterDropdown value={activeFilter} onChange={setActiveFilter} bookings={searchFiltered} />
             </div>
 
             <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-3 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/10">
@@ -512,7 +476,7 @@ export default function TransitTrackingView() {
                   </button>
                 </div>
               ) : filteredList.length === 0 ? (
-                <p className="text-center text-white/45 text-sm py-8 px-2">No bookings in this filter. Try &quot;All&quot; or adjust search.</p>
+                <p className="text-center text-white/45 text-sm py-8 px-2">No bookings with this status. Try &quot;All&quot; or change the search.</p>
               ) : (
                 <AnimatePresence>
                   {filteredList.map((b, i) => (

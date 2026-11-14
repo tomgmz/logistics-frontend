@@ -24,21 +24,10 @@ import { LiveTruckMarker } from './LiveTruckMarker'
 import { useRouteChanged } from '@/hooks/useRouteChanged'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { useLiveRoute, LiveRoutePolyline, FollowTruck, remainingStops } from './LiveRoute'
+import StatusFilterDropdown, { filterByStatus, statusFilterLabel, type StatusFilter } from './StatusFilterDropdown'
 
 const GOOGLE_MAPS_KEY    = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!
 const GOOGLE_MAPS_MAP_ID = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID!
-
-const FILTERS = ['All', 'Active', 'Pending', 'Completed'] as const
-type FilterKey = typeof FILTERS[number]
-
-function filterBookings(bookings: BookingWithRelations[], filter: FilterKey) {
-  switch (filter) {
-    case 'Active':    return bookings.filter((b) => b.status === 'in_transit' || b.status === 'assigned')
-    case 'Pending':   return bookings.filter((b) => b.status === 'pending')
-    case 'Completed': return bookings.filter((b) => b.status === 'completed')
-    default:          return bookings
-  }
-}
 
 function fmtStatus(s: string) {
   return s.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase())
@@ -195,13 +184,9 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
 
   const user = useAuthStore((s) => s.user)
 
-  const allBookings     = routeMap.bookings
-  // A cancelled booking (rejected, or withdrawn) never moves, so there is
-  // nothing to track. It stays visible in Transaction History.
-  const bookings        = useMemo(
-    () => allBookings.filter((b) => String(b.status).toLowerCase() !== 'cancelled'),
-    [allBookings],
-  )
+  // Every status, cancelled included; "All" in the status dropdown leaves
+  // cancelled ones out (they never move), Cancelled shows them.
+  const bookings        = routeMap.bookings
   const listLoading     = routeMap.listLoading
   const listError       = routeMap.listError
   const selectedId      = routeMap.selectedId
@@ -213,7 +198,7 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
   const detailError     = routeMap.detailError
 
   const [search,          setSearch]          = useState('')
-  const [activeFilter,    setActiveFilter]    = useState<FilterKey>('All')
+  const [activeFilter,    setActiveFilter]    = useState<StatusFilter>('all')
   const [mobileView,      setMobileView]      = useState<'list' | 'map'>('list')
   const [sheetOpen,       setSheetOpen]       = useState(false)
   const [detailPanelOpen, setDetailPanelOpen] = useState(true)
@@ -230,7 +215,7 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
       })
     : bookings
 
-  const filteredList = filterBookings(searchFiltered, activeFilter)
+  const filteredList = filterByStatus(searchFiltered, activeFilter)
 
   const completedStops     = stops.filter((s) => s.status === 'delivered').length
   const totalStops         = stops.length
@@ -390,7 +375,7 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
             value={search}
             onChange={(e) => {
               setSearch(e.target.value)
-              setActiveFilter('All')
+              setActiveFilter('all')
             }}
             placeholder="Search"
             className="bg-transparent border-none outline-none text-sm flex-1"
@@ -399,68 +384,8 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
         </div>
       </div>
 
-      <div className="hidden lg:grid lg:grid-cols-2 gap-1 px-3 pb-2.5 flex-shrink-0">
-        {FILTERS.map((f) => {
-          const isActive = activeFilter === f
-          const count    = filterBookings(searchFiltered, f).length
-          return (
-            <button
-              key={f}
-              onClick={() => setActiveFilter(f)}
-              className="flex items-center justify-center gap-1 py-1.5 rounded-lg text-[11px] font-bold transition-all border"
-              style={{
-                background:  isActive ? 'rgba(77,249,237,0.12)' : 'transparent',
-                borderColor: isActive ? 'rgba(77,249,237,0.35)' : 'var(--color-surface-dark)',
-                color:       isActive ? 'var(--color-cyan)'     : '#555',
-              }}
-            >
-              {f}
-              {count > 0 && (
-                <span
-                  className="rounded-full min-w-[16px] h-4 flex items-center justify-center px-1 text-[10px] font-black leading-none"
-                  style={{
-                    background: isActive ? 'rgba(77,249,237,0.2)' : '#222',
-                    color:      isActive ? 'var(--color-cyan)'     : '#666',
-                  }}
-                >
-                  {count}
-                </span>
-              )}
-            </button>
-          )
-        })}
-      </div>
-
-      <div className="flex lg:hidden gap-1 px-3 pb-2.5 flex-shrink-0">
-        {FILTERS.map((f) => {
-          const isActive = activeFilter === f
-          const count    = filterBookings(searchFiltered, f).length
-          return (
-            <button
-              key={f}
-              onClick={() => setActiveFilter(f)}
-              className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[11px] font-bold transition-all border"
-              style={{
-                background:  isActive ? 'rgba(77,249,237,0.12)' : 'transparent',
-                borderColor: isActive ? 'rgba(77,249,237,0.35)' : 'var(--color-surface-dark)',
-                color:       isActive ? 'var(--color-cyan)'     : '#555',
-              }}
-            >
-              {f}
-              {count > 0 && (
-                <span
-                  className="rounded-full min-w-[16px] h-4 flex items-center justify-center px-1 text-[10px] font-black leading-none"
-                  style={{
-                    background: isActive ? 'rgba(77,249,237,0.2)' : '#222',
-                    color:      isActive ? 'var(--color-cyan)'     : '#666',
-                  }}
-                >
-                  {count}
-                </span>
-              )}
-            </button>
-          )
-        })}
+      <div className="px-3 pb-2.5 flex-shrink-0">
+        <StatusFilterDropdown value={activeFilter} onChange={setActiveFilter} bookings={searchFiltered} />
       </div>
 
       <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-800">
@@ -484,7 +409,7 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
         ) : filteredList.length === 0 ? (
           <div className="p-6 text-center">
             <p className="text-gray-600 text-sm">
-              {activeFilter === 'All' ? 'No bookings found' : `No ${activeFilter.toLowerCase()} bookings`}
+              {activeFilter === 'all' ? 'No bookings found' : `No ${statusFilterLabel(activeFilter).toLowerCase()} bookings`}
             </p>
           </div>
         ) : (

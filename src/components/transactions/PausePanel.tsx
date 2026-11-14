@@ -20,6 +20,7 @@ import { OFFICE_CLOSE_HOUR, OFFICE_HOURS_LABEL, OFFICE_OPEN_HOUR } from '@/lib/o
 import { MapPointLink } from '@/components/map/LocationMapModal'
 import { cachedFetch } from '@/lib/query/useApiQuery'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
+import { usePanelSection } from '@/components/ui/PanelReady'
 
 /**
  * Staff view of the pauses on one booking: a way to pause a delivery in
@@ -128,13 +129,15 @@ export default function PausePanel({ bookingId, pausedAt, inTransit, canControl,
   const [planTime, setPlanTime] = useState('')
   const canAct = canControl && PAUSE_ROLES.includes(role)
 
+  const [loaded, setLoaded] = useState(false)
+  usePanelSection(!loaded)
   const load = useCallback(async () => {
     try {
-      setPauses(await cachedFetch(['booking', bookingId, 'pauses'], () => pauseService.list(bookingId), setPauses))
+      setPauses(await cachedFetch(['booking', bookingId, 'pauses'], () => pauseService.list(bookingId), (p) => { setPauses(p); setLoaded(true) }))
     } catch {
       // Read-only extra; the booking still renders without it.
       setPauses([])
-    }
+    } finally { setLoaded(true) }
   }, [bookingId])
 
   useEffect(() => { void load() }, [load, pausedAt])

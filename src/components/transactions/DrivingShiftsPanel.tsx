@@ -11,6 +11,7 @@ import { getApiErrorMessage } from '@/lib/api-error'
 import { appToast } from '@/lib/toast'
 import { formatDateTime } from './transaction-format'
 import { BORDER_C, CYAN, MUTED } from './transaction-theme'
+import { usePanelSection } from '@/components/ui/PanelReady'
 
 /**
  * Who has been at the wheel: Start Navigation puts the main driver there, and
@@ -87,10 +88,13 @@ export default function DrivingShiftsPanel({ bookingId, inTransit, hasSecondDriv
       .catch(() => setPreview(null))
   }, [swapping, bookingId])
 
+  const [loaded, setLoaded] = useState(false)
+  usePanelSection(!loaded)
   const load = useCallback(() => {
     proxyApi.get<{ data: Shift[] }>(`/admin/assignments/${bookingId}/driving-shifts`)
       .then(({ data }) => setShifts(data.data ?? []))
       .catch(() => {})
+      .finally(() => setLoaded(true))
   }, [bookingId])
   useEffect(() => { load() }, [load])
   useLiveTable(['live:bookings'], load)

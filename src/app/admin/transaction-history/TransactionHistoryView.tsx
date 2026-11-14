@@ -1,5 +1,6 @@
 'use client'
-
+
+import { PanelReadyGate, PanelSpinner } from '@/components/ui/PanelReady'
 import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
 import Pagination from '@/components/ui/Pagination'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
@@ -487,13 +488,17 @@ export default function TransactionHistoryView() {
                     </button>
                   </div>
                 </div>
-                <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 pt-[18px] pb-6 space-y-[18px]">
-                  <StaffTransactionDetail booking={selected} />
-                  <ResubmissionChanges key={`rev-${selected.booking_id as string}`} bookingId={selected.booking_id as string}
-                    resubmissionCount={resubmissionsOf(selected)} />
-                  {/* Staff-only: crew, vehicle, proof photos, inspections, reports. */}
-                  <TransactionRecord key={selected.booking_id as string} booking={selected} />
-                  <StopTimesPanel key={`times-${selected.booking_id as string}`} bookingId={selected.booking_id as string} staff />
+                <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 pt-[18px] pb-6">
+                  {/* Nothing shows until every section has its first answer
+                      (user 2026-11-14), so the panel doesn't fill in piece by piece. */}
+                  <PanelReadyGate key={selected.booking_id as string} fallback={<PanelSpinner />} className="space-y-[18px]">
+                    <StaffTransactionDetail booking={selected} />
+                    <ResubmissionChanges key={`rev-${selected.booking_id as string}`} bookingId={selected.booking_id as string}
+                      resubmissionCount={resubmissionsOf(selected)} />
+                    {/* Staff-only: crew, vehicle, proof photos, inspections, reports. */}
+                    <TransactionRecord key={selected.booking_id as string} booking={selected} />
+                    <StopTimesPanel key={`times-${selected.booking_id as string}`} bookingId={selected.booking_id as string} staff />
+                  </PanelReadyGate>
                 </div>
               </motion.aside>
             </>

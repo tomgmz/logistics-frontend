@@ -14,6 +14,11 @@ import {
 } from '@/lib/validation/fields';
 import PhoneInputRow, { attachCountryCode } from '@/components/ui/PhoneInputRow';
 
+// Same limit as the backend's contact.schema.ts; change both together.
+const MESSAGE_MAX = 500;
+// The counter turns amber from here on.
+const MESSAGE_WARN = 450;
+
 // Same name / email / phone rules as every account in the system; the backend
 // (POST /api/public/contact) checks them again before emailing the company.
 const contactSchema = z.object({
@@ -25,7 +30,7 @@ const contactSchema = z.object({
     .string()
     .trim()
     .min(10, 'Message must be at least 10 characters')
-    .max(2000, 'Message is too long (2000 characters at most)'),
+    .max(MESSAGE_MAX, `Message is too long (${MESSAGE_MAX} characters at most)`),
 });
 
 type ContactForm = {
@@ -250,13 +255,28 @@ export default function ContactSection() {
                 <textarea
                   id="contact-message"
                   rows={4}
-                  maxLength={2000}
+                  maxLength={MESSAGE_MAX}
                   value={form.message}
                   onChange={(e) => set('message', e.target.value)}
                   aria-invalid={!!errors.message}
+                  aria-describedby="contact-message-count"
                   className={`${inputClass} ${borderFor('message')} resize-none h-[clamp(4.5rem,12svh,7.5rem)] short:h-16`}
                 />
-                <FieldError message={errors.message} />
+                <div className="flex items-start justify-between gap-3">
+                  <FieldError message={errors.message} />
+                  <p
+                    id="contact-message-count"
+                    className={`ml-auto mt-1 shrink-0 text-[0.7rem] tabular-nums ${
+                      form.message.length >= MESSAGE_MAX
+                        ? 'text-[#F62626]'
+                        : form.message.length >= MESSAGE_WARN
+                          ? 'text-[#FFEA00]'
+                          : 'text-white/40'
+                    }`}
+                  >
+                    {form.message.length}/{MESSAGE_MAX}
+                  </p>
+                </div>
               </div>
 
               <button

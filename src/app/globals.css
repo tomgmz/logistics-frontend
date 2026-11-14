@@ -931,12 +931,12 @@
  * inputs, and the rule must reach every one. Checkboxes, radios, sliders,
  * colour/file pickers and buttons are not text fields and are left alone;
  * so is the MUI Select's shown value (a dropdown, not typing). The landing
- * page keeps its own fonts: it sets <html data-landing> (LandingMarker).
+ * page is included too (user 2026-11-14).
  */
-html:not([data-landing]) input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"], [type="button"], [type="submit"], [type="reset"], [type="image"], [type="hidden"]),
-html:not([data-landing]) textarea,
-html:not([data-landing]) .MuiInputBase-input:not(.MuiSelect-select),
-html:not([data-landing]) input::placeholder,
-html:not([data-landing]) textarea::placeholder {
+input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"], [type="button"], [type="submit"], [type="reset"], [type="image"], [type="hidden"]),
+textarea,
+.MuiInputBase-input:not(.MuiSelect-select),
+input::placeholder,
+textarea::placeholder {
   font-family: var(--font-darker), 'Darker Grotesque', sans-serif !important;
 }

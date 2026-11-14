@@ -7,8 +7,10 @@
  * BookingManagementView.
  */
 
-import type { ReactNode } from 'react'
+import { useId, useState, type ReactNode } from 'react'
 import {
+  ChevronDown,
+  Info,
   MapPin,
   Building2,
   Calendar,
@@ -56,12 +58,19 @@ export function Tag({
 // ── Section heading ──────────────────────────────────────────────────────────
 
 export function SectionHeading({
-  icon, children, right,
-}: { icon: ReactNode; children: ReactNode; right?: ReactNode }) {
+  icon, children, right, tone = 'muted',
+}: {
+  icon: ReactNode
+  children: ReactNode
+  right?: ReactNode
+  /** 'bright' = white heading and icon (Booking Management, Figma 2026-11-14). */
+  tone?: 'muted' | 'bright'
+}) {
+  const color = tone === 'bright' ? 'text-white' : 'text-[#818181]'
   return (
     <div className="flex items-center gap-1.5 mb-2.5">
-      <span className="shrink-0 flex items-center text-[#818181]">{icon}</span>
-      <h3 className="text-sm font-bold uppercase text-[#818181] min-w-0">{children}</h3>
+      <span className={`shrink-0 flex items-center ${color}`}>{icon}</span>
+      <h3 className={`text-sm font-bold uppercase min-w-0 ${color}`}>{children}</h3>
       {right && <div className="ml-auto shrink-0">{right}</div>}
     </div>
   )
@@ -89,9 +98,11 @@ function InfoRow({ icon, children, strong = false }: { icon: ReactNode; children
 }
 
 export function BookingInfoCard({
-  reference, extras, origin, company, date, time, vehicleType, driverLine,
+  reference, extras, origin, company, date, time, vehicleType, driverLine, accentReference = false,
 }: {
   reference:   string
+  /** Booking number in cyan (Booking Management design). */
+  accentReference?: boolean
   /** Submitted time, after-hours and problem badges — under the reference. */
   extras?:     ReactNode
   origin:      string
@@ -105,7 +116,7 @@ export function BookingInfoCard({
   const iconProps = { size: 18, strokeWidth: 2, className: 'text-[#818181]' }
   return (
     <div className={`${CARD_CLASS} px-3.5 pt-2.5 pb-3.5 space-y-2`}>
-      <p className="text-sm font-bold text-[#818181] break-all">{reference}</p>
+      <p className="text-sm font-bold break-all" style={{ color: accentReference ? PALETTE.cyan : MUTED }}>{reference}</p>
       {extras}
       <InfoRow icon={<MapPin size={18} strokeWidth={2} style={{ color: PALETTE.cyan }} />} strong>
         {origin || '—'}
@@ -261,5 +272,103 @@ export function DocumentRow({ url, filename }: { url: string; filename: string }
       <span className="flex-1 min-w-0 truncate text-lg text-white">{filename}</span>
       <Eye size={18} strokeWidth={2} className="shrink-0 text-[#818181] group-hover:text-white transition-colors" />
     </FileViewButton>
+  )
+}
+
+// ── Booking Management panel pieces (Figma "booking_management_panels", 2026-11-14) ──
+
+/** The big teal action button: "Choose vehicle and driver", "Set Call Time", "Save Plan"… */
+export const TEAL_BUTTON_CLASS =
+  'w-full min-h-[46px] px-4 py-2 rounded-[10px] border text-base font-bold transition-colors ' +
+  'disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-center'
+export const TEAL_BUTTON_STYLE = { background: '#244543', borderColor: PALETTE.cyan, color: PALETTE.cyan } as const
+/** Its outlined grey partner ("Cancel"). */
+export const GREY_BUTTON_STYLE = { background: 'transparent', borderColor: MUTED, color: MUTED } as const
+
+/** Dashed rule between groups of the panel. */
+export function DashedDivider() {
+  return <div aria-hidden className="border-t border-dashed border-[#818181]/70 my-1" />
+}
+
+/** "(i)" next to a card title: the explanation shows on hover, focus or tap. */
+export function InfoTip({ text }: { text: string }) {
+  const [open, setOpen] = useState(false)
+  const id = useId()
+  return (
+    <span className="relative shrink-0">
+      <button
+        type="button"
+        aria-label="About this"
+        aria-describedby={open ? id : undefined}
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        onBlur={() => setOpen(false)}
+        className="flex p-0.5 rounded-full text-[#818181] [@media(hover:hover)]:hover:text-white"
+      >
+        <Info size={18} strokeWidth={1.75} />
+      </button>
+      {open && (
+        <span id={id} role="tooltip"
+          className="absolute right-0 top-full mt-1.5 z-20 w-[min(260px,70vw)] rounded-lg border border-[#424242] bg-[#111] px-3 py-2 text-xs font-normal normal-case leading-snug text-white/80 shadow-xl">
+          {text}
+        </span>
+      )}
+    </span>
+  )
+}
+
+/** The design's card: icon + title (+ grey subtitle) and an (i) explanation. */
+export function DesignCard({
+  icon, title, subtitle, info, children, className = '',
+}: {
+  icon: ReactNode
+  title: ReactNode
+  subtitle?: ReactNode
+  info?: string
+  children: ReactNode
+  className?: string
+}) {
+  return (
+    <div className={`rounded-[15px] border border-[#424242] bg-[#1b1b1b] px-3.5 sm:px-4 pt-3 pb-4 space-y-3 ${className}`}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-start gap-2 min-w-0">
+          <span className="shrink-0 flex mt-px" style={{ color: PALETTE.cyan }}>{icon}</span>
+          <div className="min-w-0">
+            <h3 className="text-base font-bold text-white leading-tight">{title}</h3>
+            {subtitle && <div className="text-xs leading-tight mt-0.5">{subtitle}</div>}
+          </div>
+        </div>
+        {info && <InfoTip text={info} />}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+/** A cyan heading that opens and closes its section (Trips, Stop Times, Changes after Rejection). */
+export function CollapsibleSection({
+  title, children, defaultOpen = false, badge,
+}: { title: string; children: ReactNode; defaultOpen?: boolean; badge?: ReactNode }) {
+  const [open, setOpen] = useState(defaultOpen)
+  const id = useId()
+  return (
+    <section className="border-b border-[#424242]">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-controls={id}
+        className="w-full flex items-center justify-between gap-3 py-3 text-left"
+      >
+        <span className="flex items-center gap-2 min-w-0">
+          <span className="text-lg font-bold uppercase leading-tight" style={{ color: PALETTE.cyan }}>{title}</span>
+          {badge}
+        </span>
+        <ChevronDown size={18} strokeWidth={2} className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
+          style={{ color: PALETTE.cyan }} />
+      </button>
+      {/* Kept mounted while closed so live updates and an unsaved trip plan survive closing it. */}
+      <div id={id} hidden={!open} className="pb-4">{children}</div>
+    </section>
   )
 }

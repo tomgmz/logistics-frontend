@@ -18,6 +18,8 @@ export interface HandlingCode {
   type:             HandlingCodeType
   is_active:        boolean
   created_at?:      string
+  /** Bookings whose goods use it (main or additional code). Staff reads only. */
+  booking_count?:   number
 }
 
 export interface Commodity {
@@ -27,6 +29,10 @@ export interface Commodity {
   category?:    string | null
   is_active:    boolean
   created_at?:  string
+  /** Bookings whose goods use it. Staff reads only. */
+  booking_count?: number
+  /** Products filed under it. */
+  product_count?: number
 }
 
 export interface Product {
@@ -38,6 +44,8 @@ export interface Product {
   is_active:    boolean
   created_at?:  string
   commodities?: { name: string; category?: string | null } | null
+  /** Bookings whose goods use it. Staff reads only. */
+  booking_count?: number
 }
 
 export interface LandlinePrefix {

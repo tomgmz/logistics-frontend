@@ -21,6 +21,9 @@ import type {
   CreateLandlinePrefixPayload,
   CreateProductPayload,
   HandlingCode,
+  UpdateHandlingCodePayload,
+  UpdateCommodityPayload,
+  UpdateProductPayload,
 
   LandlinePrefix,
   Product,
@@ -44,15 +47,15 @@ const TABS = [
 ] as const
 type TabKey = (typeof TABS)[number]['key']
 
-type HandlingForm    = { code: string; name: string; description: string }
-type CommodityForm   = { name: string }
-type ProductForm     = { commodity_id: string; name: string }
+type HandlingForm    = { code: string; name: string; description: string; is_active: boolean }
+type CommodityForm   = { name: string; is_active: boolean }
+type ProductForm     = { commodity_id: string; name: string; is_active: boolean }
 type LandlineForm    = { prefix: string; city: string }
 type VehicleTypeForm = { name: string; description: string; is_active: boolean }
 
-const initHandling:    HandlingForm    = { code: '', name: '', description: '' }
-const initCommodity:   CommodityForm   = { name: '' }
-const initProduct:     ProductForm     = { commodity_id: '', name: '' }
+const initHandling:    HandlingForm    = { code: '', name: '', description: '', is_active: true }
+const initCommodity:   CommodityForm   = { name: '', is_active: true }
+const initProduct:     ProductForm     = { commodity_id: '', name: '', is_active: true }
 const initLandline:    LandlineForm    = { prefix: '', city: '' }
 const initVehicleType: VehicleTypeForm = { name: '', description: '', is_active: true }
 
@@ -82,6 +85,29 @@ function Field({ label, error, hint, children }: { label: string; error?: string
 type ConfirmTarget =
   | { kind: 'prefix'; item: LandlinePrefix }
   | { kind: 'vehicle_type'; item: VehicleType }
+  | { kind: 'handling'; item: HandlingCode }
+  | { kind: 'commodity'; item: Commodity }
+  | { kind: 'product'; item: Product }
+
+const bookingsText = (n: number) => `${n} booking${n === 1 ? '' : 's'}`
+
+/** What a handling code, commodity or product is used by; '' when nothing. */
+function usageText(item: { booking_count?: number; product_count?: number }) {
+  return [
+    item.booking_count ? bookingsText(item.booking_count) : '',
+    item.product_count ? `${item.product_count} product${item.product_count === 1 ? '' : 's'}` : '',
+  ].filter(Boolean).join(' and ')
+}
+
+/**
+ * Past bookings read these names through their link, so a rename shows on
+ * them too. Shown while a used entry's name is being changed.
+ */
+function renameHint(item: { booking_count?: number } | null, changed: boolean) {
+  if (!item || !changed || !item.booking_count) return undefined
+  return `${bookingsText(item.booking_count)} already show this name and will show the new one. `
+    + 'Use this to fix the spelling; for a different item, add a new one and make this one inactive.'
+}
 
 export default function SystemMaintenanceView() {
   // System-maintenance tier: hide the create/edit form and per-row write actions.
@@ -103,6 +129,9 @@ export default function SystemMaintenanceView() {
   const [hForm, setHForm] = useState<HandlingForm>(initHandling)
   const [cForm, setCForm] = useState<CommodityForm>(initCommodity)
   const [pForm, setPForm] = useState<ProductForm>(initProduct)
+  // The Products list's commodity filter. Picking a commodity on the add form
+  // sets it (as before); opening a product to edit doesn't.
+  const [productFilter, setProductFilter] = useState('')
 
   // The active tab's list, one server page at a time (10 on phones, 20 from
   // tablet up). `meta.tab` says which tab the rows belong to, so a tab switch
@@ -114,11 +143,11 @@ export default function SystemMaintenanceView() {
       const res = await systemMaintenanceService.getCatalogPage(t, {
         ...q,
         ...(debouncedSearch && { search: debouncedSearch }),
-        ...(t === 'products' && pForm.commodity_id && { commodity_id: pForm.commodity_id }),
+        ...(t === 'products' && productFilter && { commodity_id: productFilter }),
       })
       return { data: res.data, meta: { ...res.meta, tab: t } }
     },
-    `${tab}|${debouncedSearch}|${tab === 'products' ? pForm.commodity_id : ''}`,
+    `${tab}|${debouncedSearch}|${tab === 'products' ? productFilter : ''}`,
     { errorMessage: 'Failed to load data', cacheKey: 'system-maintenance' },
   )
   const { page, setPage, pageSize: PAGE_SIZE, totalPages } = table
@@ -130,6 +159,9 @@ export default function SystemMaintenanceView() {
 
   const [editingPrefix, setEditingPrefix] = useState<LandlinePrefix | null>(null)
   const [editingType,   setEditingType]   = useState<VehicleType | null>(null)
+  const [editingHandling,  setEditingHandling]  = useState<HandlingCode | null>(null)
+  const [editingCommodity, setEditingCommodity] = useState<Commodity | null>(null)
+  const [editingProduct,   setEditingProduct]   = useState<Product | null>(null)
 
   // Below lg the form panel would squeeze the list to nothing, so the form
   // opens as a sheet over the list instead.
@@ -160,6 +192,18 @@ export default function SystemMaintenanceView() {
     },
   })
   const typeLocks = useRecordLocks('vehicle_type', tab === 'vehicle_types')
+
+  const staleEdit = (noun: string) => () => {
+    appToast.info(`This ${noun} was just changed by someone else. Reopen it to edit the latest.`)
+    cancelEdit()
+    void load()
+  }
+  const handlingLock  = useRecordLock({ type: 'handling_code', id: editingHandling?.handling_code_id ?? null, onStale: staleEdit('handling code') })
+  const commodityLock = useRecordLock({ type: 'commodity',     id: editingCommodity?.commodity_id ?? null,   onStale: staleEdit('commodity') })
+  const productLock   = useRecordLock({ type: 'product',       id: editingProduct?.product_id ?? null,       onStale: staleEdit('product') })
+  const handlingLocks  = useRecordLocks('handling_code', tab === 'handling')
+  const commodityLocks = useRecordLocks('commodity',     tab === 'commodities')
+  const productLocks   = useRecordLocks('product',       tab === 'products')
 
   // `quiet` re-reads in place (a live signal): no spinner and no error toast.
   async function load(quiet = false) {
@@ -205,6 +249,13 @@ export default function SystemMaintenanceView() {
   }, [tab])
 
   function cancelEdit() {
+    // A half-typed new entry survives a tab switch; an edit form is dropped.
+    if (editingHandling)  setHForm(initHandling)
+    if (editingCommodity) setCForm(initCommodity)
+    if (editingProduct)   setPForm({ ...initProduct, commodity_id: productFilter })
+    setEditingHandling(null)
+    setEditingCommodity(null)
+    setEditingProduct(null)
     setEditingPrefix(null)
     setLForm(initLandline)
     setEditingType(null)
@@ -235,10 +286,31 @@ export default function SystemMaintenanceView() {
       appToast.error('Code and name are required.')
       return
     }
+    if (editingHandling) {
+      const payload: UpdateHandlingCodePayload = {
+        code:        hForm.code.trim().toUpperCase(),
+        name:        hForm.name.trim(),
+        description: hForm.description.trim() || null,
+        is_active:   hForm.is_active,
+      }
+      try {
+        setSaving(true)
+        const updated = await systemMaintenanceService.updateHandlingCode(editingHandling.handling_code_id, payload)
+        refreshTable()
+        appToast.success(`Handling code ${updated.code} saved.`)
+        closeSheet()
+      } catch (e: unknown) {
+        appToast.error(getApiErrorMessage(e) || 'Failed to save handling code')
+      } finally {
+        setSaving(false)
+      }
+      return
+    }
     const payload: CreateHandlingCodePayload = {
       code:        hForm.code.trim().toUpperCase(),
       name:        hForm.name.trim(),
       description: hForm.description.trim() || undefined,
+      is_active:   hForm.is_active,
     }
     try {
       setSaving(true)
@@ -260,13 +332,31 @@ export default function SystemMaintenanceView() {
       return
     }
     // Same check the server makes (case and outer spaces ignored).
-    const taken = commodities.find(c => c.name.trim().toLowerCase() === cForm.name.trim().toLowerCase())
+    const taken = commodities.find(c =>
+      c.commodity_id !== editingCommodity?.commodity_id && c.name.trim().toLowerCase() === cForm.name.trim().toLowerCase())
     if (taken) {
       appToast.error(`Commodity "${taken.name}" already exists.`)
       return
     }
+    if (editingCommodity) {
+      const payload: UpdateCommodityPayload = { name: cForm.name.trim(), is_active: cForm.is_active }
+      try {
+        setSaving(true)
+        const updated = await systemMaintenanceService.updateCommodity(editingCommodity.commodity_id, payload)
+        setCommodities(prev => prev.map(c => c.commodity_id === updated.commodity_id ? { ...c, ...updated } : c))
+        refreshTable()
+        appToast.success(`Commodity "${updated.name}" saved.`)
+        closeSheet()
+      } catch (e: unknown) {
+        appToast.error(getApiErrorMessage(e) || 'Failed to save commodity')
+      } finally {
+        setSaving(false)
+      }
+      return
+    }
     const payload: CreateCommodityPayload = {
-      name: cForm.name.trim(),
+      name:      cForm.name.trim(),
+      is_active: cForm.is_active,
     }
     try {
       setSaving(true)
@@ -292,16 +382,36 @@ export default function SystemMaintenanceView() {
       appToast.error('Product is required.')
       return
     }
+    if (editingProduct) {
+      const payload: UpdateProductPayload = {
+        commodity_id: pForm.commodity_id,
+        name:         pForm.name.trim(),
+        is_active:    pForm.is_active,
+      }
+      try {
+        setSaving(true)
+        const updated = await systemMaintenanceService.updateProduct(editingProduct.product_id, payload)
+        refreshTable()
+        appToast.success(`Product "${updated.name}" saved.`)
+        closeSheet()
+      } catch (e: unknown) {
+        appToast.error(getApiErrorMessage(e) || 'Failed to save product')
+      } finally {
+        setSaving(false)
+      }
+      return
+    }
     const payload: CreateProductPayload = {
       commodity_id: pForm.commodity_id,
       name:         pForm.name.trim(),
+      is_active:    pForm.is_active,
     }
     try {
       setSaving(true)
       const created = await systemMaintenanceService.createProduct(payload)
       // Re-read the page: the list endpoint embeds the commodity; the create response does not.
       refreshTable()
-      setPForm(initProduct)
+      setPForm({ ...initProduct, commodity_id: pForm.commodity_id })
       setSheetOpen(false)
       appToast.success(`Product "${created.name}" added.`)
     } catch (e: unknown) {
@@ -434,6 +544,44 @@ export default function SystemMaintenanceView() {
       return
     }
 
+    if (target.kind === 'handling' || target.kind === 'commodity' || target.kind === 'product') {
+      const item  = target.item
+      const used  = usageText(item) !== ''
+      const id    = target.kind === 'handling' ? target.item.handling_code_id
+                  : target.kind === 'commodity' ? target.item.commodity_id
+                  : target.item.product_id
+      const label = target.kind === 'handling' ? target.item.code : target.item.name
+      // In use and already inactive: the confirm only explained why.
+      if (used && !item.is_active) { setConfirm(null); return }
+      try {
+        setDeleting(id)
+        if (used) {
+          if (target.kind === 'handling')  await systemMaintenanceService.updateHandlingCode(id, { is_active: false })
+          if (target.kind === 'commodity') await systemMaintenanceService.updateCommodity(id, { is_active: false })
+          if (target.kind === 'product')   await systemMaintenanceService.updateProduct(id, { is_active: false })
+          appToast.success(`${label} is now inactive.`)
+        } else {
+          if (target.kind === 'handling')  await systemMaintenanceService.deleteHandlingCode(id)
+          if (target.kind === 'commodity') await systemMaintenanceService.deleteCommodity(id)
+          if (target.kind === 'product')   await systemMaintenanceService.deleteProduct(id)
+          appToast.success(`${label} deleted.`)
+        }
+        // Commodities also feed the product form's picker.
+        if (target.kind === 'commodity') void load(true)
+        else refreshTable()
+        if (editingHandling?.handling_code_id === id || editingCommodity?.commodity_id === id || editingProduct?.product_id === id) closeSheet()
+        setConfirm(null)
+      } catch (e: unknown) {
+        // e.g. a booking used it a moment ago: the server refuses the delete.
+        appToast.error(getApiErrorMessage(e) || `Failed to delete ${label}`)
+        setConfirm(null)
+        void load(true)
+      } finally {
+        setDeleting(null)
+      }
+      return
+    }
+
     const vt = target.item
     // A type still on models can't go; the confirm offers to hide it instead.
     if (vt.model_count > 0 && !vt.is_active) { setConfirm(null); return }
@@ -468,6 +616,27 @@ export default function SystemMaintenanceView() {
     setSheetOpen(true)
   }
 
+  function startEditHandling(hc: HandlingCode) {
+    cancelEdit()
+    setEditingHandling(hc)
+    setHForm({ code: hc.code, name: hc.name, description: hc.description ?? '', is_active: hc.is_active })
+    setSheetOpen(true)
+  }
+
+  function startEditCommodity(c: Commodity) {
+    cancelEdit()
+    setEditingCommodity(c)
+    setCForm({ name: c.name, is_active: c.is_active })
+    setSheetOpen(true)
+  }
+
+  function startEditProduct(prod: Product) {
+    cancelEdit()
+    setEditingProduct(prod)
+    setPForm({ commodity_id: prod.commodity_id, name: prod.name, is_active: prod.is_active })
+    setSheetOpen(true)
+  }
+
   function startEditType(vt: VehicleType) {
     cancelEdit()
     setEditingType(vt)
@@ -476,14 +645,14 @@ export default function SystemMaintenanceView() {
   }
 
   const isEditing = (tab === 'landline' && !!editingPrefix) || (tab === 'vehicle_types' && !!editingType)
+    || (tab === 'handling' && !!editingHandling) || (tab === 'commodities' && !!editingCommodity)
+    || (tab === 'products' && !!editingProduct)
   const activeTab = TABS.find(t => t.key === tab)!
-  // Tabs that can edit existing rows, as opposed to add-only ones.
-  const editableTab = tab === 'landline' || tab === 'vehicle_types'
 
   function renderForm() {
     if (!isEditing && !canCreate) return (
       <p className="text-sm text-white/40 leading-relaxed">
-        {editableTab
+        {canEdit
           ? 'Your access can change existing entries but not add new ones. Pick an entry in the list to edit it.'
           : 'Your access can view these entries but not add new ones.'}
       </p>
@@ -491,7 +660,10 @@ export default function SystemMaintenanceView() {
 
     if (tab === 'handling') return (
       <div className="space-y-4">
-        <Field label="Code *">
+        {editingHandling && <RecordLockBanner lock={handlingLock} noun="handling code" />}
+        {editingHandling && <EditingChip label={`Editing ${editingHandling.code}`} onCancel={closeSheet} />}
+        <fieldset disabled={handlingLock.readOnly || saving} className="space-y-4 min-w-0 border-0 p-0 m-0">
+        <Field label="Code *" hint={renameHint(editingHandling, !!editingHandling && hForm.code.trim().toUpperCase() !== editingHandling.code)}>
           <input
             value={hForm.code}
             onChange={e => setHForm(p => ({ ...p, code: e.target.value.toUpperCase() }))}
@@ -501,7 +673,7 @@ export default function SystemMaintenanceView() {
             autoComplete="off"
           />
         </Field>
-        <Field label="Name *">
+        <Field label="Name *" hint={renameHint(editingHandling, !!editingHandling && hForm.name.trim() !== editingHandling.name)}>
           <input
             value={hForm.name}
             onChange={e => setHForm(p => ({ ...p, name: e.target.value }))}
@@ -517,13 +689,28 @@ export default function SystemMaintenanceView() {
             placeholder="Optional details"
           />
         </Field>
-        <SubmitBtn label="Add handling code" busy={saving} onClick={() => void submitHandling()} />
+        <ActiveSwitch
+          value={hForm.is_active}
+          onChange={v => setHForm(p => ({ ...p, is_active: v }))}
+          onText="Offered on the booking form."
+          offText="Hidden from the booking form. Bookings that already use it keep it."
+        />
+        <SubmitBtn
+          label={editingHandling ? 'Save changes' : 'Add handling code'}
+          icon={!editingHandling}
+          busy={saving}
+          onClick={() => void submitHandling()}
+        />
+        </fieldset>
       </div>
     )
 
     if (tab === 'commodities') return (
       <div className="space-y-4">
-        <Field label="Name *">
+        {editingCommodity && <RecordLockBanner lock={commodityLock} noun="commodity" />}
+        {editingCommodity && <EditingChip label={`Editing ${editingCommodity.name}`} onCancel={closeSheet} />}
+        <fieldset disabled={commodityLock.readOnly || saving} className="space-y-4 min-w-0 border-0 p-0 m-0">
+        <Field label="Name *" hint={renameHint(editingCommodity, !!editingCommodity && cForm.name.trim() !== editingCommodity.name)}>
           <input
             value={cForm.name}
             onChange={e => setCForm(p => ({ ...p, name: e.target.value }))}
@@ -531,28 +718,50 @@ export default function SystemMaintenanceView() {
             placeholder="e.g. Electronics"
           />
         </Field>
-        <SubmitBtn label="Add commodity" busy={saving} onClick={() => void submitCommodity()} />
+        <ActiveSwitch
+          value={cForm.is_active}
+          onChange={v => setCForm(p => ({ ...p, is_active: v }))}
+          onText="Offered on the booking form and for new products."
+          offText="Hidden from the booking form and the product form. Bookings and products that already use it keep it."
+        />
+        <SubmitBtn
+          label={editingCommodity ? 'Save changes' : 'Add commodity'}
+          icon={!editingCommodity}
+          busy={saving}
+          onClick={() => void submitCommodity()}
+        />
+        </fieldset>
       </div>
     )
 
     if (tab === 'products') return (
       <div className="space-y-4">
+        {editingProduct && <RecordLockBanner lock={productLock} noun="product" />}
+        {editingProduct && <EditingChip label={`Editing ${editingProduct.name}`} onCancel={closeSheet} />}
+        <fieldset disabled={productLock.readOnly || saving} className="space-y-4 min-w-0 border-0 p-0 m-0">
         <Field label="Commodity *">
           <select
             value={pForm.commodity_id}
-            onChange={e => setPForm(p => ({ ...p, commodity_id: e.target.value }))}
+            onChange={e => {
+              const id = e.target.value
+              setPForm(p => ({ ...p, commodity_id: id }))
+              if (!editingProduct) setProductFilter(id)
+            }}
             className={inputCls}
             style={{ colorScheme: 'dark' }}
           >
             <option value="">Select commodity…</option>
-            {commodities.map(c => (
-              <option key={c.commodity_id} value={c.commodity_id}>
-                {c.name}
-              </option>
-            ))}
+            {/* Inactive commodities aren't offered, except the one the product already has. */}
+            {commodities
+              .filter(c => c.is_active || c.commodity_id === editingProduct?.commodity_id)
+              .map(c => (
+                <option key={c.commodity_id} value={c.commodity_id}>
+                  {c.name}{c.is_active ? '' : ' (inactive)'}
+                </option>
+              ))}
           </select>
         </Field>
-        <Field label="Product *">
+        <Field label="Product *" hint={renameHint(editingProduct, !!editingProduct && pForm.name.trim() !== editingProduct.name)}>
           <input
             value={pForm.name}
             onChange={e => setPForm(p => ({ ...p, name: e.target.value }))}
@@ -560,7 +769,19 @@ export default function SystemMaintenanceView() {
             placeholder="e.g. LCD Monitor"
           />
         </Field>
-        <SubmitBtn label="Add product" busy={saving} onClick={() => void submitProduct()} />
+        <ActiveSwitch
+          value={pForm.is_active}
+          onChange={v => setPForm(p => ({ ...p, is_active: v }))}
+          onText="Offered on the booking form."
+          offText="Hidden from the booking form. Bookings that already use it keep it."
+        />
+        <SubmitBtn
+          label={editingProduct ? 'Save changes' : 'Add product'}
+          icon={!editingProduct}
+          busy={saving}
+          onClick={() => void submitProduct()}
+        />
+        </fieldset>
       </div>
     )
 
@@ -600,34 +821,12 @@ export default function SystemMaintenanceView() {
               {vForm.description.length}/{VEHICLE_TYPE_DESC_MAX}
             </p>
           </Field>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={vForm.is_active}
-            onClick={() => setVForm(p => ({ ...p, is_active: !p.is_active }))}
-            className="flex w-full min-h-[44px] items-center gap-3 rounded-lg border border-white/10 bg-[#0a0a0a] px-3 py-2 text-left"
-          >
-            <span
-              className="relative h-5 w-9 shrink-0 rounded-full border transition-colors"
-              style={{
-                background:  vForm.is_active ? '#4DF9ED' : 'rgba(255,255,255,0.08)',
-                borderColor: vForm.is_active ? '#4DF9ED' : 'rgba(255,255,255,0.12)',
-              }}
-            >
-              <span
-                className="absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform"
-                style={{ transform: vForm.is_active ? 'translateX(17px)' : 'translateX(2px)' }}
-              />
-            </span>
-            <span className="min-w-0">
-              <span className="block text-sm font-semibold text-white">{vForm.is_active ? 'Active' : 'Inactive'}</span>
-              <span className="block text-[11px] text-white/40">
-                {vForm.is_active
-                  ? 'Shown when picking a type for a model, a vehicle or a vendor vehicle.'
-                  : 'Hidden from the pickers. Models that already use it keep it.'}
-              </span>
-            </span>
-          </button>
+          <ActiveSwitch
+            value={vForm.is_active}
+            onChange={v => setVForm(p => ({ ...p, is_active: v }))}
+            onText="Shown when picking a type for a model, a vehicle or a vendor vehicle."
+            offText="Hidden from the pickers. Models that already use it keep it."
+          />
           <SubmitBtn
             label={editingType ? 'Save changes' : 'Add vehicle type'}
             icon={!editingType}
@@ -705,48 +904,93 @@ export default function SystemMaintenanceView() {
 
     if (tab === 'handling') return (
       <div className="space-y-2">
-        {(rows as HandlingCode[]).map(hc => (
-          <div key={hc.handling_code_id} className={rowCls}>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-              <span className="font-mono text-sm font-bold text-[#4DF9ED] break-all">{hc.code}</span>
-              <span className="min-w-0 text-sm text-white/70 break-words">{hc.name}</span>
+        {(rows as HandlingCode[]).map(hc => {
+          const lockedBy = handlingLocks.get(hc.handling_code_id)
+          return (
+            <div key={hc.handling_code_id} className={`${rowCls} ${editingHandling?.handling_code_id === hc.handling_code_id ? '!border-[#4DF9ED]/30' : ''}`}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                    <span className="font-mono text-sm font-bold text-[#4DF9ED] break-all">{hc.code}</span>
+                    <span className="min-w-0 text-sm text-white/70 break-words">{hc.name}</span>
+                    <ActiveBadge active={hc.is_active} />
+                  </div>
+                  <UsageLine item={hc} />
+                  {hc.description && <p className="mt-1.5 text-xs text-white/35 break-words">{hc.description}</p>}
+                </div>
+                <RowButtons
+                  lockedBy={lockedBy}
+                  busy={deleting === hc.handling_code_id || !!lockedBy}
+                  deleting={deleting === hc.handling_code_id}
+                  name={hc.code}
+                  onEdit={canEdit ? () => startEditHandling(hc) : undefined}
+                  onDelete={canDelete ? () => setConfirm({ kind: 'handling', item: hc }) : undefined}
+                />
+              </div>
             </div>
-            {hc.description && <p className="mt-1.5 text-xs text-white/35 break-words">{hc.description}</p>}
-          </div>
-        ))}
+          )
+        })}
       </div>
     )
 
     if (tab === 'commodities') return (
       <div className="space-y-2">
-        {(rows as Commodity[]).map(c => (
-          <div key={c.commodity_id} className={rowCls}>
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-white break-words">{c.name}</p>
+        {(rows as Commodity[]).map(c => {
+          const lockedBy = commodityLocks.get(c.commodity_id)
+          return (
+            <div key={c.commodity_id} className={`${rowCls} ${editingCommodity?.commodity_id === c.commodity_id ? '!border-[#4DF9ED]/30' : ''}`}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <p className="text-sm font-semibold text-white break-words">{c.name}</p>
+                    <ActiveBadge active={c.is_active} />
+                  </div>
+                  <UsageLine item={c} />
+                </div>
+                <RowButtons
+                  lockedBy={lockedBy}
+                  busy={deleting === c.commodity_id || !!lockedBy}
+                  deleting={deleting === c.commodity_id}
+                  name={c.name}
+                  onEdit={canEdit ? () => startEditCommodity(c) : undefined}
+                  onDelete={canDelete ? () => setConfirm({ kind: 'commodity', item: c }) : undefined}
+                />
               </div>
-              <ActiveBadge active={c.is_active} />
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
     )
 
     if (tab === 'products') return (
       <div className="space-y-2">
-        {(rows as Product[]).map(prod => (
-          <div key={prod.product_id} className={rowCls}>
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-white break-words">{prod.name}</p>
-                <p className="text-xs text-white/40 mt-0.5 break-words">
-                  {prod.commodities?.name ?? '—'}
-                </p>
+        {(rows as Product[]).map(prod => {
+          const lockedBy = productLocks.get(prod.product_id)
+          return (
+            <div key={prod.product_id} className={`${rowCls} ${editingProduct?.product_id === prod.product_id ? '!border-[#4DF9ED]/30' : ''}`}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <p className="text-sm font-semibold text-white break-words">{prod.name}</p>
+                    <ActiveBadge active={prod.is_active} />
+                  </div>
+                  <p className="text-xs text-white/40 mt-0.5 break-words">
+                    {prod.commodities?.name ?? '—'}
+                  </p>
+                  <UsageLine item={prod} />
+                </div>
+                <RowButtons
+                  lockedBy={lockedBy}
+                  busy={deleting === prod.product_id || !!lockedBy}
+                  deleting={deleting === prod.product_id}
+                  name={prod.name}
+                  onEdit={canEdit ? () => startEditProduct(prod) : undefined}
+                  onDelete={canDelete ? () => setConfirm({ kind: 'product', item: prod }) : undefined}
+                />
               </div>
-              <ActiveBadge active={prod.is_active} />
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
     )
 
@@ -845,6 +1089,25 @@ export default function SystemMaintenanceView() {
       confirmLabel       = 'OK'
     }
   }
+  if (confirm?.kind === 'handling' || confirm?.kind === 'commodity' || confirm?.kind === 'product') {
+    const item  = confirm.item
+    const label = confirm.kind === 'handling' ? confirm.item.code : confirm.item.name
+    const uses  = usageText(item)
+    if (!uses) {
+      confirmTitle       = `Delete ${label}?`
+      confirmDescription = 'No booking uses it. It is removed for good.'
+    } else if (item.is_active) {
+      confirmTitle       = `${label} can't be deleted`
+      confirmDescription = `It is used on ${uses}, and they would lose it. `
+        + 'Make it inactive instead: it disappears from the booking form and they keep it.'
+      confirmLabel       = 'Make inactive'
+    } else {
+      confirmTitle       = `${label} can't be deleted`
+      confirmDescription = `It is used on ${uses}, and they would lose it. `
+        + 'It is already inactive, so it no longer shows on the booking form.'
+      confirmLabel       = 'OK'
+    }
+  }
   if (deleting) confirmLabel = 'Working…'
 
   return (
@@ -921,7 +1184,7 @@ export default function SystemMaintenanceView() {
               </div>
               {!loading && (
                 <p className="shrink-0 text-xs text-white/30 tabular-nums">
-                  {q || (tab === 'products' && pForm.commodity_id) ? `${tabCount} of ${tabTotal}` : tabTotal}
+                  {q || (tab === 'products' && productFilter) ? `${tabCount} of ${tabTotal}` : tabTotal}
                 </p>
               )}
             </div>
@@ -942,15 +1205,18 @@ export default function SystemMaintenanceView() {
                   </button>
                 )}
               </div>
-              {tab === 'products' && pForm.commodity_id && (
+              {tab === 'products' && productFilter && (
                 <button
                   type="button"
-                  onClick={() => setPForm(p => ({ ...p, commodity_id: '' }))}
+                  onClick={() => {
+                    setProductFilter('')
+                    if (!editingProduct) setPForm(p => ({ ...p, commodity_id: '' }))
+                  }}
                   className="inline-flex max-w-full items-center gap-1.5 self-start sm:self-auto text-[11px] font-bold uppercase tracking-widest px-2.5 py-1.5 rounded-lg border transition-colors"
                   style={{ borderColor: '#4DF9ED55', color: '#4DF9ED', background: 'rgba(77,249,237,0.08)' }}
                   aria-label="Clear commodity filter"
                 >
-                  <span className="truncate">{commodities.find(c => c.commodity_id === pForm.commodity_id)?.name ?? 'Filtered'}</span>
+                  <span className="truncate">{commodities.find(c => c.commodity_id === productFilter)?.name ?? 'Filtered'}</span>
                   <X size={12} className="shrink-0" />
                 </button>
               )}
@@ -1110,6 +1376,45 @@ function SubmitBtn({ label, busy, onClick, disabled = false, icon = true }: {
     </button>
     </div>
   )
+}
+
+function ActiveSwitch({ value, onChange, onText, offText }: {
+  value: boolean; onChange: (v: boolean) => void; onText: string; offText: string
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={value}
+      onClick={() => onChange(!value)}
+      className="flex w-full min-h-[44px] items-center gap-3 rounded-lg border border-white/10 bg-[#0a0a0a] px-3 py-2 text-left"
+    >
+      <span
+        className="relative h-5 w-9 shrink-0 rounded-full border transition-colors"
+        style={{
+          background:  value ? '#4DF9ED' : 'rgba(255,255,255,0.08)',
+          borderColor: value ? '#4DF9ED' : 'rgba(255,255,255,0.12)',
+        }}
+      >
+        <span
+          className="absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform"
+          style={{ transform: value ? 'translateX(17px)' : 'translateX(2px)' }}
+        />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-sm font-semibold text-white">{value ? 'Active' : 'Inactive'}</span>
+        <span className="block text-[11px] text-white/40">{value ? onText : offText}</span>
+      </span>
+    </button>
+  )
+}
+
+/** "Used on 3 bookings" under a handling code, commodity or product. */
+function UsageLine({ item }: { item: { booking_count?: number; product_count?: number } }) {
+  // An older server sends no counts: say nothing rather than "not used".
+  if (item.booking_count === undefined) return null
+  const uses = usageText(item)
+  return <p className="text-xs text-white/40 mt-1">{uses ? `Used on ${uses}` : 'Not used on any booking'}</p>
 }
 
 function ActiveBadge({ active }: { active: boolean }) {

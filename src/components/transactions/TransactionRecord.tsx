@@ -21,6 +21,7 @@ import { pausedPlanState } from '@/lib/pause-continuation'
 import { CARD_CLASS, SectionHeading, Tag } from '@/app/admin/booking-management/BookingDetailParts'
 import { BORDER_C, CYAN, MUTED, ERROR, AMBER, GREEN } from './transaction-theme'
 import { FileViewButton, ProtectedImg } from '@/components/ui/FileViewer'
+import { usePanelSection } from '@/components/ui/PanelReady'
 
 /**
  * The staff-only half of a transaction: everything attached to the booking that
@@ -523,6 +524,7 @@ export default function TransactionRecord({ booking }: { booking: Booking }) {
   const [record, setRecord]   = useState<RecordData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState<string | null>(null)
+  usePanelSection(loading)
 
   // The parent keys this component by booking, so a different row remounts it
   // with fresh state instead of resetting it here.

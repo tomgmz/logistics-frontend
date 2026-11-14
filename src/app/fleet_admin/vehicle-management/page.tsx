@@ -1,4 +1,9 @@
+import type { Metadata } from 'next'
 import VehicleManagementView from '@/app/admin/vehicle-management/VehicleManagementView'
+
+export const metadata: Metadata = {
+  title: 'Vehicle Management',
+}
 
 export default function FleetManagerVehicles() {
   return (
