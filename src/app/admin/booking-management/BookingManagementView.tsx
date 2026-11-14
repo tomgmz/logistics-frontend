@@ -1450,7 +1450,8 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
         if (live && (now.status !== wasStatus || (now.paused_at ?? null) !== wasPaused)) {
           void refreshDetail(openId)
           if (now.status === 'in_transit' && wasStatus !== 'in_transit') {
-            appToast.info('The driver has started this delivery. The driver and vehicle can no longer be changed.', {
+            const ref = now.reference_number ?? detail.reference_number
+            appToast.info(`The driver has started ${ref ? `delivery ${ref}` : 'this delivery'}. The driver and vehicle can no longer be changed.`, {
               action: 'assign', entityId: openId,
             })
           }
