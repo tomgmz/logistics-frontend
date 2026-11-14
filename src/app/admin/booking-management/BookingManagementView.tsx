@@ -700,7 +700,21 @@ function AssignmentPanel({
       {isAssigned ? (
         <CrewCard crew={crew} showDetail={editing}
           extra={selectedCoding && !pickerOpen ? <CodingNotice flag={selectedCoding} plate={selectedPlate!} /> : null}>
-          {editing ? bigButton : (
+          {editing ? (
+            <div className="space-y-2">
+              {bigButton}
+              {/* Back to the slim Edit bar; nothing on the booking changes. */}
+              <button
+                type="button"
+                disabled={assignBusy}
+                onClick={toggleEditing}
+                className="w-full min-h-[44px] rounded-xl text-sm font-bold border border-white/15
+                           text-white/60 hover:text-white hover:border-white/30 transition-colors disabled:opacity-40"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
             <button
               type="button"
               disabled={assignBusy}
