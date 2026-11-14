@@ -192,7 +192,10 @@ export default function TripPlanner({ detail, canEdit, allowed = true, capacity 
   )
   const started = active.filter(isStartedTrip)
   const pending = active.filter((t) => !isStartedTrip(t))
-  const canPlan = canEdit && (pending.length > 0 || started.length === 0)
+  // Planning is for a delivery still to run: never once it is Delivered,
+  // Completed, Failed or Cancelled (user 2026-11-14: no Edit Plan on Delivered).
+  const stillRunning = ['assigned', 'in_transit'].includes(String(detail.status ?? '').toLowerCase())
+  const canPlan = canEdit && stillRunning && (pending.length > 0 || started.length === 0)
 
   /** Of each line, how much the loaded/finished runs took. */
   const takenByStarted = useMemo(() => {
@@ -715,7 +718,7 @@ export default function TripPlanner({ detail, canEdit, allowed = true, capacity 
             })}
           </ul>
 
-          {active.length === 1 && started.length === 0 && (
+          {stillRunning && active.length === 1 && started.length === 0 && (
             <p className="text-xs font-bold uppercase leading-snug text-[#818181]">
               Currently one trip carrying everything. Split it only if the load will not fit the
               vehicle in a single trip.

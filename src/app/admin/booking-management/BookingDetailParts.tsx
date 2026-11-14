@@ -347,15 +347,20 @@ export function DesignCard({
 
 /** A cyan heading that opens and closes its section (Trips, Stop Times, Changes after Rejection). */
 export function CollapsibleSection({
-  title, children, defaultOpen = false, badge,
-}: { title: string; children: ReactNode; defaultOpen?: boolean; badge?: ReactNode }) {
+  title, children, defaultOpen = false, badge, lazy = false,
+}: {
+  title: string; children: ReactNode; defaultOpen?: boolean; badge?: ReactNode
+  /** Mount the content only once it is first opened (its reads wait until then). */
+  lazy?: boolean
+}) {
   const [open, setOpen] = useState(defaultOpen)
+  const [opened, setOpened] = useState(defaultOpen)
   const id = useId()
   return (
     <section className="border-b border-[#424242]">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => { setOpen((v) => !v); setOpened(true) }}
         aria-expanded={open}
         aria-controls={id}
         className="w-full flex items-center justify-between gap-3 py-3 text-left"
@@ -368,7 +373,83 @@ export function CollapsibleSection({
           style={{ color: PALETTE.cyan }} />
       </button>
       {/* Kept mounted while closed so live updates and an unsaved trip plan survive closing it. */}
-      <div id={id} hidden={!open} className="pb-4">{children}</div>
+      <div id={id} hidden={!open} className="pb-4">{lazy && !opened ? null : children}</div>
     </section>
   )
 }
+
+// ── Driver and Vehicle Assignment card (Figma 2026-11-14) ────────────────────
+
+/** Who and what is on the booking, as the assignment card lists it. */
+export interface CrewSummary {
+  vendor:        boolean
+  driver:        string | null
+  /** Licence or driver number, shown once the card is unlocked for a change. */
+  driverDetail?: string | null
+  secondDriver?: string | null
+  helper?:       string | null
+  vehicle:       string | null
+  vendorName?:   string | null
+}
+
+/**
+ * Steering wheel + "Driver and Vehicle Assignment", "company fleet" (green) or
+ * "vendor supplied" (orange) under it, the driver and the vehicle, then
+ * whatever the stage puts under them (Edit, Change, Replace, nothing).
+ */
+export function CrewCard({ crew, showDetail = false, children, extra }: {
+  crew: CrewSummary
+  showDetail?: boolean
+  children?: ReactNode
+  /** Notices under the vehicle (number coding…). */
+  extra?: ReactNode
+}) {
+  const row = 'flex items-start gap-2 text-base font-bold text-[#818181] leading-snug'
+  const icon = { size: 22, strokeWidth: 2, className: 'text-white shrink-0' }
+  return (
+    <div className={`${CARD_CLASS} px-3.5 sm:px-4 pt-3 pb-4 flex flex-col gap-3`}>
+      <div className="flex items-start gap-2 min-w-0">
+        <AssetIcon name="steering-wheel" />
+        <div className="min-w-0">
+          <h3 className="text-base font-bold text-white leading-tight">Driver and Vehicle Assignment</h3>
+          <p className="text-xs font-bold uppercase leading-tight mt-0.5"
+            style={{ color: crew.vendor ? PALETTE.orange : PALETTE.green }}>
+            {crew.vendor ? 'Vendor supplied' : 'Company fleet'}
+          </p>
+        </div>
+      </div>
+      <div className={row}>
+        <User {...icon} />
+        <span className="min-w-0 break-words">
+          {crew.driver ?? '—'}{showDetail && crew.driverDetail ? `, ${crew.driverDetail}` : ''}
+        </span>
+      </div>
+      {crew.secondDriver && (
+        <div className={row}>
+          <User {...icon} />
+          <span className="min-w-0 break-words">{crew.secondDriver} <span className="text-xs">· second driver</span></span>
+        </div>
+      )}
+      {crew.helper && (
+        <div className={row}>
+          <User {...icon} />
+          <span className="min-w-0 break-words">{crew.helper} <span className="text-xs">· helper</span></span>
+        </div>
+      )}
+      <div className={row}>
+        <Truck {...icon} />
+        <span className="min-w-0 break-words">{crew.vehicle ?? '—'}</span>
+      </div>
+      {crew.vendor && crew.vendorName && (
+        <p className="text-xs font-bold text-[#818181]">Vendor: {crew.vendorName}</p>
+      )}
+      {extra}
+      {children}
+    </div>
+  )
+}
+
+/** The slim full-width "Edit" / "Unlock" bar under a card (pencil or lock icon). */
+export const SLIM_TEAL_BUTTON_CLASS =
+  'w-full min-h-[40px] px-3 rounded-[5px] border text-base font-bold transition-colors ' +
+  'disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5'

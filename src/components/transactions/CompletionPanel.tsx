@@ -26,9 +26,11 @@ import { AMBER, BORDER_C, CYAN, ERROR, MUTED } from './transaction-theme'
 
 const AUTO_COMPLETE_DAYS = 3
 
-export default function CompletionPanel({ booking, mode, onUpdated, canAct = true }: {
+export default function CompletionPanel({ booking, mode, onUpdated, canAct = true, look = 'default' }: {
   booking:   BookingWithRelations
   mode:      'client' | 'staff'
+  /** 'booking' = Booking Management's Figma card (delivered frame, 2026-11-14). */
+  look?:     'default' | 'booking'
   onUpdated: (next: BookingWithRelations) => void
   /** Staff only: false on a Read Only Booking Management tier disables "Mark problem resolved". */
   canAct?:   boolean
@@ -108,15 +110,19 @@ export default function CompletionPanel({ booking, mode, onUpdated, canAct = tru
   }
 
   const accent = openIssue ? ERROR : AMBER
+  const designed = look === 'booking'
 
   return (
-    <div className="rounded-xl border p-4 flex flex-col gap-3"
-      style={{ borderColor: `${accent}55`, background: `${accent}0d` }}>
+    <div className={designed ? 'rounded-[15px] border px-3.5 sm:px-4 pt-3 pb-4 flex flex-col gap-3' : 'rounded-xl border p-4 flex flex-col gap-3'}
+      style={designed
+        ? { borderColor: accent, background: openIssue ? '#2a0606' : '#5a5420' }
+        : { borderColor: `${accent}55`, background: `${accent}0d` }}>
       <div className="flex items-center gap-2">
         {openIssue
-          ? <AlertTriangle size={16} style={{ color: ERROR }} />
-          : <PackageCheck size={16} style={{ color: AMBER }} />}
-        <h3 className="text-sm font-bold text-white">
+          ? <AlertTriangle size={designed ? 18 : 16} style={{ color: ERROR }} />
+          : <PackageCheck size={designed ? 18 : 16} style={{ color: AMBER }} />}
+        <h3 className={designed ? 'text-base font-bold leading-tight' : 'text-sm font-bold text-white'}
+          style={designed ? { color: accent } : undefined}>
           {openIssue
             ? 'Problem reported by the client'
             : mode === 'client' ? 'Your delivery is done — please confirm' : 'Awaiting the client’s confirmation'}
@@ -125,7 +131,7 @@ export default function CompletionPanel({ booking, mode, onUpdated, canAct = tru
 
       {openIssue ? (
         <div className="flex flex-col gap-1">
-          <p className="text-[13px] text-white/85 whitespace-pre-wrap">{issueNote}</p>
+          <p className={`${designed ? 'text-sm font-bold text-white' : 'text-[13px] text-white/85'} whitespace-pre-wrap`}>{issueNote}</p>
           <span className="text-[11px]" style={{ color: MUTED }}>
             {issueAt ? `Reported ${formatDateTime(issueAt)} · ` : ''}
             {mode === 'client'
@@ -135,14 +141,14 @@ export default function CompletionPanel({ booking, mode, onUpdated, canAct = tru
         </div>
       ) : (
         <div className="flex flex-col gap-1">
-          <p className="text-[12px] text-white/70">
+          <p className={designed ? 'text-sm font-bold text-white leading-snug' : 'text-[12px] text-white/70'}>
             {resolvedAt
               ? <>The reported problem was marked resolved on {formatDateTime(resolvedAt)}.{' '}</>
               : <>The driver finished every drop-off{deliveredAt ? ` on ${formatDateTime(deliveredAt)}` : ''}.{' '}</>}
             {mode === 'client'
               ? 'Confirm the booking is complete, or report a problem if something is wrong.'
               : 'Only the client can confirm it.'}
-            {autoAt && <> It completes automatically on <span className="font-semibold">{formatDateTime(autoAt)}</span> if nothing is reported.</>}
+            {autoAt && <> It completes automatically on <span className={designed ? '' : 'font-semibold'}>{formatDateTime(autoAt)}</span> if nothing is reported.</>}
           </p>
           {resolvedAt && issueNote && (
             <span className="text-[11px] whitespace-pre-wrap" style={{ color: MUTED }}>

@@ -28,6 +28,7 @@ import { FileViewButton } from '@/components/ui/FileViewer'
 import { cachedFetch } from '@/lib/query/useApiQuery'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { usePanelSection } from '@/components/ui/PanelReady'
+import { CrewCard, SLIM_TEAL_BUTTON_CLASS, TEAL_BUTTON_CLASS, TEAL_BUTTON_STYLE, type CrewSummary } from '@/app/admin/booking-management/BookingDetailParts'
 
 const ORANGE = PALETTE.orange
 
@@ -69,8 +70,11 @@ export default function ReplaceCrewPanel({
   currentDriverId, currentSecondDriverId, currentTruckId, currentHelperName = null,
   currentIsVendor = false, currentVendorDriverUserId = null, currentVendorPlate = null, currentVendorType = null,
   cargo = null,
+  crew = null,
   onReplaced,
 }: {
+  /** The crew on the booking: the design's assignment card is drawn around the Replace button. */
+  crew?:                  CrewSummary | null
   bookingId:              string
   reference:              string | null
   inTransit:              boolean
@@ -171,7 +175,7 @@ export default function ReplaceCrewPanel({
   ), [vendorDrivers, bookingId])
 
   const canShowButton = inTransit && canReplace
-  if (!canShowButton && history.length === 0) return null
+  if (!canShowButton && history.length === 0 && !crew) return null
 
   const snapshot = (f: Record<string, string>) => JSON.stringify(f)
   const form = { source, driverId, secondId, truckId, vendorId, vendorSecondId, plate: plate.trim().toUpperCase(), vehicleType, helper: helper.trim() }
@@ -286,14 +290,43 @@ export default function ReplaceCrewPanel({
 
   return (
     <div className="flex flex-col gap-2">
-      {canShowButton && (
+      {/* Figma "Driver and Vehicle Assignment [IN TRANSIT]" (2026-11-14): the
+          crew, then "Replace driver or vehicle?" with Edit, which turns into
+          the big Replace button. Only while the delivery is paused. After
+          delivery the card lists the crew with no button. */}
+      {crew && (
+        <CrewCard crew={crew}>
+          {canShowButton && (
+            <>
+              <div aria-hidden className="border-t border-[#424242]" />
+              <p className="text-base font-bold text-white">Replace driver or vehicle?</p>
+              {!paused && (
+                <p className="text-xs font-bold leading-snug" style={{ color: MUTED }}>
+                  Pause the delivery first (for example for a breakdown). The driver already started, so the driver or vehicle can’t simply be changed.
+                </p>
+              )}
+              {editing && paused ? (
+                <button type="button" disabled={busy} onClick={() => void openPicker()} {...writeAccess(allowed)}
+                  className={`${TEAL_BUTTON_CLASS} min-h-[56px] text-lg`} style={TEAL_BUTTON_STYLE}>
+                  Replace vehicle and driver
+                </button>
+              ) : (
+                <button type="button" disabled={!paused || busy} onClick={() => setEditing(true)} {...writeAccess(allowed)}
+                  className={SLIM_TEAL_BUTTON_CLASS} style={TEAL_BUTTON_STYLE}>
+                  <Pencil size={16} /> Edit
+                </button>
+              )}
+            </>
+          )}
+        </CrewCard>
+      )}
+      {!crew && canShowButton && (
         <div className="rounded-xl border p-3.5 flex flex-col gap-2" style={{ borderColor: BORDER_C }}>
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
               <Repeat size={16} style={{ color: CYAN }} className="shrink-0" />
               <h3 className="text-sm font-bold text-white">Replace driver or vehicle</h3>
             </div>
-            {/* Edit first, so Replace is never pressed by accident. */}
             <button type="button" disabled={!paused || busy} onClick={() => setEditing((v) => !v)} {...writeAccess(allowed)}
               aria-pressed={editing}
               className="inline-flex items-center gap-1 shrink-0 rounded-lg border px-2.5 py-1 text-[11px] font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
@@ -304,11 +337,6 @@ export default function ReplaceCrewPanel({
               {editing ? 'Done' : 'Edit'}
             </button>
           </div>
-          <p className="text-[12px] leading-snug" style={{ color: MUTED }}>
-            {paused
-              ? 'The delivery is paused. Press Edit, then send another driver or vehicle (8338 or a vendor), change the second driver, or add a helper. The delivery continues from where it stopped and everything done so far stays on record.'
-              : 'Available only while the delivery is paused (pause it above, for example for a breakdown). The driver already started, so the driver or vehicle can’t simply be changed.'}
-          </p>
           <div>
             <button type="button" disabled={!paused || !editing || busy} onClick={() => void openPicker()} {...writeAccess(allowed)}
               className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"

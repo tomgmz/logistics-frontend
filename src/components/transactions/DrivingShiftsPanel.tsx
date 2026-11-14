@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { ArrowLeftRight, CarFront } from 'lucide-react'
+import { ArrowLeftRight, ChevronDown } from 'lucide-react'
 
 import proxyApi, { initCsrf } from '@/lib/api/auth.api'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
@@ -10,7 +10,9 @@ import { writeAccess } from '@/components/layout/ModuleAccess'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { appToast } from '@/lib/toast'
 import { formatDateTime } from './transaction-format'
-import { BORDER_C, CYAN, MUTED } from './transaction-theme'
+import { MUTED } from './transaction-theme'
+import { PALETTE } from '@/lib/palette'
+import { AssetIcon, CARD_CLASS, TEAL_BUTTON_CLASS, TEAL_BUTTON_STYLE } from '@/app/admin/booking-management/BookingDetailParts'
 import { usePanelSection } from '@/components/ui/PanelReady'
 
 /**
@@ -79,6 +81,7 @@ export default function DrivingShiftsPanel({ bookingId, inTransit, hasSecondDriv
   const [swapping, setSwapping] = useState(false)
   const [busy,     setBusy]     = useState(false)
   const [preview,  setPreview]  = useState<SwapPreview | null>(null)
+  const [showShifts, setShowShifts] = useState(false)
 
   // What the swap dialog shows: read fresh each time it opens.
   useEffect(() => {
@@ -118,38 +121,59 @@ export default function DrivingShiftsPanel({ bookingId, inTransit, hasSecondDriv
   if (shifts.length === 0 && !(inTransit && hasSecondDriver)) return null
   const current = shifts.find((s) => !s.ended_at) ?? null
 
+  // Figma "booking detail frame [IN TRANSIT]" (2026-11-14): the driver at the
+  // wheel now, "with secondary driver" under the title when there is one.
   return (
-    <div className="rounded-xl border p-3.5 flex flex-col gap-2.5" style={{ borderColor: BORDER_C }}>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="flex items-center gap-2 text-sm font-bold text-white">
-          <CarFront size={15} style={{ color: CYAN }} /> Who is driving
-        </h3>
-        {inTransit && hasSecondDriver && canSwap && (
-          <button type="button" disabled={busy} onClick={() => setSwapping(true)} {...writeAccess(allowed)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-2.5 py-1.5 text-[11px] font-bold text-white/70 disabled:opacity-40 disabled:cursor-not-allowed [@media(hover:hover)]:hover:text-white">
-            <ArrowLeftRight size={12} /> Swap main and second driver
-          </button>
-        )}
+    <div className={`${CARD_CLASS} px-3.5 sm:px-4 pt-3 pb-4 flex flex-col gap-3`}>
+      <div className="flex items-start gap-2 min-w-0">
+        <AssetIcon name="steering-wheel" />
+        <div className="min-w-0">
+          <h3 className="text-base font-bold text-white leading-tight">Who is driving</h3>
+          {hasSecondDriver && (
+            <p className="text-xs font-bold leading-tight mt-0.5" style={{ color: PALETTE.yellow }}>with secondary driver</p>
+          )}
+        </div>
       </div>
 
-      {current && (
-        <p className="text-[13px] text-white">
-          {current.driver_name ?? 'A driver'} <span style={{ color: MUTED }}>since {formatDateTime(current.started_at)} ({span(current.started_at, null)})</span>
-        </p>
+      {current ? (
+        <div>
+          <p className="text-base font-bold text-white break-words">{current.driver_name ?? 'A driver'}</p>
+          <p className="text-xs font-bold" style={{ color: MUTED }}>
+            Since {formatDateTime(current.started_at)} ({span(current.started_at, null)})
+          </p>
+        </div>
+      ) : (
+        <p className="text-sm font-bold" style={{ color: MUTED }}>Nobody at the wheel yet.</p>
       )}
 
       {shifts.length > 0 && (
-        <ul className="flex flex-col gap-1">
-          {shifts.map((s) => (
-            <li key={s.shift_id} className="flex flex-wrap items-baseline justify-between gap-x-3 text-[12px]">
-              <span className="text-white/85">{s.driver_name ?? 'Driver'} <span style={{ color: MUTED }}>· {SOURCE[s.source]}</span></span>
-              <span style={{ color: MUTED }}>
-                {formatDateTime(s.started_at)} – {s.ended_at ? formatDateTime(s.ended_at) : 'now'} · {span(s.started_at, s.ended_at)}
-                {s.clock_adjusted && ' (phone clock corrected)'}
-              </span>
-            </li>
-          ))}
-        </ul>
+        <div>
+          <button type="button" onClick={() => setShowShifts((v) => !v)} aria-expanded={showShifts}
+            className="inline-flex items-center gap-1 text-sm font-bold cursor-pointer" style={{ color: PALETTE.cyan }}>
+            Driving record ({shifts.length})
+            <ChevronDown size={15} className={`transition-transform ${showShifts ? 'rotate-180' : ''}`} />
+          </button>
+          {showShifts && (
+            <ul className="mt-2 flex flex-col">
+              {shifts.map((s) => (
+                <li key={s.shift_id} className="py-1.5 border-b border-dashed border-[#818181]/60 last:border-b-0">
+                  <p className="text-xs font-bold text-white">{s.driver_name ?? 'Driver'} <span style={{ color: MUTED }}>· {SOURCE[s.source]}</span></p>
+                  <p className="text-xs font-bold" style={{ color: MUTED }}>
+                    {formatDateTime(s.started_at)} – {s.ended_at ? formatDateTime(s.ended_at) : 'now'} · {span(s.started_at, s.ended_at)}
+                    {s.clock_adjusted && ' (phone clock corrected)'}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {inTransit && hasSecondDriver && canSwap && (
+        <button type="button" disabled={busy} onClick={() => setSwapping(true)} {...writeAccess(allowed)}
+          className={`${TEAL_BUTTON_CLASS} min-h-[40px] text-sm`} style={TEAL_BUTTON_STYLE}>
+          <ArrowLeftRight size={14} /> Swap main and second driver
+        </button>
       )}
 
       <RemarksModal

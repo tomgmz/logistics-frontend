@@ -940,3 +940,46 @@ input::placeholder,
 textarea::placeholder {
   font-family: var(--font-darker), 'Darker Grotesque', sans-serif !important;
 }
+
+/* Clickable things show the hand cursor (user 2026-11-14). Tailwind v4 gives
+   buttons the arrow by default. In the base layer, so a `cursor-*` utility
+   (cursor-not-allowed, cursor-default) on an element still wins. */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  summary,
+  label[for],
+  select:not(:disabled),
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled),
+  input[type="file"]:not(:disabled) {
+    cursor: pointer;
+  }
+  button:disabled,
+  [role="button"][aria-disabled="true"] {
+    cursor: not-allowed;
+  }
+}
+
+/* Booking Management side panel: buttons lift a little and brighten on hover,
+   and press down on click (user 2026-11-14). Mouse only: a phone has no hover. */
+@media (hover: hover) {
+  .bm-panel button:not(:disabled) {
+    transition: transform 150ms ease, filter 150ms ease, box-shadow 150ms ease, background-color 150ms ease, color 150ms ease, border-color 150ms ease;
+  }
+  .bm-panel button:not(:disabled):hover {
+    transform: translateY(-1px);
+    filter: brightness(1.18);
+    box-shadow: 0 4px 14px -6px rgba(77, 249, 237, 0.35);
+  }
+  .bm-panel button:not(:disabled):active {
+    transform: translateY(0) scale(0.985);
+    filter: brightness(0.95);
+    box-shadow: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bm-panel button:not(:disabled):hover,
+  .bm-panel button:not(:disabled):active { transform: none; }
+}
+

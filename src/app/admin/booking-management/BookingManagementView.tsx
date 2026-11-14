@@ -13,9 +13,6 @@ import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   X,
-  MapPin,
-  Truck,
-  User,
   Package,
   Weight,
   Layers,
@@ -74,6 +71,8 @@ import TripPlanner from './TripPlanner'
 import VehiclePicker, { cargoSummaryFromBooking, fitProblems } from './VehiclePicker'
 import DriverPicker, { type DriverPickerOption } from './DriverPicker'
 import CompletionPanel from '@/components/transactions/CompletionPanel'
+import TransactionRecord from '@/components/transactions/TransactionRecord'
+import DeliveryStopsCard from './DeliveryStopsCard'
 import { formatPlateNumber, plateError } from '@/lib/validation/plate'
 import ProblemReportedBadge, { hasOpenClientIssue } from '@/components/transactions/ProblemReportedBadge'
 import PartlyFailedBadge, { isPartlyFailed } from '@/components/transactions/PartlyFailedBadge'
@@ -105,17 +104,18 @@ import {
   BookingInfoCard,
   CargoItemCard,
   CargoSummaryTiles,
-  StopCard,
   DocumentRow,
   CollapsibleSection,
   DashedDivider,
   TEAL_BUTTON_CLASS,
   TEAL_BUTTON_STYLE,
+  CrewCard,
+  SLIM_TEAL_BUTTON_CLASS,
+  type CrewSummary,
 } from './BookingDetailParts'
 
 import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
 import { formatDuration } from '@/lib/duration'
-import { FileViewButton, ProtectedImg } from '@/components/ui/FileViewer'
 
 const BOOKING_STATUSES: AdminBookingLifecycleStatus[] = [
   'pending',
@@ -127,8 +127,6 @@ const BOOKING_STATUSES: AdminBookingLifecycleStatus[] = [
   'failed',
   'cancelled',
 ]
-
-const DEST_STATUSES: DestinationDeliveryStatus[] = ['pending', 'delivered', 'failed']
 
 // Roles that share this view. Each non-admin role sees a filtered slice of
 // bookings and acts only on its own stage of the workflow:
@@ -663,74 +661,68 @@ function AssignmentPanel({
   const cargo = useMemo(() => cargoSummaryFromBooking(detail), [detail])
 
   const title = isAssigned ? 'Change vehicle and driver' : 'Choose vehicle and driver'
-  const crewRowIcon = { size: 18, strokeWidth: 2, className: 'text-white shrink-0' }
+
+  // Figma "Driver and Vehicle Assignment [ASSIGNED]" (2026-11-14): the crew
+  // with a slim Edit bar; Edit turns it into "Change vehicle and driver", with
+  // the driver's licence shown, so the crew is never changed by accident.
+  const mainDriver = (() => {
+    if (vendorMode) return { name: driverLabel, detail: null as string | null }
+    const dr = drivers.find((x) => (x.drivers?.driver_id ?? x.user_id) === assignDriverId)
+    return dr
+      ? { name: `${dr.first_name} ${dr.last_name}`, detail: dr.drivers?.license_number ?? null }
+      : { name: driverLabel, detail: null }
+  })()
+  const crew = {
+    vendor:       vendorMode,
+    driver:       mainDriver.name,
+    driverDetail: mainDriver.detail,
+    secondDriver: secondDriverLabel,
+    helper:       savedHelperName,
+    vehicle:      truckLabel.replace(' · ', ', '),
+    vendorName:   vendorLabel,
+  }
+  const bigButton = (
+    <button
+      type="button"
+      disabled={assignBusy}
+      onClick={onOpenPicker}
+      aria-haspopup="dialog"
+      {...writeAccess(canEdit)}
+      className={`${TEAL_BUTTON_CLASS} min-h-[56px] text-lg`}
+      style={TEAL_BUTTON_STYLE}
+    >
+      {title}
+    </button>
+  )
 
   return (
-    <div className={`${CARD_CLASS} px-3.5 sm:px-4 pt-3 pb-4 space-y-3`}>
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <AssetIcon name="steering-wheel" />
-          <h3 className="text-base font-bold text-white leading-tight">Driver and Vehicle Assignment</h3>
-        </div>
-        {isAssigned && (
-          <button
-            type="button"
-            disabled={assignBusy}
-            onClick={toggleEditing}
-            aria-pressed={editing}
-            {...writeAccess(canEdit)}
-            className="inline-flex items-center gap-1 shrink-0 rounded-[5px] px-1.5 py-0.5 text-sm font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            style={{ color: PALETTE.cyan, background: editing ? 'rgba(77,249,237,0.14)' : 'transparent' }}
-          >
-            <Pencil size={13} />
-            {editing ? 'Done' : 'Edit'}
-          </button>
-        )}
-      </div>
-
+    <>
       {isAssigned ? (
-        <div className="space-y-2.5 text-sm font-bold text-[#818181]">
-          {vendorMode && <Tag color={PALETTE.orange}>Vendor-Supplied</Tag>}
-          <div className="flex items-start gap-[5px]">
-            <User {...crewRowIcon} />
-            <span className="min-w-0 break-words">{driverLabel}</span>
-          </div>
-          {secondDriverLabel && (
-            <div className="flex items-start gap-[5px]">
-              <User {...crewRowIcon} />
-              <span className="min-w-0 break-words">{secondDriverLabel} <span className="text-xs font-normal">· second driver</span></span>
-            </div>
+        <CrewCard crew={crew} showDetail={editing}
+          extra={selectedCoding && !pickerOpen ? <CodingNotice flag={selectedCoding} plate={selectedPlate!} /> : null}>
+          {editing ? bigButton : (
+            <button
+              type="button"
+              disabled={assignBusy}
+              onClick={toggleEditing}
+              {...writeAccess(canEdit)}
+              className={SLIM_TEAL_BUTTON_CLASS}
+              style={TEAL_BUTTON_STYLE}
+            >
+              <Pencil size={16} /> Edit
+            </button>
           )}
-          {savedHelperName && (
-            <div className="flex items-start gap-[5px]">
-              <User {...crewRowIcon} />
-              <span className="min-w-0 break-words">{savedHelperName} <span className="text-xs font-normal">· helper</span></span>
-            </div>
-          )}
-          <div className="flex items-start gap-[5px]">
-            <Truck {...crewRowIcon} />
-            <span className="min-w-0 break-words">{truckLabel}</span>
-          </div>
-          {vendorMode && vendorLabel && (
-            <div className="text-xs font-normal">Vendor: {vendorLabel}</div>
-          )}
-          {selectedCoding && !pickerOpen && <CodingNotice flag={selectedCoding} plate={selectedPlate!} />}
-        </div>
+        </CrewCard>
       ) : (
-        <p className="text-xs font-bold uppercase text-[#818181]">No vehicle or driver assigned yet.</p>
+        <div className={`${CARD_CLASS} px-3.5 sm:px-4 pt-3 pb-4 space-y-3`}>
+          <div className="flex items-center gap-2 min-w-0">
+            <AssetIcon name="steering-wheel" />
+            <h3 className="text-base font-bold text-white leading-tight">Driver and Vehicle Assignment</h3>
+          </div>
+          <p className="text-xs font-bold uppercase text-[#818181]">No vehicle or driver assigned yet.</p>
+          {bigButton}
+        </div>
       )}
-
-      <button
-        type="button"
-        disabled={assignBusy || (isAssigned && !editing)}
-        onClick={onOpenPicker}
-        aria-haspopup="dialog"
-        {...writeAccess(canEdit)}
-        className={`${TEAL_BUTTON_CLASS} min-h-[50px] text-lg`}
-        style={TEAL_BUTTON_STYLE}
-      >
-        {title}
-      </button>
 
       <CrewPickerDialog
         open={pickerOpen && canEdit}
@@ -977,7 +969,7 @@ function AssignmentPanel({
 
         {selectedCoding && <CodingNotice flag={selectedCoding} plate={selectedPlate!} />}
       </CrewPickerDialog>
-    </div>
+    </>
   )
 }
 
@@ -1135,38 +1127,6 @@ function BlowbagetsRecord({ check }: { check: BlowbagetsCheck }) {
       )}
       <p className="text-[10px] text-white/35">Checked {when}</p>
     </div>
-  )
-}
-
-/**
- * Proof of pickup / proof of delivery — the photo the driver took at the stop
- * before confirming it in the app. Click through for the full-size image.
- */
-function ProofPhoto({
-  url, at, label,
-}: { url: string; at?: string | null; label: string }) {
-  return (
-    <FileViewButton
-      url={url}
-      name={label}
-      title={`${label} — open full size`}
-      className="w-full flex items-center gap-2.5 rounded-lg border border-white/[0.08] bg-black/20 p-2
-                 hover:border-[var(--color-cyan)]/40 transition-colors group"
-    >
-      <ProtectedImg
-        src={url}
-        alt={label}
-        className="h-12 w-12 shrink-0 rounded-md object-cover border border-white/10"
-      />
-      <span className="min-w-0 flex-1">
-        <span className="block text-xs font-semibold text-white/80 group-hover:text-white transition-colors">
-          {label}
-        </span>
-        <span className="block text-[11px] text-white/40">
-          {at ? new Date(at).toLocaleString() : 'Photo on file'}
-        </span>
-      </span>
-    </FileViewButton>
   )
 }
 
@@ -2028,6 +1988,36 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
   const bookingReadOnly = bookingLock.readOnly
   // The crew record on the open booking (vendor snapshot, helper), for the replacement pop-up.
   const currentAssignment = detail ? allAssignments.find((a) => a.booking_id === detail.booking_id) : undefined
+  const stage = detail ? normalizeBookingStatus(detail.status) : 'pending'
+
+  // The crew card on the road and after (Figma "Driver and Vehicle Assignment").
+  const crewSummary: CrewSummary | null = (() => {
+    if (!detail || !currentAssignment) return null
+    const a = currentAssignment
+    const person = (u?: { first_name?: string | null; last_name?: string | null } | null) =>
+      [u?.first_name, u?.last_name].filter(Boolean).join(' ').trim() || null
+    if (a.is_vendor_supplied) {
+      return {
+        vendor: true,
+        driver: a.vendor_driver_name ?? detail.driver?.name ?? null,
+        secondDriver: person(a.second_driver?.users),
+        helper: a.helper_name ?? null,
+        vehicle: [a.vendor_vehicle_plate, a.vendor_vehicle_type].filter(Boolean).join(', ') || null,
+        vendorName: a.vendor_name,
+      }
+    }
+    const dr = drivers.find((x) => (x.drivers?.driver_id ?? x.user_id) === a.driver_id)
+    const truck = trucks.find((t) => t.truck_id === a.truck_id)
+    return {
+      vendor: false,
+      driver: dr ? `${dr.first_name} ${dr.last_name}` : detail.driver?.name ?? null,
+      secondDriver: person(a.second_driver?.users),
+      helper: a.helper_name ?? null,
+      vehicle: truck
+        ? `${truck.plate_number}${truck.vehicle_type ? `, ${truck.vehicle_type}` : ''}`
+        : a.trucks?.plate_number ?? null,
+    }
+  })()
   // Badges are informational, so read-only viewers see them too.
   const bookingLocks    = useRecordLocks('booking')
   const clockNow        = useMinuteClock()
@@ -2306,7 +2296,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                 animate={{ x: 0 }}
                 exit={{ x: '100%' }}
                 transition={{ type: 'spring', damping: 28, stiffness: 260 }}
-                className="fixed lg:relative z-[50] inset-y-0 right-0 w-full max-w-[455px] shrink-0 border-l border-[#424242] flex flex-col shadow-2xl lg:shadow-none"
+                className="bm-panel fixed lg:relative z-[50] inset-y-0 right-0 w-full max-w-[455px] shrink-0 border-l border-[#424242] flex flex-col shadow-2xl lg:shadow-none"
                 style={{ background: PANEL_BG }}
               >
                 <div className="shrink-0 flex items-center justify-between gap-3 pl-4 sm:pl-[26px] pr-2 sm:pr-3 min-h-[59px] border-b border-[#424242]">
@@ -2347,7 +2337,8 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
 
                       {/* Booking info */}
                       <BookingInfoCard
-                        accentReference
+                        // Grey while Pending, cyan from Approved on (Figma frames).
+                        accentReference={stage !== 'pending'}
                         reference={bookingRef(detail)}
                         extras={detail.created_at && (
                           <div className="flex flex-wrap items-center gap-2 text-xs text-[#818181]">
@@ -2431,54 +2422,25 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                         ) : null}
                       </section>
 
-                      {/* Proof of pickup, photographed by the driver at the origin. */}
-                      {d?.pickup_proof_photo_url && (
-                        <section>
-                          <SectionHeading tone="bright" icon={<MapPin size={18} strokeWidth={2} />}>Proof of pickup</SectionHeading>
-                          <ProofPhoto
-                            url={d.pickup_proof_photo_url}
-                            at={d.pickup_proof_at}
-                            label="Pickup confirmed by driver"
-                          />
-                        </section>
-                      )}
-
-                      {/* Delivery stops */}
+                      {/* Delivery stops: one card, pickup then drop-offs (Figma "delivery stops"). */}
                       <section>
                         <SectionHeading tone="bright" icon={<AssetIcon name="delivery-stops" />}>Delivery Stops</SectionHeading>
-                        <ul className="space-y-3">
-                          {sortedStops.map((dest) => (
-                            <StopCard
-                              key={dest.destination_id}
-                              address={dest.address}
-                              status={dest.status}
-                              statuses={DEST_STATUSES}
-                              label={fmtStatus}
-                            >
-                              {/* Proof of delivery, photographed by the driver at this stop. */}
-                              {dest.proof_photo_url
-                                ? (
-                                  <ProofPhoto
-                                    url={dest.proof_photo_url}
-                                    at={dest.proof_at ?? dest.delivered_at}
-                                    label="Proof of delivery"
-                                  />
-                                )
-                                : dest.status === 'delivered' && (
-                                  <p className="text-xs text-white/30">No proof photo on file.</p>
-                                )}
-                            </StopCard>
-                          ))}
-                        </ul>
-                        {sortedStops.length === 0 && (
-                          <p className="text-sm text-white/40">No stops on this booking.</p>
-                        )}
+                        <DeliveryStopsCard
+                          bookingId={detail.booking_id}
+                          status={stage}
+                          origin={detail.origin}
+                          stops={sortedStops}
+                          pickupProofUrl={d?.pickup_proof_photo_url ?? null}
+                          pickupProofAt={d?.pickup_proof_at ?? null}
+                        />
                       </section>
 
                       {/* Transaction documents */}
                       <TransactionDocs docs={d?.transaction_documents ?? []} />
 
-                      {/* Booking status */}
+                      {/* Booking status. Figma order (2026-11-14): what happened on the
+                          road, who is driving, complete for the driver, pause, then the
+                          driver and vehicle; after delivery, the client's confirmation. */}
                       <section className="space-y-3">
                         {!showStageActions && (
                           <SectionHeading tone="bright" icon={<CalendarRange size={18} strokeWidth={2} />}>
@@ -2493,8 +2455,8 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                               disabled={pendingStatus || pendingReject}
                               onClick={() => setRejectModalOpen(true)}
                               {...writeAccess(canEdit)}
-                              className="flex-1 min-h-[50px] px-3 py-2 rounded-[10px] border text-lg font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                              style={{ background: 'rgba(246,38,38,0.10)', borderColor: PALETTE.red, color: PALETTE.red }}
+                              className="flex-1 min-h-[56px] px-3 py-2 rounded-[10px] border text-lg font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                              style={{ background: '#3a0d0d', borderColor: PALETTE.red, color: PALETTE.red }}
                             >
                               {pendingReject ? 'Rejecting…' : 'Reject'}
                             </button>
@@ -2503,7 +2465,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                               disabled={pendingStatus || pendingReject}
                               onClick={() => setApproveModalOpen(true)}
                               {...writeAccess(canEdit)}
-                              className="flex-1 min-h-[50px] px-3 py-2 rounded-[10px] border text-lg font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                              className="flex-1 min-h-[56px] px-3 py-2 rounded-[10px] border text-lg font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                               style={TEAL_BUTTON_STYLE}
                             >
                               {pendingStatus ? 'Approving…' : 'Approve'}
@@ -2533,13 +2495,13 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                         {pulledByBooking.get(detail.booking_id) && (
                           <VehiclePulledBanner
                             {...pulledByBooking.get(detail.booking_id)!}
-                            onTheRoad={normalizeBookingStatus(detail.status) !== 'assigned'}
+                            onTheRoad={stage !== 'assigned'}
                           />
                         )}
 
                         {/* A crew license that lapses before, during or just after this
                             delivery (an expired one is already refused at assignment). */}
-                        {!['completed', 'failed', 'cancelled', 'rejected'].includes(normalizeBookingStatus(detail.status)) &&
+                        {!['completed', 'failed', 'cancelled', 'rejected'].includes(stage) &&
                           crewLicenseFlags(currentAssignment, detail.schedule_date).map((f) => (
                           <div key={f.text} className="rounded-xl border px-3.5 py-2.5 text-[13px] text-white/85"
                             style={{ borderColor: f.tone === 'red' ? '#F6262666' : '#FFEA0055', background: f.tone === 'red' ? '#F6262612' : '#FFEA000d' }}>
@@ -2551,7 +2513,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                             it (note pre-filled) or close it if the truck moves on. */}
                         {(() => {
                           const bd = detail as { breakdown_reported_at?: string | null; breakdown_note?: string | null; paused_at?: string | null }
-                          return bd.breakdown_reported_at && !bd.paused_at && normalizeBookingStatus(detail.status) === 'in_transit' ? (
+                          return bd.breakdown_reported_at && !bd.paused_at && stage === 'in_transit' ? (
                             <BreakdownPanel
                               bookingId={detail.booking_id}
                               reportedAt={bd.breakdown_reported_at}
@@ -2563,20 +2525,6 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                           ) : null
                         })()}
 
-                        {/* Pausing a delivery in transit, and ending the pause: the
-                            Operations Manager's and the Company Administrator's, never
-                            the driver's. Also lists every earlier pause. */}
-                        <PausePanel
-                          bookingId={detail.booking_id}
-                          pausedAt={(detail as { paused_at?: string | null }).paused_at}
-                          inTransit={normalizeBookingStatus(detail.status) === 'in_transit'}
-                          canControl={(roleView === 'admin' || roleView === 'operations_manager') && !bookingReadOnly}
-                          allowed={canEdit}
-                          onUpdated={() => { void refreshDetail(detail.booking_id); void loadPage(true) }}
-                          plate={currentAssignment?.trucks?.plate_number ?? currentAssignment?.vendor_vehicle_plate ?? null}
-                          route={detail}
-                        />
-
                         {/* Drop-off confirmations from the previous main driver's phone
                             that arrived after a swap and failed the checks: Accept /
                             Dismiss. Shown whenever the booking has any. */}
@@ -2587,19 +2535,54 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                           onUpdated={() => { void refreshDetail(detail.booking_id); void loadPage(true) }}
                         />
 
-                        {/* The driver can't (phone stolen or dead): the office confirms
-                            the next step for them, or records a problem on the road.
-                            Locked until unlocked, like the crew Edit button. */}
+                        {/* Everything that changed on the road, in time order. */}
+                        <DeliveryEventsPanel bookingId={detail.booking_id} />
+
+                        {/* Who is at the wheel, and swapping the main and second driver
+                            when the main driver's phone is dead. On the road only. */}
+                        {stage === 'in_transit' && (
+                          <DrivingShiftsPanel
+                            bookingId={detail.booking_id}
+                            inTransit
+                            hasSecondDriver={!!committedAssignment.secondDriverId}
+                            canSwap={(roleView === 'admin' || roleView === 'operations_manager') && !bookingReadOnly}
+                            allowed={canEdit}
+                            onSwapped={() => {
+                              void refreshDetail(detail.booking_id)
+                              void loadPage(true)
+                              assignmentService.getAll().then(setAllAssignments).catch(() => {})
+                            }}
+                          />
+                        )}
+
+                        {/* The driver can't (phone stolen or dead): the office records
+                            the next step for them, or a problem on the road. Locked
+                            until unlocked. */}
                         <OfficeProgressPanel
                           bookingId={detail.booking_id}
-                          status={normalizeBookingStatus(detail.status)}
+                          status={stage}
                           fleetReturned={!!(detail as { fleet_return_at?: string | null }).fleet_return_at}
+                          paused={!!(detail as { paused_at?: string | null }).paused_at}
                           canAct={(roleView === 'admin' || roleView === 'operations_manager') && !bookingReadOnly}
                           allowed={canEdit}
                           onUpdated={() => { void refreshDetail(detail.booking_id); void loadPage(true) }}
                         />
 
-                        {/* Driver / vehicle assignment */}
+                        {/* Pausing a delivery in transit, and ending the pause: the
+                            Operations Manager's and the Company Administrator's, never
+                            the driver's. Also lists every earlier pause. */}
+                        <PausePanel
+                          bookingId={detail.booking_id}
+                          pausedAt={(detail as { paused_at?: string | null }).paused_at}
+                          inTransit={stage === 'in_transit'}
+                          canControl={(roleView === 'admin' || roleView === 'operations_manager') && !bookingReadOnly}
+                          allowed={canEdit}
+                          onUpdated={() => { void refreshDetail(detail.booking_id); void loadPage(true) }}
+                          plate={currentAssignment?.trucks?.plate_number ?? currentAssignment?.vendor_vehicle_plate ?? null}
+                          route={detail}
+                        />
+
+                        {/* Driver / vehicle assignment (Approved, Assigned). */}
                         {showAssignment && (
                           <fieldset disabled={bookingReadOnly} className="min-w-0 border-0 p-0 m-0">
                           <AssignmentPanel
@@ -2657,111 +2640,99 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                           />
                           </fieldset>
                         )}
-                        {/* Who has been at the wheel, and swapping the main and second
-                            driver when the main driver's phone is dead. */}
-                        <DrivingShiftsPanel
-                          bookingId={detail.booking_id}
-                          inTransit={normalizeBookingStatus(detail.status) === 'in_transit'}
-                          hasSecondDriver={!!committedAssignment.secondDriverId}
-                          canSwap={(roleView === 'admin' || roleView === 'operations_manager') && !bookingReadOnly}
-                          allowed={canEdit}
-                          onSwapped={() => {
-                            void refreshDetail(detail.booking_id)
-                            void loadPage(true)
-                            assignmentService.getAll().then(setAllAssignments).catch(() => {})
-                          }}
-                        />
 
-                        {/* Everything that changed on the road, in time order. */}
-                        <DeliveryEventsPanel bookingId={detail.booking_id} />
+                        {/* On the road and after: the crew card. On the road it holds
+                            "Replace driver or vehicle?" (only while paused); after
+                            delivery it just lists the crew. Also every replacement. */}
+                        {!showAssignment && (
+                          <ReplaceCrewPanel
+                            bookingId={detail.booking_id}
+                            reference={detail.reference_number ?? null}
+                            inTransit={stage === 'in_transit'}
+                            paused={!!(detail as { paused_at?: string | null }).paused_at}
+                            canReplace={(roleView === 'admin' || roleView === 'operations_manager') && !bookingReadOnly}
+                            allowed={canEdit}
+                            drivers={drivers}
+                            trucks={trucks}
+                            currentDriverId={committedAssignment.driverId || null}
+                            currentSecondDriverId={committedAssignment.secondDriverId || null}
+                            currentTruckId={committedAssignment.truckId || null}
+                            currentHelperName={currentAssignment?.helper_name ?? null}
+                            currentIsVendor={!!currentAssignment?.is_vendor_supplied}
+                            currentVendorDriverUserId={currentAssignment?.vendor_driver_user_id ?? null}
+                            currentVendorPlate={currentAssignment?.vendor_vehicle_plate ?? null}
+                            currentVendorType={currentAssignment?.vendor_vehicle_type ?? null}
+                            cargo={cargoSummaryFromBooking(detail)}
+                            crew={['in_transit', 'delivered', 'completed', 'failed'].includes(stage) ? crewSummary : null}
+                            onReplaced={() => {
+                              void refreshDetail(detail.booking_id)
+                              void loadPage(true)
+                              assignmentService.getAll().then(setAllAssignments).catch(() => {})
+                              adminFetchTrucks().then(setTrucks).catch(() => {})
+                            }}
+                          />
+                        )}
 
-                        {/* On the road the crew can no longer be re-assigned; while the
-                            delivery is paused, it can be replaced. Lists every
-                            replacement on the booking too. */}
-                        <ReplaceCrewPanel
-                          bookingId={detail.booking_id}
-                          reference={detail.reference_number ?? null}
-                          inTransit={normalizeBookingStatus(detail.status) === 'in_transit'}
-                          paused={!!(detail as { paused_at?: string | null }).paused_at}
-                          canReplace={(roleView === 'admin' || roleView === 'operations_manager') && !bookingReadOnly}
-                          allowed={canEdit}
-                          drivers={drivers}
-                          trucks={trucks}
-                          currentDriverId={committedAssignment.driverId || null}
-                          currentSecondDriverId={committedAssignment.secondDriverId || null}
-                          currentTruckId={committedAssignment.truckId || null}
-                          currentHelperName={currentAssignment?.helper_name ?? null}
-                          currentIsVendor={!!currentAssignment?.is_vendor_supplied}
-                          currentVendorDriverUserId={currentAssignment?.vendor_driver_user_id ?? null}
-                          currentVendorPlate={currentAssignment?.vendor_vehicle_plate ?? null}
-                          currentVendorType={currentAssignment?.vendor_vehicle_type ?? null}
-                          cargo={cargoSummaryFromBooking(detail)}
-                          onReplaced={() => {
-                            void refreshDetail(detail.booking_id)
-                            void loadPage(true)
-                            assignmentService.getAll().then(setAllAssignments).catch(() => {})
-                            adminFetchTrucks().then(setTrucks).catch(() => {})
-                          }}
-                        />
-
-
+                        {/* Delivered: waiting on the client. Staff can only resolve a reported problem. */}
+                        {(roleView === 'admin' || roleView === 'operations_manager') && (
+                          <CompletionPanel booking={detail as unknown as BookingWithRelations} mode="staff" canAct={canEdit}
+                            look="booking"
+                            onUpdated={() => { void refreshDetail(detail.booking_id); void loadPage() }} />
+                        )}
                       </section>
 
-                      {/* Delivered: waiting on the client. Staff can only resolve a reported problem. */}
-                      {(roleView === 'admin' || roleView === 'operations_manager') && (
-                        <CompletionPanel booking={detail as unknown as BookingWithRelations} mode="staff" canAct={canEdit}
-                          onUpdated={() => { void refreshDetail(detail.booking_id); void loadPage() }} />
-                      )}
-
-                      {/* Figma (2026-11-14): Trips, Stop Times and Changes after
-                          Rejection as cyan sections that open and close. */}
-                      {(showTripPlanner || showStopTimes || resubmissionsOf(detail) > 0) && (
-                        <div>
-                          {!showTripPlanner && !showStopTimes && <DashedDivider />}
-                          {/* How many runs the assigned vehicle makes. Only once a
-                              vehicle actually exists: until then there is no body to
-                              compare the load against, and nothing to plan around. */}
-                          {showTripPlanner && (
-                            <CollapsibleSection key={`trips-${detail.booking_id}`} title="Trips">
-                              <TripPlanner
-                                key={`${detail.booking_id}:${plannerTick}`}
-                                detail={detail}
-                                canEdit={!bookingReadOnly}
-                                allowed={canEdit}
-                                capacity={plannerCapacity}
-                              />
-                            </CollapsibleSection>
-                          )}
-                          {/* Arrival, start and finish at the loading and each
-                              drop-off, per trip. */}
-                          {showStopTimes && (
-                            <CollapsibleSection key={`times-${detail.booking_id}`} title="Stop Times">
-                              <StopTimesPanel
-                                key={`times-${detail.booking_id}`}
-                                bookingId={detail.booking_id}
-                                staff
-                                look="booking"
-                                pickupAddress={detail.origin}
-                                summary={stopTimesSummary(d?.required_weight_kg ?? null, d?.required_volume_cbm ?? null)}
-                                // Stop times are what happened on the road: nothing to
-                                // fill in before the delivery starts (server refuses too).
-                                canEdit={(roleView === 'admin' || roleView === 'operations_manager') && !bookingReadOnly
-                                  && ['in_transit', 'delivered', 'completed', 'failed'].includes(String(detail.status))}
-                                allowed={canEdit}
-                              />
-                            </CollapsibleSection>
-                          )}
-                          {/* What the client changed when resubmitting after a rejection,
-                              so the approver sees the old values (and files) next to the new. */}
-                          {resubmissionsOf(detail) > 0 && (
-                            <CollapsibleSection key={`rev-${detail.booking_id}`} title="Changes after Rejection"
-                              defaultOpen={showStageActions}>
-                              <ResubmissionChanges key={`rev-${detail.booking_id}`} bookingId={detail.booking_id}
-                                resubmissionCount={resubmissionsOf(detail)} look="booking" />
-                            </CollapsibleSection>
-                          )}
-                        </div>
-                      )}
+                      {/* Figma (2026-11-14): Trips, Stop Times, Changes after
+                          Rejection and History as cyan sections that open and close,
+                          under a dashed rule. */}
+                      <div>
+                        <DashedDivider />
+                        {/* How many runs the assigned vehicle makes. Only once a
+                            vehicle actually exists. */}
+                        {showTripPlanner && (
+                          <CollapsibleSection key={`trips-${detail.booking_id}`} title="Trips">
+                            <TripPlanner
+                              key={`${detail.booking_id}:${plannerTick}`}
+                              detail={detail}
+                              canEdit={!bookingReadOnly}
+                              allowed={canEdit}
+                              capacity={plannerCapacity}
+                            />
+                          </CollapsibleSection>
+                        )}
+                        {/* Arrival, start and finish at the loading and each
+                            drop-off, per trip. */}
+                        {showStopTimes && (
+                          <CollapsibleSection key={`times-${detail.booking_id}`} title="Stop Times">
+                            <StopTimesPanel
+                              key={`times-${detail.booking_id}`}
+                              bookingId={detail.booking_id}
+                              staff
+                              look="booking"
+                              pickupAddress={detail.origin}
+                              summary={stopTimesSummary(d?.required_weight_kg ?? null, d?.required_volume_cbm ?? null)}
+                              // Stop times are what happened on the road: nothing to
+                              // fill in before the delivery starts (server refuses too).
+                              canEdit={(roleView === 'admin' || roleView === 'operations_manager') && !bookingReadOnly
+                                && ['in_transit', 'delivered', 'completed', 'failed'].includes(String(detail.status))}
+                              allowed={canEdit}
+                            />
+                          </CollapsibleSection>
+                        )}
+                        {/* What the client changed when resubmitting after a rejection,
+                            so the approver sees the old values (and files) next to the new. */}
+                        {resubmissionsOf(detail) > 0 && (
+                          <CollapsibleSection key={`rev-${detail.booking_id}`} title="Changes after Rejection"
+                            defaultOpen={showStageActions}>
+                            <ResubmissionChanges key={`rev-${detail.booking_id}`} bookingId={detail.booking_id}
+                              resubmissionCount={resubmissionsOf(detail)} look="booking" />
+                          </CollapsibleSection>
+                        )}
+                        {/* Who decided what, the vehicle's inspection and the driver's
+                            reports: read when opened, not before. */}
+                        <CollapsibleSection key={`hist-${detail.booking_id}`} title="History" lazy>
+                          <TransactionRecord booking={detail as unknown as BookingWithRelations} variant="history" />
+                        </CollapsibleSection>
+                      </div>
                     </PanelReadyGate>
                   )}
                 </div>

@@ -519,7 +519,12 @@ function ApprovalsSection({ approvals, booking }: { approvals: TransactionApprov
 
 // ─── Root ────────────────────────────────────────────────────────────────────
 
-export default function TransactionRecord({ booking }: { booking: Booking }) {
+export default function TransactionRecord({ booking, variant = 'full' }: {
+  booking: Booking
+  /** 'history' = Booking Management's History section: approvals, inspection and
+   *  reports only (the panel already shows the crew, trips, customer and cargo). */
+  variant?: 'full' | 'history'
+}) {
   const bookingId = booking.booking_id as string
   const [record, setRecord]   = useState<RecordData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -560,6 +565,12 @@ export default function TransactionRecord({ booking }: { booking: Booking }) {
         <div className="flex items-center gap-2 text-xs" style={{ color: ERROR }}>
           <AlertCircle size={14} /> {error}
         </div>
+      ) : record && variant === 'history' ? (
+        <>
+          <ApprovalsSection approvals={record.approvals} booking={booking} />
+          {record.delivery?.trucks && <InspectionSection inspection={record.inspection} />}
+          <ReportsSection reports={record.reports} />
+        </>
       ) : record && (
         <>
           <CrewSection record={record} booking={booking} />
@@ -569,8 +580,12 @@ export default function TransactionRecord({ booking }: { booking: Booking }) {
           <ApprovalsSection approvals={record.approvals} booking={booking} />
         </>
       )}
-      <CustomerSection booking={booking} />
-      <CargoLinesSection booking={booking} />
+      {variant === 'full' && (
+        <>
+          <CustomerSection booking={booking} />
+          <CargoLinesSection booking={booking} />
+        </>
+      )}
     </div>
   )
 }

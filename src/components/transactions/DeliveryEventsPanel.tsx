@@ -1,20 +1,21 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { ChevronDown, History } from 'lucide-react'
+import { ChevronDown, TriangleAlert } from 'lucide-react'
 
 import proxyApi from '@/lib/api/auth.api'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { PALETTE } from '@/lib/palette'
 import { formatDateTime } from './transaction-format'
-import { BORDER_C, MUTED } from './transaction-theme'
+import { MUTED } from './transaction-theme'
+import { CARD_CLASS } from '@/app/admin/booking-management/BookingDetailParts'
 import { usePanelSection } from '@/components/ui/PanelReady'
 
 /**
  * Everything that changed on the road, in one list, oldest first: runs loaded,
  * drop-offs delivered or failed (and by whom), drivers swapped, driver or
  * vehicle replaced, pauses, late confirmations and how each was decided.
- * Collapsed by default; read-only.
+ * Open by default (Figma "booking detail frame", 2026-11-14); read-only.
  */
 
 interface DeliveryEvent {
@@ -41,7 +42,7 @@ const DOT: Record<string, string> = {
 
 export default function DeliveryEventsPanel({ bookingId }: { bookingId: string }) {
   const [events, setEvents] = useState<DeliveryEvent[]>([])
-  const [open,   setOpen]   = useState(false)
+  const [open,   setOpen]   = useState(true)
 
   const [loaded, setLoaded] = useState(false)
   usePanelSection(!loaded)
@@ -57,22 +58,24 @@ export default function DeliveryEventsPanel({ bookingId }: { bookingId: string }
   if (events.length === 0) return null
 
   return (
-    <div className="rounded-xl border p-3.5 flex flex-col gap-2.5" style={{ borderColor: BORDER_C }}>
+    <div className={`${CARD_CLASS} px-3.5 sm:px-4 pt-3 pb-4 flex flex-col gap-3`}>
       <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open}
         className="flex items-center justify-between gap-2 text-left cursor-pointer">
-        <span className="flex items-center gap-2 text-sm font-bold text-white">
-          <History size={15} style={{ color: PALETTE.cyan }} /> What happened on the road ({events.length})
+        <span className="flex items-center gap-2 text-base font-bold text-white leading-tight">
+          <TriangleAlert size={20} strokeWidth={2} className="shrink-0" style={{ color: PALETTE.cyan }} />
+          What happened on the road
         </span>
-        <ChevronDown size={15} className={`text-white/60 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown size={18} className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
+          style={{ color: PALETTE.cyan }} />
       </button>
       {open && (
-        <ol className="flex flex-col gap-2">
+        <ol className="flex flex-col gap-2.5">
           {events.map((e, i) => (
-            <li key={`${e.at}-${i}`} className="flex gap-2.5">
-              <span className="mt-1.5 w-2 h-2 rounded-full shrink-0" style={{ background: DOT[e.kind] ?? 'rgba(255,255,255,0.5)' }} />
+            <li key={`${e.at}-${i}`} className="flex gap-2">
+              <span className="mt-1.5 w-1.5 h-1.5 rounded-full shrink-0" style={{ background: DOT[e.kind] ?? PALETTE.green }} />
               <div className="min-w-0">
-                <p className="text-[13px] text-white break-words">{e.title}</p>
-                <p className="text-[12px] break-words" style={{ color: MUTED }}>
+                <p className="text-sm font-bold text-white break-words leading-tight">{e.title}</p>
+                <p className="text-xs font-bold break-words leading-snug" style={{ color: MUTED }}>
                   {formatDateTime(e.at)}{e.by ? ` · ${e.by}` : ''}{e.detail ? ` · ${e.detail}` : ''}
                 </p>
               </div>

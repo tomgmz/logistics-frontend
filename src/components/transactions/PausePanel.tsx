@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { CalendarClock, ChevronDown, ChevronRight, PauseCircle, Play } from 'lucide-react'
+import { ChevronDown, PauseCircle } from 'lucide-react'
 
 import { pauseService, pauseReasonLabel, PAUSE_REASON_LABEL, type BookingPause, type PauseReason } from '@/lib/services/admin/pause.service'
 import { useAuthStore } from '@/lib/store/auth.store'
@@ -13,7 +13,7 @@ import { writeAccess } from '@/components/layout/ModuleAccess'
 import { formatCallClock } from '@/app/admin/booking-management/DriverCallTime'
 import { phDay } from '@/lib/ph-date'
 import { formatDateTime } from './transaction-format'
-import { AMBER, BORDER_C, GREEN, MUTED } from './transaction-theme'
+import { MUTED } from './transaction-theme'
 import { PALETTE } from '@/lib/palette'
 import { codingFlagFor } from '@/lib/number-coding'
 import { OFFICE_CLOSE_HOUR, OFFICE_HOURS_LABEL, OFFICE_OPEN_HOUR } from '@/lib/office-hours'
@@ -219,150 +219,186 @@ export default function PausePanel({ bookingId, pausedAt, inTransit, canControl,
     }
   }
 
+  // Figma "delivery paused" frames (2026-11-14): one red card that holds the
+  // Pause button, or the pause in force (continuation, End Pause) and the
+  // earlier pauses.
+  const inputBox = 'w-full min-w-0 min-h-[46px] rounded-[10px] border border-[#424242] bg-[#0a0a0a] px-3 text-sm font-bold text-white outline-none [color-scheme:dark] disabled:opacity-50'
+  const fieldLabel = 'flex flex-col gap-1.5 text-sm font-bold text-[#818181] min-w-0'
+  const hint = (
+    <p className="text-xs font-bold leading-snug" style={{ color: MUTED }}>
+      The planned arrival moves to that day and call time. The client is told the date and the new expected arrival; the driver the date and the call time, with a reminder an hour before.
+    </p>
+  )
+  const bigGreen = 'w-full min-h-[56px] rounded-[10px] border text-lg font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed'
+  const greenStyle = { background: '#2a1e0c', borderColor: PALETTE.green, color: PALETTE.green }
+  const tealSmall = 'w-full min-h-[40px] rounded-[5px] border text-sm font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed'
+  const tealStyle = { background: '#1f3533', borderColor: PALETTE.cyan, color: PALETTE.cyan }
+  const redCard = (open || canPause)
+
+  const earlier = past.length > 0 && (
+    <div>
+      <button type="button" onClick={() => setShowPast((v) => !v)} aria-expanded={showPast}
+        className="inline-flex items-center gap-1 text-base font-bold cursor-pointer bg-transparent border-none p-0"
+        style={{ color: PALETTE.cyan }}>
+        Earlier pauses ({past.length})
+        <ChevronDown size={16} className={`transition-transform ${showPast ? 'rotate-180' : ''}`} />
+      </button>
+      {showPast && (
+        <ul className="mt-2 flex flex-col list-none p-0 m-0">
+          {past.map((p) => (
+            <li key={p.pause_id} className="py-2 border-b border-dashed border-[#818181]/60 last:border-b-0 flex flex-col gap-0.5">
+              <span className="text-xs font-bold text-white whitespace-pre-wrap break-words">
+                {pauseReasonLabel(p.reason)}{p.note ? ` · ${p.note}` : ''}
+              </span>
+              <span className="text-xs font-bold" style={{ color: MUTED }}>
+                {formatDateTime(p.paused_at)} - {formatDateTime(p.resumed_at)} ({duration(p.paused_at, p.resumed_at)})
+                {' · '}{p.resumed_via === 'staff' && personName(p.resumer)
+                  ? `Resumed by: ${personName(p.resumer)}`
+                  : ENDED_BY[p.resumed_via ?? ''] ?? 'Ended'}
+                {p.resume_note ? ` · ${p.resume_note}` : ''}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+
   return (
-    <div className="flex flex-col gap-2">
+    <div className={redCard
+      ? 'rounded-[15px] border px-3.5 sm:px-4 pt-3 pb-4 flex flex-col gap-3'
+      : 'rounded-[15px] border border-[#424242] bg-[#1b1b1b] px-3.5 sm:px-4 pt-3 pb-4 flex flex-col gap-3'}
+      style={redCard ? { borderColor: PALETTE.red, background: '#250505' } : undefined}>
       {canPause && (
-        <div className="rounded-xl border p-3.5 flex flex-wrap items-center justify-between gap-2"
-          style={{ borderColor: BORDER_C }}>
-          <span className="text-[12px] min-w-0 flex-1" style={{ color: MUTED }}>
+        <>
+          <div className="flex items-center gap-2">
+            <PauseCircle size={22} strokeWidth={2} style={{ color: PALETTE.red }} className="shrink-0" />
+            <h3 className="text-base font-bold leading-tight" style={{ color: PALETTE.red }}>Pause delivery</h3>
+          </div>
+          <p className="text-sm font-bold text-white leading-snug">
             Something stopping the truck (weather, a breakdown, a closed stop)? Pause the delivery; only the office can resume it.
-          </span>
+          </p>
           <button type="button" disabled={busy} onClick={() => setPausing(true)} {...writeAccess(allowed)}
-            className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-            style={{ background: AMBER, color: '#000' }}>
-            <PauseCircle size={13} />
+            className={bigGreen} style={greenStyle}>
             Pause delivery
           </button>
-        </div>
+        </>
       )}
 
       {open && (
-        <div className="rounded-xl border p-3.5 flex flex-col gap-2"
-          style={{ borderColor: `${AMBER}55`, background: `${AMBER}0d` }}>
-          <div className="flex items-center gap-2">
-            <PauseCircle size={16} style={{ color: AMBER }} />
-            <h3 className="text-sm font-bold text-white">
-              Delivery paused · {pauseReasonLabel(open.reason)}
-            </h3>
+        <>
+          <div className="flex items-start gap-2">
+            <PauseCircle size={22} strokeWidth={2} style={{ color: PALETTE.red }} className="shrink-0" />
+            <div className="min-w-0">
+              <h3 className="text-base font-bold leading-tight" style={{ color: PALETTE.red }}>Delivery paused</h3>
+              <p className="text-xs font-bold leading-snug mt-0.5" style={{ color: PALETTE.green }}>
+                Since {formatDateTime(open.paused_at)} ({duration(open.paused_at, null)})
+                {personName(open.pauser) ? ` · by ${personName(open.pauser)}` : ''}
+              </p>
+            </div>
           </div>
-          <p className="text-[13px] text-white/85 whitespace-pre-wrap">{open.note}</p>
-          <span className="text-[11px]" style={{ color: MUTED }}>
-            Since {formatDateTime(open.paused_at)} ({duration(open.paused_at, null)})
-            {personName(open.pauser) ? ` · by ${personName(open.pauser)}` : ''}
-            {open.latitude != null && open.longitude != null && (
-              <> · <MapPointLink className="underline"
-                point={{ latitude: open.latitude, longitude: open.longitude, label: 'Where the truck was when paused' }}>where the truck was</MapPointLink></>
-            )}
-          </span>
+          <p className="text-xs font-bold leading-snug whitespace-pre-wrap break-words">
+            <span style={{ color: PALETTE.red }}>Remarks:</span>{' '}
+            <span className="text-white">{pauseReasonLabel(open.reason)}{open.note ? ` · ${open.note}` : ''}</span>
+          </p>
+          {(open.latitude != null && open.longitude != null) && (
+            <MapPointLink className="text-xs font-bold underline self-start text-[#4DF9ED]"
+              point={{ latitude: open.latitude, longitude: open.longitude, label: 'Where the truck was when paused' }}>
+              Where the truck was when paused
+            </MapPointLink>
+          )}
           {open.report_id && (
-            <Link href={reportHref(open.report_id)} className="text-[12px] font-semibold underline" style={{ color: AMBER }}>
+            <Link href={reportHref(open.report_id)} className="text-xs font-bold underline self-start" style={{ color: PALETTE.orange }}>
               Breakdown report filed — open it in Reports
             </Link>
           )}
+
           {/* When it continues: a date for the client, plus a call time for the driver. */}
-          <div className="flex flex-col gap-2 rounded-lg border px-3 py-2.5" style={{ borderColor: BORDER_C }}>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-white/85 min-w-0">
-                <CalendarClock size={13} style={{ color: AMBER }} className="shrink-0" />
-                {open.expected_resume_date
-                  ? <>Continues {dayLabel(open.expected_resume_date)}
-                      {open.expected_resume_call_time ? ` · driver call time ${formatCallClock(open.expected_resume_call_time)}` : ''}</>
-                  : 'No continuation date set yet — the client sees the delivery date as to be confirmed'}
-              </span>
-              {canAct && !planning && (
-                <button type="button" disabled={busy} onClick={beginPlan} {...writeAccess(allowed)}
-                  className="text-[11px] font-bold px-2.5 py-1 rounded-lg border border-white/10 text-white/60 hover:text-white
-                             hover:border-white/25 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0">
-                  {open.expected_resume_date ? 'Change date' : 'Set continuation date'}
-                </button>
-              )}
-            </div>
-            {!planning && open.expected_resume_date && continuationWarnings(
-              open.expected_resume_date.slice(0, 10), open.expected_resume_call_time?.slice(0, 5) ?? '', plate, route,
-            ).map((w) => (
-              <p key={w} className="text-[12px]" style={{ color: PALETTE.orange }}>{w}</p>
-            ))}
-            {continuationOverdue && !planning && (
-              <p className="text-[12px] font-semibold" style={{ color: PALETTE.orange }}>
-                That call time has passed and the delivery is still paused. Resume it, or set a new date.
+          <div className="rounded-[15px] border border-[#424242] bg-[#141414] px-3.5 sm:px-4 py-3 flex flex-col gap-3">
+            {!open.expected_resume_date && (
+              <p className="text-sm font-bold leading-snug" style={{ color: PALETTE.cyan }}>
+                No continuation date set yet — the client sees the delivery date as to be confirmed
               </p>
             )}
-            {planning && (
-              <div className="flex flex-col gap-2">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <label className="flex flex-col gap-1 text-[11px] font-bold uppercase tracking-wider text-white/50">
+            {planning ? (
+              <>
+                <div className="grid grid-cols-1 min-[380px]:grid-cols-2 gap-3">
+                  <label className={fieldLabel}>
                     Continuation date
                     <input type="date" value={planDate} min={phDay(Date.now())} disabled={busy}
-                      onChange={(e) => setPlanDate(e.target.value)}
-                      className="w-full min-w-0 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base sm:text-sm font-normal normal-case tracking-normal text-white/85 outline-none [color-scheme:dark]" />
+                      onChange={(e) => setPlanDate(e.target.value)} className={inputBox} />
                   </label>
-                  <label className="flex flex-col gap-1 text-[11px] font-bold uppercase tracking-wider text-white/50">
+                  <label className={fieldLabel}>
                     Driver call time
                     <input type="time" value={planTime} step={300} disabled={busy}
-                      onChange={(e) => setPlanTime(e.target.value)}
-                      className="w-full min-w-0 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base sm:text-sm font-normal normal-case tracking-normal text-white/85 outline-none [color-scheme:dark]" />
+                      onChange={(e) => setPlanTime(e.target.value)} className={inputBox} />
                   </label>
                 </div>
-                <p className="text-[11px]" style={{ color: MUTED }}>
-                  {continuationWarnings(planDate, planTime, plate, route).map((w) => (
-                    <span key={w} className="block mb-1 font-semibold" style={{ color: PALETTE.orange }}>{w}</span>
-                  ))}
-                  The planned arrival moves to that day and call time. The client is told the date and the new expected arrival; the driver the date and the call time, with a reminder an hour before.
-                </p>
-                <div className="flex flex-wrap gap-2">
+                {continuationWarnings(planDate, planTime, plate, route).map((w) => (
+                  <p key={w} className="text-xs font-bold" style={{ color: PALETTE.orange }}>{w}</p>
+                ))}
+                {hint}
+                <div className="flex gap-2.5">
                   <button type="button" disabled={busy} onClick={() => setPlanning(false)}
-                    className="flex-1 min-w-[90px] py-2 rounded-lg border border-white/10 text-[12px] font-bold text-white/50 hover:text-white transition-colors disabled:opacity-40">
+                    className={tealSmall} style={{ background: 'transparent', borderColor: MUTED, color: MUTED }}>
                     Cancel
                   </button>
                   <button type="button" disabled={busy || !planDate || !planTime} onClick={() => void savePlan()}
-                    className="flex-1 min-w-[90px] py-2 rounded-lg text-[12px] font-bold transition-colors disabled:opacity-40"
-                    style={{ background: `${AMBER}26`, color: AMBER }}>
+                    className={tealSmall} style={tealStyle}>
                     {busy ? 'Saving…' : 'Save and notify'}
                   </button>
                 </div>
-              </div>
+              </>
+            ) : open.expected_resume_date ? (
+              <>
+                <div className="grid grid-cols-1 min-[380px]:grid-cols-2 gap-3">
+                  <div className={fieldLabel}>
+                    Continuation date
+                    <span className={`${inputBox} flex items-center`}>{dayLabel(open.expected_resume_date.slice(0, 10))}</span>
+                  </div>
+                  <div className={fieldLabel}>
+                    Driver call time
+                    <span className={`${inputBox} flex items-center`}>
+                      {open.expected_resume_call_time ? formatCallClock(open.expected_resume_call_time) : '—'}
+                    </span>
+                  </div>
+                </div>
+                {continuationWarnings(
+                  open.expected_resume_date.slice(0, 10), open.expected_resume_call_time?.slice(0, 5) ?? '', plate, route,
+                ).map((w) => (
+                  <p key={w} className="text-xs font-bold" style={{ color: PALETTE.orange }}>{w}</p>
+                ))}
+                {continuationOverdue && (
+                  <p className="text-xs font-bold" style={{ color: PALETTE.orange }}>
+                    That call time has passed and the delivery is still paused. Resume it, or set a new date.
+                  </p>
+                )}
+                {hint}
+                {canAct && (
+                  <button type="button" disabled={busy} onClick={beginPlan} {...writeAccess(allowed)}
+                    className={tealSmall} style={tealStyle}>
+                    Change date
+                  </button>
+                )}
+              </>
+            ) : canAct && (
+              <button type="button" disabled={busy} onClick={beginPlan} {...writeAccess(allowed)}
+                className={tealSmall} style={tealStyle}>
+                Set continuation date
+              </button>
             )}
           </div>
 
           {canAct && (
-            <div>
-              <button type="button" disabled={busy} onClick={() => setAsking(true)} {...writeAccess(allowed)}
-                className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                style={{ background: GREEN, color: '#000' }}>
-                <Play size={13} fill="#000" />
-                {busy ? 'Saving…' : 'End pause'}
-              </button>
-            </div>
+            <button type="button" disabled={busy} onClick={() => setAsking(true)} {...writeAccess(allowed)}
+              className={bigGreen} style={greenStyle}>
+              {busy ? 'Saving…' : 'End Pause'}
+            </button>
           )}
-        </div>
+        </>
       )}
 
-      {past.length > 0 && (
-        <div className="rounded-xl border px-3.5 py-2.5" style={{ borderColor: BORDER_C }}>
-          <button type="button" onClick={() => setShowPast((v) => !v)}
-            className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-white/50 cursor-pointer bg-transparent border-none p-0">
-            {showPast ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-            Earlier pauses ({past.length})
-          </button>
-          {showPast && (
-            <ul className="mt-2 flex flex-col gap-2.5 list-none p-0 m-0">
-              {past.map((p) => (
-                <li key={p.pause_id} className="flex flex-col gap-0.5">
-                  <span className="text-[12px] font-semibold text-white/85">
-                    {pauseReasonLabel(p.reason)} · {duration(p.paused_at, p.resumed_at)}
-                  </span>
-                  <span className="text-[12px] text-white/70 whitespace-pre-wrap">{p.note}</span>
-                  <span className="text-[11px]" style={{ color: MUTED }}>
-                    {formatDateTime(p.paused_at)} – {formatDateTime(p.resumed_at)} · {ENDED_BY[p.resumed_via ?? ''] ?? 'Ended'}
-                    {p.resumed_via === 'staff' && personName(p.resumer) ? ` (${personName(p.resumer)})` : ''}
-                    {p.resume_note ? `: ${p.resume_note}` : ''}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
+      {earlier}
 
       <RemarksModal
         open={pausing}
