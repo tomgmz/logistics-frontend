@@ -33,6 +33,9 @@ export const BOOKING_STATUS_COLOR: Record<string, string> = {
   arrived:    PALETTE.cyan,
   delivered:  '#ffffff',
   completed:  PALETTE.green,
+  // No drop-off delivered (2026-11-14). Red like Cancelled; told apart by its
+  // label and icon (the palette has no seventh colour).
+  failed:     PALETTE.red,
   cancelled:  PALETTE.red,
 }
 

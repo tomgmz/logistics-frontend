@@ -365,6 +365,8 @@ export default function ChatWindow({ conversation, draftUser, currentUserId, isP
         disabled={sending}
         replyTo={replyTo}
         onCancelReply={() => setReplyTo(null)}
+        // Same key as the floating chat; a chat not yet created is keyed by the person.
+        draftKey={convId ? `dm:${convId}` : `dm-user:${participant.user_id}`}
       showJumpToLatest={!atLatest} onJumpToLatest={scrollToLatest} />
     </div>
   )

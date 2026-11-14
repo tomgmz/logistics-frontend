@@ -177,6 +177,7 @@ export type AdminBookingLifecycleStatus =
   | 'in_transit'
   | 'delivered'
   | 'completed'
+  | 'failed'
   | 'cancelled'
 
 export const bookingService = {

@@ -391,6 +391,7 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
           replyTo={replyTo}
           onCancelReply={() => setReplyTo(null)}
           compact
+          draftKey={`group:${groupId}`}
         showJumpToLatest={!atLatest} onJumpToLatest={scrollToLatest} />
       </div>
       )}

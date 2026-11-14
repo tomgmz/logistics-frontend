@@ -58,7 +58,9 @@ export default function OfficeProgressPanel({ bookingId, status, fleetReturned, 
   // the driver presses Start Navigation. Before that, a driver without a phone
   // signs in on another one, or the office assigns another driver.
   const live = status === 'in_transit'
-  const needsReturn = (status === 'delivered' || status === 'completed') && !fleetReturned
+  // A Failed booking (nothing delivered) still has a vehicle to bring back,
+  // unless it was stolen (then the office records it when settled).
+  const needsReturn = (status === 'delivered' || status === 'completed' || status === 'failed') && !fleetReturned
 
   const [loaded, setLoaded] = useState(false)
   usePanelSection((live || needsReturn) && !loaded)

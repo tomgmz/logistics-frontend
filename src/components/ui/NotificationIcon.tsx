@@ -78,6 +78,7 @@ const ACTIONABLE_TYPES = new Set([
   "client.contract_expiring_staff",
   "it_admin.handover",
   "email.undelivered",
+  "auth.session_reuse",
 ]);
 
 // The filter dropdown lists only the groups a role can actually receive, so
@@ -88,7 +89,8 @@ const ALL: FilterOption    = { value: "", label: "All notifications" };
 const UNREAD: FilterOption = { value: "unread", label: "Unread" };
 const BOOKINGS: FilterOption = { value: "booking", label: "Bookings" };
 const REPORTS: FilterOption  = { value: "driver", label: "Driver reports" };
-const RESETS: FilterOption   = { value: "auth", label: "Password resets" };
+// "auth.*": password resets, and (IT Administrator) accounts signed out for safety.
+const RESETS: FilterOption   = { value: "auth", label: "Sign-in and passwords" };
 const TICKETS: FilterOption  = { value: "support", label: "Support tickets" };
 const VEHICLES: FilterOption = { value: "vehicle", label: "Vehicles" };
 

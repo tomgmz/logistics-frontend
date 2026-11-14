@@ -32,9 +32,10 @@ const STATUS_LABEL: Record<string, string> = {
   in_transit: 'In transit',
   delivered:  'Delivered, awaiting client',
   completed:  'Completed',
+  failed:     'Failed, nothing delivered',
   cancelled:  'Cancelled',
 }
-const STATUS_ORDER = ['pending', 'approved', 'assigned', 'in_transit', 'delivered', 'completed', 'cancelled']
+const STATUS_ORDER = ['pending', 'approved', 'assigned', 'in_transit', 'delivered', 'completed', 'failed', 'cancelled']
 
 const TONE = { cyan: '#4df9ed', amber: '#ffea00', red: '#f62626', green: '#3af626', muted: '#818181' } as const
 

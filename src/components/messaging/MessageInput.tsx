@@ -1,6 +1,8 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
+import { useMessageDraft } from '@/lib/messaging/messageDraft'
+import { preloadEmojiData } from './EmojiPicker'
 import { Send, Smile, X, Image as ImageIcon } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import EmojiPicker from './EmojiPicker'
@@ -26,6 +28,8 @@ interface MessageInputProps {
   /** The newest message is out of view: show the arrow-down above the box. */
   showJumpToLatest?: boolean
   onJumpToLatest?:   () => void
+  /** Names the chat ('dm:<id>', 'group:<id>') so unsent text is kept per chat. */
+  draftKey?:         string
 }
 
 export default function MessageInput({
@@ -37,8 +41,10 @@ export default function MessageInput({
   compact = false,
   showJumpToLatest = false,
   onJumpToLatest,
+  draftKey,
 }: MessageInputProps) {
-  const [text, setText]           = useState('')
+  // Unsent text comes back when the chat is reopened (and after a reload).
+  const [text, setText]           = useMessageDraft(draftKey)
   const [showEmoji, setShowEmoji] = useState(false)
   const textareaRef               = useRef<HTMLTextAreaElement>(null)
   const typingTimeout             = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -48,6 +54,10 @@ export default function MessageInput({
   const [photoError, setPhotoError] = useState<string | null>(null)
   // "@" opens the booking list; picking one writes its number in.
   const mention = useBookingMentionPicker(text, setText, textareaRef)
+
+  // Fetch the emoji list in the background once a chat is open, so the first
+  // click on the emoji button doesn't wait for it.
+  useEffect(() => { preloadEmojiData() }, [])
 
   const pickPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -70,12 +80,17 @@ export default function MessageInput({
     onTypingChange?.(false)
   }, [onTypingChange])
 
+  // Auto-grow, whatever set the text (typing, an emoji, a restored draft).
+  useEffect(() => {
+    const el = textareaRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${Math.min(el.scrollHeight, compact ? 80 : 120)}px`
+  }, [text, compact])
+
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setText(e.target.value)
     mention.sync()
-    // Auto-grow
-    e.target.style.height = 'auto'
-    e.target.style.height = `${Math.min(e.target.scrollHeight, compact ? 80 : 120)}px`
 
     if (e.target.value.trim() && !isTyping.current) {
       isTyping.current = true
@@ -93,12 +108,9 @@ export default function MessageInput({
     if (typingTimeout.current) clearTimeout(typingTimeout.current)
     onSend(trimmed, replyTo?.messageId)
     setText('')
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto'
-      textareaRef.current.focus()
-    }
+    textareaRef.current?.focus()
     setShowEmoji(false)
-  }, [text, disabled, replyTo, onSend, stopTyping])
+  }, [text, disabled, replyTo, onSend, stopTyping, setText])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (mention.onKeyDown(e)) return

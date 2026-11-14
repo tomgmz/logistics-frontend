@@ -1,9 +1,10 @@
 'use client'
 
 import {
-  MapPin, Truck, Clock, Check, CheckCircle2, XCircle, AlertCircle, Loader2, PackageCheck,
+  MapPin, Truck, Clock, Check, CheckCircle2, XCircle, AlertCircle, Loader2, PackageCheck, OctagonX,
 } from 'lucide-react'
 import ProblemReportedBadge from './ProblemReportedBadge'
+import PartlyFailedBadge from './PartlyFailedBadge'
 
 import { type BookingStatus, asBookingStatus } from '@/app/types/maps/routemap.types'
 import type { BookingWithRelations } from '@/lib/types/booking-relations'
@@ -18,7 +19,7 @@ import { CYAN, MUTED, ERROR, AMBER, GREEN, BORDER_C } from './transaction-theme'
  */
 
 const S = Object.fromEntries(
-  (['BOOKED', 'APPROVED', 'PENDING', 'ASSIGNED', 'IN_TRANSIT', 'ARRIVED', 'DELIVERED', 'COMPLETED', 'CANCELLED'] as const)
+  (['BOOKED', 'APPROVED', 'PENDING', 'ASSIGNED', 'IN_TRANSIT', 'ARRIVED', 'DELIVERED', 'COMPLETED', 'FAILED', 'CANCELLED'] as const)
     .map((k) => [k, bookingStatusColor(k)]),
 ) as Record<BookingStatus, string>
 
@@ -34,6 +35,7 @@ export const STATUS_META: Record<
   ARRIVED:    { label: 'Arrived',    color: S.ARRIVED, bg: `${S.ARRIVED}18`, icon: <MapPin       size={12} /> },
   DELIVERED:  { label: 'Delivered',  color: S.DELIVERED, bg: `${S.DELIVERED}18`, icon: <PackageCheck size={12} /> },
   COMPLETED:  { label: 'Completed',  color: S.COMPLETED, bg: `${S.COMPLETED}18`,  icon: <CheckCircle2 size={12} /> },
+  FAILED:     { label: 'Failed',     color: S.FAILED, bg: `${S.FAILED}18`, icon: <OctagonX     size={12} /> },
   CANCELLED:  { label: 'Cancelled',  color: S.CANCELLED, bg: `${S.CANCELLED}18`, icon: <XCircle      size={12} /> },
 }
 
@@ -59,6 +61,7 @@ export const TIMELINE_LABELS: Record<BookingStatus, string> = {
   ARRIVED:    'Arrived',
   DELIVERED:  'Delivered — Awaiting Confirmation',
   COMPLETED:  'Completed',
+  FAILED:     'Failed — Nothing Delivered',
   CANCELLED:  'Cancelled',
 }
 
@@ -69,6 +72,11 @@ export function getStepState(
   if (currentStatus === 'CANCELLED') {
     return stepStatus === 'CANCELLED' ? 'active' : 'upcoming'
   }
+  // Failed ends the road part: everything up to In Transit happened.
+  if (currentStatus === 'FAILED') {
+    if (stepStatus === 'FAILED') return 'active'
+    return STATUS_ORDER.indexOf(stepStatus) <= STATUS_ORDER.indexOf('IN_TRANSIT') ? 'done' : 'upcoming'
+  }
   const stepIdx    = STATUS_ORDER.indexOf(stepStatus)
   const currentIdx = STATUS_ORDER.indexOf(currentStatus)
   if (stepIdx < currentIdx)   return 'done'
@@ -76,8 +84,13 @@ export function getStepState(
   return 'upcoming'
 }
 
-/** `problem`: an open client-reported problem (hasOpenClientIssue), shown as a substatus under Delivered. */
-export function StatusBadge({ status, problem = false }: { status: string; problem?: boolean }) {
+/**
+ * `problem`: an open client-reported problem (hasOpenClientIssue), shown as a substatus under Delivered.
+ * `booking`: when given and some drop-offs failed (isPartlyFailed), "Partly Failed" shows under it.
+ */
+export function StatusBadge({ status, problem = false, partlyFailed = false, booking }: {
+  status: string; problem?: boolean; partlyFailed?: boolean; booking?: Record<string, unknown> | null
+}) {
   const m = getStatusMeta(status)
   return (
     <span className="inline-flex flex-col items-start">
@@ -88,6 +101,7 @@ export function StatusBadge({ status, problem = false }: { status: string; probl
         {m.icon}{m.label}
       </span>
       {problem && asBookingStatus(status) === 'DELIVERED' && <ProblemReportedBadge />}
+      {partlyFailed && <PartlyFailedBadge booking={booking} />}
     </span>
   )
 }
@@ -95,6 +109,7 @@ export function StatusBadge({ status, problem = false }: { status: string; probl
 export function StatusTimeline({ booking }: { booking: BookingWithRelations }) {
   const currentStatus = asBookingStatus(booking.status)
   const isCancelled   = currentStatus === 'CANCELLED'
+  const isFailed      = currentStatus === 'FAILED'
   const createdAt     = booking.created_at as string | undefined
   const updatedAt     = booking.updated_at as string | undefined
 
@@ -102,6 +117,13 @@ export function StatusTimeline({ booking }: { booking: BookingWithRelations }) {
     ? [
         { status: 'PENDING'   as BookingStatus, timestamp: formatDateTime(createdAt) },
         { status: 'CANCELLED' as BookingStatus, timestamp: formatDateTime(updatedAt) },
+      ]
+    : isFailed
+    ? [
+        ...STATUS_ORDER.slice(0, STATUS_ORDER.indexOf('IN_TRANSIT') + 1).map((s, idx) => ({
+          status: s, timestamp: idx === 0 ? formatDateTime(createdAt) : formatDateTime(updatedAt),
+        })),
+        { status: 'FAILED' as BookingStatus, timestamp: formatDateTime(updatedAt) },
       ]
     : STATUS_ORDER.map((s, idx) => ({
         status: s,
@@ -123,7 +145,7 @@ export function StatusTimeline({ booking }: { booking: BookingWithRelations }) {
         const resolvedStatus = currentStatus === 'UNKNOWN' ? 'PENDING' : currentStatus
         const state  = getStepState(step.status, resolvedStatus)
         const isLast = i === steps.length - 1
-        const accent = step.status === 'CANCELLED' ? ERROR : CYAN
+        const accent = step.status === 'CANCELLED' || step.status === 'FAILED' ? ERROR : CYAN
 
         return (
           <li key={step.status} className="flex gap-3" aria-current={state === 'active' ? 'step' : undefined}>

@@ -23,6 +23,11 @@ const INACTIVE_MESSAGE =
 const CONTRACT_MESSAGE =
   "Your company's contract with 8338 has ended and the 7-day viewing period is over. Contact 8338 to renew it; you can sign in again once it is renewed."
 
+// Refresh-token reuse (2026-11-14): the session's sign-in token was used again
+// from somewhere else, so every session of the account was ended.
+const REUSED_MESSAGE =
+  'For your security you were signed out on every device: your sign-in was used from somewhere else. Sign in again. If this keeps happening, contact your Administrator.'
+
 const DEFAULT_MESSAGE = 'You have been signed out.'
 
 export default function SignedOutNotice() {
@@ -39,6 +44,8 @@ export default function SignedOutNotice() {
       appToast.error(INACTIVE_MESSAGE, { action: 'signed-out', duration: 8000 })
     } else if (reason === 'contract_ended') {
       appToast.error(CONTRACT_MESSAGE, { action: 'signed-out', duration: 10000 })
+    } else if (reason === 'reused') {
+      appToast.error(REUSED_MESSAGE, { action: 'signed-out', duration: 10000 })
     } else {
       appToast.info(DEFAULT_MESSAGE, { action: 'signed-out' })
     }

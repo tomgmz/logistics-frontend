@@ -92,10 +92,17 @@ export function isContractEnded(err: unknown): boolean {
     && (err as AxiosError<{ code?: string }>).response?.data?.code === 'CONTRACT_ENDED'
 }
 
+/** The session was ended because its sign-in token was used from somewhere else (2026-11-14). */
+export function isSessionReused(err: unknown): boolean {
+  return isSessionDead(err)
+    && (err as AxiosError<{ code?: string }>).response?.data?.code === 'SESSION_REUSED'
+}
+
 /** The signed-out notice to show for a refused refresh, if any. */
-export function signedOutReasonOf(err: unknown): 'inactive' | 'contract_ended' | undefined {
+export function signedOutReasonOf(err: unknown): 'inactive' | 'contract_ended' | 'reused' | undefined {
   if (isAccountInactive(err)) return 'inactive'
   if (isContractEnded(err))   return 'contract_ended'
+  if (isSessionReused(err))   return 'reused'
   return undefined
 }
 

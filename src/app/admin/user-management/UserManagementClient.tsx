@@ -10,7 +10,7 @@ import {
   Users, UserPlus,
   Pencil, Eye, ShieldCheck, ShieldOff, Archive,
   AlertTriangle,
-  KeyRound, Send, ArchiveRestore,
+  Send, ArchiveRestore,
 } from 'lucide-react'
 import { createTheme, ThemeProvider } from '@mui/material/styles'
 import type {
@@ -143,14 +143,6 @@ function formatDate(iso: string | null): string {
   return new Date(iso).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-function formatDateTime(iso: string | null): string {
-  if (!iso) return 'Never'
-  return new Date(iso).toLocaleDateString('en-PH', {
-    month: 'short', day: 'numeric', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  })
-}
-
 // The table format (Figma 3234:1482): the name bold cyan, the rest bold white,
 // headers grey small caps. Spacing and sizes come from .data-table (globals.css).
 const NAME_TEXT = 't-name'
@@ -258,27 +250,6 @@ function RowMenu({ user, mode, onView, onEdit, onStatusChange, lockedBy }: RowMe
   return <RowActionMenu actions={actions} heading={displayName(user)} subheading={user.email} iconSize={18} />
 }
 
-/** Where a vendor driver's app access stands, in one badge. */
-function AccessBadge({ access }: { access: VendorDriverUser['access'] | undefined }) {
-  // A row without access state is not a vendor account (or not loaded yet).
-  if (!access) return <span className="text-sm text-[#818181]">—</span>
-  // Whether they can sign in shows in the Status column (Deactivated).
-  const cfg = access.enrolled
-      ? { label: `Passkey set up${access.passkey_count > 1 ? ` (${access.passkey_count})` : ''}`,
-          cls: 'bg-[#4df9ed]/10 text-[#4df9ed] border-[#4df9ed]/30' }
-      : access.invite_pending
-        ? { label: 'Passkey link sent', cls: 'bg-orange-500/15 text-orange-400 border-orange-500/30' }
-        : { label: 'Password only',     cls: 'bg-[#818181]/10 text-[#818181] border-[#818181]/30' }
-  return (
-    <span
-      title={access.last_used_at ? `Last used ${formatDateTime(access.last_used_at)}` : undefined}
-      className={`t-badge gap-1 ${cfg.cls}`}
-    >
-      <KeyRound size={10} /> {cfg.label}
-    </span>
-  )
-}
-
 /** The archived view's row menu: look at the account, or bring it back. */
 function ArchivedRowMenu({ user, mode, onView, onRestore, lockedBy }: {
   user:      AnyUser
@@ -304,8 +275,8 @@ function ArchivedRowMenu({ user, mode, onView, onRestore, lockedBy }: {
 }
 
 /**
- * Actions for a vendor driver: the shared view/edit form, plus the access actions
- * (passkey link, revoke, restore). Password resets go through the reset queue,
+ * Actions for a vendor driver: the shared view/edit form, the optional passkey
+ * link, and the account status actions. Password resets go through the reset queue,
  * as for a company driver.
  */
 function VendorRowMenu({ user, mode, onDone, onView, onEdit, onStatusChange, lockedBy }: {
@@ -345,7 +316,7 @@ function VendorRowMenu({ user, mode, onDone, onView, onEdit, onStatusChange, loc
   // archived the same way.
   const accessActions: RowAction[] = !itMode ? [] : [
     ...(user.status === 'active'
-      ? [{ label: 'Send Passkey Link', icon: <Send size={15} />, onSelect: () => void resend(), section: 'App access', description: 'Email an optional passkey setup link' }]
+      ? [{ label: 'Send Passkey Link', icon: <Send size={15} />, onSelect: () => void resend(), section: 'Passkey', description: 'Email an optional passkey setup link' }]
       : []),
     ...STATUS_ACTIONS.filter((x) => x.status !== user.status).map((x) => ({
       label: x.label, icon: x.icon, tone: x.tone, section: 'Account', description: x.description,
@@ -531,7 +502,6 @@ function renderCells(user: AnyUser, tab: TabValue) {
               <LicenseExpiryBadge expiry={u.drivers?.license_expiry ?? null} />
             </div>
           </td>
-          <td><AccessBadge access={u.access} /></td>
           <td><StatusBadge status={u.status} /></td>
         </>
       )
@@ -553,7 +523,7 @@ const HEADERS: Record<TabValue, string[]> = {
   all:         ['Name', 'Email', 'Phone', 'Role', 'Status'],
   clients:     ['Name', 'Email', 'Company', 'Status', 'Last Login'],
   drivers:     ['Name', 'License #', 'Expiry', 'Driver Status', 'Acct. Status'],
-  'vendor-drivers': ['Name', 'Vendor', 'Email', 'Expiry', 'App Access', 'Acct. Status'],
+  'vendor-drivers': ['Name', 'Vendor', 'Email', 'Expiry', 'Acct. Status'],
   archived:    ['Name', 'Email', 'Phone', 'Role', 'Status'],
 }
 
@@ -566,19 +536,13 @@ const LICENSE_OPTIONS = [
   { value: 'ok',        label: 'In date' },
 ]
 
-const ACCESS_OPTIONS = [
-  { value: 'enrolled',   label: 'Passkey set up' },
-  { value: 'invited',    label: 'Passkey link sent' },
-  { value: 'not_set_up', label: 'Password only' },
-]
-
 /** "on_trip" → "On Trip". */
 function humanize(v: string): string {
   return v.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
 /** Company, vendor and driver-status choices come from the accounts loaded. */
-function filterFields(tab: TabValue, rows: AnyUser[], archivedOnly: boolean): FilterField[] {
+function filterFields(tab: TabValue, rows: AnyUser[]): FilterField[] {
   const status: FilterField[] = [{ key: 'status', label: 'Account Status', options: STATUS_OPTIONS }]
   const license: FilterField = { key: 'license', label: 'License', options: LICENSE_OPTIONS }
   const role: FilterField = { key: 'role', label: 'Role', options: [{ value: 'client', label: 'Client' }, { value: 'driver', label: 'Driver' }] }
@@ -599,7 +563,6 @@ function filterFields(tab: TabValue, rows: AnyUser[], archivedOnly: boolean): Fi
       return [
         ...status,
         { key: 'vendor', label: 'Vendor', options: optionsFrom(rows.map((u) => (u as VendorDriverUser).drivers?.vendor_name)) },
-        ...(archivedOnly ? [] : [{ key: 'access', label: 'App Access', options: ACCESS_OPTIONS }]),
         license,
       ]
   }
@@ -728,7 +691,7 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
   // Both pages filter by account status only, in Untitled UI's dropdowns filter
   // bar (the user's call, 2026-10-25). One status at a time, read "Status:
   // Active"; "All" means every current status. The archived list filters by role.
-  const filterDefs = filterFields(activeTab, users, showArchived)
+  const filterDefs = filterFields(activeTab, users)
     .filter((f) => f.key === (showArchived ? 'role' : 'status'))
     .map((f) => ({ ...f, label: showArchived ? 'Role' : 'Status', single: true }))
   const licenseOnly = matchesFilter(filters, 'license', 'attention') && !matchesFilter(filters, 'license', 'ok')

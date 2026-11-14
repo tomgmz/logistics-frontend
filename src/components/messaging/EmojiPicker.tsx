@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Search } from 'lucide-react'
-import emojiData from '@emoji-mart/data/sets/15/native.json'
 
 interface EmojiSkin {
   unified: string
@@ -23,7 +22,34 @@ interface EmojiDataShape {
   emojis: Record<string, EmojiEntry>
 }
 
-const data = emojiData as EmojiDataShape
+/*
+ * The emoji list (433 KB) is its own chunk, fetched in the background once a
+ * chat box is on screen (preloadEmojiData, called by MessageInput), instead of
+ * being bundled into every page with a chat box. The search index is built
+ * only when someone first types in the emoji search.
+ */
+let data: EmojiDataShape | null = null
+let loading: Promise<EmojiDataShape> | null = null
+
+function loadEmojiData(): Promise<EmojiDataShape> {
+  if (data) return Promise.resolve(data)
+  loading ??= import('@emoji-mart/data/sets/15/native.json')
+    .then((m) => {
+      data = ((m as { default?: unknown }).default ?? m) as EmojiDataShape
+      return data
+    })
+    .catch((err) => { loading = null; throw err })
+  return loading
+}
+
+/** Starts the download when the browser is idle; safe to call many times. */
+export function preloadEmojiData(): void {
+  if (data || loading || typeof window === 'undefined') return
+  const start = () => { void loadEmojiData().catch(() => { /* retried when the picker opens */ }) }
+  // Safari has no requestIdleCallback.
+  if ('requestIdleCallback' in window) window.requestIdleCallback(start, { timeout: 3000 })
+  else setTimeout(start, 1500)
+}
 
 const CATEGORY_META: Record<string, { label: string; icon: string }> = {
   people:   { label: 'Smileys & People', icon: '😀' },
@@ -45,20 +71,28 @@ const SKIN_TONES: { label: string; index: number }[] = [
   { label: 'Dark',         index: 5 },
 ]
 
-const searchIndex: Record<string, string> = {}
-for (const id of Object.keys(data.emojis)) {
-  const e = data.emojis[id]
-  searchIndex[id] = [e.name, ...(e.keywords ?? []), ...(e.emoticons ?? [])].join(' ').toLowerCase()
+let searchIndex: Record<string, string> | null = null
+
+function getSearchIndex(d: EmojiDataShape): Record<string, string> {
+  if (!searchIndex) {
+    const idx: Record<string, string> = {}
+    for (const id of Object.keys(d.emojis)) {
+      const e = d.emojis[id]
+      idx[id] = [e.name, ...(e.keywords ?? []), ...(e.emoticons ?? [])].join(' ').toLowerCase()
+    }
+    searchIndex = idx
+  }
+  return searchIndex
 }
 
 function getNative(id: string, skinIndex = 0): string {
-  const e = data.emojis[id]
+  const e = data?.emojis[id]
   if (!e) return ''
   return (e.skins[skinIndex] ?? e.skins[0])?.native ?? ''
 }
 
 function hasSkins(id: string): boolean {
-  return (data.emojis[id]?.skins.length ?? 1) > 1
+  return (data?.emojis[id]?.skins.length ?? 1) > 1
 }
 
 const COLS = 8
@@ -103,6 +137,18 @@ export default function EmojiPicker({ onSelect, onClose, position = 'top' }: Emo
   const searchRef = useRef<HTMLInputElement>(null)
   const gridRef   = useRef<HTMLDivElement>(null)
 
+  // Usually already fetched in the background; if not, show a spinner until it is.
+  const [ready, setReady]       = useState(() => data !== null)
+  const [loadFailed, setFailed] = useState(false)
+  useEffect(() => {
+    if (ready) return
+    let cancelled = false
+    loadEmojiData()
+      .then(() => { if (!cancelled) setReady(true) })
+      .catch(() => { if (!cancelled) setFailed(true) })
+    return () => { cancelled = true }
+  }, [ready])
+
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 120)
     return () => clearTimeout(t)
@@ -121,13 +167,15 @@ export default function EmojiPicker({ onSelect, onClose, position = 'top' }: Emo
     return () => clearTimeout(t)
   }, [])
 
-  const categories = data.categories
+  const categories = useMemo(() => (ready && data ? data.categories : []), [ready])
 
   const displayEmojis = useMemo(() => {
+    if (!ready || !data) return []
     const q = debouncedSearch.trim().toLowerCase()
     if (!q) return categories[activeCatIndex]?.emojis ?? []
-    return Object.keys(data.emojis).filter(id => searchIndex[id].includes(q))
-  }, [debouncedSearch, activeCatIndex, categories])
+    const idx = getSearchIndex(data)
+    return Object.keys(data.emojis).filter(id => idx[id].includes(q))
+  }, [ready, debouncedSearch, activeCatIndex, categories])
 
   const { visibleItems, paddingTop, paddingBottom, totalHeight, setScrollTop } =
     useVirtualGrid(displayEmojis)
@@ -152,9 +200,11 @@ export default function EmojiPicker({ onSelect, onClose, position = 'top' }: Emo
     const btnRect    = (e.currentTarget as HTMLElement).getBoundingClientRect()
     const pickerRect = ref.current?.getBoundingClientRect()
     if (!pickerRect) return
+    const skins = data?.emojis[id]?.skins
+    if (!skins) return
     setEmojiSkins({
       id,
-      skins: data.emojis[id].skins,
+      skins,
       x: btnRect.left - pickerRect.left,
       y: btnRect.top  - pickerRect.top,
     })
@@ -201,7 +251,7 @@ export default function EmojiPicker({ onSelect, onClose, position = 'top' }: Emo
             onClick={() => setSkinBarOpen(o => !o)}
             className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-white/10 transition-colors"
           >
-            <span className="text-[18px] leading-none">{getNative('raised_hand', skinTone)}</span>
+            <span className="text-[18px] leading-none">{getNative('raised_hand', skinTone) || '✋'}</span>
           </button>
 
           <AnimatePresence>
@@ -275,7 +325,13 @@ export default function EmojiPicker({ onSelect, onClose, position = 'top' }: Emo
           [&::-webkit-scrollbar-thumb]:rounded-full
         "
       >
-        {displayEmojis.length === 0 ? (
+        {!ready ? (
+          loadFailed
+            ? <p className="ff-body text-white/30 text-xs text-center py-10">Emojis could not be loaded. Close and try again.</p>
+            : <div className="flex h-full items-center justify-center" role="status" aria-label="Loading emojis">
+                <span className="size-5 animate-spin rounded-full border-2 border-white/15 border-t-[var(--color-cyan)]" />
+              </div>
+        ) : displayEmojis.length === 0 ? (
           <p className="ff-body text-white/20 text-xs text-center py-10">No emoji found</p>
         ) : (
           <div style={{ height: totalHeight }}>
@@ -289,7 +345,7 @@ export default function EmojiPicker({ onSelect, onClose, position = 'top' }: Emo
                     <button
                       key={id}
                       type="button"
-                      title={data.emojis[id]?.name}
+                      title={data?.emojis[id]?.name}
                       onClick={() => handleSelect(id)}
                       onContextMenu={e => handleContextMenu(e, id)}
                       className="

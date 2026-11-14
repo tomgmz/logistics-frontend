@@ -40,7 +40,7 @@ interface StopLike {
 }
 
 /** Booking statuses where the truck has left the pickup point. */
-const PAST_PICKUP = new Set(['in_transit', 'delivered', 'completed'])
+const PAST_PICKUP = new Set(['in_transit', 'delivered', 'completed', 'failed'])
 
 /**
  * Turn a booking's pickup and drop-offs into steps.

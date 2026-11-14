@@ -31,6 +31,7 @@ import CompletionPanel from '@/components/transactions/CompletionPanel'
 import BookingDocuments from '@/components/transactions/BookingDocuments'
 import { StatusBadge, getStatusMeta } from '@/components/transactions/TransactionStatus'
 import ProblemReportedBadge, { hasOpenClientIssue } from '@/components/transactions/ProblemReportedBadge'
+import PartlyFailedBadge, { isPartlyFailed } from '@/components/transactions/PartlyFailedBadge'
 import ResubmittedBadge, { resubmissionsOf } from '@/components/transactions/ResubmittedBadge'
 import DelayedBadge from '@/components/transactions/DelayedBadge'
 import ResubmissionChanges from '@/components/transactions/ResubmissionChanges'
@@ -63,6 +64,7 @@ const TABS: { key: BookingStatus | 'all'; label: string }[] = [
   { key: 'IN_TRANSIT', label: 'In transit' },
   { key: 'DELIVERED',  label: 'Delivered' },
   { key: 'COMPLETED',  label: 'Completed' },
+  { key: 'FAILED',     label: 'Failed' },
   { key: 'CANCELLED',  label: 'Cancelled' },
 ]
 
@@ -100,7 +102,7 @@ function SkeletonCard() {
 }
 
 /** The status as the Figma tags it: coloured outline, tinted fill, no icon. */
-function StatusTag({ status, problem = false }: { status: string; problem?: boolean }) {
+function StatusTag({ status, problem = false, booking }: { status: string; problem?: boolean; booking?: Record<string, unknown> }) {
   const m = getStatusMeta(status)
   // Delivered (awaiting the client's confirmation) is white in the Figma, not
   // the green Completed uses. A reported problem is a substatus under it.
@@ -113,6 +115,7 @@ function StatusTag({ status, problem = false }: { status: string; problem?: bool
         {m.label}
       </span>
       {problem && delivered && <ProblemReportedBadge />}
+      {booking && isPartlyFailed(booking) && <PartlyFailedBadge booking={booking} />}
     </span>
   )
 }
@@ -157,7 +160,7 @@ function BookingCard({ booking, onSelect }: {
           <ResubmittedBadge className="" count={resubmissionsOf(booking)} />
           <DelayedBadge className="" booking={booking} />
         </div>
-        <StatusTag status={booking.status} problem={hasOpenClientIssue(booking)} />
+        <StatusTag status={booking.status} problem={hasOpenClientIssue(booking)} booking={booking} />
       </div>
 
       <div className="flex flex-col gap-1.5">
@@ -304,7 +307,7 @@ export default function BookingHistoryModule() {
           <div className="ml-auto flex items-center gap-2">
             <ResubmittedBadge className="" count={resubmissionsOf(selected)} />
             <DelayedBadge className="" booking={selected} />
-            <StatusBadge status={selected.status} problem={hasOpenClientIssue(selected)} />
+            <StatusBadge status={selected.status} problem={hasOpenClientIssue(selected)} partlyFailed={isPartlyFailed(selected)} booking={selected} />
           </div>
         )}
       </div>

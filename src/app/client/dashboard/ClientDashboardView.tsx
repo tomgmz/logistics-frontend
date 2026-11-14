@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import {
-  AlertCircle, Truck, Clock, CheckCircle2, MapPin, Plus, ChevronRight, XCircle,
+  AlertCircle, Truck, Clock, CheckCircle2, MapPin, Plus, ChevronRight, XCircle, OctagonX,
 } from 'lucide-react'
 
 import { bookingService } from '@/lib/services/client/booking.service'
@@ -13,6 +13,7 @@ import { type BookingStatus, asBookingStatus } from '@/app/types/maps/routemap.t
 import { bookingRef } from '@/lib/booking'
 import { bookingStatusColor } from '@/lib/palette'
 import ProblemReportedBadge, { hasOpenClientIssue } from '@/components/transactions/ProblemReportedBadge'
+import PartlyFailedBadge, { isPartlyFailed } from '@/components/transactions/PartlyFailedBadge'
 import { isAwaitingResubmit } from '@/lib/booking-resubmit'
 import { useBookingClosed } from '@/lib/contract-status'
 import RejectionPanel from '@/components/transactions/RejectionPanel'
@@ -55,6 +56,7 @@ const STATUS_META: Record<BookingStatus, { label: string; color: string; icon: R
   ARRIVED:    { label: 'Arrived',    color: bookingStatusColor('ARRIVED'), icon: <MapPin       size={11} /> },
   DELIVERED:  { label: 'Delivered — Please Confirm', color: bookingStatusColor('DELIVERED'), icon: <CheckCircle2 size={11} /> },
   COMPLETED:  { label: 'Completed',  color: bookingStatusColor('COMPLETED'),  icon: <CheckCircle2 size={11} /> },
+  FAILED:     { label: 'Failed',     color: bookingStatusColor('FAILED'), icon: <OctagonX     size={11} /> },
   CANCELLED:  { label: 'Cancelled',  color: bookingStatusColor('CANCELLED'), icon: <XCircle      size={11} /> },
 }
 
@@ -120,7 +122,7 @@ function phToday(): string {
 
 // ── presentational ─────────────────────────────────────────────────────────
 
-function StatusBadge({ status, problem = false }: { status: string; problem?: boolean }) {
+function StatusBadge({ status, problem = false, booking }: { status: string; problem?: boolean; booking?: Record<string, unknown> }) {
   // With a reported problem the status reads plain "Delivered" (not "please
   // confirm": the client already answered) and the problem is a substatus under it.
   const base = statusMeta(status)
@@ -134,6 +136,7 @@ function StatusBadge({ status, problem = false }: { status: string; problem?: bo
         {m.icon}{m.label}
       </span>
       {problem && <ProblemReportedBadge />}
+      {booking && isPartlyFailed(booking) && <PartlyFailedBadge booking={booking} />}
     </span>
   )
 }
@@ -174,7 +177,7 @@ function ActiveShipmentRow({ booking }: { booking: BookingWithRelations }) {
           {bookingRef(booking)}
         </Link>
       </td>
-      <td><StatusBadge status={booking.status} problem={hasOpenClientIssue(booking as unknown as Record<string, unknown>)} /></td>
+      <td><StatusBadge status={booking.status} problem={hasOpenClientIssue(booking as unknown as Record<string, unknown>)} booking={booking as unknown as Record<string, unknown>} /></td>
       <td className="whitespace-nowrap">
         {formatDate(booking.schedule_date)}
         {typeof booking.call_time === 'string' && <span style={{ color: MUTED }}> · {booking.call_time}</span>}

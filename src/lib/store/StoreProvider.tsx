@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { useAuthStore } from './auth.store'
 import { resetBooking, restoreBookingDraft } from './booking.store'
 import { clearBookingDraft } from './booking-draft'
+import { clearAllMessageDrafts } from '@/lib/messaging/messageDraft'
 
 /**
  * Screen-state stores (Zustand) that need wiring at the app root. Server data
@@ -20,6 +21,8 @@ export default function StoreProvider({ children }: { children: React.ReactNode 
     if (prev.user && state.user?.user_id !== prev.user.user_id) {
       clearBookingDraft()
       resetBooking()
+      // Unsent chat text too (it is encrypted, but it is still theirs).
+      clearAllMessageDrafts()
     }
   }), [])
 

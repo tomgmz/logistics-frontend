@@ -301,6 +301,7 @@ export default function MessengerChatBubble({ conversationId, index }: Props) {
           replyTo={replyTo}
           onCancelReply={() => setReplyTo(null)}
           compact
+          draftKey={`dm:${conversationId}`}
         showJumpToLatest={!atLatest} onJumpToLatest={scrollToLatest} />
       </div>
     </motion.div>

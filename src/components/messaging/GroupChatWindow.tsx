@@ -494,7 +494,7 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
             <div ref={bottomRef} className="h-1" />
           </div>
 
-          <MessageInput onSend={handleSend} onTypingChange={broadcastTyping} disabled={sending} replyTo={replyTo} onCancelReply={() => setReplyTo(null)} showJumpToLatest={!atLatest} onJumpToLatest={scrollToLatest} />
+          <MessageInput onSend={handleSend} onTypingChange={broadcastTyping} disabled={sending} replyTo={replyTo} onCancelReply={() => setReplyTo(null)} showJumpToLatest={!atLatest} onJumpToLatest={scrollToLatest} draftKey={`group:${group.id}`} />
         </>
       )}
 

@@ -1,5 +1,6 @@
 'use client'
-
+
+
 import { PanelReadyGate, PanelSectionFlag, PanelSpinner } from '@/components/ui/PanelReady'
 import Pagination from '@/components/ui/Pagination'
 import FilterBar from '@/components/ui/FilterBar'
@@ -21,7 +22,6 @@ import {
   Ruler,
   Check,
   ClipboardCheck,
-  KeyRound,
   AlertTriangle,
   PauseCircle,
   Boxes,
@@ -66,7 +66,6 @@ import { getApiErrorMessage } from '@/lib/api-error'
 import { bookingRef, bookingRefFromRecord } from '@/lib/booking'
 import {
   externalDriverService,
-  type ExternalDriverAccess,
   type VendorDriverUser,
 } from '@/lib/services/admin/external-driver.service'
 import type { RouteDistance, SecondDriverRecord } from '@/lib/services/admin/assignment.service'
@@ -77,6 +76,7 @@ import DriverPicker, { type DriverPickerOption } from './DriverPicker'
 import CompletionPanel from '@/components/transactions/CompletionPanel'
 import { formatPlateNumber, plateError } from '@/lib/validation/plate'
 import ProblemReportedBadge, { hasOpenClientIssue } from '@/components/transactions/ProblemReportedBadge'
+import PartlyFailedBadge, { isPartlyFailed } from '@/components/transactions/PartlyFailedBadge'
 import ResubmittedBadge, { resubmissionsOf } from '@/components/transactions/ResubmittedBadge'
 import { MAX_RESUBMISSIONS } from '@/lib/booking-resubmit'
 import SharedDelayedBadge from '@/components/transactions/DelayedBadge'
@@ -124,6 +124,7 @@ const BOOKING_STATUSES: AdminBookingLifecycleStatus[] = [
   'in_transit',
   'delivered',
   'completed',
+  'failed',
   'cancelled',
 ]
 
@@ -327,6 +328,9 @@ interface ListRow {
   issue_note: string | null
   /** Times the client resubmitted it after a rejection. */
   resubmissions: number
+  /** Delivered/Completed with at least one failed drop-off. */
+  partly_failed: boolean
+  raw: Record<string, unknown>
 }
 
 function toRows(raw: Record<string, unknown>[]): ListRow[] {
@@ -352,6 +356,8 @@ function toRows(raw: Record<string, unknown>[]): ListRow[] {
       issue_open:        hasOpenClientIssue(b),
       issue_note:        typeof b.client_issue_note === 'string' ? b.client_issue_note : null,
       resubmissions:     resubmissionsOf(b),
+      partly_failed:     isPartlyFailed(b),
+      raw:               b,
     }
   })
 }
@@ -485,49 +491,6 @@ function vendorOption(v: VendorDriverUser, bookingId: string): DriverPickerOptio
   }
 }
 
-/**
- * App access for a vendor driver who was given an account.
- *
- * Since 2026-11-09 a vendor driver signs in like a company driver (password or
- * emailed code); a passkey is optional. The vendor snapshot on the delivery is
- * untouched by any access change, because that is the record of who drove.
- */
-function ExternalDriverAccessRow({ userId }: { userId: string }) {
-  const [access, setAccess] = useState<ExternalDriverAccess | null>(null)
-
-  const load = useCallback(() => {
-    externalDriverService.getAccess(userId)
-      .then(setAccess)
-      .catch(() => setAccess(null))
-  }, [userId])
-
-  useEffect(() => { load() }, [load])
-
-  const revoked = access !== null && !access.account_active
-
-  const status = !access
-    ? 'Checking app access…'
-    : revoked
-      ? 'Account deactivated'
-    : access.enrolled
-      ? `App access active · ${access.passkey_count} passkey${access.passkey_count === 1 ? '' : 's'}` +
-        (access.last_used_at ? ` · last used ${new Date(access.last_used_at).toLocaleString()}` : '')
-      : access.invite_pending
-        ? `Setup link sent — not yet used${access.invite_expires_at ? ` · expires ${new Date(access.invite_expires_at).toLocaleString()}` : ''}`
-        : 'App access active · password or emailed code'
-
-  return (
-    <div className="mt-2 pt-2 border-t border-white/[0.06] space-y-1.5">
-      <div className="flex items-center gap-1.5 text-[11px] text-white/45">
-        <KeyRound size={11} className="text-white/30 shrink-0" />
-        <span>{status}</span>
-      </div>
-      {/* The passkey link and the account status are the IT Administrator's. */}
-      <p className="text-[10px] text-white/35">App access is managed by the IT Administrator.</p>
-    </div>
-  )
-}
-
 function AssignmentPanel({
   detail,
   drivers,
@@ -541,7 +504,6 @@ function AssignmentPanel({
   vendorForm,
   vendorDrivers,
   vendorDriversLoading,
-  externalDriverUserId,
   selectClass,
   onDriverChange,
   onSecondDriverChange,
@@ -584,8 +546,6 @@ function AssignmentPanel({
   /** Vendor drivers registered in Driver Management, with their access state. */
   vendorDrivers:   VendorDriverUser[]
   vendorDriversLoading: boolean
-  /** Set when this vendor driver was provisioned an app account, so access can be managed. */
-  externalDriverUserId: string | null
   selectClass:     string
   onDriverChange:  (id: string) => void
   onSecondDriverChange: (id: string) => void
@@ -753,9 +713,6 @@ function AssignmentPanel({
           </div>
           {vendorMode && vendorLabel && (
             <div className="text-xs font-normal">Vendor: {vendorLabel}</div>
-          )}
-          {vendorMode && externalDriverUserId && (
-            <ExternalDriverAccessRow userId={externalDriverUserId} />
           )}
           {selectedCoding && !pickerOpen && <CodingNotice flag={selectedCoding} plate={selectedPlate!} />}
         </div>
@@ -1561,7 +1518,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
         // confirmed back in the 8338 lot — the cargo being off the truck does
         // not put the truck in the yard. The server refuses these assignments
         // either way; this keeps the dropdowns from offering them first.
-        if (bookingStatus === 'delivered' || bookingStatus === 'completed') return !a.bookings?.fleet_return_at
+        if (bookingStatus === 'delivered' || bookingStatus === 'completed' || bookingStatus === 'failed') return !a.bookings?.fleet_return_at
         return true
       }),
     [allAssignments, selectedId],
@@ -2035,12 +1992,12 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
 
   const showTripPlanner = !!detail &&
     (roleView === 'admin' || roleView === 'operations_manager') &&
-    ['assigned', 'in_transit', 'delivered', 'completed'].includes(normalizeBookingStatus(detail.status))
+    ['assigned', 'in_transit', 'delivered', 'completed', 'failed'].includes(normalizeBookingStatus(detail.status))
 
   // Stop times exist once a vehicle and its trips do; every role that sees the
   // booking may read them.
   const showStopTimes = !!detail &&
-    ['assigned', 'in_transit', 'delivered', 'completed'].includes(normalizeBookingStatus(detail.status))
+    ['assigned', 'in_transit', 'delivered', 'completed', 'failed'].includes(normalizeBookingStatus(detail.status))
 
   /**
    * One person edits a booking at a time. Operations and the Company Admin can
@@ -2054,7 +2011,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
    * lock anybody out.
    */
   const bookingOpen = !!detail &&
-    !['delivered', 'completed', 'cancelled'].includes(String(detail.status ?? '').toLowerCase())
+    !['delivered', 'completed', 'failed', 'cancelled'].includes(String(detail.status ?? '').toLowerCase())
   const mayEditBooking = canEdit
   const bookingLock = useRecordLock({
     type:    'booking',
@@ -2205,7 +2162,8 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                   // rejection, any status now; "Delayed" after In Transit =
                   // in-transit bookings running late now.
                   items={(['all', ...(hidePending ? ['resubmitted'] : []), ...BOOKING_STATUSES.filter((s) => !hidePending || s !== 'pending')])
-                    .flatMap((key) => (key === 'in_transit' ? [key, 'delayed'] : key === 'pending' ? [key, 'resubmitted'] : [key]))
+                    // "Partly Failed" after Completed: Delivered/Completed with a failed drop-off.
+                    .flatMap((key) => (key === 'in_transit' ? [key, 'delayed'] : key === 'pending' ? [key, 'resubmitted'] : key === 'completed' ? [key, 'partly_failed'] : [key]))
                     .map((key) => ({
                       id: key,
                       label: `${key === 'all' ? (hidePending ? 'All (active)' : 'All') : fmtStatus(key)} (${key === 'all' ? statusCounts.all : statusCounts[key] ?? 0})`,
@@ -2286,6 +2244,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                                 {fmtStatus(r.status)}
                               </span>
                               {r.issue_open && <ProblemReportedBadge note={r.issue_note} />}
+                              {r.partly_failed && <PartlyFailedBadge booking={r.raw} />}
                               {r.pause_reason && <PausedBadge reason={r.pause_reason} />}
                               {r.delayed !== undefined && <DelayedBadge minutes={r.delayed} />}
                               {['assigned', 'in_transit'].includes(r.status) &&
@@ -2361,6 +2320,9 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                           <Tag color={statusColor(detail.status)} size="md">{fmtStatus(detail.status)}</Tag>
                           {hasOpenClientIssue(detail as unknown as Record<string, unknown>) && (
                             <ProblemReportedBadge note={(detail as { client_issue_note?: string | null }).client_issue_note} />
+                          )}
+                          {isPartlyFailed(detail as unknown as Record<string, unknown>) && (
+                            <PartlyFailedBadge booking={detail as unknown as Record<string, unknown>} />
                           )}
                         </span>
                       </>
@@ -2577,7 +2539,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
 
                         {/* A crew license that lapses before, during or just after this
                             delivery (an expired one is already refused at assignment). */}
-                        {!['completed', 'cancelled', 'rejected'].includes(normalizeBookingStatus(detail.status)) &&
+                        {!['completed', 'failed', 'cancelled', 'rejected'].includes(normalizeBookingStatus(detail.status)) &&
                           crewLicenseFlags(currentAssignment, detail.schedule_date).map((f) => (
                           <div key={f.text} className="rounded-xl border px-3.5 py-2.5 text-[13px] text-white/85"
                             style={{ borderColor: f.tone === 'red' ? '#F6262666' : '#FFEA0055', background: f.tone === 'red' ? '#F6262612' : '#FFEA000d' }}>
@@ -2664,10 +2626,6 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                             vendorForm={vendorForm}
                             vendorDrivers={vendorDrivers}
                             vendorDriversLoading={vendorDriversLoading}
-                            externalDriverUserId={
-                              allAssignments.find((a) => a.booking_id === detail.booking_id)
-                                ?.vendor_driver_user_id ?? null
-                            }
                             selectClass={selectClass}
                             onDriverChange={handleDriverChange}
                             onTruckChange={handleTruckChange}
@@ -2788,7 +2746,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                                 // Stop times are what happened on the road: nothing to
                                 // fill in before the delivery starts (server refuses too).
                                 canEdit={(roleView === 'admin' || roleView === 'operations_manager') && !bookingReadOnly
-                                  && ['in_transit', 'delivered', 'completed'].includes(String(detail.status))}
+                                  && ['in_transit', 'delivered', 'completed', 'failed'].includes(String(detail.status))}
                                 allowed={canEdit}
                               />
                             </CollapsibleSection>

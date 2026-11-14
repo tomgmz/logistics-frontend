@@ -354,7 +354,11 @@ export default function AdministratorManagementView({ archive }: {
   const linkedSearch   = searchParams.get('search') ?? ''
 
   const [section,          setSection]          = useState<ModuleSection>(
-    !archive && deepLinkTab === RESETS_DEEPLINK ? 'password-resets' : 'directory',
+    archive ? 'directory'
+      : deepLinkTab === RESETS_DEEPLINK ? 'password-resets'
+      // "Account signed out for safety" for a client or driver: ?tab=people&search=<email>
+      : deepLinkTab === 'people' ? 'people'
+      : 'directory',
   )
   // Opens on All Administrators: every staff account at once.
   const homeTab: TabValue = archive ? 'archived' : 'all'

@@ -6,6 +6,7 @@ import PlaceIcon        from '@mui/icons-material/Place'
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'
 import { bookingStatusColor } from '@/lib/palette'
 import ProblemReportedBadge from '@/components/transactions/ProblemReportedBadge'
+import PartlyFailedBadge, { isPartlyFailed } from '@/components/transactions/PartlyFailedBadge'
 
 export type BookingStatus =
   | 'PENDING' | 'ASSIGNED' | 'IN_TRANSIT' | 'IN TRANSIT'
@@ -15,7 +16,7 @@ export type BookingStatus =
 const STATUS_LABEL: Record<string, string> = {
   PENDING: 'Pending', BOOKED: 'Booked', APPROVED: 'Approved', ASSIGNED: 'Assigned',
   IN_TRANSIT: 'In Transit', 'IN TRANSIT': 'In Transit', ARRIVED: 'Arrived',
-  DELIVERED: 'Delivered', COMPLETED: 'Completed', CANCELLED: 'Cancelled',
+  DELIVERED: 'Delivered', COMPLETED: 'Completed', FAILED: 'Failed', CANCELLED: 'Cancelled',
 }
 
 const STATUS_MAP: Record<string, { label: string; color: string; bg: string; border: string }> =
@@ -24,7 +25,7 @@ const STATUS_MAP: Record<string, { label: string; color: string; bg: string; bor
     return [key, { label, color, bg: `${color}1f`, border: `${color}4d` }]
   }))
 
-export function StatusBadge({ status, problem = false }: { status: string; problem?: boolean }) {
+export function StatusBadge({ status, problem = false, booking }: { status: string; problem?: boolean; booking?: Record<string, unknown> | null }) {
   const key = status.toUpperCase().replace(/-/g, '_')
   const cfg = STATUS_MAP[key] ?? STATUS_MAP.PENDING
 
@@ -39,6 +40,7 @@ export function StatusBadge({ status, problem = false }: { status: string; probl
         {cfg.label.toUpperCase()}
       </span>
       {problem && key === 'DELIVERED' && <ProblemReportedBadge />}
+      {booking && isPartlyFailed(booking) && <PartlyFailedBadge booking={booking} />}
     </span>
   )
 }

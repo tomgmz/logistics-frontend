@@ -19,6 +19,7 @@ export const BOOKING_STATUS_FILTERS = [
   { value: 'in_transit', label: 'In Transit' },
   { value: 'delivered',  label: 'Delivered' },
   { value: 'completed',  label: 'Completed' },
+  { value: 'failed',     label: 'Failed' },
   { value: 'cancelled',  label: 'Cancelled' },
 ] as const
 

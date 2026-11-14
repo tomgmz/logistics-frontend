@@ -511,7 +511,7 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
       >
         <div className="h-14 flex items-center justify-end px-4 flex-shrink-0 border-b"
           style={{ borderColor: 'var(--color-surface-dark)' }}>
-          {routeData && bookingDetail && <StatusBadge status={bookingDetail.status ?? 'pending'} problem={hasOpenClientIssue(bookingDetail as unknown as Record<string, unknown>)} />}
+          {routeData && bookingDetail && <StatusBadge status={bookingDetail.status ?? 'pending'} problem={hasOpenClientIssue(bookingDetail as unknown as Record<string, unknown>)} booking={bookingDetail as unknown as Record<string, unknown>} />}
         </div>
 
         <div className="flex-1 relative min-h-0">{mapContent}</div>
