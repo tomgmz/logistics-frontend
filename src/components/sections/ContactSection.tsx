@@ -4,6 +4,7 @@ import { useRef, useState, type FormEvent } from 'react';
 import { motion, useInView } from 'framer-motion';
 import { z } from 'zod';
 import { getApiUrl } from '@/lib/api/api-url';
+import { useTurnstile, CaptchaError } from '@/lib/hooks/useTurnstile';
 import {
   emailField,
   fieldErrors,
@@ -90,6 +91,10 @@ export default function ContactSection() {
   const [form, setForm]       = useState<ContactForm>(emptyForm);
   const [errors, setErrors]   = useState<Record<string, string>>({});
   const [sending, setSending] = useState(false);
+  // The captcha starts on the first focus in the form, not on page load, so
+  // visitors who never write don't run it.
+  const [captchaArmed, setCaptchaArmed] = useState(false);
+  const captcha = useTurnstile('contact');
   const [status, setStatus]   = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
 
   // Checked as you type, the same way the account forms do: each field shows its
@@ -127,11 +132,12 @@ export default function ContactSection() {
     try {
       // No cookies on purpose: a public form has nothing to do with a signed-in
       // visitor's session, and leaving them off keeps CSRF out of the picture.
+      const captchaToken = await captcha.getToken();
       const res = await fetch(`${getApiUrl()}/public/contact`, {
         method:      'POST',
         headers:     { 'Content-Type': 'application/json' },
         credentials: 'omit',
-        body:        JSON.stringify({ ...checked.data, website: form.website }),
+        body:        JSON.stringify({ ...checked.data, website: form.website, captcha_token: captchaToken }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
@@ -145,7 +151,11 @@ export default function ContactSection() {
       setForm(emptyForm);
       setErrors({});
       setStatus({ kind: 'success', text: 'Thank you. Your message has been sent, and our team will get back to you soon.' });
-    } catch {
+    } catch (err) {
+      if (err instanceof CaptchaError) {
+        setStatus({ kind: 'error', text: err.message });
+        return;
+      }
       setStatus({ kind: 'error', text: 'We could not reach our server. Please check your connection and try again.' });
     } finally {
       setSending(false);
@@ -198,7 +208,7 @@ export default function ContactSection() {
               grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-0 overflow-hidden"
           >
 
-            <form className="relative p-5 sm:p-8 md:p-[clamp(1.5rem,4svh,2.5rem)]" onSubmit={handleSubmit} noValidate>
+            <form className="relative p-5 sm:p-8 md:p-[clamp(1.5rem,4svh,2.5rem)]" onSubmit={handleSubmit} onFocusCapture={() => setCaptchaArmed(true)} noValidate>
               <div aria-hidden="true" className="absolute -left-[9999px] top-0 w-px h-px overflow-hidden">
                 <label>
                   Website
@@ -278,6 +288,8 @@ export default function ContactSection() {
                   </p>
                 </div>
               </div>
+
+              {captchaArmed && captcha.element}
 
               <button
                 type="submit"
