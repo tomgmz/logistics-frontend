@@ -18,11 +18,11 @@ import { BookingMentionCards } from './BookingMention'
  *                       You replied to [name]
  *                            ( quoted message )
  *            (            your message, teal pill )   [😀… | ↩ | 🗑]
- *                                    [time]  read
+ *                                    [time]  Seen
  *   ( their message, grey pill )
  *   [time]
  *
- * Pill bubbles; the time (and "read" on yours) only under the last bubble of
+ * Pill bubbles; the time (and "Seen" on yours) only under the last bubble of
  * a run; a reaction chip on the bubble's lower inner corner. A direct chat
  * shows no avatar or name (hideIdentity); a group keeps them. The action bar
  * is unchanged: a mouse opens it on hover, touch with a long press. Every chat
@@ -149,7 +149,7 @@ export default function MessageItem({
   const textSize = compact ? 'text-[15px]' : 'text-[17px]'
   const isPhoto  = !!attachmentUrl
 
-  // Last bubble of a run: (name ·) time, and "read" on yours.
+  // Last bubble of a run: (name ·) time, and "Seen" on yours.
   const meta = showName ? (
     <div className={`flex items-center gap-1.5 px-0.5 ${isMine ? 'justify-end self-end' : 'justify-start self-start'}`}>
       {!hideIdentity && !isMine && (
@@ -161,7 +161,7 @@ export default function MessageItem({
       <time className="shrink-0 text-[13px] font-medium text-white/45" dateTime={createdAt}>
         {pending ? 'sending…' : formatMessageTime(createdAt)}
       </time>
-      {isMine && seen && !pending && <span className="text-[13px] font-semibold text-[var(--color-cyan)]">read</span>}
+      {isMine && seen && !pending && <span className="text-[13px] font-semibold text-[var(--color-cyan)]">Seen</span>}
     </div>
   ) : null
 
