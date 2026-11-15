@@ -903,7 +903,8 @@ export default function UserFormModal({
                 {viewing ? 'View' : isEdit ? 'Edit' : 'Create'}
               </p>
               <h2 className="mt-0.5 text-lg font-bold text-white">
-                {formLabel}
+                {/* The kind of driver is chosen before the form opens and fixed once it exists. */}
+                {tab === 'drivers' ? `Driver (${isVendorDriver ? 'Vendor' : 'Company'})` : formLabel}
               </h2>
             </div>
             <button
@@ -917,15 +918,6 @@ export default function UserFormModal({
 
           <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5 px-6 py-6">
             <RecordLockBanner lock={lock} noun="account" />
-            {tab === 'drivers' && (
-              <div>
-                <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-[#818181]">Driver from</p>
-                {/* Picked before the form opened (Create User → type), and fixed once the driver exists. */}
-                <p className="text-sm text-white">
-                  {isVendorDriver ? 'Vendor' : '8338 Logistics (company driver)'}
-                </p>
-              </div>
-            )}
             {tab === 'drivers' && (
               <div className="rounded-xl border border-dashed border-[#424242] bg-[#2a2a2a]/30 px-4 py-4">
 
