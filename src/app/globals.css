@@ -960,26 +960,3 @@ textarea::placeholder {
     cursor: not-allowed;
   }
 }
-
-/* Booking Management side panel: buttons lift a little and brighten on hover,
-   and press down on click (user 2026-11-14). Mouse only: a phone has no hover. */
-@media (hover: hover) {
-  .bm-panel button:not(:disabled) {
-    transition: transform 150ms ease, filter 150ms ease, box-shadow 150ms ease, background-color 150ms ease, color 150ms ease, border-color 150ms ease;
-  }
-  .bm-panel button:not(:disabled):hover {
-    transform: translateY(-1px);
-    filter: brightness(1.18);
-    box-shadow: 0 4px 14px -6px rgba(77, 249, 237, 0.35);
-  }
-  .bm-panel button:not(:disabled):active {
-    transform: translateY(0) scale(0.985);
-    filter: brightness(0.95);
-    box-shadow: none;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .bm-panel button:not(:disabled):hover,
-  .bm-panel button:not(:disabled):active { transform: none; }
-}
-

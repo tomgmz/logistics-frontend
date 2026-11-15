@@ -2311,7 +2311,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                 animate={{ x: 0 }}
                 exit={{ x: '100%' }}
                 transition={{ type: 'spring', damping: 28, stiffness: 260 }}
-                className="bm-panel fixed lg:relative z-[50] inset-y-0 right-0 w-full max-w-[455px] shrink-0 border-l border-[#424242] flex flex-col shadow-2xl lg:shadow-none"
+                className="fixed lg:relative z-[50] inset-y-0 right-0 w-full max-w-[455px] shrink-0 border-l border-[#424242] flex flex-col shadow-2xl lg:shadow-none"
                 style={{ background: PANEL_BG }}
               >
                 <div className="shrink-0 flex items-center justify-between gap-3 pl-4 sm:pl-[26px] pr-2 sm:pr-3 min-h-[59px] border-b border-[#424242]">
