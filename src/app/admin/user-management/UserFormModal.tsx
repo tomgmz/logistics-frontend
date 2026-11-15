@@ -394,6 +394,16 @@ export default function UserFormModal({
   const [renewalScanning, setRenewalScanning] = useState(false)
   // Words where the scan may have read an Ñ as a plain N.
   const [nChecks, setNChecks] = useState<NonNullable<LicenseOCRResult['name_n_checks']>>([])
+  // The license number and expiry come only from the license photo: read-only
+  // on create and edit, changed by uploading a new photo; the server refuses a
+  // typed value. Typing is allowed only when the scanners themselves failed.
+  const [scanUnavailable, setScanUnavailable] = useState(false)
+  // "The expiry could not be read from the card…": a clearer photo is needed.
+  const [scanMissing,     setScanMissing]     = useState<string | null>(null)
+  // ID Analyzer's fake / edited card flags (they need the note).
+  const [scanFlags,    setScanFlags]    = useState<string[]>([])
+  // Read by the Google Vision fallback: text only, no fake-card check.
+  const [scanFallback, setScanFallback] = useState(false)
 
   // Licence links expire after 10–15 minutes. A fresh one is kept here rather
   // than in `user`, because a new `user` resets whatever the admin has typed.
@@ -414,6 +424,32 @@ export default function UserFormModal({
     return () => { if (licensePreview) URL.revokeObjectURL(licensePreview) }
   }, [licensePreview])
 
+  /** Same wording as the server's, so the two lists don't repeat each other. */
+  function fraudLines(r: LicenseOCRResult): string[] {
+    return (r.fraud_warnings ?? []).map(w =>
+      `The card was flagged as possibly fake or edited: ${w.description || w.code}. Check the physical card and LTO (LTMS).`)
+  }
+
+  /** The server's "this isn't a Philippine driver's license" answer, or null. */
+  function notLicenseMessage(err: unknown): string | null {
+    const data = (err as { response?: { data?: { code?: string; message?: string } } })?.response?.data
+    return data?.code === 'NOT_A_LICENSE' ? (data.message ?? "This photo doesn't look like a Philippine driver's license.") : null
+  }
+
+  /** Which of the number / expiry the scan couldn't read, as a request for a clearer photo. */
+  function unreadMessage(r: LicenseOCRResult): string | null {
+    const missing = [!r.license_number && 'license number', !r.license_expiry && 'expiry'].filter(Boolean)
+    return missing.length
+      ? `The ${missing.join(' and ')} could not be read from the card. Upload a clearer photo of the front of the license.`
+      : null
+  }
+
+  /** Drop a refused photo so it can't be saved. */
+  function dropLicensePhoto() {
+    setLicenseFile(null)
+    setLicensePreview(prev => { if (prev) URL.revokeObjectURL(prev); return null })
+  }
+
   async function handleLicenseScan(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -430,9 +466,16 @@ export default function UserFormModal({
     setNameCheck(null)
     setNChecks([])
     setScanLocked(new Set())
+    setScanUnavailable(false)
+    setScanMissing(null)
+    setScanFlags([])
+    setScanFallback(false)
 
     try {
       const result = await ocrService.scanLicense(file)
+      setScanFlags(fraudLines(result))
+      setScanFallback(result.full_check === false)
+      setScanMissing(unreadMessage(result))
       setNChecks((result.name_n_checks ?? []).map(c => ({
         ...c, word: toNameCase(c.word), suggested: toNameCase(c.suggested),
       })))
@@ -445,8 +488,9 @@ export default function UserFormModal({
         ...(result.last_name      && { last_name:      toNameCase(result.last_name) }),
         ...(result.middle_name    && { middle_name:    toNameCase(result.middle_name) }),
         ...(result.suffix         && { suffix:         result.suffix }),
-        ...(result.license_number && { license_number: result.license_number }),
-        ...(result.license_expiry && { license_expiry: result.license_expiry }),
+        // Always from this card: an earlier scan's value must not stay behind.
+        license_number: result.license_number ?? '',
+        license_expiry: result.license_expiry ?? '',
       }))
       const scannedKeys = LICENSE_FIELDS.filter(k => result[k])
       setScanLocked(new Set(scannedKeys))
@@ -462,8 +506,15 @@ export default function UserFormModal({
       }
       setScanDone(true)
       appToast.success('License scanned — review and confirm the pre-filled fields.', { action: 'ocr-scan' })
-    } catch {
-      setScanError('Scan failed — fields were not auto-filled, but the image is still attached.')
+    } catch (err) {
+      const refused = notLicenseMessage(err)
+      if (refused) {
+        setScanError(refused)
+        dropLicensePhoto()
+      } else {
+        setScanError('Scan failed — fields were not auto-filled, but the image is still attached.')
+        setScanUnavailable(true)
+      }
     } finally {
       setScanLoading(false)
       e.target.value = ''
@@ -471,10 +522,9 @@ export default function UserFormModal({
   }
 
   // Replacing the license on an existing driver (usually a renewal). The new
-  // card is scanned: its expiry is filled in (locked, with Undo), and the name
-  // and license number are only COMPARED with the saved ones, never overwritten,
-  // so another person's license shows up as a mismatch instead of quietly
-  // replacing this driver's details.
+  // card is scanned: its license number and expiry are filled in (read-only),
+  // and the name is only COMPARED with the saved one, never overwritten. A
+  // number that differs from the saved one is flagged (another person's card?).
   async function handleLicenseReplace(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     e.target.value = ''
@@ -487,11 +537,24 @@ export default function UserFormModal({
     setFieldErrors(prev => { const n = { ...prev }; delete n.license_image; return n })
 
     setRenewalScanning(true)
+    setScanError(null)
+    setScanFallback(false)
+    setScanUnavailable(false)
+    setScanMissing(null)
     const issues: string[] = []
     try {
       const r = await ocrService.scanLicense(file)
-      if (r.license_number && !sameLicenseNumber(r.license_number, form.license_number)) {
-        issues.push(`The new card reads license number ${r.license_number}, not ${String(form.license_number)}. It may be another person's license.`)
+      issues.push(...fraudLines(r))
+      setScanFallback(r.full_check === false)
+      if (r.license_number) {
+        // Compared with the saved number (the field may hold an earlier upload's).
+        if (!sameLicenseNumber(r.license_number, initialState.license_number)) {
+          issues.push(`The new card reads license number ${r.license_number}, not ${String(initialState.license_number)}. It may be another person's license.`)
+        }
+        const number = r.license_number
+        setForm(prev => ({ ...prev, license_number: number }))
+        setScanLocked(prev => new Set(prev).add('license_number'))
+        setLockValues(prev => ({ ...prev, license_number: number }))
       }
       const savedName = `${String(form.first_name ?? '')} ${String(form.last_name ?? '')}`
       const cardName  = `${r.first_name ?? ''} ${r.last_name ?? ''}`.trim()
@@ -503,11 +566,17 @@ export default function UserFormModal({
         setForm(prev => ({ ...prev, license_expiry: expiry }))
         setScanLocked(prev => new Set(prev).add('license_expiry'))
         setLockValues(prev => ({ ...prev, license_expiry: expiry }))
-      } else {
-        issues.push('The expiry could not be read from the new card. Enter it by hand.')
       }
-    } catch {
-      issues.push('The new card could not be read automatically. Check its details by eye.')
+      setScanMissing(unreadMessage(r))
+    } catch (err) {
+      const refused = notLicenseMessage(err)
+      if (refused) {
+        setScanError(refused)
+        dropLicensePhoto()
+      } else {
+        issues.push('The new card could not be read automatically. Check its details by eye.')
+        setScanUnavailable(true)
+      }
     } finally {
       setRenewalScanning(false)
       setLicenseIssues(issues)
@@ -546,6 +615,10 @@ export default function UserFormModal({
     setEligibility(null)
     setNameCheck(null)
     setNChecks([])
+    setScanUnavailable(false)
+    setScanMissing(null)
+    setScanFlags([])
+    setScanFallback(false)
     setScanLocked(savedLicenseLocks(tab, initialState, isEdit))
     setLockValues(lockValuesOf(savedLicenseLocks(tab, initialState, isEdit), initialState))
     setLicenseVerified(false)
@@ -681,6 +754,11 @@ export default function UserFormModal({
     setLicenseFile(null)
     setLicensePreview(null)
     setLicenseActions(false)
+    setScanError(null)
+    setScanUnavailable(false)
+    setScanMissing(null)
+    setScanFlags([])
+    setScanFallback(false)
     setScanLocked(savedLicenseLocks(tab, initialState, isEdit))
     setLockValues(lockValuesOf(savedLicenseLocks(tab, initialState, isEdit), initialState))
     setLicenseVerified(false)
@@ -719,6 +797,7 @@ export default function UserFormModal({
   const createIssues = tab === 'drivers' && !isEdit
     ? [
         ...(scanError ? ['The license could not be read automatically, so its details were typed by hand.'] : []),
+        ...scanFlags,
         ...Object.entries(lockValues)
           .filter(([k, v]) => v !== '' && String(form[k] ?? '').trim() !== v.trim())
           .map(([k, v]) => `The ${LICENSE_LABEL[k] ?? k} was changed from what the card reads (${v}) to ${String(form[k] ?? '') || 'empty'}.`),
@@ -733,7 +812,8 @@ export default function UserFormModal({
     : []
   const localIssues = [...createIssues, ...editIssues]
   const shownIssues = [...localIssues, ...licenseIssues.filter((m) => !localIssues.includes(m))]
-  const isSaveDisabled = loading || (isEdit && !isDirty)
+  // While a license photo is being read the number and expiry are not in yet.
+  const isSaveDisabled = loading || scanLoading || renewalScanning || (isEdit && !isDirty)
   const fe = fieldErrors
 
   const isVendorDriver = tab === 'drivers' && form.is_external === true
@@ -754,12 +834,18 @@ export default function UserFormModal({
 
   /** Read-only props for a field the scan filled, plus the Edit button that unlocks it. */
   function scanned(key: string) {
-    const locked = scanLocked.has(key)
+    // License number and expiry: from the photo only, no Edit (the server refuses a typed value).
+    const cardLocked = (key === 'license_number' || key === 'license_expiry') && !scanUnavailable
+    const locked = cardLocked || scanLocked.has(key)
     return {
       input: {
         id: `user-form-${key}`,
         readOnly: locked,
-        ...(locked && { title: isEdit ? "From the driver's license. Press Edit to change it." : 'Filled from the license scan. Press Edit to change it.' }),
+        ...(locked && { title: cardLocked
+          ? (isEdit
+              ? "Comes from the driver's license. Upload the new license to change it."
+              : "Read from the license photo. If it is wrong or empty, upload a clearer photo.")
+          : isEdit ? "From the driver's license. Press Edit to change it." : 'Filled from the license scan. Press Edit to change it.' }),
       },
       // No cyan hover/focus border or caret while locked: it must not look typeable.
       lockedClass: locked
@@ -768,7 +854,7 @@ export default function UserFormModal({
       // Viewing: the whole form is read-only already, so no Edit buttons. Once
       // unlocked, Edit becomes Undo, which puts the scanned/saved value back and
       // locks the field again: the way back from an edit that was a mistake.
-      action: viewing ? undefined : locked ? (
+      action: viewing || cardLocked ? undefined : locked ? (
         <button
           type="button"
           onClick={() => unlockScanned(key)}
@@ -941,6 +1027,14 @@ export default function UserFormModal({
 
                   {scanError && (
                     <p className="w-full text-[11px] text-red-400">{scanError}</p>
+                  )}
+                  {scanMissing && !scanError && (
+                    <p className="w-full text-[11px] text-red-400">{scanMissing}</p>
+                  )}
+                  {scanFallback && !scanError && (
+                    <p className="w-full text-[11px] text-[#FFEA00]">
+                      Read by the backup scanner, so the fake-card check did not run. Check the card itself and LTO (LTMS) carefully.
+                    </p>
                   )}
                 </div>
 

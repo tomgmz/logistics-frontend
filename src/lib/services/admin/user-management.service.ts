@@ -278,6 +278,14 @@ export interface LicenseOCRResult {
   dl_codes:            string[]
   restriction_codes:   string[]
   vehicle_eligibility: VehicleEligibility | null
+  // Older servers send none of these.
+  is_license?:         boolean
+  not_license_reason?: string | null
+  /** Fake / edited card flags (ID Analyzer); saving then needs a note. */
+  fraud_warnings?:     { code: string; description: string }[]
+  provider?:           'idanalyzer' | 'vision'
+  /** False when the backup scanner read it (no fake-card check). */
+  full_check?:         boolean
 }
 
 export const ocrService = {

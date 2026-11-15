@@ -83,6 +83,7 @@ const SERVICE_ICON: Record<string, ReactNode> = {
   'storage':       <Cloud size={15} />,
   'google-maps':   <MapPin size={15} />,
   'push':          <Bell size={15} />,
+  'idanalyzer':    <ScanLine size={15} />,
   'google-vision': <ScanLine size={15} />,
 }
 
