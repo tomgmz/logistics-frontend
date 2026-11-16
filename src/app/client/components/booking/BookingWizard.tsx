@@ -14,6 +14,7 @@ import { bookingToResubmitDraft, canResubmitAgain, isAwaitingResubmit, MAX_RESUB
 import { getApiErrorMessage } from '@/lib/api-error'
 import { appToast } from '@/lib/toast'
 import { loadDraftFiles, saveDraftFiles } from '@/lib/store/booking-draft'
+import { useResolvedBookingKey } from '@/lib/booking-url'
 import './BookingDetails.css'
 
 const STEPS = [
@@ -38,12 +39,22 @@ function ResubmitLoader({ onLoaded, onLoading }: {
   onLoading: (loading: boolean) => void
 }) {
   const router       = useRouter()
-  const id           = useSearchParams().get('resubmit')
+  // ?resubmit=202611-00193 (older links: the id). undefined = still looking it up.
+  const key          = useSearchParams().get('resubmit')
+  const resolved     = useResolvedBookingKey(key, 'resubmit', false)
+  const id           = resolved ?? null
   const loadedId     = useBookingStore((s) => s.resubmit?.bookingId ?? null)
   const loadedIdRef  = useRef(loadedId)
   loadedIdRef.current = loadedId
 
   useEffect(() => {
+    // Wait for the lookup, so a correction already loaded isn't dropped meanwhile.
+    if (key && resolved === undefined) return
+    if (key && resolved === null) {
+      appToast.error('This booking can no longer be edited and resubmitted.')
+      router.replace('/client/booking')
+      return
+    }
     if (!id) {
       if (loadedIdRef.current) {
         resetBooking()
@@ -81,7 +92,7 @@ function ResubmitLoader({ onLoaded, onLoading }: {
       }
     })()
     return () => { cancelled = true }
-  }, [id, router, onLoaded, onLoading])
+  }, [key, resolved, id, router, onLoaded, onLoading])
 
   return null
 }

@@ -17,6 +17,7 @@ import { formatConversationTime } from '@/app/utils/messaging.utils'
 import type { Conversation, Group } from '@/app/types/messaging/messaging.types'
 import { cachedData, storeData } from '@/lib/query/useApiQuery'
 import { useCatchUp } from '@/lib/hooks/useLiveTable'
+import SearchClearButton from '@/components/ui/SearchClearButton'
 
 type Tab = 'All' | 'Unread'
 type PanelItem =
@@ -160,8 +161,9 @@ export default function MessengerFloatingPanel() {
           <div className="px-3 pb-2 shrink-0">
             <div className="relative">
               <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/25 pointer-events-none" />
-              <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search"
-                className="w-full bg-white/[0.04] border border-white/[0.07] rounded-xl pl-9 pr-3 py-2 ff-body text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-[var(--color-cyan)]/30 transition-colors" />
+              <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search" aria-label="Search"
+                className="w-full bg-white/[0.04] border border-white/[0.07] rounded-xl pl-9 pr-9 py-2 ff-body text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-[var(--color-cyan)]/30 transition-colors" />
+              <SearchClearButton value={search} onClear={() => setSearch('')} />
             </div>
           </div>
 

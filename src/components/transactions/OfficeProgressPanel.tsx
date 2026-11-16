@@ -1,7 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { ChevronDown, Lock, LockOpen } from 'lucide-react'
+import { Lock, LockOpen } from 'lucide-react'
+import { ToggleBox } from '@/components/ui/accordion'
 
 import proxyApi, { initCsrf } from '@/lib/api/auth.api'
 import { tripService, type Trip } from '@/lib/services/admin/trip.service'
@@ -14,6 +15,7 @@ import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { AssetIcon, CARD_CLASS, InfoTip, MUTED, TEAL_BUTTON_CLASS, TEAL_BUTTON_STYLE } from '@/app/admin/booking-management/BookingDetailParts'
 import { formatDateTime } from './transaction-format'
 import { usePanelSection } from '@/components/ui/PanelReady'
+import Dropdown from '@/components/ui/Dropdown'
 
 const INCIDENTS = [
   { key: 'truck_stolen',   label: 'Truck stolen' },
@@ -212,7 +214,7 @@ export default function OfficeProgressPanel({ bookingId, status, fleetReturned, 
         <div className="grid grid-cols-1 min-[380px]:grid-cols-2 gap-3">
           <label className="flex flex-col gap-1 min-w-0">
             <span className="text-sm font-bold" style={{ color: labelColor }}>Location</span>
-            <select value={placeId} disabled={locked} {...writeAccess(allowed)}
+            <Dropdown value={placeId} disabled={locked} {...writeAccess(allowed)}
               onChange={(e) => {
                 setPlaceId(e.target.value)
                 const next = steps.find((x) => x.id === e.target.value)
@@ -221,16 +223,16 @@ export default function OfficeProgressPanel({ bookingId, status, fleetReturned, 
               className={selectClass}>
               <option value="" disabled>Choose</option>
               {steps.map((x) => <option key={x.id} value={x.id}>{x.place}</option>)}
-            </select>
+            </Dropdown>
           </label>
           <label className="flex flex-col gap-1 min-w-0">
             <span className="text-sm font-bold" style={{ color: labelColor }}>Activity</span>
-            <select value={activity} disabled={locked || !picked} {...writeAccess(allowed)}
+            <Dropdown value={activity} disabled={locked || !picked} {...writeAccess(allowed)}
               onChange={(e) => setActivity(e.target.value)}
               className={selectClass}>
               <option value="" disabled>{picked ? 'Choose' : ''}</option>
               {activities.map((a) => <option key={a} value={a}>{a}</option>)}
-            </select>
+            </Dropdown>
           </label>
         </div>
       ) : (
@@ -246,15 +248,9 @@ export default function OfficeProgressPanel({ bookingId, status, fleetReturned, 
       )}
 
       {office.length > 0 && (
-        <div>
-          <button type="button" onClick={() => setShowEarlier((v) => !v)} aria-expanded={showEarlier}
-            className="inline-flex items-center gap-1 text-base font-bold cursor-pointer"
-            style={{ color: unlocked ? PALETTE.cyan : MUTED }}>
-            Earlier updates ({office.length})
-            <ChevronDown size={16} className={`transition-transform ${showEarlier ? 'rotate-180' : ''}`} />
-          </button>
-          {showEarlier && (
-            <ul className="mt-2 flex flex-col">
+        <ToggleBox open={showEarlier} onOpenChange={setShowEarlier} title={`Earlier updates (${office.length})`}
+          triggerClassName="text-base" triggerStyle={{ color: unlocked ? PALETTE.cyan : MUTED }}>
+            <ul className="flex flex-col">
               {office.map((e, i) => (
                 <li key={`${e.at}-${i}`} className="py-2 border-b border-dashed border-[#818181]/60 last:border-b-0">
                   <p className="text-xs font-bold text-white break-words">{e.title}{e.detail ? ` · ${e.detail}` : ''}</p>
@@ -262,8 +258,7 @@ export default function OfficeProgressPanel({ bookingId, status, fleetReturned, 
                 </li>
               ))}
             </ul>
-          )}
-        </div>
+        </ToggleBox>
       )}
 
       {status === 'in_transit' && openStops && (
@@ -331,14 +326,14 @@ export default function OfficeProgressPanel({ bookingId, status, fleetReturned, 
       >
         <label className="mt-3 block text-xs font-bold text-white/70">
           Problem
-          <select
+          <Dropdown
             value={type}
             onChange={(e) => setType(e.target.value as typeof type)}
             className="mt-1 w-full min-h-[44px] rounded-lg border border-white/15 bg-[#0a0a0a] px-3 text-sm text-white"
             style={{ colorScheme: 'dark' }}
           >
             {INCIDENTS.map((i) => <option key={i.key} value={i.key}>{i.label}</option>)}
-          </select>
+          </Dropdown>
         </label>
       </RemarksModal>
     </div>

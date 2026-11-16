@@ -8,6 +8,8 @@ import { itAdminService, type ITAdminHandoverStatus, type StandinCandidate } fro
 import { extractApiError } from '@/lib/api-error'
 import { appToast } from '@/lib/toast'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
+import Dropdown from '@/components/ui/Dropdown'
+import { FieldError, errorBorder } from '@/components/ui/FieldError'
 
 /** A moment as a Manila date, e.g. "Nov 23, 2026, 3:15 PM". */
 function formatPh(iso: string) {
@@ -61,6 +63,9 @@ export default function ItAdminHandoverPanel() {
   const [picking, setPicking] = useState(false)
   const [candidates, setCandidates] = useState<StandinCandidate[] | null>(null)
   const [choice,  setChoice]  = useState<string>('')
+  // Save pressed with nobody chosen: the message shows under the picker.
+  const [choiceTried, setChoiceTried] = useState(false)
+  const choiceError = choiceTried && !choice ? 'Choose a Company Administrator.' : undefined
 
   async function openPicker(current: string | null) {
     setChoice(current ?? '')
@@ -72,7 +77,8 @@ export default function ItAdminHandoverPanel() {
   }
 
   async function saveStandin() {
-    if (!choice) { appToast.error('Choose a Company Administrator.'); return }
+    if (!choice) { setChoiceTried(true); return }
+    setChoiceTried(false)
     setPicking(false)
     setBusy(true)
     try {
@@ -135,7 +141,7 @@ export default function ItAdminHandoverPanel() {
         description="If no replacement has set their password by the render target, this Company Administrator takes over the IT Administrator's work, and your account is archived. A stand-in is required; you can change who it is until then."
         confirmLabel="Save"
         cancelLabel="Back"
-        onCancel={() => setPicking(false)}
+        onCancel={() => { setPicking(false); setChoiceTried(false) }}
         onConfirm={() => { void saveStandin() }}
       >
         {candidates === null ? (
@@ -143,17 +149,21 @@ export default function ItAdminHandoverPanel() {
         ) : candidates.length === 0 ? (
           <p className="text-[13px] text-[#818181]">There is no active Company Administrator to name.</p>
         ) : (
-          <select
+          <Dropdown
             value={choice}
             onChange={(e) => setChoice(e.target.value)}
             aria-label="Company Administrator stand-in"
-            className="w-full rounded-lg border border-[#424242] bg-[#1b1b1b] px-3 py-2.5 text-[14px] text-white focus:border-[#4df9ed] focus:outline-none"
+            aria-invalid={!!choiceError}
+            className={`w-full rounded-lg border border-[#424242] bg-[#1b1b1b] px-3 py-2.5 text-[14px] text-white focus:border-[#4df9ed] focus:outline-none ${errorBorder(choiceError)}`}
           >
             <option value="" disabled>Choose a Company Administrator</option>
             {candidates.map((c) => (
               <option key={c.user_id} value={c.user_id}>{personName(c)} ({c.email})</option>
             ))}
-          </select>
+          </Dropdown>
+        )}
+        {candidates && candidates.length > 0 && (
+          <FieldError>{choiceError}</FieldError>
         )}
       </ReusableModal>
     </>

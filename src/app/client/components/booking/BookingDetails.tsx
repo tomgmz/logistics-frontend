@@ -37,8 +37,8 @@ import { appToast } from '@/lib/toast'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import type { Commodity, Product, HandlingCode } from '@/app/types/admin/cargo-catalog.types'
 
-import Select, { SelectChangeEvent } from '@mui/material/Select'
-import MenuItem from '@mui/material/MenuItem'
+import Dropdown from '@/components/ui/Dropdown'
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
 import TextField from '@mui/material/TextField'
 import FormHelperText from '@mui/material/FormHelperText'
 import { SxProps, Theme } from '@mui/material/styles'
@@ -126,6 +126,9 @@ const ERROR_COLOR    = '#f62626'
 const ERROR_BORDER   = `${ERROR_COLOR}99`
 const RADIUS         = '10px'
 
+/** The closed box of every dropdown on the form (36 px, the card's grey, cyan edge on focus). */
+const SELECT_BOX = 'h-9 rounded-[10px] border border-[#818181] bg-[#424242] pl-2.5 text-sm text-white outline-none focus:border-[#4DF9ED66] [@media(hover:hover)]:hover:border-[#4DF9ED66]'
+
 // Panels and product cards, as in the Figma booking form.
 const PANEL_CLS = 'bg-[#2A2828] rounded-[10px] shadow-[0_4px_4px_rgba(0,0,0,0.25)]'
 
@@ -135,15 +138,6 @@ function FormIcon({ name, size, className = '' }: { name: string; size: number; 
     // eslint-disable-next-line @next/next/no-img-element
     <img src={`/icons/booking-form/${name}`} alt="" width={size} height={size}
       className={`shrink-0 ${className}`} draggable={false} />
-  )
-}
-
-/** The Figma chevron for every Select here; MUI passes the positioning class. */
-function SelectChevron({ className }: { className?: string }) {
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img src="/icons/booking-form/chevron-down.svg" alt="" width={16} height={16}
-      className={className} draggable={false} />
   )
 }
 
@@ -222,47 +216,9 @@ function fieldSx(bg: string, borderColor: string, hasError = false): SxProps<The
   }
 }
 
-function selectSx(bg: string, borderColor: string, hasError = false): SxProps<Theme> {
-  const activeBorder = hasError ? ERROR_COLOR : `${CYAN}66`
-  const idleBorder   = hasError ? ERROR_BORDER : borderColor
-  return {
-    height: 36, borderRadius: RADIUS, backgroundColor: bg,
-    color: '#fff', fontSize: '0.875rem', fontFamily: 'inherit',
-    '& .MuiSelect-select': {
-      padding: '0 32px 0 10px !important', height: '36px !important',
-      display: 'flex', alignItems: 'center',
-    },
-    '& .MuiOutlinedInput-notchedOutline': { borderColor: idleBorder, borderRadius: RADIUS },
-    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: activeBorder },
-    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: activeBorder, borderWidth: 1 },
-    '&.Mui-error .MuiOutlinedInput-notchedOutline': { borderColor: ERROR_BORDER },
-    '&.Mui-error:hover .MuiOutlinedInput-notchedOutline': { borderColor: ERROR_BORDER },
-    '& .MuiSvgIcon-root': { color: 'rgba(255,255,255,0.5)' },
-    '& .MuiSelect-icon': { right: 8, top: 'calc(50% - 8px)' },
-    '& legend': { display: 'none' },
-    '& fieldset': { top: 0 },
-  }
-}
-
 const HELPER_SX: SxProps<Theme> = {
   color: ERROR_COLOR, fontSize: '0.7rem', marginTop: '3px',
   marginLeft: '2px', fontFamily: 'inherit', lineHeight: 1.3,
-}
-
-const MENU_PROPS = {
-  PaperProps: {
-    sx: {
-      bgcolor: '#2A2828', color: '#fff',
-      border: `1px solid ${BORDER_CARD}`, borderRadius: RADIUS,
-      '& .MuiMenuItem-root': {
-        // Portaled to <body>, so 'inherit' would pick up the small caps face.
-        fontSize: '0.875rem', fontFamily: "var(--font-alegreya), 'Alegreya Sans', sans-serif",
-        '&:hover':              { bgcolor: 'rgba(77,249,237,0.08)' },
-        '&.Mui-selected':       { bgcolor: 'rgba(77,249,237,0.14)' },
-        '&.Mui-selected:hover': { bgcolor: 'rgba(77,249,237,0.20)' },
-      },
-    },
-  },
 }
 
 const fadeUp: Variants = {
@@ -767,18 +723,13 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
   const fileHashes = useRef(new WeakMap<File, string>())
   const keptHashes = useRef(new Map<string, string | null>())
   const [infoOpen,   setInfoOpen]   = useState(false)
+  // How the formulas button was last pressed: a mouse already opened the card by hovering.
+  const infoPointer = useRef<string>('')
+  const infoButton  = useRef<HTMLButtonElement>(null)
   // Drop-offs close to the pickup, waiting on the client to confirm the pins.
   const [nearDropoffs, setNearDropoffs] = useState<{ index: number; meters: number }[]>([])
   // A removal waiting on "are you sure?" (drop-off, filled-in product, file).
   const [pendingRemove, setPendingRemove] = useState<{ title: string; description: string; run: () => void } | null>(null)
-
-  // iOS Safari never focuses a tapped button, so blur alone would not close it.
-  useEffect(() => {
-    if (!infoOpen) return
-    const close = () => setInfoOpen(false)
-    document.addEventListener('pointerdown', close)
-    return () => document.removeEventListener('pointerdown', close)
-  }, [infoOpen])
 
   const allGroups = sections.flatMap((s) => s.groups)
 
@@ -1255,28 +1206,34 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
         >
           <div className="flex items-start justify-between gap-3">
             <SectionHeader icon={<FormIcon name="cargo-capacity.svg" size={22} />} title="Product & Cargo Capacity" />
-            <div className="relative group shrink-0">
-              {/* Tap toggles it too: a hover-only tooltip never opens on a phone. */}
-              <button
-                type="button"
-                aria-label="Cargo estimate info"
-                aria-expanded={infoOpen}
-                onClick={() => setInfoOpen((o) => !o)}
-                // Kept from the document listener below, or a tap to close would reopen it.
-                onPointerDown={(e) => e.stopPropagation()}
-                className="relative inline-flex items-center justify-center w-8 h-8 rounded-full
-                           opacity-80 hover:opacity-100 transition-opacity cursor-pointer"
-              >
-                <FormIcon name="info-circle-bg.svg" size={32} className="absolute inset-0" />
-                <FormIcon name="info.svg" size={20} />
-              </button>
-              <div
-                role="tooltip"
-                className={`pointer-events-none absolute right-0 top-10 z-20 w-[min(300px,calc(100vw-48px))]
-                          rounded-lg border border-white/10 bg-[#111] px-3 py-3
-                          text-xs text-white/80 shadow-xl transition-all
-                          group-hover:opacity-100 group-hover:translate-y-0
-                          ${infoOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-1'}`}
+            {/* shadcn Hover Card: opens on hover and keyboard focus. A hover card never opens on
+                touch, so a tap (or Enter) toggles it too; a tap outside or Escape closes it. */}
+            <HoverCard open={infoOpen} onOpenChange={setInfoOpen} openDelay={100} closeDelay={150}>
+              <HoverCardTrigger asChild>
+                <button
+                  ref={infoButton}
+                  type="button"
+                  aria-label="Cargo estimate formulas"
+                  aria-expanded={infoOpen}
+                  onPointerDown={(e) => { infoPointer.current = e.pointerType }}
+                  onClick={() => {
+                    if (infoPointer.current !== 'mouse') setInfoOpen((o) => !o)
+                    infoPointer.current = ''
+                  }}
+                  className="relative shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-full
+                             opacity-80 [@media(hover:hover)]:hover:opacity-100 transition-opacity cursor-pointer"
+                >
+                  <FormIcon name="info-circle-bg.svg" size={32} className="absolute inset-0" />
+                  <FormIcon name="info.svg" size={20} />
+                </button>
+              </HoverCardTrigger>
+              <HoverCardContent
+                align="end"
+                className="w-[min(300px,calc(100vw-48px))] px-3 py-3"
+                // The button toggles it itself; a press on it isn't a press outside.
+                onPointerDownOutside={(e) => {
+                  if (infoButton.current?.contains(e.target as Node)) e.preventDefault()
+                }}
               >
                 <p className="text-white/40 text-[10px] uppercase tracking-widest mb-2">
                   {mode === 'palletized' ? 'Palletized Formulas' : 'Loose Cargo Formulas'}
@@ -1303,8 +1260,8 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                 <p className="text-white/25 text-[10px] mt-2 pt-1 border-t border-white/[0.07]">
                   Estimates only — final charges may vary after review.
                 </p>
-              </div>
-            </div>
+              </HoverCardContent>
+            </HoverCard>
           </div>
 
           <div className="flex items-center gap-6">
@@ -1433,13 +1390,13 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                                       </div>
                                       <WeightUnitSelect value={g.weightUnit}
                                         onChange={(u) => handleUpdateGroup(section.dropoffIndex, g.id, { weightUnit: u })} />
-                                      <Select value={g.perItem} IconComponent={SelectChevron}
-                                        onChange={(e: SelectChangeEvent) =>
+                                      <Dropdown value={g.perItem} aria-label="Weight per item or total"
+                                        onChange={(e) =>
                                           handleUpdateGroup(section.dropoffIndex, g.id, { perItem: e.target.value as 'Per Item' | 'Total' })}
-                                        sx={{ ...selectSx(INPUT_BG_CARD, BORDER_CARD), width: 110, flexShrink: 0 }} MenuProps={MENU_PROPS}>
-                                        <MenuItem value="Per Item">Per Item</MenuItem>
-                                        <MenuItem value="Total">Total</MenuItem>
-                                      </Select>
+                                        className={`${SELECT_BOX} w-[110px] shrink-0`}>
+                                        <option value="Per Item">Per Item</option>
+                                        <option value="Total">Total</option>
+                                      </Dropdown>
                                     </div>
                                   </div>
 
@@ -1469,17 +1426,17 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
 
                                   <div className="flex flex-col gap-1 w-full sm:w-[170px]">
                                     <label className="ff-regular booking-text text-xs whitespace-nowrap">Pallet Type</label>
-                                    <Select value={g.palletType} IconComponent={SelectChevron}
-                                      onChange={(e: SelectChangeEvent) => {
+                                    <Dropdown value={g.palletType} aria-label="Pallet type"
+                                      onChange={(e) => {
                                         const type = e.target.value as ItemGroup['palletType']
                                         handleUpdateGroup(section.dropoffIndex, g.id, { palletType: type, ...PALLET_DIMENSIONS[type] })
                                       }}
-                                      sx={{ ...selectSx(INPUT_BG_CARD, BORDER_CARD), width: '100%' }} MenuProps={MENU_PROPS}>
-                                      <MenuItem value="Standard">Standard (120×100)</MenuItem>
-                                      <MenuItem value="Euro">Euro (120×80)</MenuItem>
-                                      <MenuItem value="Half">Half (60×80)</MenuItem>
-                                      <MenuItem value="Custom">Custom</MenuItem>
-                                    </Select>
+                                      className={`${SELECT_BOX} w-full`}>
+                                      <option value="Standard">Standard (120×100)</option>
+                                      <option value="Euro">Euro (120×80)</option>
+                                      <option value="Half">Half (60×80)</option>
+                                      <option value="Custom">Custom</option>
+                                    </Dropdown>
                                   </div>
 
                                   <div className="flex flex-col gap-1 w-full sm:min-w-[260px] sm:flex-1">
@@ -2110,21 +2067,20 @@ function CheckRow({ checked, onChange, label }: { checked: boolean; onChange: (v
 /** Dimensions are entered in centimetres; the box shows the unit the way the Figma does. */
 function DimensionUnitSelect() {
   return (
-    <Select value="cm" IconComponent={SelectChevron}
-      sx={{ ...selectSx(INPUT_BG_CARD, BORDER_CARD), width: 72, flexShrink: 0 }} MenuProps={MENU_PROPS}>
-      <MenuItem value="cm">CM</MenuItem>
-    </Select>
+    <Dropdown value="cm" aria-label="Dimension unit" className={`${SELECT_BOX} w-[72px] shrink-0`}>
+      <option value="cm">CM</option>
+    </Dropdown>
   )
 }
 
 function WeightUnitSelect({ value, onChange }: { value: WeightUnit; onChange: (u: WeightUnit) => void }) {
   return (
-    <Select value={value} IconComponent={SelectChevron}
-      onChange={(e: SelectChangeEvent) => onChange(e.target.value as WeightUnit)}
-      sx={{ ...selectSx(INPUT_BG_CARD, BORDER_CARD), width: 72, flexShrink: 0 }} MenuProps={MENU_PROPS}>
-      <MenuItem value="kg">KG</MenuItem>
-      <MenuItem value="lbs">LBS</MenuItem>
-    </Select>
+    <Dropdown value={value} aria-label="Weight unit"
+      onChange={(e) => onChange(e.target.value as WeightUnit)}
+      className={`${SELECT_BOX} w-[72px] shrink-0`}>
+      <option value="kg">KG</option>
+      <option value="lbs">LBS</option>
+    </Dropdown>
   )
 }
 

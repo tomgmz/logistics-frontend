@@ -8,13 +8,17 @@ export const metadata: Metadata = {
 /**
  * The client's Transit Tracking map.
  *
- * This route is static, so there is no `bookingId` to read — the previous
- * version destructured one from `params` and always got `undefined`, which
- * `RouteMap` quietly tolerated by rendering the list with nothing selected. The
- * list-first behaviour is what we want here, so the dead plumbing is gone rather
- * than the segment being made dynamic: a client picks the delivery they want to
- * watch from their own bookings.
+ * Opens on the list. `?booking=202611-00193` (the dashboard's Track link; the
+ * booking number without "BK-", lib/booking-url) opens that booking straight
+ * away. It is looked up through the client's own scope, so another company's
+ * number opens nothing.
  */
-export default function ClientTrackingPage() {
-  return <RouteMapWrapper />
+export default async function ClientTrackingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ booking?: string | string[] }>
+}) {
+  const { booking } = await searchParams
+  const bookingId = typeof booking === 'string' && booking.trim() ? booking.trim() : undefined
+  return <RouteMapWrapper initialBookingId={bookingId} />
 }

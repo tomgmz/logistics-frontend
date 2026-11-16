@@ -14,6 +14,8 @@ import {
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
+import Combobox from '@/components/ui/Combobox'
+import Dropdown from '@/components/ui/Dropdown'
 
 const CATEGORIES = Object.keys(TICKET_CATEGORY_LABEL) as TicketCategory[]
 
@@ -206,7 +208,7 @@ export default function NewTicketModal({ open, onClose, onCreated }: {
                 <label htmlFor="ticket-booking" className={LABEL}>
                   Booking <span className="normal-case font-normal text-white/30">(optional)</span>
                 </label>
-                <select
+                <Combobox
                   id="ticket-booking"
                   value={bookingId}
                   disabled={busy || !client}
@@ -219,13 +221,13 @@ export default function NewTicketModal({ open, onClose, onCreated }: {
                       {(b.reference_number ?? b.booking_id.slice(0, 8))} · {titleCase(b.status)}{b.schedule_date ? ` · ${b.schedule_date}` : ''}
                     </option>
                   ))}
-                </select>
+                </Combobox>
               </div>
 
               {/* Category */}
               <div>
                 <label htmlFor="ticket-category" className={LABEL}>Topic</label>
-                <select
+                <Dropdown
                   id="ticket-category"
                   value={category}
                   disabled={busy}
@@ -233,7 +235,7 @@ export default function NewTicketModal({ open, onClose, onCreated }: {
                   className={FIELD}
                 >
                   {CATEGORIES.map((c) => <option key={c} value={c}>{TICKET_CATEGORY_LABEL[c]}</option>)}
-                </select>
+                </Dropdown>
               </div>
 
               {/* Subject + message */}

@@ -42,6 +42,7 @@ import {
   BG_PAGE, BG_PANEL, BG_CARD, BORDER, BORDER_C, CYAN, MUTED, ERROR,
 } from '@/components/transactions/transaction-theme'
 import StopTimesPanel from '@/components/transactions/StopTimesPanel'
+import { useResolvedBookingKey } from '@/lib/booking-url'
 
 
 /** An icon exported from the Figma Transaction History (public/icons/transaction-history). */
@@ -195,8 +196,9 @@ type View = 'list' | 'detail'
 // reports it up. Isolated so useSearchParams sits under its own Suspense boundary.
 function DeepLinkReader({ onId }: { onId: (id: string | null) => void }) {
   const searchParams = useSearchParams()
-  const id = searchParams.get('booking')
-  useEffect(() => { onId(id) }, [id, onId])
+  // ?booking=202611-00193 (older links: the id).
+  const id = useResolvedBookingKey(searchParams.get('booking'))
+  useEffect(() => { onId(id ?? null) }, [id, onId])
   return null
 }
 

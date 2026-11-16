@@ -4,6 +4,7 @@ import { useEffect, useState, type InputHTMLAttributes } from 'react'
 import { systemMaintenanceService, type LandlinePrefix } from '@/lib/services/admin/system-maintenance.service'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { cachedFetch } from '@/lib/query/useApiQuery'
+import Combobox from '@/components/ui/Combobox'
 
 const inputBase =
   'w-full rounded-[10px] border border-[#424242] bg-[#2a2a2a99] px-3 py-2 text-[13px] text-white placeholder-[#555] outline-none transition-colors duration-150 focus:border-[#4df9ed] hover:border-[#4df9ed50]'
@@ -82,24 +83,21 @@ export default function LandlineInputRow({ value, onChange, error }: LandlineInp
 
   return (
     <div className="flex">
-      <select
+      <Combobox
         value={areaCode}
+        aria-label="City (area code)"
+        searchPlaceholder="Search city or area code"
+        emptyText="No city matches."
         onChange={e => handleAreaChange(e.target.value)}
         className={[
           'rounded-l-[10px] border border-r-0 border-[#424242] bg-[#232323] px-2 py-2',
           'text-[13px] text-white outline-none cursor-pointer',
-          'transition-colors duration-150 appearance-none',
+          'transition-colors duration-150',
           error
             ? 'border-red-500/60 focus:border-red-500 hover:border-red-500/80'
             : 'focus:border-[#4df9ed] hover:border-[#4df9ed50]',
         ].join(' ')}
-        style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`,
-          backgroundRepeat:   'no-repeat',
-          backgroundPosition: 'right 8px center',
-          paddingRight: '24px',
-          minWidth:     '180px',
-        }}
+        style={{ minWidth: '180px' }}
       >
         <option value="">Select city</option>
         {areaCodes.map(a => (
@@ -107,7 +105,7 @@ export default function LandlineInputRow({ value, onChange, error }: LandlineInp
             ({a.prefix}) {a.city}
           </option>
         ))}
-      </select>
+      </Combobox>
 
       <Input
         type="tel"

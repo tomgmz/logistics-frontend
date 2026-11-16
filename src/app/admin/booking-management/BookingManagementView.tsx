@@ -116,6 +116,9 @@ import {
 
 import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
 import { formatDuration } from '@/lib/duration'
+import Dropdown from '@/components/ui/Dropdown'
+import { FieldError } from '@/components/ui/FieldError'
+import { useResolvedBookingKey } from '@/lib/booking-url'
 
 const BOOKING_STATUSES: AdminBookingLifecycleStatus[] = [
   'pending',
@@ -890,13 +893,11 @@ function AssignmentPanel({
                   autoCapitalize="characters"
                   aria-invalid={!!vendorPlateError}
                 />
-                {vendorPlateError && (
-                  <p className="text-[10px] text-red-400 mt-1 leading-snug">{vendorPlateError}</p>
-                )}
+                <FieldError>{vendorPlateError}</FieldError>
               </div>
               <div>
                 <label htmlFor="vendor-vehicle-type" className="text-[11px] text-white/40 block mb-1">Vehicle type</label>
-                <select
+                <Dropdown
                   id="vendor-vehicle-type"
                   value={vendorForm.vendor_vehicle_type}
                   disabled={assignBusy || vehicleTypes.loading}
@@ -908,7 +909,7 @@ function AssignmentPanel({
                   {vehicleTypes.options.map((vt) => (
                     <option key={vt} value={vt}>{vt}</option>
                   ))}
-                </select>
+                </Dropdown>
                 {vehicleTypes.error && (
                   <p className="text-[10px] text-amber-200/90 mt-1 leading-snug">
                     Couldn&apos;t load the vehicle types. Close and reopen this pop-up to try again.
@@ -1167,12 +1168,13 @@ interface BookingManagementViewProps {
   roleView?: BookingRoleView
 }
 
-// Reads the ?booking=<id> deep-link (set by a notification tap) and opens that
-// booking's detail once. Isolated so useSearchParams sits under its own Suspense
-// boundary, as this view has several role-specific page entry points.
+// Reads the ?booking=202611-00193 deep-link (a notification tap; older links
+// carry the id) and opens that booking's detail once. Isolated so
+// useSearchParams sits under its own Suspense boundary, as this view has
+// several role-specific page entry points.
 function BookingDeepLink({ onFocus }: { onFocus: (id: string) => void }) {
   const searchParams = useSearchParams()
-  const focusBookingId = searchParams.get('booking')
+  const focusBookingId = useResolvedBookingKey(searchParams.get('booking'))
   const autoOpenedRef = useRef<string | null>(null)
   useEffect(() => {
     if (focusBookingId && autoOpenedRef.current !== focusBookingId) {

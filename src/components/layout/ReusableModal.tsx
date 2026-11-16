@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
+import { FieldError, errorBorder } from "@/components/ui/FieldError";
 
 /**
  * Render into <body>, not where the modal is declared. A modal declared inside
@@ -254,6 +255,10 @@ export interface RemarksModalProps {
   tone?: "danger" | "approve";
   /** Pre-fills the remarks when the modal mounts (still editable); mount it when opening. */
   initialRemarks?: string;
+  /** Fewest characters the remarks need. Too short on Confirm: the message shows under the box, red outline. */
+  minRemarks?: number;
+  /** That message (default: "Write at least N characters."). */
+  minRemarksMessage?: string;
 }
 
 // Confirm button and focus colours per tone, from the fixed palette.
@@ -278,13 +283,22 @@ export function RemarksModal({
   confirmDisabled = false,
   tone = "danger",
   initialRemarks,
+  minRemarks = 0,
+  minRemarksMessage,
 }: RemarksModalProps) {
   const toneStyle = REMARKS_TONE[tone];
   // Seeded when the modal mounts; a caller with a draft mounts it fresh.
   const [remarks, setRemarks] = useState(initialRemarks ?? "");
+  // Confirm pressed with too short remarks: the message shows under the box, live.
+  const [tried, setTried] = useState(false);
+  const tooShort = remarks.trim().length < minRemarks;
+  const remarksError = tried && tooShort
+    ? minRemarksMessage ?? `Write at least ${minRemarks} characters.`
+    : undefined;
 
   const handleCancel = () => {
     setRemarks("");
+    setTried(false);
     onCancel?.();
   };
 
@@ -292,9 +306,11 @@ export function RemarksModal({
     const trimmed = remarks.trim();
 
     if (!trimmed || confirmDisabled) return;
+    if (trimmed.length < minRemarks) { setTried(true); return; }
 
     onConfirm?.(trimmed);
     setRemarks("");
+    setTried(false);
   };
 
   useEffect(() => {
@@ -402,10 +418,12 @@ export function RemarksModal({
                   placeholder={remarksPlaceholder}
                   rows={3}
                   disabled={busy}
+                  aria-invalid={!!remarksError}
                   className={`w-full rounded-lg border border-white/10 bg-black/30 text-sm text-white/85
                              px-3 py-2 outline-none resize-none placeholder:text-white/30
-                             ${toneStyle.focus} disabled:opacity-50 transition-colors`}
+                             ${toneStyle.focus} disabled:opacity-50 transition-colors ${errorBorder(remarksError)}`}
                 />
+                <FieldError>{remarksError}</FieldError>
               </div>
             </div>
 

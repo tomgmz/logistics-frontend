@@ -5,6 +5,7 @@ import { Camera, X } from 'lucide-react'
 import type { ServiceStatus } from '@/app/types/truck.types'
 import type { RegistrationStatus } from '@/lib/registration-expiry'
 import { ProtectedImg } from '@/components/ui/FileViewer'
+import { FieldError, errorBorder } from '@/components/ui/FieldError'
 
 /** Shared bits for odometer readings and routine service. */
 
@@ -44,12 +45,15 @@ export function OdometerInput({
   lastKm,
   label = 'Odometer (km)',
   disabled,
+  error,
 }: {
   value:     string
   onChange:  (v: string) => void
   lastKm?:   number | null
   label?:    string
   disabled?: boolean
+  /** Shown under the field, with a red outline. */
+  error?:    string | null
 }) {
   const km   = parseKm(value)
   const diff = km != null && lastKm != null ? km - lastKm : null
@@ -64,8 +68,10 @@ export function OdometerInput({
         inputMode="numeric"
         disabled={disabled}
         placeholder={lastKm != null ? `Last: ${lastKm.toLocaleString()}` : 'e.g. 48250'}
-        className={`${inputCls} font-mono tabular-nums`}
+        className={`${inputCls} font-mono tabular-nums ${errorBorder(error)}`}
+        aria-invalid={!!error}
       />
+      <FieldError>{error}</FieldError>
       {diff != null && (
         <span className={`block text-[10px] mt-1 ${diff < 0 ? 'text-red-400' : diff > 2000 ? 'text-amber-300' : 'text-white/35'}`}>
           {diff < 0
@@ -86,15 +92,19 @@ export function PhotoField({
   label,
   required,
   disabled,
+  error: formError,
 }: {
   file:      File | null
   onFile:    (f: File | null) => void
   label:     string
   required?: boolean
   disabled?: boolean
+  /** The form's check (e.g. "Add a photo"), under the picker with a red outline. */
+  error?:    string | null
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [error, setError] = useState<string | null>(null)
+  const shownError = error ?? formError
 
   const preview = useMemo(() => (file ? URL.createObjectURL(file) : null), [file])
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview) }, [preview])
@@ -132,7 +142,7 @@ export function PhotoField({
           type="button"
           disabled={disabled}
           onClick={() => inputRef.current?.click()}
-          className="inline-flex items-center gap-2 rounded-lg border border-dashed border-white/20 px-3 py-2 text-xs font-semibold text-white/70 hover:bg-white/5 disabled:opacity-40"
+          className={`inline-flex items-center gap-2 rounded-lg border border-dashed border-white/20 px-3 py-2 text-xs font-semibold text-white/70 hover:bg-white/5 disabled:opacity-40 ${errorBorder(shownError)}`}
         >
           <Camera size={14} />
           {file ? 'Retake' : 'Add photo'}
@@ -146,7 +156,7 @@ export function PhotoField({
           onChange={(e) => { pick(e.target.files?.[0]); e.target.value = '' }}
         />
       </div>
-      {error && <p className="text-[11px] text-red-400 mt-1">{error}</p>}
+      <FieldError>{shownError}</FieldError>
     </div>
   )
 }

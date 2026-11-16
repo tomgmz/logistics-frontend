@@ -9,7 +9,6 @@
 
 import { useId, useState, type ReactNode } from 'react'
 import {
-  ChevronDown,
   Info,
   MapPin,
   Building2,
@@ -25,6 +24,7 @@ import {
 } from 'lucide-react'
 
 import { PALETTE } from '@/lib/palette'
+import { ToggleBox } from '@/components/ui/accordion'
 import { FileViewButton } from '@/components/ui/FileViewer'
 
 /** Panel surfaces and greys from the design. Not badge colours, so not in the palette. */
@@ -355,26 +355,28 @@ export function CollapsibleSection({
 }) {
   const [open, setOpen] = useState(defaultOpen)
   const [opened, setOpened] = useState(defaultOpen)
-  const id = useId()
   return (
-    <section className="border-b border-[#424242]">
-      <button
-        type="button"
-        onClick={() => { setOpen((v) => !v); setOpened(true) }}
-        aria-expanded={open}
-        aria-controls={id}
-        className="w-full flex items-center justify-between gap-3 py-3 text-left"
-      >
+    // shadcn Accordion with its usual underline (user 2026-11-16: these sections keep the
+    // underline; the full outline is for the smaller toggles). Kept mounted while closed so
+    // live updates and an unsaved trip plan survive closing it.
+    <ToggleBox
+      open={open}
+      onOpenChange={(v) => { setOpen(v); if (v) setOpened(true) }}
+      keepMounted
+      className="rounded-none border-0 border-b border-[#424242]"
+      triggerClassName="rounded-none px-0 py-3"
+      chevronClassName="size-[18px]"
+      chevronStyle={{ color: PALETTE.cyan }}
+      contentClassName="px-0 pb-4"
+      title={
         <span className="flex items-center gap-2 min-w-0">
           <span className="text-lg font-bold uppercase leading-tight" style={{ color: PALETTE.cyan }}>{title}</span>
           {badge}
         </span>
-        <ChevronDown size={18} strokeWidth={2} className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
-          style={{ color: PALETTE.cyan }} />
-      </button>
-      {/* Kept mounted while closed so live updates and an unsaved trip plan survive closing it. */}
-      <div id={id} hidden={!open} className="pb-4">{lazy && !opened ? null : children}</div>
-    </section>
+      }
+    >
+      {lazy && !opened ? null : children}
+    </ToggleBox>
   )
 }
 

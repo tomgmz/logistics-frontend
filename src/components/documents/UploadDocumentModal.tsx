@@ -20,6 +20,7 @@ import {
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { cachedFetch } from '@/lib/query/useApiQuery'
+import Dropdown from '@/components/ui/Dropdown'
 
 // Mirrors the backend's uploadDocuments middleware.
 const MAX_FILES = 3
@@ -294,7 +295,7 @@ export default function UploadDocumentModal({
               {/* Type */}
               <div>
                 <label htmlFor="doc-type" className="block text-[11px] font-bold uppercase tracking-wide text-white/45 mb-1.5">Document Type</label>
-                <select
+                <Dropdown
                   id="doc-type"
                   value={docType}
                   disabled={busy}
@@ -304,7 +305,7 @@ export default function UploadDocumentModal({
                   {TYPES_FOR[target].map((t) => (
                     <option key={t} value={t}>{DOCUMENT_TYPE_LABELS[t]}</option>
                   ))}
-                </select>
+                </Dropdown>
               </div>
 
               {/* Client (a contract) */}

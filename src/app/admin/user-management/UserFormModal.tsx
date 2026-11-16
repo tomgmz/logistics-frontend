@@ -47,6 +47,8 @@ import { useSignedLinkRefresh } from '@/lib/hooks/useSignedLinkRefresh'
 import RecordLockBanner, { RecordLockBadge } from '@/components/ui/RecordLockBanner'
 import { writeAccess } from '@/components/layout/ModuleAccess'
 import { ProtectedImg } from '@/components/ui/FileViewer'
+import Dropdown from '@/components/ui/Dropdown'
+import { FieldError, errorBorder } from '@/components/ui/FieldError'
 
 interface UserFormModalProps {
   tab: UserTab
@@ -314,17 +316,13 @@ function Select({
   ...props
 }: Omit<SelectHTMLAttributes<HTMLSelectElement>, 'required'> & { error?: string }) {
   return (
-    <select
+    <Dropdown
       {...props}
-      className={`${inputBase} appearance-none bg-[#2a2a2a] ${error ? 'border-red-500/60' : ''} ${className}`}
-      style={{
-        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`,
-        backgroundRepeat: 'no-repeat',
-        backgroundPosition: 'right 12px center',
-      }}
+      value={props.value as string | undefined}
+      className={`${inputBase} bg-[#2a2a2a] ${error ? 'border-red-500/60' : ''} ${className}`}
     >
       {children}
-    </select>
+    </Dropdown>
   )
 }
 
@@ -390,6 +388,8 @@ export default function UserFormModal({
   // checks flag. The server runs the same checks on its own scan.
   const [licenseVerified, setLicenseVerified] = useState(false)
   const [licenseNote,     setLicenseNote]     = useState('')
+  // Save pressed: the LTMS tick and the note show their problem under themselves, live.
+  const [licenseTried,    setLicenseTried]    = useState(false)
   const [licenseIssues,   setLicenseIssues]   = useState<string[]>([])
   const [renewalScanning, setRenewalScanning] = useState(false)
   // Words where the scan may have read an Ñ as a plain N.
@@ -623,6 +623,7 @@ export default function UserFormModal({
     setLockValues(lockValuesOf(savedLicenseLocks(tab, initialState, isEdit), initialState))
     setLicenseVerified(false)
     setLicenseNote('')
+    setLicenseTried(false)
     setLicenseIssues([])
     setShowCustomSuffix(
       !!initialState.suffix && !USER_SUFFIXES.includes(initialState.suffix as never),
@@ -677,12 +678,8 @@ export default function UserFormModal({
     const confirmError = needsEmailConfirm ? confirmEmailError(String(form.email ?? ''), confirmEmail) : undefined
     if (confirmError) errors.confirm_email = confirmError
     if (Object.keys(errors).length > 0) { setFieldErrors(errors); return }
-    if (licenseCheck && !licenseVerified) {
-      setGlobalError('Tick that you checked this license against LTO (LTMS) before saving.')
-      return
-    }
-    if (licenseCheck && shownIssues.length > 0 && licenseNote.trim().length < 10) {
-      setGlobalError('Add a note explaining the flagged license details before saving.')
+    if (licenseCheck && (!licenseVerified || (shownIssues.length > 0 && licenseNote.trim().length < 10))) {
+      setLicenseTried(true)
       return
     }
     setConfirmSave(true)
@@ -763,6 +760,7 @@ export default function UserFormModal({
     setLockValues(lockValuesOf(savedLicenseLocks(tab, initialState, isEdit), initialState))
     setLicenseVerified(false)
     setLicenseNote('')
+    setLicenseTried(false)
     setLicenseIssues([])
     setViewing(true)
   }
@@ -1347,11 +1345,15 @@ export default function UserFormModal({
                     {shownIssues.map((m) => <li key={m}>{m}</li>)}
                   </ul>
                 )}
-                <label className="flex items-start gap-2.5 text-[12px] leading-snug text-white/85 cursor-pointer">
-                  <input type="checkbox" checked={licenseVerified} onChange={e => setLicenseVerified(e.target.checked)}
-                    className="mt-0.5 h-4 w-4 shrink-0 accent-[#4df9ed]" />
-                  I checked this license against LTO (LTMS): it is valid and belongs to this driver.
-                </label>
+                <div>
+                  <label className="flex items-start gap-2.5 text-[12px] leading-snug text-white/85 cursor-pointer">
+                    <input type="checkbox" checked={licenseVerified} onChange={e => setLicenseVerified(e.target.checked)}
+                      aria-invalid={licenseTried && !licenseVerified}
+                      className={`mt-0.5 h-4 w-4 shrink-0 accent-[#4df9ed] ${licenseTried && !licenseVerified ? 'outline outline-1 outline-[#f62626]/60' : ''}`} />
+                    I checked this license against LTO (LTMS): it is valid and belongs to this driver.
+                  </label>
+                  <FieldError>{licenseTried && !licenseVerified ? 'Tick that you checked this license against LTO (LTMS) before saving.' : undefined}</FieldError>
+                </div>
                 {shownIssues.length > 0 && (
                   <div>
                     <label htmlFor="license-change-note" className="block text-[11px] font-semibold uppercase tracking-widest text-[#818181] mb-1.5">
@@ -1360,7 +1362,9 @@ export default function UserFormModal({
                     <textarea id="license-change-note" rows={3} maxLength={1000} value={licenseNote}
                       onChange={e => setLicenseNote(e.target.value)}
                       placeholder="e.g. Married name on the new card; LTMS shows the same license number."
-                      className="w-full resize-none rounded-lg border border-[#424242] bg-[#1b1b1b] px-3 py-2 text-base sm:text-sm text-white outline-none focus:border-[#4df9ed]" />
+                      aria-invalid={licenseTried && licenseNote.trim().length < 10}
+                      className={`w-full resize-none rounded-lg border border-[#424242] bg-[#1b1b1b] px-3 py-2 text-base sm:text-sm text-white outline-none focus:border-[#4df9ed] ${errorBorder(licenseTried && licenseNote.trim().length < 10)}`} />
+                    <FieldError>{licenseTried && licenseNote.trim().length < 10 ? 'Add a note explaining the flagged license details (at least 10 characters).' : undefined}</FieldError>
                   </div>
                 )}
                 {isEdit && <p className="text-[11px] text-[#818181]">The previous license is kept in the driver&apos;s license history.</p>}

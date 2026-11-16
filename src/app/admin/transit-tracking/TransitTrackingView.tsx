@@ -27,6 +27,7 @@ import { pauseReasonLabel } from '@/lib/pause-reasons'
 import { useLiveRoute, LiveRoutePolyline, FollowTruck, remainingStops } from '@/components/map/LiveRoute'
 import { RouteStepper, bookingRouteSteps, dropoffSummary } from '@/components/map/RouteStepper'
 import { formatDuration } from '@/lib/duration'
+import SearchClearButton from '@/components/ui/SearchClearButton'
 import StatusFilterDropdown, { filterByStatus, type StatusFilter } from '@/components/map/StatusFilterDropdown'
 
 const GOOGLE_MAPS_KEY    = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
@@ -448,15 +449,17 @@ export default function TransitTrackingView() {
             {/* Same search + "Status: …" picker as the client's tracking map
                 (user 2026-11-14). Status words stay Alegreya Sans SC. */}
             <div className="px-3 pt-3 pb-2 flex-shrink-0">
-              <div className="flex items-center gap-2 rounded-[10px] px-3 py-2.5" style={{ background: '#2a2828' }}>
+              <div className="relative flex items-center gap-2 rounded-[10px] pl-3 pr-9 py-2.5" style={{ background: '#2a2828' }}>
                 <SearchIcon sx={{ fontSize: 16, color: '#9f9c9c' }} />
                 <input
                   value={search}
                   onChange={(e) => { setSearch(e.target.value); setActiveFilter('all') }}
                   placeholder="Search"
-                  className="bg-transparent border-none outline-none text-sm flex-1"
+                  aria-label="Search"
+                  className="bg-transparent border-none outline-none text-sm flex-1 min-w-0"
                   style={{ color: '#9f9c9c' }}
                 />
+                <SearchClearButton value={search} onClear={() => setSearch('')} />
               </div>
             </div>
 
@@ -464,7 +467,9 @@ export default function TransitTrackingView() {
               <StatusFilterDropdown value={activeFilter} onChange={setActiveFilter} bookings={searchFiltered} />
             </div>
 
-            <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-3 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/10">
+            {/* overflow-x-hidden: a hovered card slides 2 px right (whileHover),
+                which made the list scrollable sideways. */}
+            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-2 pb-3 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/10">
               {listLoading ? (
                 <div className="flex flex-col items-center justify-center py-10 gap-2">
                   <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--color-cyan)' }} />

@@ -3,6 +3,7 @@
 import { useRef, type KeyboardEvent } from 'react'
 import { ChevronDown } from '@untitledui/icons'
 import { cn } from '@/lib/utils'
+import Dropdown from '@/components/ui/Dropdown'
 
 /**
  * Untitled UI's horizontal tab list, type "button-minimal", size "sm"
@@ -48,15 +49,16 @@ export function TabsMinimal<K extends string>({ items, selectedKey, onSelectionC
   return (
     <>
     <div className={cn('relative w-full', alwaysDropdown ? 'md:w-[210px] 3xl:w-[259px]' : 'md:hidden')}>
-      <select
+      <Dropdown
         value={selectedKey}
         onChange={(e) => onSelectionChange(e.target.value as K)}
         aria-label={label}
         // 16px: iOS Safari zooms into any smaller focused field.
+        chevron={false}
         className="ff-sc h-[38px] 3xl:h-[44px] w-full cursor-pointer appearance-none rounded-[10px] border border-[#343434] bg-[#2a2828] pl-4 pr-10 text-[16px] md:text-[15px] 3xl:text-[18px] text-white outline-hidden [color-scheme:dark] focus:border-[#4df9ed]"
       >
         {items.map((t) => <option key={t.id} value={t.id} className="bg-[#1b1b1b] text-white">{t.label}</option>)}
-      </select>
+      </Dropdown>
       <ChevronDown aria-hidden className="pointer-events-none absolute right-3.5 top-1/2 size-5 -translate-y-1/2 text-white" />
     </div>
     {!alwaysDropdown && <div

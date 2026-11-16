@@ -32,6 +32,7 @@ import { useVehicleTypeOptions } from '@/lib/hooks/useVehicleTypes'
 import { useServerTable } from '@/lib/hooks/useServerTable'
 import { useDebouncedValue } from '@/lib/hooks/useDebouncedValue'
 import { ProtectedImg } from '@/components/ui/FileViewer'
+import Dropdown from '@/components/ui/Dropdown'
 
 
 interface ModelFormState {
@@ -606,7 +607,7 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete, archive 
                   <label className="text-[11px] font-bold uppercase text-white/40">
                     Vehicle type <span className="text-red-400">*</span>
                   </label>
-                  <select
+                  <Dropdown
                     value={form.vehicle_type}
                     onChange={handleVehicleTypeChange}
                     className={inputCls(!!fieldErrors.vehicle_type)}
@@ -617,7 +618,7 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete, archive 
                     {vehicleTypes.options.map((vt) => (
                       <option key={vt} value={vt}>{vt}</option>
                     ))}
-                  </select>
+                  </Dropdown>
                   {!vehicleTypes.loading && (vehicleTypes.error || vehicleTypes.options.length === 0) && (
                     <p className="text-[11px] text-amber-200/90">
                       {vehicleTypes.error

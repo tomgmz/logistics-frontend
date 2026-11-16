@@ -11,6 +11,7 @@ import { SectionHeader } from './TransactionDetail'
 import { formatDateTime, fileNameFromUrl } from './transaction-format'
 import { AMBER, BG_PANEL, BG_CARD, BORDER, BORDER_C, CYAN, MUTED, ERROR } from './transaction-theme'
 import { cachedFetch } from '@/lib/query/useApiQuery'
+import Dropdown from '@/components/ui/Dropdown'
 import { DesignCard } from '@/app/admin/booking-management/BookingDetailParts'
 import { FileViewButton } from '@/components/ui/FileViewer'
 import { usePanelSection } from '@/components/ui/PanelReady'
@@ -204,7 +205,9 @@ function BookingRevisions({ revisions }: { revisions: BookingRevision[] }) {
           {ordered.length > 1 ? (
             <label className="relative inline-flex items-center gap-1 text-lg font-bold uppercase" style={{ color: CYAN }}>
               <span className="sr-only">Resubmission to show</span>
-              <select
+              <Dropdown
+                chevron={false}
+                aria-label="Resubmission to show"
                 value={rev.revision_number}
                 onChange={(e) => setPick(Number(e.target.value))}
                 className="appearance-none bg-transparent pr-6 font-bold uppercase outline-none cursor-pointer"
@@ -215,7 +218,7 @@ function BookingRevisions({ revisions }: { revisions: BookingRevision[] }) {
                     Resubmission {r.revision_number}
                   </option>
                 ))}
-              </select>
+              </Dropdown>
               <ChevronDown size={16} className="pointer-events-none absolute right-0" />
             </label>
           ) : (

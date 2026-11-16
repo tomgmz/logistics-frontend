@@ -12,6 +12,7 @@ import { extractApiError } from '@/lib/api-error'
 import { appToast } from '@/lib/toast'
 import PhoneInputRow, { attachCountryCode } from '@/components/ui/PhoneInputRow'
 import { blockPaste, confirmEmailError } from '@/lib/validation/fields'
+import Dropdown from '@/components/ui/Dropdown'
 
 /**
  * The IT Admin's handover form, two modes (2026-10-25):
@@ -234,7 +235,7 @@ export default function ItAdminTransitionModal({
                         There is no active Company Administrator to name. One is needed before the handover can start.
                       </p>
                     ) : (
-                      <select
+                      <Dropdown
                         className={inputBase}
                         value={standinId}
                         onChange={(e) => { setStandinId(e.target.value); setErrors((er) => ({ ...er, standin: '' })) }}
@@ -246,7 +247,7 @@ export default function ItAdminTransitionModal({
                             {[c.first_name, c.last_name].filter(Boolean).join(' ') || c.email} ({c.email})
                           </option>
                         ))}
-                      </select>
+                      </Dropdown>
                     )}
                   </Field>
                 )}
@@ -326,6 +327,8 @@ export default function ItAdminTransitionModal({
       {/* Confirm first. Starting asks for a reason for the record. */}
       <RemarksModal
         open={confirming && mode === 'start'}
+        minRemarks={10}
+        minRemarksMessage="Give a reason of at least 10 characters. It goes on the audit record."
         title="Start the handover?"
         description={
           `Your ${renderDays}-day render time starts now. ` +

@@ -34,6 +34,8 @@ export default function OdometerModal({
   const [km,    setKm]    = useState('')
   const [photo, setPhoto] = useState<File | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Field checks show under their fields once Next has been pressed, then live.
+  const [showErrors, setShowErrors] = useState(false)
   const [busy,  setBusy]  = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
 
@@ -41,20 +43,27 @@ export default function OdometerModal({
   const isReturn = !!truck?.return_odometer_due
 
   useEffect(() => {
-    setKm(''); setPhoto(null); setError(null); setConfirmOpen(false)
+    setKm(''); setPhoto(null); setError(null); setShowErrors(false); setConfirmOpen(false)
   }, [truck?.truck_id])
 
-  function review() {
+  function fieldErrors(): { km?: string; photo?: string } {
+    const errs: { km?: string; photo?: string } = {}
     const reading = parseKm(km)
-    if (reading == null) { setError('Enter the odometer in whole kilometres.'); return }
-    if (truck?.odometer_km != null && reading < truck.odometer_km) {
-      setError(`The odometer can't go below the last reading (${fmtKm(truck.odometer_km)}).`); return
+    if (reading == null) errs.km = 'Enter the odometer in whole kilometres.'
+    else if (truck?.odometer_km != null && reading < truck.odometer_km) {
+      errs.km = `The odometer can't go below the last reading (${fmtKm(truck.odometer_km)}).`
+    } else if (isReturn && truck?.odometer_km != null && reading === truck.odometer_km) {
+      errs.km = `The return odometer must be higher than the last reading (${fmtKm(truck.odometer_km)}).`
     }
-    if (isReturn && truck?.odometer_km != null && reading === truck.odometer_km) {
-      setError(`The return odometer must be higher than the last reading (${fmtKm(truck.odometer_km)}).`); return
-    }
-    if (!photo) { setError('Add a photo of the odometer.'); return }
+    if (!photo) errs.photo = 'Add a photo of the odometer.'
+    return errs
+  }
+  const errs = showErrors ? fieldErrors() : {}
+
+  function review() {
     setError(null)
+    setShowErrors(true)
+    if (Object.keys(fieldErrors()).length > 0) return
     setConfirmOpen(true)
   }
 
@@ -123,8 +132,8 @@ export default function OdometerModal({
                     : 'Type the reading on the dash and attach a photo of it. Use this whenever the vehicle is back ' +
                       'in the parking lot, for example when a trip is paused.'}
                 </p>
-                <OdometerInput value={km} onChange={setKm} lastKm={truck.odometer_km ?? null} />
-                <PhotoField file={photo} onFile={setPhoto} label="Odometer photo" required />
+                <OdometerInput value={km} onChange={setKm} lastKm={truck.odometer_km ?? null} error={errs.km} />
+                <PhotoField file={photo} onFile={setPhoto} label="Odometer photo" required error={errs.photo} />
                 {error && (
                   <p className="text-xs text-red-400 border border-red-500/25 rounded-lg px-3 py-2 bg-red-500/10">{error}</p>
                 )}

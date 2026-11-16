@@ -56,6 +56,7 @@ import { Button } from '@/components/ui/untitled/button'
 import type { DateRange } from '@/components/ui/untitled/date-range-picker'
 import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
 import { useServerTable } from '@/lib/hooks/useServerTable'
+import { bookingQuery } from '@/lib/booking-url'
 
 /**
  * Document Management — one library over every file the system keeps, shared
@@ -454,8 +455,8 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
   // The Fleet Manager has no booking page (2026-11-11), so no Open Booking there.
   const bookingHref = (d: LibraryDocument | null) =>
     !d?.booking_id || portal === 'fleet_admin' ? null
-      : portal === 'admin' || portal === 'general_manager' ? `/${portal}/transaction-history?booking=${d.booking_id}`
-      : `/${portal}/booking-management?booking=${d.booking_id}`
+      : portal === 'admin' || portal === 'general_manager' ? `/${portal}/transaction-history${bookingQuery({ booking_id: d.booking_id, reference_number: d.reference_number })}`
+      : `/${portal}/booking-management${bookingQuery({ booking_id: d.booking_id, reference_number: d.reference_number })}`
 
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE))
   const hasFileFilters = !!(search || types.length || review || dateRange || sort !== 'desc')

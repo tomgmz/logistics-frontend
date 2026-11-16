@@ -36,6 +36,8 @@ import Pagination from '@/components/ui/Pagination'
 import { useServerTable } from '@/lib/hooks/useServerTable'
 import { useDebouncedValue } from '@/lib/hooks/useDebouncedValue'
 import { cachedData, storeData } from '@/lib/query/useApiQuery'
+import Combobox from '@/components/ui/Combobox'
+import { FieldError, errorBorder } from '@/components/ui/FieldError'
 
 
 const TABS = [
@@ -76,7 +78,7 @@ function Field({ label, error, hint, children }: { label: string; error?: string
       <label className={labelCls}>{label}</label>
       {children}
       {error
-        ? <p className="mt-1 text-[11px] text-red-400">{error}</p>
+        ? <FieldError>{error}</FieldError>
         : hint && <p className="mt-1 text-[11px] text-white/30">{hint}</p>}
     </div>
   )
@@ -156,6 +158,8 @@ export default function SystemMaintenanceView() {
   const [lForm, setLForm] = useState<LandlineForm>(initLandline)
   const [vForm, setVForm] = useState<VehicleTypeForm>(initVehicleType)
   const [vTouched, setVTouched] = useState(false)
+  // Which form has had Save pressed: its field errors then show under the fields, live.
+  const [tried, setTried] = useState<Partial<Record<'h' | 'c' | 'p' | 'l', boolean>>>({})
 
   const [editingPrefix, setEditingPrefix] = useState<LandlinePrefix | null>(null)
   const [editingType,   setEditingType]   = useState<VehicleType | null>(null)
@@ -261,6 +265,7 @@ export default function SystemMaintenanceView() {
     setEditingType(null)
     setVForm(initVehicleType)
     setVTouched(false)
+    setTried({})
   }
 
   function closeSheet() {
@@ -281,11 +286,35 @@ export default function SystemMaintenanceView() {
     setSheetOpen(true)
   }
 
+  // Field checks for the four catalogue forms, shown under each field.
+  const takenCommodity = commodities.find(c =>
+    c.commodity_id !== editingCommodity?.commodity_id && c.name.trim().toLowerCase() === cForm.name.trim().toLowerCase())
+  const hCheck = {
+    code: !hForm.code.trim() ? 'Enter a code.' : undefined,
+    name: !hForm.name.trim() ? 'Enter a name.' : undefined,
+  }
+  const cCheck = {
+    name: !cForm.name.trim() ? 'Enter the commodity name.'
+      : takenCommodity ? `"${takenCommodity.name}" already exists.` : undefined,
+  }
+  const pCheck = {
+    commodity: !pForm.commodity_id ? 'Choose a commodity.' : undefined,
+    name:      !pForm.name.trim() ? 'Enter the product name.' : undefined,
+  }
+  const lCheck = {
+    prefix: !lForm.prefix.trim() ? 'Enter the prefix.'
+      : !/^\d+$/.test(lForm.prefix.trim()) ? 'Digits only.' : undefined,
+    city:   !lForm.city.trim() ? 'Enter the city.' : undefined,
+  }
+  const hasError = (check: Record<string, string | undefined>) => Object.values(check).some(Boolean)
+  const hErr: Partial<typeof hCheck> = tried.h ? hCheck : {}
+  const cErr: Partial<typeof cCheck> = tried.c ? cCheck : {}
+  const pErr: Partial<typeof pCheck> = tried.p ? pCheck : {}
+  const lErr: Partial<typeof lCheck> = tried.l ? lCheck : {}
+
   async function submitHandling() {
-    if (!hForm.code.trim() || !hForm.name.trim()) {
-      appToast.error('Code and name are required.')
-      return
-    }
+    setTried(t => ({ ...t, h: true }))
+    if (hasError(hCheck)) return
     if (editingHandling) {
       const payload: UpdateHandlingCodePayload = {
         code:        hForm.code.trim().toUpperCase(),
@@ -297,7 +326,7 @@ export default function SystemMaintenanceView() {
         setSaving(true)
         const updated = await systemMaintenanceService.updateHandlingCode(editingHandling.handling_code_id, payload)
         refreshTable()
-        appToast.success(`Handling code ${updated.code} saved.`)
+        setTried({}); appToast.success(`Handling code ${updated.code} saved.`)
         closeSheet()
       } catch (e: unknown) {
         appToast.error(getApiErrorMessage(e) || 'Failed to save handling code')
@@ -318,7 +347,7 @@ export default function SystemMaintenanceView() {
       refreshTable()
       setHForm(initHandling)
       setSheetOpen(false)
-      appToast.success(`Handling code ${created.code} added.`)
+      setTried({}); appToast.success(`Handling code ${created.code} added.`)
     } catch (e: unknown) {
       appToast.error(getApiErrorMessage(e) || 'Failed to add handling code')
     } finally {
@@ -327,17 +356,9 @@ export default function SystemMaintenanceView() {
   }
 
   async function submitCommodity() {
-    if (!cForm.name.trim()) {
-      appToast.error('Commodity name is required.')
-      return
-    }
-    // Same check the server makes (case and outer spaces ignored).
-    const taken = commodities.find(c =>
-      c.commodity_id !== editingCommodity?.commodity_id && c.name.trim().toLowerCase() === cForm.name.trim().toLowerCase())
-    if (taken) {
-      appToast.error(`Commodity "${taken.name}" already exists.`)
-      return
-    }
+    // Includes the same duplicate check the server makes (case and outer spaces ignored).
+    setTried(t => ({ ...t, c: true }))
+    if (hasError(cCheck)) return
     if (editingCommodity) {
       const payload: UpdateCommodityPayload = { name: cForm.name.trim(), is_active: cForm.is_active }
       try {
@@ -345,7 +366,7 @@ export default function SystemMaintenanceView() {
         const updated = await systemMaintenanceService.updateCommodity(editingCommodity.commodity_id, payload)
         setCommodities(prev => prev.map(c => c.commodity_id === updated.commodity_id ? { ...c, ...updated } : c))
         refreshTable()
-        appToast.success(`Commodity "${updated.name}" saved.`)
+        setTried({}); appToast.success(`Commodity "${updated.name}" saved.`)
         closeSheet()
       } catch (e: unknown) {
         appToast.error(getApiErrorMessage(e) || 'Failed to save commodity')
@@ -365,7 +386,7 @@ export default function SystemMaintenanceView() {
       refreshTable()
       setCForm(initCommodity)
       setSheetOpen(false)
-      appToast.success(`Commodity "${created.name}" added.`)
+      setTried({}); appToast.success(`Commodity "${created.name}" added.`)
     } catch (e: unknown) {
       appToast.error(getApiErrorMessage(e) || 'Failed to add commodity')
     } finally {
@@ -374,14 +395,8 @@ export default function SystemMaintenanceView() {
   }
 
   async function submitProduct() {
-    if (!pForm.commodity_id) {
-      appToast.error('Please select a commodity.')
-      return
-    }
-    if (!pForm.name.trim()) {
-      appToast.error('Product is required.')
-      return
-    }
+    setTried(t => ({ ...t, p: true }))
+    if (hasError(pCheck)) return
     if (editingProduct) {
       const payload: UpdateProductPayload = {
         commodity_id: pForm.commodity_id,
@@ -392,7 +407,7 @@ export default function SystemMaintenanceView() {
         setSaving(true)
         const updated = await systemMaintenanceService.updateProduct(editingProduct.product_id, payload)
         refreshTable()
-        appToast.success(`Product "${updated.name}" saved.`)
+        setTried({}); appToast.success(`Product "${updated.name}" saved.`)
         closeSheet()
       } catch (e: unknown) {
         appToast.error(getApiErrorMessage(e) || 'Failed to save product')
@@ -413,7 +428,7 @@ export default function SystemMaintenanceView() {
       refreshTable()
       setPForm({ ...initProduct, commodity_id: pForm.commodity_id })
       setSheetOpen(false)
-      appToast.success(`Product "${created.name}" added.`)
+      setTried({}); appToast.success(`Product "${created.name}" added.`)
     } catch (e: unknown) {
       appToast.error(getApiErrorMessage(e) || 'Failed to add product')
     } finally {
@@ -422,18 +437,8 @@ export default function SystemMaintenanceView() {
   }
 
   async function submitLandline() {
-    if (!lForm.prefix.trim()) {
-      appToast.error('Prefix is required.')
-      return
-    }
-    if (!/^\d+$/.test(lForm.prefix.trim())) {
-      appToast.error('Prefix must be numeric digits only.')
-      return
-    }
-    if (!lForm.city.trim()) {
-      appToast.error('City is required.')
-      return
-    }
+    setTried(t => ({ ...t, l: true }))
+    if (hasError(lCheck)) return
 
     try {
       setSaving(true)
@@ -445,7 +450,7 @@ export default function SystemMaintenanceView() {
         }
         const updated = await systemMaintenanceService.updateLandlinePrefix(editingPrefix.prefix_id, payload)
         refreshTable()
-        appToast.success(`Prefix (${updated.prefix}) updated.`)
+        setTried({}); appToast.success(`Prefix (${updated.prefix}) updated.`)
         closeSheet()
       } else {
         const payload: CreateLandlinePrefixPayload = {
@@ -456,7 +461,7 @@ export default function SystemMaintenanceView() {
         refreshTable()
         setLForm(initLandline)
         setSheetOpen(false)
-        appToast.success(`Prefix (${created.prefix}) added.`)
+        setTried({}); appToast.success(`Prefix (${created.prefix}) added.`)
       }
     } catch (e: unknown) {
       const msg = getApiErrorMessage(e)
@@ -663,21 +668,23 @@ export default function SystemMaintenanceView() {
         {editingHandling && <RecordLockBanner lock={handlingLock} noun="handling code" />}
         {editingHandling && <EditingChip label={`Editing ${editingHandling.code}`} onCancel={closeSheet} />}
         <fieldset disabled={handlingLock.readOnly || saving} className="space-y-4 min-w-0 border-0 p-0 m-0">
-        <Field label="Code *" hint={renameHint(editingHandling, !!editingHandling && hForm.code.trim().toUpperCase() !== editingHandling.code)}>
+        <Field label="Code *" error={hErr.code} hint={renameHint(editingHandling, !!editingHandling && hForm.code.trim().toUpperCase() !== editingHandling.code)}>
           <input
             value={hForm.code}
             onChange={e => setHForm(p => ({ ...p, code: e.target.value.toUpperCase() }))}
-            className={inputCls}
+            className={`${inputCls} ${errorBorder(hErr.code)}`}
+            aria-invalid={!!hErr.code}
             placeholder="e.g. GEN"
             autoCapitalize="characters"
             autoComplete="off"
           />
         </Field>
-        <Field label="Name *" hint={renameHint(editingHandling, !!editingHandling && hForm.name.trim() !== editingHandling.name)}>
+        <Field label="Name *" error={hErr.name} hint={renameHint(editingHandling, !!editingHandling && hForm.name.trim() !== editingHandling.name)}>
           <input
             value={hForm.name}
             onChange={e => setHForm(p => ({ ...p, name: e.target.value }))}
-            className={inputCls}
+            className={`${inputCls} ${errorBorder(hErr.name)}`}
+            aria-invalid={!!hErr.name}
             placeholder="e.g. General Cargo"
           />
         </Field>
@@ -710,11 +717,12 @@ export default function SystemMaintenanceView() {
         {editingCommodity && <RecordLockBanner lock={commodityLock} noun="commodity" />}
         {editingCommodity && <EditingChip label={`Editing ${editingCommodity.name}`} onCancel={closeSheet} />}
         <fieldset disabled={commodityLock.readOnly || saving} className="space-y-4 min-w-0 border-0 p-0 m-0">
-        <Field label="Name *" hint={renameHint(editingCommodity, !!editingCommodity && cForm.name.trim() !== editingCommodity.name)}>
+        <Field label="Name *" error={cErr.name} hint={renameHint(editingCommodity, !!editingCommodity && cForm.name.trim() !== editingCommodity.name)}>
           <input
             value={cForm.name}
             onChange={e => setCForm(p => ({ ...p, name: e.target.value }))}
-            className={inputCls}
+            className={`${inputCls} ${errorBorder(cErr.name)}`}
+            aria-invalid={!!cErr.name}
             placeholder="e.g. Electronics"
           />
         </Field>
@@ -739,15 +747,16 @@ export default function SystemMaintenanceView() {
         {editingProduct && <RecordLockBanner lock={productLock} noun="product" />}
         {editingProduct && <EditingChip label={`Editing ${editingProduct.name}`} onCancel={closeSheet} />}
         <fieldset disabled={productLock.readOnly || saving} className="space-y-4 min-w-0 border-0 p-0 m-0">
-        <Field label="Commodity *">
-          <select
+        <Field label="Commodity *" error={pErr.commodity}>
+          <Combobox
+            aria-invalid={!!pErr.commodity}
             value={pForm.commodity_id}
             onChange={e => {
               const id = e.target.value
               setPForm(p => ({ ...p, commodity_id: id }))
               if (!editingProduct) setProductFilter(id)
             }}
-            className={inputCls}
+            className={`${inputCls} ${errorBorder(pErr.commodity)}`}
             style={{ colorScheme: 'dark' }}
           >
             <option value="">Select commodity…</option>
@@ -759,13 +768,14 @@ export default function SystemMaintenanceView() {
                   {c.name}{c.is_active ? '' : ' (inactive)'}
                 </option>
               ))}
-          </select>
+          </Combobox>
         </Field>
-        <Field label="Product *" hint={renameHint(editingProduct, !!editingProduct && pForm.name.trim() !== editingProduct.name)}>
+        <Field label="Product *" error={pErr.name} hint={renameHint(editingProduct, !!editingProduct && pForm.name.trim() !== editingProduct.name)}>
           <input
             value={pForm.name}
             onChange={e => setPForm(p => ({ ...p, name: e.target.value }))}
-            className={inputCls}
+            className={`${inputCls} ${errorBorder(pErr.name)}`}
+            aria-invalid={!!pErr.name}
             placeholder="e.g. LCD Monitor"
           />
         </Field>
@@ -847,22 +857,24 @@ export default function SystemMaintenanceView() {
         )}
 
         <fieldset disabled={prefixLock.readOnly || saving} className="space-y-4 min-w-0 border-0 p-0 m-0">
-          <Field label="Prefix *">
+          <Field label="Prefix *" error={lErr.prefix}>
             <input
               value={lForm.prefix}
               onChange={e => setLForm(p => ({ ...p, prefix: e.target.value.replace(/\D/g, '').slice(0, 4) }))}
-              className={inputCls}
+              className={`${inputCls} ${errorBorder(lErr.prefix)}`}
+              aria-invalid={!!lErr.prefix}
               placeholder="e.g. 2, 32, 62"
               inputMode="numeric"
               pattern="[0-9]*"
             />
           </Field>
 
-          <Field label="City *">
+          <Field label="City *" error={lErr.city}>
             <input
               value={lForm.city}
               onChange={e => setLForm(p => ({ ...p, city: e.target.value }))}
-              className={inputCls}
+              className={`${inputCls} ${errorBorder(lErr.city)}`}
+              aria-invalid={!!lErr.city}
               placeholder="e.g. Metro Manila"
             />
           </Field>

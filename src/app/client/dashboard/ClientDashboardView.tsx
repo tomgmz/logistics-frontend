@@ -24,6 +24,7 @@ import { CardLink, MetricRow, MetricRowSkeleton } from '@/components/dashboard/A
 import type { CardSpec } from '@/components/dashboard/StaffDashboard'
 import { cachedData, storeData } from '@/lib/query/useApiQuery'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
+import { bookingQuery } from '@/lib/booking-url'
 
 /**
  * The client's dashboard, in the same Untitled UI dashboard-04 format as the
@@ -171,7 +172,7 @@ function ActiveShipmentRow({ booking }: { booking: BookingWithRelations }) {
     <tr>
       <td className="whitespace-nowrap">
         <Link
-          href={`/client/history?booking=${booking.booking_id}`}
+          href={`/client/history${bookingQuery(booking)}`}
           className="text-white transition-opacity [@media(hover:hover)]:hover:opacity-80"
         >
           {bookingRef(booking)}
@@ -200,7 +201,7 @@ function ActiveShipmentRow({ booking }: { booking: BookingWithRelations }) {
       <td className="whitespace-nowrap text-right">
         {inTransit && (
           <Link
-            href="/client/tracking"
+            href={`/client/tracking${bookingQuery(booking)}`}
             className="inline-flex items-center gap-0.5 transition-opacity [@media(hover:hover)]:hover:opacity-80"
             style={{ color: CYAN }}
           >
@@ -268,7 +269,7 @@ function AttentionCard({ rejected, onUpdated }: {
                 <div className="flex items-center gap-2">
                   <XCircle size={15} style={{ color: ERROR }} />
                   <Link
-                    href={`/client/history?booking=${b.booking_id}`}
+                    href={`/client/history${bookingQuery(b)}`}
                     className="text-sm font-semibold text-white transition-opacity [@media(hover:hover)]:hover:opacity-80"
                   >
                     {bookingRef(b)}

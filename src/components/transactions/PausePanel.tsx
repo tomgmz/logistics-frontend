@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ChevronDown, PauseCircle } from 'lucide-react'
+import { PauseCircle } from 'lucide-react'
+import { CARD_TOGGLE, ToggleBox } from '@/components/ui/accordion'
 
 import { pauseService, pauseReasonLabel, PAUSE_REASON_LABEL, type BookingPause, type PauseReason } from '@/lib/services/admin/pause.service'
 import { useAuthStore } from '@/lib/store/auth.store'
@@ -21,6 +22,7 @@ import { MapPointLink } from '@/components/map/LocationMapModal'
 import { cachedFetch } from '@/lib/query/useApiQuery'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { usePanelSection } from '@/components/ui/PanelReady'
+import Dropdown from '@/components/ui/Dropdown'
 
 /**
  * Staff view of the pauses on one booking: a way to pause a delivery in
@@ -236,15 +238,14 @@ export default function PausePanel({ bookingId, pausedAt, inTransit, canControl,
   const redCard = (open || canPause)
 
   const earlier = past.length > 0 && (
-    <div>
-      <button type="button" onClick={() => setShowPast((v) => !v)} aria-expanded={showPast}
-        className="inline-flex items-center gap-1 text-base font-bold cursor-pointer bg-transparent border-none p-0"
-        style={{ color: PALETTE.cyan }}>
-        Earlier pauses ({past.length})
-        <ChevronDown size={16} className={`transition-transform ${showPast ? 'rotate-180' : ''}`} />
-      </button>
-      {showPast && (
-        <ul className="mt-2 flex flex-col list-none p-0 m-0">
+    // Alone in the card (no pause running, no Pause button), its outline IS the card, so
+    // there aren't two outlines one inside the other (user 2026-11-16).
+    <ToggleBox open={showPast} onOpenChange={setShowPast} title={`Earlier pauses (${past.length})`}
+      triggerStyle={{ color: PALETTE.cyan }}
+      {...(redCard
+        ? { triggerClassName: 'text-base' }
+        : CARD_TOGGLE)}>
+        <ul className="flex flex-col list-none p-0 m-0">
           {past.map((p) => (
             <li key={p.pause_id} className="py-2 border-b border-dashed border-[#818181]/60 last:border-b-0 flex flex-col gap-0.5">
               <span className="text-xs font-bold text-white whitespace-pre-wrap break-words">
@@ -260,14 +261,14 @@ export default function PausePanel({ bookingId, pausedAt, inTransit, canControl,
             </li>
           ))}
         </ul>
-      )}
-    </div>
+    </ToggleBox>
   )
 
   return (
     <div className={redCard
       ? 'rounded-[15px] border px-3.5 sm:px-4 pt-3 pb-4 flex flex-col gap-3'
-      : 'rounded-[15px] border border-[#424242] bg-[#1b1b1b] px-3.5 sm:px-4 pt-3 pb-4 flex flex-col gap-3'}
+      // Only "Earlier pauses" in it: that box draws the card itself.
+      : 'flex flex-col gap-3'}
       style={redCard ? { borderColor: PALETTE.red, background: '#250505' } : undefined}>
       {canPause && (
         <>
@@ -416,14 +417,14 @@ export default function PausePanel({ bookingId, pausedAt, inTransit, canControl,
           <label htmlFor="pause-reason" className="block text-[11px] font-bold uppercase tracking-wider text-white/50">
             Reason <span className="text-red-400">*</span>
           </label>
-          <select id="pause-reason" value={reason} disabled={busy}
+          <Dropdown id="pause-reason" value={reason} disabled={busy}
             onChange={(e) => setReason(e.target.value as PauseReason | '')}
             className="w-full rounded-lg border border-white/10 bg-black/30 text-base sm:text-sm text-white/85 px-3 py-2 outline-none disabled:opacity-50">
             <option value="" disabled>Choose a reason</option>
             {(Object.keys(PAUSE_REASON_LABEL) as PauseReason[]).map((k) => (
               <option key={k} value={k} className="bg-[#424242]">{PAUSE_REASON_LABEL[k]}</option>
             ))}
-          </select>
+          </Dropdown>
         </div>
       </RemarksModal>
 

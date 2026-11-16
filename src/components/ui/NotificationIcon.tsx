@@ -18,6 +18,7 @@ import type { AppNotification, NotificationFilter } from "@/lib/services/notific
 import { useAuthStore } from "@/lib/store/auth.store";
 import { helpTabFromUrl, openHelpAssistant } from "@/lib/services/support.service";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
+import Dropdown from "@/components/ui/Dropdown";
 
 const timeAgo = (iso: string): string => {
   const diff = now() - new Date(iso).getTime();
@@ -506,22 +507,19 @@ export default function NotificationIcon() {
       >
         Show
       </label>
-      <select
+      <Dropdown
         id="notification-filter"
         value={filter ?? ""}
         onChange={(e) => { void setFilter((e.target.value || null) as NotificationFilter | null); }}
-        className="flex-1 min-w-0 cursor-pointer appearance-none rounded-lg border border-white/[0.08] bg-[#161616] px-2.5 py-1.5 pr-7 text-[13px] text-white outline-none transition-colors hover:border-white/20 focus:border-[var(--color-cyan,#4df9ed)]/60"
+        className="flex-1 min-w-0 cursor-pointer rounded-lg border border-white/[0.08] bg-[#161616] px-2.5 py-1.5 pr-7 text-[13px] text-white outline-none transition-colors hover:border-white/20 focus:border-[var(--color-cyan,#4df9ed)]/60"
         style={{
           fontFamily: "var(--font-darker), 'Darker Grotesque', sans-serif",
-          backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23777' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`,
-          backgroundRepeat: "no-repeat",
-          backgroundPosition: "right 10px center",
         }}
       >
         {filterOptions.map((o) => (
           <option key={o.value || "all"} value={o.value}>{o.label}</option>
         ))}
-      </select>
+      </Dropdown>
     </div>
   );
 

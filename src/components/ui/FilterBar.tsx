@@ -4,6 +4,8 @@ import { useState, type ReactNode } from 'react'
 import { FilterLines } from '@untitledui/icons'
 import { Search, ListFilter, Plus, X, ChevronDown, Check } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import Dropdown from '@/components/ui/Dropdown'
+import SearchClearButton from '@/components/ui/SearchClearButton'
 import { Button } from '@/components/ui/untitled/button'
 import { DateRangePicker, type DateRange } from '@/components/ui/untitled/date-range-picker'
 
@@ -173,8 +175,9 @@ export default function FilterBar({
               onChange={(e) => search.onChange(e.target.value)}
               placeholder={search.placeholder ?? 'Search'}
               aria-label={search.placeholder ?? 'Search'}
-              className={`${CONTROL_H} ${CONTROL_TEXT} w-full rounded-[10px] border border-[#818181] bg-[#424242] pl-9 3xl:pl-10 pr-4 text-white placeholder-[#818181] outline-none transition focus:border-[#4df9ed] [&::-webkit-search-cancel-button]:hidden`}
+              className={`${CONTROL_H} ${CONTROL_TEXT} w-full rounded-[10px] border border-[#818181] bg-[#424242] pl-9 3xl:pl-10 pr-9 text-white placeholder-[#818181] outline-none transition focus:border-[#4df9ed] [&::-webkit-search-cancel-button]:hidden`}
             />
+            <SearchClearButton value={search.value} onClear={() => search.onChange('')} />
           </div>
         )}
 
@@ -237,8 +240,9 @@ function SearchBox({ value, onChange, placeholder = 'Search', onEnter }: {
         placeholder={placeholder}
         aria-label={placeholder}
         // 16px on phones: iOS Safari zooms the page into any smaller focused field.
-        className="ff-sc h-[38px] 3xl:h-[44px] w-full rounded-[10px] border border-[#818181] bg-[#343434] pl-11 3xl:pl-[48px] pr-3 text-[16px] md:text-[15px] 3xl:text-[18px] text-white placeholder:text-[#818181] outline-none transition focus:border-[#4df9ed] [&::-webkit-search-cancel-button]:hidden"
+        className="ff-sc h-[38px] 3xl:h-[44px] w-full rounded-[10px] border border-[#818181] bg-[#343434] pl-11 3xl:pl-[48px] pr-10 text-[16px] md:text-[15px] 3xl:text-[18px] text-white placeholder:text-[#818181] outline-none transition focus:border-[#4df9ed] [&::-webkit-search-cancel-button]:hidden"
       />
+      <SearchClearButton value={value} onClear={() => onChange('')} className="right-2" />
     </div>
   )
 }
@@ -344,7 +348,7 @@ const SELECT =
   'max-sm:text-[16px] text-[13px] outline-none transition [color-scheme:dark] ' +
   'focus:border-[#4df9ed] disabled:cursor-not-allowed disabled:opacity-50'
 
-/** A native select (the phone's own picker on iOS and Android) in our look. */
+/** A rule's dropdown: the phone's own picker on phones, the shadcn Select from 768 px (Dropdown). */
 function RuleSelect({ value, onChange, placeholder, options, disabled, label }: {
   value:        string
   onChange:     (value: string) => void
@@ -355,7 +359,7 @@ function RuleSelect({ value, onChange, placeholder, options, disabled, label }: 
 }) {
   return (
     <div className="relative min-w-0">
-      <select
+      <Dropdown
         value={value}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
@@ -364,8 +368,7 @@ function RuleSelect({ value, onChange, placeholder, options, disabled, label }: 
       >
         {placeholder && <option value="" disabled>{placeholder}</option>}
         {options.map((o) => <option key={o.value} value={o.value} className="bg-[#1b1b1b] text-white">{o.label}</option>)}
-      </select>
-      <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 text-[#818181]" />
+      </Dropdown>
     </div>
   )
 }

@@ -1,7 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { ArrowLeftRight, ChevronDown } from 'lucide-react'
+import { ArrowLeftRight } from 'lucide-react'
+import { ToggleBox } from '@/components/ui/accordion'
 
 import proxyApi, { initCsrf } from '@/lib/api/auth.api'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
@@ -147,14 +148,9 @@ export default function DrivingShiftsPanel({ bookingId, inTransit, hasSecondDriv
       )}
 
       {shifts.length > 0 && (
-        <div>
-          <button type="button" onClick={() => setShowShifts((v) => !v)} aria-expanded={showShifts}
-            className="inline-flex items-center gap-1 text-sm font-bold cursor-pointer" style={{ color: PALETTE.cyan }}>
-            Driving record ({shifts.length})
-            <ChevronDown size={15} className={`transition-transform ${showShifts ? 'rotate-180' : ''}`} />
-          </button>
-          {showShifts && (
-            <ul className="mt-2 flex flex-col">
+        <ToggleBox open={showShifts} onOpenChange={setShowShifts} title={`Driving record (${shifts.length})`}
+          triggerClassName="text-sm" triggerStyle={{ color: PALETTE.cyan }}>
+            <ul className="flex flex-col">
               {shifts.map((s) => (
                 <li key={s.shift_id} className="py-1.5 border-b border-dashed border-[#818181]/60 last:border-b-0">
                   <p className="text-xs font-bold text-white">{s.driver_name ?? 'Driver'} <span style={{ color: MUTED }}>· {SOURCE[s.source]}</span></p>
@@ -165,8 +161,7 @@ export default function DrivingShiftsPanel({ bookingId, inTransit, hasSecondDriv
                 </li>
               ))}
             </ul>
-          )}
-        </div>
+        </ToggleBox>
       )}
 
       {inTransit && hasSecondDriver && canSwap && (

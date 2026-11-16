@@ -12,6 +12,7 @@ import ReusableModal from '@/components/layout/ReusableModal'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { OdometerInput, PhotoField, parseKm, fmtKm, fmtDay, phToday, inputCls } from './maintenance-ui'
+import { FieldError, errorBorder } from '@/components/ui/FieldError'
 
 /**
  * Log a routine service. Restarts both counters (km and months) from the
@@ -33,6 +34,8 @@ export default function RecordServiceModal({
   const [workshop, setWorkshop] = useState('')
   const [receipt,  setReceipt]  = useState<File | null>(null)
   const [error,    setError]    = useState<string | null>(null)
+  // Field checks show under their fields once Next has been pressed, then live.
+  const [showErrors, setShowErrors] = useState(false)
   const [busy,     setBusy]     = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
 
@@ -41,23 +44,32 @@ export default function RecordServiceModal({
   useEffect(() => {
     setDate(phToday())
     setKm(truck?.odometer_km != null ? String(truck.odometer_km) : '')
-    setWork(''); setWorkshop(''); setReceipt(null); setError(null); setConfirmOpen(false)
+    setWork(''); setWorkshop(''); setReceipt(null); setError(null); setShowErrors(false); setConfirmOpen(false)
   }, [truck?.truck_id, truck?.odometer_km])
+
+  function fieldErrors(): { date?: string; km?: string; work?: string } {
+    const errs: { date?: string; km?: string; work?: string } = {}
+    if (!truck) return errs
+    const reading = parseKm(km)
+    if (!date) errs.date = 'Enter the service date.'
+    else if (date > phToday()) errs.date = 'The service date cannot be in the future.'
+    else if (truck.last_service_at && date < truck.last_service_at) {
+      errs.date = `The service date is before the last service (${fmtDay(truck.last_service_at)}).`
+    }
+    if (reading == null) errs.km = 'Enter the odometer at the service in whole kilometres.'
+    else if (truck.last_service_odometer_km != null && reading < truck.last_service_odometer_km) {
+      errs.km = `The odometer is below the last service reading (${fmtKm(truck.last_service_odometer_km)}).`
+    }
+    if (!work.trim()) errs.work = 'Describe the work done.'
+    return errs
+  }
+  const errs = showErrors ? fieldErrors() : {}
 
   function review() {
     if (!truck) return
-    const reading = parseKm(km)
-    if (!date) { setError('Enter the service date.'); return }
-    if (date > phToday()) { setError('The service date cannot be in the future.'); return }
-    if (truck.last_service_at && date < truck.last_service_at) {
-      setError(`The service date is before the last service (${fmtDay(truck.last_service_at)}).`); return
-    }
-    if (reading == null) { setError('Enter the odometer at the service in whole kilometres.'); return }
-    if (truck.last_service_odometer_km != null && reading < truck.last_service_odometer_km) {
-      setError(`The odometer is below the last service reading (${fmtKm(truck.last_service_odometer_km)}).`); return
-    }
-    if (!work.trim()) { setError('Describe the work done.'); return }
     setError(null)
+    setShowErrors(true)
+    if (Object.keys(fieldErrors()).length > 0) return
     setConfirmOpen(true)
   }
 
@@ -132,9 +144,11 @@ export default function RecordServiceModal({
                   <span className="text-[11px] font-bold uppercase text-white/40">
                     Service date <span className="text-red-400">*</span>
                   </span>
-                  <input type="date" value={date} max={phToday()} onChange={(e) => setDate(e.target.value)} className={inputCls} />
+                  <input type="date" value={date} max={phToday()} onChange={(e) => setDate(e.target.value)}
+                    className={`${inputCls} ${errorBorder(errs.date)}`} aria-invalid={!!errs.date} />
+                  <FieldError>{errs.date}</FieldError>
                 </label>
-                <OdometerInput value={km} onChange={setKm} lastKm={truck.odometer_km ?? null} label="Odometer at service (km)" />
+                <OdometerInput value={km} onChange={setKm} lastKm={truck.odometer_km ?? null} label="Odometer at service (km)" error={errs.km} />
                 <label className="block">
                   <span className="text-[11px] font-bold uppercase text-white/40">
                     Work done <span className="text-red-400">*</span>
@@ -145,8 +159,10 @@ export default function RecordServiceModal({
                     rows={3}
                     maxLength={2000}
                     placeholder="e.g. Change oil and oil filter, replace air filter, check brakes"
-                    className={`${inputCls} resize-none`}
+                    className={`${inputCls} resize-none ${errorBorder(errs.work)}`}
+                    aria-invalid={!!errs.work}
                   />
+                  <FieldError>{errs.work}</FieldError>
                 </label>
                 <label className="block">
                   <span className="text-[11px] font-bold uppercase text-white/40">Workshop</span>

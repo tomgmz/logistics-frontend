@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Check, ChevronDown } from 'lucide-react'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
+import { NativeDropdown, useDesktopPicker } from '@/components/ui/Dropdown'
 import type { BookingWithRelations } from '@/lib/types/booking-relations'
 
 /**
@@ -35,68 +35,67 @@ export function statusFilterLabel(filter: StatusFilter) {
   return BOOKING_STATUS_FILTERS.find((f) => f.value === filter)?.label ?? 'All'
 }
 
-/** The tracking list's status picker: one full-width button, a menu with a count per status. */
+/**
+ * The tracking list's status picker: one full-width box, a count per status.
+ * Tablets and desktop: the shadcn Select with a count pill per status. Phones:
+ * the phone's own picker, "Pending (3)" (user 2026-11-16, as every dropdown).
+ */
 export default function StatusFilterDropdown({ value, onChange, bookings }: {
   value:    StatusFilter
   onChange: (value: StatusFilter) => void
   /** The bookings the counts are taken from (after the search). */
   bookings: BookingWithRelations[]
 }) {
+  const desktop = useDesktopPicker()
   const [open, setOpen] = useState(false)
   const narrowed = value !== 'all'
+  const counts = BOOKING_STATUS_FILTERS.map((f) => ({ ...f, count: filterByStatus(bookings, f.value).length }))
+
+  const boxStyle = {
+    background:  narrowed || open ? 'rgba(77,249,237,0.12)' : 'transparent',
+    borderColor: narrowed || open ? 'rgba(77,249,237,0.35)' : 'var(--color-surface-dark)',
+    color:       narrowed || open ? 'var(--color-cyan)' : '#9f9c9c',
+  }
+  const boxClass = 'h-9 w-full rounded-lg border px-3 text-[13px] font-bold transition-colors'
+
+  if (!desktop) {
+    return (
+      <NativeDropdown
+        value={value}
+        aria-label="Status"
+        onChange={(e) => onChange(e.target.value as StatusFilter)}
+        className={boxClass}
+        style={boxStyle}
+      >
+        {counts.map((f) => <option key={f.value} value={f.value}>{`Status: ${f.label} (${f.count})`}</option>)}
+      </NativeDropdown>
+    )
+  }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          aria-label={`Status: ${statusFilterLabel(value)}`}
-          className="flex h-9 w-full items-center justify-between gap-2 rounded-lg border px-3 text-[13px] font-bold transition-colors"
-          style={{
-            background:  narrowed || open ? 'rgba(77,249,237,0.12)' : 'transparent',
-            borderColor: narrowed || open ? 'rgba(77,249,237,0.35)' : 'var(--color-surface-dark)',
-            color:       narrowed || open ? 'var(--color-cyan)' : '#9f9c9c',
-          }}
-        >
-          <span className="truncate">Status: {statusFilterLabel(value)}</span>
-          <ChevronDown className={`size-4 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent
-        align="start"
-        sideOffset={6}
-        collisionPadding={16}
-        className="w-[var(--radix-popover-trigger-width)] min-w-[200px] max-w-[calc(100vw-32px)] gap-0 rounded-xl border border-[#424242] bg-[#1b1b1b] p-1 text-white shadow-[0_20px_40px_rgba(0,0,0,0.6)] ring-0"
-      >
-        <div role="menu" aria-label="Status" className="flex max-h-[min(50dvh,var(--radix-popover-content-available-height))] flex-col overflow-y-auto overscroll-contain">
-          {BOOKING_STATUS_FILTERS.map((f) => {
-            const on    = f.value === value
-            const count = filterByStatus(bookings, f.value).length
-            return (
-              <button
-                key={f.value}
-                type="button"
-                role="menuitemradio"
-                aria-checked={on}
-                onClick={() => { onChange(f.value); setOpen(false) }}
-                className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] transition-colors [@media(hover:hover)]:hover:bg-[#2a2a2a] ${on ? 'text-[var(--color-cyan)]' : 'text-white'}`}
+    <Select value={value} onValueChange={(v) => onChange(v as StatusFilter)} open={open} onOpenChange={setOpen}>
+      <SelectTrigger aria-label={`Status: ${statusFilterLabel(value)}`} className={boxClass} style={boxStyle}>
+        <span className="truncate">Status: {statusFilterLabel(value)}</span>
+      </SelectTrigger>
+      <SelectContent className="ff-regular min-w-[200px]">
+        {counts.map((f) => {
+          const on = f.value === value
+          return (
+            <SelectItem key={f.value} value={f.value} textValue={f.label} className="text-[13px] [&>span:last-child]:flex [&>span:last-child]:flex-1 [&>span:last-child]:items-center [&>span:last-child]:gap-2.5">
+              <span className="min-w-0 flex-1 truncate">{f.label}</span>
+              <span
+                className="min-w-[20px] rounded-full px-1.5 text-center text-[11px] font-bold leading-[18px] tabular-nums"
+                style={{
+                  background: on ? 'rgba(77,249,237,0.2)' : '#2a2a2a',
+                  color:      on ? 'var(--color-cyan)' : f.count ? '#9f9c9c' : '#555',
+                }}
               >
-                <Check className={`size-4 shrink-0 ${on ? 'opacity-100' : 'opacity-0'}`} />
-                <span className="min-w-0 flex-1 truncate">{f.label}</span>
-                <span
-                  className="min-w-[20px] rounded-full px-1.5 text-center text-[11px] font-bold leading-[18px] tabular-nums"
-                  style={{
-                    background: on ? 'rgba(77,249,237,0.2)' : '#2a2a2a',
-                    color:      on ? 'var(--color-cyan)' : count ? '#9f9c9c' : '#555',
-                  }}
-                >
-                  {count}
-                </span>
-              </button>
-            )
-          })}
-        </div>
-      </PopoverContent>
-    </Popover>
+                {f.count}
+              </span>
+            </SelectItem>
+          )
+        })}
+      </SelectContent>
+    </Select>
   )
 }

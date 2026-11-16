@@ -1,7 +1,9 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Check, ChevronDown, Search } from 'lucide-react'
+import { Check, ChevronDown } from 'lucide-react'
+
+import { Command, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 
 import { phDay } from '@/lib/ph-date'
 
@@ -149,32 +151,27 @@ export default function DriverPicker({
       </button>
 
       {open && (
-        <div className="mt-1.5 rounded-lg border border-white/10 bg-[#141414]">
-          <div className="flex items-center gap-2 border-b border-white/10 px-3">
-            <Search size={14} className="text-white/35 shrink-0" />
-            <input
-              autoFocus
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape') { e.stopPropagation(); setOpen(false) }
-                if (e.key === 'Enter' && shown.length === 1 && !shown[0].disabledNote) { e.preventDefault(); pick(shown[0].value) }
-              }}
-              placeholder="Search by name or license"
-              aria-label="Search drivers"
-              // 16px on phones so iOS Safari doesn't zoom into the field.
-              className="w-full bg-transparent py-2 text-base sm:text-sm text-white placeholder:text-white/30 outline-none"
-            />
-          </div>
-
-          <ul role="listbox" aria-label={ariaLabel} className="max-h-64 overflow-y-auto overscroll-contain py-1">
+        // shadcn Command (the Combobox's list), kept inline under the button.
+        <Command
+          shouldFilter={false}
+          className="mt-1.5 rounded-lg border border-white/10 bg-[#141414]"
+          onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setOpen(false) } }}
+        >
+          <CommandInput
+            autoFocus
+            value={query}
+            onValueChange={setQuery}
+            placeholder="Search by name or license"
+            aria-label="Search drivers"
+          />
+          <CommandList aria-label={ariaLabel}>
             {emptyLabel && !q && (
-              <Row selected={value === ''} onPick={() => pick('')}>
+              <Row value={EMPTY_ROW} selected={value === ''} onPick={() => pick('')}>
                 <span className="text-white/60">{emptyLabel}</span>
               </Row>
             )}
             {shown.map((o) => (
-              <Row key={o.value} selected={o.value === value} disabled={!!o.disabledNote} onPick={() => pick(o.value)}>
+              <Row key={o.value} value={o.value} selected={o.value === value} disabled={!!o.disabledNote} onPick={() => pick(o.value)}>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-white">{o.name}</span>
                   {(o.detail || o.disabledNote || o.warning) && (
@@ -187,39 +184,39 @@ export default function DriverPicker({
               </Row>
             ))}
             {shown.length === 0 && (
-              <li className="px-3 py-3 text-xs text-white/40">
+              <p className="px-3 py-3 text-xs text-white/40">
                 {q ? `No driver matches "${query.trim()}".` : 'No drivers to choose from.'}
-              </li>
+              </p>
             )}
-          </ul>
+          </CommandList>
 
           {hiddenCount > 0 && (
             <p className="border-t border-white/10 px-3 py-1.5 text-[10px] text-white/35 leading-snug">
               {hiddenCount} driver{hiddenCount === 1 ? '' : 's'} not shown: license expired by the delivery day.
             </p>
           )}
-        </div>
+        </Command>
       )}
     </div>
   )
 }
 
+/** cmdk can't hold '' as an item value. */
+const EMPTY_ROW = '__none__'
+
 function Row({
-  selected, disabled, onPick, children,
-}: { selected: boolean; disabled?: boolean; onPick: () => void; children: React.ReactNode }) {
+  value, selected, disabled, onPick, children,
+}: { value: string; selected: boolean; disabled?: boolean; onPick: () => void; children: React.ReactNode }) {
   return (
-    <li role="option" aria-selected={selected} aria-disabled={disabled}>
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={onPick}
-        className={`w-full flex items-center gap-2 px-3 py-2 text-left text-sm disabled:opacity-40 ${
-          selected ? 'bg-[rgba(77,249,237,0.08)]' : ''
-        } [@media(hover:hover)]:hover:bg-white/[0.04]`}
-      >
-        <span className="w-4 shrink-0">{selected && <Check size={14} className="text-[var(--color-cyan)]" />}</span>
-        {children}
-      </button>
-    </li>
+    <CommandItem
+      value={value}
+      disabled={disabled}
+      onSelect={onPick}
+      aria-selected={selected}
+      className={`gap-2 rounded-md px-2 ${selected ? 'bg-[rgba(77,249,237,0.08)]' : ''}`}
+    >
+      <span className="w-4 shrink-0">{selected && <Check size={14} className="text-[var(--color-cyan)]" />}</span>
+      {children}
+    </CommandItem>
   )
 }

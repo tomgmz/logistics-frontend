@@ -20,6 +20,7 @@ import {
   type DashboardVehicle,
 } from '@/lib/services/admin/staff-dashboard.service'
 import { cachedData, storeData } from '@/lib/query/useApiQuery'
+import { bookingQuery } from '@/lib/booking-url'
 
 /**
  * The staff dashboards.
@@ -54,7 +55,7 @@ export interface CardSpec {
 }
 
 function bookingHref(base: string, b: DashboardBooking) {
-  return `${base}/booking-management?booking=${encodeURIComponent(b.booking_id)}`
+  return `${base}/booking-management${bookingQuery(b)}`
 }
 
 function cardsFor(role: StaffRole, d: Data): CardSpec[] {

@@ -17,6 +17,7 @@ import { RouteStepper, bookingRouteSteps, dropoffSummary }   from './RouteSteppe
 import { DirectionsRenderer }                from './DirectionsRenderer'
 import { useAuthStore }                      from '@/lib/store/auth.store'
 import { useRouteMap } from '@/lib/hooks/useRouteMap'
+import { useResolvedBookingKey } from '@/lib/booking-url'
 import { statusColor } from './status.colors'
 import { bookingRef } from '@/lib/booking'
 import { useLiveDriverPosition } from '@/lib/hooks/useLiveDriverPosition'
@@ -24,6 +25,7 @@ import { LiveTruckMarker } from './LiveTruckMarker'
 import { useRouteChanged } from '@/hooks/useRouteChanged'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { useLiveRoute, LiveRoutePolyline, FollowTruck, remainingStops } from './LiveRoute'
+import SearchClearButton from '@/components/ui/SearchClearButton'
 import StatusFilterDropdown, { filterByStatus, statusFilterLabel, type StatusFilter } from './StatusFilterDropdown'
 
 const GOOGLE_MAPS_KEY    = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!
@@ -176,8 +178,10 @@ function EmptyMapState() {
   )
 }
 
+/** initialBookingId: the key from the address, `202611-00193` (older links: the id). */
 export default function RouteMap({ initialBookingId }: { initialBookingId?: string }) {
-  const routeMap = useRouteMap(initialBookingId ?? null)
+  const startId  = useResolvedBookingKey(initialBookingId)
+  const routeMap = useRouteMap(startId ?? null)
   const { loadBookings: rmLoad, select: rmSelect, clear: rmClear, refreshRoute: rmRefresh, reloadRoute: rmReload } = routeMap
 
   const [totalDuration, setTotalDuration] = useState<number>(0)
@@ -199,7 +203,10 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
 
   const [search,          setSearch]          = useState('')
   const [activeFilter,    setActiveFilter]    = useState<StatusFilter>('all')
-  const [mobileView,      setMobileView]      = useState<'list' | 'map'>('list')
+  // Opened on a booking (?booking=): phones go straight to its map, as a tap on the list does.
+  const [mobileView,      setMobileView]      = useState<'list' | 'map'>(() =>
+    initialBookingId && typeof window !== 'undefined' && window.innerWidth < 1024 ? 'map' : 'list',
+  )
   const [sheetOpen,       setSheetOpen]       = useState(false)
   const [detailPanelOpen, setDetailPanelOpen] = useState(true)
 
@@ -371,7 +378,7 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
     <div className="flex flex-col h-full">
 
       <div className="px-3 pt-3 pb-2 flex-shrink-0">
-        <div className="flex items-center gap-2 rounded-[10px] px-3 py-2.5" style={{ background: '#2a2828' }}>
+        <div className="relative flex items-center gap-2 rounded-[10px] pl-3 pr-9 py-2.5" style={{ background: '#2a2828' }}>
           <SearchIcon sx={{ fontSize: 16, color: '#9f9c9c' }} />
           <input
             value={search}
@@ -380,9 +387,11 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
               setActiveFilter('all')
             }}
             placeholder="Search"
-            className="bg-transparent border-none outline-none text-sm flex-1"
+            aria-label="Search"
+            className="bg-transparent border-none outline-none text-sm flex-1 min-w-0"
             style={{ color: '#9f9c9c' }}
           />
+          <SearchClearButton value={search} onClear={() => setSearch('')} />
         </div>
       </div>
 
@@ -390,7 +399,9 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
         <StatusFilterDropdown value={activeFilter} onChange={setActiveFilter} bookings={searchFiltered} />
       </div>
 
-      <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-800">
+      {/* overflow-x-hidden: a hovered card slides 2 px right (whileHover), which
+          made the whole list scrollable sideways. */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-800">
         {listLoading ? (
           <div className="flex flex-col items-center justify-center py-12 gap-3">
             <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin"

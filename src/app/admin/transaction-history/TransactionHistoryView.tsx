@@ -44,6 +44,7 @@ import { Button } from '@/components/ui/untitled/button'
 import type { DateRange } from '@/components/ui/untitled/date-range-picker'
 import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
 import { cachedData, storeData } from '@/lib/query/useApiQuery'
+import { useResolvedBookingKey } from '@/lib/booking-url'
 /**
  * Transaction history for staff — the client's own history widened across every
  * company.
@@ -121,8 +122,11 @@ function KpiTile({ label, value, accent, sub }: {
 // Reports ?booking=<id>. Isolated so useSearchParams sits under its own
 // Suspense boundary.
 function BookingDeepLink({ onBooking }: { onBooking: (id: string | null) => void }) {
-  const id = useSearchParams()?.get('booking') ?? null
-  useEffect(() => { onBooking(id) }, [id, onBooking])
+  // ?booking=202611-00193 (older links: the id).
+  const key = useSearchParams()?.get('booking') ?? null
+  const id  = useResolvedBookingKey(key)
+  // Not found: useResolvedBookingKey says so.
+  useEffect(() => { onBooking(id ?? null) }, [id, onBooking])
   return null
 }
 

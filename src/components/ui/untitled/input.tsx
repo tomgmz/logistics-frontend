@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useSyncExternalStore, type FC } from 'react'
 import { cn } from '@/lib/utils'
+import SearchClearButton from '@/components/ui/SearchClearButton'
 
 const noSubscribe = () => () => {}
 
@@ -54,16 +55,17 @@ export function InputShortcut({ value, onChange, onEnter, placeholder = 'Search'
         aria-keyshortcuts={mac ? 'Meta+K' : 'Control+K'}
         // 16px on phones: iOS Safari zooms into any smaller focused field.
         className={cn(
-          'm-0 w-full bg-transparent px-3 py-2 text-white ring-0 outline-hidden placeholder:text-[#818181] max-sm:text-[16px] text-sm md:pr-16 [&::-webkit-search-cancel-button]:hidden',
+          'm-0 w-full bg-transparent px-3 py-2 pr-9 text-white ring-0 outline-hidden placeholder:text-[#818181] max-sm:text-[16px] text-sm md:pr-16 [&::-webkit-search-cancel-button]:hidden',
           Icon && 'pl-9',
         )}
       />
-      {/* Shortcut: only where there is a keyboard to press it on. */}
-      <div className="pointer-events-none absolute inset-y-0.5 right-0.5 z-10 hidden items-center rounded-r-[inherit] bg-linear-to-r from-transparent to-[#1b1b1b] to-40% pl-8 pr-1.5 md:flex [@media(hover:none)]:hidden">
+      <SearchClearButton value={value} onClear={() => onChange('')} />
+      {/* Shortcut: only where there is a keyboard to press it on; the clear button takes its place once something is typed. */}
+      {!value && <div className="pointer-events-none absolute inset-y-0.5 right-0.5 z-10 hidden items-center rounded-r-[inherit] bg-linear-to-r from-transparent to-[#1b1b1b] to-40% pl-8 pr-1.5 md:flex [@media(hover:none)]:hidden">
         <span aria-hidden="true" className="pointer-events-none rounded px-1 py-px text-xs font-medium text-[#818181] ring-1 ring-[#424242] select-none ring-inset">
           {mac ? '⌘K' : 'Ctrl K'}
         </span>
-      </div>
+      </div>}
     </div>
   )
 }

@@ -10,6 +10,7 @@ import { canResubmitAgain, isAwaitingResubmit, MAX_RESUBMISSIONS } from '@/lib/b
 import { useBookingClosed } from '@/lib/contract-status'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { appToast } from '@/lib/toast'
+import { bookingQuery } from '@/lib/booking-url'
 import { BORDER_C, CYAN, ERROR, MUTED } from './transaction-theme'
 
 /**
@@ -71,7 +72,7 @@ export default function RejectionPanel({ booking, onUpdated, compact = false }: 
   ) : (
     <div className="flex flex-wrap gap-2">
       {!bookingClosed && !limitReached && (
-        <Link href={`/client/booking?resubmit=${encodeURIComponent(bookingId)}`}
+        <Link href={`/client/booking${bookingQuery({ booking_id: bookingId, reference_number: booking.reference_number as string | null | undefined }, 'resubmit')}`}
           className={`inline-flex items-center gap-1.5 rounded-lg font-bold ${btn}`}
           style={{ background: CYAN, color: '#000' }}>
           <Pencil size={compact ? 12 : 14} /> Edit &amp; Resubmit

@@ -1,14 +1,14 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { ChevronDown, TriangleAlert } from 'lucide-react'
+import { TriangleAlert } from 'lucide-react'
+import { CARD_TOGGLE, ToggleBox } from '@/components/ui/accordion'
 
 import proxyApi from '@/lib/api/auth.api'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { PALETTE } from '@/lib/palette'
 import { formatDateTime } from './transaction-format'
 import { MUTED } from './transaction-theme'
-import { CARD_CLASS } from '@/app/admin/booking-management/BookingDetailParts'
 import { usePanelSection } from '@/components/ui/PanelReady'
 
 /**
@@ -58,17 +58,18 @@ export default function DeliveryEventsPanel({ bookingId }: { bookingId: string }
   if (events.length === 0) return null
 
   return (
-    <div className={`${CARD_CLASS} px-3.5 sm:px-4 pt-3 pb-4 flex flex-col gap-3`}>
-      <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open}
-        className="flex items-center justify-between gap-2 text-left cursor-pointer">
+    <ToggleBox
+      open={open}
+      onOpenChange={setOpen}
+      {...CARD_TOGGLE}
+      chevronStyle={{ color: PALETTE.cyan }}
+      title={
         <span className="flex items-center gap-2 text-base font-bold text-white leading-tight">
           <TriangleAlert size={20} strokeWidth={2} className="shrink-0" style={{ color: PALETTE.cyan }} />
           What happened on the road
         </span>
-        <ChevronDown size={18} className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
-          style={{ color: PALETTE.cyan }} />
-      </button>
-      {open && (
+      }
+    >
         <ol className="flex flex-col gap-2.5">
           {events.map((e, i) => (
             <li key={`${e.at}-${i}`} className="flex gap-2">
@@ -82,7 +83,6 @@ export default function DeliveryEventsPanel({ bookingId }: { bookingId: string }
             </li>
           ))}
         </ol>
-      )}
-    </div>
+    </ToggleBox>
   )
 }

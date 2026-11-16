@@ -78,10 +78,7 @@ export default function CompletionPanel({ booking, mode, onUpdated, canAct = tru
   )
 
   const resolve = async (note: string) => {
-    if (note.length < 5) {
-      appToast.error('Write what was done about the problem (at least 5 characters).')
-      return
-    }
+    // The modal holds a note under 5 characters back (message under its box).
     setAskResolve(false)
     await run(
       () => bookingService.resolveDeliveryIssue(bookingId, note),
@@ -174,6 +171,8 @@ export default function CompletionPanel({ booking, mode, onUpdated, canAct = tru
             </button>
             <RemarksModal
               open={askResolve}
+              minRemarks={5}
+              minRemarksMessage="Write what was done about the problem (at least 5 characters)."
               tone="approve"
               title="Mark the problem resolved?"
               description={`Your remarks are sent to the client with the notice. They then have ${AUTO_COMPLETE_DAYS} days to confirm the booking or report again.`}

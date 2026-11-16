@@ -29,6 +29,8 @@ import { cachedFetch } from '@/lib/query/useApiQuery'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { usePanelSection } from '@/components/ui/PanelReady'
 import { CrewCard, SLIM_TEAL_BUTTON_CLASS, TEAL_BUTTON_CLASS, TEAL_BUTTON_STYLE, type CrewSummary } from '@/app/admin/booking-management/BookingDetailParts'
+import Dropdown from '@/components/ui/Dropdown'
+import { FieldError } from '@/components/ui/FieldError'
 
 const ORANGE = PALETTE.orange
 
@@ -466,14 +468,14 @@ export default function ReplaceCrewPanel({
                       <label className="text-[11px] text-white/40 block mb-1">Vehicle plate</label>
                       <input value={plate} disabled={busy} onChange={(e) => setPlate(e.target.value.toUpperCase())}
                         maxLength={8} placeholder="ABC 1234" className={selectClass} />
-                      {plateProblem && <p className="text-[11px] mt-1 text-red-400">{plateProblem}</p>}
+                      <FieldError>{plateProblem}</FieldError>
                     </div>
                     <div className="min-w-0">
                       <label className="text-[11px] text-white/40 block mb-1">Vehicle type</label>
-                      <select value={vehicleType} disabled={busy} onChange={(e) => setVehicleType(e.target.value)} className={selectClass}>
+                      <Dropdown value={vehicleType} disabled={busy} onChange={(e) => setVehicleType(e.target.value)} className={selectClass}>
                         <option value="">Choose a type</option>
                         {vehicleTypes.map((t) => <option key={t} value={t}>{t}</option>)}
-                      </select>
+                      </Dropdown>
                     </div>
                   </div>
                 </>

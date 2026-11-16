@@ -8,6 +8,7 @@ import { getApiErrorMessage } from '@/lib/api-error'
 import { writeAccess } from '@/components/layout/ModuleAccess'
 import { PALETTE } from '@/lib/palette'
 import { GREY_BUTTON_STYLE, TEAL_BUTTON_CLASS, TEAL_BUTTON_STYLE } from './BookingDetailParts'
+import Dropdown from '@/components/ui/Dropdown'
 
 /**
  * The driver's call time: when operations wants the driver at the pickup point.
@@ -110,20 +111,20 @@ export default function DriverCallTime({ bookingId, clientCallTime, driverCallTi
       {editing && (
         <>
           <div className="flex flex-wrap items-center gap-2">
-            <select aria-label="Hour" value={draft.hour} disabled={saving}
+            <Dropdown aria-label="Hour" value={draft.hour} disabled={saving}
               onChange={(e) => setDraft((d) => ({ ...d, hour: Number(e.target.value) }))} className={selectClass}>
               {HOURS.map((h) => <option key={h} value={h}>{h}</option>)}
-            </select>
+            </Dropdown>
             <span className="text-white/40">:</span>
-            <select aria-label="Minute" value={draft.minute} disabled={saving}
+            <Dropdown aria-label="Minute" value={draft.minute} disabled={saving}
               onChange={(e) => setDraft((d) => ({ ...d, minute: Number(e.target.value) }))} className={selectClass}>
               {MINUTES.map((m) => <option key={m} value={m}>{String(m).padStart(2, '0')}</option>)}
-            </select>
-            <select aria-label="AM or PM" value={draft.pm ? 'PM' : 'AM'} disabled={saving}
+            </Dropdown>
+            <Dropdown aria-label="AM or PM" value={draft.pm ? 'PM' : 'AM'} disabled={saving}
               onChange={(e) => setDraft((d) => ({ ...d, pm: e.target.value === 'PM' }))} className={selectClass}>
               <option value="AM">AM</option>
               <option value="PM">PM</option>
-            </select>
+            </Dropdown>
           </div>
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={() => setEditing(false)} disabled={saving} className={smallBtn} style={GREY_BUTTON_STYLE}>

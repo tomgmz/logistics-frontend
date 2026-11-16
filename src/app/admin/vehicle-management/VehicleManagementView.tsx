@@ -70,6 +70,7 @@ import { type RowAction } from '@/components/ui/RowActionMenu'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { formatPlateNumber, plateError } from '@/lib/validation/plate'
+import { FieldError, errorBorder } from '@/components/ui/FieldError'
 import { registrationStatus } from '@/lib/registration-expiry'
 
 import FilterBar from '@/components/ui/FilterBar'
@@ -81,8 +82,16 @@ import { useVehicleTypeOptions } from '@/lib/hooks/useVehicleTypes'
 import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
 import { useCachedFetch } from '@/lib/hooks/useCachedFetch'
 import { cachedData, storeData } from '@/lib/query/useApiQuery'
+import Dropdown from '@/components/ui/Dropdown'
+import Combobox from '@/components/ui/Combobox'
 
 type FormMode    = 'create' | 'edit' | null
+
+/** A message per field, shown under it. */
+type VehicleFormErrors = Partial<Record<
+  'plate' | 'registration' | 'driver' | 'odometer' | 'intervalKm' | 'intervalMonths' | 'lastServiceAt' | 'lastServiceKm',
+  string
+>>
 type ConfirmKind = 'save' | 'archive' | null
 
 interface TruckFormState {
@@ -410,6 +419,7 @@ export default function VehicleManagementView({ archive }: {
   const [form,          setForm]          = useState<TruckFormState>(emptyForm())
   const [originalForm,  setOriginalForm]  = useState<TruckFormState>(emptyForm())
   const [formError,     setFormError]     = useState<string | null>(null)
+  const [showErrors,    setShowErrors]    = useState(false)
 
   const [confirmKind, setConfirmKind] = useState<ConfirmKind>(null)
   const [actionBusy,  setActionBusy]  = useState(false)
@@ -634,6 +644,7 @@ export default function VehicleManagementView({ archive }: {
     setForm(emptyForm())
     setOriginalForm(emptyForm())
     setFormError(null)
+    setShowErrors(false)
     setTypeFilter('')
     setModalMode('create')
   }
@@ -645,6 +656,7 @@ export default function VehicleManagementView({ archive }: {
     setForm(initial)
     setOriginalForm(initial)
     setFormError(null)
+    setShowErrors(false)
     setTypeFilter(models.find((m) => m.model_id === initial.model_id)?.vehicle_type?.trim() ?? '')
     setModalMode('edit')
   }
@@ -669,15 +681,17 @@ export default function VehicleManagementView({ archive }: {
     setModalMode(null)
     setEditingId(null)
     setFormError(null)
+    setShowErrors(false)
   }
 
-  function validateForm(): boolean {
-    setFormError(null)
+  /**
+   * Every problem in the form, by field (shown under that field). Pure, so after
+   * the first Save the messages follow the typing and clear once fixed.
+   */
+  function formErrors(): VehicleFormErrors {
+    const errs: VehicleFormErrors = {}
     const plateMsg = plateError(form.plate_number)
-    if (plateMsg) {
-      setFormError(plateMsg)
-      return false
-    }
+    if (plateMsg) errs.plate = plateMsg
 
     // Odometer + service schedule. Required when creating; on an older vehicle
     // the parts not yet set are entered here once.
@@ -692,38 +706,47 @@ export default function VehicleManagementView({ archive }: {
     // Registration: required for a new vehicle; on an older one it is asked for
     // (Maintenance flags it) but saving other changes is not held up by it.
     if (isCreate && !form.registration_expiry) {
-      setFormError('Enter the date the registration is valid until.'); return false
-    }
-    if (form.registration_expiry && !/^\d{4}-\d{2}-\d{2}$/.test(form.registration_expiry)) {
-      setFormError('Enter a valid registration expiry date.'); return false
-    }
-    if (!isCreate && editingTruck?.registration_expiry && !form.registration_expiry) {
-      setFormError('The registration expiry date cannot be cleared — enter the renewed date instead.'); return false
+      errs.registration = 'Enter the date the registration is valid until.'
+    } else if (form.registration_expiry && !/^d{4}-d{2}-d{2}$/.test(form.registration_expiry)) {
+      errs.registration = 'Enter a valid registration expiry date.'
+    } else if (!isCreate && editingTruck?.registration_expiry && !form.registration_expiry) {
+      errs.registration = 'The registration expiry date cannot be cleared — enter the renewed date instead.'
     }
     if (isCreate && pairOnCreate && !form.assigned_driver_id) {
-      setFormError('Choose the regular driver, or turn off "Assign a regular driver".'); return false
+      errs.driver = 'Choose the regular driver, or turn off "Assign a regular driver".'
     }
     if (needOdometer && (isCreate || form.odometer_km.trim()) && odo == null) {
-      setFormError('Enter the current odometer in whole kilometres.'); return false
+      errs.odometer = 'Enter the current odometer in whole kilometres.'
     }
     const intervalTouched = isCreate || form.service_interval_km.trim() || form.service_interval_months.trim()
     if (intervalTouched && (everyKm == null || everyKm < 100)) {
-      setFormError('Enter the service interval in kilometres (at least 100).'); return false
+      errs.intervalKm = 'Enter the kilometres (at least 100).'
     }
     if (intervalTouched && everyMonths == null) {
-      setFormError('Enter the service interval in months (1 to 60).'); return false
+      errs.intervalMonths = 'Enter the months (1 to 60).'
     }
     const baselineTouched = needBaseline && (isCreate || form.last_service_at || form.last_service_odometer_km.trim())
     if (baselineTouched) {
-      if (!form.last_service_at) { setFormError('Enter the last service date.'); return false }
-      if (form.last_service_at > phToday()) { setFormError('The last service date cannot be in the future.'); return false }
-      if (lastKm == null) { setFormError('Enter the odometer at the last service.'); return false }
-      const currentKm = odo ?? editingTruck?.odometer_km ?? null
-      if (currentKm != null && lastKm > currentKm) {
-        setFormError('The last service odometer cannot be higher than the current odometer.'); return false
+      if (!form.last_service_at) errs.lastServiceAt = 'Enter the last service date.'
+      else if (form.last_service_at > phToday()) errs.lastServiceAt = 'The last service date cannot be in the future.'
+      if (lastKm == null) errs.lastServiceKm = 'Enter the odometer at the last service.'
+      else {
+        const currentKm = odo ?? editingTruck?.odometer_km ?? null
+        if (currentKm != null && lastKm > currentKm) {
+          errs.lastServiceKm = 'Higher than the current odometer.'
+        }
       }
     }
-    return true
+    return errs
+  }
+
+  // Shown once Save has been pressed, then live.
+  const fieldErrors: VehicleFormErrors = showErrors && modalMode ? formErrors() : {}
+
+  function validateForm(): boolean {
+    setFormError(null)
+    setShowErrors(true)
+    return Object.keys(formErrors()).length === 0
   }
 
   const handleSaveClick = () => {
@@ -1264,9 +1287,11 @@ export default function VehicleManagementView({ archive }: {
                     autoComplete="off"
                     autoCorrect="off"
                     autoCapitalize="characters"
-                    className="mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-3 py-2.5 text-sm text-white outline-none focus:border-[var(--color-cyan)]/40 font-mono tracking-widest uppercase"
+                    className={`mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-3 py-2.5 text-sm text-white outline-none focus:border-[var(--color-cyan)]/40 font-mono tracking-widest uppercase ${errorBorder(fieldErrors.plate)}`}
                     placeholder="ABC 1234"
+                    aria-invalid={!!fieldErrors.plate}
                   />
+                  <FieldError>{fieldErrors.plate}</FieldError>
                   <p className="text-[10px] text-white/25 mt-1">
                     Letters and numbers only (e.g. ABC 1234 or ÑBC 5678). Space is inserted automatically.
                   </p>
@@ -1277,7 +1302,7 @@ export default function VehicleManagementView({ archive }: {
                   <label htmlFor="vehicle-type-filter" className="text-[11px] font-bold uppercase text-white/40">
                     Vehicle type
                   </label>
-                  <select
+                  <Dropdown
                     id="vehicle-type-filter"
                     value={typeFilter}
                     onChange={(e) => changeTypeFilter(e.target.value)}
@@ -1289,7 +1314,7 @@ export default function VehicleManagementView({ archive }: {
                     {vehicleTypes.options.map((vt) => (
                       <option key={vt} value={vt}>{vt}</option>
                     ))}
-                  </select>
+                  </Dropdown>
 
                   <span className="text-[11px] font-bold uppercase text-white/40">
                     Model
@@ -1399,8 +1424,10 @@ export default function VehicleManagementView({ archive }: {
                       type="date"
                       value={form.registration_expiry}
                       onChange={(e) => setForm((f) => ({ ...f, registration_expiry: e.target.value }))}
-                      className={`${inputCls} min-w-0 appearance-none`}
+                      className={`${inputCls} min-w-0 appearance-none ${errorBorder(fieldErrors.registration)}`}
+                      aria-invalid={!!fieldErrors.registration}
                     />
+                    <FieldError>{fieldErrors.registration}</FieldError>
                   </label>
                   {(() => {
                     const st = registrationStatus(form.registration_expiry || null)
@@ -1440,6 +1467,7 @@ export default function VehicleManagementView({ archive }: {
                         value={form.odometer_km}
                         onChange={(v) => setForm((f) => ({ ...f, odometer_km: v }))}
                         label="Current odometer (km)"
+                        error={fieldErrors.odometer}
                       />
                       {modalMode === 'create' && (
                         <PhotoField file={createOdoPhoto} onFile={setCreateOdoPhoto} label="Odometer photo" />
@@ -1463,7 +1491,8 @@ export default function VehicleManagementView({ archive }: {
                           onChange={(e) => setForm((f) => ({ ...f, service_interval_km: e.target.value }))}
                           inputMode="numeric"
                           placeholder="e.g. 5000"
-                          className={`${inputCls} mt-0 pr-10 font-mono tabular-nums`}
+                          className={`${inputCls} mt-0 pr-10 font-mono tabular-nums ${errorBorder(fieldErrors.intervalKm)}`}
+                          aria-invalid={!!fieldErrors.intervalKm}
                         />
                         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-white/35">km</span>
                       </div>
@@ -1474,11 +1503,19 @@ export default function VehicleManagementView({ archive }: {
                           onChange={(e) => setForm((f) => ({ ...f, service_interval_months: e.target.value }))}
                           inputMode="numeric"
                           placeholder="e.g. 3"
-                          className={`${inputCls} mt-0 pr-16 font-mono tabular-nums`}
+                          className={`${inputCls} mt-0 pr-16 font-mono tabular-nums ${errorBorder(fieldErrors.intervalMonths)}`}
+                          aria-invalid={!!fieldErrors.intervalMonths}
                         />
                         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-white/35">months</span>
                       </div>
                     </div>
+                    {(fieldErrors.intervalKm || fieldErrors.intervalMonths) && (
+                      <div className="grid grid-cols-[1fr_auto_1fr] gap-2">
+                        <FieldError>{fieldErrors.intervalKm}</FieldError>
+                        <span />
+                        <FieldError>{fieldErrors.intervalMonths}</FieldError>
+                      </div>
+                    )}
                     <p className="text-[10px] text-white/25 mt-1">
                       Whichever comes first. An overdue vehicle cannot be assigned until its service is recorded.
                     </p>
@@ -1495,8 +1532,10 @@ export default function VehicleManagementView({ archive }: {
                           value={form.last_service_at}
                           max={phToday()}
                           onChange={(e) => setForm((f) => ({ ...f, last_service_at: e.target.value }))}
-                          className={inputCls}
+                          className={`${inputCls} ${errorBorder(fieldErrors.lastServiceAt)}`}
+                          aria-invalid={!!fieldErrors.lastServiceAt}
                         />
+                        <FieldError>{fieldErrors.lastServiceAt}</FieldError>
                       </label>
                       <label className="block">
                         <span className="text-[11px] font-bold uppercase text-white/40">
@@ -1507,8 +1546,10 @@ export default function VehicleManagementView({ archive }: {
                           onChange={(e) => setForm((f) => ({ ...f, last_service_odometer_km: e.target.value }))}
                           inputMode="numeric"
                           placeholder="km"
-                          className={`${inputCls} font-mono tabular-nums`}
+                          className={`${inputCls} font-mono tabular-nums ${errorBorder(fieldErrors.lastServiceKm)}`}
+                          aria-invalid={!!fieldErrors.lastServiceKm}
                         />
+                        <FieldError>{fieldErrors.lastServiceKm}</FieldError>
                       </label>
                       <p className="col-span-2 text-[10px] text-white/25 -mt-1">
                         Never serviced? Use the day it was put into service and its odometer then.
@@ -1526,7 +1567,7 @@ export default function VehicleManagementView({ archive }: {
                 {modalMode === 'edit' && (
                   <label className="block">
                     <span className="text-[11px] font-bold uppercase text-white/40">Status</span>
-                    <select
+                    <Dropdown
                       value={form.status}
                       onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as Truck['status'] }))}
                       className="mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-3 py-2.5 text-sm text-white outline-none"
@@ -1536,7 +1577,7 @@ export default function VehicleManagementView({ archive }: {
                       {EDITABLE_STATUSES.filter((s) => s !== 'in_use' || editingTruck?.status === 'in_use').map((s) => (
                         <option key={s} value={s}>{fmtLabel(s)}</option>
                       ))}
-                    </select>
+                    </Dropdown>
                   </label>
                 )}
 
@@ -1573,10 +1614,11 @@ export default function VehicleManagementView({ archive }: {
                     <span className="text-[11px] font-bold uppercase text-white/40">
                       Assigned driver{modalMode === 'create' && <span className="text-red-400"> *</span>}
                     </span>
-                    <select
+                    <Combobox
                       value={form.assigned_driver_id}
                       onChange={(e) => setForm((f) => ({ ...f, assigned_driver_id: e.target.value }))}
-                      className="mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-3 py-2.5 text-sm text-white outline-none"
+                      className={`mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-3 py-2.5 text-sm text-white outline-none ${errorBorder(fieldErrors.driver)}`}
+                      aria-invalid={!!fieldErrors.driver}
                     >
                       <option value="">{modalMode === 'create' ? 'Select driver' : 'No regular driver'}</option>
                       {drivers.map((d) => {
@@ -1591,7 +1633,8 @@ export default function VehicleManagementView({ archive }: {
                           </option>
                         )
                       })}
-                    </select>
+                    </Combobox>
+                    <FieldError>{fieldErrors.driver}</FieldError>
                     <p className="text-[10px] text-white/25 mt-1">
                       Who normally drives this vehicle. Operations still picks the driver per booking —
                       this fills it in for them, it does not lock the vehicle to one person.

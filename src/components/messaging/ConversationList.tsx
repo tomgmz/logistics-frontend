@@ -6,6 +6,7 @@ import { motion } from 'framer-motion'
 import { ArrowLeft, MessageCirclePlus, Search } from 'lucide-react'
 import type { Conversation, Group, UnifiedListItem } from '@/app/types/messaging/messaging.types'
 import { formatConversationTime } from '@/app/utils/messaging.utils'
+import SearchClearButton from '@/components/ui/SearchClearButton'
 
 interface ConversationListProps {
   items:              UnifiedListItem[]
@@ -53,8 +54,10 @@ export default function ConversationList({
           <input
             type="text" value={search} onChange={e => onSearchChange(e.target.value)}
             placeholder="Search people, conversation, etc."
-            className="w-full h-12 bg-[#262626] rounded-lg pl-9 pr-3 text-[15px] font-medium text-white placeholder:text-white/55 focus:outline-none focus:ring-1 focus:ring-[var(--color-cyan)]/40 transition-all"
+            aria-label="Search conversations"
+            className="w-full h-12 bg-[#262626] rounded-lg pl-9 pr-10 text-[15px] font-medium text-white placeholder:text-white/55 focus:outline-none focus:ring-1 focus:ring-[var(--color-cyan)]/40 transition-all"
           />
+          <SearchClearButton value={search} onClear={() => onSearchChange('')} className="right-2" />
         </div>
       </div>
 

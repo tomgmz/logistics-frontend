@@ -24,6 +24,9 @@ import {
 import { useIsMobile } from '@/lib/hooks/useIsMobile'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 import { cachedFetch } from '@/lib/query/useApiQuery'
+import Dropdown from '@/components/ui/Dropdown'
+import Combobox from '@/components/ui/Combobox'
+import { FieldError, errorBorder } from '@/components/ui/FieldError'
 
 /**
  * The help assistant: an FAQ chatbot, and a ticket to our team when it can't
@@ -139,6 +142,13 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
   const [bookings,   setBookings]   = useState<BookingOption[]>([])
   const [sending,    setSending]    = useState(false)
   const [formError,  setFormError]  = useState<string | null>(null)
+  // Send pressed: subject / details problems show under their fields, live.
+  const [ticketTried, setTicketTried] = useState(false)
+  const ticketErrors = {
+    subject: subject.trim().length < 3 ? 'Add a short subject.' : undefined,
+    details: details.trim().length < 10 ? 'Describe the problem in a sentence or two.' : undefined,
+  }
+  const ticketErr: Partial<typeof ticketErrors> = ticketTried ? ticketErrors : {}
 
   const [tickets,        setTickets]        = useState<SupportTicket[]>([])
   const [ticketsLoading, setTicketsLoading] = useState(false)
@@ -291,12 +301,13 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
     setSubject((asked[0] ?? '').slice(0, 120))
     setDetails(asked.join('\n'))
     setFormError(null)
+    setTicketTried(false)
     setTicketOpen(true)
   }, [messages])
 
   const submitTicket = useCallback(async () => {
-    if (subject.trim().length < 3)  { setFormError('Add a short subject.'); return }
-    if (details.trim().length < 10) { setFormError('Describe the problem in a sentence or two.'); return }
+    setTicketTried(true)
+    if (subject.trim().length < 3 || details.trim().length < 10) return
     setSending(true)
     setFormError(null)
     try {
@@ -534,30 +545,32 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
                     </p>
                     <label className="block">
                       <span className="text-[10px] font-bold uppercase text-white/40">Topic</span>
-                      <select value={category} onChange={(e) => setCategory(e.target.value as TicketCategory)}
+                      <Dropdown value={category} onChange={(e) => setCategory(e.target.value as TicketCategory)}
                         className="mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-2.5 py-2 text-xs text-white outline-none">
                         {(Object.keys(TICKET_CATEGORY_LABEL) as TicketCategory[]).map((c) => (
                           <option key={c} value={c}>{TICKET_CATEGORY_LABEL[c]}</option>
                         ))}
-                      </select>
+                      </Dropdown>
                     </label>
                     <label className="block">
                       <span className="text-[10px] font-bold uppercase text-white/40">Booking (optional)</span>
-                      <select value={bookingId} onChange={(e) => setBookingId(e.target.value)}
+                      <Combobox value={bookingId} onChange={(e) => setBookingId(e.target.value)}
                         className="mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-2.5 py-2 text-xs text-white outline-none">
                         <option value="">Not about a specific booking</option>
                         {bookings.map((b) => <option key={b.booking_id} value={b.booking_id}>{b.label}</option>)}
-                      </select>
+                      </Combobox>
                     </label>
                     <label className="block">
                       <span className="text-[10px] font-bold uppercase text-white/40">Subject</span>
-                      <input value={subject} onChange={(e) => setSubject(e.target.value)} maxLength={150}
-                        className="mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-2.5 py-2 text-xs text-white outline-none focus:border-[var(--color-cyan)]/50" />
+                      <input value={subject} onChange={(e) => setSubject(e.target.value)} maxLength={150} aria-invalid={!!ticketErr.subject}
+                        className={`mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-2.5 py-2 text-xs text-white outline-none focus:border-[var(--color-cyan)]/50 ${errorBorder(ticketErr.subject)}`} />
+                      <FieldError>{ticketErr.subject}</FieldError>
                     </label>
                     <label className="block">
                       <span className="text-[10px] font-bold uppercase text-white/40">What happened?</span>
-                      <textarea value={details} onChange={(e) => setDetails(e.target.value)} rows={4} maxLength={4000}
-                        className="mt-1 w-full resize-none rounded-lg border border-white/10 bg-[#111] px-2.5 py-2 text-xs text-white outline-none focus:border-[var(--color-cyan)]/50" />
+                      <textarea value={details} onChange={(e) => setDetails(e.target.value)} rows={4} maxLength={4000} aria-invalid={!!ticketErr.details}
+                        className={`mt-1 w-full resize-none rounded-lg border border-white/10 bg-[#111] px-2.5 py-2 text-xs text-white outline-none focus:border-[var(--color-cyan)]/50 ${errorBorder(ticketErr.details)}`} />
+                      <FieldError>{ticketErr.details}</FieldError>
                     </label>
                     {formError && <p className="text-[11px] text-red-400">{formError}</p>}
                     <div className="flex justify-end gap-2">
