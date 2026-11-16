@@ -253,20 +253,18 @@ export async function getAuthStatus(email: string): Promise<AuthStatusResponse> 
   return data.data
 }
 
-export async function requestOtp(email: string, captcha_token?: string): Promise<void> {
-  await directApi.post('/auth/request-otp', { email, captcha_token })
+export async function requestOtp(email: string): Promise<void> {
+  await directApi.post('/auth/request-otp', { email })
 }
 
 export async function verifyOtp(
   email:        string,
   code:         string,
-  captcha_token?: string,
   device_info?: string
 ): Promise<AuthResponse> {
   const { data } = await nextApi.post('/api/auth/verify-otp', {
     email,
     code,
-    captcha_token,
     device_info: device_info ?? getDeviceInfo(),
     platform:    'web',
   })
@@ -276,13 +274,11 @@ export async function verifyOtp(
 export async function loginWithPassword(
   email:        string,
   password:     string,
-  captcha_token?: string,
   device_info?: string
 ): Promise<AuthResponse> {
   const { data } = await nextApi.post('/api/auth/login', {
     email,
     password,
-    captcha_token,
     device_info: device_info ?? getDeviceInfo(),
     platform:    'web',
   })
@@ -301,10 +297,10 @@ export async function changePassword(password: string): Promise<void> {
  * Goes direct (like getAuthStatus/requestOtp) rather than through the Next route
  * handlers: there is no session and no cookie to set.
  */
-export async function requestPasswordReset(email: string, captcha_token?: string): Promise<string> {
+export async function requestPasswordReset(email: string): Promise<string> {
   const { data } = await directApi.post<{ status: string; message: string }>(
     '/auth/forgot-password',
-    { email, captcha_token }
+    { email }
   )
   return data.message
 }
@@ -319,10 +315,10 @@ export async function requestPasswordReset(email: string, captcha_token?: string
  * Resolves the same way for an address that is not an IT Admin's as for one that
  * is, by design. The UI must not read anything into it.
  */
-export async function requestItAdminResetOtp(email: string, captcha_token?: string): Promise<string> {
+export async function requestItAdminResetOtp(email: string): Promise<string> {
   const { data } = await directApi.post<{ status: string; message: string }>(
     '/auth/it-admin/forgot-password',
-    { email, captcha_token }
+    { email }
   )
   return data.message
 }
@@ -342,11 +338,10 @@ export interface ResetOtpVerification {
 export async function verifyItAdminResetOtp(
   email: string,
   code:  string,
-  captcha_token?: string,
 ): Promise<ResetOtpVerification> {
   const { data } = await directApi.post<{ status: string; data: ResetOtpVerification }>(
     '/auth/it-admin/verify-otp',
-    { email, code, captcha_token }
+    { email, code }
   )
   return data.data
 }
@@ -365,8 +360,8 @@ export async function verifyResetToken(token: string): Promise<ResetTokenStatus>
   return data.data
 }
 
-export async function completePasswordReset(token: string, password: string, captcha_token?: string): Promise<void> {
-  await directApi.post('/auth/reset-password', { token, password, captcha_token })
+export async function completePasswordReset(token: string, password: string): Promise<void> {
+  await directApi.post('/auth/reset-password', { token, password })
 }
 
 export async function getMe(): Promise<AuthUser> {

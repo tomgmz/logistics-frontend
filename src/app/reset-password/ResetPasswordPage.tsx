@@ -8,7 +8,6 @@ import Link from 'next/link'
 import { ASSETS } from '@/lib/data'
 import SiteFooter from '@/components/layout/SiteFooter'
 import { completePasswordReset, verifyResetToken } from '@/lib/api/auth.api'
-import { useTurnstile } from '@/lib/hooks/useTurnstile'
 import {
   IconEye,
   IconLock,
@@ -77,7 +76,6 @@ export default function ResetPasswordPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirm,  setShowConfirm]  = useState(false)
   const [loading,      setLoading]      = useState(false)
-  const captcha = useTurnstile('reset_password')
   const [error,        setError]        = useState('')
   const [done,         setDone]         = useState(false)
 
@@ -115,7 +113,7 @@ export default function ResetPasswordPage() {
     setLoading(true)
     setError('')
     try {
-      await completePasswordReset(token, password, await captcha.getToken())
+      await completePasswordReset(token, password)
       setDone(true)
       // Back to the landing page, where the sign-in modal lives.
       setTimeout(() => router.replace('/'), 2200)
@@ -354,8 +352,6 @@ export default function ResetPasswordPage() {
                       </motion.p>
                     )}
                   </AnimatePresence>
-
-                  {captcha.element}
 
                   <motion.button
                     type="submit"

@@ -8,7 +8,6 @@ import {
   requestOtp, verifyOtp, loginWithPassword, getMe, getAuthStatus,
   requestPasswordReset, requestItAdminResetOtp, verifyItAdminResetOtp, AuthUser,
 } from '@/lib/api/auth.api'
-import { useTurnstile, CaptchaError } from '@/lib/hooks/useTurnstile'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { ROLE_ROUTES } from '@/constants/roles'
 import { now } from '@/app/utils/serverTime'
@@ -22,7 +21,6 @@ const RATE_LIMIT_FALLBACK_SECS = 60
 interface ApiErrorResponse { message?: string; code?: string; retryAfter?: number }
 
 function extractErrorMessage(err: unknown, fallback: string): string {
-  if (err instanceof CaptchaError) return err.message
   if (err instanceof AxiosError) {
     const data = err.response?.data as ApiErrorResponse | undefined
     return data?.message ?? fallback
@@ -315,8 +313,6 @@ function ItAdminOtpResetStep({
   const router = useRouter()
   const submitting = useRef(false)
   const codeSentAt = useRef<number>(0)
-  const sendCaptcha   = useTurnstile('it_admin_forgot')
-  const verifyCaptcha = useTurnstile('it_admin_verify')
 
   const [stage,     setStage]     = useState<'intro' | 'code'>('intro')
   const [code,      setCode]      = useState<string[]>(Array(OTP_LENGTH).fill(''))
@@ -342,7 +338,7 @@ function ItAdminOtpResetStep({
     if (sending) return
     setSending(true); setError('')
     try {
-      await requestItAdminResetOtp(email, await sendCaptcha.getToken())
+      await requestItAdminResetOtp(email)
       codeSentAt.current = now()
       setResendSec(RESEND_SECS)
       setCode(Array(OTP_LENGTH).fill(''))
@@ -385,7 +381,7 @@ function ItAdminOtpResetStep({
     submitting.current = true
     setVerifying(true); setError('')
     try {
-      const { token } = await verifyItAdminResetOtp(email, joined, await verifyCaptcha.getToken())
+      const { token } = await verifyItAdminResetOtp(email, joined)
       // Deliberately a navigation, not a third screen in this modal. The reset
       // page already checks the token, enforces the password rules and reports a
       // token that died on the way — duplicating that here would be a second
@@ -400,7 +396,7 @@ function ItAdminOtpResetStep({
     }
     // On success the ref stays latched: the page is navigating away, and a second
     // submission would spend a code that has already been traded for a token.
-  }, [email, joined, router, verifyCaptcha])
+  }, [email, joined, router])
 
   useEffect(() => {
     if (joined.length === OTP_LENGTH) handleVerify()
@@ -522,9 +518,6 @@ function ItAdminOtpResetStep({
           </div>
         </>
       )}
-
-      {sendCaptcha.element}
-      {verifyCaptcha.element}
     </motion.div>
   )
 }
@@ -548,13 +541,12 @@ function ForgotPasswordStep({
   const [loading, setLoading] = useState(false)
   const [sent,    setSent]    = useState(false)
   const [error,   setError]   = useState('')
-  const captcha = useTurnstile('forgot_password')
 
   async function handleRequest() {
     if (loading) return
     setLoading(true); setError('')
     try {
-      await requestPasswordReset(email, await captcha.getToken())
+      await requestPasswordReset(email)
       setSent(true)
     } catch (err) {
       setError(extractErrorMessage(err, 'Could not submit your request. Please try again.'))
@@ -620,8 +612,6 @@ function ForgotPasswordStep({
           <AnimatePresence>
             {error && <ErrorMessage message={error} />}
           </AnimatePresence>
-
-          {captcha.element}
 
           <PrimaryButton loading={loading} onClick={handleRequest}>
             Request Reset Link
@@ -718,13 +708,12 @@ function MethodStep({
 }) {
   const [loading, setLoading] = useState<'otp' | 'password' | null>(null)
   const [error,   setError]   = useState('')
-  const captcha = useTurnstile('request_otp')
 
   const handleOtp = async () => {
     if (loading) return
     setLoading('otp'); setError('')
     try {
-      await requestOtp(email, await captcha.getToken())
+      await requestOtp(email)
       onSelectOtp()
     } catch (err) {
       if (err instanceof AxiosError && err.response?.status === 429) {
@@ -827,8 +816,6 @@ function MethodStep({
         </motion.button>
       </div>
 
-      {captcha.element}
-
       <AnimatePresence>
         {error && <ErrorMessage message={error} />}
       </AnimatePresence>
@@ -855,8 +842,6 @@ function OtpStep({
 }) {
   const lockExpiresAt                     = useRef<number>(0)
   const submitting                        = useRef(false)
-  const verifyCaptcha                     = useTurnstile('verify_otp')
-  const resendCaptcha                     = useTurnstile('request_otp')
   const [otp,           setOtp]           = useState<string[]>(Array(OTP_LENGTH).fill(''))
   const [loading,       setLoading]       = useState(false)
   const [error,         setError]         = useState('')
@@ -991,7 +976,7 @@ function OtpStep({
     setLoading(true); setError('')
     let succeeded = false
     try {
-      const res = await verifyOtp(email, code, await verifyCaptcha.getToken())
+      const res = await verifyOtp(email, code)
       // The API's portalUrl is the `/portal/*` namespace, which this app does
       // not route; ROLE_ROUTES is the web app's own map.
       const destination = getFallbackRoute(res.user.role)
@@ -1028,7 +1013,7 @@ function OtpStep({
         setLoading(false)
       }
     }
-  }, [code, email, onSuccess, lockState, verifyCaptcha])
+  }, [code, email, onSuccess, lockState])
 
   useEffect(() => {
     if (code.length === OTP_LENGTH) handleSubmit()
@@ -1038,7 +1023,7 @@ function OtpStep({
     if (lockState !== 'none') return
     setResending(true); setError('')
     try {
-      await requestOtp(email, await resendCaptcha.getToken())
+      await requestOtp(email)
       try {
         const status = await getAuthStatus(email)
         applyStatus(status)
@@ -1169,9 +1154,6 @@ function OtpStep({
         )}
       </AnimatePresence>
 
-      {verifyCaptcha.element}
-      {resendCaptcha.element}
-
       <PrimaryButton
         loading={loading}
         disabled={code.length !== OTP_LENGTH || lockState !== 'none'}
@@ -1215,7 +1197,6 @@ function PasswordStep({
 }) {
   const lockExpiresAt = useRef<number>(0)
   const submitting    = useRef(false)
-  const captcha       = useTurnstile('login')
   const [password,      setPassword]      = useState('')
   const [showPassword,  setShowPassword]  = useState(false)
   const [loading,       setLoading]       = useState(false)
@@ -1282,7 +1263,7 @@ function PasswordStep({
     setLoading(true); setError('')
     let succeeded = false
     try {
-      const res = await loginWithPassword(email, password, await captcha.getToken())
+      const res = await loginWithPassword(email, password)
       // The API's portalUrl is the `/portal/*` namespace, which this app does
       // not route; ROLE_ROUTES is the web app's own map.
       const destination = getFallbackRoute(res.user.role)
@@ -1414,8 +1395,6 @@ function PasswordStep({
             <ErrorMessage message={error} />
           )}
         </AnimatePresence>
-
-        {captcha.element}
 
         <PrimaryButton
           type="submit"

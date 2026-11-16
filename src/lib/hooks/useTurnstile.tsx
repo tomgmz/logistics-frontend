@@ -3,13 +3,13 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 
 /**
- * Cloudflare Turnstile, the captcha on every public form (contact form, sign-in,
- * forgot password, IT Administrator reset code, reset-password page).
+ * Cloudflare Turnstile, the captcha on the landing page's contact form (the
+ * only public form with one since 2026-11-16).
  *
- *   const captcha = useTurnstile('login')
+ *   const captcha = useTurnstile('contact')
  *   ...
  *   const token = await captcha.getToken()   // before the request
- *   await loginWithPassword(email, password, token)
+ *   send it as captcha_token
  *   ...
  *   {captcha.element}                        // where a challenge may show
  *
@@ -23,15 +23,9 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
  * Dev test key that always passes: 1x00000000000000000000AA.
  */
 
-export type CaptchaAction =
-  | 'contact'
-  | 'login'
-  | 'request_otp'
-  | 'verify_otp'
-  | 'forgot_password'
-  | 'it_admin_forgot'
-  | 'it_admin_verify'
-  | 'reset_password'
+// Only the landing page's contact form (user 2026-11-16; sign-in and
+// password reset have no captcha).
+export type CaptchaAction = 'contact'
 
 interface TurnstileApi {
   render: (el: HTMLElement, opts: Record<string, unknown>) => string
