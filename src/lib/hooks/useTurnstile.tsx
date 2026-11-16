@@ -16,7 +16,9 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
  * The widget starts as soon as the form shows, so a token is usually ready by
  * the time the person presses the button. Most people see nothing: it only
  * appears ("Verify you are human") when Cloudflare wants a tick. A token is
- * single use, so each getToken() spends the one it has and fetches the next.
+ * single use: getToken() spends the one it has, and the next getToken() starts
+ * a fresh check (never fetched early, so a tick box always belongs to the
+ * message being sent).
  *
  * No NEXT_PUBLIC_TURNSTILE_SITE_KEY = nothing renders and getToken() gives
  * undefined (the server then decides; with no secret it doesn't check either).
@@ -162,8 +164,8 @@ export function useTurnstile(action: CaptchaAction): {
     const ready = tokenRef.current
     if (ready && Date.now() - ready.at < TOKEN_FRESH_MS) {
       tokenRef.current = null
-      // Fetch the next one now, so a retry doesn't wait.
-      setTimeout(run, 0)
+      // No early fetch of the next token: it could ask for a tick right after
+      // "sent" and look like the message wasn't checked. The next send runs it.
       return ready.value
     }
     const token = await new Promise<string>((resolve, reject) => {
@@ -176,7 +178,6 @@ export function useTurnstile(action: CaptchaAction): {
       waiters.current.push({ resolve: done, reject: (e) => { clearTimeout(timer); reject(e) } })
       run()
     })
-    setTimeout(run, 0)
     return token
   }, [loadError, run])
 
