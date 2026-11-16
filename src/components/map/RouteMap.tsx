@@ -330,9 +330,11 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
       defaultZoom={11}
       gestureHandling="greedy"
       className="w-full h-full"
-      // Only fullscreen; the map is still pannable/zoomable by gesture and wheel.
+      // No controls and no "Keyboard shortcuts" link; the map is still
+      // pannable/zoomable by gesture and wheel. Google's logo, "Map data" and
+      // "Terms" stay: the Maps Platform Terms require them.
       disableDefaultUI
-      fullscreenControl
+      keyboardShortcuts={false}
     >
       <MapMarkers routeData={routeData} stops={stops} />
       {isInTransit && (

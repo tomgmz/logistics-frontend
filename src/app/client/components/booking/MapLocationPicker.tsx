@@ -192,6 +192,7 @@ export default function MapLocationPicker({
         minZoom:          PH_MIN_ZOOM,
         restriction:      PH_RESTRICTION,
         disableDefaultUI: true,
+        keyboardShortcuts: false,
         gestureHandling:  'greedy',
         clickableIcons:   true,
         styles:           DARK_MAP_STYLES as google.maps.MapTypeStyle[],
@@ -344,9 +345,8 @@ export default function MapLocationPicker({
   return (
     <div
       className="relative w-full h-full overflow-hidden"
-      style={{ background: BG, fontFamily: "'DM Sans', sans-serif" }}
+      style={{ background: BG, fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif" }}
     >
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');`}</style>
 
       <div ref={mapDivRef} className="absolute inset-0" />
 

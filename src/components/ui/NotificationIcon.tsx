@@ -213,7 +213,7 @@ function NotifBody({ n }: { n: AppNotification }) {
       <div className="flex items-center justify-between mb-0.5">
         <span
           className={`font-bold text-sm ${isUnread ? "text-white" : "text-white/50"}`}
-          style={{ fontFamily: "'Darker Grotesque', sans-serif" }}
+          style={{ fontFamily: "var(--font-darker), 'Darker Grotesque', sans-serif" }}
         >
           {n.title}
         </span>
@@ -221,13 +221,13 @@ function NotifBody({ n }: { n: AppNotification }) {
       </div>
       <p
         className="text-[13px] text-white/40 leading-relaxed m-0 mb-1 line-clamp-2"
-        style={{ fontFamily: "'Darker Grotesque', sans-serif" }}
+        style={{ fontFamily: "var(--font-darker), 'Darker Grotesque', sans-serif" }}
       >
         {n.body}
       </p>
       <span
         className="text-[10px] tracking-widest text-white/20"
-        style={{ fontFamily: "'Aboreto', sans-serif" }}
+        style={{ fontFamily: "var(--font-aboreto), 'Aboreto', sans-serif" }}
       >
         {timeAgo(n.created_at)}
       </span>
@@ -288,7 +288,7 @@ function NotifDetailModal({
               <h2
                 id="notif-detail-title"
                 className="m-0 text-base font-bold text-white truncate"
-                style={{ fontFamily: "'Darker Grotesque', sans-serif" }}
+                style={{ fontFamily: "var(--font-darker), 'Darker Grotesque', sans-serif" }}
               >
                 Notification
               </h2>
@@ -304,7 +304,7 @@ function NotifDetailModal({
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 sm:px-6 pb-6 flex flex-col gap-5">
               <div
                 className="rounded-xl bg-white/[0.04] px-4 py-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm"
-                style={{ fontFamily: "'Darker Grotesque', sans-serif" }}
+                style={{ fontFamily: "var(--font-darker), 'Darker Grotesque', sans-serif" }}
               >
                 <span className="font-bold text-white/60">Received:</span>
                 <span className="text-white/85">
@@ -322,7 +322,7 @@ function NotifDetailModal({
                 </div>
                 <p
                   className="m-0 text-[17px] font-semibold text-white leading-relaxed whitespace-pre-line break-words"
-                  style={{ fontFamily: "'Darker Grotesque', sans-serif" }}
+                  style={{ fontFamily: "var(--font-darker), 'Darker Grotesque', sans-serif" }}
                 >
                   {n.body}
                 </p>
@@ -334,13 +334,13 @@ function NotifDetailModal({
                     <div key={f.label} className="flex items-baseline justify-between gap-3 px-3.5 py-2">
                       <dt
                         className="text-[10px] tracking-widest uppercase text-white/30 shrink-0"
-                        style={{ fontFamily: "'Aboreto', sans-serif" }}
+                        style={{ fontFamily: "var(--font-aboreto), 'Aboreto', sans-serif" }}
                       >
                         {f.label}
                       </dt>
                       <dd
                         className="m-0 text-sm text-white/80 text-right break-words min-w-0"
-                        style={{ fontFamily: "'Darker Grotesque', sans-serif" }}
+                        style={{ fontFamily: "var(--font-darker), 'Darker Grotesque', sans-serif" }}
                       >
                         {f.value}
                       </dd>
@@ -355,7 +355,7 @@ function NotifDetailModal({
                   <button
                     onClick={() => onTakeAction(url)}
                     className="self-center flex items-center justify-center gap-2 w-full sm:w-auto sm:px-8 rounded-xl py-2.5 text-[11px] tracking-widest uppercase font-bold cursor-pointer transition-opacity hover:opacity-85 bg-[var(--color-cyan,#4df9ed)] text-[#0a0a0a] border-none"
-                    style={{ fontFamily: "'Aboreto', sans-serif" }}
+                    style={{ fontFamily: "var(--font-aboreto), 'Aboreto', sans-serif" }}
                   >
                     Take action
                     <ChevronRight size={14} />
@@ -461,14 +461,14 @@ export default function NotificationIcon() {
       <div className="flex items-center gap-2.5 min-w-0">
         <span
           className="text-[13px] tracking-[0.12em] uppercase text-white"
-          style={{ fontFamily: "'Aboreto', sans-serif" }}
+          style={{ fontFamily: "var(--font-aboreto), 'Aboreto', sans-serif" }}
         >
           Notifications
         </span>
         {unreadCount > 0 && (
           <span
             className="text-[11px] font-bold bg-[var(--color-cyan,#4df9ed)] text-[#0a0a0a] rounded-full px-1.5 leading-relaxed"
-            style={{ fontFamily: "'Darker Grotesque', sans-serif" }}
+            style={{ fontFamily: "var(--font-darker), 'Darker Grotesque', sans-serif" }}
           >
             {unreadCount}
           </span>
@@ -479,7 +479,7 @@ export default function NotificationIcon() {
         {unreadCount > 0 && (
           <button
             className="flex items-center gap-1 text-[10px] tracking-widest text-white/40 bg-transparent border border-white/[0.08] rounded-lg px-2.5 py-1 cursor-pointer transition-all hover:text-white hover:border-white/20 hover:bg-white/5"
-            style={{ fontFamily: "'Aboreto', sans-serif" }}
+            style={{ fontFamily: "var(--font-aboreto), 'Aboreto', sans-serif" }}
             onClick={(e) => { e.stopPropagation(); setOpenConfirm(true); }}
           >
             <CheckCheck size={12} />
@@ -502,7 +502,7 @@ export default function NotificationIcon() {
       <label
         htmlFor="notification-filter"
         className="text-[10px] tracking-widest uppercase text-white/30 shrink-0"
-        style={{ fontFamily: "'Aboreto', sans-serif" }}
+        style={{ fontFamily: "var(--font-aboreto), 'Aboreto', sans-serif" }}
       >
         Show
       </label>
@@ -512,7 +512,7 @@ export default function NotificationIcon() {
         onChange={(e) => { void setFilter((e.target.value || null) as NotificationFilter | null); }}
         className="flex-1 min-w-0 cursor-pointer appearance-none rounded-lg border border-white/[0.08] bg-[#161616] px-2.5 py-1.5 pr-7 text-[13px] text-white outline-none transition-colors hover:border-white/20 focus:border-[var(--color-cyan,#4df9ed)]/60"
         style={{
-          fontFamily: "'Darker Grotesque', sans-serif",
+          fontFamily: "var(--font-darker), 'Darker Grotesque', sans-serif",
           backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23777' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`,
           backgroundRepeat: "no-repeat",
           backgroundPosition: "right 10px center",
@@ -529,7 +529,7 @@ export default function NotificationIcon() {
     notifications.length === 0 ? (
       <div
         className="text-[11px] tracking-[0.08em] uppercase text-white/20 text-center py-9"
-        style={{ fontFamily: "'Aboreto', sans-serif" }}
+        style={{ fontFamily: "var(--font-aboreto), 'Aboreto', sans-serif" }}
       >
         {filter ? "Nothing here" : "No notifications yet"}
       </div>
@@ -606,8 +606,6 @@ export default function NotificationIcon() {
 
   return (
     <>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Aboreto&family=Darker+Grotesque:wght@400;500;600;700&display=swap');`}</style>
-
       {isMobile ? (
         <>
           {bellButton}

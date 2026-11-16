@@ -700,7 +700,9 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
 
   return (
     <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-60px)] overflow-y-auto overflow-x-hidden lg:overflow-hidden ff-sc bg-[var(--color-bg)]">
-      <div className="flex flex-[1_0_auto] lg:flex-1 lg:min-h-0 flex-col p-3 lg:p-4 gap-3 lg:overflow-hidden">
+      {/* The same page frame as User Management, Vehicle Management and the other
+          Archive tabs, so the table card is the same size when switching tabs. */}
+      <div className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0 px-3 py-3 sm:px-4 lg:px-5 3xl:px-6 lg:pt-3 lg:pb-4 3xl:pb-5 gap-3 3xl:gap-4 lg:overflow-hidden">
         {/* Where you are: Untitled UI's text breadcrumbs (not in the Archive module). */}
         {!archive && <Breadcrumbs
           className="shrink-0"

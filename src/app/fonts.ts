@@ -92,6 +92,14 @@ export const darkerGrotesque = localFont({
   variable: '--font-darker',
 });
 
+// DM Sans - the booking form's map location picker (variable, 400-700)
+export const dmSans = localFont({
+  src: './fonts/dm-sans/dm-sans-400-700.woff2',
+  weight: '400 700',
+  display: 'swap',
+  variable: '--font-dm-sans',
+});
+
 // Geist - the `font-sans` default (variable, 100-900)
 export const geist = localFont({
   src: './fonts/geist/geist-100-900.woff2',

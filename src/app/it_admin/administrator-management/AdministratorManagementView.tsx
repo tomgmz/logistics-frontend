@@ -669,7 +669,7 @@ export default function AdministratorManagementView({ archive }: {
             )}
 
             {/* Table */}
-            <div className="overflow-x-auto flex-[1_0_auto] lg:flex-1 lg:overflow-auto lg:min-h-0">
+            <div className="flex flex-col overflow-x-auto flex-[1_0_auto] lg:flex-1 lg:overflow-auto lg:min-h-0">
               {/* Fixed layout: every column, Actions included, gets the same width. */}
               <table className="data-table max-lg:min-w-[900px] lg:table-fixed">
                 <thead className="sticky top-0 z-10">
@@ -681,17 +681,7 @@ export default function AdministratorManagementView({ archive }: {
                 <tbody className="max-lg:whitespace-nowrap">
                   {(loading || fetching) ? (
                     <TableSkeleton cols={colCount} rows={pageSize} />
-                  ) : users.length === 0 ? (
-                    <tr>
-                      <td colSpan={colCount}>
-                        <EmptyState
-                          tab={activeTab} onAdd={openCreate} archived={showArchived}
-                          filtered={!!search || statusFilter.length > 0}
-                          onClear={() => { setSearchInput(''); setSearch(''); setStatusFilter([]) }}
-                        />
-                      </td>
-                    </tr>
-                  ) : (
+                  ) : users.length === 0 ? null : (
                     <AnimatePresence mode="wait">
                       {users.map((user, i) => (
                         <motion.tr
@@ -729,6 +719,17 @@ export default function AdministratorManagementView({ archive }: {
                   )}
                 </tbody>
               </table>
+              {/* Empty: the message fills the space under the headers, centred
+                  (sticky left-0 keeps it in view while the table scrolls sideways on phones). */}
+              {!(loading || fetching) && users.length === 0 && (
+                <div className="ff-darker sticky left-0 flex flex-1 items-center justify-center">
+                  <EmptyState
+                    tab={activeTab} onAdd={openCreate} archived={showArchived}
+                    filtered={!!search || statusFilter.length > 0}
+                    onClear={() => { setSearchInput(''); setSearch(''); setStatusFilter([]) }}
+                  />
+                </div>
+              )}
             </div>
 
             {/* Pagination */}

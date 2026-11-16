@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import ThemeRegistry from '@/components/ui/ThemeRegistry';
 import CsrfInit from '@/components/CsrfInit';
 import IosViewportFix from '@/components/IosViewportFix';
-import { alegreyaSansSC, alegreyaSans, aboreto, fredoka, leagueSpartan, eurostile, darkerGrotesque, geist } from '@/app/fonts';
+import { alegreyaSansSC, alegreyaSans, aboreto, fredoka, leagueSpartan, eurostile, darkerGrotesque, dmSans, geist } from '@/app/fonts';
 import StoreProvider from '@/lib/store/StoreProvider';
 import QueryProvider from '@/lib/query/QueryProvider';
 import { LastPageTracker } from '@/lib/navigation/lastPage';
@@ -38,7 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html 
       lang="en" 
-      className={cn("scroll-smooth", alegreyaSansSC.variable, alegreyaSans.variable, aboreto.variable, fredoka.variable, leagueSpartan.variable, eurostile.variable, darkerGrotesque.variable, "font-sans", geist.variable)}
+      className={cn("scroll-smooth", alegreyaSansSC.variable, alegreyaSans.variable, aboreto.variable, fredoka.variable, leagueSpartan.variable, eurostile.variable, darkerGrotesque.variable, dmSans.variable, "font-sans", geist.variable)}
       // "&" in small caps looks unlike an ampersand: 'Alegreya Amp' (globals.css,
       // unicode-range U+0026 only) draws it in regular Alegreya Sans, and every
       // other character falls through to the SC face.

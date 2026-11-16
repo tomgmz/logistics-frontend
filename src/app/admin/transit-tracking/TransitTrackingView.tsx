@@ -367,9 +367,11 @@ export default function TransitTrackingView() {
       defaultZoom={11}
       gestureHandling="greedy"
       className="w-full h-full min-h-[240px]"
-      // Only fullscreen; the map is still pannable/zoomable by gesture and wheel.
+      // No controls and no "Keyboard shortcuts" link; the map is still
+      // pannable/zoomable by gesture and wheel. Google's logo, "Map data" and
+      // "Terms" stay: the Maps Platform Terms require them.
       disableDefaultUI
-      fullscreenControl
+      keyboardShortcuts={false}
     >
       <FitBounds fitKey={fitKey} points={showSingle ? singlePoints : fleetPoints} />
 

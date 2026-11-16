@@ -895,7 +895,7 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
             )}
 
             {/* Table */}
-            <div className="overflow-x-auto flex-[1_0_auto] lg:flex-1 lg:overflow-auto lg:min-h-0">
+            <div className="flex flex-col overflow-x-auto flex-[1_0_auto] lg:flex-1 lg:overflow-auto lg:min-h-0">
               {/* Fixed layout: every column, Actions included, gets the same width.
                   Content starts at the left of its column; the row menu sits right. */}
               <table className="data-table max-lg:min-w-[900px] lg:table-fixed">
@@ -908,18 +908,7 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
                 <tbody className="max-lg:whitespace-nowrap">
                   {(loading || fetching) ? (
                     <TableSkeleton cols={colCount} rows={pageSize} />
-                  ) : users.length === 0 ? (
-                    <tr>
-                      <td colSpan={colCount}>
-                        <EmptyState
-                          tab={activeTab} onAdd={openCreate} showAdd={!itMode} canAdd={access.canCreate} archived={showArchived}
-                          // The tab picks which list (and its columns), so it stays.
-                          filtered={!!search || filters.length > 0}
-                          onClear={() => { setSearchInput(''); setSearch(''); applyFilters([]) }}
-                        />
-                      </td>
-                    </tr>
-                  ) : (
+                  ) : users.length === 0 ? null : (
                     <AnimatePresence mode="wait">
                       {users.map((user, i) => (
                         <motion.tr
@@ -967,6 +956,19 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
                   )}
                 </tbody>
               </table>
+              {/* Empty: the message fills the space under the headers, centred,
+                  instead of a short bordered row with blank space below it.
+                  sticky left-0 keeps it in view on phones, where the table scrolls sideways. */}
+              {!(loading || fetching) && users.length === 0 && (
+                <div className="ff-darker sticky left-0 flex flex-1 items-center justify-center">
+                  <EmptyState
+                    tab={activeTab} onAdd={openCreate} showAdd={!itMode} canAdd={access.canCreate} archived={showArchived}
+                    // The tab picks which list (and its columns), so it stays.
+                    filtered={!!search || filters.length > 0}
+                    onClear={() => { setSearchInput(''); setSearch(''); applyFilters([]) }}
+                  />
+                </div>
+              )}
             </div>
 
             {/* Pagination */}

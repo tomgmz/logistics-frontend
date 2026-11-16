@@ -78,6 +78,7 @@ export function LocationMapModal({ point, onClose }: { point: MapPoint | null; o
               gestureHandling="greedy"
               disableDefaultUI
               fullscreenControl
+              keyboardShortcuts={false}
               className="w-full h-full"
             >
               <AdvancedMarker position={center} title={point.label ?? undefined} />

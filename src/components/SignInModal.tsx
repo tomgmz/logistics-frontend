@@ -131,7 +131,7 @@ function GlassInput({
     <div className="flex flex-col gap-2">
       <label
         className="text-[0.72rem] font-semibold tracking-[0.18em] uppercase"
-        style={{ color: 'rgba(255,255,255,0.55)', fontFamily: "'League Spartan', sans-serif" }}
+        style={{ color: 'rgba(255,255,255,0.55)', fontFamily: "var(--font-league-spartan), 'League Spartan', sans-serif" }}
       >
         {label}
       </label>
@@ -176,7 +176,7 @@ function PrimaryButton({
       style={{
         background: '#ffffff',
         color: '#0a0a0a',
-        fontFamily: "'League Spartan', sans-serif",
+        fontFamily: "var(--font-league-spartan), 'League Spartan', sans-serif",
         border: 'none',
       }}
     >
@@ -194,7 +194,7 @@ function BackButton({ onClick, label = 'Change email' }: { onClick: () => void; 
       onClick={onClick}
       className="flex items-center gap-1.5 text-white/35 text-[0.78rem]
         hover:text-white/60 transition-colors bg-transparent border-none cursor-pointer"
-      style={{ fontFamily: "'League Spartan', sans-serif" }}
+      style={{ fontFamily: "var(--font-league-spartan), 'League Spartan', sans-serif" }}
     >
       <IconBack /> {label}
     </button>
@@ -257,7 +257,7 @@ function PermanentLockScreen({
         <IconAlert />
         <span
           className="text-[0.72rem] font-semibold tracking-[0.18em] uppercase"
-          style={{ fontFamily: "'League Spartan', sans-serif" }}
+          style={{ fontFamily: "var(--font-league-spartan), 'League Spartan', sans-serif" }}
         >
           Account Locked
         </span>
@@ -269,7 +269,7 @@ function PermanentLockScreen({
           background: 'rgba(246,38,38,0.08)',
           border: '1px solid rgba(246,38,38,0.25)',
           color: 'rgba(246,38,38,0.85)',
-          fontFamily: "'League Spartan', sans-serif",
+          fontFamily: "var(--font-league-spartan), 'League Spartan', sans-serif",
         }}
       >
         <span>
@@ -415,7 +415,7 @@ function ItAdminOtpResetStep({
         <IconShield />
         <span
           className="text-[0.72rem] font-semibold tracking-[0.18em] uppercase"
-          style={{ fontFamily: "'League Spartan', sans-serif" }}
+          style={{ fontFamily: "var(--font-league-spartan), 'League Spartan', sans-serif" }}
         >
           {stage === 'intro' ? 'IT Administrator Reset' : 'Enter Your Code'}
         </span>
@@ -425,7 +425,7 @@ function ItAdminOtpResetStep({
         <>
           <p
             className="text-[0.82rem] leading-relaxed text-white/50"
-            style={{ fontFamily: "'League Spartan', sans-serif" }}
+            style={{ fontFamily: "var(--font-league-spartan), 'League Spartan', sans-serif" }}
           >
             As IT Administrator you reset your own password — there is no queue above you to
             approve it. We will email a 6-digit code to{' '}
@@ -447,7 +447,7 @@ function ItAdminOtpResetStep({
         <>
           <p
             className="text-white/40 text-[0.8rem] leading-relaxed"
-            style={{ fontFamily: "'League Spartan', sans-serif" }}
+            style={{ fontFamily: "var(--font-league-spartan), 'League Spartan', sans-serif" }}
           >
             6-digit code sent to{' '}
             <span className="text-[#4df9ed]/70 break-all" style={{ fontFamily: 'monospace' }}>
@@ -511,7 +511,7 @@ function ItAdminOtpResetStep({
               className="text-[0.78rem] bg-transparent border-none cursor-pointer transition-colors
                 disabled:text-white/25 disabled:cursor-not-allowed
                 enabled:text-[#4df9ed]/70 enabled:hover:text-[#4df9ed]"
-              style={{ fontFamily: "'League Spartan', sans-serif" }}
+              style={{ fontFamily: "var(--font-league-spartan), 'League Spartan', sans-serif" }}
             >
               {sending ? 'Sending…' : resendSec > 0 ? `Resend in ${resendSec}s` : 'Resend code'}
             </button>
@@ -568,7 +568,7 @@ function ForgotPasswordStep({
         <IconKey />
         <span
           className="text-[0.72rem] font-semibold tracking-[0.18em] uppercase"
-          style={{ fontFamily: "'League Spartan', sans-serif" }}
+          style={{ fontFamily: "var(--font-league-spartan), 'League Spartan', sans-serif" }}
         >
           {sent ? 'Request Submitted' : 'Password Reset'}
         </span>
@@ -582,7 +582,7 @@ function ForgotPasswordStep({
               background: 'rgba(77,249,237,0.07)',
               border: '1px solid rgba(77,249,237,0.22)',
               color: 'rgba(255,255,255,0.7)',
-              fontFamily: "'League Spartan', sans-serif",
+              fontFamily: "var(--font-league-spartan), 'League Spartan', sans-serif",
             }}
           >
             <span>
@@ -601,7 +601,7 @@ function ForgotPasswordStep({
         <>
           <p
             className="text-[0.82rem] leading-relaxed text-white/50"
-            style={{ fontFamily: "'League Spartan', sans-serif" }}
+            style={{ fontFamily: "var(--font-league-spartan), 'League Spartan', sans-serif" }}
           >
             Password resets go through an Administrator. We will let your{' '}
             <span className="text-white/75">{approverLabel(role)}</span> know that{' '}
@@ -662,7 +662,7 @@ function EmailStep({ onSuccess }: { onSuccess: (email: string) => void }) {
             autoFocus
             className="w-full bg-transparent text-white text-[0.95rem] outline-none
               placeholder-white/20"
-            style={{ fontFamily: "'League Spartan', sans-serif" }}
+            style={{ fontFamily: "var(--font-league-spartan), 'League Spartan', sans-serif" }}
           />
         </GlassInput>
 
@@ -741,7 +741,7 @@ function MethodStep({
       <div className="flex flex-col gap-1">
         <p
           className="text-white/40 text-[0.8rem] leading-relaxed"
-          style={{ fontFamily: "'League Spartan', sans-serif" }}
+          style={{ fontFamily: "var(--font-league-spartan), 'League Spartan', sans-serif" }}
         >
           Signing in as{' '}
           <span className="text-[#4df9ed]/70 break-all" style={{ fontFamily: 'monospace' }}>
@@ -750,7 +750,7 @@ function MethodStep({
         </p>
         <p
           className="text-white/30 text-[0.75rem] mt-1"
-          style={{ fontFamily: "'League Spartan', sans-serif" }}
+          style={{ fontFamily: "var(--font-league-spartan), 'League Spartan', sans-serif" }}
         >
           How would you like to continue?
         </p>
@@ -775,13 +775,13 @@ function MethodStep({
           <div className="flex flex-col gap-0.5">
             <span
               className="text-white text-[0.85rem] font-semibold tracking-wide"
-              style={{ fontFamily: "'League Spartan', sans-serif" }}
+              style={{ fontFamily: "var(--font-league-spartan), 'League Spartan', sans-serif" }}
             >
               Email Sign-In Code
             </span>
             <span
               className="text-white/35 text-[0.72rem]"
-              style={{ fontFamily: "'League Spartan', sans-serif" }}
+              style={{ fontFamily: "var(--font-league-spartan), 'League Spartan', sans-serif" }}
             >
               We&apos;ll send a 6-digit code to your inbox
             </span>
@@ -802,13 +802,13 @@ function MethodStep({
           <div className="flex flex-col gap-0.5">
             <span
               className="text-white text-[0.85rem] font-semibold tracking-wide"
-              style={{ fontFamily: "'League Spartan', sans-serif" }}
+              style={{ fontFamily: "var(--font-league-spartan), 'League Spartan', sans-serif" }}
             >
               Password
             </span>
             <span
               className="text-white/35 text-[0.72rem]"
-              style={{ fontFamily: "'League Spartan', sans-serif" }}
+              style={{ fontFamily: "var(--font-league-spartan), 'League Spartan', sans-serif" }}
             >
               Sign in with your account password
             </span>
@@ -1067,14 +1067,14 @@ function OtpStep({
           <IconShield />
           <span
             className="text-[0.72rem] font-semibold tracking-[0.18em] uppercase"
-            style={{ fontFamily: "'League Spartan', sans-serif" }}
+            style={{ fontFamily: "var(--font-league-spartan), 'League Spartan', sans-serif" }}
           >
             Check your email
           </span>
         </div>
         <p
           className="text-white/40 text-[0.8rem] leading-relaxed"
-          style={{ fontFamily: "'League Spartan', sans-serif" }}
+          style={{ fontFamily: "var(--font-league-spartan), 'League Spartan', sans-serif" }}
         >
           6-digit code sent to{' '}
           <span className="text-[#4df9ed]/70 break-all" style={{ fontFamily: 'monospace' }}>
@@ -1132,7 +1132,7 @@ function OtpStep({
               background: 'rgba(255,122,48,0.08)',
               border: '1px solid rgba(255,122,48,0.25)',
               color: 'rgba(255,122,48,0.85)',
-              fontFamily: "'League Spartan', sans-serif",
+              fontFamily: "var(--font-league-spartan), 'League Spartan', sans-serif",
             }}
           >
             <span>
@@ -1172,7 +1172,7 @@ function OtpStep({
             className="text-[0.78rem] bg-transparent border-none cursor-pointer transition-colors
               disabled:text-white/25 disabled:cursor-not-allowed
               enabled:text-[#4df9ed]/70 enabled:hover:text-[#4df9ed]"
-            style={{ fontFamily: "'League Spartan', sans-serif" }}
+            style={{ fontFamily: "var(--font-league-spartan), 'League Spartan', sans-serif" }}
           >
             {resending ? 'Sending…' : resendSec > 0 ? `Resend in ${resendSec}s` : 'Resend code'}
           </button>
@@ -1326,14 +1326,14 @@ function PasswordStep({
           <IconLock />
           <span
             className="text-[0.72rem] font-semibold tracking-[0.18em] uppercase"
-            style={{ fontFamily: "'League Spartan', sans-serif" }}
+            style={{ fontFamily: "var(--font-league-spartan), 'League Spartan', sans-serif" }}
           >
             Enter your password
           </span>
         </div>
         <p
           className="text-white/40 text-[0.8rem] leading-relaxed"
-          style={{ fontFamily: "'League Spartan', sans-serif" }}
+          style={{ fontFamily: "var(--font-league-spartan), 'League Spartan', sans-serif" }}
         >
           Signing in as{' '}
           <span className="text-[#4df9ed]/70 break-all" style={{ fontFamily: 'monospace' }}>
@@ -1354,7 +1354,7 @@ function PasswordStep({
             disabled={lockState !== 'none'}
             className="w-full bg-transparent text-white text-[0.95rem] outline-none
               placeholder-white/20 disabled:opacity-40"
-            style={{ fontFamily: "'League Spartan', sans-serif" }}
+            style={{ fontFamily: "var(--font-league-spartan), 'League Spartan', sans-serif" }}
           />
           <button
             type="button"
@@ -1379,7 +1379,7 @@ function PasswordStep({
                 background: 'rgba(255,122,48,0.08)',
                 border: '1px solid rgba(255,122,48,0.25)',
                 color: 'rgba(255,122,48,0.85)',
-                fontFamily: "'League Spartan', sans-serif",
+                fontFamily: "var(--font-league-spartan), 'League Spartan', sans-serif",
               }}
             >
               <span>Account temporarily locked. Try again in</span>
@@ -1413,7 +1413,7 @@ function PasswordStep({
           className="text-[0.75rem] transition-colors no-underline bg-transparent border-none cursor-pointer p-0"
           style={{
             color: 'rgba(255,255,255,0.28)',
-            fontFamily: "'League Spartan', sans-serif",
+            fontFamily: "var(--font-league-spartan), 'League Spartan', sans-serif",
           }}
           onMouseEnter={e => ((e.currentTarget as HTMLButtonElement).style.color = 'rgba(77,249,237,0.65)')}
           onMouseLeave={e => ((e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.28)')}
@@ -1426,7 +1426,7 @@ function PasswordStep({
         className="text-[0.71rem] leading-relaxed -mt-3 text-center"
         style={{
           color: 'rgba(255,255,255,0.18)',
-          fontFamily: "'League Spartan', sans-serif",
+          fontFamily: "var(--font-league-spartan), 'League Spartan', sans-serif",
         }}
       >
         Password resets are approved by your {approverLabel(role)}.
@@ -1462,7 +1462,7 @@ function SuccessStep() {
 
       <p
         className="text-white/40 text-sm"
-        style={{ fontFamily: "'League Spartan', sans-serif" }}
+        style={{ fontFamily: "var(--font-league-spartan), 'League Spartan', sans-serif" }}
       >
         Redirecting...
       </p>
@@ -1729,7 +1729,7 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
                         className="text-[0.73rem] leading-snug"
                         style={{
                           color: 'rgba(255,255,255,0.25)',
-                          fontFamily: "'League Spartan', sans-serif",
+                          fontFamily: "var(--font-league-spartan), 'League Spartan', sans-serif",
                         }}
                       >
                         Interested in working with us?
@@ -1740,7 +1740,7 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
                         className="shrink-0 text-[0.75rem] tracking-[0.15em] uppercase
                           px-4 py-2 rounded-xl transition-all duration-200 no-underline"
                         style={{
-                          fontFamily: "'League Spartan', sans-serif",
+                          fontFamily: "var(--font-league-spartan), 'League Spartan', sans-serif",
                           background: 'rgba(77,249,237,0.06)',
                           border: '1px solid rgba(77,249,237,0.2)',
                           color: 'rgba(77,249,237,0.75)',

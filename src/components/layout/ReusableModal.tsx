@@ -178,7 +178,7 @@ export default function ReusableModal({
                   id="modal-description"
                   className="mt-2 m-0 text-white/75 break-words whitespace-pre-line"
                   style={{
-                    fontFamily: "'Alegreya Sans', sans-serif",
+                    fontFamily: "var(--font-alegreya), 'Alegreya Sans', sans-serif",
                     fontWeight: 400,
                     fontSize: "clamp(12px, 2.8vw, 15px)",
                     lineHeight: "1.55",
