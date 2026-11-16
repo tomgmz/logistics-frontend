@@ -4,7 +4,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useSyncExt
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
   Bot, CheckCircle2, ChevronRight, LifeBuoy, Loader2, MessageCircleQuestion, Send, Ticket, X,
 } from 'lucide-react'
@@ -60,6 +60,37 @@ interface Msg {
 interface BookingOption { booking_id: string; label: string }
 
 const noopSubscribe = () => () => {}
+
+/**
+ * How long the "typing…" bubble shows before a reply: a little longer for a
+ * longer answer, but never long enough to feel slow (chat widgets keep it
+ * around a second).
+ */
+function typingDelay(text: string): number {
+  return Math.min(1600, Math.max(700, 400 + text.length * 6))
+}
+
+/** Three bouncing dots in a bot bubble, shown while the assistant "types". */
+function TypingBubble() {
+  const reduce = useReducedMotion()
+  return (
+    <div className="flex justify-start gap-2" role="status" aria-label="The assistant is typing">
+      <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-[var(--color-cyan)]">
+        <Bot size={13} />
+      </span>
+      <div className="flex items-center gap-1 rounded-2xl rounded-bl-md bg-white/[0.06] px-3.5 py-3">
+        {[0, 1, 2].map((i) => (
+          <motion.span
+            key={i}
+            className="block h-1.5 w-1.5 rounded-full bg-white/60"
+            animate={reduce ? { opacity: [0.35, 1, 0.35] } : { y: [0, -4, 0], opacity: [0.45, 1, 0.45] }}
+            transition={{ duration: 0.9, repeat: Infinity, ease: 'easeInOut', delay: i * 0.15 }}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
 
 const GREETING =
   'Hi! I\'m the 8338 help assistant. Ask me about bookings, tracking, deliveries or your account, ' +
@@ -118,6 +149,22 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
     setMessages((prev) => [...prev, { ...m, id: nextId.current++ }])
   }, [])
 
+  // A bot reply to something the client asked or tapped: "typing…" first, then
+  // the message. While it types, new questions wait (the send button and the
+  // question buttons do nothing), so replies never arrive out of order.
+  const [typing, setTyping] = useState(false)
+  const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => { if (typingTimer.current) clearTimeout(typingTimer.current) }, [])
+  const reply = useCallback((m: Omit<Msg, 'id'>) => {
+    if (typingTimer.current) clearTimeout(typingTimer.current)
+    setTyping(true)
+    typingTimer.current = setTimeout(() => {
+      typingTimer.current = null
+      setTyping(false)
+      push(m)
+    }, typingDelay(m.text))
+  }, [push])
+
   // Opened from elsewhere in the portal (the dashboard's help card).
   useEffect(() => {
     const onOpen = (e: Event) => {
@@ -172,7 +219,7 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
 
   useEffect(() => {
     scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: 'smooth' })
-  }, [messages, ticketOpen])
+  }, [messages, ticketOpen, typing])
 
   const loadTickets = useCallback(async () => {
     setTicketsLoading(true)
@@ -200,12 +247,12 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
   }, [ticketOpen, bookings.length, user])
 
   const answer = useCallback((entry: FaqEntry) => {
-    push({ from: 'bot', text: entry.answer, faq: entry })
-  }, [push])
+    reply({ from: 'bot', text: entry.answer, faq: entry })
+  }, [reply])
 
   const ask = useCallback((text: string) => {
     const q = text.trim()
-    if (!q) return
+    if (!q || typing) return
     push({ from: 'client', text: q })
     setInput('')
 
@@ -214,14 +261,14 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
     if (best && best.score >= CONFIDENT_SCORE) {
       answer(best.entry)
     } else if (matches.length > 0) {
-      push({
+      reply({
         from: 'bot',
         text: 'I\'m not completely sure what you mean. Is it one of these?',
         suggestions: matches.map((m) => m.entry),
         offerTicket: true,
       })
     } else {
-      push({
+      reply({
         from: 'bot',
         text: canTicket
           ? 'Sorry, I don\'t have an answer for that. Our team can help: open a ticket and they will reply by email.'
@@ -229,12 +276,13 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
         offerTicket: true,
       })
     }
-  }, [answer, push, canTicket])
+  }, [answer, push, reply, canTicket, typing])
 
   const pick = useCallback((entry: FaqEntry) => {
+    if (typing) return
     push({ from: 'client', text: entry.question })
     answer(entry)
-  }, [answer, push])
+  }, [answer, push, typing])
 
   const startTicket = useCallback(() => {
     const asked    = messages.filter((m) => m.from === 'client').map((m) => m.text)
@@ -405,20 +453,21 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
                           <button type="button" onClick={() => {
                             setHelped((h) => ({ ...h, [m.id]: true }))
                             setQuestionsAfter(nextId.current)
-                            push({ from: 'bot', text: 'Glad that helped! Ask anything else any time.' })
+                            reply({ from: 'bot', text: 'Glad that helped! Ask anything else any time.' })
                           }}
-                            className="rounded-md border border-white/10 px-2 py-0.5 text-white/70 hover:bg-white/5">Yes</button>
+                            disabled={typing}
+                            className="rounded-md border border-white/10 px-2 py-0.5 text-white/70 hover:bg-white/5 disabled:opacity-40">Yes</button>
                           <button type="button" onClick={() => {
                             setHelped((h) => ({ ...h, [m.id]: false }))
                             setQuestionsAfter(nextId.current)
-                            push({
+                            reply({
                               from: 'bot',
                               text: canTicket
                                 ? 'Sorry about that. Our team can look into it: open a ticket and they will reply by email.'
                                 : 'Sorry about that. Our team can help: send them a message and they will reply by email.',
                               offerTicket: true,
                             })
-                          }} className="rounded-md border border-white/10 px-2 py-0.5 text-white/70 hover:bg-white/5">No</button>
+                          }} disabled={typing} className="rounded-md border border-white/10 px-2 py-0.5 text-white/70 hover:bg-white/5 disabled:opacity-40">No</button>
                         </div>
                       )}
 
@@ -474,6 +523,8 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
                     )}
                   </Fragment>
                 ))}
+
+                {typing && <TypingBubble />}
 
                 {ticketOpen && (
                   <div className="space-y-2.5 rounded-xl border border-white/[0.08] bg-white/[0.02] p-3">
@@ -532,7 +583,7 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
                   maxLength={300}
                   className="flex-1 rounded-xl border border-white/10 bg-[#111] px-3 py-2.5 text-[13px] text-white outline-none placeholder:text-white/30 focus:border-[var(--color-cyan)]/50"
                 />
-                <button type="submit" disabled={!input.trim()} aria-label="Send"
+                <button type="submit" disabled={!input.trim() || typing} aria-label="Send"
                   className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-cyan)] text-[#0a0a0a] disabled:opacity-30">
                   <Send size={16} />
                 </button>
