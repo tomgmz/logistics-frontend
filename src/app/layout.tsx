@@ -2,18 +2,16 @@ import type { Metadata, Viewport } from 'next';
 import ThemeRegistry from '@/components/ui/ThemeRegistry';
 import CsrfInit from '@/components/CsrfInit';
 import IosViewportFix from '@/components/IosViewportFix';
-import { alegreyaSansSC, alegreyaSans, aboreto, fredoka, leagueSpartan, eurostile, darkerGrotesque } from '@/app/fonts';
+import { alegreyaSansSC, alegreyaSans, aboreto, fredoka, leagueSpartan, eurostile, darkerGrotesque, geist } from '@/app/fonts';
 import StoreProvider from '@/lib/store/StoreProvider';
 import QueryProvider from '@/lib/query/QueryProvider';
 import { LastPageTracker } from '@/lib/navigation/lastPage';
 import AuthRehydrator from '@/components/AuthRehydrator';
 import AppToaster from '@/components/ui/AppToaster';
 import './globals.css';
-import { Geist } from "next/font/google";
 import { cn } from "@/lib/utils";
 import { SITE_URL } from '@/constants/site';
 
-const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 export const viewport: Viewport = {
   themeColor: '#0a0a0a',
