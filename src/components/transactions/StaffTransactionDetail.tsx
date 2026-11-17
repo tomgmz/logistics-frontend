@@ -10,7 +10,7 @@ import {
 } from '@/app/admin/booking-management/BookingDetailParts'
 import { StatusTimeline } from './TransactionStatus'
 import {
-  formatDate, formatDateTime, formatPeso, fileNameFromUrl,
+  formatDate, formatDateTime, fileNameFromUrl,
   buildCargoSummary, getDropoffs,
 } from './transaction-format'
 import { MUTED, ERROR } from './transaction-theme'
@@ -44,7 +44,6 @@ export default function StaffTransactionDetail({ booking }: { booking: BookingWi
 
   const schedDate = booking.schedule_date as string | undefined
   const callTime  = booking.call_time     as string | undefined
-  const totalCost = booking.total_cost    as number | null | undefined
   const createdAt = booking.created_at    as string | undefined
 
   const weightKg     = booking.required_weight_kg     as number | null | undefined
@@ -73,10 +72,9 @@ export default function StaffTransactionDetail({ booking }: { booking: BookingWi
           <Calendar size={14} strokeWidth={2} />
           <span>Booked on {formatDateTime(createdAt)}</span>
         </div>
-        <div className="grid grid-cols-3 gap-3 pt-2.5 border-t-[0.5px] border-[#818181]">
+        <div className="grid grid-cols-2 gap-3 pt-2.5 border-t-[0.5px] border-[#818181]">
           <Field label="Scheduled Date" value={formatDate(schedDate)} />
           <Field label="Call Time"      value={callTime ?? '—'} />
-          <Field label="Total Cost"     value={formatPeso(totalCost)} accent />
         </div>
       </div>
 

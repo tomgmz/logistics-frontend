@@ -10,7 +10,7 @@ import { downloadXlsx, type XlsxColumn } from '@/lib/xlsx-export'
  */
 
 export type DateBasis = 'scheduled' | 'booked' | 'completed'
-export type SortKey   = 'date_desc' | 'date_asc' | 'amount_desc' | 'amount_asc'
+export type SortKey   = 'date_desc' | 'date_asc'
 
 export interface TransactionFilters {
   status?:    string
@@ -34,16 +34,12 @@ export interface CompanyBreakdownRow {
   clientId:    string | null
   companyName: string
   count:       number
-  grossValue:  number
 }
 
 export interface TransactionSummary {
   total:            number
-  grossValue:       number
-  averageValue:     number
   completed:        number
   cancelled:        number
-  unpriced:         number
   cancellationRate: number
   breakdown:        CompanyBreakdownRow[]
 }

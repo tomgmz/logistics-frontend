@@ -115,12 +115,13 @@ export const tripService = {
    * to follow the client's call time. Only before the delivery starts. The
    * driver is reminded an hour ahead and may still start earlier.
    */
-  setDriverCallTime: async (bookingId: string, driverCallTime: string | null) => {
+  setDriverCallTime: async (bookingId: string, driverCallTime: string | null, driverCallDate: string | null = null) => {
     await initCsrf()
-    const { data } = await proxyApi.put<ApiResponse<{ driver_call_time: string | null }>>(
-      `${B}/${bookingId}/driver-call-time`, { driver_call_time: driverCallTime },
+    const { data } = await proxyApi.put<ApiResponse<{ driver_call_time: string | null; driver_call_date?: string | null }>>(
+      `${B}/${bookingId}/driver-call-time`,
+      { driver_call_time: driverCallTime, driver_call_date: driverCallTime ? driverCallDate : null },
     )
-    return data.data.driver_call_time
+    return { time: data.data.driver_call_time, date: data.data.driver_call_date ?? null }
   },
 }
 

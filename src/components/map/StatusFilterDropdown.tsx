@@ -77,7 +77,7 @@ export default function StatusFilterDropdown({ value, onChange, bookings }: {
       <SelectTrigger aria-label={`Status: ${statusFilterLabel(value)}`} className={boxClass} style={boxStyle}>
         <span className="truncate">Status: {statusFilterLabel(value)}</span>
       </SelectTrigger>
-      <SelectContent className="ff-regular min-w-[200px]">
+      <SelectContent className="ff-regular">
         {counts.map((f) => {
           const on = f.value === value
           return (

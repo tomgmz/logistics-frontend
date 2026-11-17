@@ -43,21 +43,6 @@ export function formatDateTime(iso: string | Date | null | undefined): string {
   })
 }
 
-/** A row's amount. Treats 0 as "no price yet", which is right on a booking. */
-export function formatPeso(n: number | null | undefined): string {
-  if (!n) return '—'
-  return `₱ ${n.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`
-}
-
-/**
- * An aggregate's amount. A totals tile reading "—" because the filtered range
- * genuinely sums to zero is a bug, so this only dashes on a missing number.
- */
-export function formatPesoExact(n: number | null | undefined): string {
-  if (n === null || n === undefined || Number.isNaN(n)) return '—'
-  return `₱ ${n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-}
-
 export function fileNameFromUrl(url: string): string {
   try {
     const parts = new URL(url).pathname.split('/')

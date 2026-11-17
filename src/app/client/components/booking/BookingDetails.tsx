@@ -1258,7 +1258,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                   </div>
                 )}
                 <p className="text-white/25 text-[10px] mt-2 pt-1 border-t border-white/[0.07]">
-                  Estimates only — final charges may vary after review.
+                  Estimates from the figures entered; our team checks the load when assigning a vehicle.
                 </p>
               </HoverCardContent>
             </HoverCard>
@@ -1520,7 +1520,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                                         label="Oversize" />
                                       {g.oversize && (
                                         <span className="ff-regular booking-text text-xs text-[var(--color-cyan)]">
-                                          Oversize may incur extra charges
+                                          Oversize may need a larger vehicle
                                         </span>
                                       )}
                                     </>

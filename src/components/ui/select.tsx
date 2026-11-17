@@ -56,6 +56,7 @@ function SelectContent({
   position = "popper",
   sideOffset = 6,
   onEscapeKeyDown,
+  style,
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Content>) {
   return (
@@ -64,6 +65,10 @@ function SelectContent({
         data-slot="select-content"
         position={position}
         sideOffset={sideOffset}
+        // Never narrower than the box it opens from. Set as a style, not a
+        // class, so a caller's min-w-* class can't replace it (a min-w-[200px]
+        // on the tracking status picker did, 2026-11-17).
+        style={position === "popper" ? { minWidth: "var(--radix-select-trigger-width)", ...style } : style}
         collisionPadding={16}
         // Escape closes the menu only. Modals and the chat panel close on an
         // Escape they hear on window/document, so it must stop here.
@@ -76,7 +81,7 @@ function SelectContent({
           "relative z-[1500] flex min-w-[8rem] flex-col overflow-hidden rounded-xl border border-[#424242] bg-[#1b1b1b] text-white shadow-[0_20px_40px_rgba(0,0,0,0.6)]",
           "max-h-[min(50dvh,var(--radix-select-content-available-height))] origin-(--radix-select-content-transform-origin)",
           "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 duration-100",
-          position === "popper" && "w-full min-w-(--radix-select-trigger-width) max-w-[calc(100vw-32px)]",
+          position === "popper" && "w-full max-w-[calc(100vw-32px)]",
           className
         )}
         {...props}

@@ -231,9 +231,9 @@ export const FAQ: FaqEntry[] = [
     id: 'pricing',
     question: 'How much does a delivery cost? How do I pay?',
     answer:
-      'Rates depend on the route, the cargo and the vehicle, so our team quotes them directly rather than ' +
-      'online. Send us your pickup and drop-off points and what you are moving (through the contact form, or a ' +
-      'ticket in the help assistant if you are already a client) and we will reply by email with a quote.',
+      'This system handles bookings and deliveries only: no prices, amounts or payments are shown or taken ' +
+      'here. Rates and payment are arranged with our team directly. Send us your question through the contact ' +
+      'form, or a ticket in the help assistant if you are already a client, and we will reply by email.',
     keywords: ['how much', 'price', 'pricing', 'cost', 'rate', 'quote', 'pay', 'payment', 'invoice', 'billing', 'charge', 'fee'],
     category: 'other',
   },

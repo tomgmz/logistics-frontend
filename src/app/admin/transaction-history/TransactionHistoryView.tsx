@@ -28,7 +28,7 @@ import ResubmittedBadge, { resubmissionsOf } from '@/components/transactions/Res
 import DelayedBadge from '@/components/transactions/DelayedBadge'
 import ResubmissionChanges from '@/components/transactions/ResubmissionChanges'
 import {
-  formatDate, formatPeso, getCompanyName, getDropoffs,
+  formatDate, getCompanyName, getDropoffs,
 } from '@/components/transactions/transaction-format'
 import {
   transactionHistoryService, downloadDispatchXlsx,
@@ -94,8 +94,6 @@ const DATE_BASES: { key: DateBasis; label: string }[] = [
 const SORTS: { key: SortKey; label: string }[] = [
   { key: 'date_desc',   label: 'Date — Newest First' },
   { key: 'date_asc',    label: 'Date — Oldest First' },
-  { key: 'amount_desc', label: 'Amount — Highest First' },
-  { key: 'amount_asc',  label: 'Amount — Lowest First' },
 ]
 
 // The cards above the table: one count per status, in that status's colour.
@@ -394,7 +392,6 @@ export default function TransactionHistoryView() {
                         <th>Scheduled</th>
                         <th className="hidden md:table-cell">Route</th>
                         <th>Status</th>
-                        <th className="text-right">Amount</th>
                       </tr>
                     </thead>
                     <tbody className="ff-regular">
@@ -445,9 +442,6 @@ export default function TransactionHistoryView() {
                               {isPartlyFailed(b) && <PartlyFailedBadge booking={b} />}
                               <ResubmittedBadge count={resubmissionsOf(b)} />
                               <DelayedBadge booking={b} />
-                            </td>
-                            <td className="whitespace-nowrap text-right font-semibold tabular-nums text-white">
-                              {formatPeso(b.total_cost as number | null | undefined)}
                             </td>
                           </tr>
                         )

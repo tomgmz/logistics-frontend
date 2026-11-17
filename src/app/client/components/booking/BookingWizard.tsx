@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect, useRef, Suspense } from 'react'
+import { useState, useCallback, useEffect, useRef, Suspense, Fragment } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Check, XCircle } from 'lucide-react'
@@ -175,9 +175,12 @@ export default function BookingWizard() {
           )}
         </h1>
 
-        <div className="hidden sm:flex items-center gap-8 lg:gap-12 justify-self-center">
+        {/* Step, line, step: the line is its own piece with the same space on
+            both sides, so it joins the two steps instead of trailing off the
+            first one (user 2026-11-17: "looks odd"). */}
+        <div className="hidden sm:flex items-center gap-3 lg:gap-4 justify-self-center">
           {STEPS.map((s, i) => (
-            <div key={s.id} className="flex items-center">
+            <Fragment key={s.id}>
               <StepPip
                 step={s}
                 isActive={step === s.id}
@@ -190,11 +193,11 @@ export default function BookingWizard() {
                 }}
               />
               {i < STEPS.length - 1 && (
-                <div className={`w-8 lg:w-12 h-px mx-1 transition-colors duration-500
-                  ${step > s.id ? 'bg-[var(--color-cyan)]' : 'bg-white/10'}`}
+                <div aria-hidden className={`w-16 lg:w-24 h-px transition-colors duration-500
+                  ${step > s.id ? 'bg-[var(--color-cyan)]' : 'bg-white/20'}`}
                 />
               )}
-            </div>
+            </Fragment>
           ))}
         </div>
 

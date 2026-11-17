@@ -176,7 +176,6 @@ export function DetailsPanelContent({
   const vehicle     = assignedVehicle(bookingDetail)
   const truckType   = bookingDetail?.truck_type_needed ?? vehicle.type ?? 'To be assigned'
   const plateNumber = vehicle.plate ?? '—'
-  const totalCost   = bookingDetail?.total_cost != null ? `₱${bookingDetail.total_cost}` : '—'
   // The planned arrival at the last stop of the last run, as a window. Before
   // it's planned (no truck yet) this falls back to the scheduled day.
   const plannedAt   = bookingDetail?.estimated_delivery ?? null
@@ -519,19 +518,6 @@ export function DetailsPanelContent({
           <p className="text-[10px] mb-0.5" style={{ color: 'var(--color-muted)' }}>Planned Arrival</p>
           <p className="text-white text-[13px]" style={SC}>
             {isLoading ? <Skeleton style={{ width: '5rem' }} /> : estDelivery || '—'}
-          </p>
-        </div>
-
-        <div className="flex-1 rounded-[8px] p-3 border" style={{ borderColor: 'var(--color-border)' }}>
-          <div className="flex items-center justify-between mb-1.5">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-muted)" strokeWidth="1.5">
-              <rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>
-            </svg>
-            {!isLoading && <span className="text-[10px] font-bold" style={{ color: '#3af626' }}>Paid</span>}
-          </div>
-          <p className="text-[10px] mb-0.5" style={{ color: 'var(--color-muted)' }}>Total Cost</p>
-          <p className="text-white text-[13px]" style={SC}>
-            {isLoading ? <Skeleton style={{ width: '4rem' }} /> : totalCost}
           </p>
         </div>
       </div>

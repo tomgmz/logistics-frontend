@@ -39,6 +39,8 @@ export interface BookingDetail {
   call_time:      string
   // When operations wants the driver at the pickup point; null = call_time.
   driver_call_time?: string | null
+  // Its day (booking day or the day before); null = the booking day.
+  driver_call_date?: string | null
   status:         string
 
   // Set while the driver has the delivery paused. The reason category is the
@@ -65,7 +67,6 @@ export interface BookingDetail {
   created_at?:         string
   updated_at?:         string
 
-  total_cost?:         number | null
   estimated_delivery?: string | null
 
   transaction_documents?:  string[] | null

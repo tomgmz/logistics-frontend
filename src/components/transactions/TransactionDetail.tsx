@@ -11,7 +11,7 @@ import { bookingRef } from '@/lib/booking'
 import { StatusBadge, StatusTimeline } from './TransactionStatus'
 import { hasOpenClientIssue } from './ProblemReportedBadge'
 import {
-  formatDate, formatDateTime, formatPeso, fileNameFromUrl,
+  formatDate, formatDateTime, fileNameFromUrl,
   buildCargoSummary, getDropoffs,
   getDriverName, getPlateNumber, getTruckModel,
 } from './transaction-format'
@@ -78,7 +78,6 @@ export default function TransactionDetail({ booking, animated = true, showCrew =
 
   const schedDate   = booking.schedule_date as string | undefined
   const callTime    = booking.call_time     as string | undefined
-  const totalCost   = booking.total_cost    as number | null | undefined
   const createdAt   = booking.created_at    as string | undefined
 
   const weightKg    = booking.required_weight_kg  as number | null | undefined
@@ -125,10 +124,9 @@ export default function TransactionDetail({ booking, animated = true, showCrew =
           <StatusBadge status={booking.status} problem={hasOpenClientIssue(booking as unknown as Record<string, unknown>)} />
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2 border-t" style={{ borderColor: BORDER }}>
+        <div className="grid grid-cols-2 gap-3 pt-2 border-t" style={{ borderColor: BORDER }}>
           <InfoTile label="Scheduled Date" value={formatDate(schedDate)} />
           <InfoTile label="Call Time"      value={callTime ?? '—'} />
-          <InfoTile label="Total Cost"     value={formatPeso(totalCost)} accent />
         </div>
       </div>
 

@@ -415,7 +415,9 @@ export default function TripPlanner({ detail, canEdit, allowed = true, capacity 
       <DriverCallTime
         bookingId={bookingId}
         clientCallTime={detail.call_time}
+        scheduleDate={detail.schedule_date}
         driverCallTime={detail.driver_call_time}
+        driverCallDate={detail.driver_call_date}
         canEdit={canEdit}
         allowed={allowed}
         editable={(detail.status ?? '').toLowerCase() === 'assigned'}
