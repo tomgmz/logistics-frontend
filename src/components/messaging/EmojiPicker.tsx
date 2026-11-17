@@ -287,7 +287,7 @@ export default function EmojiPicker({ onSelect, onClose, position = 'top' }: Emo
         <div className="
           flex items-center gap-0.5 px-2 py-1.5
           border-b border-white/[0.06]
-          overflow-x-auto [&::-webkit-scrollbar]:hidden
+          overflow-x-auto
         ">
           {categories.map((cat, i) => {
             const meta = CATEGORY_META[cat.id]

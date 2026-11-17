@@ -333,19 +333,22 @@ export function DateRangePicker({ value, onChange, label = 'Select Date', classN
           isExiting && 'duration-100 ease-in animate-out fade-out placement-bottom:slide-out-to-top-0.5 placement-top:slide-out-to-bottom-0.5',
         )}
       >
-        <AriaDialog aria-label={label} className="ff-regular flex max-h-[85dvh] overflow-y-auto rounded-2xl bg-[#1b1b1b] text-white shadow-[0_20px_40px_rgba(0,0,0,0.6)] ring-1 ring-[#424242] focus:outline-hidden">
+        <AriaDialog aria-label={label} className="ff-regular flex max-h-[85dvh] overflow-hidden rounded-2xl bg-[#1b1b1b] text-white shadow-[0_20px_40px_rgba(0,0,0,0.6)] ring-1 ring-[#424242] focus:outline-hidden">
           {({ close }) => (
             <>
-              <div className="hidden w-38 flex-col gap-0.5 border-r border-[#424242] p-3 lg:flex">
+              <div className="hidden w-38 flex-col gap-0.5 overflow-y-auto border-r border-[#424242] p-3 lg:flex">
                 {Object.values(presets).map((p) => (
                   <PresetButton key={p.label} value={p.value} onPick={() => { setDraft(p.value); setFocusedValue(p.value.start) }}>
                     {p.label}
                   </PresetButton>
                 ))}
               </div>
-              <div className="flex flex-col">
-                <RangeCalendar focusedValue={focusedValue} onFocusChange={setFocusedValue} presets={presets} />
-                <div className="flex justify-between gap-3 border-t border-[#424242] p-4">
+              {/* Only the calendar scrolls (short screens); the buttons stay. */}
+              <div className="flex min-h-0 flex-col">
+                <div className="min-h-0 flex-1 overflow-y-auto">
+                  <RangeCalendar focusedValue={focusedValue} onFocusChange={setFocusedValue} presets={presets} />
+                </div>
+                <div className="flex shrink-0 justify-between gap-3 border-t border-[#424242] p-4">
                   <div className="hidden items-center gap-2 md:flex">
                     <DateField slot="start" />
                     <div className="text-base text-[#818181]">–</div>

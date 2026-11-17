@@ -33,6 +33,7 @@ import { useServerTable } from '@/lib/hooks/useServerTable'
 import { useDebouncedValue } from '@/lib/hooks/useDebouncedValue'
 import { ProtectedImg } from '@/components/ui/FileViewer'
 import Dropdown from '@/components/ui/Dropdown'
+import { TruncatedText } from '@/components/ui/TruncatedText'
 
 
 interface ModelFormState {
@@ -472,7 +473,7 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete, archive 
                       <td>
                         <ModelThumb imageUrl={m.image_url ?? null} label={m.name} size={40} />
                       </td>
-                      <td className="t-name max-w-[240px] truncate">{m.name}</td>
+                      <td className="t-name max-w-[240px] truncate"><TruncatedText>{m.name}</TruncatedText></td>
                       <td>{m.vehicle_type ?? '—'}</td>
                       <td className="hidden md:table-cell tabular-nums">{fmtDimensions(m)}</td>
                       <td className="tabular-nums whitespace-nowrap">
@@ -538,7 +539,7 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete, archive 
                 </button>
               </div>
 
-              <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain scrollbar-none [-webkit-overflow-scrolling:touch]">
+              <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
               <RecordLockBanner lock={modelLock} noun="truck model" className="mx-4 mt-4" />
               <fieldset
                 disabled={modelLock.readOnly}
@@ -749,8 +750,10 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete, archive 
 
               </fieldset>
 
-              {/* Footer: pinned to the bottom while the form scrolls. */}
-              <div className="sticky bottom-0 z-10 bg-[var(--color-surface)] flex items-center justify-between gap-2 px-4 py-3 border-t border-white/[0.07]">
+              </div>
+
+              {/* Footer: stays below the scrolling form, so the scrollbar stops above it. */}
+              <div className="shrink-0 bg-[var(--color-surface)] flex items-center justify-between gap-2 px-4 py-3 border-t border-white/[0.07]">
                 {formMode === 'edit' && editingModel && canDelete && (
                   <button
                     type="button"
@@ -779,7 +782,6 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete, archive 
                     {formMode === 'create' ? 'Create' : 'Save'}
                   </button>
                 </div>
-              </div>
               </div>
             </motion.div>
           </motion.div>
@@ -815,7 +817,7 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete, archive 
                 </button>
               </div>
 
-              <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain scrollbar-none [-webkit-overflow-scrolling:touch]">
+              <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
               <div className="p-4 space-y-4">
                 {viewModel.image_url ? (
                   <ProtectedImg src={viewModel.image_url} alt={viewModel.name} className="w-full h-44 object-cover rounded-xl border border-white/10 bg-black/30" />
@@ -855,8 +857,10 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete, archive 
                   ))}
                 </div>
               </div>
+              </div>
 
-              <div className="flex justify-end gap-2 px-4 py-3 border-t border-white/[0.07]">
+              {/* Buttons stay below the scrolling details. */}
+              <div className="shrink-0 flex justify-end gap-2 px-4 py-3 border-t border-white/[0.07]">
                 <button
                   type="button"
                   onClick={() => setViewModel(null)}
@@ -876,7 +880,6 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete, archive 
                   Update Details
                 </button>
                 )}
-              </div>
               </div>
             </motion.div>
           </motion.div>

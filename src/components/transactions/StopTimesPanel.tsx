@@ -561,7 +561,7 @@ function EditStopTime({ bookingId, editing, onClose, onSaved }: {
               className={`${field} resize-none`} />
           </div>
         </div>
-        <div className="px-4 py-3 border-t border-white/[0.06] flex gap-2">
+        <div className="shrink-0 px-4 py-3 border-t border-white/[0.06] flex gap-2">
           <button type="button" disabled={busy} onClick={onClose}
             className="flex-1 py-2 rounded-lg text-sm font-bold border border-white/10 text-white/50 disabled:opacity-40">
             Cancel

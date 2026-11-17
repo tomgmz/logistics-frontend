@@ -45,6 +45,7 @@ import type { DateRange } from '@/components/ui/untitled/date-range-picker'
 import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
 import { cachedData, storeData } from '@/lib/query/useApiQuery'
 import { useResolvedBookingKey } from '@/lib/booking-url'
+import { TruncatedText } from '@/components/ui/TruncatedText'
 /**
  * Transaction history for staff — the client's own history widened across every
  * company.
@@ -415,7 +416,7 @@ export default function TransactionHistoryView() {
                             }`}>
                             <td className="whitespace-nowrap font-medium text-[#4df9ed]">{bookingRef(b)}</td>
                             <td className="max-w-[200px] truncate text-white">
-                              {getCompanyName(b)}
+                              <TruncatedText>{getCompanyName(b)}</TruncatedText>
                             </td>
                             <td className="hidden whitespace-nowrap lg:table-cell">
                               {formatDate(b.created_at as string | undefined)}
@@ -424,12 +425,14 @@ export default function TransactionHistoryView() {
                               {formatDate(b.schedule_date as string | undefined)}
                             </td>
                             <td className="hidden max-w-[260px] truncate md:table-cell">
+                              <TruncatedText text={route ? (drops.length > 1 ? `${route} +${drops.length - 1}` : route) : null}>
                               {route || '—'}
                               {drops.length > 1 && (
                                 <span className="ml-1 text-xs" style={{ color: MUTED }}>
                                   +{drops.length - 1}
                                 </span>
                               )}
+                              </TruncatedText>
                             </td>
                             <td>
                               {/* Untitled UI's pill with a dot, in the status colour. */}

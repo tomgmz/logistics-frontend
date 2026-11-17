@@ -42,6 +42,7 @@ import StatTiles from '@/components/ui/StatTiles'
 import RowActionMenu, { type RowAction } from '@/components/ui/RowActionMenu'
 import AccountActionConfirm, { statusConfirmCopy, type AccountConfirm } from '@/components/admin/AccountActionConfirm'
 import { useServerTable } from '@/lib/hooks/useServerTable'
+import { TruncatedText } from '@/components/ui/TruncatedText'
 type AdminMgmtTab = Extract<
   UserTab,
   'admins' | 'general-managers' | 'fleet-admins' | 'operations-admins'
@@ -145,7 +146,7 @@ const TD_BADGE  = ''
 
 /** Long addresses are cut short with an ellipsis at the edge of their column. */
 function EmailText({ value }: { value: string | null | undefined }) {
-  return <span title={value ?? undefined} className="block min-w-0 max-lg:max-w-[170px] truncate">{value ?? '—'}</span>
+  return <TruncatedText className="max-lg:max-w-[170px]">{value ?? '—'}</TruncatedText>
 }
 
 const STATUS_CFG: Record<UserStatus, { label: string; cls: string }> = {

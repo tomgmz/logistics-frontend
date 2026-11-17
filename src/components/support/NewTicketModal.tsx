@@ -152,7 +152,7 @@ export default function NewTicketModal({ open, onClose, onCreated }: {
               </button>
             </div>
 
-            <div className="p-5 space-y-5 overflow-y-auto min-h-0">
+            <div className="flex-1 p-5 space-y-5 overflow-y-auto min-h-0">
               {/* Client */}
               <div>
                 <span className={LABEL}>Client<span className="text-red-400"> *</span></span>

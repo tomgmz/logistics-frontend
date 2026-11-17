@@ -320,10 +320,10 @@
     color: #4df9ed;
   }
 
-  ::-webkit-scrollbar        { width: 5px; }
-  ::-webkit-scrollbar-track  { background: #0a0a0a; }
-  ::-webkit-scrollbar-thumb  { background: #2a2a2a; border-radius: 4px; }
-  ::-webkit-scrollbar-thumb:hover { background: #4df9ed; }
+  ::-webkit-scrollbar        { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track  { background: transparent; }
+  ::-webkit-scrollbar-thumb  { background: #4df9ed; border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: #8bfbf3; }
 
   /*
    * Tables: the scroll container that holds a table gets a cyan thumb, both
@@ -337,6 +337,19 @@
   /* Firefox has no ::-webkit-scrollbar; it takes the colors from here. */
   @supports not selector(::-webkit-scrollbar) {
     *:has(> table) { scrollbar-color: #4df9ed #0a0a0a; scrollbar-width: thin; }
+  }
+
+  /*
+   * Chat message box: a slim rounded thumb on no track, inside the pill. Only
+   * shows once the text passes 5 lines (MessageInput turns overflow on then).
+   */
+  .chat-input-scroll::-webkit-scrollbar        { width: 4px; }
+  .chat-input-scroll::-webkit-scrollbar-track  { background: transparent; }
+  .chat-input-scroll::-webkit-scrollbar-thumb  { background: #4df9ed; border-radius: 999px; }
+  .chat-input-scroll::-webkit-scrollbar-thumb:hover { background: #8bfbf3; }
+  .chat-input-scroll::-webkit-scrollbar-button { display: none; height: 0; }
+  @supports not selector(::-webkit-scrollbar) {
+    .chat-input-scroll { scrollbar-color: #4df9ed transparent; scrollbar-width: thin; }
   }
 
   *:focus-visible {
@@ -957,4 +970,18 @@ textarea::placeholder {
   [role="button"][aria-disabled="true"] {
     cursor: not-allowed;
   }
+}
+
+/*
+ * Every scrollbar thumb is cyan, at rest and while scrolling (user 2026-11-17).
+ * Unlayered on purpose: it beats the grey thumbs components set with Tailwind
+ * classes ([&::-webkit-scrollbar-thumb]:bg-white/10), which live in a layer.
+ * No scrollbar is hidden any more (user 2026-11-17: every scrollbar cyan). Don't set scrollbar-color for
+ * Chrome: since Chrome 121 it switches off every ::-webkit-scrollbar rule.
+ */
+::-webkit-scrollbar-thumb       { background: #4df9ed; }
+::-webkit-scrollbar-thumb:hover { background: #8bfbf3; }
+@supports not selector(::-webkit-scrollbar) {
+  * { scrollbar-color: #4df9ed transparent; scrollbar-width: thin; }
+  .chat-input-scroll { scrollbar-color: #4df9ed transparent; }
 }

@@ -149,7 +149,7 @@ export default function PermissionsModal({ userId, userName, onClose, onSaved }:
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-auto px-6 py-4">
+        <div className="min-h-0 flex-1 overflow-auto px-6 py-4">
           <RecordLockBanner lock={lock} noun="account" className="mb-4" />
           {loading ? (
             <div className="flex items-center justify-center py-16 text-[#818181]">
@@ -180,7 +180,7 @@ export default function PermissionsModal({ userId, userName, onClose, onSaved }:
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between border-t border-[#2a2a2a] px-6 py-4">
+        <div className="flex shrink-0 items-center justify-between border-t border-[#2a2a2a] px-6 py-4">
           <span className="text-xs text-[#818181]">{grantedCount} module{grantedCount !== 1 ? 's' : ''} granted</span>
           <div className="flex items-center gap-2">
             <button

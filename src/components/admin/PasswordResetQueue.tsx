@@ -20,6 +20,7 @@ import {
 } from '@/lib/services/admin/password-reset.service'
 import { useServerTable } from '@/lib/hooks/useServerTable'
 import { useDebouncedValue } from '@/lib/hooks/useDebouncedValue'
+import { TruncatedText } from '@/components/ui/TruncatedText'
 
 /**
  * The pending-reset queue on the IT Admin's User Management page. Since
@@ -287,7 +288,7 @@ export default function PasswordResetQueue({
                     >
                       {/* Figma 3234:1681: the name white, the rest grey. */}
                       <td><p className="t-name text-white">{fullName(r)}</p></td>
-                      <td title={r.email} className="truncate text-[#818181]">{r.email}</td>
+                      <td className="truncate text-[#818181]"><TruncatedText>{r.email}</TruncatedText></td>
                       <td className="text-[#818181]">
                         {ROLE_LABELS[r.requested_role] ?? r.requested_role.replace(/_/g, ' ')}
                       </td>

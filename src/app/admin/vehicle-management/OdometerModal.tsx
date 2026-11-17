@@ -107,10 +107,10 @@ export default function OdometerModal({
               role="dialog"
               aria-modal="true"
               aria-label={`${isReturn ? 'Return odometer' : 'Update odometer'} for ${truck.plate_number}`}
-              className="w-full max-w-md max-h-[90dvh] overflow-y-auto overscroll-contain rounded-2xl border border-white/10 bg-[var(--color-surface)] shadow-2xl"
+              className="w-full max-w-md max-h-[90dvh] flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-[var(--color-surface)] shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.07]">
+              <div className="flex shrink-0 items-center justify-between px-4 py-3 border-b border-white/[0.07]">
                 <div className="flex items-center gap-2.5 min-w-0">
                   <Gauge size={18} className="text-[var(--color-cyan)] shrink-0" />
                   <div className="min-w-0">
@@ -123,6 +123,7 @@ export default function OdometerModal({
                 </button>
               </div>
 
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
               <RecordLockBanner lock={lock} noun="vehicle" className="mx-4 mt-4" />
               <fieldset disabled={lock.readOnly || busy} className="p-4 space-y-3 min-w-0 border-0 m-0">
                 <p className="text-[11px] text-white/45 leading-snug">
@@ -139,7 +140,9 @@ export default function OdometerModal({
                 )}
               </fieldset>
 
-              <div className="sticky bottom-0 z-10 bg-[var(--color-surface)] flex justify-end gap-2 px-4 py-3 border-t border-white/[0.07]">
+              </div>
+
+              <div className="shrink-0 bg-[var(--color-surface)] flex justify-end gap-2 px-4 py-3 border-t border-white/[0.07]">
                 <button type="button" onClick={onClose} disabled={busy} className="px-4 py-2 rounded-lg border border-white/15 text-sm text-white/80 hover:bg-white/5">
                   Cancel
                 </button>

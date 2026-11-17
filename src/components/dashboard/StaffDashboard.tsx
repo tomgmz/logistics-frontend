@@ -21,6 +21,7 @@ import {
 } from '@/lib/services/admin/staff-dashboard.service'
 import { cachedData, storeData } from '@/lib/query/useApiQuery'
 import { bookingQuery } from '@/lib/booking-url'
+import { TruncatedText } from '@/components/ui/TruncatedText'
 
 /**
  * The staff dashboards.
@@ -248,8 +249,8 @@ function ListCard({ list, base }: { list: ListSpec; base: string }) {
                       </Link>
                     )}
                   </td>
-                  <td className="max-w-[180px] truncate">{b.client ?? '—'}</td>
-                  <td className="max-w-[180px] truncate">{b.origin?.split(',')[0] ?? '—'}</td>
+                  <td className="max-w-[180px] truncate"><TruncatedText>{b.client ?? '—'}</TruncatedText></td>
+                  <td className="max-w-[180px] truncate"><TruncatedText>{b.origin?.split(',')[0] ?? '—'}</TruncatedText></td>
                   <td className="whitespace-nowrap">{b.schedule_date ? formatDate(b.schedule_date) : '—'}</td>
                   <td className="whitespace-nowrap">{b.call_time ? b.call_time.slice(0, 5) : '—'}</td>
                 </tr>

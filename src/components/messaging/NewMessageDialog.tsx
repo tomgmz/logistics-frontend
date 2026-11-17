@@ -213,7 +213,7 @@ export default function NewMessageDialog({ initialTab, onClose, onConversationRe
               {members.length === 0 ? (
                 <p className="text-white/45 text-[13px] font-medium ml-[3px] mb-2">Tick the people to add.</p>
               ) : (
-                <div ref={stripRef} className="flex gap-[22px] overflow-x-auto overscroll-x-contain pl-[11px] pr-2 pt-1 pb-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <div ref={stripRef} className="flex gap-[22px] overflow-x-auto overscroll-x-contain pl-[11px] pr-2 pt-1 pb-1.5">
                   {members.map(u => (
                     <div key={u.user_id} className="flex flex-col items-center w-10 shrink-0">
                       <span className="relative w-[35px] h-[35px] rounded-full border-[1.5px] border-[var(--color-cyan)] bg-[#0e1010] flex items-center justify-center text-[15px] font-medium text-white">

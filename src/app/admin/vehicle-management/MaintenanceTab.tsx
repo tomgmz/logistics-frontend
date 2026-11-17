@@ -31,6 +31,7 @@ import { getApiErrorMessage } from '@/lib/api-error'
 import { ModelThumb, TABLE_TAG, resolveModelImageUrl } from './vehicle-ui'
 import { useServerTable } from '@/lib/hooks/useServerTable'
 import { useDebouncedValue } from '@/lib/hooks/useDebouncedValue'
+import { TruncatedText } from '@/components/ui/TruncatedText'
 
 /**
  * Vehicle Management → Maintenance: everything a vehicle owes before it can go out,
@@ -471,7 +472,7 @@ export default function MaintenanceTab({
                         />
                       </td>
                       <td className="t-name whitespace-nowrap">{focusTruck.plate_number}</td>
-                      <td className="max-w-[200px] truncate hidden md:table-cell">{focusTruck.truck_model?.name ?? '—'}</td>
+                      <td className="max-w-[200px] truncate hidden md:table-cell"><TruncatedText>{focusTruck.truck_model?.name ?? '—'}</TruncatedText></td>
                       <td>
                         {focusTruck.status === 'archived' ? '---' : (
                           <span className={TABLE_TAG} style={{ color: '#3af626', borderColor: '#3af626', background: 'rgba(58,246,38,0.1)' }}>Passed</span>
@@ -506,7 +507,7 @@ export default function MaintenanceTab({
                           />
                         </td>
                         <td className="t-name whitespace-nowrap">{t.plate_number}</td>
-                        <td className="max-w-[200px] truncate hidden md:table-cell">{t.truck_model?.name ?? '—'}</td>
+                        <td className="max-w-[200px] truncate hidden md:table-cell"><TruncatedText>{t.truck_model?.name ?? '—'}</TruncatedText></td>
                         <td>
                           {/* "View Driver Report" opens the report it names. */}
                           {p.report ? (

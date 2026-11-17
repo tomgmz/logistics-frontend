@@ -32,6 +32,9 @@ interface MessageInputProps {
   draftKey?:         string
 }
 
+/** The box grows up to this many lines, then scrolls inside. */
+const MAX_LINES = 5
+
 export default function MessageInput({
   onSend,
   onTypingChange,
@@ -80,13 +83,20 @@ export default function MessageInput({
     onTypingChange?.(false)
   }, [onTypingChange])
 
-  // Auto-grow, whatever set the text (typing, an emoji, a restored draft).
+  // Auto-grow up to 5 lines, whatever set the text (typing, an emoji, a
+  // restored draft); past that the box scrolls inside. The scrollbar is only
+  // turned on when the text really is taller than 5 lines, so an empty or
+  // short message never shows one.
+  const lineHeight = compact ? 20 : 24
+  const maxHeight  = lineHeight * MAX_LINES
   useEffect(() => {
     const el = textareaRef.current
     if (!el) return
     el.style.height = 'auto'
-    el.style.height = `${Math.min(el.scrollHeight, compact ? 80 : 120)}px`
-  }, [text, compact])
+    const full = el.scrollHeight
+    el.style.height = `${Math.min(full, maxHeight)}px`
+    el.style.overflowY = full > maxHeight + 1 ? 'auto' : 'hidden'
+  }, [text, maxHeight])
 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setText(e.target.value)
@@ -127,16 +137,18 @@ export default function MessageInput({
 
   const hasText = text.trim().length > 0
   const iconSize = compact ? 20 : 26
+  // Same height as a one-line pill, so the side buttons line up with it.
+  const slotH    = compact ? 'h-9' : 'h-[50px]'
   const iconBtn  = 'group inline-flex shrink-0 items-center justify-center rounded-md p-1 text-white/70 transition-colors duration-100 hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-50'
 
-  // Figma (Web Messaging.png / Messaging.png): emoji, photo, the pill field and
-  // a round send button in one row; a reply being written is quoted above it.
+  // Photo, the pill field (emoji inside, Messenger-style) and a round send
+  // button in one row; a reply being written is quoted above it.
   return (
     <div className={`ff-darker relative shrink-0 border-t border-white/[0.12] bg-[#0a0a0a] ${compact ? 'px-2 py-2' : 'px-4 py-3.5'}`}>
       {onJumpToLatest && <JumpToLatest show={showJumpToLatest && !mention.open} onClick={onJumpToLatest} />}
       <PhotoSendDialog file={photo} onCancel={() => setPhoto(null)} onSend={sendPhoto} />
 
-      <div className={`relative mx-auto w-full ${compact ? '' : 'max-w-[1100px]'}`}>
+      <div className="relative w-full">
         {/* Replying to … */}
         <AnimatePresence>
           {replyTo && (
@@ -162,32 +174,23 @@ export default function MessageInput({
 
         <BookingMentionMenu picker={mention} />
 
-        <div className={`flex items-center ${compact ? 'gap-1' : 'gap-2.5'}`}>
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setShowEmoji(v => !v)}
-              title="Emoji"
-              aria-label="Emoji"
-              className={`${iconBtn} ${showEmoji ? 'bg-[var(--color-cyan)]/10 text-[var(--color-cyan)]' : ''}`}
-            >
-              <Smile size={iconSize} strokeWidth={1.6} />
+        {/* Messenger-style: the photo button left, the pill (text + emoji at
+            its right end) and send. As the text grows the buttons stay on the
+            bottom line, and the emoji button sits beside the last line. */}
+        <div className={`flex items-end ${compact ? 'gap-1' : 'gap-2.5'}`}>
+          <div className={`flex shrink-0 items-center ${slotH}`}>
+            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={pickPhoto} />
+            <button type="button" onClick={() => fileRef.current?.click()} title="Send a photo (up to 10 MB)" aria-label="Send a photo" className={iconBtn}>
+              <ImageIcon size={iconSize} strokeWidth={1.6} />
             </button>
-            <AnimatePresence>
-              {showEmoji && (
-                <EmojiPicker
-                  onSelect={handleEmojiSelect}
-                  onClose={() => setShowEmoji(false)}
-                  position="top"
-                />
-              )}
-            </AnimatePresence>
           </div>
-          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={pickPhoto} />
-          <button type="button" onClick={() => fileRef.current?.click()} title="Send a photo (up to 10 MB)" aria-label="Send a photo" className={iconBtn}>
-            <ImageIcon size={iconSize} strokeWidth={1.6} />
-          </button>
 
+          {/* The pill is this wrapper, so the scrollbar sits inside it, clear
+              of the rounded ends; a click on its padding focuses the box. */}
+          <div
+            onClick={e => { if (e.target === e.currentTarget) textareaRef.current?.focus() }}
+            className={`flex min-w-0 flex-1 cursor-text items-end gap-1 rounded-[22px] border border-[#5a5a5a] bg-[#111212] focus-within:border-[var(--color-cyan)]/60 ${compact ? 'py-[7px] pl-3 pr-2' : 'py-3 pl-5 pr-3'}`}
+          >
           <textarea
             ref={textareaRef}
             value={text}
@@ -204,10 +207,32 @@ export default function MessageInput({
             // sent, and disabling the box would drop its focus, so the user had
             // to click back into it after every message. Sending is blocked in
             // handleSend instead, and the next message can be typed meanwhile.
-            className={`min-w-0 flex-1 resize-none rounded-[22px] border border-[#5a5a5a] bg-[#111212] font-medium text-white placeholder:text-white/45 focus:outline-none focus:border-[var(--color-cyan)]/60 overflow-y-auto [&::-webkit-scrollbar]:w-[3px] [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full ${compact ? 'px-3 py-1.5 text-[15px]' : 'px-5 py-3 text-[17px]'}`}
-            style={{ minHeight: compact ? '36px' : '50px', maxHeight: compact ? '80px' : '120px' }}
+            className={`chat-input-scroll block min-w-0 flex-1 resize-none overflow-y-hidden border-0 bg-transparent p-0 font-medium text-white placeholder:text-white/45 focus:outline-none focus-visible:outline-none ${compact ? 'pr-1.5 text-[15px] leading-[20px]' : 'pr-2.5 text-[17px] leading-[24px]'}`}
+            style={{ height: lineHeight, maxHeight }}
           />
+            <div className="relative shrink-0" style={{ height: lineHeight }}>
+              <button
+                type="button"
+                onClick={() => setShowEmoji(v => !v)}
+                title="Emoji"
+                aria-label="Emoji"
+                className={`inline-flex h-full items-center justify-center rounded-full px-0.5 transition-colors duration-100 hover:text-white ${showEmoji ? 'text-[var(--color-cyan)]' : 'text-white/70'}`}
+              >
+                <Smile size={compact ? 18 : 22} strokeWidth={1.8} />
+              </button>
+              <AnimatePresence>
+                {showEmoji && (
+                  <EmojiPicker
+                    onSelect={handleEmojiSelect}
+                    onClose={() => setShowEmoji(false)}
+                    position="top"
+                  />
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
 
+          <div className={`flex shrink-0 items-center ${slotH}`}>
           <button
             type="button"
             onClick={handleSend}
@@ -217,6 +242,7 @@ export default function MessageInput({
           >
             <Send size={compact ? 16 : 20} strokeWidth={1.8} />
           </button>
+          </div>
         </div>
 
         {photoError && (

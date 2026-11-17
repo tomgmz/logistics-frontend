@@ -42,6 +42,7 @@ import FilterBar, {
   matchesFilter, optionsFrom, type FilterField, type FilterValues,
 } from '@/components/ui/FilterBar'
 import { useServerTable } from '@/lib/hooks/useServerTable'
+import { TruncatedText } from '@/components/ui/TruncatedText'
 // No IT Administrator tab: IT Administrators are the IT Administrator's own
 // business, and a new one is only made through their handover (2026-10-25).
 type UserMgmtTab = Extract<UserTab, 'clients' | 'drivers'>
@@ -154,7 +155,7 @@ const TD_MUTED  = ''
 
 /** Long addresses are cut short with an ellipsis at the edge of their column. */
 function EmailText({ value }: { value: string | null | undefined }) {
-  return <span title={value ?? undefined} className="block min-w-0 max-lg:max-w-[170px] truncate">{value ?? '—'}</span>
+  return <TruncatedText className="max-lg:max-w-[170px]">{value ?? '—'}</TruncatedText>
 }
 
 /** "[date], [time]": two lines at the Figma's full size, one line when compact. */

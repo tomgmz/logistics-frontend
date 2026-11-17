@@ -119,6 +119,7 @@ import { formatDuration } from '@/lib/duration'
 import Dropdown from '@/components/ui/Dropdown'
 import { FieldError } from '@/components/ui/FieldError'
 import { useResolvedBookingKey } from '@/lib/booking-url'
+import { TruncatedText } from '@/components/ui/TruncatedText'
 
 const BOOKING_STATUSES: AdminBookingLifecycleStatus[] = [
   'pending',
@@ -1054,7 +1055,7 @@ function CrewPickerDialog({
             <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-5 py-4 space-y-3">
               {children}
             </div>
-            <div className="px-4 sm:px-5 py-3 border-t border-white/[0.06]">
+            <div className="shrink-0 px-4 sm:px-5 py-3 border-t border-white/[0.06]">
               {footer}
             </div>
           </motion.div>
@@ -2233,7 +2234,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                             }`}
                           >
                             <td className="font-bold max-w-[200px]">
-                              <div className="truncate text-[#4df9ed]">{r.display_id}</div>
+                              <TruncatedText as="div" className="text-[#4df9ed]">{r.display_id}</TruncatedText>
                               {/* Status-type badges keep the small-caps face. */}
                               <div className="font-[family-name:var(--font-alegreya-sc)]">
                                 {showAfterHours(r.status, r.created_at) && <AfterHoursBadge />}
@@ -2279,8 +2280,8 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                               <ResubmittedBadge count={r.resubmissions} />
                             </td>
                             <td className="whitespace-nowrap text-white">{r.schedule_date ?? '—'}</td>
-                            <td className="max-w-[180px] 3xl:max-w-[260px] truncate hidden md:table-cell text-white">{r.company ?? '—'}</td>
-                            <td className="max-w-[220px] truncate text-white">{r.origin ?? '—'}</td>
+                            <td className="max-w-[180px] 3xl:max-w-[260px] truncate hidden md:table-cell text-white"><TruncatedText>{r.company ?? '—'}</TruncatedText></td>
+                            <td className="max-w-[220px] truncate text-white"><TruncatedText>{r.origin ?? '—'}</TruncatedText></td>
                             <td className="hidden lg:table-cell text-white">{r.truck_type_needed ?? '—'}</td>
                             <td className="text-white">{r.stops}</td>
                           </tr>

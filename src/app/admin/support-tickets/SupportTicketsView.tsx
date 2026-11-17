@@ -25,6 +25,7 @@ import { useDebouncedValue } from '@/lib/hooks/useDebouncedValue'
 import FilterBar from '@/components/ui/FilterBar'
 import { TableCard } from '@/components/ui/untitled/table-card'
 import { TabsMinimal } from '@/components/ui/untitled/tabs'
+import { TruncatedText } from '@/components/ui/TruncatedText'
 /**
  * Tickets — the Company Administrator's full view of client support tickets.
  *
@@ -330,7 +331,7 @@ export default function SupportTicketsView() {
                           }`}
                         >
                           <td className={`${TD} whitespace-nowrap font-mono font-medium text-white`}>{t.reference}</td>
-                          <td className={`${TD} max-w-[280px] truncate text-white`}>{t.subject}</td>
+                          <td className={`${TD} max-w-[280px] truncate text-white`}><TruncatedText>{t.subject}</TruncatedText></td>
                           <td className={TD}>
                             <p className="text-[#c4c4c4]">{t.clients?.company_name ?? '—'}</p>
                             {opener && <p className="text-[#818181]">{opener}</p>}

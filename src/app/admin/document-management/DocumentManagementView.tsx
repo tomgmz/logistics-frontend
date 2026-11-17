@@ -57,6 +57,7 @@ import type { DateRange } from '@/components/ui/untitled/date-range-picker'
 import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
 import { useServerTable } from '@/lib/hooks/useServerTable'
 import { bookingQuery } from '@/lib/booking-url'
+import { TruncatedText } from '@/components/ui/TruncatedText'
 
 /**
  * Document Management — one library over every file the system keeps, shared
@@ -911,7 +912,7 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
                             <div className="flex min-w-0 max-w-[300px] items-center gap-3">
                               <DocumentThumb doc={d} />
                               <div className="min-w-0">
-                                <p className="t-name truncate" title={d.file_name}>{d.file_name}</p>
+                                <TruncatedText as="p" className="t-name">{d.file_name}</TruncatedText>
                                 <p className="text-[#818181]">{DOCUMENT_SOURCE_LABELS[d.source]}</p>
                               </div>
                             </div>
@@ -922,7 +923,7 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
                               {d.reference_number ? (
                                 <>
                                   <p className="font-medium text-[#4df9ed]">{d.reference_number}</p>
-                                  <p className="max-w-[200px] truncate text-[#818181]">{d.company_name ?? '—'}</p>
+                                  <TruncatedText as="p" className="max-w-[200px] text-[#818181]">{d.company_name ?? '—'}</TruncatedText>
                                 </>
                               ) : null}
                               {d.plate_number && <p className={`font-mono ${d.reference_number ? 'text-xs text-[#818181]' : 'text-[#c4c4c4]'}`}>{d.plate_number}</p>}
@@ -930,7 +931,7 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
                             </td>
                           )}
                           <td className={`${TD} hidden xl:table-cell`}>
-                            <p className="max-w-[260px] truncate" title={d.detail ?? undefined}>{d.detail ?? d.notes ?? '—'}</p>
+                            <TruncatedText as="p" className="max-w-[260px]">{d.detail ?? d.notes ?? '—'}</TruncatedText>
                             {d.override_reason && (
                               <p className="mt-0.5 flex items-center gap-1 text-xs text-amber-300" title={d.override_reason}>
                                 <MapPinOff size={11} /> Taken away from the stop
@@ -1000,8 +1001,8 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
                             <div className="flex min-w-0 items-center gap-3">
                               <FolderIcon fleet={r.fleet} />
                               <div className="min-w-0">
-                                <p className="t-name truncate">{r.name}</p>
-                                <p className="truncate text-[#818181]">{r.sub}</p>
+                                <TruncatedText as="p" className="t-name">{r.name}</TruncatedText>
+                                <TruncatedText as="p" className="text-[#818181]">{r.sub}</TruncatedText>
                               </div>
                             </div>
                           </td>

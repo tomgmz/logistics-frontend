@@ -507,7 +507,7 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
                     className="absolute top-4 bottom-4 left-14 w-[500px] z-10 rounded-[24px] overflow-hidden flex flex-col"
                     style={{ background: 'var(--color-surface)' }}
                   >
-                    <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-none">
+                    <div className="flex-1 overflow-y-auto overflow-x-hidden">
                       {detailPanel}
                     </div>
                   </motion.div>

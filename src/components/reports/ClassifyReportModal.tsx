@@ -49,10 +49,10 @@ export default function ClassifyReportModal({
             role="dialog"
             aria-modal="true"
             aria-label="Classify report"
-            className="w-full max-w-md max-h-[90dvh] overflow-y-auto overscroll-contain rounded-2xl border border-white/10 bg-[var(--color-surface)] shadow-2xl"
+            className="w-full max-w-md max-h-[90dvh] flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-[var(--color-surface)] shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.07]">
+            <div className="flex shrink-0 items-center justify-between px-4 py-3 border-b border-white/[0.07]">
               <div className="min-w-0">
                 <h2 className="text-sm font-bold text-white uppercase tracking-widest">Classify report</h2>
                 <p className="text-[11px] text-white/40 mt-0.5 truncate">
@@ -65,6 +65,7 @@ export default function ClassifyReportModal({
               </button>
             </div>
 
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
             <div className="p-4 space-y-3">
               <div className="grid grid-cols-2 gap-2">
                 {(Object.keys(INCIDENT_LABELS) as IncidentType[]).map((k) => {
@@ -100,7 +101,9 @@ export default function ClassifyReportModal({
               </p>
             </div>
 
-            <div className="sticky bottom-0 z-10 bg-[var(--color-surface)] flex justify-end gap-2 px-4 py-3 border-t border-white/[0.07]">
+            </div>
+
+            <div className="shrink-0 bg-[var(--color-surface)] flex justify-end gap-2 px-4 py-3 border-t border-white/[0.07]">
               <button
                 type="button"
                 onClick={onCancel}

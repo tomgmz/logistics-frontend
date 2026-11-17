@@ -893,9 +893,11 @@ export default function UserFormModal({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.96, y: 12 }}
           transition={{ type: 'spring', duration: 0.3, bounce: 0.15 }}
-          className="relative z-10 w-full max-w-2xl max-h-[90dvh] overflow-y-auto rounded-2xl border border-[#2a2a2a] bg-[#1b1b1b] shadow-2xl [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+          className="relative z-10 flex w-full max-w-2xl max-h-[90dvh] flex-col overflow-hidden rounded-2xl border border-[#2a2a2a] bg-[#1b1b1b] shadow-2xl"
         >
-          <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#2a2a2a] bg-[#1b1b1b] px-6 py-4">
+          {/* Header, scrolling fields and buttons: only the fields scroll, so the
+              scrollbar sits between the two rules, clear of the rounded corners. */}
+          <div className="flex shrink-0 items-center justify-between border-b border-[#2a2a2a] bg-[#1b1b1b] px-6 py-4">
             <div>
               <p className="text-[10px] font-bold tracking-[0.14em] uppercase text-[#4df9ed]">
                 {viewing ? 'View' : isEdit ? 'Edit' : 'Create'}
@@ -914,7 +916,8 @@ export default function UserFormModal({
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5 px-6 py-6">
+          <form onSubmit={handleSubmit} noValidate className="flex min-h-0 flex-1 flex-col">
+            <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-6 py-6">
             <RecordLockBanner lock={lock} noun="account" />
             {tab === 'drivers' && (
               <div className="rounded-xl border border-dashed border-[#424242] bg-[#2a2a2a]/30 px-4 py-4">
@@ -1382,9 +1385,10 @@ export default function UserFormModal({
             )}
 
             </fieldset>
+            </div>
 
             {viewing ? (
-            <div className="sticky bottom-0 z-10 -mx-6 -mb-6 px-6 pb-6 bg-[#1b1b1b] flex items-center justify-end gap-3 border-t border-[#2a2a2a] pt-5 mt-1">
+            <div className="flex shrink-0 items-center justify-end gap-3 border-t border-[#2a2a2a] bg-[#1b1b1b] px-6 py-5">
               <button
                 type="button"
                 onClick={onClose}
@@ -1406,7 +1410,7 @@ export default function UserFormModal({
               ))}
             </div>
             ) : (
-            <div className="sticky bottom-0 z-10 -mx-6 -mb-6 px-6 pb-6 bg-[#1b1b1b] flex justify-end gap-3 border-t border-[#2a2a2a] pt-5 mt-1">
+            <div className="flex shrink-0 justify-end gap-3 border-t border-[#2a2a2a] bg-[#1b1b1b] px-6 py-5">
               <button
                 type="button"
                 onClick={requestCancel}

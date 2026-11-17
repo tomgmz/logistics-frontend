@@ -84,6 +84,7 @@ import { useCachedFetch } from '@/lib/hooks/useCachedFetch'
 import { cachedData, storeData } from '@/lib/query/useApiQuery'
 import Dropdown from '@/components/ui/Dropdown'
 import Combobox from '@/components/ui/Combobox'
+import { TruncatedText } from '@/components/ui/TruncatedText'
 
 type FormMode    = 'create' | 'edit' | null
 
@@ -207,7 +208,7 @@ function VehicleDetailsModal({
               </button>
             </div>
 
-            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain scrollbar-none [-webkit-overflow-scrolling:touch]">
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
             <div className="p-4 space-y-4">
               <div className="flex gap-3 items-center">
                 <ModelThumb
@@ -297,8 +298,10 @@ function VehicleDetailsModal({
 
               <MaintenanceHistory key={truck.truck_id} truckId={truck.truck_id} />
             </div>
+            </div>
 
-            <div className="flex justify-end gap-2 px-4 py-3 border-t border-white/[0.07]">
+            {/* Buttons stay below the scrolling details. */}
+            <div className="shrink-0 flex justify-end gap-2 px-4 py-3 border-t border-white/[0.07]">
               <button
                 type="button"
                 onClick={onClose}
@@ -316,7 +319,6 @@ function VehicleDetailsModal({
                   Update Details
                 </button>
               )}
-            </div>
             </div>
           </motion.div>
         </motion.div>
@@ -1116,7 +1118,7 @@ export default function VehicleManagementView({ archive }: {
                             {t.truck_model?.vehicle_type ?? '—'}
                           </td>
                           <td className="max-w-[200px] truncate hidden md:table-cell">
-                            {t.truck_model?.name ?? '—'}
+                            <TruncatedText>{t.truck_model?.name ?? '—'}</TruncatedText>
                           </td>
                           <td className="hidden md:table-cell tabular-nums whitespace-nowrap">
                             {t.truck_model?.max_weight_kg != null
@@ -1268,7 +1270,7 @@ export default function VehicleManagementView({ archive }: {
                 </button>
               </div>
 
-              <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain scrollbar-none [-webkit-overflow-scrolling:touch]">
+              <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
               <RecordLockBanner lock={truckLock} noun="vehicle" className="mx-4 mt-4" />
               <fieldset disabled={truckLock.readOnly} className="p-4 space-y-3 min-w-0 border-0 m-0">
 
@@ -1649,8 +1651,10 @@ export default function VehicleManagementView({ archive }: {
                 )}
               </fieldset>
 
-              {/* Footer: pinned to the bottom while the form scrolls. */}
-              <div className="sticky bottom-0 z-10 bg-[var(--color-surface)] flex items-center justify-between gap-2 px-4 py-3 border-t border-white/[0.07]">
+              </div>
+
+              {/* Footer: stays below the scrolling form, so the scrollbar stops above it. */}
+              <div className="shrink-0 bg-[var(--color-surface)] flex items-center justify-between gap-2 px-4 py-3 border-t border-white/[0.07]">
                 {modalMode === 'edit' && editingTruck && canDelete && (
                   <button
                     type="button"
@@ -1681,7 +1685,6 @@ export default function VehicleManagementView({ archive }: {
                     {modalMode === 'create' ? 'Create' : 'Save'}
                   </button>
                 </div>
-              </div>
               </div>
             </motion.div>
           </motion.div>

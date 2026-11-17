@@ -122,9 +122,9 @@ function PhotoSendPanel({ file, onCancel, onSend }: {
           <motion.div
             initial={{ opacity: 0, scale: 0.94, y: 12 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.94, y: 12 }}
             transition={{ duration: 0.18 }}
-            className="w-full max-w-md max-h-[90dvh] overflow-y-auto overscroll-contain bg-[var(--color-bg)] border border-white/[0.09] rounded-2xl shadow-2xl p-5 flex flex-col gap-4"
+            className="w-full max-w-md max-h-[90dvh] overflow-hidden bg-[var(--color-bg)] border border-white/[0.09] rounded-2xl shadow-2xl p-5 flex flex-col gap-4"
           >
-            <div className="flex items-center justify-between">
+            <div className="flex shrink-0 items-center justify-between">
               <h3 id="photo-send-title" className="ff-body text-sm font-semibold text-white">Send a photo</h3>
               <button type="button" onClick={onCancel} disabled={busy} aria-label="Close"
                 className="p-1 rounded-lg hover:bg-white/5 text-white/40 hover:text-white/70 transition-colors">
@@ -132,6 +132,7 @@ function PhotoSendPanel({ file, onCancel, onSend }: {
               </button>
             </div>
 
+            <div className="-mx-1 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain px-1">
             <div className="rounded-xl overflow-hidden border border-white/[0.08] bg-black/30 flex items-center justify-center">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={preview} alt="Photo to send" className="max-h-64 w-auto object-contain" />
@@ -156,8 +157,9 @@ function PhotoSendPanel({ file, onCancel, onSend }: {
             />
 
             {error && <p className="ff-body text-xs text-red-400">{error}</p>}
+            </div>
 
-            <div className="sticky bottom-0 z-10 -mx-5 -mb-5 px-5 pt-1 pb-5 bg-[var(--color-bg)] flex gap-2">
+            <div className="shrink-0 bg-[var(--color-bg)] flex gap-2">
               <button type="button" onClick={onCancel} disabled={busy}
                 className="flex-1 py-2 rounded-xl border border-white/10 ff-body text-sm text-white/70 hover:text-white transition-colors disabled:opacity-50">
                 Cancel

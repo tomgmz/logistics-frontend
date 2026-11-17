@@ -12,6 +12,7 @@ import {
 import { formatDate, formatTime, formatDateTime } from '@/app/utils/timeFormat'
 import { expandCode, roleLabel } from '@/lib/roles'
 import { auditActionLabel, systemSourceLabel } from '@/lib/log-labels'
+import { TruncatedText } from '@/components/ui/TruncatedText'
 
 /**
  * The two log tables in the table format (Figma 3234:594 System Logs,
@@ -150,7 +151,7 @@ export function AuditLogTable({ logs, loading, pageSize, selectedId, onSelect }:
             </td>
             <td><span className={CODE_PILL}>{auditActionLabel(log.action)}</span></td>
             {/* The server sends the description already readable (lib/log-text.ts). */}
-            <td className="max-w-[420px] truncate" title={log.description ?? undefined}>{log.description || '—'}</td>
+            <td className="max-w-[420px] truncate"><TruncatedText>{log.description || '—'}</TruncatedText></td>
           </tr>
         ))}
       </tbody>
@@ -189,7 +190,7 @@ export function SystemLogTable({ logs, loading, pageSize, selectedId, onSelect }
               </span>
             </td>
             <td><span className={CODE_PILL} title={log.source}>{systemSourceLabel(log.source)}</span></td>
-            <td className="max-w-[420px] truncate" title={log.message}>{log.message}</td>
+            <td className="max-w-[420px] truncate"><TruncatedText>{log.message}</TruncatedText></td>
             <td className={`ff-sc text-right ${log.resolved ? 'text-[#3af626]' : 'text-[#f62626]'}`}>
               {log.resolved ? 'Yes' : 'No'}
             </td>

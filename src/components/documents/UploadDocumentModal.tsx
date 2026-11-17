@@ -269,7 +269,7 @@ export default function UploadDocumentModal({
               </button>
             </div>
 
-            <div className="p-5 space-y-5 overflow-y-auto min-h-0">
+            <div className="flex-1 p-5 space-y-5 overflow-y-auto min-h-0">
               {/* Where it is filed (the Fleet Manager files on vehicles only) */}
               {!vehicleOnly && (
                 <div>

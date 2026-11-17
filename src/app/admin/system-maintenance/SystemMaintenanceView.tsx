@@ -2,7 +2,8 @@
 
 import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Plus, Tag, Layers, Package, Phone, Truck, Pencil, Trash2, X, Search } from 'lucide-react'
 import { appToast } from '@/lib/toast'
@@ -1144,7 +1145,7 @@ export default function SystemMaintenanceView() {
       </header>
 
       {/* tab bar: scrolls sideways on a phone */}
-      <div role="tablist" aria-label="System Maintenance sections" className="shrink-0 flex gap-1 border-b border-white/[0.07] px-2 sm:px-4 pt-2 overflow-x-auto scrollbar-none overscroll-x-contain">
+      <div role="tablist" aria-label="System Maintenance sections" className="shrink-0 flex gap-1 border-b border-white/[0.07] px-2 sm:px-4 pt-2 overflow-x-auto overscroll-x-contain">
         {TABS.map(({ key, label, icon: Icon }) => {
           const active = tab === key
           return (
@@ -1281,12 +1282,7 @@ export default function SystemMaintenanceView() {
                   <X size={18} />
                 </button>
               </div>
-              <div
-                className="sheet-form flex-1 min-h-0 overflow-y-auto overscroll-contain p-4"
-                style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
-              >
-                {renderForm()}
-              </div>
+              <SheetBody>{renderForm()}</SheetBody>
             </motion.div>
           </motion.div>
         )}
@@ -1365,13 +1361,36 @@ function EditingChip({ label, onCancel }: { label: string; onCancel: () => void 
   )
 }
 
+/**
+ * The phone/tablet sheet: the fields scroll, the Save button sits in a bar
+ * below them (SubmitBtn moves itself there), so neither the header nor the
+ * button scrolls and the scrollbar stops above the bar.
+ */
+const SheetFooterCtx = createContext<HTMLElement | null>(null)
+
+function SheetBody({ children }: { children: React.ReactNode }) {
+  const [footer, setFooter] = useState<HTMLDivElement | null>(null)
+  return (
+    <>
+      <div className="sheet-form flex-1 min-h-0 overflow-y-auto overscroll-contain p-4">
+        <SheetFooterCtx.Provider value={footer}>{children}</SheetFooterCtx.Provider>
+      </div>
+      <div
+        ref={setFooter}
+        className="shrink-0 border-t border-white/[0.07] px-4 pt-3 empty:hidden"
+        style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+      />
+    </>
+  )
+}
+
 function SubmitBtn({ label, busy, onClick, disabled = false, icon = true }: {
   label: string; busy: boolean; onClick: () => void; disabled?: boolean; icon?: boolean
 }) {
-  // In the phone/tablet sheet (.sheet-form) the button stays pinned to the
-  // bottom while the form scrolls; inline on desktop it sits after the fields.
-  return (
-    <div className="[.sheet-form_&]:sticky [.sheet-form_&]:bottom-0 [.sheet-form_&]:z-10 [.sheet-form_&]:-mx-4 [.sheet-form_&]:-mb-4 [.sheet-form_&]:px-4 [.sheet-form_&]:py-3 [.sheet-form_&]:border-t [.sheet-form_&]:border-white/[0.07] [.sheet-form_&]:bg-[var(--color-surface,#111)]">
+  // In the sheet the button goes to the bar below the fields; inline on
+  // desktop it sits after the fields.
+  const sheetFooter = useContext(SheetFooterCtx)
+  const button = (
     <button
       type="button"
       disabled={busy || disabled}
@@ -1386,8 +1405,8 @@ function SubmitBtn({ label, busy, onClick, disabled = false, icon = true }: {
       {icon && <Plus size={15} />}
       {busy ? 'Saving…' : label}
     </button>
-    </div>
   )
+  return sheetFooter ? createPortal(button, sheetFooter) : <div>{button}</div>
 }
 
 function ActiveSwitch({ value, onChange, onText, offText }: {

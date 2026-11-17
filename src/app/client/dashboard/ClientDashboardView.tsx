@@ -25,6 +25,7 @@ import type { CardSpec } from '@/components/dashboard/StaffDashboard'
 import { cachedData, storeData } from '@/lib/query/useApiQuery'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { bookingQuery } from '@/lib/booking-url'
+import { TruncatedText } from '@/components/ui/TruncatedText'
 
 /**
  * The client's dashboard, in the same Untitled UI dashboard-04 format as the
@@ -186,7 +187,7 @@ function ActiveShipmentRow({ booking }: { booking: BookingWithRelations }) {
       <td className="max-w-[260px]">
         <span className="flex items-center gap-1.5">
           <MapPin size={13} className="shrink-0" style={{ color: CYAN }} />
-          <span className="truncate">{(booking.origin as string | undefined) ?? '—'}</span>
+          <TruncatedText>{(booking.origin as string | undefined) ?? '—'}</TruncatedText>
           <span className="shrink-0" style={{ color: MUTED }}>→ {stops.length} {stops.length === 1 ? 'stop' : 'stops'}</span>
         </span>
       </td>
