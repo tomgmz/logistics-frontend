@@ -8,6 +8,7 @@ import QueryProvider from '@/lib/query/QueryProvider';
 import { LastPageTracker } from '@/lib/navigation/lastPage';
 import AuthRehydrator from '@/components/AuthRehydrator';
 import AppToaster from '@/components/ui/AppToaster';
+import StickyHeaderScrollbar from '@/components/ui/StickyHeaderScrollbar';
 import './globals.css';
 import { cn } from "@/lib/utils";
 import { SITE_URL } from '@/constants/site';
@@ -48,6 +49,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         style={{ fontFamily: 'var(--font-alegreya-sc)' }}>
         <CsrfInit />
         <IosViewportFix />
+        <StickyHeaderScrollbar />
         <QueryProvider>
           <StoreProvider>
             <AuthRehydrator />

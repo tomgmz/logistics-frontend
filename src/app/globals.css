@@ -334,6 +334,9 @@
   *:has(> table)::-webkit-scrollbar-thumb  { background: #4df9ed; }
   *:has(> table)::-webkit-scrollbar-thumb:hover { background: #8bfbf3; }
   *:has(> table)::-webkit-scrollbar-corner { background: #0a0a0a; }
+  /* The vertical bar starts under the sticky header row: that rule lives in
+     components/ui/StickyHeaderScrollbar.tsx, not here, because the CSS
+     compiler drops `::-webkit-scrollbar-track:vertical`. */
   /* Firefox has no ::-webkit-scrollbar; it takes the colors from here. */
   @supports not selector(::-webkit-scrollbar) {
     *:has(> table) { scrollbar-color: #4df9ed #0a0a0a; scrollbar-width: thin; }
