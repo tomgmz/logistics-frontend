@@ -2010,7 +2010,17 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
 
   // The crew card on the road and after (Figma "Driver and Vehicle Assignment").
   const crewSummary: CrewSummary | null = (() => {
-    if (!detail || !currentAssignment) return null
+    if (!detail) return null
+    // No assignment record loaded (yet): the booking's own driver and vehicle,
+    // so the card is still the design's card, never the old fallback.
+    if (!currentAssignment) {
+      const v = detail.vehicle ?? detail.driver?.truck ?? null
+      return {
+        vendor: false,
+        driver: detail.driver?.name ?? null,
+        vehicle: v?.plate_number ? `${v.plate_number}${v.vehicle_type ? `, ${v.vehicle_type}` : ''}` : null,
+      }
+    }
     const a = currentAssignment
     const person = (u?: { first_name?: string | null; last_name?: string | null } | null) =>
       [u?.first_name, u?.last_name].filter(Boolean).join(' ').trim() || null

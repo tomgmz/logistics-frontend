@@ -23,7 +23,7 @@ import { EMPTY_CARGO_SUMMARY } from '@/lib/cargo/summary'
 import type { CargoSummary } from '@/lib/cargo/summary'
 import { formatDateTime } from './transaction-format'
 import { PALETTE } from '@/lib/palette'
-import { BORDER_C, CYAN, MUTED } from './transaction-theme'
+import { CYAN, MUTED } from './transaction-theme'
 import { FileViewButton } from '@/components/ui/FileViewer'
 import { cachedData, cachedFetch } from '@/lib/query/useApiQuery'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
@@ -277,62 +277,33 @@ export default function ReplaceCrewPanel({
 
   return (
     <div className="flex flex-col gap-2">
-      {/* Figma "Driver and Vehicle Assignment [IN TRANSIT]" (2026-11-14): the
-          crew, then "Replace driver or vehicle?" with Edit, which turns into
-          the big Replace button. Only while the delivery is paused. After
-          delivery the card lists the crew with no button. */}
+      {/* Figma 2048-1485 (user 2026-11-17): the crew, a full-width Edit, and
+          Edit turns into the big button. Only while the delivery is paused.
+          After delivery the card lists the crew with no button. */}
       {crew && (
-        <CrewCard crew={crew}>
+        <CrewCard crew={crew} showDetail={editing && paused}>
           {canShowButton && (
-            <>
-              <div aria-hidden className="border-t border-[#424242]" />
-              <p className="text-base font-bold text-white">Replace driver or vehicle?</p>
-              {!paused && (
-                <p className="text-xs font-bold leading-snug" style={{ color: MUTED }}>
-                  Pause the delivery first (for example for a breakdown). The driver already started, so the driver or vehicle can’t simply be changed.
-                </p>
-              )}
-              {editing && paused ? (
-                <button type="button" disabled={busy} onClick={() => void openPicker()} {...writeAccess(allowed)}
-                  className={`${TEAL_BUTTON_CLASS} min-h-[56px] text-lg`} style={TEAL_BUTTON_STYLE}>
-                  Replace vehicle and driver
-                </button>
-              ) : (
+            editing && paused ? (
+              <button type="button" disabled={busy} onClick={() => void openPicker()} {...writeAccess(allowed)}
+                className={`${TEAL_BUTTON_CLASS} min-h-[56px] text-lg`} style={TEAL_BUTTON_STYLE}>
+                Replace vehicle and driver
+              </button>
+            ) : (
+              <>
                 <button type="button" disabled={!paused || busy} onClick={() => setEditing(true)} {...writeAccess(allowed)}
+                  title={paused ? undefined : 'Pause the delivery first to replace the driver or vehicle.'}
                   className={SLIM_TEAL_BUTTON_CLASS} style={TEAL_BUTTON_STYLE}>
                   <Pencil size={16} /> Edit
                 </button>
-              )}
-            </>
+                {!paused && (
+                  <p className="text-xs font-bold leading-snug -mt-1" style={{ color: MUTED }}>
+                    Pause the delivery first to replace the driver or vehicle.
+                  </p>
+                )}
+              </>
+            )
           )}
         </CrewCard>
-      )}
-      {!crew && canShowButton && (
-        <div className="rounded-xl border p-3.5 flex flex-col gap-2" style={{ borderColor: BORDER_C }}>
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 min-w-0">
-              <Repeat size={16} style={{ color: CYAN }} className="shrink-0" />
-              <h3 className="text-sm font-bold text-white">Replace driver or vehicle</h3>
-            </div>
-            <button type="button" disabled={!paused || busy} onClick={() => setEditing((v) => !v)} {...writeAccess(allowed)}
-              aria-pressed={editing}
-              className="inline-flex items-center gap-1 shrink-0 rounded-lg border px-2.5 py-1 text-[11px] font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              style={editing
-                ? { borderColor: 'rgba(77,249,237,0.45)', color: CYAN, background: 'rgba(77,249,237,0.10)' }
-                : { borderColor: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.6)' }}>
-              <Pencil size={11} />
-              {editing ? 'Done' : 'Edit'}
-            </button>
-          </div>
-          <div>
-            <button type="button" disabled={!paused || !editing || busy} onClick={() => void openPicker()} {...writeAccess(allowed)}
-              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
-              style={{ background: 'rgba(77,249,237,0.12)', border: '1px solid rgba(77,249,237,0.30)', color: CYAN }}>
-              <Repeat size={13} />
-              Replace driver or vehicle
-            </button>
-          </div>
-        </div>
       )}
 
       {open && (
