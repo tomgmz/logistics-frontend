@@ -83,7 +83,6 @@ import ResubmissionChanges from '@/components/transactions/ResubmissionChanges'
 import ReplaceCrewPanel, { ReplacementHistory } from '@/components/transactions/ReplaceCrewPanel'
 import StopTimesPanel from '@/components/transactions/StopTimesPanel'
 import PausePanel from '@/components/transactions/PausePanel'
-import DrivingShiftsPanel from '@/components/transactions/DrivingShiftsPanel'
 import BreakdownPanel from '@/components/transactions/BreakdownPanel'
 import OfficeProgressPanel from '@/components/transactions/OfficeProgressPanel'
 import LateConfirmationsPanel from '@/components/transactions/LateConfirmationsPanel'
@@ -2565,23 +2564,6 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
 
                         {/* Everything that changed on the road, in time order. */}
                         <DeliveryEventsPanel bookingId={detail.booking_id} />
-
-                        {/* Who is at the wheel, and swapping the main and second driver
-                            when the main driver's phone is dead. On the road only. */}
-                        {stage === 'in_transit' && (
-                          <DrivingShiftsPanel
-                            bookingId={detail.booking_id}
-                            inTransit
-                            hasSecondDriver={!!committedAssignment.secondDriverId}
-                            canSwap={(roleView === 'admin' || roleView === 'operations_manager') && !bookingReadOnly}
-                            allowed={canEdit}
-                            onSwapped={() => {
-                              void refreshDetail(detail.booking_id)
-                              void loadPage(true)
-                              assignmentService.getAll().then(setAllAssignments).catch(() => {})
-                            }}
-                          />
-                        )}
 
                         {/* The driver can't (phone stolen or dead): the office records
                             the next step for them, or a problem on the road. Locked
