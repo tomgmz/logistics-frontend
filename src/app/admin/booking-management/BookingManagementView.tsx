@@ -80,7 +80,7 @@ import ResubmittedBadge, { resubmissionsOf } from '@/components/transactions/Res
 import { MAX_RESUBMISSIONS } from '@/lib/booking-resubmit'
 import SharedDelayedBadge from '@/components/transactions/DelayedBadge'
 import ResubmissionChanges from '@/components/transactions/ResubmissionChanges'
-import ReplaceCrewPanel from '@/components/transactions/ReplaceCrewPanel'
+import ReplaceCrewPanel, { ReplacementHistory } from '@/components/transactions/ReplaceCrewPanel'
 import StopTimesPanel from '@/components/transactions/StopTimesPanel'
 import PausePanel from '@/components/transactions/PausePanel'
 import DrivingShiftsPanel from '@/components/transactions/DrivingShiftsPanel'
@@ -2748,7 +2748,11 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                         {/* Who decided what, the vehicle's inspection and the driver's
                             reports: read when opened, not before. */}
                         <CollapsibleSection key={`hist-${detail.booking_id}`} title="History" lazy>
-                          <TransactionRecord booking={detail as unknown as BookingWithRelations} variant="history" />
+                          <div className="flex flex-col gap-[18px]">
+                            <TransactionRecord booking={detail as unknown as BookingWithRelations} variant="history" />
+                            {/* Driver / vehicle replacements live here, not in the assignment card. */}
+                            <ReplacementHistory bookingId={detail.booking_id} />
+                          </div>
                         </CollapsibleSection>
                       </div>
                     </PanelReadyGate>

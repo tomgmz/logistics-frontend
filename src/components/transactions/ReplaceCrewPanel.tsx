@@ -1,7 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowRight, ChevronDown, ChevronRight, Pencil, Repeat, X } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { ArrowRight, Pencil, Repeat, X } from 'lucide-react'
 
 import {
   assignmentService,
@@ -25,10 +25,9 @@ import { formatDateTime } from './transaction-format'
 import { PALETTE } from '@/lib/palette'
 import { BORDER_C, CYAN, MUTED } from './transaction-theme'
 import { FileViewButton } from '@/components/ui/FileViewer'
-import { cachedFetch } from '@/lib/query/useApiQuery'
+import { cachedData, cachedFetch } from '@/lib/query/useApiQuery'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
-import { usePanelSection } from '@/components/ui/PanelReady'
-import { CrewCard, SLIM_TEAL_BUTTON_CLASS, TEAL_BUTTON_CLASS, TEAL_BUTTON_STYLE, type CrewSummary } from '@/app/admin/booking-management/BookingDetailParts'
+import { CARD_CLASS, SectionHeading, CrewCard, SLIM_TEAL_BUTTON_CLASS, TEAL_BUTTON_CLASS, TEAL_BUTTON_STYLE, type CrewSummary } from '@/app/admin/booking-management/BookingDetailParts'
 import Dropdown from '@/components/ui/Dropdown'
 import { FieldError } from '@/components/ui/FieldError'
 
@@ -101,8 +100,6 @@ export default function ReplaceCrewPanel({
   cargo?:                 CargoSummary | null
   onReplaced:             () => void
 }) {
-  const [history, setHistory] = useState<CrewReplacement[]>([])
-  const [showHistory, setShowHistory] = useState(true)
   const [editing, setEditing] = useState(false)
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -142,17 +139,6 @@ export default function ReplaceCrewPanel({
     return () => { cancelled = true }
   }, [open, bookingId])
 
-  const [loaded, setLoaded] = useState(false)
-  usePanelSection(!loaded)
-  const load = useCallback(async () => {
-    try {
-      setHistory(await cachedFetch(['booking', bookingId, 'replacements'], () => assignmentService.getReplacements(bookingId), (h) => { setHistory(h); setLoaded(true) }))
-    } catch { setHistory([]) } finally { setLoaded(true) }
-  }, [bookingId])
-  useEffect(() => { void load() }, [load, paused])
-  // Live: a replacement made by someone else joins the history (the form is
-  // not touched).
-  useLiveTable(['live:bookings'], () => { void load() })
 
   useBodyScrollLock(open)
   useEffect(() => {
@@ -177,7 +163,7 @@ export default function ReplaceCrewPanel({
   ), [vendorDrivers, bookingId])
 
   const canShowButton = inTransit && canReplace
-  if (!canShowButton && history.length === 0 && !crew) return null
+  if (!canShowButton && !crew) return null
 
   const snapshot = (f: Record<string, string>) => JSON.stringify(f)
   const form = { source, driverId, secondId, truckId, vendorId, vendorSecondId, plate: plate.trim().toUpperCase(), vehicleType, helper: helper.trim() }
@@ -264,7 +250,6 @@ export default function ReplaceCrewPanel({
       appToast.success('Driver or vehicle replaced. The drivers and the client have been told.', { action: 'assign', entityId: bookingId })
       setOpen(false)
       setEditing(false)
-      await load()
       onReplaced()
     } catch (err) {
       appToast.error(getApiErrorMessage(err, 'Could not replace the driver or vehicle.'), { action: 'assign', entityId: bookingId })
@@ -347,46 +332,6 @@ export default function ReplaceCrewPanel({
               Replace driver or vehicle
             </button>
           </div>
-        </div>
-      )}
-
-      {history.length > 0 && (
-        <div className="rounded-xl border px-3.5 py-2.5" style={{ borderColor: BORDER_C }}>
-          <button type="button" onClick={() => setShowHistory((v) => !v)}
-            className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-white/50 cursor-pointer bg-transparent border-none p-0">
-            {showHistory ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-            Replacement history ({history.length})
-          </button>
-          {showHistory && (
-            <ul className="mt-2 flex flex-col gap-3 list-none p-0 m-0">
-              {history.map((r) => {
-                const oldPlate = r.old_truck?.plate_number ?? r.old_vehicle_plate
-                const newPlate = r.new_truck?.plate_number ?? r.new_vehicle_plate
-                return (
-                  <li key={r.replacement_id} className="flex flex-col gap-0.5">
-                    <span className="text-[12px] font-semibold text-white/85 flex flex-wrap items-center gap-1">
-                      {nameOf(r.old_driver) ?? '—'}{oldPlate ? ` · ${oldPlate}` : ''}
-                      <ArrowRight size={12} className="shrink-0" />
-                      {nameOf(r.new_driver) ?? '—'}{newPlate ? ` · ${newPlate}` : ''}
-                    </span>
-                    <span className="text-[12px] text-white/70 whitespace-pre-wrap break-words">{r.reason_note}</span>
-                    <span className="text-[11px]" style={{ color: MUTED }}>
-                      {formatDateTime(r.replaced_at)}
-                      {nameOf(r.replaced_by_user) ? ` · by ${nameOf(r.replaced_by_user)}` : ''}
-                    </span>
-                    {r.transfer_required && (
-                      <span className="text-[11px]" style={{ color: r.transfer_confirmed_at ? MUTED : ORANGE }}>
-                        {r.transfer_confirmed_at
-                          ? <>Load moved to the new vehicle {formatDateTime(r.transfer_confirmed_at)}
-                              {r.transfer_photo_url && <> · <FileViewButton className="underline" url={r.transfer_photo_url} name="Load transfer photo">photo</FileViewButton></>}</>
-                          : 'Waiting for the new driver to confirm the load was moved to the new vehicle.'}
-                      </span>
-                    )}
-                  </li>
-                )
-              })}
-            </ul>
-          )}
         </div>
       )}
 
@@ -592,5 +537,63 @@ export default function ReplaceCrewPanel({
         )}
       </ReusableModal>
     </div>
+  )
+}
+
+/**
+ * Every driver / vehicle replacement made on a booking (any status): who and
+ * what was replaced by whom, why, and the load transfer. Shown in Booking
+ * Management's History section (user 2026-11-17), not in the assignment card.
+ */
+export function ReplacementHistory({ bookingId }: { bookingId: string }) {
+  // The kept copy shows at once; the fresh read replaces it.
+  const [history, setHistory] = useState<CrewReplacement[]>(
+    () => cachedData<CrewReplacement[]>(['booking', bookingId, 'replacements']) ?? [])
+  // Re-read when a live signal says a replacement may have been made.
+  const [tick, setTick] = useState(0)
+  useEffect(() => {
+    let cancelled = false
+    cachedFetch(['booking', bookingId, 'replacements'], () => assignmentService.getReplacements(bookingId))
+      .then((h) => { if (!cancelled) setHistory(h) })
+      .catch(() => { /* read-only extra; the rest of History still shows */ })
+    return () => { cancelled = true }
+  }, [bookingId, tick])
+  useLiveTable(['live:bookings'], () => setTick((n) => n + 1))
+
+  if (history.length === 0) return null
+  return (
+    <section>
+      <SectionHeading icon={<Repeat size={18} strokeWidth={2} />}>
+        Driver and vehicle replacements ({history.length})
+      </SectionHeading>
+      <ul className={`${CARD_CLASS} px-3.5 py-1 flex flex-col list-none m-0`}>
+        {history.map((r) => {
+          const oldPlate = r.old_truck?.plate_number ?? r.old_vehicle_plate
+          const newPlate = r.new_truck?.plate_number ?? r.new_vehicle_plate
+          return (
+            <li key={r.replacement_id} className="flex flex-col gap-0.5 py-2.5 border-b border-dashed border-[#818181]/60 last:border-b-0">
+              <span className="text-sm font-bold text-white flex flex-wrap items-center gap-1">
+                {nameOf(r.old_driver) ?? '—'}{oldPlate ? ` · ${oldPlate}` : ''}
+                <ArrowRight size={13} className="shrink-0" />
+                {nameOf(r.new_driver) ?? '—'}{newPlate ? ` · ${newPlate}` : ''}
+              </span>
+              <span className="text-xs text-white/75 whitespace-pre-wrap break-words">{r.reason_note}</span>
+              <span className="text-xs font-bold" style={{ color: MUTED }}>
+                {formatDateTime(r.replaced_at)}
+                {nameOf(r.replaced_by_user) ? ` · by ${nameOf(r.replaced_by_user)}` : ''}
+              </span>
+              {r.transfer_required && (
+                <span className="text-xs" style={{ color: r.transfer_confirmed_at ? MUTED : ORANGE }}>
+                  {r.transfer_confirmed_at
+                    ? <>Load moved to the new vehicle {formatDateTime(r.transfer_confirmed_at)}
+                        {r.transfer_photo_url && <> · <FileViewButton className="underline" url={r.transfer_photo_url} name="Load transfer photo">photo</FileViewButton></>}</>
+                    : 'Waiting for the new driver to confirm the load was moved to the new vehicle.'}
+                </span>
+              )}
+            </li>
+          )
+        })}
+      </ul>
+    </section>
   )
 }
