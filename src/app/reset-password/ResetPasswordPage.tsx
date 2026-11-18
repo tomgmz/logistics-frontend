@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { ASSETS } from '@/lib/data'
 import SiteFooter from '@/components/layout/SiteFooter'
 import { completePasswordReset, verifyResetToken } from '@/lib/api/auth.api'
+import { useAuthStore } from '@/lib/store/auth.store'
 import {
   IconEye,
   IconLock,
@@ -114,9 +115,15 @@ export default function ResetPasswordPage() {
     setError('')
     try {
       await completePasswordReset(token, password)
+      // The reset ended every session; forget any user this browser still
+      // remembers, or the landing page would send it to the portal instead.
+      useAuthStore.getState().clearUser()
       setDone(true)
-      // Back to the landing page, where the sign-in modal lives.
-      setTimeout(() => router.replace('/'), 2200)
+      // Not signed in automatically (OWASP: sign in again the usual way; the
+      // reset also signed out every device). The landing page opens the
+      // sign-in form straight away with a note, rather than leaving the person
+      // to find the button.
+      setTimeout(() => router.replace('/?signin=reset'), 2200)
     } catch (err: unknown) {
       const msg = extractErrorMessage(err, 'Failed to reset password. Please try again.')
       // A token rejected at submit time is spent or expired; swap the whole form

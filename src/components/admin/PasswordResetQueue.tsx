@@ -52,9 +52,11 @@ const STATUS_CFG: Record<ResetRequestStatus, { label: string; cls: string }> = {
 // Rows an admin can still issue a link for. 'expired' counts: the previous link
 // timed out unused and the person behind it is still locked out.
 const SENDABLE: ResetRequestStatus[] = ['pending', 'expired']
-// Only an untouched request can be rejected. Once a link has gone out the
-// decision stands (the API refuses too), so Reject stays disabled from then on.
-const CANCELLABLE: ResetRequestStatus[] = ['pending']
+// Reject works on an untouched request and on one whose link expired unused
+// (2026-11-18), never while a link is live (the API refuses too). Requests also
+// close by themselves: when the person signs in or changes their password, when
+// they ask again, or 7 days after the link expired.
+const CANCELLABLE: ResetRequestStatus[] = ['pending', 'expired']
 
 // Rows per page: 10 on a phone, 20 on anything wider (the user's call, 2026-10-25).
 
@@ -390,9 +392,12 @@ export default function PasswordResetQueue({
             ? `${pending.request.status === 'expired'
                  ? `The previous link expired unused. A fresh one will be emailed to ${pending.request.email}, and the old one stops working.`
                  : `A one-time reset link will be emailed to ${pending.request.email}.`
-               } It works once and expires 5 minutes after it is sent. Once sent, this request can no longer be rejected.`
+               } It works once and expires 5 minutes after it is sent. It can't be rejected while the link is still valid.`
             : pending
-              ? `${fullName(pending.request)} will not get a reset link, and this cannot be undone. They can request again from the sign-in screen.`
+              ? `${pending.request.status === 'expired'
+                   ? `The link sent to ${fullName(pending.request)} expired unused. This removes the request from the queue.`
+                   : `${fullName(pending.request)} will not get a reset link.`
+                 } This cannot be undone. They can request again from the sign-in screen.`
               : undefined
         }
         confirmLabel={

@@ -593,6 +593,13 @@ function ForgotPasswordStep({
               The link works once and expires 5 minutes after it is sent, so open it soon. You can close this window —
               check your email.
             </span>
+            {/* Same text whether or not they asked before, so it reveals nothing
+                about the account; the server keeps one request per person. */}
+            <span className="text-white/40 text-[0.76rem]">
+              Already asked before? There is still only one request. Asking again just reminds your{' '}
+              {approverLabel(role)}, and replaces a link that expired. If you sign in another way, the request closes
+              on its own.
+            </span>
           </div>
 
           <BackButton onClick={onBack} label="Back to sign in" />
@@ -1492,9 +1499,11 @@ const STEP_ORDER_PW: Step[] = ['email', 'method', 'password', 'success']
 interface SignInModalProps {
   isOpen: boolean
   onClose: () => void
+  /** A line shown above the email step, e.g. after a password reset. */
+  notice?: string | null
 }
 
-export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
+export default function SignInModal({ isOpen, onClose, notice }: SignInModalProps) {
   const [step,   setStep]   = useState<Step>('email')
   const [email,  setEmail]  = useState('')
   const [method, setMethod] = useState<'otp' | 'password' | null>(null)
@@ -1664,6 +1673,20 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
                 </div>
 
                 <AnimatePresence mode="wait">
+                  {step === 'email' && notice && (
+                    <p
+                      key="notice"
+                      role="status"
+                      className="mb-4 rounded-xl px-4 py-3 text-[0.8rem] leading-relaxed text-white/75"
+                      style={{
+                        background: 'rgba(77,249,237,0.07)',
+                        border: '1px solid rgba(77,249,237,0.22)',
+                        fontFamily: "var(--font-league-spartan), 'League Spartan', sans-serif",
+                      }}
+                    >
+                      {notice}
+                    </p>
+                  )}
                   {step === 'email' && (
                     <EmailStep key="email" onSuccess={handleEmailSuccess} />
                   )}

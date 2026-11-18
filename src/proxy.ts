@@ -67,7 +67,13 @@ async function route(req: NextRequest): Promise<NextResponse> {
   // render the landing page and drop the cookies, rather than reading them and
   // sending the browser back to the portal it just fled — the two disagreeing
   // is what turns a stale cookie into an endless reload.
-  if (pathname === '/' && req.nextUrl.searchParams.get(SIGNED_OUT_PARAM) === '1') {
+  // After a password reset ("?signin=reset") likewise: the reset revoked every
+  // session, so cookies still in this browser are dead and would only bounce
+  // the person into the portal and out again instead of the sign-in form.
+  if (
+    pathname === '/' &&
+    (req.nextUrl.searchParams.get(SIGNED_OUT_PARAM) === '1' || req.nextUrl.searchParams.get('signin') === 'reset')
+  ) {
     const res = NextResponse.next()
     res.cookies.delete('access_token')
     res.cookies.delete('refresh_token')

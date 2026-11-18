@@ -21,6 +21,22 @@ export default function Navbar() {
   const [menuOpen,    setMenuOpen]    = useState(false);
   const [activeIdx,   setActiveIdx]   = useState(0);
   const [signInOpen,  setSignInOpen]  = useState(false);
+  const [signInNotice, setSignInNotice] = useState<string | null>(null);
+
+  // "/?signin=reset" (the reset-password page after a successful reset) opens
+  // the sign-in form at once with a note, instead of leaving the person on the
+  // landing page. Read from location, not useSearchParams, so the landing page
+  // needs no Suspense boundary; the parameter is dropped from the address.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const reason = params.get('signin');
+    if (!reason) return;
+    if (reason === 'reset') setSignInNotice('Your password was changed. Sign in with your new password.');
+    setSignInOpen(true);
+    params.delete('signin');
+    const rest = params.toString();
+    window.history.replaceState(null, '', `${window.location.pathname}${rest ? `?${rest}` : ''}${window.location.hash}`);
+  }, []);
 
   const { scrollYProgress } = useScroll();
   const scaleX = useSpring(scrollYProgress, { stiffness: 200, damping: 30 });
@@ -247,7 +263,11 @@ export default function Navbar() {
       </AnimatePresence>
 
       {/* Sign In Modal */}
-      <SignInModal isOpen={signInOpen} onClose={() => setSignInOpen(false)} />
+      <SignInModal
+        isOpen={signInOpen}
+        notice={signInNotice}
+        onClose={() => { setSignInOpen(false); setSignInNotice(null); }}
+      />
     </>
   );
 }
