@@ -84,7 +84,6 @@ const SERVICE_ICON: Record<string, ReactNode> = {
   'google-maps':   <MapPin size={15} />,
   'push':          <Bell size={15} />,
   'idanalyzer':    <ScanLine size={15} />,
-  'google-vision': <ScanLine size={15} />,
 }
 
 function ago(iso: string | null, now: number): string {

@@ -392,8 +392,6 @@ export default function UserFormModal({
   const [licenseTried,    setLicenseTried]    = useState(false)
   const [licenseIssues,   setLicenseIssues]   = useState<string[]>([])
   const [renewalScanning, setRenewalScanning] = useState(false)
-  // Words where the scan may have read an Ñ as a plain N.
-  const [nChecks, setNChecks] = useState<NonNullable<LicenseOCRResult['name_n_checks']>>([])
   // The license number and expiry come only from the license photo: read-only
   // on create and edit, changed by uploading a new photo; the server refuses a
   // typed value. Typing is allowed only when the scanners themselves failed.
@@ -402,8 +400,6 @@ export default function UserFormModal({
   const [scanMissing,     setScanMissing]     = useState<string | null>(null)
   // ID Analyzer's fake / edited card flags (they need the note).
   const [scanFlags,    setScanFlags]    = useState<string[]>([])
-  // Read by the Google Vision fallback: text only, no fake-card check.
-  const [scanFallback, setScanFallback] = useState(false)
 
   // Licence links expire after 10–15 minutes. A fresh one is kept here rather
   // than in `user`, because a new `user` resets whatever the admin has typed.
@@ -464,30 +460,30 @@ export default function UserFormModal({
     setScanError(null)
     setEligibility(null)
     setNameCheck(null)
-    setNChecks([])
     setScanLocked(new Set())
     setScanUnavailable(false)
     setScanMissing(null)
     setScanFlags([])
-    setScanFallback(false)
 
     try {
       const result = await ocrService.scanLicense(file)
       setScanFlags(fraudLines(result))
-      setScanFallback(result.full_check === false)
       setScanMissing(unreadMessage(result))
-      setNChecks((result.name_n_checks ?? []).map(c => ({
-        ...c, word: toNameCase(c.word), suggested: toNameCase(c.suggested),
-      })))
       if (result.first_name && result.middle_name) {
         setNameCheck({ first: toNameCase(result.first_name), middle: toNameCase(result.middle_name) })
       }
+      // When the card's name was read, all four name fields come from this card,
+      // empty where it has none: a re-scan must not leave an earlier scan's
+      // middle name or suffix behind.
+      const nameRead = !!(result.first_name || result.last_name)
       setForm(prev => ({
         ...prev,
-        ...(result.first_name     && { first_name:     toNameCase(result.first_name) }),
-        ...(result.last_name      && { last_name:      toNameCase(result.last_name) }),
-        ...(result.middle_name    && { middle_name:    toNameCase(result.middle_name) }),
-        ...(result.suffix         && { suffix:         result.suffix }),
+        ...(nameRead && {
+          first_name:  result.first_name  ? toNameCase(result.first_name)  : '',
+          last_name:   result.last_name   ? toNameCase(result.last_name)   : '',
+          middle_name: result.middle_name ? toNameCase(result.middle_name) : '',
+          suffix:      result.suffix ?? null,
+        }),
         // Always from this card: an earlier scan's value must not stay behind.
         license_number: result.license_number ?? '',
         license_expiry: result.license_expiry ?? '',
@@ -538,14 +534,12 @@ export default function UserFormModal({
 
     setRenewalScanning(true)
     setScanError(null)
-    setScanFallback(false)
     setScanUnavailable(false)
     setScanMissing(null)
     const issues: string[] = []
     try {
       const r = await ocrService.scanLicense(file)
       issues.push(...fraudLines(r))
-      setScanFallback(r.full_check === false)
       if (r.license_number) {
         // Compared with the saved number (the field may hold an earlier upload's).
         if (!sameLicenseNumber(r.license_number, initialState.license_number)) {
@@ -614,11 +608,9 @@ export default function UserFormModal({
     setScanError(null)
     setEligibility(null)
     setNameCheck(null)
-    setNChecks([])
     setScanUnavailable(false)
     setScanMissing(null)
     setScanFlags([])
-    setScanFallback(false)
     setScanLocked(savedLicenseLocks(tab, initialState, isEdit))
     setLockValues(lockValuesOf(savedLicenseLocks(tab, initialState, isEdit), initialState))
     setLicenseVerified(false)
@@ -656,7 +648,6 @@ export default function UserFormModal({
     if (typeof value === 'string' && NAME_FIELDS.has(key)) value = toNameCase(value)
     // Typing in either name field is its own answer to the middle-name question.
     if (key === 'first_name' || key === 'middle_name') setNameCheck(null)
-    if (NAME_FIELDS.has(key)) setNChecks(prev => prev.filter(c => c.field !== key))
     setForm(prev => {
       const next = { ...prev, [key]: value }
       validateField(key, value, next)
@@ -755,7 +746,6 @@ export default function UserFormModal({
     setScanUnavailable(false)
     setScanMissing(null)
     setScanFlags([])
-    setScanFallback(false)
     setScanLocked(savedLicenseLocks(tab, initialState, isEdit))
     setLockValues(lockValuesOf(savedLicenseLocks(tab, initialState, isEdit), initialState))
     setLicenseVerified(false)
@@ -1024,11 +1014,6 @@ export default function UserFormModal({
                   {scanMissing && !scanError && (
                     <p className="w-full text-[11px] text-red-400">{scanMissing}</p>
                   )}
-                  {scanFallback && !scanError && (
-                    <p className="w-full text-[11px] text-[#FFEA00]">
-                      Read by the backup scanner, so the fake-card check did not run. Check the card itself and LTO (LTMS) carefully.
-                    </p>
-                  )}
                 </div>
 
                 {fe.license_image && (
@@ -1118,42 +1103,6 @@ export default function UserFormModal({
                 </div>
               </Field>
             </div>
-
-            {nChecks.map(c => (
-              <div
-                key={`${c.field}:${c.word}`}
-                className="flex flex-col gap-2.5 rounded-[10px] border border-[#4df9ed40] bg-[#4df9ed0d] px-3.5 py-3"
-              >
-                <p className="text-[12px] leading-snug text-[#cfcfcf]">
-                  The scan wasn&apos;t sure about an &ldquo;N&rdquo; in{' '}
-                  <span className="font-semibold text-white">&ldquo;{c.word}&rdquo;</span>. Check the license: is it spelled{' '}
-                  <span className="font-semibold text-white">&ldquo;{c.suggested}&rdquo;</span>?
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const swap = (v: string) => v.split(' ').map(w => (w === c.word ? c.suggested : w)).join(' ')
-                      setForm(prev => ({ ...prev, [c.field]: swap(String(prev[c.field] ?? '')) }))
-                      setNameCheck(prev => prev && { first: swap(prev.first), middle: swap(prev.middle) })
-                      // The card's own reading, corrected: not a change from the card.
-                      setLockValues(prev => c.field in prev ? { ...prev, [c.field]: swap(prev[c.field]) } : prev)
-                      setNChecks(prev => prev.filter(x => x !== c))
-                    }}
-                    className="rounded-[8px] border border-[#424242] px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:border-[#4df9ed]"
-                  >
-                    Yes, use &ldquo;{c.suggested}&rdquo;
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setNChecks(prev => prev.filter(x => x !== c))}
-                    className="rounded-[8px] border border-[#424242] px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:border-[#4df9ed]"
-                  >
-                    No, keep &ldquo;{c.word}&rdquo;
-                  </button>
-                </div>
-              </div>
-            ))}
 
             {nameCheck && (
               <div className="flex flex-col gap-2.5 rounded-[10px] border border-[#4df9ed40] bg-[#4df9ed0d] px-3.5 py-3">

@@ -273,8 +273,6 @@ export interface LicenseOCRResult {
   last_name:           string | null
   middle_name:         string | null
   suffix:              string | null
-  // Name words whose "N" the scan was unsure of — it may be an Ñ with a worn tilde.
-  name_n_checks?:      { field: 'first_name' | 'last_name' | 'middle_name'; word: string; suggested: string }[]
   dl_codes:            string[]
   restriction_codes:   string[]
   vehicle_eligibility: VehicleEligibility | null
@@ -283,9 +281,7 @@ export interface LicenseOCRResult {
   not_license_reason?: string | null
   /** Fake / edited card flags (ID Analyzer); saving then needs a note. */
   fraud_warnings?:     { code: string; description: string }[]
-  provider?:           'idanalyzer' | 'vision'
-  /** False when the backup scanner read it (no fake-card check). */
-  full_check?:         boolean
+  provider?:           'idanalyzer'
 }
 
 export const ocrService = {
