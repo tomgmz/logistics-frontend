@@ -95,6 +95,8 @@ interface MessageItemProps {
   currentUserId:  string
   /** The sender's name (with role); your own messages say "You". */
   senderName?:    string
+  /** Shown after the name (a group member whose account is inactive or archived). */
+  senderTag?:     React.ReactNode
   /** True on the last message of a run from one sender: name (and their avatar). */
   showName?:      boolean
   initials?:      string
@@ -122,7 +124,7 @@ interface MessageItemProps {
 }
 
 export default function MessageItem({
-  messageId, isMine, currentUserId, senderName, showName = true, initials = '?', online,
+  messageId, isMine, currentUserId, senderName, senderTag, showName = true, initials = '?', online,
   createdAt, body, attachmentUrl, stamped, seen, pending = false, replyTo,
   reactions = [], onReact, onReply, onDelete, compact = false, footer, hideIdentity = false,
 }: MessageItemProps) {
@@ -155,6 +157,7 @@ export default function MessageItem({
       {!hideIdentity && !isMine && (
         <>
           <span className="min-w-0 truncate text-[13px] font-semibold text-white/70">{senderName}</span>
+          {senderTag}
           <span className="text-[13px] text-white/30">·</span>
         </>
       )}

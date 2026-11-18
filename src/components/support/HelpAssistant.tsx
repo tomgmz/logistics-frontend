@@ -455,7 +455,8 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
               <div>
                 <p className="text-sm font-bold text-white">Chat Support</p>
                 <p className="text-[11px] text-white/40">
-                  {tab === 'messages' && canTicket ? 'Your driver and our team' : 'Answers right away · our team replies by email'}
+                  {/* Drivers and clients can't message each other: the inbox is the office's messages only. */}
+                  {tab === 'messages' && canTicket ? 'Messages from our team' : 'Answers right away · our team replies by email'}
                 </p>
               </div>
             </div>

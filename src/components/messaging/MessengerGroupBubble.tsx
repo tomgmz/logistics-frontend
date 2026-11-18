@@ -1,6 +1,7 @@
 'use client'
 
 import { useStickToBottom } from '@/lib/hooks/useStickToBottom'
+import AccountStatusTag from './AccountStatusTag'
 import { nameWithRole } from '@/lib/roles'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
@@ -347,6 +348,7 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
                         isMine={isMine}
                         currentUserId={currentUserId}
                         senderName={sender ? nameWithRole(sender.first_name, sender.last_name, sender.role) : 'Someone'}
+                        senderTag={<AccountStatusTag status={sender?.account_status} />}
                         showName={showName}
                         initials={sender ? `${sender.first_name?.[0] ?? '?'}${sender.last_name?.[0] ?? '?'}`.toUpperCase() : '?'}
                         online={onlineIds.includes(msg.sender_id)}

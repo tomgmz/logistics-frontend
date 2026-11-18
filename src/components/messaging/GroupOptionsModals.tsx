@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import AccountStatusTag from './AccountStatusTag'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X, Search, Loader2, Users, Check, UserPlus, Pencil, UserMinus, Inbox } from 'lucide-react'
 import { messagingService, type MessagableUser, type GroupMemberRequest } from '@/lib/services/messaging.service'
@@ -151,7 +152,7 @@ function MembersModal({ group, currentUserId, onClose, onChanged }: {
         </p>
         {[...joined].sort(sortByName).map(m => (
           <PersonRow key={m.user_id} first={m.first_name} last={m.last_name} role={m.role}
-            right={<>{tag(m)}{removeControl(m)}</>} />
+            right={<><AccountStatusTag status={m.account_status} />{tag(m)}{removeControl(m)}</>} />
         ))}
         {invited.length > 0 && (
           <>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef, useCallback } from 'react'
+import AccountStatusTag from './AccountStatusTag'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Search, Loader2, Users, Expand } from 'lucide-react'
 import { matchesPersonSearch, nameWithRole } from '@/lib/roles'
@@ -229,7 +230,10 @@ function PanelDmItem({ conv, currentUserId, isOnline, onSelect }: { conv: Conver
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2">
-          <span className={`ff-body text-[13px] truncate ${hasUnread ? 'text-white' : 'text-white/65'}`}>{nameWithRole(p.first_name, p.last_name, p.role)}</span>
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className={`ff-body text-[13px] truncate ${hasUnread ? 'text-white' : 'text-white/65'}`}>{nameWithRole(p.first_name, p.last_name, p.role)}</span>
+            <AccountStatusTag status={p.account_status} />
+          </span>
           {last && <span className="ff-body text-[10px] text-white/22 shrink-0">{formatConversationTime(last.created_at)}</span>}
         </div>
         <div className="flex items-center gap-1.5">

@@ -9,6 +9,9 @@ export type UserRole =
   | 'driver'
   | 'it_admin'
 
+/** users.status of someone in a chat: inactive or archived closes a one-to-one chat (2026-11-18). */
+export type AccountStatus = 'active' | 'inactive' | 'archived'
+
 export interface MessageReaction  { emoji: string; user_id: string }
 export interface MessageReplyTo   { message_id: string; content: string; sender_id: string }
 export interface BookingRefRow    { booking_id: string; reference_number: string | null }
@@ -30,6 +33,7 @@ export interface ConversationWithDetails {
     last_name: string | null
     role: UserRole
     email: string
+    account_status?: AccountStatus
   }
   /** The booking the conversation was started for, if any. */
   booking?: BookingRefRow | null
@@ -72,6 +76,7 @@ export interface MessageParticipant {
   role: UserRole
   email: string
   is_online?: boolean
+  account_status?: AccountStatus
 }
 
 export interface Message {
@@ -117,6 +122,7 @@ export function toConversation(raw: ConversationWithDetails): Conversation {
       role:       raw.other_user.role,
       email:      raw.other_user.email,
       is_online:  false,
+      account_status: raw.other_user.account_status ?? 'active',
     }],
     last_message: raw.last_message ? {
       message_id: raw.last_message.message_id,
@@ -177,6 +183,7 @@ export interface GroupMemberRaw {
     last_name: string | null
     role: UserRole
     email: string
+    account_status?: AccountStatus
   }
 }
 
@@ -214,6 +221,7 @@ export interface GroupMember {
   status: 'pending' | 'accepted' | 'declined'
   invited_by: string
   last_read_at: string | null
+  account_status?: AccountStatus
 }
 
 export interface Group {
@@ -242,6 +250,7 @@ export function toGroup(raw: GroupRaw): Group {
       status:       m.status,
       invited_by:   m.invited_by,
       last_read_at: m.last_read_at ?? null,
+      account_status: m.user.account_status ?? 'active',
     })),
     last_message: raw.last_message ? {
       message_id: raw.last_message.message_id,

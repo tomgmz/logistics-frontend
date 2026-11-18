@@ -1,6 +1,7 @@
 'use client'
 
 import { nameWithRole } from '@/lib/roles'
+import AccountStatusTag from './AccountStatusTag'
 
 import { motion } from 'framer-motion'
 import { ArrowLeft, MessageCirclePlus, Search } from 'lucide-react'
@@ -102,8 +103,8 @@ export default function ConversationList({
 
 /** Row per the Figma: ringed initials (cyan when unread), name (cyan bold when
  *  unread), the last message ("Name: …" bold when unread, "You: …" grey), time. */
-function Row({ initials, name, preview, time, unread, pending, selected, online, index, onClick }: {
-  initials: string; name: string; preview: React.ReactNode; time?: string
+function Row({ initials, name, tag, preview, time, unread, pending, selected, online, index, onClick }: {
+  initials: string; name: string; tag?: React.ReactNode; preview: React.ReactNode; time?: string
   unread: boolean; pending?: boolean; selected: boolean; online?: boolean; index: number; onClick: () => void
 }) {
   return (
@@ -124,7 +125,10 @@ function Row({ initials, name, preview, time, unread, pending, selected, online,
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
-          <span className={`text-[17px] leading-tight truncate ${unread ? 'text-[var(--color-cyan)] font-bold' : 'text-white font-medium'}`}>{name}</span>
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className={`text-[17px] leading-tight truncate ${unread ? 'text-[var(--color-cyan)] font-bold' : 'text-white font-medium'}`}>{name}</span>
+            {tag}
+          </span>
           {time && <span className="text-[12px] font-medium text-white/45 shrink-0 leading-tight">{time}</span>}
         </div>
         <p className={`text-[13px] leading-snug truncate ${unread ? 'text-white font-bold' : 'text-white/45 font-medium'}`}>{preview}</p>
@@ -153,6 +157,7 @@ function DmItem({ conv, index, isSelected, currentUserId, onSelect, isOnline }: 
     <Row
       initials={`${p.first_name?.[0] ?? '?'}${p.last_name?.[0] ?? ''}`.toUpperCase()}
       name={nameWithRole(p.first_name, p.last_name, p.role)}
+      tag={<AccountStatusTag status={p.account_status} />}
       preview={preview}
       time={last ? formatConversationTime(last.created_at) : undefined}
       unread={hasUnread}

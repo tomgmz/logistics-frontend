@@ -1,6 +1,7 @@
 'use client'
 
 import { useStickToBottom } from '@/lib/hooks/useStickToBottom'
+import AccountStatusTag, { closedChatNotice, isAccountClosed } from './AccountStatusTag'
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { Loader2, ChevronLeft } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -285,7 +286,10 @@ export default function ChatWindow({ conversation, draftUser, currentUserId, isP
           {isOnline && <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-[var(--color-green)] border-2 border-[var(--color-bg)]" />}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-[22px] font-medium text-white leading-6 truncate">{nameWithRole(participant.first_name, participant.last_name, participant.role)}</p>
+          <div className="flex min-w-0 items-center gap-2">
+            <p className="text-[22px] font-medium text-white leading-6 truncate">{nameWithRole(participant.first_name, participant.last_name, participant.role)}</p>
+            <AccountStatusTag status={participant.account_status} />
+          </div>
           <AnimatePresence mode="wait">
             {isOtherTyping ? (
               <motion.p key="typing" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.15 }} className="text-[14px] font-medium text-[var(--color-cyan)] flex items-center gap-1">
@@ -369,6 +373,7 @@ export default function ChatWindow({ conversation, draftUser, currentUserId, isP
         onCancelReply={() => setReplyTo(null)}
         // Same key as the floating chat; a chat not yet created is keyed by the person.
         draftKey={convId ? `dm:${convId}` : `dm-user:${participant.user_id}`}
+        closedNotice={isAccountClosed(participant.account_status) ? closedChatNotice(participant.first_name, participant.account_status) : null}
       showJumpToLatest={!atLatest} onJumpToLatest={scrollToLatest} />
     </div>
   )

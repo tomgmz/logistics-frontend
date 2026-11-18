@@ -31,6 +31,8 @@ interface MessageInputProps {
   onJumpToLatest?:   () => void
   /** Names the chat ('dm:<id>', 'group:<id>') so unsent text is kept per chat. */
   draftKey?:         string
+  /** The other person's account is inactive or archived: this line replaces the box. */
+  closedNotice?:     string | null
 }
 
 /** The box grows up to this many lines, then scrolls inside. */
@@ -46,6 +48,7 @@ export default function MessageInput({
   showJumpToLatest = false,
   onJumpToLatest,
   draftKey,
+  closedNotice,
 }: MessageInputProps) {
   // Unsent text comes back when the chat is reopened (and after a reload).
   const [text, setText]           = useMessageDraft(draftKey)
@@ -146,6 +149,15 @@ export default function MessageInput({
   // Same height as a one-line pill, so the side buttons line up with it.
   const slotH    = compact ? 'h-9' : 'h-[50px]'
   const iconBtn  = 'group inline-flex shrink-0 items-center justify-center rounded-md p-1 text-white/70 transition-colors duration-100 hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-50'
+
+  // Nobody to reply to (2026-11-18): the box gives way to a plain line, the
+  // jump-to-latest arrow stays.
+  if (closedNotice) return (
+    <div className={`ff-darker relative shrink-0 border-t border-white/[0.12] bg-[#0a0a0a] ${compact ? 'px-3 py-2.5' : 'px-4 py-4'}`}>
+      {onJumpToLatest && <JumpToLatest show={showJumpToLatest} onClick={onJumpToLatest} />}
+      <p role="status" className={`text-center font-semibold text-white/55 ${compact ? 'text-[13px]' : 'text-[15px]'}`}>{closedNotice}</p>
+    </div>
+  )
 
   // Photo, the pill field (emoji inside, Messenger-style) and a round send
   // button in one row; a reply being written is quoted above it.

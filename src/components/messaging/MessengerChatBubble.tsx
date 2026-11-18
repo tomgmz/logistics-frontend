@@ -1,6 +1,7 @@
 'use client'
 
 import { useStickToBottom } from '@/lib/hooks/useStickToBottom'
+import AccountStatusTag, { closedChatNotice, isAccountClosed } from './AccountStatusTag'
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Loader2, Minus } from 'lucide-react'
@@ -222,7 +223,10 @@ export default function MessengerChatBubble({ conversationId, index }: Props) {
             <p className="ff-body text-xs text-white/30">Loading…</p>
           ) : (
             <>
-              <p className="ff-body text-xs text-white truncate">{participant ? nameWithRole(participant.first_name, participant.last_name, participant.role) : ''}</p>
+              <div className="flex min-w-0 items-center gap-1.5">
+                <p className="ff-body text-xs text-white truncate">{participant ? nameWithRole(participant.first_name, participant.last_name, participant.role) : ''}</p>
+                <AccountStatusTag status={participant?.account_status} />
+              </div>
               <AnimatePresence mode="wait">
                 {isTyping ? (
                   <motion.p key="t" initial={{ opacity: 0, y: 2 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="ff-body text-[9px] text-[var(--color-cyan)] flex items-center gap-0.5">
@@ -302,6 +306,7 @@ export default function MessengerChatBubble({ conversationId, index }: Props) {
           onCancelReply={() => setReplyTo(null)}
           compact
           draftKey={`dm:${conversationId}`}
+          closedNotice={participant && isAccountClosed(participant.account_status) ? closedChatNotice(participant.first_name, participant.account_status) : null}
         showJumpToLatest={!atLatest} onJumpToLatest={scrollToLatest} />
       </div>
     </motion.div>
