@@ -392,8 +392,6 @@ export function CollapsibleSection({
  * with a `data-jump="<name>"` attribute anywhere inside the scroll area.
  * Hidden once the last card is reached or everything fits.
  */
-/** Height of the arrow's area at the panel's bottom (label + chevron + fade). */
-const JUMPER_ZONE = 96
 /** Space left above a card once jumped to. */
 const JUMP_GAP = 12
 
@@ -407,10 +405,10 @@ export function NextCardJumper({ scrollRef }: { scrollRef: RefObject<HTMLElement
     // At (or near) the bottom, or nothing to scroll: no cue.
     if (box.scrollTop + box.clientHeight >= box.scrollHeight - 8) { setNext(null); return }
     const boxTop = box.getBoundingClientRect().top
-    // The first card whose heading is not yet on screen: below the visible
-    // area, or behind the arrow itself. A card you can already see is never
-    // offered.
-    const fold = box.clientHeight - JUMPER_ZONE
+    // The first card that starts completely below the panel's visible bottom
+    // edge. A card with any part on screen, even peeking under the arrow, is
+    // never offered (user 2026-11-18: naming a card already shown felt wrong).
+    const fold = box.clientHeight - 4
     const maxScroll = box.scrollHeight - box.clientHeight
     const targets = Array.from(box.querySelectorAll<HTMLElement>('[data-jump]'))
       .filter((el) => el.offsetParent !== null)
