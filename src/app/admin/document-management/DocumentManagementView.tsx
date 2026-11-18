@@ -1,6 +1,6 @@
 'use client'
 
-import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
+import TableEmptyState from '@/components/ui/TableEmptyState'
 import Pagination from '@/components/ui/Pagination'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
@@ -847,17 +847,20 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
                 <Spinner label="Loading documents…" />
               ) : error ? (
                 <ErrorState message={error} onRetry={() => void load()} />
-              ) : docs.length === 0 ? (
-                <div className="flex flex-1 flex-col items-center justify-center gap-3 px-4 py-12 text-center">
-                  <FileSearch size={40} className="text-white/20" />
-                  <p className="text-sm text-white/45">
-                    {hasFileFilters ? 'No documents match your filters.'
-                      : nav.level === 'review' ? 'Nothing is waiting for review.'
-                      : archivedView ? 'No archived documents.'
-                      : 'No documents in this folder yet.'}
-                  </p>
-                  <ClearFiltersLink show={hasFileFilters} onClear={resetFilters} className="mt-0" />
-                </div>
+              ) : docs.length === 0 && view === 'grid' ? (
+                <TableEmptyState
+                  icon={FileSearch}
+                  filtered={hasFileFilters}
+                  title={hasFileFilters ? undefined
+                    : nav.level === 'review' ? 'Nothing waiting for review'
+                    : archivedView ? 'No archived documents'
+                    : 'No documents in this folder yet'}
+                  message={hasFileFilters ? 'No documents match your search or filters.'
+                    : nav.level === 'review' ? 'Uploads waiting for another reviewer appear here.'
+                    : archivedView ? 'Archived documents appear here.'
+                    : 'Files uploaded or recorded for this folder appear here.'}
+                  onClear={resetFilters}
+                />
               ) : view === 'grid' ? (
                 <div className="overflow-x-auto lg:overflow-auto flex-[1_0_auto] lg:flex-1 lg:min-h-0 p-4 md:p-6">
                   <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6">
@@ -898,7 +901,7 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
                   </div>
                 </div>
               ) : (
-                <div className="overflow-x-auto lg:overflow-auto flex-[1_0_auto] lg:flex-1 lg:min-h-0">
+                <div className="flex flex-col overflow-x-auto lg:overflow-auto flex-[1_0_auto] lg:flex-1 lg:min-h-0">
                   <table className="data-table min-w-[820px]">
                     <thead className="sticky top-0 z-10">
                       <tr>
@@ -982,6 +985,21 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
                       ))}
                     </tbody>
                   </table>
+                  {docs.length === 0 && (
+                    <TableEmptyState
+                      icon={FileSearch}
+                      filtered={hasFileFilters}
+                      title={hasFileFilters ? undefined
+                        : nav.level === 'review' ? 'Nothing waiting for review'
+                        : archivedView ? 'No archived documents'
+                        : 'No documents in this folder yet'}
+                      message={hasFileFilters ? 'No documents match your search or filters.'
+                        : nav.level === 'review' ? 'Uploads waiting for another reviewer appear here.'
+                        : archivedView ? 'Archived documents appear here.'
+                        : 'Files uploaded or recorded for this folder appear here.'}
+                      onClear={resetFilters}
+                    />
+                  )}
                 </div>
               )}
               {!loading && !error && total > 0 && (
@@ -994,16 +1012,8 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
                 <Spinner label="Loading folders…" />
               ) : folderError ? (
                 <ErrorState message={folderError} onRetry={() => void loadFolders()} />
-              ) : folderRows.length === 0 ? (
-                <div className="flex flex-1 flex-col items-center justify-center gap-3 px-4 py-12 text-center">
-                  <FileSearch size={40} className="text-white/20" />
-                  <p className="text-sm text-white/45">
-                    {search ? 'Nothing matches your search.' : 'No documents have been recorded yet.'}
-                  </p>
-                  <ClearFiltersLink show={!!search} onClear={resetFilters} className="mt-0" />
-                </div>
               ) : (
-                <div className="overflow-x-auto lg:overflow-auto flex-[1_0_auto] lg:flex-1 lg:min-h-0">
+                <div className="flex flex-col overflow-x-auto lg:overflow-auto flex-[1_0_auto] lg:flex-1 lg:min-h-0">
                   <table className="data-table min-w-[720px]">
                     <thead className="sticky top-0 z-10">
                       <tr>
@@ -1041,6 +1051,15 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
                       ))}
                     </tbody>
                   </table>
+                  {folderRows.length === 0 && (
+                    <TableEmptyState
+                      icon={FileSearch}
+                      filtered={!!search}
+                      title={search ? undefined : 'No documents yet'}
+                      message={search ? 'Nothing matches your search.' : 'Folders appear once a file is recorded or uploaded.'}
+                      onClear={resetFilters}
+                    />
+                  )}
                 </div>
               )}
               {!folderLoading && !folderError && folderRows.length > 0 && (

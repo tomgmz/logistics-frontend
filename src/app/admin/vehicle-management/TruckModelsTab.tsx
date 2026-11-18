@@ -1,6 +1,6 @@
 'use client'
 
-import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
+import TableEmptyState from '@/components/ui/TableEmptyState'
 import { useRef, useState, type ReactNode } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Upload, Truck as TruckIcon, Pencil, Archive, Eye } from 'lucide-react'
@@ -435,24 +435,9 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete, archive 
                 Try again
               </button>
             </div>
-          ) : models.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center gap-4 py-12 text-center px-4">
-              <TruckIcon size={40} className="text-white/20" />
-              <p className="text-sm text-white/45">
-                {modelCount === 0
-                  ? (archivedView ? 'No archived models.' : 'No truck models yet.')
-                  : 'No models match your search.'}
-              </p>
-              <ClearFiltersLink show={modelCount > 0} onClear={() => setSearch('')} className="mt-0" />
-              {modelCount === 0 && canCreate && !archivedView && (
-                <button type="button" onClick={openCreate} className="text-[var(--color-cyan)] text-sm font-bold">
-                  Add the first model
-                </button>
-              )}
-            </div>
           ) : (
             <>
-            <div className="overflow-x-auto lg:overflow-auto flex-[1_0_auto] lg:flex-1 lg:min-h-0">
+            <div className="flex flex-col overflow-x-auto lg:overflow-auto flex-[1_0_auto] lg:flex-1 lg:min-h-0">
               <table className="data-table min-w-[700px]">
                 <thead className="sticky top-0 z-10">
                   <tr className="[&>th]:whitespace-nowrap">
@@ -504,6 +489,22 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete, archive 
                   ))}
                 </tbody>
               </table>
+              {models.length === 0 && (
+                <TableEmptyState
+                  icon={TruckIcon}
+                  filtered={modelCount > 0}
+                  title={modelCount === 0 ? (archivedView ? 'No archived models' : 'No truck models yet') : undefined}
+                  message={modelCount > 0
+                    ? 'No models match your search.'
+                    : archivedView ? 'Archived models appear here.' : 'Add a model before adding vehicles of that kind.'}
+                  onClear={() => setSearch('')}
+                  action={modelCount === 0 && canCreate && !archivedView && (
+                    <button type="button" onClick={openCreate} className="text-[var(--color-cyan)] text-sm font-bold">
+                      Add the first model
+                    </button>
+                  )}
+                />
+              )}
             </div>
             <Pagination page={page} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPageChange={setPage} disabled={table.fetching} />
             </>

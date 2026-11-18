@@ -1,6 +1,6 @@
 'use client'
 
-import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
+import TableEmptyState from '@/components/ui/TableEmptyState'
 import { useState, type ReactNode } from 'react'
 import { CheckCircle2, ChevronRight, ExternalLink, Mail, Ticket } from 'lucide-react'
 import SidePanel from '@/components/ui/SidePanel'
@@ -284,26 +284,9 @@ export default function SupportTicketsView() {
                 Try again
               </button>
             </div>
-          ) : tickets.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center gap-3 py-12 text-center px-4">
-              <Ticket size={40} className="text-white/20" />
-              <p className="text-sm text-white/45">
-                {counts.all === 0
-                  ? 'No tickets yet.'
-                  : statusFilter === 'open' && !search.trim()
-                    ? 'No open tickets.'
-                    : 'No tickets match your filters.'}
-              </p>
-              {/* Clearing shows every ticket, resolved ones too. */}
-              <ClearFiltersLink
-                show={counts.all > 0}
-                onClear={() => { setSearch(''); setStatusFilter('all'); setPage(1) }}
-                className="mt-0"
-              />
-            </div>
           ) : (
             <>
-            <div className="flex-[1_0_auto] lg:flex-1 overflow-x-auto lg:overflow-auto lg:min-h-0">
+            <div className="flex flex-col flex-[1_0_auto] lg:flex-1 overflow-x-auto lg:overflow-auto lg:min-h-0">
               <table className="data-table min-w-[960px]">
                 <thead className="sticky top-0 z-10">
                   <tr className="h-11 border-b border-[#424242]">
@@ -351,6 +334,21 @@ export default function SupportTicketsView() {
                   })}
                 </tbody>
               </table>
+              {tickets.length === 0 && (
+                <TableEmptyState
+                  icon={Ticket}
+                  // Clearing shows every ticket, resolved ones too.
+                  filtered={counts.all > 0}
+                  title={counts.all === 0 ? 'No tickets yet'
+                    : statusFilter === 'open' && !search.trim() ? 'No open tickets' : undefined}
+                  message={counts.all === 0
+                    ? 'Tickets opened from the help assistant appear here.'
+                    : statusFilter === 'open' && !search.trim()
+                      ? 'Every ticket has been resolved.'
+                      : 'No tickets match your search or filters.'}
+                  onClear={() => { setSearch(''); setStatusFilter('all'); setPage(1) }}
+                />
+              )}
             </div>
             <Pagination page={page} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPageChange={setPage} disabled={table.fetching} />
             </>

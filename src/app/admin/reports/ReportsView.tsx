@@ -1,6 +1,6 @@
 'use client'
 
-import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
+import TableEmptyState from '@/components/ui/TableEmptyState'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Siren, ChevronRight } from 'lucide-react'
@@ -314,24 +314,9 @@ export default function ReportsView() {
                 Try again
               </button>
             </div>
-          ) : reports.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center gap-3 py-12 text-center px-4">
-              <Siren size={40} className="text-white/20" />
-              <p className="text-sm text-white/45">
-                {counts.all === 0
-                  ? (isFleet ? 'No vehicle-related reports yet.' : 'No driver has raised a report yet.')
-                  : 'No reports match your filters.'}
-              </p>
-              {/* Clearing shows every report, resolved ones too. */}
-              <ClearFiltersLink
-                show={counts.all > 0}
-                onClear={() => { setSearch(''); setStatusFilter('all'); setTypeFilter('all'); setPage(1) }}
-                className="mt-0"
-              />
-            </div>
           ) : (
             <>
-            <div className="flex-[1_0_auto] lg:flex-1 overflow-x-auto lg:overflow-auto lg:min-h-0">
+            <div className="flex flex-col flex-[1_0_auto] lg:flex-1 overflow-x-auto lg:overflow-auto lg:min-h-0">
               <table className="data-table min-w-[900px]">
                 <thead className="sticky top-0 z-10">
                   <tr className="h-11 border-b border-[#424242]">
@@ -385,6 +370,18 @@ export default function ReportsView() {
                   ))}
                 </tbody>
               </table>
+              {reports.length === 0 && (
+                <TableEmptyState
+                  icon={Siren}
+                  // Clearing shows every report, resolved ones too.
+                  filtered={counts.all > 0}
+                  title={counts.all === 0 ? 'No reports yet' : undefined}
+                  message={counts.all === 0
+                    ? (isFleet ? 'Vehicle-related reports from drivers appear here.' : 'Reports and SOS alerts raised by drivers appear here.')
+                    : 'No reports match your search or filters.'}
+                  onClear={() => { setSearch(''); setStatusFilter('all'); setTypeFilter('all'); setPage(1) }}
+                />
+              )}
             </div>
             <Pagination page={page} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPageChange={setPage} disabled={table.fetching} />
             </>

@@ -1,6 +1,6 @@
 'use client'
 
-import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
+import TableEmptyState from '@/components/ui/TableEmptyState'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import FilterBar from '@/components/ui/FilterBar'
 import { TableCard } from '@/components/ui/untitled/table-card'
@@ -433,21 +433,9 @@ export default function MaintenanceTab({
             <p className="text-red-400 text-sm text-center">{listError}</p>
             <button type="button" onClick={() => { onReload(); void table.reload() }} className="text-[var(--color-cyan)] text-sm font-semibold">Try again</button>
           </div>
-        ) : total === 0 && !pinFocus ? (
-          <div className="flex-1 flex flex-col items-center justify-center gap-3 py-12 text-center px-4">
-            <Wrench size={40} className="text-white/20" />
-            <p className="text-sm text-white/45">
-              {problems.length === 0 ? 'Every vehicle is ready. Nothing to do.' : 'Nothing matches your search.'}
-            </p>
-            <ClearFiltersLink
-              show={problems.length > 0}
-              onClear={() => { onSearchChange(''); setGroupFilter('all'); setPage(1) }}
-              className="mt-0"
-            />
-          </div>
         ) : (
           <>
-            <div className="overflow-x-auto lg:overflow-auto flex-[1_0_auto] lg:flex-1 lg:min-h-0">
+            <div className="flex flex-col overflow-x-auto lg:overflow-auto flex-[1_0_auto] lg:flex-1 lg:min-h-0">
               <table className="data-table min-w-[860px]">
                 <thead className="sticky top-0 z-10">
                   <tr className="[&>th]:whitespace-nowrap">
@@ -542,6 +530,17 @@ export default function MaintenanceTab({
                   })}
                 </tbody>
               </table>
+              {total === 0 && !pinFocus && (
+                <TableEmptyState
+                  icon={Wrench}
+                  filtered={problems.length > 0}
+                  title={problems.length === 0 ? 'Every vehicle is ready' : undefined}
+                  message={problems.length === 0
+                    ? 'Nothing to do. Vehicles that need a service, a check or papers appear here.'
+                    : 'No vehicles match your search or filters.'}
+                  onClear={() => { onSearchChange(''); setGroupFilter('all'); setPage(1) }}
+                />
+              )}
             </div>
             <Pagination page={page} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPageChange={setPage} disabled={table.fetching} />
           </>

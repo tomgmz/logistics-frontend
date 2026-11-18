@@ -1,6 +1,7 @@
 'use client'
 
-import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
+import TableEmptyState from '@/components/ui/TableEmptyState'
+import { ScrollText } from 'lucide-react'
 import Pagination from '@/components/ui/Pagination'
 import { useLivePending } from '@/lib/hooks/useLiveTable'
 import NewEntriesBar from '@/components/ui/NewEntriesBar'
@@ -145,22 +146,21 @@ export default function AuditLogsPage() {
 
           <NewEntriesBar count={pending} onRefresh={() => void fetchLogs()} />
 
-          <div className="flex-[1_0_auto] lg:flex-1 overflow-x-auto lg:overflow-auto lg:min-h-0">
-            {!loading && !error && logs.length === 0 ? (
-              <div className="flex flex-col items-center py-16 text-[#424242] text-sm tracking-wide">
-                No logs match your filters.
-                <ClearFiltersLink
-                  show={!!search || !!logType || !!dateRange}
-                  onClear={() => { setSearch(''); setLogType(''); setDateRange(null); setPage(1) }}
-                />
-              </div>
-            ) : (
-              <AuditLogTable
-                logs={logs}
-                loading={loading}
-                pageSize={PAGE_SIZE}
-                selectedId={selected?.log_id ?? null}
-                onSelect={(log) => setSelected((prev) => prev?.log_id === log.log_id ? null : log)}
+          <div className="flex flex-col flex-[1_0_auto] lg:flex-1 overflow-x-auto lg:overflow-auto lg:min-h-0">
+            <AuditLogTable
+              logs={logs}
+              loading={loading}
+              pageSize={PAGE_SIZE}
+              selectedId={selected?.log_id ?? null}
+              onSelect={(log) => setSelected((prev) => prev?.log_id === log.log_id ? null : log)}
+            />
+            {!loading && !error && logs.length === 0 && (
+              <TableEmptyState
+                icon={ScrollText}
+                filtered={!!search || !!logType || !!dateRange}
+                title={search || logType || dateRange ? undefined : 'No audit logs yet'}
+                message={search || logType || dateRange ? 'No logs match your search or filters.' : 'Actions people take in the system are recorded here.'}
+                onClear={() => { setSearch(''); setLogType(''); setDateRange(null); setPage(1) }}
               />
             )}
           </div>

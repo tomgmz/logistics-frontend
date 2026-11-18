@@ -1,6 +1,6 @@
 'use client'
 
-import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
+import TableEmptyState from '@/components/ui/TableEmptyState'
 import Pagination from '@/components/ui/Pagination'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -1044,30 +1044,9 @@ export default function VehicleManagementView({ archive }: {
                 Try again
               </button>
             </div>
-          ) : trucks.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center gap-4 py-12 text-center px-4">
-              <TruckIcon size={40} className="text-white/20" />
-              {/* "Add your first vehicle" only when the fleet really is empty —
-                  not when a search or status filter just hides everything. */}
-              <p className="text-sm text-white/45">
-                {debouncedSearch || statusFilter !== 'all'
-                  ? 'No vehicles match your filters.'
-                  : tab === 'archived' ? 'No archived vehicles.' : 'No vehicles yet.'}
-              </p>
-              <ClearFiltersLink
-                show={!!debouncedSearch || statusFilter !== 'all'}
-                onClear={() => { setSearch(''); setStatusFilter('all'); setPage(0) }}
-                className="mt-0"
-              />
-              {canCreate && tab !== 'archived' && !debouncedSearch && statusFilter === 'all' && (
-                <button type="button" onClick={openCreate} className="text-[var(--color-cyan)] text-sm font-bold">
-                  Add your first vehicle
-                </button>
-              )}
-            </div>
           ) : (
             <>
-              <div className="overflow-x-auto lg:overflow-auto flex-[1_0_auto] lg:flex-1 lg:min-h-0">
+              <div className="flex flex-col overflow-x-auto lg:overflow-auto flex-[1_0_auto] lg:flex-1 lg:min-h-0">
                 <table className="data-table min-w-[900px]">
                   <thead className="sticky top-0 z-10">
                     <tr className="[&>th]:whitespace-nowrap">
@@ -1185,6 +1164,23 @@ export default function VehicleManagementView({ archive }: {
                     })}
                   </tbody>
                 </table>
+                {trucks.length === 0 && (
+                  <TableEmptyState
+                    icon={TruckIcon}
+                    filtered={!!debouncedSearch || statusFilter !== 'all'}
+                    title={debouncedSearch || statusFilter !== 'all' ? undefined
+                      : tab === 'archived' ? 'No archived vehicles' : 'No vehicles yet'}
+                    message={debouncedSearch || statusFilter !== 'all'
+                      ? 'No vehicles match your search or filters.'
+                      : tab === 'archived' ? 'Archived vehicles appear here.' : 'Vehicles appear here once they are added.'}
+                    onClear={() => { setSearch(''); setStatusFilter('all'); setPage(0) }}
+                    action={canCreate && tab !== 'archived' && (
+                      <button type="button" onClick={openCreate} className="text-[var(--color-cyan)] text-sm font-bold">
+                        Add your first vehicle
+                      </button>
+                    )}
+                  />
+                )}
               </div>
 
               <Pagination page={pageSafe + 1} totalPages={pageCount} total={totalRows} pageSize={PAGE_SIZE} onPageChange={(p) => setPage(p - 1)} />

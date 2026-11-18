@@ -1,8 +1,9 @@
 'use client'
 
+import TableEmptyState from '@/components/ui/TableEmptyState'
+import { Package as EmptyTransactionsIcon } from 'lucide-react'
 
 import { PanelReadyGate, PanelSpinner } from '@/components/ui/PanelReady'
-import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
 import Pagination from '@/components/ui/Pagination'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { useSignedLinkRefresh, withFreshLinks } from '@/lib/hooks/useSignedLinkRefresh'
@@ -374,14 +375,9 @@ export default function TransactionHistoryView() {
                   Try again
                 </button>
               </div>
-            ) : rows.length === 0 ? (
-              <div className="flex flex-1 flex-col items-center justify-center gap-3 py-12">
-                <p className="text-sm text-white/45">No transactions match your filters.</p>
-                <ClearFiltersLink show={hasActiveFilters} onClear={clearFilters} className="mt-0" />
-              </div>
             ) : (
               <>
-                <div className="lg:min-h-0 flex-[1_0_auto] lg:flex-1 overflow-x-auto lg:overflow-auto">
+                <div className="flex flex-col lg:min-h-0 flex-[1_0_auto] lg:flex-1 overflow-x-auto lg:overflow-auto">
                   <table className="data-table">
                     {/* Untitled UI's header row: tinted, small caps, sentence case. */}
                     <thead className="sticky top-0 z-10">
@@ -448,6 +444,17 @@ export default function TransactionHistoryView() {
                       })}
                     </tbody>
                   </table>
+                  {rows.length === 0 && (
+                    <TableEmptyState
+                      icon={EmptyTransactionsIcon}
+                      filtered={hasActiveFilters}
+                      title={hasActiveFilters ? undefined : 'No transactions yet'}
+                      message={hasActiveFilters
+                        ? 'No transactions match your search or filters.'
+                        : 'Bookings appear here once they are made.'}
+                      onClear={clearFilters}
+                    />
+                  )}
                 </div>
 
                 <Pagination page={pageSafe + 1} totalPages={pageCount} total={totalRows} pageSize={PAGE_SIZE} onPageChange={(p) => setPage(p - 1)} />

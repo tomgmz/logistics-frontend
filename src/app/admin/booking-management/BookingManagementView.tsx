@@ -1,10 +1,11 @@
 'use client'
 
+import TableEmptyState from '@/components/ui/TableEmptyState'
+import { Package as EmptyBookingsIcon } from 'lucide-react'
 
 import { PanelReadyGate, PanelSectionFlag, PanelSpinner } from '@/components/ui/PanelReady'
 import Pagination from '@/components/ui/Pagination'
 import FilterBar from '@/components/ui/FilterBar'
-import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
 import { TableCard } from '@/components/ui/untitled/table-card'
 import { TabsMinimal } from '@/components/ui/untitled/tabs'
 import type { DateRange } from '@/components/ui/untitled/date-range-picker'
@@ -2204,17 +2205,9 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                 <p className="text-red-400 text-sm">{listError}</p>
                 <button type="button" onClick={() => void loadPage()} className="text-[var(--color-cyan)] text-sm font-semibold">Try again</button>
               </div>
-            ) : listRows.length === 0 ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-sm text-white/45 py-12">
-                No bookings match your filters.
-                <ClearFiltersLink
-                  show={!!search || statusFilter !== 'all' || !!dateRange}
-                  onClear={() => { setSearch(''); setStatusFilter('all'); setDateRange(null); setPage(0) }}
-                />
-              </div>
             ) : (
               <>
-                <div className="overflow-x-auto lg:overflow-auto flex-[1_0_auto] lg:flex-1 lg:min-h-0">
+                <div className="flex flex-col overflow-x-auto lg:overflow-auto flex-[1_0_auto] lg:flex-1 lg:min-h-0">
                   <table className="data-table">
                     {/* Headers keep the small caps face; the data rows are regular Alegreya Sans. */}
                     <thead className="sticky top-0 z-10">
@@ -2301,6 +2294,17 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                       })}
                     </tbody>
                   </table>
+                  {listRows.length === 0 && (
+                    <TableEmptyState
+                      icon={EmptyBookingsIcon}
+                      filtered={!!search || statusFilter !== 'all' || !!dateRange}
+                      title={!search && statusFilter === 'all' && !dateRange ? 'No bookings yet' : undefined}
+                      message={!search && statusFilter === 'all' && !dateRange
+                        ? 'Bookings appear here once clients make them.'
+                        : 'No bookings match your search or filters.'}
+                      onClear={() => { setSearch(''); setStatusFilter('all'); setDateRange(null); setPage(0) }}
+                    />
+                  )}
                 </div>
                 <Pagination page={pageSafe + 1} totalPages={pageCount} total={totalRows} pageSize={PAGE_SIZE} onPageChange={(p) => setPage(p - 1)} />
               </>

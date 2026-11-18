@@ -1,6 +1,7 @@
 'use client'
 
-import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
+import TableEmptyState from '@/components/ui/TableEmptyState'
+import { ScrollText } from 'lucide-react'
 import Pagination from '@/components/ui/Pagination'
 import { useLivePending } from '@/lib/hooks/useLiveTable'
 import NewEntriesBar from '@/components/ui/NewEntriesBar'
@@ -71,8 +72,10 @@ function LogCard({ toolbar, detail, error, pending, onLoadNew, empty, table, pag
         <div className="shrink-0 border-b border-red-500/20 bg-red-500/10 px-5 py-3 text-sm text-red-400">{error}</div>
       )}
       <NewEntriesBar count={pending} onRefresh={onLoadNew} />
-      <div className="flex-[1_0_auto] lg:flex-1 overflow-x-auto lg:overflow-auto lg:min-h-0">
-        {empty ?? table}
+      {/* The headers stay; an empty list shows its message under them. */}
+      <div className="flex flex-col flex-[1_0_auto] lg:flex-1 overflow-x-auto lg:overflow-auto lg:min-h-0">
+        {table}
+        {empty}
       </div>
       {pagination}
     </TableCard.Root>
@@ -184,10 +187,13 @@ function AuditLogsTab({ switcher }: { switcher: ReactNode }) {
       pending={pending}
       onLoadNew={() => setRefreshKey((k) => k + 1)}
       empty={!loading && !error && logs.length === 0 && (
-        <div className="flex flex-col items-center py-16 text-[#424242] text-sm tracking-wide">
-          No logs match your filters.
-          <ClearFiltersLink show={filtered} onClear={() => { setSearch(''); setLogType(''); setDateRange(null); setPage(1) }} />
-        </div>
+        <TableEmptyState
+          icon={ScrollText}
+          filtered={filtered}
+          title={filtered ? undefined : 'No audit logs yet'}
+          message={filtered ? 'No logs match your search or filters.' : 'Actions people take in the system are recorded here.'}
+          onClear={() => { setSearch(''); setLogType(''); setDateRange(null); setPage(1) }}
+        />
       ) || null}
       table={
         <AuditLogTable
@@ -356,13 +362,13 @@ function SystemLogsTab({ switcher }: { switcher: ReactNode }) {
       pending={pending}
       onLoadNew={() => setRefreshKey((k) => k + 1)}
       empty={!loading && !error && logs.length === 0 && (
-        <div className="flex flex-col items-center py-16 text-[#424242] text-sm tracking-wide">
-          No system logs match your filters.
-          <ClearFiltersLink
-            show={filtered}
-            onClear={() => { setSearch(''); setEventType(''); setLevel(''); setResolved(''); setDateRange(null); setPage(1) }}
-          />
-        </div>
+        <TableEmptyState
+          icon={ScrollText}
+          filtered={filtered}
+          title={filtered ? undefined : 'No system logs yet'}
+          message={filtered ? 'No system logs match your search or filters.' : 'Automatic actions, refusals and errors are recorded here.'}
+          onClear={() => { setSearch(''); setEventType(''); setLevel(''); setResolved(''); setDateRange(null); setPage(1) }}
+        />
       ) || null}
       table={
         <SystemLogTable

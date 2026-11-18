@@ -1,6 +1,7 @@
 'use client'
 
-import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
+import TableEmptyState from '@/components/ui/TableEmptyState'
+import { TabsMinimal } from '@/components/ui/untitled/tabs'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { useEffect, useState } from 'react'
 import { AlertTriangle, MailCheck } from 'lucide-react'
@@ -57,8 +58,11 @@ const CANCELLABLE: ResetRequestStatus[] = ['pending']
 
 // Rows per page: 10 on a phone, 20 on anything wider (the user's call, 2026-10-25).
 
-const STATUS_OPTIONS = (Object.keys(STATUS_CFG) as ResetRequestStatus[])
-  .map((s) => ({ value: s, label: STATUS_CFG[s].label }))
+type StatusView = 'all' | ResetRequestStatus
+const STATUS_VIEWS: { id: StatusView; label: string }[] = [
+  { id: 'all', label: 'All Statuses' },
+  ...(Object.keys(STATUS_CFG) as ResetRequestStatus[]).map((s) => ({ id: s, label: STATUS_CFG[s].label })),
+]
 
 // Every role that can ask for a reset, listed even before any of them has. 'driver'
 // covers company and vendor drivers (vendor drivers have a password since
@@ -127,6 +131,12 @@ export default function PasswordResetQueue({
   const [pending,       setPending]       = useState<PendingAction | null>(null)
   const [search,        setSearch]        = useState('')
   const [filters,       setFilters]       = useState<FilterValues>([])
+  // Status is its own dropdown left of Filters (user 2026-11-18), like
+  // Administrator Management's role dropdown; Filters keeps Role (and Requested).
+  const [statusView,    setStatusView]    = useState<StatusView>('all')
+  const queryFilters: FilterValues = statusView === 'all'
+    ? filters
+    : [...filters, { field: 'status', op: 'is', value: statusView }]
   // The card layout's "Select dates": the day the request came in.
   const [dateRange,     setDateRange]     = useState<DateRange | null>(null)
 
@@ -137,11 +147,11 @@ export default function PasswordResetQueue({
   const table = useServerTable(
     (q) => passwordResetService.listPage({
       ...q,
-      ...(filters.length   && { filters: JSON.stringify(filters) }),
+      ...(queryFilters.length && { filters: JSON.stringify(queryFilters) }),
       ...(debouncedSearch && { search: debouncedSearch }),
       ...(dateRange       && { from: dateRange.from, to: dateRange.to }),
     }),
-    `${JSON.stringify(filters)}|${debouncedSearch}|${dateRange?.from ?? ''}|${dateRange?.to ?? ''}`,
+    `${JSON.stringify(queryFilters)}|${debouncedSearch}|${dateRange?.from ?? ''}|${dateRange?.to ?? ''}`,
     { errorMessage: 'Failed to load reset requests.', cacheKey: 'password-resets' },
   )
   const { rows: pageRows, loading, error, page, setPage, pageSize, total, totalPages } = table
@@ -210,8 +220,15 @@ export default function PasswordResetQueue({
         <FilterBar
           layout={cardHeader ? 'split' : 'inline'}
           search={{ value: search, onChange: setSearch, placeholder: 'Search name or email' }}
+          leading={(
+            <TabsMinimal
+              label="Request status"
+              items={STATUS_VIEWS}
+              selectedKey={statusView}
+              onSelectionChange={(k: StatusView) => { setStatusView(k); setPage(1) }}
+            />
+          )}
           fields={[
-            { key: 'status',    label: 'Status',    options: STATUS_OPTIONS },
             { key: 'role',      label: 'Role',      options: ROLE_OPTIONS },
             // The card layout picks dates with "Select dates" instead.
             ...(cardHeader ? [] : [{ key: 'requested', label: 'Requested', options: REQUESTED_OPTIONS, single: true, anyLabel: 'Any time' }]),
@@ -219,7 +236,7 @@ export default function PasswordResetQueue({
           dateRange={cardHeader ? { value: dateRange, onChange: setDateRange } : undefined}
           values={filters}
           onChange={setFilters}
-          // Untitled UI's "Dropdowns" filter bar: Status, Role and Requested each their own dropdown.
+          // Untitled UI's "Dropdowns" filter bar: Role and Requested each their own dropdown.
           variant="dropdowns"
           summary={!cardHeader && <span className="text-[#4df9ed]">{total} Request{total !== 1 ? 's' : ''}</span>}
           className={regularData ? 'ff-regular' : ''}
@@ -231,7 +248,7 @@ export default function PasswordResetQueue({
         )}
 
         {/* Table */}
-        <div className="flex-[1_0_auto] lg:flex-1 overflow-auto lg:min-h-0">
+        <div className="flex flex-col flex-[1_0_auto] lg:flex-1 overflow-auto lg:min-h-0">
           {/* Sized like the Users table. Desktop (lg+): fixed layout, a fixed-width
               actions column and five equal ones; phones and tablets: at least 960px
               wide, scrolling sideways. */}
@@ -252,26 +269,7 @@ export default function PasswordResetQueue({
                     <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-t-[#4df9ed]" />
                   </td>
                 </tr>
-              ) : pageRows.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-20 text-center">
-                    <div className="mb-4 inline-flex rounded-full border border-[#2a2a2a] bg-[#1b1b1b] p-4">
-                      <MailCheck size={26} className="text-[#818181]" />
-                    </div>
-                    <p className="text-base font-semibold text-white">{unfiltered > 0 ? 'No records found' : 'Nothing to action'}</p>
-                    <p className="mt-1 text-sm text-[#818181]">
-                      {unfiltered > 0
-                        ? 'No requests match your search or filters.'
-                        : 'No password reset requests on record.'}
-                    </p>
-                    <ClearFiltersLink
-                      show={unfiltered > 0}
-                      onClear={() => { setSearch(''); setFilters([]); setDateRange(null); setPage(1) }}
-                      className="mt-4"
-                    />
-                  </td>
-                </tr>
-              ) : (
+              ) : pageRows.length === 0 ? null : (
                 pageRows.map((r) => {
                   const cfg     = STATUS_CFG[r.status]
                   const isFocus = focusRequestId === r.request_id
@@ -361,6 +359,17 @@ export default function PasswordResetQueue({
               )}
             </tbody>
           </table>
+          {!loading && pageRows.length === 0 && (
+            <TableEmptyState
+              icon={MailCheck}
+              filtered={unfiltered > 0}
+              title={unfiltered > 0 ? undefined : 'No password reset requests'}
+              message={unfiltered > 0
+                ? 'No requests match your search or filters.'
+                : 'Requests appear here when someone asks for a password reset.'}
+              onClear={() => { setSearch(''); setFilters([]); setStatusView('all'); setDateRange(null); setPage(1) }}
+            />
+          )}
         </div>
         {!loading && total > 0 && (
           <Pagination page={page} totalPages={totalPages} total={total} pageSize={pageSize} onPageChange={setPage} disabled={table.fetching} />

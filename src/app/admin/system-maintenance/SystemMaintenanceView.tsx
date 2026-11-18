@@ -1,6 +1,6 @@
 'use client'
 
-import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
+import TableEmptyState from '@/components/ui/TableEmptyState'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -1464,14 +1464,17 @@ function ActiveBadge({ active }: { active: boolean }) {
 
 function EmptyState({ filtered, canAdd, noun, onAdd, onClear }: { filtered: boolean; canAdd: boolean; noun: string; onAdd: () => void; onClear: () => void }) {
   return (
-    <div className="flex flex-col items-center gap-3 py-10 text-center">
-      <p className="text-sm text-white/30">{filtered ? 'Nothing matches your search.' : 'No entries yet.'}</p>
-      <ClearFiltersLink show={filtered} onClear={onClear} className="mt-0" />
-      {!filtered && canAdd && (
+    <TableEmptyState
+      icon={Layers}
+      filtered={filtered}
+      title={filtered ? undefined : 'No entries yet'}
+      message={filtered ? 'Nothing matches your search.' : `Add a ${noun} and it appears here.`}
+      onClear={onClear}
+      action={canAdd && (
         <button type="button" onClick={onAdd} className="lg:hidden text-sm font-bold text-[#4DF9ED]">
           Add the first {noun}
         </button>
       )}
-    </div>
+    />
   )
 }

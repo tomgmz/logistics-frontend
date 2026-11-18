@@ -1,5 +1,6 @@
 'use client'
 
+import TableEmptyState from '@/components/ui/TableEmptyState'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { useSignedLinkRefresh, withFreshLinks } from '@/lib/hooks/useSignedLinkRefresh'
 import { useServerTable } from '@/lib/hooks/useServerTable'
@@ -399,19 +400,15 @@ export default function BookingHistoryModule() {
 
               {/* Empty */}
               {!loading && !error && bookings.length === 0 && (
-                <div className="flex flex-col items-center gap-3 py-16">
-                  <Package size={32} style={{ color: MUTED }} />
-                  <p className="text-sm" style={{ color: MUTED }}>
-                    {(statusCounts.all ?? 0) === 0 ? 'No bookings yet.' : 'No bookings match your filters.'}
-                  </p>
-                  {hasActiveFilters && (
-                    <button onClick={clearFilters}
-                      className="text-xs underline underline-offset-2 cursor-pointer hover:opacity-80"
-                      style={{ color: CYAN }}>
-                      Clear all filters
-                    </button>
-                  )}
-                </div>
+                <TableEmptyState
+                  icon={Package}
+                  filtered={hasActiveFilters}
+                  title={(statusCounts.all ?? 0) === 0 ? 'No bookings yet' : undefined}
+                  message={(statusCounts.all ?? 0) === 0
+                    ? 'Your bookings appear here once you make one.'
+                    : 'No bookings match your search or filters.'}
+                  onClear={clearFilters}
+                />
               )}
 
               {/* Cards */}

@@ -1,6 +1,6 @@
 'use client'
 
-import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
+import TableEmptyState from '@/components/ui/TableEmptyState'
 import Pagination from '@/components/ui/Pagination'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { useState, useEffect, useCallback, type ReactNode } from 'react'
@@ -293,24 +293,23 @@ function ArchivedRowMenu({ user, onView, onRestore, lockedBy }: {
 function EmptyState({ tab, onAdd, archived = false, filtered, onClear }: { tab: TabValue; onAdd: () => void; archived?: boolean; filtered: boolean; onClear: () => void }) {
   const label = tab === 'all' || tab === 'archived' ? 'administrator accounts' : TABS.find(t => t.key === tab)?.label.toLowerCase() ?? tab
   return (
-    <div className="flex flex-col items-center justify-center py-24 text-center">
-      <div className="mb-4 rounded-full border border-[#424242] bg-[#1b1b1b] p-4">
-        <ShieldCheckIcon size={28} className="text-[#818181]" />
-      </div>
-      <p className="text-base font-semibold text-white">No records found</p>
-      <p className="mt-1 text-sm text-[#818181]">
-        {archived ? `No archived ${label}.` : `No ${label} match your current filters.`}
-      </p>
-      <ClearFiltersLink show={filtered} onClear={onClear} className="mt-4" />
-      {tab !== 'all' && tab !== 'archived' && !archived && (
+    <TableEmptyState
+      icon={ShieldCheckIcon}
+      filtered={filtered}
+      onClear={onClear}
+      title={filtered ? undefined : archived ? `No archived ${label}` : `No ${label} yet`}
+      message={filtered
+        ? `No ${label} match your search or filters.`
+        : archived ? `Archived ${label} appear here.` : `${label.charAt(0).toUpperCase() + label.slice(1)} appear here once they are added.`}
+      action={tab !== 'all' && tab !== 'archived' && !archived && (
         <button
           onClick={onAdd}
-          className="mt-6 flex items-center gap-2 rounded-lg bg-[#4df9ed] px-4 py-2 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5]"
+          className="flex items-center gap-2 rounded-lg bg-[#4df9ed] px-4 py-2 text-sm font-semibold text-[#0a0a0a] transition [@media(hover:hover)]:hover:bg-[#7bfbf5]"
         >
           <UserPlus size={14} /> Add First Account
         </button>
       )}
-    </div>
+    />
   )
 }
 
@@ -723,13 +722,11 @@ export default function AdministratorManagementView({ archive }: {
               {/* Empty: the message fills the space under the headers, centred
                   (sticky left-0 keeps it in view while the table scrolls sideways on phones). */}
               {!(loading || fetching) && users.length === 0 && (
-                <div className="ff-darker sticky left-0 flex flex-1 items-center justify-center">
-                  <EmptyState
-                    tab={activeTab} onAdd={openCreate} archived={showArchived}
-                    filtered={!!search || statusFilter.length > 0}
-                    onClear={() => { setSearchInput(''); setSearch(''); setStatusFilter([]) }}
-                  />
-                </div>
+                <EmptyState
+                  tab={activeTab} onAdd={openCreate} archived={showArchived}
+                  filtered={!!search || statusFilter.length > 0}
+                  onClear={() => { setSearchInput(''); setSearch(''); setStatusFilter([]) }}
+                />
               )}
             </div>
 

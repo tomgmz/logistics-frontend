@@ -1,6 +1,6 @@
 'use client'
 
-import ClearFiltersLink from '@/components/ui/ClearFiltersLink'
+import TableEmptyState from '@/components/ui/TableEmptyState'
 import Pagination from '@/components/ui/Pagination'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { useState, useEffect, useCallback, type ReactNode } from 'react'
@@ -358,30 +358,30 @@ function TableSkeleton({ cols, rows }: { cols: number; rows: number }) {
 }
 
 function EmptyState({ tab, onAdd, showAdd, canAdd, archived = false, filtered, onClear }: { tab: TabValue; onAdd: () => void; showAdd: boolean; canAdd: boolean; archived?: boolean; filtered: boolean; onClear: () => void }) {
+  const noun = tab === 'all' ? 'users' : ACCOUNT_NOUN[tab].toLowerCase() + 's'
   return (
-    <div className="flex flex-col items-center justify-center py-24 text-center">
-      <div className="mb-4 rounded-full border border-[#424242] bg-[#1b1b1b] p-4">
-        <Users size={28} className="text-[#818181]" />
-      </div>
-      <p className="text-base font-semibold text-white">No records found</p>
-      <p className="mt-1 text-sm text-[#818181]">
-        {archived
-          ? `No archived ${tab === 'all' ? 'users' : ACCOUNT_NOUN[tab].toLowerCase() + 's'}.`
-          : tab === 'vendor-drivers'
-          ? 'No vendor drivers yet. Add one here, then pick them in Booking Management for a vendor-supplied delivery.'
-          : `No ${tab === 'all' ? 'users' : tab} match your current filters.`}
-      </p>
-      <ClearFiltersLink show={filtered} onClear={onClear} className="mt-4" />
-      {tab !== 'all' && showAdd && !archived && (
+    <TableEmptyState
+      icon={Users}
+      filtered={filtered}
+      onClear={onClear}
+      title={filtered ? undefined : archived ? `No archived ${noun}` : `No ${noun} yet`}
+      message={filtered
+        ? `No ${noun} match your search or filters.`
+        : archived
+        ? `Archived ${noun} appear here.`
+        : tab === 'vendor-drivers'
+        ? 'Add one here, then pick them in Booking Management for a vendor-supplied delivery.'
+        : `${noun.charAt(0).toUpperCase() + noun.slice(1)} appear here once they are added.`}
+      action={tab !== 'all' && showAdd && !archived && (
         <button
           onClick={onAdd}
           {...writeAccess(canAdd)}
-          className="mt-6 flex items-center gap-2 rounded-lg bg-[#4df9ed] px-4 py-2 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-[#4df9ed]"
+          className="flex items-center gap-2 rounded-lg bg-[#4df9ed] px-4 py-2 text-sm font-semibold text-[#0a0a0a] transition [@media(hover:hover)]:hover:bg-[#7bfbf5] disabled:cursor-not-allowed disabled:opacity-40"
         >
           <UserPlus size={14} /> Add First User
         </button>
       )}
-    </div>
+    />
   )
 }
 
@@ -961,14 +961,12 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
                   instead of a short bordered row with blank space below it.
                   sticky left-0 keeps it in view on phones, where the table scrolls sideways. */}
               {!(loading || fetching) && users.length === 0 && (
-                <div className="ff-darker sticky left-0 flex flex-1 items-center justify-center">
-                  <EmptyState
-                    tab={activeTab} onAdd={openCreate} showAdd={!itMode} canAdd={access.canCreate} archived={showArchived}
-                    // The tab picks which list (and its columns), so it stays.
-                    filtered={!!search || filters.length > 0}
-                    onClear={() => { setSearchInput(''); setSearch(''); applyFilters([]) }}
-                  />
-                </div>
+                <EmptyState
+                  tab={activeTab} onAdd={openCreate} showAdd={!itMode} canAdd={access.canCreate} archived={showArchived}
+                  // The tab picks which list (and its columns), so it stays.
+                  filtered={!!search || filters.length > 0}
+                  onClear={() => { setSearchInput(''); setSearch(''); applyFilters([]) }}
+                />
               )}
             </div>
 
