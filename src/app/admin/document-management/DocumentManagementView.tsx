@@ -88,14 +88,14 @@ import { TruncatedText } from '@/components/ui/TruncatedText'
 const GRID_PAGE_SIZE = 24
 const POLL_MS   = 60_000
 const VIEW_KEY  = 'documents.view'
+// A client's contracts shown in its folder (not paged; a client has a handful).
+const CONTRACT_CAP = 50
 
 type ViewMode = 'table' | 'grid'
 
 type Nav =
   | { level: 'root'; only?: 'clients' }
   | { level: 'client';  clientId: string }
-  /** A client's Contract folder, pinned first inside the client's folder. */
-  | { level: 'contract'; clientId: string }
   | { level: 'booking'; bookingId: string }
   | { level: 'fleet' }
   | { level: 'vehicle'; truckId: string }
@@ -134,9 +134,11 @@ function navFrom(p: URLSearchParams): Nav {
   const booking = p.get('booking')
   const vehicle = p.get('vehicle')
   const client  = p.get('client')
+  // The Contract folder was removed 2026-11-18: an old ?contract= link opens
+  // the client's folder, where the contracts are now listed.
   const contract = p.get('contract')
   if (booking) return { level: 'booking', bookingId: booking }
-  if (contract) return { level: 'contract', clientId: contract }
+  if (contract) return { level: 'client', clientId: contract }
   if (vehicle) return { level: 'vehicle', truckId: vehicle }
   if (p.get('review') === '1') return { level: 'review' }
   if (p.get('archived') === '1') return { level: 'archived' }
@@ -149,7 +151,6 @@ function navQuery(n: Nav): string {
   switch (n.level) {
     case 'root':    return n.only === 'clients' ? '?show=clients' : ''
     case 'client':  return `?client=${encodeURIComponent(n.clientId)}`
-    case 'contract': return `?contract=${encodeURIComponent(n.clientId)}`
     case 'booking': return `?booking=${encodeURIComponent(n.bookingId)}`
     case 'fleet':   return '?fleet=1'
     case 'vehicle': return `?vehicle=${encodeURIComponent(n.truckId)}`
@@ -232,7 +233,7 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
     // A client/booking link opened by the Fleet Manager lands on Fleet instead.
     return fleetOnly && n.level !== 'fleet' && n.level !== 'vehicle' && n.level !== 'review' ? home : n
   }, [searchParams, fleetOnly, home, archive])
-  const isFiles = nav.level === 'booking' || nav.level === 'vehicle' || nav.level === 'review' || nav.level === 'contract' || nav.level === 'archived'
+  const isFiles = nav.level === 'booking' || nav.level === 'vehicle' || nav.level === 'review' || nav.level === 'archived'
   // From the Archive module, a folder opens in Document Management itself.
   const libraryPath = archive ? `/${portal}/document-management` : pathname
   const go      = useCallback((n: Nav) => router.push(`${libraryPath}${navQuery(n)}`), [router, libraryPath])
@@ -355,8 +356,7 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
     review_status: nav.level === 'review' ? 'pending' : (review || undefined),
     booking_id:    nav.level === 'booking' ? nav.bookingId : undefined,
     truck_id:      nav.level === 'vehicle' ? nav.truckId : undefined,
-    client_id:     nav.level === 'contract' ? nav.clientId : undefined,
-    group:         nav.level === 'vehicle' ? 'fleet' : nav.level === 'contract' ? 'client' : undefined,
+    group:         nav.level === 'vehicle' ? 'fleet' : undefined,
     date_from:     dateRange?.from,
     date_to:       dateRange?.to,
     // Archived documents are listed in the Archive module only.
@@ -398,10 +398,37 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
       .catch(() => {})
   }, isFiles)
 
+  // ── A client's contracts: listed as files at the top of the client's folder
+  // (no separate Contract folder since 2026-11-18). A client has a handful, so
+  // one read of up to CONTRACT_CAP, not paged.
+  const [contracts, setContracts] = useState<LibraryDocument[]>([])
+  const contractClient = nav.level === 'client' && nav.clientId !== 'none' && !fleetOnly ? nav.clientId : null
+  const contractReq = useRef(0)
+  const loadContracts = useCallback(async () => {
+    const id = ++contractReq.current
+    if (!contractClient) { setContracts([]); return }
+    try {
+      const res = await fetchDocuments(
+        { group: 'client', client_id: contractClient, search: search || undefined, archived: 'hide', sort: 'desc' },
+        1, CONTRACT_CAP,
+      )
+      if (id === contractReq.current) setContracts(res.data)
+    } catch {
+      if (id === contractReq.current) setContracts([])
+    }
+  }, [contractClient, search])
+  useEffect(() => { void loadContracts() }, [loadContracts])
+  useSignedLinkRefresh(contracts, () => {
+    if (!contractClient) return
+    fetchDocuments({ group: 'client', client_id: contractClient, search: search || undefined, archived: 'hide', sort: 'desc' }, 1, CONTRACT_CAP)
+      .then((res) => setContracts((prev) => withFreshLinks(prev, res.data)))
+      .catch(() => {})
+  }, !!contractClient)
+
   const reloadAll = useCallback((quiet = false) => {
     void loadTop()
-    if (isFiles) void load(quiet); else void loadFolders(quiet)
-  }, [loadTop, load, loadFolders, isFiles])
+    if (isFiles) void load(quiet); else { void loadFolders(quiet); void loadContracts() }
+  }, [loadTop, load, loadFolders, loadContracts, isFiles])
 
   // Real time: every file source signals live:documents (staff uploads, the
   // client's attachments, pickup and stop proof photos, odometer photos and
@@ -418,7 +445,10 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
     return () => window.clearInterval(t)
   }, [reloadAll])
 
-  const previewDoc = useMemo(() => docs.find((d) => d.doc_key === previewKey) ?? null, [docs, previewKey])
+  const previewDoc = useMemo(
+    () => docs.find((d) => d.doc_key === previewKey) ?? contracts.find((d) => d.doc_key === previewKey) ?? null,
+    [docs, contracts, previewKey],
+  )
 
   // A re-read (review, archive, fresh links) updates the ticked copies too, so
   // the download never carries a stale status.
@@ -604,10 +634,6 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
   if (nav.level === 'client') {
     title = clientName(nav.clientId)
     crumbs.push({ label: title })
-  } else if (nav.level === 'contract') {
-    crumbs.push({ label: clientName(nav.clientId), to: { level: 'client', clientId: nav.clientId } })
-    title = 'Contract'
-    crumbs.push({ label: title })
   } else if (nav.level === 'booking') {
     const cid = bookingInfo ? (bookingInfo.client_id ?? 'none') : null
     if (cid) crumbs.push({ label: clientName(cid), to: { level: 'client', clientId: cid } })
@@ -631,7 +657,8 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
 
   // ── Folder rows for the current level ──────────────────────────────────
 
-  type FolderRow = { key: string; to: Nav; fleet?: boolean; name: string; sub: React.ReactNode; detail: React.ReactNode; files: number; pending: number; last: string | null }
+  /** `doc`: a contract listed as a file in a client's folder; it opens the preview, not a folder. */
+  type FolderRow = { key: string; to: Nav; doc?: LibraryDocument; fleet?: boolean; name: string; sub: React.ReactNode; detail: React.ReactNode; files: number; pending: number; last: string | null }
 
   const folderRows: FolderRow[] = useMemo(() => {
     if (nav.level === 'root') {
@@ -656,24 +683,24 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
           })
     }
     if (nav.level === 'client') {
-      return folders.map((b): FolderRow => b.kind === 'contract'
-        ? {
-            key: `k:${b.id}`, to: { level: 'contract', clientId: nav.clientId },
-            name: 'Contract', sub: 'Staff only',
-            detail: '—', files: b.file_count, pending: b.pending_review, last: b.last_upload,
-          }
-        : {
+      const contractRows = folderTable.page > 1 ? [] : contracts.map((d): FolderRow => ({
+        key: `k:${d.doc_key}`, to: nav, doc: d,
+        name: d.file_name, sub: 'Contract · Staff only',
+        detail: <ReviewStatusBadge doc={d} />, files: 1,
+        pending: d.review_status === 'pending' ? 1 : 0, last: d.uploaded_at,
+      }))
+      return [...contractRows, ...folders.map((b): FolderRow => ({
         key: `b:${b.id}`, to: { level: 'booking', bookingId: b.id ?? '' },
         name: b.name ?? 'Booking', sub: b.schedule_date ? `Scheduled ${formatDate(b.schedule_date)}` : 'Booking',
         detail: <StatusPill status={b.booking_status} />, files: b.file_count, pending: b.pending_review, last: b.last_upload,
-      })
+      }))]
     }
     return folders.map((v) => ({
       key: `v:${v.id}`, to: { level: 'vehicle', truckId: v.id ?? '' }, fleet: true,
       name: v.name ?? 'Vehicle', sub: 'Vehicle',
       detail: v.booking_count > 0 ? plural(v.booking_count, 'booking') : '—', files: v.file_count, pending: v.pending_review, last: v.last_upload,
     }))
-  }, [nav, folders])
+  }, [nav, folders, contracts, folderTable.page])
 
   // Already the current page's rows — the server paginated them.
   const folderSlice = folderRows
@@ -993,13 +1020,13 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
                           key={r.key}
                           role="button"
                           tabIndex={0}
-                          onClick={() => go(r.to)}
-                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(r.to) } }}
+                          onClick={() => (r.doc ? setPreviewKey(r.doc.doc_key) : go(r.to))}
+                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (r.doc) setPreviewKey(r.doc.doc_key); else go(r.to) } }}
                           className="cursor-pointer transition-colors [@media(hover:hover)]:hover:bg-[#2a2a2a]/40"
                         >
                           <td className={TD}>
                             <div className="flex min-w-0 items-center gap-3">
-                              <FolderIcon fleet={r.fleet} />
+                              {r.doc ? <DocumentThumb doc={r.doc} /> : <FolderIcon fleet={r.fleet} />}
                               <div className="min-w-0">
                                 <TruncatedText as="p" className="t-name">{r.name}</TruncatedText>
                                 <TruncatedText as="p" className="text-[#818181]">{r.sub}</TruncatedText>
@@ -1041,15 +1068,14 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
           schedule_date:    bookingInfo.schedule_date,
           company_name:     bookingInfo.company_name,
         } : null}
-        initialClient={nav.level === 'client' || nav.level === 'contract'
+        initialClient={nav.level === 'client'
           ? { client_id: nav.clientId, company_name: clientName(nav.clientId) }
           : null}
         // Inside a vehicle's folder the upload goes to that vehicle.
         initialTruck={nav.level === 'vehicle'
           ? { truck_id: nav.truckId, plate_number: plateOf(nav.truckId), description: null }
           : null}
-        initialType={nav.level === 'contract' ? 'contract'
-          : nav.level === 'fleet' || nav.level === 'vehicle' || fleetOnly ? 'vehicle_registration'
+        initialType={nav.level === 'fleet' || nav.level === 'vehicle' || fleetOnly ? 'vehicle_registration'
           : 'proof_of_delivery'}
         vehicleOnly={fleetOnly}
         onClose={() => setUploadOpen(false)}
