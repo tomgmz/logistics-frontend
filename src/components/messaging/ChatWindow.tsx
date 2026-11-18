@@ -212,6 +212,7 @@ export default function ChatWindow({ conversation, draftUser, currentUserId, isP
         onConversationCreated?.(saved.conversation_id)
       } catch {
         setError('Failed to send message')
+        return false
       } finally { setSending(false) }
       return
     }
@@ -236,6 +237,7 @@ export default function ChatWindow({ conversation, draftUser, currentUserId, isP
     } catch {
       pendingIds.current.delete(oid)
       setMessages(prev => prev.filter(m => m.id !== oid))
+      return false
     } finally { setSending(false) }
   }
 

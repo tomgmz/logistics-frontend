@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Search } from 'lucide-react'
+import SearchClearButton from '@/components/ui/SearchClearButton'
 
 interface EmojiSkin {
   unified: string
@@ -237,10 +238,11 @@ export default function EmojiPicker({ onSelect, onClose, position = 'top' }: Emo
             placeholder="Search emoji…"
             className="
               w-full bg-white/[0.05] border border-white/[0.07] rounded-xl
-              pl-7 pr-2 py-1.5 ff-body text-xs text-white
+              pl-7 pr-8 py-1.5 ff-body text-xs text-white
               placeholder:text-white/25 focus:outline-none
             "
           />
+          <SearchClearButton value={search} onClear={() => setSearch('')} className="size-6" />
         </div>
 
         {/* Skin tone button */}

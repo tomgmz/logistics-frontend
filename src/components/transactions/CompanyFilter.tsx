@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Building2, Check, ChevronDown, Search, X } from 'lucide-react'
 import type { CompanyOption } from '@/lib/services/admin/transaction-history.service'
+import SearchClearButton from '@/components/ui/SearchClearButton'
 
 /**
  * Multi-select for the company filter.
@@ -107,6 +108,7 @@ export default function CompanyFilter({ options, selected, onChange, loading }: 
               className="flex-1 border-none bg-transparent text-sm text-white/80 outline-none
                          placeholder:text-white/35"
             />
+            <SearchClearButton value={search} onClear={() => setSearch('')} className="static shrink-0 translate-y-0 size-6" />
           </div>
 
           <div className="max-h-[280px] overflow-y-auto py-1">

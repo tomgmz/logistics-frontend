@@ -16,6 +16,7 @@ import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import Combobox from '@/components/ui/Combobox'
 import Dropdown from '@/components/ui/Dropdown'
+import SearchClearButton from '@/components/ui/SearchClearButton'
 
 const CATEGORIES = Object.keys(TICKET_CATEGORY_LABEL) as TicketCategory[]
 
@@ -179,6 +180,7 @@ export default function NewTicketModal({ open, onClose, onCreated }: {
                         aria-label="Search clients"
                         className="bg-transparent outline-none text-base sm:text-sm flex-1 min-w-0 text-white/85 placeholder:text-white/30"
                       />
+                      <SearchClearButton value={clientQuery} onClear={() => setClientQuery('')} className="static shrink-0 translate-y-0 size-6" />
                     </div>
                     <div className="max-h-48 overflow-y-auto">
                       {searching && clientOptions.length === 0 ? (

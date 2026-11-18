@@ -88,6 +88,12 @@ export async function adminArchiveTruck(truckId: string): Promise<void> {
   await authApi.post(`${ADMIN}/trucks/${truckId}/archive`)
 }
 
+/** Undo an archive: the vehicle is back as Available (its checks still gate assignment). */
+export async function adminRestoreTruck(truckId: string): Promise<void> {
+  await initCsrf()
+  await authApi.post(`${ADMIN}/trucks/${truckId}/restore`)
+}
+
 // --- BLOWBAGETS vehicle inspections ----------------------------------------
 // Recorded by the fleet manager against a vehicle. Only a vehicle whose latest
 // inspection passed can be assigned to a booking by operations.
@@ -159,6 +165,12 @@ export async function adminUpdateTruckModel(modelId: string, body: UpdateTruckMo
 export async function adminArchiveTruckModel(modelId: string): Promise<void> {
   await initCsrf()
   await authApi.post(`${ADMIN}/truck-models/${modelId}/archive`)
+}
+
+/** Undo an archive: the model is back in the catalog. */
+export async function adminRestoreTruckModel(modelId: string): Promise<void> {
+  await initCsrf()
+  await authApi.post(`${ADMIN}/truck-models/${modelId}/restore`)
 }
 /**
  * Vehicle Management → Maintenance: vehicles that need a mechanic (out of

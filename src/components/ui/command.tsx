@@ -5,6 +5,7 @@ import { Command as CommandPrimitive } from "cmdk"
 import { Search } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import SearchClearButton from '@/components/ui/SearchClearButton'
 
 /*
  * shadcn/ui Command (cmdk), the list behind the shadcn Combobox
@@ -23,7 +24,12 @@ function Command({ className, ...props }: React.ComponentProps<typeof CommandPri
   )
 }
 
-function CommandInput({ className, ...props }: React.ComponentProps<typeof CommandPrimitive.Input>) {
+function CommandInput({ className, value, onValueChange, ...props }: React.ComponentProps<typeof CommandPrimitive.Input>) {
+  // Controlled here when the caller doesn't control it, so the × can empty it
+  // (rule: every search box gets a SearchClearButton).
+  const [own, setOwn] = React.useState('')
+  const text    = value ?? own
+  const setText = (v: string) => { if (value === undefined) setOwn(v); onValueChange?.(v) }
   return (
     <div data-slot="command-input-wrapper" className="flex items-center gap-2 border-b border-white/10 px-3">
       <Search aria-hidden className="size-3.5 shrink-0 text-white/35" />
@@ -34,8 +40,11 @@ function CommandInput({ className, ...props }: React.ComponentProps<typeof Comma
           "w-full bg-transparent py-2 text-base text-white outline-none placeholder:text-white/30 disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm",
           className
         )}
+        value={text}
+        onValueChange={setText}
         {...props}
       />
+      <SearchClearButton value={text} onClear={() => setText('')} className="static shrink-0 translate-y-0 size-6" />
     </div>
   )
 }

@@ -21,6 +21,7 @@ import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { cachedFetch } from '@/lib/query/useApiQuery'
 import Dropdown from '@/components/ui/Dropdown'
+import SearchClearButton from '@/components/ui/SearchClearButton'
 
 // Mirrors the backend's uploadDocuments middleware.
 const MAX_FILES = 3
@@ -329,6 +330,7 @@ export default function UploadDocumentModal({
                           placeholder="Search by company…"
                           className="bg-transparent outline-none text-sm flex-1 text-white/85 placeholder:text-white/30"
                         />
+                        <SearchClearButton value={clientQuery} onClear={() => setClientQuery('')} className="static shrink-0 translate-y-0 size-6" />
                       </div>
                       <div className="max-h-48 overflow-y-auto">
                         {searching && clientOptions.length === 0 ? (
@@ -375,6 +377,7 @@ export default function UploadDocumentModal({
                           placeholder="Search by plate…"
                           className="bg-transparent outline-none text-sm flex-1 text-white/85 placeholder:text-white/30"
                         />
+                        <SearchClearButton value={truckQuery} onClear={() => setTruckQuery('')} className="static shrink-0 translate-y-0 size-6" />
                       </div>
                       <div className="max-h-48 overflow-y-auto">
                         {searching && truckOptions.length === 0 ? (
@@ -425,6 +428,7 @@ export default function UploadDocumentModal({
                         placeholder="Search by booking reference or client…"
                         className="bg-transparent outline-none text-sm flex-1 text-white/85 placeholder:text-white/30"
                       />
+                      <SearchClearButton value={query} onClear={() => setQuery('')} className="static shrink-0 translate-y-0 size-6" />
                     </div>
                     <div className="max-h-48 overflow-y-auto">
                       {searching && options.length === 0 ? (

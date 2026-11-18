@@ -8,6 +8,7 @@ import type { MessagableUser } from '@/lib/services/messaging.service'
 import { roleLabel, matchesPersonSearch } from '@/lib/roles'
 import { cachedFetch } from '@/lib/query/useApiQuery'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
+import SearchClearButton from '@/components/ui/SearchClearButton'
 
 /**
  * New Message, per the Figma (docs/figma/messaging "new message [direct]" and
@@ -160,8 +161,9 @@ export default function NewMessageDialog({ initialTab, onClose, onConversationRe
             <input
               ref={searchRef} type="text" value={search} onChange={e => setSearch(e.target.value)}
               placeholder="Search by name, role..."
-              className="w-full h-[29px] bg-transparent border border-[#2f2f2f] rounded-[10px] pl-9 pr-3 text-[15px] font-medium text-white placeholder:text-white/40 focus:outline-none focus:border-[var(--color-cyan)] transition-colors"
+              className="w-full h-[29px] bg-transparent border border-[#2f2f2f] rounded-[10px] pl-9 pr-9 text-[15px] font-medium text-white placeholder:text-white/40 focus:outline-none focus:border-[var(--color-cyan)] transition-colors"
             />
+            <SearchClearButton value={search} onClear={() => setSearch('')} className="size-6" />
           </div>
 
           {/* Group name */}

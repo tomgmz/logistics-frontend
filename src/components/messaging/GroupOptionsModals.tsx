@@ -9,6 +9,7 @@ import { roleLabel, matchesPersonSearch } from '@/lib/roles'
 import { getApiErrorMessage } from '@/lib/api-error'
 import type { Group, GroupMember } from '@/app/types/messaging/messaging.types'
 import { cachedFetch } from '@/lib/query/useApiQuery'
+import SearchClearButton from '@/components/ui/SearchClearButton'
 
 export type GroupOptionsView = 'members' | 'add' | 'rename' | 'requests'
 
@@ -229,7 +230,8 @@ function AddMembersModal({ group, isCreator, onClose, onDone }: {
         <div className="relative">
           <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/25 pointer-events-none" />
           <input ref={searchRef} type="text" value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Search by name or role…" className={`${INPUT_CLASS} pl-9 py-2`} />
+            placeholder="Search by name or role…" className={`${INPUT_CLASS} pl-9 pr-9 py-2`} />
+          <SearchClearButton value={search} onClear={() => setSearch('')} />
         </div>
       </div>
 

@@ -3,7 +3,7 @@
 import TableEmptyState from '@/components/ui/TableEmptyState'
 import { useRef, useState, type ReactNode } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Upload, Truck as TruckIcon, Pencil, Archive, Eye } from 'lucide-react'
+import { X, Upload, Truck as TruckIcon, Pencil, Archive, ArchiveRestore, Eye } from 'lucide-react'
 import type { CreateTruckModelInput, UpdateTruckModelInput } from '@/app/types/truck.types'
 import { TruckModel } from '@/app/types/truck-model'
 import {
@@ -11,6 +11,7 @@ import {
   adminCreateTruckModel,
   adminUpdateTruckModel,
   adminArchiveTruckModel,
+  adminRestoreTruckModel,
   adminUploadTruckModelImage,
 } from '@/lib/services/admin/trucks.service'
 import ReusableModal from '@/components/layout/ReusableModal'
@@ -95,7 +96,7 @@ interface Props {
 }
 
 type FormMode    = 'create' | 'edit' | null
-type ConfirmKind = 'save' | 'archive' | null
+type ConfirmKind = 'save' | 'archive' | 'restore' | null
 
 type FieldErrors = Partial<Record<keyof ModelFormState | 'image', string>>
 
@@ -297,8 +298,17 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete, archive 
     const actions: RowAction[] = [
       { label: 'View Details', icon: <Eye size={13} />, onSelect: () => setViewModel(m) },
     ]
-    // An archived model is read-only (there is no restore).
-    if (m.archived_at) return actions
+    // An archived model can only be viewed or restored (2026-11-18).
+    if (m.archived_at) {
+      if (canDelete) {
+        actions.push({
+          label: 'Restore', icon: <ArchiveRestore size={13} />, separated: true,
+          onSelect: () => { setArchiveTarget(m); setConfirmKind('restore') },
+          disabled: !!lockedBy, title: lockedTitle,
+        })
+      }
+      return actions
+    }
     if (canEdit) {
       actions.push({
         label: 'Update Details', icon: <Pencil size={13} />, onSelect: () => openEdit(m),
@@ -381,11 +391,35 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete, archive 
     }
   }
 
-  const confirmTitle = confirmKind === 'archive'
+  const executeRestore = async () => {
+    if (!archiveTarget) return
+    const id = archiveTarget.model_id
+    setActionBusy(true)
+    try {
+      await adminRestoreTruckModel(id)
+      appToast.success(`${archiveTarget.name} restored. It is back in the catalog.`, { action: 'truck-model-restore', entityId: id })
+      if (viewModel?.model_id === id) setViewModel(null)
+      setArchiveTarget(null)
+      setConfirmKind(null)
+      await loadModels()
+    } catch (e) {
+      appToast.error(getApiErrorMessage(e, 'Request failed. Please try again.'), { action: 'truck-model-restore', entityId: id })
+      setConfirmKind(null)
+    } finally {
+      setActionBusy(false)
+    }
+  }
+
+  const confirmTitle = confirmKind === 'restore'
+    ? 'Restore model?'
+    : confirmKind === 'archive'
     ? 'Archive model?'
     : formMode === 'create' ? 'Create model?' : 'Save changes?'
 
-  const confirmDescription = confirmKind === 'archive'
+  const confirmDescription = confirmKind === 'restore'
+    ? `"${archiveTarget?.name ?? 'This model'}" goes back in the catalog and can be picked for vehicles again. `
+      + 'Vehicles archived with it stay archived until restored one by one.'
+    : confirmKind === 'archive'
     ? `"${archiveTarget?.name ?? 'This model'}" will be hidden from the catalog and can no longer be picked for vehicles. `
       + 'Past bookings keep their details. A model still used by an active vehicle cannot be archived.'
     : formMode === 'create'
@@ -393,7 +427,9 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete, archive 
       : `Save updates to "${form.name.trim() || 'this model'}"?`
 
   const confirmLabel = actionBusy
-    ? (uploadBusy ? 'Uploading…' : 'Saving…')
+    ? (uploadBusy ? 'Uploading…' : confirmKind === 'restore' ? 'Restoring…' : 'Saving…')
+    : confirmKind === 'restore'
+      ? 'Restore'
     : confirmKind === 'archive'
       ? 'Archive'
       : formMode === 'create' ? 'Create' : 'Save'
@@ -897,10 +933,11 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete, archive 
         onCancel={() => {
           if (actionBusy) return
           setConfirmKind(null)
-          if (confirmKind === 'archive') setArchiveTarget(null)
+          if (confirmKind === 'archive' || confirmKind === 'restore') setArchiveTarget(null)
         }}
         onConfirm={() => {
-          if (confirmKind === 'archive') void executeArchive()
+          if (confirmKind === 'restore') void executeRestore()
+          else if (confirmKind === 'archive') void executeArchive()
           else void executeSave()
         }}
       />

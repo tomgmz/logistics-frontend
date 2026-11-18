@@ -256,7 +256,7 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
       const saved = await messagingService.sendGroupMessage(group.id, { content: text, attachment_url: attachmentUrl, reply_to_message_id: replyToMessageId })
       setMessages(p => p.map(m => m.id === oid ? coerce(saved) : m))
       pendingIds.current.delete(oid)
-    } catch { pendingIds.current.delete(oid); setMessages(p => p.filter(m => m.id !== oid)) }
+    } catch { pendingIds.current.delete(oid); setMessages(p => p.filter(m => m.id !== oid)); return false }
     finally { setSending(false) }
   }
 

@@ -222,8 +222,9 @@ function ErrorMessage({ message }: { message: string }) {
  * deal with it" and knowing who to chase.
  */
 function approverLabel(role?: string | null): string {
-  if (!role)                                  return 'Administrator'
-  if (role === 'driver' || role === 'client') return 'Company Administrator'
+  // Every reset request goes to the IT Administrator (handlerGroupFor on the
+  // server, since 2026-10-24), whoever asks.
+  void role
   return 'IT Administrator'
 }
 

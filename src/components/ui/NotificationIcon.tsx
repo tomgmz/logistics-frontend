@@ -99,7 +99,7 @@ const FILTERS_BY_ROLE: Record<string, FilterOption[]> = {
   admin:              [ALL, UNREAD, BOOKINGS, REPORTS, VEHICLES, RESETS, TICKETS],
   it_admin:           [ALL, UNREAD, RESETS],
   general_manager:    [ALL, UNREAD, BOOKINGS],
-  operations_manager: [ALL, UNREAD, BOOKINGS, REPORTS],
+  operations_manager: [ALL, UNREAD, BOOKINGS, REPORTS, TICKETS],
   fleet_manager:      [ALL, UNREAD, BOOKINGS, REPORTS, VEHICLES],
   client:             [ALL, UNREAD, BOOKINGS, TICKETS],
   driver:             [ALL, UNREAD, BOOKINGS, { value: "driver", label: "License" }],

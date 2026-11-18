@@ -9,6 +9,7 @@ import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 import {
   Pencil,
   Archive,
+  ArchiveRestore,
   Eye,
   X,
   Truck as TruckIcon,
@@ -38,6 +39,7 @@ import {
   adminCreateTruck,
   adminUpdateTruck, flaggedBookingNotice,
   adminArchiveTruck,
+  adminRestoreTruck,
   adminFetchTruckModels,
   adminFetchMaintenanceQueue,
   adminUploadFleetPhoto,
@@ -93,7 +95,7 @@ type VehicleFormErrors = Partial<Record<
   'plate' | 'registration' | 'driver' | 'odometer' | 'intervalKm' | 'intervalMonths' | 'lastServiceAt' | 'lastServiceKm',
   string
 >>
-type ConfirmKind = 'save' | 'archive' | null
+type ConfirmKind = 'save' | 'archive' | 'restore' | null
 
 interface TruckFormState {
   plate_number: string
@@ -761,6 +763,31 @@ export default function VehicleManagementView({ archive }: {
     setConfirmKind('archive')
   }
 
+  // Restore reuses archiveTarget: only one of the two can be asked at a time.
+  const handleRestoreClick = (t: Truck) => {
+    setArchiveTarget(t)
+    setConfirmKind('restore')
+  }
+
+  const executeRestore = async () => {
+    if (!archiveTarget) return
+    const id = archiveTarget.truck_id
+    setActionBusy(true)
+    try {
+      await adminRestoreTruck(id)
+      appToast.success(`${archiveTarget.plate_number} restored. It is back on the Vehicles list.`, { action: 'truck-restore', entityId: id })
+      if (viewTruck?.truck_id === id) setViewTruck(null)
+      setArchiveTarget(null)
+      setConfirmKind(null)
+      await refreshAll()
+    } catch (e) {
+      appToast.error(getApiErrorMessage(e, 'Request failed. Please try again.'), { action: 'truck-restore', entityId: id })
+      setConfirmKind(null)
+    } finally {
+      setActionBusy(false)
+    }
+  }
+
   const executeSave = async () => {
     const model_id  = form.model_id.trim() || null
 
@@ -854,7 +881,16 @@ export default function VehicleManagementView({ archive }: {
     const actions: RowAction[] = [
       { label: 'View Details', icon: <Eye size={13} />, onSelect: () => setViewTruck(t) },
     ]
-    if (archived) return actions
+    if (archived) {
+      if (canDelete) {
+        actions.push({
+          label: 'Restore', icon: <ArchiveRestore size={13} />, separated: true,
+          onSelect: () => handleRestoreClick(t),
+          disabled: !!lockedBy, title: lockedTitle,
+        })
+      }
+      return actions
+    }
 
     if (canEdit) {
       actions.push({
@@ -910,6 +946,15 @@ export default function VehicleManagementView({ archive }: {
           + ' Its booking and inspection history is kept, and it is listed under Archive.',
         confirmLabel: actionBusy ? 'Archiving…' : 'Archive',
         onConfirm:    () => { void executeArchive() },
+      }
+    }
+    if (confirmKind === 'restore' && archiveTarget) {
+      return {
+        title:        'Restore vehicle?',
+        description:  `${archiveTarget.plate_number} goes back on the Vehicles list as Available. Its service, registration`
+          + ' and inspection checks still apply before it can be assigned. Its regular driver is not paired again.',
+        confirmLabel: actionBusy ? 'Restoring…' : 'Restore',
+        onConfirm:    () => { void executeRestore() },
       }
     }
     return null
@@ -1228,7 +1273,7 @@ export default function VehicleManagementView({ archive }: {
         onCancel={() => {
           if (actionBusy) return
           setConfirmKind(null)
-          if (confirmKind === 'archive') setArchiveTarget(null)
+          if (confirmKind === 'archive' || confirmKind === 'restore') setArchiveTarget(null)
         }}
         onConfirm={confirmModalProps?.onConfirm}
       />

@@ -207,7 +207,7 @@ export default function MessengerGroupBubble({ groupId, index }: Props) {
       const saved = await messagingService.sendGroupMessage(groupId, { content: text, attachment_url: attachmentUrl, reply_to_message_id: replyToMessageId })
       setMessages(prev => prev.map(m => m.id === oid ? coerce(saved) : m))
       pendingIds.current.delete(oid)
-    } catch { pendingIds.current.delete(oid); setMessages(prev => prev.filter(m => m.id !== oid)) }
+    } catch { pendingIds.current.delete(oid); setMessages(prev => prev.filter(m => m.id !== oid)); return false }
     finally { setSending(false) }
   }
 

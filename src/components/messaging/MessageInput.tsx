@@ -18,7 +18,8 @@ export interface ReplyToPreview {
 
 interface MessageInputProps {
   /** `attachmentUrl`: a photo already uploaded; `body` is then its caption (may be empty). */
-  onSend:          (body: string, replyToMessageId?: string, attachmentUrl?: string) => void
+  /** Resolve to false when the send failed: the typed text then comes back. */
+  onSend:          (body: string, replyToMessageId?: string, attachmentUrl?: string) => void | Promise<boolean | void>
   onTypingChange?: (isTyping: boolean) => void
   disabled?:       boolean
   replyTo?:        ReplyToPreview | null
@@ -116,8 +117,13 @@ export default function MessageInput({
     if (!trimmed || disabled) return
     stopTyping()
     if (typingTimeout.current) clearTimeout(typingTimeout.current)
-    onSend(trimmed, replyTo?.messageId)
+    const result = onSend(trimmed, replyTo?.messageId)
     setText('')
+    // Failed (no signal, server error): put the text back, as WhatsApp and
+    // Slack do, unless the person has already typed something new.
+    void Promise.resolve(result).then((ok) => {
+      if (ok === false && !(textareaRef.current?.value ?? '').trim()) setText(trimmed)
+    })
     textareaRef.current?.focus()
     setShowEmoji(false)
   }, [text, disabled, replyTo, onSend, stopTyping, setText])
