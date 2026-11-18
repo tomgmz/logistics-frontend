@@ -21,7 +21,9 @@ import {
   Ruler,
   FileText,
   Eye,
+  ChevronDown,
 } from 'lucide-react'
+import { motion, useReducedMotion } from 'framer-motion'
 
 import { PALETTE } from '@/lib/palette'
 import { ToggleBox } from '@/components/ui/accordion'
@@ -377,6 +379,52 @@ export function CollapsibleSection({
     >
       {lazy && !opened ? null : children}
     </ToggleBox>
+  )
+}
+
+/**
+ * "More Details ⌄": a centered label over a gently bouncing orange chevron
+ * that reveals the booking's reference detail (cargo, stops, documents) so
+ * the panel opens on the summary and what needs acting on. Closed by default;
+ * the content stays mounted (hidden) so its reads finish with the panel and
+ * nothing refetches on each open.
+ */
+export function MoreDetailsReveal({ children, label = 'More Details' }: {
+  children: ReactNode
+  label?: string
+}) {
+  const [open, setOpen] = useState(false)
+  const reduceMotion = useReducedMotion()
+  const contentId = useId()
+  return (
+    <div>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={contentId}
+        onClick={() => setOpen((v) => !v)}
+        className="group mx-auto flex flex-col items-center gap-0.5 px-4 py-2 rounded-lg text-white/85 hover:text-white transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
+      >
+        <span className="text-base font-bold leading-tight">{open ? 'Less Details' : label}</span>
+        <motion.span
+          aria-hidden
+          className="flex"
+          style={{ color: PALETTE.orange }}
+          // Bounce only while closed, as the cue to look below; still when
+          // the viewer asks for reduced motion.
+          animate={!open && !reduceMotion ? { y: [0, 4, 0] } : { y: 0 }}
+          transition={!open && !reduceMotion
+            ? { duration: 1.4, repeat: Infinity, ease: 'easeInOut' }
+            : { duration: 0.2 }}
+        >
+          <ChevronDown size={26} strokeWidth={2.5}
+            className={`transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+        </motion.span>
+      </button>
+      <div id={contentId} hidden={!open} className="space-y-[18px] pt-[18px]">
+        {children}
+      </div>
+    </div>
   )
 }
 
