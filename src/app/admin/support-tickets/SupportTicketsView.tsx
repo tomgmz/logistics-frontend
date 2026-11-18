@@ -13,7 +13,8 @@ import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { formatDate, formatDateTime, formatTime } from '@/app/utils/timeFormat'
 import {
-  openedByStaff, supportService, TICKET_CATEGORY_LABEL, type SupportTicket, type TicketCategory,
+  openedByStaff, replyStateOf, supportService, TICKET_CATEGORY_LABEL,
+  type ReplyState, type SupportTicket, type TicketCategory,
 } from '@/lib/services/support.service'
 import NewTicketModal from '@/components/support/NewTicketModal'
 import { Plus } from '@untitledui/icons'
@@ -65,6 +66,66 @@ function StatusBadge({ status }: { status: SupportTicket['status'] }) {
   )
 }
 
+// Where the email conversation stands (Zendesk's Open / Pending), from the
+// replies recorded at the reply address. Palette colours (lib/palette.ts).
+const REPLY_STATE: Record<ReplyState, { label: string; color: string } | null> = {
+  new:                null,
+  client_replied:     { label: 'Client replied',     color: '#FF7A30' },
+  waiting_for_client: { label: 'Waiting for client', color: '#8A38F5' },
+}
+
+function ReplyStateBadge({ ticket, tracking }: { ticket: SupportTicket; tracking: boolean }) {
+  const state    = replyStateOf(ticket, tracking)
+  const cfg      = state ? REPLY_STATE[state] : null
+  const reopened = tracking && ticket.status === 'open' && !!ticket.reopened_at
+  if (!cfg && !reopened) return null
+  return (
+    <span className="mt-1 flex flex-wrap gap-1">
+      {reopened && (
+        <span
+          className="inline-flex text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border"
+          style={{ color: '#F62626', borderColor: 'rgba(246,38,38,0.35)', background: 'rgba(246,38,38,0.08)' }}
+        >
+          Reopened
+        </span>
+      )}
+      {cfg && (
+        <span
+          className="inline-flex text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border"
+          style={{ color: cfg.color, borderColor: `${cfg.color}59`, background: `${cfg.color}14` }}
+        >
+          {cfg.label}
+        </span>
+      )}
+    </span>
+  )
+}
+
+/** The email replies recorded for this ticket, oldest first. */
+function ReplyList({ ticket: t }: { ticket: SupportTicket }) {
+  const replies = [...(t.support_ticket_replies ?? [])].sort((a, b) => a.received_at.localeCompare(b.received_at))
+  if (replies.length === 0) return null
+  const who = (r: (typeof replies)[number]) =>
+    r.direction === 'staff' ? 'Our team' : r.from_name ? `${r.from_name} (${r.from_email})` : r.from_email
+  return (
+    <div>
+      <p className="text-[11px] font-bold uppercase tracking-wide text-white/40 mb-1.5">Email replies ({replies.length})</p>
+      <ul className="flex flex-col gap-2">
+        {replies.map((r) => (
+          <li key={r.reply_id} className="rounded-xl border border-white/[0.08] bg-black/20 px-3 py-2.5">
+            <p className="text-[11px] text-white/45">
+              <span className="font-bold text-white/70">{who(r)}</span>
+              {r.direction === 'other' && " · not the client's account email"}
+              {' · '}{formatDateTime(r.received_at)}
+            </p>
+            <p className="mt-1 text-sm text-white/80 whitespace-pre-wrap break-words">{r.body_text || '(no text)'}</p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 function DetailRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex items-start justify-between gap-4 py-2 border-b border-white/[0.05] last:border-0">
@@ -75,7 +136,7 @@ function DetailRow({ label, children }: { label: string; children: ReactNode }) 
 }
 
 /** The side panel's body: who raised it, about what, the message, and how it ended. */
-function TicketDetail({ ticket: t }: { ticket: SupportTicket }) {
+function TicketDetail({ ticket: t, tracking }: { ticket: SupportTicket; tracking: boolean }) {
   const opener   = personName(t.opener)
   const resolver = personName(t.resolver)
   const byStaff  = openedByStaff(t)
@@ -84,6 +145,7 @@ function TicketDetail({ ticket: t }: { ticket: SupportTicket }) {
     <>
       <div className="flex flex-wrap items-center gap-2 font-[family-name:var(--font-alegreya-sc)]">
         <StatusBadge status={t.status} />
+        <ReplyStateBadge ticket={t} tracking={tracking} />
       </div>
 
       <div className="rounded-xl border border-white/[0.08] bg-black/20 px-3">
@@ -119,6 +181,8 @@ function TicketDetail({ ticket: t }: { ticket: SupportTicket }) {
           </ul>
         </details>
       )}
+
+      <ReplyList ticket={t} />
 
       {t.status === 'resolved' && (
         <div>
@@ -180,10 +244,25 @@ function TicketActions({ ticket: t, inbox, canEdit, onResolve }: {
   )
 }
 
+/**
+ * The resolve dialog's text. Zendesk lets an agent solve without a customer
+ * reply (a reply later reopens it), so this warns rather than blocks.
+ */
+function resolveDescription(t: SupportTicket | null, tracking: boolean): string {
+  const base = "The client is emailed that the ticket is resolved, with this note. Answer them first in Gmail (Reply all on the ticket email) if you haven't."
+  if (!t || !tracking || replyStateOf(t, tracking) === 'client_replied') return base
+  const why = t.client_last_reply_at
+    ? "The client hasn't replied since your team's last email."
+    : "The client hasn't replied to this ticket yet."
+  return `${why} You can still resolve it; if they reply later, the ticket opens again by itself. ${base}`
+}
+
 export default function SupportTicketsView() {
   // Tickets tier: Read Only sees the reply and resolve actions, disabled.
   const { canEdit } = useModuleAccess()
   const [inbox,   setInbox]   = useState('')
+  // Replies are recorded only when the server has a ticket reply address.
+  const [tracking, setTracking] = useState(false)
 
   const [search,       setSearch]       = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('open')
@@ -206,6 +285,7 @@ export default function SupportTicketsView() {
         ...(debouncedSearch && { search: debouncedSearch }),
       })
       setInbox(res.inbox)
+      setTracking(res.replyTracking)
       return res
     },
     `${statusFilter}|${debouncedSearch}`,
@@ -325,7 +405,10 @@ export default function SupportTicketsView() {
                             <div className="text-white">{formatDate(t.created_at)}</div>
                             <div className="text-[#818181]">{formatTime(t.created_at)}</div>
                           </td>
-                          <td className={`${TD} font-[family-name:var(--font-alegreya-sc)]`}><StatusBadge status={t.status} /></td>
+                          <td className={`${TD} font-[family-name:var(--font-alegreya-sc)]`}>
+                            <StatusBadge status={t.status} />
+                            <ReplyStateBadge ticket={t} tracking={tracking} />
+                          </td>
                           <td className={TD}>
                             <ChevronRight size={18} className="text-[#818181]" aria-hidden />
                           </td>
@@ -364,7 +447,7 @@ export default function SupportTicketsView() {
         subtitle={selected ? `Raised ${formatDateTime(selected.created_at)}` : undefined}
         footer={selected && <TicketActions ticket={selected} inbox={inbox} canEdit={canEdit} onResolve={() => setResolving(selected)} />}
       >
-        {selected && <TicketDetail ticket={selected} />}
+        {selected && <TicketDetail ticket={selected} tracking={tracking} />}
       </SidePanel>
       </div>
 
@@ -373,7 +456,7 @@ export default function SupportTicketsView() {
       <RemarksModal
         open={!!resolving}
         title={resolving ? `Resolve ${resolving.reference}?` : 'Resolve ticket?'}
-        description="The client is emailed that the ticket is resolved, with this note. Answer them first in Gmail (Reply all on the ticket email) if you haven't."
+        description={resolveDescription(resolving, tracking)}
         remarksLabel="Note to the client"
         remarksPlaceholder="e.g. We corrected the drop-off address on your booking."
         confirmLabel={busy ? 'Saving…' : 'Mark resolved'}

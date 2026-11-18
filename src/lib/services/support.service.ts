@@ -46,6 +46,36 @@ export interface SupportTicket {
   /** Staff reads only: the help-assistant chat that led to the ticket. */
   chat_transcript?: ChatLine[] | null
   resolver?:       { first_name: string | null; last_name: string | null } | null
+  /** Email replies recorded from the reply address (staff reads only, 2026-11-18). */
+  client_last_reply_at?: string | null
+  staff_last_reply_at?:  string | null
+  reopened_at?:          string | null
+  reopen_count?:         number
+  support_ticket_replies?: TicketReply[] | null
+}
+
+export interface TicketReply {
+  reply_id:    string
+  /** client = the client's account email; staff = the support inbox; other = any other address. */
+  direction:   'client' | 'staff' | 'other'
+  from_email:  string
+  from_name:   string | null
+  body_text:   string
+  received_at: string
+}
+
+/**
+ * Where an open ticket stands in the email conversation (Zendesk's New /
+ * Pending / Open): null when replies aren't recorded or the ticket is resolved.
+ */
+export type ReplyState = 'new' | 'client_replied' | 'waiting_for_client'
+export function replyStateOf(t: SupportTicket, tracking: boolean): ReplyState | null {
+  if (!tracking || t.status !== 'open') return null
+  const client = t.client_last_reply_at ? Date.parse(t.client_last_reply_at) : 0
+  const staff  = t.staff_last_reply_at ? Date.parse(t.staff_last_reply_at) : 0
+  if (client && client >= staff) return 'client_replied'
+  if (staff) return 'waiting_for_client'
+  return 'new'
 }
 
 export interface TicketClientOption {
@@ -136,12 +166,12 @@ export const supportService = {
 
   /** One page of the Tickets table; status, search and counts are server-side. */
   async listPage(params: PageRequest & { status: 'open' | 'resolved' | 'all'; search?: string }): Promise<
-    PagedResponse<SupportTicket, { counts: { all: number; open: number; resolved: number } }> & { inbox: string }
+    PagedResponse<SupportTicket, { counts: { all: number; open: number; resolved: number } }> & { inbox: string; replyTracking: boolean }
   > {
     const { data } = await proxyApi.get<
-      PagedResponse<SupportTicket, { counts: { all: number; open: number; resolved: number } }> & { inbox?: string }
+      PagedResponse<SupportTicket, { counts: { all: number; open: number; resolved: number } }> & { inbox?: string; reply_tracking?: boolean }
     >('/support/tickets', { params })
-    return { data: data.data, meta: data.meta, inbox: data.inbox ?? '' }
+    return { data: data.data, meta: data.meta, inbox: data.inbox ?? '', replyTracking: !!data.reply_tracking }
   },
 
   /** Staff open a ticket for a client (a call, an email, a walk-in). It is emailed to the client as usual. */

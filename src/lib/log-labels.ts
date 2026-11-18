@@ -76,6 +76,10 @@ const AUDIT_ACTION_LABEL: Record<string, string> = {
   export:                                 'Exported',
   support_ticket_opened:                  'Support ticket opened',
   support_ticket_resolved:                'Support ticket resolved',
+  support_ticket_replied:                 'Client replied to a support ticket',
+  support_ticket_reopened:                'Support ticket reopened by a client reply',
+  vehicle_restored:                       'Vehicle restored',
+  vehicle_model_restored:                 'Vehicle model restored',
 }
 
 // Words that keep their capitals wherever they appear.
