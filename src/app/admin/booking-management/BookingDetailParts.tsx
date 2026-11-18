@@ -392,6 +392,11 @@ export function CollapsibleSection({
  * with a `data-jump="<name>"` attribute anywhere inside the scroll area.
  * Hidden once the last card is reached or everything fits.
  */
+/** Height of the arrow's area at the panel's bottom (label + chevron + fade). */
+const JUMPER_ZONE = 96
+/** Space left above a card once jumped to. */
+const JUMP_GAP = 12
+
 export function NextCardJumper({ scrollRef }: { scrollRef: RefObject<HTMLElement | null> }) {
   const reduceMotion = useReducedMotion()
   const [next, setNext] = useState<{ el: HTMLElement; name: string } | null>(null)
@@ -402,11 +407,18 @@ export function NextCardJumper({ scrollRef }: { scrollRef: RefObject<HTMLElement
     // At (or near) the bottom, or nothing to scroll: no cue.
     if (box.scrollTop + box.clientHeight >= box.scrollHeight - 8) { setNext(null); return }
     const boxTop = box.getBoundingClientRect().top
-    // The first card whose top is still below the upper part of the panel.
+    // The first card whose heading is not yet on screen: below the visible
+    // area, or behind the arrow itself. A card you can already see is never
+    // offered.
+    const fold = box.clientHeight - JUMPER_ZONE
+    const maxScroll = box.scrollHeight - box.clientHeight
     const targets = Array.from(box.querySelectorAll<HTMLElement>('[data-jump]'))
       .filter((el) => el.offsetParent !== null)
-    const found = targets.find((el) => el.getBoundingClientRect().top - boxTop > 48)
-    setNext(found ? { el: found, name: found.dataset.jump ?? '' } : null)
+    const found = targets.find((el) => el.getBoundingClientRect().top - boxTop > fold)
+    // Near the end the panel can't scroll a short last card to the top;
+    // only offer it if the jump still moves the view.
+    if (found && box.scrollTop < maxScroll - 8) setNext({ el: found, name: found.dataset.jump ?? '' })
+    else setNext(null)
   }, [scrollRef])
 
   useEffect(() => {
@@ -438,13 +450,26 @@ export function NextCardJumper({ scrollRef }: { scrollRef: RefObject<HTMLElement
 
   const jump = () => {
     const box = scrollRef.current
+    const el = next.el
     if (!box) return
-    const top = next.el.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop - 12
-    try {
-      box.scrollTo({ top, behavior: reduceMotion ? 'auto' : 'smooth' })
-    } catch {
-      box.scrollTop = top // older Safari without scroll options
+    const targetTop = () => el.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop - JUMP_GAP
+    const go = (smooth: boolean) => {
+      const top = Math.min(targetTop(), box.scrollHeight - box.clientHeight)
+      try {
+        box.scrollTo({ top, behavior: smooth ? 'smooth' : 'auto' })
+      } catch {
+        box.scrollTop = top // older Safari without scroll options
+      }
     }
+    go(!reduceMotion)
+    // Cards above can still grow while it scrolls (maps, files loading):
+    // once it settles, put the card back at the top if it moved.
+    window.setTimeout(() => {
+      if (!el.isConnected) return
+      const off = el.getBoundingClientRect().top - box.getBoundingClientRect().top - JUMP_GAP
+      const canMove = off > 0 ? box.scrollTop < box.scrollHeight - box.clientHeight - 1 : box.scrollTop > 0
+      if (Math.abs(off) > 4 && canMove) go(false)
+    }, reduceMotion ? 50 : 700)
   }
 
   return (
