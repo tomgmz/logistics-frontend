@@ -1,3 +1,4 @@
+import { getApiUrl } from '@/lib/api/api-url'
 import proxyApi, { initCsrf } from '@/lib/api/auth.api'
 import type { PagedResponse, PageRequest } from '@/lib/hooks/useServerTable'
 
@@ -61,6 +62,13 @@ export interface TicketBookingOption {
   schedule_date:    string | null
 }
 
+/** What POST /support/assistant answers. */
+export type AssistantAnswer =
+  | { status: 'answered'; answer: string; source_ids: string[] }
+  | { status: 'off_topic' }
+  | { status: 'not_in_knowledge' }
+  | { status: 'unavailable' }
+
 /** The office opened it for the client (the opener is not the client's account). */
 export function openedByStaff(t: SupportTicket): boolean {
   return !!t.opened_by && !!t.clients?.user_id && t.opened_by !== t.clients.user_id
@@ -77,6 +85,42 @@ export const supportService = {
     await initCsrf()
     const { data } = await proxyApi.post<{ data: SupportTicket }>('/support/tickets', input)
     return data.data
+  },
+
+  /**
+   * The assistant's AI answer (Gemini, grounded in the FAQ), asked when the
+   * keyword matcher has no confident answer. Signed-in clients only. Any
+   * failure reads as 'unavailable', so the chat falls back to keyword answers.
+   */
+  async ask(question: string, earlier: string[]): Promise<AssistantAnswer> {
+    try {
+      await initCsrf()
+      const { data } = await proxyApi.post<{ data: AssistantAnswer }>('/support/assistant', { question, earlier })
+      return data.data ?? { status: 'unavailable' }
+    } catch {
+      return { status: 'unavailable' }
+    }
+  },
+
+  /**
+   * The same for a visitor on the landing page (not signed in): public
+   * knowledge only, a Turnstile token per question, no cookies. Any failure
+   * (limit, captcha, server) reads as 'unavailable'.
+   */
+  async askPublic(question: string, earlier: string[], captchaToken: string | undefined): Promise<AssistantAnswer> {
+    try {
+      const res = await fetch(`${getApiUrl()}/public/assistant`, {
+        method:      'POST',
+        headers:     { 'Content-Type': 'application/json' },
+        credentials: 'omit',
+        body:        JSON.stringify({ question, earlier, captcha_token: captchaToken }),
+      })
+      if (!res.ok) return { status: 'unavailable' }
+      const body = await res.json().catch(() => null) as { data?: AssistantAnswer } | null
+      return body?.data ?? { status: 'unavailable' }
+    } catch {
+      return { status: 'unavailable' }
+    }
   },
 
   async mine(): Promise<SupportTicket[]> {

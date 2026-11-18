@@ -16,12 +16,13 @@ import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { formatDateTime } from '@/app/utils/timeFormat'
 import { bookingRef } from '@/lib/booking'
-import { matchFaq, CONFIDENT_SCORE, STARTER_QUESTIONS, PUBLIC_STARTER_QUESTIONS, type FaqEntry } from '@/lib/support/faq'
+import { FAQ, matchFaq, smallTalk, CONFIDENT_SCORE, STARTER_QUESTIONS, PUBLIC_STARTER_QUESTIONS, type FaqEntry, type FaqMatch } from '@/lib/support/faq'
 import {
   supportService, TICKET_CATEGORY_LABEL, OPEN_HELP_EVENT, openedByStaff,
   type ChatLine, type HelpTab, type SupportTicket, type TicketCategory,
 } from '@/lib/services/support.service'
 import { useIsMobile } from '@/lib/hooks/useIsMobile'
+import { useTurnstile } from '@/lib/hooks/useTurnstile'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 import { cachedFetch } from '@/lib/query/useApiQuery'
 import Dropdown from '@/components/ui/Dropdown'
@@ -58,6 +59,8 @@ interface Msg {
   suggestions?: FaqEntry[]
   /** Offer the "talk to our team" button under this message. */
   offerTicket?: boolean
+  /** Written by the AI (Gemini) from the FAQ, not one of our own answers word for word. */
+  ai?: boolean
 }
 
 interface BookingOption { booking_id: string; label: string }
@@ -260,33 +263,91 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
     reply({ from: 'bot', text: entry.answer, faq: entry })
   }, [reply])
 
-  const ask = useCallback((text: string) => {
-    const q = text.trim()
-    if (!q || typing) return
-    push({ from: 'client', text: q })
-    setInput('')
+  /** No confident answer: offer the near matches, else a ticket. */
+  const noAnswer = useCallback((matches: FaqMatch[]): Omit<Msg, 'id'> => (
+    matches.length > 0
+      ? {
+          from: 'bot',
+          text: 'I\'m not completely sure what you mean. Is it one of these?',
+          suggestions: matches.map((m) => m.entry),
+          offerTicket: true,
+        }
+      : {
+          from: 'bot',
+          text: canTicket
+            ? 'Sorry, I don\'t have an answer for that. Our team can help: open a ticket and they will reply by email.'
+            : 'Sorry, I don\'t have an answer for that. Our team can help: send them a message and they will reply by email.',
+          offerTicket: true,
+        }
+  ), [canTicket])
 
-    const matches = matchFaq(q, 3, !canTicket)
-    const best    = matches[0]
-    if (best && best.score >= CONFIDENT_SCORE) {
-      answer(best.entry)
-    } else if (matches.length > 0) {
-      reply({
+  // A visitor's AI questions carry an invisible Cloudflare check (one per
+  // question); a signed-in client's go with their session instead.
+  const captcha = useTurnstile('assistant')
+  const visitor = !canTicket
+
+  /**
+   * Ask the AI: an answer written from the knowledge and citing it, "off
+   * topic", or nothing (then the keyword fallback). Signed-in clients ask with
+   * their session; visitors on the landing page ask the public endpoint
+   * (public knowledge only). The typing bubble shows while it thinks, at least
+   * as long as for a keyword answer.
+   */
+  const askAi = useCallback(async (q: string, earlier: string[], matches: FaqMatch[]) => {
+    if (typingTimer.current) { clearTimeout(typingTimer.current); typingTimer.current = null }
+    setTyping(true)
+    const started = Date.now()
+    const res     = visitor
+      ? await supportService.askPublic(q, earlier, await captcha.getToken().catch(() => undefined))
+      : await supportService.ask(q, earlier)
+    const wait    = 700 - (Date.now() - started)
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait))
+    setTyping(false)
+
+    if (res.status === 'answered') {
+      const source = FAQ.find((f) => f.id === res.source_ids[0])
+      push({ from: 'bot', text: res.answer, faq: source, ai: true })
+    } else if (res.status === 'off_topic') {
+      push({
         from: 'bot',
-        text: 'I\'m not completely sure what you mean. Is it one of these?',
-        suggestions: matches.map((m) => m.entry),
+        text: visitor
+          ? 'I can only help with questions about 8338 Logistics and our delivery service. Pick a common ' +
+            'question below, or send our team a message.'
+          : 'I can only help with questions about your bookings, deliveries, tracking and your 8338 account. ' +
+            'Pick a common question below, or ask our team.',
+        suggestions: visitor ? PUBLIC_STARTER_QUESTIONS : STARTER_QUESTIONS,
         offerTicket: true,
       })
     } else {
-      reply({
-        from: 'bot',
-        text: canTicket
-          ? 'Sorry, I don\'t have an answer for that. Our team can help: open a ticket and they will reply by email.'
-          : 'Sorry, I don\'t have an answer for that. Our team can help: send them a message and they will reply by email.',
-        offerTicket: true,
-      })
+      push(noAnswer(matches))
     }
-  }, [answer, push, reply, canTicket, typing])
+  }, [push, noAnswer, visitor, captcha])
+
+  const ask = useCallback((text: string) => {
+    const q = text.trim()
+    if (!q || typing) return
+    // Earlier questions in this chat, so a follow-up ("what about Sundays?") makes sense.
+    const earlier = messages.filter((m) => m.from === 'client').map((m) => m.text).slice(-3)
+    push({ from: 'client', text: q })
+    setInput('')
+
+    // Hi / thanks / bye: answered at once, never "no answer" and never the AI.
+    const talk = smallTalk(q)
+    if (talk) {
+      const starters = isPublic && !canTicket ? PUBLIC_STARTER_QUESTIONS : STARTER_QUESTIONS
+      reply(talk === 'greeting'
+        ? { from: 'bot', text: 'Hi! What can I help you with? Ask about bookings, tracking, deliveries or your account, or pick a common question.', suggestions: starters }
+        : talk === 'thanks'
+          ? { from: 'bot', text: 'You\'re welcome! Ask anything else any time.' }
+          : { from: 'bot', text: 'Goodbye! I\'m here whenever you need help.' })
+      return
+    }
+
+    const matches = matchFaq(q, 3, !canTicket)
+    const best    = matches[0]
+    if (best && best.score >= CONFIDENT_SCORE) answer(best.entry)
+    else void askAi(q, earlier, matches)
+  }, [answer, push, reply, askAi, canTicket, isPublic, typing, messages])
 
   const pick = useCallback((entry: FaqEntry) => {
     if (typing) return
@@ -448,6 +509,12 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
                         {m.text}
                       </div>
 
+                      {m.ai && (
+                        <p className="text-[10px] leading-snug text-white/35">
+                          AI answer based on our help articles. If something looks wrong, ask our team.
+                        </p>
+                      )}
+
                       {m.faq?.link && (canTicket || !m.faq.link.href.startsWith('/client')) && (
                         <Link
                           href={m.faq.link.href}
@@ -458,7 +525,7 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
                         </Link>
                       )}
 
-                      {m.faq && helped[m.id] === undefined && (
+                      {(m.faq || m.ai) && helped[m.id] === undefined && (
                         <div className="flex items-center gap-2 text-[11px] text-white/45">
                           Did this answer it?
                           <button type="button" onClick={() => {
@@ -584,6 +651,9 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
                   </div>
                 )}
               </div>
+
+              {/* Invisible unless Cloudflare asks this visitor for a tick. */}
+              {visitor && <div className="relative px-3">{captcha.element}</div>}
 
               <form
                 onSubmit={(e) => { e.preventDefault(); ask(input) }}

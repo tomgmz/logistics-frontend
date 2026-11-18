@@ -27,7 +27,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 
 // Only the landing page's contact form (user 2026-11-16; sign-in and
 // password reset have no captcha).
-export type CaptchaAction = 'contact'
+export type CaptchaAction = 'contact' | 'assistant'
 
 interface TurnstileApi {
   render: (el: HTMLElement, opts: Record<string, unknown>) => string

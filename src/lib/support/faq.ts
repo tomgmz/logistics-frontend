@@ -66,7 +66,8 @@ export const FAQ: FaqEntry[] = [
     question: 'How far ahead do I need to book?',
     answer:
       'Same-day bookings are accepted until 12:00 noon, Monday to Saturday, with a call time later than ' +
-      'the time you book. After noon, and on Sundays, the earliest date you can pick is tomorrow. You can ' +
+      'the time you book. After 12:00 noon on any day, and all day on Sundays, the earliest date you can pick is ' +
+      'tomorrow. You can ' +
       'book up to one month in advance (the same date next month). Call times are set in 5-minute steps.',
     keywords: ['same day', 'today', 'tomorrow', 'advance', 'ahead', 'earliest', 'lead time', 'urgent', 'rush', 'how soon'],
     link: { href: '/client/booking', label: 'Open Booking' },
@@ -107,11 +108,13 @@ export const FAQ: FaqEntry[] = [
     id: 'rejected',
     question: 'My booking was rejected. What now?',
     answer:
-      'The notification and the booking in Transaction History show the reason it was turned down. Fix what ' +
-      'it mentions (often the date, cargo details or an address) and send a new booking. If the reason is ' +
-      'unclear, open a ticket and we will explain.',
+      'The notification and the booking in Transaction History show the reason it was turned down. Open it and ' +
+      'choose Edit & Resubmit: fix what the reason mentions (often the date, cargo details or an address) and ' +
+      'resubmit; it goes back for approval with the same booking number. A booking can be resubmitted at most 3 ' +
+      'times; after that you can only cancel it and make a new booking. Or choose Cancel Booking. If the reason ' +
+      'is unclear, open a ticket and we will explain.',
     keywords: ['rejected', 'reject', 'declined', 'denied', 'cancelled by', 'why rejected', 'reason'],
-    link: { href: '/client/booking', label: 'Send a new booking' },
+    link: { href: '/client/history', label: 'Open Transaction History' },
     category: 'booking',
   },
   {
@@ -295,6 +298,27 @@ export function matchFaq(question: string, limit = 3, publicVisitor = false): Fa
     .filter((m) => m.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, limit)
+}
+
+/**
+ * Small talk: a greeting, thanks or goodbye on its own (English, Filipino,
+ * Taglish). Answered right away with a fixed reply; never sent to the AI (it
+ * has no passage to cite, so it would be refused) or treated as "no answer".
+ * A greeting followed by a real question ("hi, how do I book?") is not small
+ * talk: the question is answered as usual.
+ */
+export type SmallTalk = 'greeting' | 'thanks' | 'bye'
+
+const SMALL_TALK: [SmallTalk, RegExp][] = [
+  ['greeting', /^(hi+|hello+|hey+|helo|hallo|yo|good (morning|afternoon|evening|day)|morning|magandang (umaga|hapon|gabi|araw)|kumusta|kamusta|musta|ola|hola)( (po|there|team|8338|everyone|ulit))*$/],
+  ['thanks', /^(thanks?|thank you( (so|very) much)?|ty|tnx|thx|salamat( po)?|maraming salamat( po)?|ok(ay)? thanks?|got it,? thanks?|noted,? thanks?)( po)?$/],
+  ['bye', /^(bye+|goodbye|see you|paalam|ingat|sige( po)?|ok(ay)? bye)( po)?$/],
+]
+
+export function smallTalk(text: string): SmallTalk | null {
+  const t = text.toLowerCase().replace(/[!?.,~:)(]+/g, ' ').replace(/\s+/g, ' ').trim()
+  for (const [kind, re] of SMALL_TALK) if (re.test(t)) return kind
+  return null
 }
 
 /** A match is confident enough to answer outright. Below it, offer choices. */
