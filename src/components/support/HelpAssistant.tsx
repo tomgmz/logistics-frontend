@@ -16,7 +16,7 @@ import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { formatDateTime } from '@/app/utils/timeFormat'
 import { bookingRef } from '@/lib/booking'
-import { FAQ, matchFaq, smallTalk, CONFIDENT_SCORE, STARTER_QUESTIONS, PUBLIC_STARTER_QUESTIONS, type FaqEntry, type FaqMatch } from '@/lib/support/faq'
+import { FAQ, matchFaq, smallTalk, STARTER_QUESTIONS, PUBLIC_STARTER_QUESTIONS, type FaqEntry, type FaqMatch } from '@/lib/support/faq'
 import {
   supportService, TICKET_CATEGORY_LABEL, OPEN_HELP_EVENT, openedByStaff,
   type ChatLine, type HelpTab, type SupportTicket, type TicketCategory,
@@ -343,11 +343,14 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
       return
     }
 
+    // Every typed question goes to the AI, which reads the whole FAQ and
+    // understands Filipino / Taglish and rewording. The keyword matches are
+    // only the fallback ("Is it one of these?") when the AI can't answer:
+    // a single English word ("book" in "hanggang anong oras pwede mag book?")
+    // must never pick the answer by itself.
     const matches = matchFaq(q, 3, !canTicket)
-    const best    = matches[0]
-    if (best && best.score >= CONFIDENT_SCORE) answer(best.entry)
-    else void askAi(q, earlier, matches)
-  }, [answer, push, reply, askAi, canTicket, isPublic, typing, messages])
+    void askAi(q, earlier, matches)
+  }, [push, reply, askAi, canTicket, isPublic, typing, messages])
 
   const pick = useCallback((entry: FaqEntry) => {
     if (typing) return

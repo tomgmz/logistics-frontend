@@ -80,7 +80,7 @@ export const FAQ: FaqEntry[] = [
       'Our office reviews bookings Monday to Saturday, 8:00 AM to 5:00 PM. A booking sent outside those hours ' +
       'is still received and is reviewed on the next working day. Deliveries themselves run 7 days a week, ' +
       'Sundays included.',
-    keywords: ['hours', 'office hours', 'open', 'sunday', 'weekend', 'holiday', 'saturday', 'time', 'closed'],
+    keywords: ['hours', 'office hours', 'open', 'sunday', 'weekend', 'holiday', 'saturday', 'time', 'closed', 'oras', 'anong oras', 'hanggang', 'sarado', 'linggo'],
     category: 'booking',
   },
   {
@@ -275,7 +275,9 @@ export interface FaqMatch {
 /**
  * Score every entry against the question: a matching keyword phrase is worth
  * more the longer it is, words shared with the FAQ's own question count a
- * little. Returns the best few, best first.
+ * little. Returns the best few, best first. Never picks an answer by itself:
+ * the help assistant sends every typed question to the AI and only offers
+ * these as "Is it one of these?" when the AI can't answer.
  */
 export function matchFaq(question: string, limit = 3, publicVisitor = false): FaqMatch[] {
   const text  = ` ${normalize(question)} `
@@ -320,9 +322,6 @@ export function smallTalk(text: string): SmallTalk | null {
   for (const [kind, re] of SMALL_TALK) if (re.test(t)) return kind
   return null
 }
-
-/** A match is confident enough to answer outright. Below it, offer choices. */
-export const CONFIDENT_SCORE = 2.5
 
 /** Shown as quick replies before the client types anything. */
 export const STARTER_QUESTIONS = ['book', 'track', 'confirm-completion', 'report-problem', 'proof', 'password']
