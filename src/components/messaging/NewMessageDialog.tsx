@@ -131,7 +131,7 @@ export default function NewMessageDialog({ initialTab, onClose, onConversationRe
           initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 24 }}
           transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
           role="dialog" aria-modal="true" aria-label="New Message"
-          className="w-full sm:max-w-[360px] bg-[#0e1010] border border-[#3a3a3a] rounded-t-[18px] sm:rounded-[18px] shadow-2xl overflow-hidden flex flex-col max-h-[90dvh] sm:max-h-[min(615px,90dvh)]"
+          className="w-full sm:max-w-[360px] bg-[#0e1010] border border-[#3a3a3a] rounded-t-[18px] sm:rounded-[18px] shadow-2xl overflow-hidden flex flex-col h-[85dvh] sm:h-[min(615px,90dvh)]"
         >
           {/* Header */}
           <div className="px-4 pt-2.5 pb-2 flex items-center justify-between border-b border-[#3a3a3a] shrink-0">
@@ -160,7 +160,7 @@ export default function NewMessageDialog({ initialTab, onClose, onConversationRe
             <input
               ref={searchRef} type="text" value={search} onChange={e => setSearch(e.target.value)}
               placeholder="Search by name, role..."
-              className="w-full h-[29px] bg-transparent border border-[#2f2f2f] rounded-[10px] pl-9 pr-3 text-[15px] font-medium text-white placeholder:text-white/40 focus:outline-none focus:border-[var(--color-cyan)]/40"
+              className="w-full h-[29px] bg-transparent border border-[#2f2f2f] rounded-[10px] pl-9 pr-3 text-[15px] font-medium text-white placeholder:text-white/40 focus:outline-none focus:border-[var(--color-cyan)] transition-colors"
             />
           </div>
 
@@ -169,7 +169,7 @@ export default function NewMessageDialog({ initialTab, onClose, onConversationRe
             <input
               type="text" value={groupName} onChange={e => setGroupName(e.target.value)} maxLength={100}
               placeholder="Group Name"
-              className="mx-4 mb-1.5 h-[29px] bg-transparent border border-[var(--color-cyan)] rounded-[10px] px-2 text-[15px] font-medium text-white placeholder:text-white/40 focus:outline-none shrink-0"
+              className="mx-4 mb-1.5 h-[29px] bg-transparent border border-[#2f2f2f] rounded-[10px] px-2 text-[15px] font-medium text-white placeholder:text-white/40 focus:outline-none focus:border-[var(--color-cyan)] transition-colors shrink-0"
             />
           )}
 
