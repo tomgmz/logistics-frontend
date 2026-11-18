@@ -7,7 +7,7 @@
  * BookingManagementView.
  */
 
-import { useId, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useState, type ReactNode, type RefObject } from 'react'
 import {
   Info,
   MapPin,
@@ -382,48 +382,96 @@ export function CollapsibleSection({
   )
 }
 
+// ── Jump to the next card ────────────────────────────────────────────────────
+
 /**
- * "More Details ⌄": a centered label over a gently bouncing orange chevron
- * that reveals the booking's reference detail (cargo, stops, documents) so
- * the panel opens on the summary and what needs acting on. Closed by default;
- * the content stays mounted (hidden) so its reads finish with the panel and
- * nothing refetches on each open.
+ * A floating "<next card's name> ⌄" with a bouncing orange chevron at the
+ * bottom of the panel (user 2026-11-18, like a portfolio's "Recent Projects ⌄"
+ * scroll cue). Tapping it scrolls the next card to the top of the panel, so the
+ * reader moves card by card instead of facing everything at once. Cards opt in
+ * with a `data-jump="<name>"` attribute anywhere inside the scroll area.
+ * Hidden once the last card is reached or everything fits.
  */
-export function MoreDetailsReveal({ children, label = 'More Details' }: {
-  children: ReactNode
-  label?: string
-}) {
-  const [open, setOpen] = useState(false)
+export function NextCardJumper({ scrollRef }: { scrollRef: RefObject<HTMLElement | null> }) {
   const reduceMotion = useReducedMotion()
-  const contentId = useId()
+  const [next, setNext] = useState<{ el: HTMLElement; name: string } | null>(null)
+
+  const measure = useCallback(() => {
+    const box = scrollRef.current
+    if (!box) { setNext(null); return }
+    // At (or near) the bottom, or nothing to scroll: no cue.
+    if (box.scrollTop + box.clientHeight >= box.scrollHeight - 8) { setNext(null); return }
+    const boxTop = box.getBoundingClientRect().top
+    // The first card whose top is still below the upper part of the panel.
+    const targets = Array.from(box.querySelectorAll<HTMLElement>('[data-jump]'))
+      .filter((el) => el.offsetParent !== null)
+    const found = targets.find((el) => el.getBoundingClientRect().top - boxTop > 48)
+    setNext(found ? { el: found, name: found.dataset.jump ?? '' } : null)
+  }, [scrollRef])
+
+  useEffect(() => {
+    const box = scrollRef.current
+    if (!box) return
+    let frame = 0
+    const schedule = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(measure) }
+    schedule()
+    box.addEventListener('scroll', schedule, { passive: true })
+    window.addEventListener('resize', schedule)
+    // Cards load, open and close: re-measure when the content changes.
+    const mo = new MutationObserver(schedule)
+    mo.observe(box, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-state', 'hidden', 'class'] })
+    let ro: ResizeObserver | null = null
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(schedule)
+      ro.observe(box)
+    }
+    return () => {
+      cancelAnimationFrame(frame)
+      box.removeEventListener('scroll', schedule)
+      window.removeEventListener('resize', schedule)
+      mo.disconnect()
+      ro?.disconnect()
+    }
+  }, [scrollRef, measure])
+
+  if (!next) return null
+
+  const jump = () => {
+    const box = scrollRef.current
+    if (!box) return
+    const top = next.el.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop - 12
+    try {
+      box.scrollTo({ top, behavior: reduceMotion ? 'auto' : 'smooth' })
+    } catch {
+      box.scrollTop = top // older Safari without scroll options
+    }
+  }
+
   return (
-    <div>
+    <div
+      className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center pt-8"
+      style={{
+        paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
+        background: `linear-gradient(to bottom, transparent, ${PANEL_BG} 70%)`,
+      }}
+    >
       <button
         type="button"
-        aria-expanded={open}
-        aria-controls={contentId}
-        onClick={() => setOpen((v) => !v)}
-        className="group mx-auto flex flex-col items-center gap-0.5 px-4 py-2 rounded-lg text-white/85 hover:text-white transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
+        onClick={jump}
+        aria-label={`Go to ${next.name}`}
+        className="pointer-events-auto flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-lg text-white/85 hover:text-white transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
       >
-        <span className="text-base font-bold leading-tight">{open ? 'Less Details' : label}</span>
+        <span className="text-sm font-bold leading-tight whitespace-nowrap">{next.name}</span>
         <motion.span
           aria-hidden
           className="flex"
           style={{ color: PALETTE.orange }}
-          // Bounce only while closed, as the cue to look below; still when
-          // the viewer asks for reduced motion.
-          animate={!open && !reduceMotion ? { y: [0, 4, 0] } : { y: 0 }}
-          transition={!open && !reduceMotion
-            ? { duration: 1.4, repeat: Infinity, ease: 'easeInOut' }
-            : { duration: 0.2 }}
+          animate={reduceMotion ? { y: 0 } : { y: [0, 5, 0] }}
+          transition={reduceMotion ? { duration: 0 } : { duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
         >
-          <ChevronDown size={26} strokeWidth={2.5}
-            className={`transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+          <ChevronDown size={26} strokeWidth={2.5} />
         </motion.span>
       </button>
-      <div id={contentId} hidden={!open} className="space-y-[18px] pt-[18px]">
-        {children}
-      </div>
     </div>
   )
 }

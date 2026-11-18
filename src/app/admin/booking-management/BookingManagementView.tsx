@@ -105,7 +105,7 @@ import {
   CargoSummaryTiles,
   DocumentRow,
   CollapsibleSection,
-  MoreDetailsReveal,
+  NextCardJumper,
   DashedDivider,
   TEAL_BUTTON_CLASS,
   TEAL_BUTTON_STYLE,
@@ -1148,7 +1148,7 @@ function BlowbagetsRecord({ check }: { check: BlowbagetsCheck }) {
 
 function TransactionDocs({ docs }: { docs: string[] }) {
   return (
-    <section>
+    <section data-jump="Transaction Documents">
       <SectionHeading tone="bright" icon={<History size={18} strokeWidth={2} />}>Transaction Documents</SectionHeading>
       {docs.length === 0 ? (
         <p className="text-sm text-white/40">No documents attached.</p>
@@ -1216,6 +1216,8 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
   const selectedIdRef = useRef<string | null>(null)
   selectedIdRef.current = selectedId
   const [detail, setDetail]               = useState<BookingDetail | null>(null)
+  /** The side panel's scroll area, for the next-card arrow. */
+  const panelScrollRef = useRef<HTMLDivElement>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError]     = useState<string | null>(null)
 
@@ -2351,7 +2353,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                   </div>
                 </div>
 
-                <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 pt-[18px] pb-6 space-y-[18px]">
+                <div ref={panelScrollRef} className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 pt-[18px] pb-24 space-y-[18px]">
                   {detailLoading && <PanelSpinner />}
                   {detailError && !detailLoading && (
                     <p className="text-sm text-red-400 text-center py-8">{detailError}</p>
@@ -2385,10 +2387,91 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                           : null}
                       />
 
+                      {/* Cargo items */}
+                      {cargoItems.length > 0 && (
+                        <section data-jump="Cargo Items">
+                          <SectionHeading tone="bright"
+                            icon={<Boxes size={18} strokeWidth={2} />}
+                            right={
+                              <span className="text-xs font-bold text-[#818181] whitespace-nowrap">
+                                {cargoPieces > 0 ? cargoPieces : cargoItems.length} item{(cargoPieces > 0 ? cargoPieces : cargoItems.length) === 1 ? '' : 's'}
+                                <span className="inline-block w-4" />
+                                {stopCount} stop{stopCount === 1 ? '' : 's'}
+                              </span>
+                            }
+                          >
+                            Cargo Items
+                          </SectionHeading>
+                          <div className="space-y-3">
+                            {cargoItems.map((item, idx) => {
+                              const hasDims = item.length_cm && item.width_cm && item.height_cm
+                              const dropOff = item.destination_id ? stopNumberById.get(item.destination_id) ?? null : null
+                              return (
+                                <CargoItemCard
+                                  key={item.item_id ?? idx}
+                                  index={idx + 1}
+                                  dropOff={dropOff}
+                                  quantity={item.quantity}
+                                  commodity={resolveLabel(item.commodity_id, item.commodity_text, item.commodities)}
+                                  product={resolveLabel(item.product_id, item.product_text, item.products)}
+                                  shc={item.shc?.name ?? item.shc?.code ?? item.shc_text ?? null}
+                                  ashc={item.ashc?.name ?? item.ashc?.code ?? item.ashc_text ?? null}
+                                  weight={fmtNum(item.weight_kg, 'KG')}
+                                  volume={fmtNum(item.volume_cbm, 'CBM', 4)}
+                                  dims={hasDims ? `${item.length_cm} × ${item.width_cm} × ${item.height_cm} cm` : null}
+                                  notes={item.notes}
+                                />
+                              )
+                            })}
+                          </div>
+                        </section>
+                      )}
+
+                      {/* Cargo summary */}
+                      <section data-jump="Cargo Summary">
+                        <SectionHeading tone="bright" icon={<AssetIcon name="cargo-summary" />}>Cargo Summary</SectionHeading>
+                        <CargoSummaryTiles
+                          weightKg={d?.required_weight_kg ?? null}
+                          volumeCbm={d?.required_volume_cbm ?? null}
+                          lengthCm={d?.required_length_cm ?? null}
+                        />
+                        {/* The constraint worth flagging is cargo that must NOT
+                            be stacked — it dictates how the truck is loaded.
+                            `stackable_required` is the old field, set with the
+                            opposite sense and never populated for loose cargo;
+                            it is still read so historical bookings keep their
+                            note. */}
+                        {d?.non_stackable_cargo ? (
+                          <p className="text-xs text-amber-400 mt-2 flex items-center gap-1.5">
+                            <Layers size={12} />Contains non-stackable cargo
+                          </p>
+                        ) : d?.stackable_required ? (
+                          <p className="text-xs text-[var(--color-cyan)] mt-2 flex items-center gap-1.5">
+                            <Layers size={12} />Stackable pallets included
+                          </p>
+                        ) : null}
+                      </section>
+
+                      {/* Delivery stops: one card, pickup then drop-offs (Figma "delivery stops"). */}
+                      <section data-jump="Delivery Stops">
+                        <SectionHeading tone="bright" icon={<AssetIcon name="delivery-stops" />}>Delivery Stops</SectionHeading>
+                        <DeliveryStopsCard
+                          bookingId={detail.booking_id}
+                          status={stage}
+                          origin={detail.origin}
+                          stops={sortedStops}
+                          pickupProofUrl={d?.pickup_proof_photo_url ?? null}
+                          pickupProofAt={d?.pickup_proof_at ?? null}
+                        />
+                      </section>
+
+                      {/* Transaction documents */}
+                      <TransactionDocs docs={d?.transaction_documents ?? []} />
+
                       {/* Booking status. Figma order (2026-11-14): what happened on the
                           road, who is driving, complete for the driver, pause, then the
                           driver and vehicle; after delivery, the client's confirmation. */}
-                      <section className="space-y-3">
+                      <section data-jump="Booking Status" className="space-y-3">
                         {!showStageActions && (
                           <SectionHeading tone="bright" icon={<CalendarRange size={18} strokeWidth={2} />}>
                             Booking Status
@@ -2611,97 +2694,10 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                         )}
                       </section>
 
-                      {/* Reference detail behind "More Details ⌄" (user 2026-11-18,
-                          against data overload): the panel opens on the summary and
-                          Booking Status, where the actions are; cargo, stops and
-                          documents unfold on request. Keyed so each booking opens closed. */}
-                      <MoreDetailsReveal key={`more-${detail.booking_id}`}>
-                        {/* Cargo items */}
-                        {cargoItems.length > 0 && (
-                          <section>
-                            <SectionHeading tone="bright"
-                              icon={<Boxes size={18} strokeWidth={2} />}
-                              right={
-                                <span className="text-xs font-bold text-[#818181] whitespace-nowrap">
-                                  {cargoPieces > 0 ? cargoPieces : cargoItems.length} item{(cargoPieces > 0 ? cargoPieces : cargoItems.length) === 1 ? '' : 's'}
-                                  <span className="inline-block w-4" />
-                                  {stopCount} stop{stopCount === 1 ? '' : 's'}
-                                </span>
-                              }
-                            >
-                              Cargo Items
-                            </SectionHeading>
-                            <div className="space-y-3">
-                              {cargoItems.map((item, idx) => {
-                                const hasDims = item.length_cm && item.width_cm && item.height_cm
-                                const dropOff = item.destination_id ? stopNumberById.get(item.destination_id) ?? null : null
-                                return (
-                                  <CargoItemCard
-                                    key={item.item_id ?? idx}
-                                    index={idx + 1}
-                                    dropOff={dropOff}
-                                    quantity={item.quantity}
-                                    commodity={resolveLabel(item.commodity_id, item.commodity_text, item.commodities)}
-                                    product={resolveLabel(item.product_id, item.product_text, item.products)}
-                                    shc={item.shc?.name ?? item.shc?.code ?? item.shc_text ?? null}
-                                    ashc={item.ashc?.name ?? item.ashc?.code ?? item.ashc_text ?? null}
-                                    weight={fmtNum(item.weight_kg, 'KG')}
-                                    volume={fmtNum(item.volume_cbm, 'CBM', 4)}
-                                    dims={hasDims ? `${item.length_cm} × ${item.width_cm} × ${item.height_cm} cm` : null}
-                                    notes={item.notes}
-                                  />
-                                )
-                              })}
-                            </div>
-                          </section>
-                        )}
-
-                        {/* Cargo summary */}
-                        <section>
-                          <SectionHeading tone="bright" icon={<AssetIcon name="cargo-summary" />}>Cargo Summary</SectionHeading>
-                          <CargoSummaryTiles
-                            weightKg={d?.required_weight_kg ?? null}
-                            volumeCbm={d?.required_volume_cbm ?? null}
-                            lengthCm={d?.required_length_cm ?? null}
-                          />
-                          {/* The constraint worth flagging is cargo that must NOT
-                              be stacked — it dictates how the truck is loaded.
-                              `stackable_required` is the old field, set with the
-                              opposite sense and never populated for loose cargo;
-                              it is still read so historical bookings keep their
-                              note. */}
-                          {d?.non_stackable_cargo ? (
-                            <p className="text-xs text-amber-400 mt-2 flex items-center gap-1.5">
-                              <Layers size={12} />Contains non-stackable cargo
-                            </p>
-                          ) : d?.stackable_required ? (
-                            <p className="text-xs text-[var(--color-cyan)] mt-2 flex items-center gap-1.5">
-                              <Layers size={12} />Stackable pallets included
-                            </p>
-                          ) : null}
-                        </section>
-
-                        {/* Delivery stops: one card, pickup then drop-offs (Figma "delivery stops"). */}
-                        <section>
-                          <SectionHeading tone="bright" icon={<AssetIcon name="delivery-stops" />}>Delivery Stops</SectionHeading>
-                          <DeliveryStopsCard
-                            bookingId={detail.booking_id}
-                            status={stage}
-                            origin={detail.origin}
-                            stops={sortedStops}
-                            pickupProofUrl={d?.pickup_proof_photo_url ?? null}
-                            pickupProofAt={d?.pickup_proof_at ?? null}
-                          />
-                        </section>
-
-                        {/* Transaction documents */}
-                        <TransactionDocs docs={d?.transaction_documents ?? []} />
-                      </MoreDetailsReveal>
-
                       {/* Figma (2026-11-14): Trips, Stop Times, Changes after
                           Rejection and History as cyan sections that open and close,
                           under a dashed rule. */}
-                      <div>
+                      <div data-jump={showTripPlanner ? 'Trips and History' : showStopTimes ? 'Stop Times and History' : 'History'}>
                         <DashedDivider />
                         {/* How many runs the assigned vehicle makes. Only once a
                             vehicle actually exists. */}
@@ -2757,6 +2753,8 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                     </PanelReadyGate>
                   )}
                 </div>
+                {/* "Next card ⌄": jumps card by card down the panel. */}
+                {detail && !detailLoading && <NextCardJumper key={detail.booking_id} scrollRef={panelScrollRef} />}
               </motion.aside>
             </>
           )}
