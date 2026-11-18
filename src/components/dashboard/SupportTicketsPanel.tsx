@@ -32,8 +32,9 @@ import NewTicketModal from '@/components/support/NewTicketModal'
 export function gmailThreadUrl(inbox: string, reference: string): string {
   return `https://mail.google.com/mail/?authuser=${encodeURIComponent(inbox)}#search/${encodeURIComponent(`"${reference}"`)}`
 }
-export function gmailComposeUrl(inbox: string, to: string, subject: string): string {
-  const q = new URLSearchParams({ authuser: inbox, view: 'cm', fs: '1', to, su: subject })
+/** `cc`: the ticket reply address, so a new email is recorded on the ticket too. */
+export function gmailComposeUrl(inbox: string, to: string, subject: string, cc?: string | null): string {
+  const q = new URLSearchParams({ authuser: inbox, view: 'cm', fs: '1', to, su: subject, ...(cc ? { cc } : {}) })
   return `https://mail.google.com/mail/?${q.toString()}`
 }
 /**

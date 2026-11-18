@@ -199,16 +199,18 @@ function TicketDetail({ ticket: t, tracking }: { ticket: SupportTicket; tracking
 }
 
 /** The side panel's footer: answer by email, then mark it resolved. */
-function TicketActions({ ticket: t, inbox, canEdit, onResolve }: {
+function TicketActions({ ticket: t, inbox, replyAddress, canEdit, onResolve }: {
   ticket:    SupportTicket
   inbox:     string
+  /** The ticket reply address: CC'd on New email so it is recorded. */
+  replyAddress: string | null
   canEdit:   boolean
   onResolve: () => void
 }) {
   // The thread is with the client's account, even when staff opened the ticket.
   const clientEmail = t.clients?.users?.email ?? (openedByStaff(t) ? null : t.opener?.email) ?? null
   const compose = clientEmail && inbox
-    ? gmailComposeUrl(inbox, clientEmail, `[${t.reference}] ${t.subject}`)
+    ? gmailComposeUrl(inbox, clientEmail, `[${t.reference}] ${t.subject}`, replyAddress)
     : null
   const open = t.status === 'open'
   if (!inbox && !open) return null
@@ -263,6 +265,7 @@ export default function SupportTicketsView() {
   const [inbox,   setInbox]   = useState('')
   // Replies are recorded only when the server has a ticket reply address.
   const [tracking, setTracking] = useState(false)
+  const [replyAddress, setReplyAddress] = useState<string | null>(null)
 
   const [search,       setSearch]       = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('open')
@@ -286,6 +289,7 @@ export default function SupportTicketsView() {
       })
       setInbox(res.inbox)
       setTracking(res.replyTracking)
+      setReplyAddress(res.replyAddress)
       return res
     },
     `${statusFilter}|${debouncedSearch}`,
@@ -445,7 +449,7 @@ export default function SupportTicketsView() {
         label="Ticket details"
         title={selected?.reference ?? ''}
         subtitle={selected ? `Raised ${formatDateTime(selected.created_at)}` : undefined}
-        footer={selected && <TicketActions ticket={selected} inbox={inbox} canEdit={canEdit} onResolve={() => setResolving(selected)} />}
+        footer={selected && <TicketActions ticket={selected} inbox={inbox} replyAddress={replyAddress} canEdit={canEdit} onResolve={() => setResolving(selected)} />}
       >
         {selected && <TicketDetail ticket={selected} tracking={tracking} />}
       </SidePanel>

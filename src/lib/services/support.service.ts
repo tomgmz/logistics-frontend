@@ -166,12 +166,12 @@ export const supportService = {
 
   /** One page of the Tickets table; status, search and counts are server-side. */
   async listPage(params: PageRequest & { status: 'open' | 'resolved' | 'all'; search?: string }): Promise<
-    PagedResponse<SupportTicket, { counts: { all: number; open: number; resolved: number } }> & { inbox: string; replyTracking: boolean }
+    PagedResponse<SupportTicket, { counts: { all: number; open: number; resolved: number } }> & { inbox: string; replyTracking: boolean; replyAddress: string | null }
   > {
     const { data } = await proxyApi.get<
-      PagedResponse<SupportTicket, { counts: { all: number; open: number; resolved: number } }> & { inbox?: string; reply_tracking?: boolean }
+      PagedResponse<SupportTicket, { counts: { all: number; open: number; resolved: number } }> & { inbox?: string; reply_tracking?: boolean; reply_address?: string | null }
     >('/support/tickets', { params })
-    return { data: data.data, meta: data.meta, inbox: data.inbox ?? '', replyTracking: !!data.reply_tracking }
+    return { data: data.data, meta: data.meta, inbox: data.inbox ?? '', replyTracking: !!data.reply_tracking, replyAddress: data.reply_address ?? null }
   },
 
   /** Staff open a ticket for a client (a call, an email, a walk-in). It is emailed to the client as usual. */
