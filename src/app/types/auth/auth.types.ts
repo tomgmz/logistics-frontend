@@ -2,9 +2,8 @@ export interface AuthStatusResponse {
   locked: boolean
   permanent?: boolean
   locked_until?: string
-  // The account's role, when the email matched one. Returned by the API all
-  // along; used to name which admin handles this person's password reset.
-  role?: string
+  // No role since 2026-11-19: asked before sign-in, it told strangers which
+  // address was the IT Administrator's (security review F-03).
 }
 
 export interface OtpCode {

@@ -229,15 +229,6 @@ function approverLabel(role?: string | null): string {
   return 'IT Administrator'
 }
 
-/**
- * Whether this person resets themselves with a code instead of waiting for an
- * admin. Mirrors canSelfResetByOtp() on the backend, which is the only place the
- * rule is enforced — this one decides which screen to show, nothing more.
- */
-function selfResetsByOtp(role?: string | null): boolean {
-  return role === 'it_admin'
-}
-
 function PermanentLockScreen({
   onBack,
   onRequestReset,
@@ -278,14 +269,12 @@ function PermanentLockScreen({
           Your account has been permanently locked due to too many failed login attempts.
         </span>
         <span>
-          {selfResetsByOtp(role)
-            ? 'Reset your password with an emailed code and set a new one yourself. That also unlocks your account.'
-            : `Request a password reset and your ${approverLabel(role)} will send you a link to set a new password. That also unlocks your account.`}
+          {`Request a password reset and your ${approverLabel(role)} will send you a link to set a new password. That also unlocks your account.`}
         </span>
       </div>
 
       <PrimaryButton onClick={onRequestReset}>
-        {selfResetsByOtp(role) ? 'Reset My Password' : 'Request A Password Reset'}
+        Request A Password Reset
       </PrimaryButton>
 
       <BackButton onClick={onBack} label="Change email" />
@@ -535,10 +524,17 @@ function ForgotPasswordStep({
   email,
   role,
   onBack,
+  onItAdminReset,
 }: {
   email: string
   role?: string | null
   onBack: () => void
+  /**
+   * The IT Administrator's self-reset by emailed code. Offered to everyone:
+   * the sign-in screen no longer learns anyone's role before sign-in (security
+   * review 2026-11-19), and the code endpoint answers the same for any address.
+   */
+  onItAdminReset?: () => void
 }) {
   const [loading, setLoading] = useState(false)
   const [sent,    setSent]    = useState(false)
@@ -625,6 +621,17 @@ function ForgotPasswordStep({
           <PrimaryButton loading={loading} onClick={handleRequest}>
             Request Reset Link
           </PrimaryButton>
+
+          {onItAdminReset && (
+            <button
+              type="button"
+              onClick={onItAdminReset}
+              className="-mt-2 self-center bg-transparent border-none cursor-pointer p-0 text-[0.75rem] underline underline-offset-2 text-white/40"
+              style={{ fontFamily: "var(--font-league-spartan), 'League Spartan', sans-serif" }}
+            >
+              IT Administrator? Reset with an emailed code
+            </button>
+          )}
 
           <BackButton onClick={onBack} label="Back" />
         </>
@@ -1511,7 +1518,9 @@ export default function SignInModal({ isOpen, onClose, notice }: SignInModalProp
   const [method, setMethod] = useState<'otp' | 'password' | null>(null)
   // Only used to name the right approver ("your Company Admin" vs "your IT Admin")
   // on the reset screens. Best effort — the copy falls back to "administrator".
-  const [role,   setRole]   = useState<string | null>(null)
+  // Which reset screen 'forgot' shows. Chosen by the person, never looked up:
+  // /auth/status no longer says what role an email has.
+  const [itAdminReset, setItAdminReset] = useState(false)
   const resendExpiresAt     = useRef<number>(0)
   const redirectTimer       = useRef<ReturnType<typeof setTimeout> | null>(null)
   const router              = useRouter()
@@ -1535,10 +1544,7 @@ export default function SignInModal({ isOpen, onClose, notice }: SignInModalProp
 
   const handleEmailSuccess = (e: string) => {
     setEmail(e)
-    setRole(null)
-    // Fire and forget: this only decides which admin the reset copy names, so a
-    // failure must not hold up the sign-in flow.
-    void getAuthStatus(e).then((s) => setRole(s.role ?? null)).catch(() => {})
+    setItAdminReset(false)
     setStep('method')
   }
 
@@ -1702,18 +1708,18 @@ export default function SignInModal({ isOpen, onClose, notice }: SignInModalProp
                     />
                   )}
                   {step === 'forgot' && (
-                    selfResetsByOtp(role) ? (
+                    itAdminReset ? (
                       <ItAdminOtpResetStep
                         key="forgot-otp"
                         email={email}
-                        onBack={() => setStep(method === 'password' ? 'password' : 'otp')}
+                        onBack={() => setItAdminReset(false)}
                       />
                     ) : (
                       <ForgotPasswordStep
                         key="forgot"
                         email={email}
-                        role={role}
                         onBack={() => setStep(method === 'password' ? 'password' : 'otp')}
+                        onItAdminReset={() => setItAdminReset(true)}
                       />
                     )
                   )}
@@ -1724,8 +1730,7 @@ export default function SignInModal({ isOpen, onClose, notice }: SignInModalProp
                       resendExpiresAt={resendExpiresAt}
                       onSuccess={handleAuthSuccess}
                       onBack={() => setStep('method')}
-                      onRequestReset={() => setStep('forgot')}
-                      role={role}
+                      onRequestReset={() => { setItAdminReset(false); setStep('forgot') }}
                     />
                   )}
                   {step === 'password' && (
@@ -1734,8 +1739,7 @@ export default function SignInModal({ isOpen, onClose, notice }: SignInModalProp
                       email={email}
                       onSuccess={handleAuthSuccess}
                       onBack={() => setStep('method')}
-                      onRequestReset={() => setStep('forgot')}
-                      role={role}
+                      onRequestReset={() => { setItAdminReset(false); setStep('forgot') }}
                     />
                   )}
                   {step === 'success' && (

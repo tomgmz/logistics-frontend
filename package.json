@@ -14,7 +14,8 @@
     "test:e2e:chrome": "playwright test --project=chromium",
     "test:e2e:ui": "playwright test --ui --project=chromium",
     "test:e2e:headed": "playwright test --headed --project=chromium",
-    "test:e2e:excel": "python e2e/support/update-excel.py e2e-last-run.json"
+    "test:e2e:excel": "python e2e/support/update-excel.py e2e-last-run.json",
+    "test:e2e:booking": "set SLOWMO=600&& playwright test e2e/booking-journey.spec.ts --headed --project=chromium"
   },
   "dependencies": {
     "@emoji-mart/data": "^1.2.1",

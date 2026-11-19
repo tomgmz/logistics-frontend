@@ -87,9 +87,9 @@ export default function DriverSetupPage() {
               Set up in the app
             </h1>
             <p className="text-white/40 text-[0.8rem] leading-relaxed">
-              Your sign-in is set up in the 8338 Logistics app on your phone.
-              There is no password — you will unlock the app with your
-              fingerprint, face, or phone PIN.
+              This link sets up quick sign-in in the 8338 Logistics app on your
+              phone, so you can unlock it with your fingerprint, face, or phone
+              PIN. Your password and emailed sign-in code keep working too.
             </p>
           </div>
 

@@ -22,9 +22,11 @@ test.describe('Sign in: happy paths', () => {
 })
 
 test.describe('Sign in: unhappy paths', () => {
-  test('AUTH-013 wrong password is refused with attempts left', async ({ page }) => {
+  test('AUTH-013 wrong password is refused', async ({ page }) => {
     await signInWithPassword(page, 'client013', 'Wrong-Password-1')
-    await expectRefused(page, /Incorrect password/i)
+    // No "attempts remaining" count since 2026-11-19: only a real account has
+    // one, so it told strangers which emails exist.
+    await expectRefused(page, /^Incorrect email or password\.$/)
     // Clear the failed-attempt counter so the account stays usable.
     await page.getByPlaceholder('••••••••').fill(require('./support/env.cjs').seedPassword())
     await page.getByRole('button', { name: 'Sign In', exact: true }).last().click()
@@ -55,8 +57,8 @@ test.describe('Sign in: unhappy paths', () => {
 
   test('AUTH-019 unknown email gets a generic refusal', async ({ page }) => {
     await signInWithPassword(page, 'nobody999')
-    // Same wording as a wrong password: never reveals whether the email exists.
-    await expectRefused(page, /^Invalid credentials$/)
+    // Same wording as a wrong password (AUTH-013): never reveals whether the email exists.
+    await expectRefused(page, /^Incorrect email or password\.$/)
   })
 
   test('AUTH-022 expired temporary password is refused', async ({ page }) => {

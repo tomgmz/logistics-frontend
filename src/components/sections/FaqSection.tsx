@@ -69,7 +69,7 @@ function FaqItem({
             className="overflow-hidden"
           >
             <div className="mx-5 sm:mx-7 h-px bg-white/[0.07] mb-4" />
-            <p className="font-'Alegreysa Sans SC, sans-serif' text-[#818181] text-sm sm:text-base
+            <p className="font-[family-name:var(--font-alegreya-sc)] text-[#818181] text-sm sm:text-base
               leading-relaxed tracking-wide px-5 sm:px-7 pb-5 sm:pb-6">
               {a}
             </p>

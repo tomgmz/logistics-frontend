@@ -46,10 +46,10 @@ type ContactForm = {
 
 const emptyForm: ContactForm = { first_name: '', last_name: '', email: '', phone: '', message: '', website: '' };
 
-const labelClass = "font-'Alegreysa Sans SC, sans-serif' text-white/60 text-[0.65rem] tracking-widest uppercase mb-1.5 block";
+const labelClass = "font-[family-name:var(--font-alegreya-sc)] text-white/60 text-[0.65rem] tracking-widest uppercase mb-1.5 block";
 
 const inputClass = `w-full bg-[#1a1a1a] border rounded-[8px]
-  px-3 py-2.5 text-white text-sm font-'Alegreysa Sans SC, sans-serif'
+  px-3 py-2.5 text-white text-sm font-[family-name:var(--font-alegreya-sc)]
   focus:outline-none focus:border-[#4df9ed]/40 transition-colors`;
 
 const TEXT_FIELDS: {
@@ -193,7 +193,7 @@ export default function ContactSection() {
             initial={{ opacity: 0, y: 20 }}
             animate={inView ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="font-'Alegreysa Sans SC, sans-serif' text-[#818181]
+            className="font-[family-name:var(--font-alegreya-sc)] text-[#818181]
               text-center tracking-widest uppercase mb-[clamp(1.25rem,4svh,3.5rem)] short:mb-4 short:!text-sm max-w-2xl mx-auto leading-relaxed"
           >
             Be our partner by sending us a message. Our team is here to assist you with any logistics
@@ -294,7 +294,7 @@ export default function ContactSection() {
               <button
                 type="submit"
                 disabled={sending}
-                className="font-'Alegreysa Sans SC, sans-serif' bg-white text-[#0a0a0a] px-7 py-2.5 rounded-[8px]
+                className="font-[family-name:var(--font-alegreya-sc)] bg-white text-[#0a0a0a] px-7 py-2.5 rounded-[8px]
                   text-sm tracking-wider font-semibold
                   hover:bg-white/90 transition-all duration-300 cursor-pointer w-full sm:w-auto
                   disabled:opacity-50 disabled:cursor-not-allowed"
@@ -314,30 +314,30 @@ export default function ContactSection() {
 
             <div className="border-t lg:border-t-0 lg:border-l border-white/[0.08]
               p-5 sm:p-8 md:p-[clamp(1.5rem,4svh,2.5rem)] bg-[#0f0f0f]">
-              <h3 className="font-'Alegreysa Sans SC, sans-serif' text-white text-sm tracking-widest uppercase mb-1">
+              <h3 className="font-[family-name:var(--font-alegreya-sc)] text-white text-sm tracking-widest uppercase mb-1">
                 Contact Details
               </h3>
-              <p className="font-'Alegreysa Sans SC, sans-serif' text-white/40 text-xs tracking-wide mb-[clamp(1rem,3svh,2rem)] leading-relaxed">
+              <p className="font-[family-name:var(--font-alegreya-sc)] text-white/40 text-xs tracking-wide mb-[clamp(1rem,3svh,2rem)] leading-relaxed">
                 For direct support or partnership inquiries.
               </p>
 
               <div className="flex flex-col gap-5">
                 <div className="flex items-start gap-3">
                   <span className="text-[#4df9ed] text-base mt-0.5">📞</span>
-                  <span className="font-'Alegreysa Sans SC, sans-serif' text-white/70 text-sm leading-relaxed">
+                  <span className="font-[family-name:var(--font-alegreya-sc)] text-white/70 text-sm leading-relaxed">
                     +63 9685 536 8975
                   </span>
                 </div>
                 <div className="flex items-start gap-3">
                   <span className="text-[#4df9ed] text-base mt-0.5">✉️</span>
-                  <span className="font-'Alegreysa Sans SC, sans-serif' text-white/70 text-sm leading-relaxed break-words">
+                  <span className="font-[family-name:var(--font-alegreya-sc)] text-white/70 text-sm leading-relaxed break-words">
                     {/* Wraps after the @ on narrow panels, not mid-word. */}
                     8338LogisticsServices@<wbr />gmail.com
                   </span>
                 </div>
                 <div className="flex items-start gap-3">
                   <span className="text-[#4df9ed] text-base mt-0.5">📍</span>
-                  <span className="font-'Alegreysa Sans SC, sans-serif' text-white/70 text-sm leading-relaxed">
+                  <span className="font-[family-name:var(--font-alegreya-sc)] text-white/70 text-sm leading-relaxed">
                     Blk. 6 Lot 8 Lynville Enclave,
                     Mamatid, City of Cabuyao, Laguna
                   </span>
