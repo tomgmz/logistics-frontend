@@ -28,6 +28,10 @@ const CONTRACT_MESSAGE =
 const REUSED_MESSAGE =
   'For your security you were signed out on every device: your sign-in was used from somewhere else. Sign in again. If this keeps happening, contact your Administrator.'
 
+// One session per account (2026-11-19): signing in anywhere else ends this one.
+const REPLACED_MESSAGE =
+  'Your account was signed in on another browser or device, so you were signed out here. If that was not you, sign in again and change your password.'
+
 const DEFAULT_MESSAGE = 'You have been signed out.'
 
 export default function SignedOutNotice() {
@@ -46,6 +50,8 @@ export default function SignedOutNotice() {
       appToast.error(CONTRACT_MESSAGE, { action: 'signed-out', duration: 10000 })
     } else if (reason === 'reused') {
       appToast.error(REUSED_MESSAGE, { action: 'signed-out', duration: 10000 })
+    } else if (reason === 'replaced') {
+      appToast.warn(REPLACED_MESSAGE, { action: 'signed-out', duration: 10000 })
     } else {
       appToast.info(DEFAULT_MESSAGE, { action: 'signed-out' })
     }

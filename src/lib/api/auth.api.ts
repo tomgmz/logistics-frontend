@@ -2,7 +2,7 @@ import axios, { AxiosInstance, AxiosError } from 'axios'
 import { getApiUrl } from './api-url'
 import { AuthStatusResponse } from '@/app/types/auth/auth.types'
 import { useAuthStore } from '@/lib/store/auth.store'
-import { goHomeSignedOut } from '@/lib/auth-redirect'
+import { goHomeSignedOut, type SignedOutReason } from '@/lib/auth-redirect'
 
 const directApi: AxiosInstance = axios.create({
   baseURL: getApiUrl(),
@@ -98,11 +98,18 @@ export function isSessionReused(err: unknown): boolean {
     && (err as AxiosError<{ code?: string }>).response?.data?.code === 'SESSION_REUSED'
 }
 
+/** The session ended because the account signed in on another browser or device (2026-11-19). */
+export function isSessionReplaced(err: unknown): boolean {
+  return isSessionDead(err)
+    && (err as AxiosError<{ code?: string }>).response?.data?.code === 'SESSION_REPLACED'
+}
+
 /** The signed-out notice to show for a refused refresh, if any. */
-export function signedOutReasonOf(err: unknown): 'inactive' | 'contract_ended' | 'reused' | undefined {
+export function signedOutReasonOf(err: unknown): SignedOutReason | undefined {
   if (isAccountInactive(err)) return 'inactive'
   if (isContractEnded(err))   return 'contract_ended'
   if (isSessionReused(err))   return 'reused'
+  if (isSessionReplaced(err)) return 'replaced'
   return undefined
 }
 
