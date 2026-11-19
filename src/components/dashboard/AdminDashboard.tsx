@@ -206,7 +206,8 @@ function BookingsOverallCard({ d }: { d: Data }) {
                     <Cell key={s.status} fill={STRIPED.has(s.status) ? `url(#${stripeId(s.status)})` : bookingStatusColor(s.status)} />
                   ))}
                 </Pie>
-                <Tooltip {...TOOLTIP} />
+                {/* Above the "Total bookings" label, which is painted later in the DOM. */}
+                <Tooltip {...TOOLTIP} wrapperStyle={{ zIndex: 10 }} />
               </PieChart>
             </ResponsiveContainer>
           )}

@@ -85,6 +85,7 @@ import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
 import { useCachedFetch } from '@/lib/hooks/useCachedFetch'
 import { cachedData, storeData } from '@/lib/query/useApiQuery'
 import Dropdown from '@/components/ui/Dropdown'
+import DatePicker from '@/components/ui/DatePicker'
 import Combobox from '@/components/ui/Combobox'
 import { TruncatedText } from '@/components/ui/TruncatedText'
 
@@ -1463,12 +1464,13 @@ export default function VehicleManagementView({ archive }: {
                     <span className="text-[11px] font-bold uppercase text-white/40">
                       Valid until {modalMode === 'create' && <span className="text-red-400">*</span>}
                     </span>
-                    <input
-                      type="date"
+                    <DatePicker
                       value={form.registration_expiry}
-                      onChange={(e) => setForm((f) => ({ ...f, registration_expiry: e.target.value }))}
-                      className={`${inputCls} min-w-0 appearance-none ${errorBorder(fieldErrors.registration)}`}
-                      aria-invalid={!!fieldErrors.registration}
+                      onChange={(v) => setForm((f) => ({ ...f, registration_expiry: v }))}
+                      className={`${inputCls} min-w-0 ${errorBorder(fieldErrors.registration)}`}
+                      invalid={!!fieldErrors.registration}
+                      clearable={modalMode !== 'create'}
+                      aria-label="Registration valid until"
                     />
                     <FieldError>{fieldErrors.registration}</FieldError>
                   </label>
@@ -1570,13 +1572,13 @@ export default function VehicleManagementView({ archive }: {
                         <span className="text-[11px] font-bold uppercase text-white/40">
                           Last service <span className="text-red-400">*</span>
                         </span>
-                        <input
-                          type="date"
+                        <DatePicker
                           value={form.last_service_at}
                           max={phToday()}
-                          onChange={(e) => setForm((f) => ({ ...f, last_service_at: e.target.value }))}
+                          onChange={(v) => setForm((f) => ({ ...f, last_service_at: v }))}
                           className={`${inputCls} ${errorBorder(fieldErrors.lastServiceAt)}`}
-                          aria-invalid={!!fieldErrors.lastServiceAt}
+                          invalid={!!fieldErrors.lastServiceAt}
+                          aria-label="Last service date"
                         />
                         <FieldError>{fieldErrors.lastServiceAt}</FieldError>
                       </label>

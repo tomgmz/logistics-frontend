@@ -48,6 +48,7 @@ import RecordLockBanner, { RecordLockBadge } from '@/components/ui/RecordLockBan
 import { writeAccess } from '@/components/layout/ModuleAccess'
 import { ProtectedImg } from '@/components/ui/FileViewer'
 import Dropdown from '@/components/ui/Dropdown'
+import DatePicker from '@/components/ui/DatePicker'
 import { FieldError, errorBorder } from '@/components/ui/FieldError'
 
 interface UserFormModalProps {
@@ -1212,12 +1213,13 @@ export default function UserFormModal({
               </Field>
 
               <Field label="Contract Valid Until" required={!isEdit} error={fe.contract_valid_until}>
-                <Input
-                  type="date"
+                <DatePicker
                   value={form.contract_valid_until as string}
-                  onChange={e => set('contract_valid_until', e.target.value)}
-                  error={fe.contract_valid_until}
-                  className="[color-scheme:dark]"
+                  onChange={v => set('contract_valid_until', v)}
+                  invalid={!!fe.contract_valid_until}
+                  clearable={isEdit}
+                  className={inputBase}
+                  aria-label="Contract valid until"
                 />
               </Field>
             </>)}
@@ -1258,13 +1260,13 @@ export default function UserFormModal({
                   />
                 </Field>
                 <Field label="License Expiry" required error={fe.license_expiry} action={scanned('license_expiry').action}>
-                  <Input
+                  <DatePicker
                     {...scanned('license_expiry').input}
-                    type="date"
                     value={form.license_expiry as string}
-                    onChange={e => set('license_expiry', e.target.value)}
-                    error={fe.license_expiry}
-                    className={`[color-scheme:dark] ${scanned('license_expiry').lockedClass}`}
+                    onChange={v => set('license_expiry', v)}
+                    invalid={!!fe.license_expiry}
+                    className={`${inputBase} ${scanned('license_expiry').lockedClass}`}
+                    aria-label="License expiry"
                   />
                 </Field>
               </div>

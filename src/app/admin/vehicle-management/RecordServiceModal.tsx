@@ -13,6 +13,7 @@ import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { OdometerInput, PhotoField, parseKm, fmtKm, fmtDay, phToday, inputCls } from './maintenance-ui'
 import { FieldError, errorBorder } from '@/components/ui/FieldError'
+import DatePicker from '@/components/ui/DatePicker'
 
 /**
  * Log a routine service. Restarts both counters (km and months) from the
@@ -145,8 +146,9 @@ export default function RecordServiceModal({
                   <span className="text-[11px] font-bold uppercase text-white/40">
                     Service date <span className="text-red-400">*</span>
                   </span>
-                  <input type="date" value={date} max={phToday()} onChange={(e) => setDate(e.target.value)}
-                    className={`${inputCls} ${errorBorder(errs.date)}`} aria-invalid={!!errs.date} />
+                  <DatePicker value={date} max={phToday()} onChange={setDate}
+                    className={`${inputCls} ${errorBorder(errs.date)}`} invalid={!!errs.date}
+                    disabled={lock.readOnly || busy} aria-label="Service date" />
                   <FieldError>{errs.date}</FieldError>
                 </label>
                 <OdometerInput value={km} onChange={setKm} lastKm={truck.odometer_km ?? null} label="Odometer at service (km)" error={errs.km} />

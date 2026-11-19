@@ -23,6 +23,7 @@ import { cachedFetch } from '@/lib/query/useApiQuery'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { usePanelSection } from '@/components/ui/PanelReady'
 import Dropdown from '@/components/ui/Dropdown'
+import DatePicker from '@/components/ui/DatePicker'
 
 /**
  * Staff view of the pauses on one booking: a way to pause a delivery in
@@ -326,8 +327,8 @@ export default function PausePanel({ bookingId, pausedAt, inTransit, canControl,
                 <div className="grid grid-cols-1 min-[380px]:grid-cols-2 gap-3">
                   <label className={fieldLabel}>
                     Continuation date
-                    <input type="date" value={planDate} min={phDay(Date.now())} disabled={busy}
-                      onChange={(e) => setPlanDate(e.target.value)} className={inputBox} />
+                    <DatePicker value={planDate} min={phDay(Date.now())} disabled={busy}
+                      onChange={setPlanDate} className={inputBox} aria-label="Continuation date" />
                   </label>
                   <label className={fieldLabel}>
                     Driver call time
