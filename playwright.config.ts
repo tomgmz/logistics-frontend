@@ -1,58 +1,59 @@
 import { defineConfig, devices } from '@playwright/test'
+// Settings come ONLY from logistics-backend/.env.e2e (the TEST database and
+// bucket); env.cjs throws if anything matches production.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { backendEnv, webEnv, WEB_PORT, API_PORT } = require('./e2e/support/env.cjs')
 
 /**
- * Browser tests (e2e/). READ ONLY: they sign in with the seed accounts, open
- * screens and use filters; they never save, assign, approve or archive.
+ * Browser tests. Run against the TEST Supabase project, never production.
  *
- * They run against THIS machine: the web app on :3000 and the backend on :4000,
- * started below unless already running. The local backend's .env points at the
- * PRODUCTION database, so it is started with DISABLE_SCHEDULERS=1 (no second
- * copy of the reminders), and every Google Maps request is blocked in the
- * browser (e2e/support/session.ts), so a run costs nothing.
+ *   npm run build:e2e      once after web changes (builds into .next-e2e)
+ *   npm run test:e2e:ui    Playwright's window: watch every step
+ *   npm run test:e2e       all browsers, headless; report in e2e-report/
  *
- * Each project signs in its own seed accounts (`slot`): the one-session rule
- * would otherwise sign one browser out when another signs in.
+ * The test cases these implement are listed in docs/testing/8338 Test Cases.xlsx
+ * (each test title starts with its case ID).
  */
 export default defineConfig({
   testDir: './e2e',
-  timeout: 120_000,
+  timeout: 90_000,
   expect: { timeout: 15_000 },
   fullyParallel: false,
-  workers: 4,
+  workers: 1,
   retries: 0,
-  reporter: [['list'], ['html', { open: 'never', outputFolder: 'e2e-report' }]],
+  // excel-reporter writes every result into docs/testing/8338 Test Cases.xlsx.
+  reporter: [['list'], ['html', { open: 'never', outputFolder: 'e2e-report' }], ['./e2e/support/excel-reporter.ts']],
   outputDir: 'e2e-results',
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: `http://localhost:${WEB_PORT}`,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
+    video: 'retain-on-failure',
   },
   projects: [
-    { name: 'chromium',       use: { ...devices['Desktop Chrome'] },  metadata: { slot: 1, client: 'client038' } },
-    { name: 'firefox',        use: { ...devices['Desktop Firefox'] }, metadata: { slot: 3, client: 'client052' } },
-    { name: 'webkit',         use: { ...devices['Desktop Safari'] },  metadata: { slot: 4, client: 'client024' } },
-    // Phone width (375 px) on the iPhone profile, WebKit engine.
-    { name: 'iphone',         use: { ...devices['iPhone 13 mini'] },  metadata: { slot: 5, client: 'client031' } },
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    { name: 'edge',     use: { ...devices['Desktop Edge'], channel: 'msedge' } },
+    { name: 'firefox',  use: { ...devices['Desktop Firefox'] } },
+    { name: 'webkit',   use: { ...devices['Desktop Safari'] } },
+    { name: 'iphone',   use: { ...devices['iPhone 13 mini'] } },
   ],
   webServer: [
     {
       command: 'npx tsx src/index.ts',
       cwd: '../logistics-backend',
-      url: 'http://localhost:4000/api/auth/csrf',
-      env: { DISABLE_SCHEDULERS: '1' },
-      reuseExistingServer: true,
+      url: `http://localhost:${API_PORT}/api/auth/csrf`,
+      env: backendEnv,
+      // Own ports (4100 / 3100), and never reuse a running server: the dev
+      // servers on 3000 / 4000 point at PRODUCTION.
+      reuseExistingServer: false,
       timeout: 180_000,
     },
     {
-      // The BUILT app (run `npm run build` first): what users get, and far
-      // lighter than `next dev`, which ran this PC out of memory compiling pages.
-      command: 'npx next start -p 3000',
-      url: 'http://localhost:3000',
-      // Session cookies without `Secure` on http://localhost (WebKit drops them
-      // otherwise); see app/api/auth/_proxy.ts. Never set on a deployment.
-      env: { E2E_LOCAL_HTTP: '1' },
-      reuseExistingServer: true,
-      timeout: 300_000,
+      command: `npx next start -p ${WEB_PORT}`,
+      url: `http://localhost:${WEB_PORT}`,
+      env: webEnv,
+      reuseExistingServer: false,
+      timeout: 180_000,
     },
   ],
 })

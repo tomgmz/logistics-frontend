@@ -15,6 +15,7 @@
 
 # next.js
 /.next/
+/.next-e2e/
 /out/
 
 # production
@@ -44,3 +45,4 @@ next-env.d.ts
 /e2e-results/
 /e2e-report/
 /playwright/.cache/
+/e2e-last-run.json

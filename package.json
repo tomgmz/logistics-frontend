@@ -9,8 +9,12 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
+    "build:e2e": "node e2e/support/build-e2e.mjs",
     "test:e2e": "playwright test",
-    "test:e2e:chrome": "playwright test --project=chromium"
+    "test:e2e:chrome": "playwright test --project=chromium",
+    "test:e2e:ui": "playwright test --ui --project=chromium",
+    "test:e2e:headed": "playwright test --headed --project=chromium",
+    "test:e2e:excel": "python e2e/support/update-excel.py e2e-last-run.json"
   },
   "dependencies": {
     "@emoji-mart/data": "^1.2.1",

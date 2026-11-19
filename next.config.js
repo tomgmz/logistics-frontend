@@ -1,5 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Browser tests build into their own folder (npm run build:e2e) with the
+  // TEST Supabase project baked in, so the normal .next build is never
+  // overwritten by one that points elsewhere.
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   images: {
     remotePatterns: [
       {
