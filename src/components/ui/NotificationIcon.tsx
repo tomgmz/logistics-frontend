@@ -82,6 +82,7 @@ const ACTIONABLE_TYPES = new Set([
   "it_admin.handover",
   "email.undelivered",
   "auth.session_reuse",
+  "auth.account_locked",
 ]);
 
 // The filter dropdown lists only the groups a role can actually receive, so
