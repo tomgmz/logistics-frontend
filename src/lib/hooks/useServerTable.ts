@@ -44,6 +44,8 @@ export interface PagedResponse<T, X extends object = object> {
 export interface PageRequest {
   page:  number
   limit: number
+  /** The table's Order toggle (lib/table-order.ts): the natural order flipped. */
+  reverse?: 1
 }
 
 export function useServerTable<T, X extends object = object>(

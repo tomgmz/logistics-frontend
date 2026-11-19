@@ -88,6 +88,7 @@ import Dropdown from '@/components/ui/Dropdown'
 import DatePicker from '@/components/ui/DatePicker'
 import Combobox from '@/components/ui/Combobox'
 import { TruncatedText } from '@/components/ui/TruncatedText'
+import { ORDER_LABELS, isReversed, orderField, orderRules, reverseParam, withoutOrder } from '@/lib/table-order'
 
 type FormMode    = 'create' | 'edit' | null
 
@@ -460,6 +461,8 @@ export default function VehicleManagementView({ archive }: {
 
   // `quiet`: a live refresh re-reads in place — no spinner, and a transient
   // failure leaves the rows on screen instead of replacing them with an error.
+  // The Order toggle: plate A to Z, or Z to A.
+  const [reverse, setReverse] = useState(false)
   const loadTrucksPage = useCallback(async (quiet = false) => {
     const query = {
       page:     page + 1,
@@ -468,6 +471,7 @@ export default function VehicleManagementView({ archive }: {
       // with any other status (or 'all') the server leaves them out.
       status:   archivedTab ? 'archived' : statusFilter,
       search:   debouncedSearch,
+      ...reverseParam(reverse),
     }
     type PageRes = Awaited<ReturnType<typeof adminFetchTrucksPaginated>>
     const cacheKey = `vehicle-management|vehicles|${JSON.stringify(query)}`
@@ -492,7 +496,7 @@ export default function VehicleManagementView({ archive }: {
     } finally {
       if (!quiet) setListLoading(false)
     }
-  }, [page, statusFilter, debouncedSearch, PAGE_SIZE, archivedTab])
+  }, [page, statusFilter, debouncedSearch, PAGE_SIZE, archivedTab, reverse])
 
   useEffect(() => { void loadModels() }, [loadModels])
 
@@ -1066,12 +1070,12 @@ export default function VehicleManagementView({ archive }: {
             search={{ value: search, onChange: (v) => { setSearch(v); setPage(0) }, placeholder: tab === 'archived' ? 'Search plate or model' : 'Search plate, model or status' }}
             leading={switcher}
             // Archived is not a status here: it is its own tab.
-            fields={tab === 'archived' ? [] : [{
+            fields={[...(tab === 'archived' ? [] : [{
               key: 'status', label: 'Status', single: true,
               options: STATUSES.filter((s) => s !== 'archived').map((s) => ({ value: s, label: fmtLabel(s) })),
-            }]}
-            values={statusFilter === 'all' ? [] : [{ field: 'status', op: 'is' as const, value: statusFilter }]}
-            onChange={(v) => { setStatusFilter(v.find((r) => r.field === 'status')?.value ?? 'all'); setPage(0) }}
+            }]), orderField(ORDER_LABELS.plate)]}
+            values={[...(statusFilter === 'all' ? [] : [{ field: 'status', op: 'is' as const, value: statusFilter }]), ...orderRules(reverse)]}
+            onChange={(v) => { setStatusFilter(v.find((r) => r.field === 'status')?.value ?? 'all'); setReverse(isReversed(v)); setPage(0) }}
             trailing={trailing}
           />
 
@@ -1219,7 +1223,7 @@ export default function VehicleManagementView({ archive }: {
                     message={debouncedSearch || statusFilter !== 'all'
                       ? 'No vehicles match your search or filters.'
                       : tab === 'archived' ? 'Archived vehicles appear here.' : 'Vehicles appear here once they are added.'}
-                    onClear={() => { setSearch(''); setStatusFilter('all'); setPage(0) }}
+                    onClear={() => { setSearch(''); setStatusFilter('all'); setReverse(false); setPage(0) }}
                     action={canCreate && tab !== 'archived' && (
                       <button type="button" onClick={openCreate} className="text-[var(--color-cyan)] text-sm font-bold">
                         Add your first vehicle

@@ -44,6 +44,7 @@ import {
 } from '@/components/transactions/transaction-theme'
 import StopTimesPanel from '@/components/transactions/StopTimesPanel'
 import { useResolvedBookingKey } from '@/lib/booking-url'
+import { ORDER_LABELS, isReversed, orderField, orderRules, reverseParam, withoutOrder } from '@/lib/table-order'
 
 
 /** An icon exported from the Figma Transaction History (public/icons/transaction-history). */
@@ -217,6 +218,7 @@ export default function BookingHistoryModule() {
   // Server-side pages of 12 cards: the server keeps to this client's own
   // bookings, applies the tab, search and dates, orders by schedule date
   // (newest first) and counts every status for the tabs.
+  const [reverse, setReverse] = useState(false)
   const table = useServerTable(
     (q) => bookingService.fetchClientBookingsPage({
       page:  q.page,
@@ -225,8 +227,9 @@ export default function BookingHistoryModule() {
       ...(debouncedSearch && { search: debouncedSearch }),
       ...(dateFrom && { date_from: dateFrom }),
       ...(dateTo   && { date_to: dateTo }),
+      ...reverseParam(reverse),
     }),
-    `${activeTab}|${debouncedSearch}|${dateFrom}|${dateTo}`,
+    `${activeTab}|${debouncedSearch}|${dateFrom}|${dateTo}|${reverse}`,
     { enabled: !!clientId, errorMessage: 'Failed to load bookings. Please try again.', cacheKey: 'client-history' },
   )
   const { rows: bookings, setRows: setBookings, error, page, setPage, total, totalPages } = table
@@ -277,11 +280,11 @@ export default function BookingHistoryModule() {
   }, {})
 
   const hasActiveFilters =
-    !!dateFrom || !!dateTo || !!search || activeTab !== 'all'
+    !!dateFrom || !!dateTo || !!search || activeTab !== 'all' || reverse
 
   function clearFilters() {
     setDateFrom(''); setDateTo('')
-    setSearch(''); setActiveTab('all')
+    setSearch(''); setActiveTab('all'); setReverse(false)
   }
 
   return (
@@ -359,6 +362,9 @@ export default function BookingHistoryModule() {
                   value: dateFrom || dateTo ? { from: dateFrom || dateTo, to: dateTo || dateFrom } : null,
                   onChange: (r) => { setDateFrom(r?.from ?? ''); setDateTo(r?.to ?? '') },
                 }}
+                fields={[orderField(ORDER_LABELS.schedule)]}
+                values={orderRules(reverse)}
+                onChange={(v) => setReverse(isReversed(v))}
               />
 
               <div className="flex flex-[1_0_auto] flex-col gap-4 p-4 md:p-6">

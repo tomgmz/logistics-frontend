@@ -43,6 +43,7 @@ import FilterBar, {
 } from '@/components/ui/FilterBar'
 import { useServerTable } from '@/lib/hooks/useServerTable'
 import { TruncatedText } from '@/components/ui/TruncatedText'
+import { ORDER_LABELS, isReversed, orderField, orderRules, reverseParam, withoutOrder } from '@/lib/table-order'
 // No IT Administrator tab: IT Administrators are the IT Administrator's own
 // business, and a new one is only made through their handover (2026-10-25).
 type UserMgmtTab = Extract<UserTab, 'clients' | 'drivers'>
@@ -649,6 +650,7 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
   // drawing the previous tab's rows through the new tab's cells (company
   // drivers through the vendor columns, which read an `access` field they
   // don't have) crashed the page, so rows only show under their own tab.
+  const [reverse, setReverse] = useState(false)
   const table = useServerTable(
     async (q) => {
       const tab = activeTab
@@ -663,13 +665,14 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
           tab: tab === 'archived' ? 'all' : tab,
           ...(sent.length && { filters: JSON.stringify(sent) }),
           ...(search && { search }),
+          ...reverseParam(reverse),
         }),
         userService.getStats('client,driver'),
       ])
       setStats({ total: statsResult.total, active: statsResult.active, deactivated: statsResult.deactivated ?? 0, locked: statsResult.locked ?? 0 })
       return { data: res.data, meta: { ...res.meta, tab } }
     },
-    `${activeTab}|${JSON.stringify(filters)}|${search}`,
+    `${activeTab}|${JSON.stringify(filters)}|${search}|${reverse}`,
     { errorMessage: 'Failed to load users. Check your connection or permissions.', cacheKey: 'user-management' },
   )
   const tableReady = table.meta?.tab === activeTab
@@ -832,9 +835,9 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
               layout="split"
               // Names exactly what the server searches (user-directory.service.ts).
               search={{ value: searchInput, onChange: setSearchInput, placeholder: SEARCH_PLACEHOLDER[activeTab] }}
-              fields={filterDefs}
-              values={filters}
-              onChange={applyFilters}
+              fields={[...filterDefs, orderField(ORDER_LABELS.name)]}
+              values={[...filters, ...orderRules(reverse)]}
+              onChange={(v) => { applyFilters(withoutOrder(v)); setReverse(isReversed(v)) }}
               trailing={!itMode && !archive && (
                 <Button size="toolbar" color="accent" iconLeading={UserPlusIcon} onClick={openCreate} {...writeAccess(access.canCreate)}>
                   {addLabel}
@@ -965,7 +968,7 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
                   tab={activeTab} onAdd={openCreate} showAdd={!itMode} canAdd={access.canCreate} archived={showArchived}
                   // The tab picks which list (and its columns), so it stays.
                   filtered={!!search || filters.length > 0}
-                  onClear={() => { setSearchInput(''); setSearch(''); applyFilters([]) }}
+                  onClear={() => { setSearchInput(''); setSearch(''); applyFilters([]); setReverse(false) }}
                 />
               )}
             </div>

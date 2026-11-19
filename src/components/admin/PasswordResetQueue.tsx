@@ -22,6 +22,7 @@ import {
 import { useServerTable } from '@/lib/hooks/useServerTable'
 import { useDebouncedValue } from '@/lib/hooks/useDebouncedValue'
 import { TruncatedText } from '@/components/ui/TruncatedText'
+import { ORDER_LABELS, isReversed, orderField, orderRules, reverseParam, withoutOrder } from '@/lib/table-order'
 
 /**
  * The pending-reset queue on the IT Admin's User Management page. Since
@@ -136,6 +137,7 @@ export default function PasswordResetQueue({
   // Status is its own dropdown left of Filters (user 2026-11-18), like
   // Administrator Management's role dropdown; Filters keeps Role (and Requested).
   const [statusView,    setStatusView]    = useState<StatusView>('all')
+  const [reverse,       setReverse]       = useState(false)
   const queryFilters: FilterValues = statusView === 'all'
     ? filters
     : [...filters, { field: 'status', op: 'is', value: statusView }]
@@ -152,8 +154,9 @@ export default function PasswordResetQueue({
       ...(queryFilters.length && { filters: JSON.stringify(queryFilters) }),
       ...(debouncedSearch && { search: debouncedSearch }),
       ...(dateRange       && { from: dateRange.from, to: dateRange.to }),
+      ...reverseParam(reverse),
     }),
-    `${JSON.stringify(queryFilters)}|${debouncedSearch}|${dateRange?.from ?? ''}|${dateRange?.to ?? ''}`,
+    `${JSON.stringify(queryFilters)}|${debouncedSearch}|${dateRange?.from ?? ''}|${dateRange?.to ?? ''}|${reverse}`,
     { errorMessage: 'Failed to load reset requests.', cacheKey: 'password-resets' },
   )
   const { rows: pageRows, loading, error, page, setPage, pageSize, total, totalPages } = table
@@ -234,10 +237,11 @@ export default function PasswordResetQueue({
             { key: 'role',      label: 'Role',      options: ROLE_OPTIONS },
             // The card layout picks dates with "Select dates" instead.
             ...(cardHeader ? [] : [{ key: 'requested', label: 'Requested', options: REQUESTED_OPTIONS, single: true, anyLabel: 'Any time' }]),
+            orderField(ORDER_LABELS.oldest),
           ]}
           dateRange={cardHeader ? { value: dateRange, onChange: setDateRange } : undefined}
-          values={filters}
-          onChange={setFilters}
+          values={[...filters, ...orderRules(reverse)]}
+          onChange={(v) => { setFilters(withoutOrder(v)); setReverse(isReversed(v)) }}
           // Untitled UI's "Dropdowns" filter bar: Role and Requested each their own dropdown.
           variant="dropdowns"
           summary={!cardHeader && <span className="text-[#4df9ed]">{total} Request{total !== 1 ? 's' : ''}</span>}
@@ -369,7 +373,7 @@ export default function PasswordResetQueue({
               message={unfiltered > 0
                 ? 'No requests match your search or filters.'
                 : 'Requests appear here when someone asks for a password reset.'}
-              onClear={() => { setSearch(''); setFilters([]); setStatusView('all'); setDateRange(null); setPage(1) }}
+              onClear={() => { setSearch(''); setFilters([]); setStatusView('all'); setReverse(false); setDateRange(null); setPage(1) }}
             />
           )}
         </div>

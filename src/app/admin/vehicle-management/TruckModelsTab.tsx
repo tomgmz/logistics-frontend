@@ -35,6 +35,7 @@ import { useDebouncedValue } from '@/lib/hooks/useDebouncedValue'
 import { ProtectedImg } from '@/components/ui/FileViewer'
 import Dropdown from '@/components/ui/Dropdown'
 import { TruncatedText } from '@/components/ui/TruncatedText'
+import { ORDER_LABELS, isReversed, orderField, orderRules, reverseParam, withoutOrder } from '@/lib/table-order'
 
 
 interface ModelFormState {
@@ -113,16 +114,18 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete, archive 
   const archivedView = view === 'archived'
 
   // Server-side pages, searched on the server (10 rows on phones, 20 from tablet up).
+  const [reverse, setReverse] = useState(false)
   const table = useServerTable(
     async (q) => {
       const res = await adminFetchTruckModelsPage({
         ...q,
+        ...reverseParam(reverse),
         ...(debouncedSearch && { search: debouncedSearch }),
         ...(archivedView && { archived: 'only' as const }),
       })
       return { ...res, meta: { ...res.meta, view } }
     },
-    `${view}|${debouncedSearch}`,
+    `${view}|${debouncedSearch}|${reverse}`,
     { errorMessage: 'Request failed. Please try again.', cacheKey: 'vehicle-models' },
   )
   const { loading, error: listError, page, setPage, pageSize: PAGE_SIZE, total, totalPages } = table
@@ -449,6 +452,9 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete, archive 
             // Names exactly what the server searches (truck-model.controller.ts).
             search={{ value: search, onChange: setSearch, placeholder: 'Search model, type or use' }}
             leading={archive}
+            fields={[orderField(archivedView ? ORDER_LABELS.newest : ORDER_LABELS.name)]}
+            values={orderRules(reverse)}
+            onChange={(v) => setReverse(isReversed(v))}
             trailing={canCreate && !archivedView && (
               <Button size="toolbar" color="accent" iconLeading={PlusIcon} onClick={openCreate}>
                 Add Model
@@ -533,7 +539,7 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete, archive 
                   message={modelCount > 0
                     ? 'No models match your search.'
                     : archivedView ? 'Archived models appear here.' : 'Add a model before adding vehicles of that kind.'}
-                  onClear={() => setSearch('')}
+                  onClear={() => { setSearch(''); setReverse(false) }}
                   action={modelCount === 0 && canCreate && !archivedView && (
                     <button type="button" onClick={openCreate} className="text-[var(--color-cyan)] text-sm font-bold">
                       Add the first model

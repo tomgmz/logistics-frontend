@@ -43,6 +43,7 @@ import RowActionMenu, { type RowAction } from '@/components/ui/RowActionMenu'
 import AccountActionConfirm, { statusConfirmCopy, type AccountConfirm } from '@/components/admin/AccountActionConfirm'
 import { useServerTable } from '@/lib/hooks/useServerTable'
 import { TruncatedText } from '@/components/ui/TruncatedText'
+import { ORDER_LABELS, isReversed, orderField, orderRules, reverseParam, withoutOrder } from '@/lib/table-order'
 type AdminMgmtTab = Extract<
   UserTab,
   'admins' | 'general-managers' | 'fleet-admins' | 'operations-admins'
@@ -380,6 +381,7 @@ export default function AdministratorManagementView({ archive }: {
   // current status. On the archived list the same dropdown picks a role instead.
   // Archived rows get a Restore action.
   const [statusFilter,     setStatusFilter]     = useState<FilterValues>([])
+  const [reverse,          setReverse]          = useState(false)
   const showArchived = activeTab === 'archived'
   const statusPick   = showArchived ? 'archived' : statusFilter.find((r) => r.field === 'status')?.value ?? null
   const rolePick     = showArchived ? statusFilter.find((r) => r.field === 'role')?.value ?? null : null
@@ -428,13 +430,14 @@ export default function AdministratorManagementView({ archive }: {
           tab: directoryTab,
           ...(sent.length && { filters: JSON.stringify(sent) }),
           ...(search && { search }),
+          ...reverseParam(reverse),
         }),
         userService.getStats(ADMIN_ROLE_FILTER),
       ])
       setStats({ total: statsResult.total, active: statsResult.active, archived: statsResult.archived })
       return { data: res.data, meta: { ...res.meta, tab } }
     },
-    `${viewTab}|${statusPick ?? ''}|${rolePick ?? ''}|${search}`,
+    `${viewTab}|${statusPick ?? ''}|${rolePick ?? ''}|${search}|${reverse}`,
     {
       enabled:      !isResetsTab && !isPeopleTab,
       errorMessage: 'Failed to load accounts. Check your connection or permissions.',
@@ -640,11 +643,14 @@ export default function AdministratorManagementView({ archive }: {
               search={{ value: searchInput, onChange: setSearchInput, placeholder: 'Search name, email or phone' }}
               // One status at a time, as before; now inside the Filters panel.
               // The archived list picks a role instead.
-              fields={showArchived
-                ? [{ key: 'role', label: 'Role', single: true, options: ROLE_OPTIONS }]
-                : [{ key: 'status', label: 'Status', single: true, options: STATUS_OPTIONS }]}
-              values={statusFilter}
-              onChange={setStatusFilter}
+              fields={[
+                showArchived
+                  ? { key: 'role', label: 'Role', single: true, options: ROLE_OPTIONS }
+                  : { key: 'status', label: 'Status', single: true, options: STATUS_OPTIONS },
+                orderField(ORDER_LABELS.name),
+              ]}
+              values={[...statusFilter, ...orderRules(reverse)]}
+              onChange={(v) => { setStatusFilter(withoutOrder(v)); setReverse(isReversed(v)) }}
               trailing={!archive && (
                 <Button size="toolbar" color="accent" iconLeading={UserPlusIcon} onClick={openCreate} disabled={checkingGeneralManager}>
                   {addLabel}
@@ -725,7 +731,7 @@ export default function AdministratorManagementView({ archive }: {
                 <EmptyState
                   tab={activeTab} onAdd={openCreate} archived={showArchived}
                   filtered={!!search || statusFilter.length > 0}
-                  onClear={() => { setSearchInput(''); setSearch(''); setStatusFilter([]) }}
+                  onClear={() => { setSearchInput(''); setSearch(''); setStatusFilter([]); setReverse(false) }}
                 />
               )}
             </div>

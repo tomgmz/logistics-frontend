@@ -27,6 +27,7 @@ import FilterBar from '@/components/ui/FilterBar'
 import { TableCard } from '@/components/ui/untitled/table-card'
 import { TabsMinimal } from '@/components/ui/untitled/tabs'
 import { TruncatedText } from '@/components/ui/TruncatedText'
+import { ORDER_LABELS, isReversed, orderField, orderRules, reverseParam, withoutOrder } from '@/lib/table-order'
 /**
  * Tickets — the Company Administrator's full view of client support tickets.
  *
@@ -269,6 +270,8 @@ export default function SupportTicketsView() {
 
   const [search,       setSearch]       = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('open')
+  // Newest first by default; Oldest first is the queue order (longest waiting).
+  const [sort,         setSort]         = useState<'desc' | 'asc'>('desc')
   const debouncedSearch = useDebouncedValue(search.trim())
   // The open ticket. The panel shows the live row from the page whenever it is
   // on it (a resolve elsewhere shows at once), else the copy from the click.
@@ -285,6 +288,7 @@ export default function SupportTicketsView() {
       const res = await supportService.listPage({
         ...q,
         status: statusFilter,
+        sort,
         ...(debouncedSearch && { search: debouncedSearch }),
       })
       setInbox(res.inbox)
@@ -292,7 +296,7 @@ export default function SupportTicketsView() {
       setReplyAddress(res.replyAddress)
       return res
     },
-    `${statusFilter}|${debouncedSearch}`,
+    `${statusFilter}|${debouncedSearch}|${sort}`,
     { errorMessage: 'Could not load tickets. Please try again.', cacheKey: 'support-tickets' },
   )
   const { rows: tickets, loading, error, page, setPage, pageSize: PAGE_SIZE, total, totalPages } = table
@@ -338,6 +342,10 @@ export default function SupportTicketsView() {
           <FilterBar
             layout="split"
             search={{ value: search, onChange: setSearch, placeholder: 'Search ticket, client, subject or booking' }}
+            // Same Order option as Document Management, in the Filters panel.
+            fields={[orderField(ORDER_LABELS.newest)]}
+            values={orderRules(sort === 'asc')}
+            onChange={(v) => setSort(isReversed(v) ? 'asc' : 'desc')}
             trailing={
               <Button size="toolbar" color="accent" iconLeading={Plus} onClick={() => setCreating(true)} {...writeAccess(canEdit)}>
                 New Ticket
@@ -433,7 +441,7 @@ export default function SupportTicketsView() {
                     : statusFilter === 'open' && !search.trim()
                       ? 'Every ticket has been resolved.'
                       : 'No tickets match your search or filters.'}
-                  onClear={() => { setSearch(''); setStatusFilter('all'); setPage(1) }}
+                  onClear={() => { setSearch(''); setStatusFilter('all'); setSort('desc'); setPage(1) }}
                 />
               )}
             </div>

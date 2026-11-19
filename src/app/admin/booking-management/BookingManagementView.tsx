@@ -121,6 +121,7 @@ import Dropdown from '@/components/ui/Dropdown'
 import { FieldError } from '@/components/ui/FieldError'
 import { useResolvedBookingKey } from '@/lib/booking-url'
 import { TruncatedText } from '@/components/ui/TruncatedText'
+import { ORDER_LABELS, isReversed, orderField, orderRules, reverseParam, withoutOrder } from '@/lib/table-order'
 
 const BOOKING_STATUSES: AdminBookingLifecycleStatus[] = [
   'pending',
@@ -1383,6 +1384,10 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
 
   const [dateRange, setDateRange] = useState<DateRange | null>(null)
 
+  // The Order toggle: newest first (the Pending queue: oldest first), flipped.
+
+  const [reverse, setReverse] = useState(false)
+
   const loadPage = useCallback(async (quiet = false) => {
     const query = {
       page:   page + 1,
@@ -1391,6 +1396,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
       search: debouncedSearch,
       dateFrom: dateRange?.from,
       dateTo:   dateRange?.to,
+      ...reverseParam(reverse),
     }
     type PageRes = Awaited<ReturnType<typeof bookingService.fetchBookingsAdminPaginated>>
     const cacheKey = `booking-management|${JSON.stringify(query)}`
@@ -1420,7 +1426,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     } finally {
       if (!quiet) setListLoading(false)
     }
-  }, [page, statusFilter, debouncedSearch, dateRange, PAGE_SIZE])
+  }, [page, statusFilter, debouncedSearch, dateRange, PAGE_SIZE, reverse])
 
   useEffect(() => { void loadPage() }, [loadPage])
 
@@ -2175,6 +2181,9 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
               search={{ value: search, onChange: (v) => { setSearch(v); setPage(0) }, placeholder: 'Search reference, company, pickup, drop-off or delayed' }}
               // Untitled UI's "Select dates": the schedule-date window, filtered on the server.
               dateRange={{ value: dateRange, onChange: (r) => { setDateRange(r); setPage(0) } }}
+              fields={[orderField((forcedStatus ?? statusFilter) === 'pending' ? ORDER_LABELS.oldest : ORDER_LABELS.newest)]}
+              values={orderRules(reverse)}
+              onChange={(v) => { setReverse(isReversed(v)); setPage(0) }}
               leading={!forcedStatus && (
                 <TabsMinimal
                   label="Booking status"
@@ -2302,7 +2311,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                       message={!search && statusFilter === 'all' && !dateRange
                         ? 'Bookings appear here once clients make them.'
                         : 'No bookings match your search or filters.'}
-                      onClear={() => { setSearch(''); setStatusFilter('all'); setDateRange(null); setPage(0) }}
+                      onClear={() => { setSearch(''); setStatusFilter('all'); setDateRange(null); setReverse(false); setPage(0) }}
                     />
                   )}
                 </div>

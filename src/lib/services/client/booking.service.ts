@@ -234,6 +234,7 @@ export const bookingService = {
     /** Schedule-date window, inclusive, YYYY-MM-DD. */
     dateFrom?: string
     dateTo?:   string
+    reverse?:  1
   }): Promise<{
     rows: Record<string, unknown>[]
     meta: {
@@ -262,6 +263,7 @@ export const bookingService = {
         search: params.search || undefined,
         date_from: params.dateFrom || undefined,
         date_to:   params.dateTo   || undefined,
+        reverse:   params.reverse,
       },
     })
     return {
@@ -356,7 +358,7 @@ export const bookingService = {
    * of the client's bookings, keyed by lower-case status plus `all`.
    */
   fetchClientBookingsPage: async (params: {
-    page: number; limit: number; status?: string; search?: string; date_from?: string; date_to?: string
+    page: number; limit: number; status?: string; search?: string; date_from?: string; date_to?: string; reverse?: 1
   }): Promise<{ data: BookingWithRelations[]; meta: { total: number; page: number; limit: number; totalPages: number; statusCounts: Record<string, number> } }> => {
     const { data } = await proxyApi.get<{
       status: string

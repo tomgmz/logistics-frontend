@@ -32,6 +32,7 @@ import { ModelThumb, TABLE_TAG, resolveModelImageUrl } from './vehicle-ui'
 import { useServerTable } from '@/lib/hooks/useServerTable'
 import { useDebouncedValue } from '@/lib/hooks/useDebouncedValue'
 import { TruncatedText } from '@/components/ui/TruncatedText'
+import { ORDER_LABELS, isReversed, orderField, orderRules, reverseParam, withoutOrder } from '@/lib/table-order'
 
 /**
  * Vehicle Management → Maintenance: everything a vehicle owes before it can go out,
@@ -302,14 +303,16 @@ export default function MaintenanceTab({
   // where its actions live now.
   const focusId         = focusTruck?.truck_id ?? null
   const debouncedSearch = useDebouncedValue(search.trim())
+  const [reverse, setReverse] = useState(false)
   const table = useServerTable(
     (q) => adminFetchMaintenancePage({
       ...q,
       group: groupFilter,
       ...(debouncedSearch && { search: debouncedSearch }),
       ...(focusId && { focus: focusId }),
+      ...reverseParam(reverse),
     }),
-    `${groupFilter}|${debouncedSearch}|${focusId ?? ''}`,
+    `${groupFilter}|${debouncedSearch}|${focusId ?? ''}|${reverse}`,
     { errorMessage: 'Could not load the maintenance list. Please try again.', cacheKey: 'vehicle-maintenance' },
   )
   const { page, setPage, pageSize: PAGE_SIZE, total, totalPages } = table
@@ -417,9 +420,9 @@ export default function MaintenanceTab({
               value: f.key,
               label: `${f.label} (${problems.filter((p) => matchesFilter(p, f.key)).length})`,
             })),
-          }]}
-          values={groupFilter === 'all' ? [] : [{ field: 'needs', op: 'is' as const, value: groupFilter }]}
-          onChange={(v) => { setGroupFilter((v.find((r) => r.field === 'needs')?.value ?? 'all') as GroupFilter); setPage(1) }}
+          }, orderField(ORDER_LABELS.urgent)]}
+          values={[...(groupFilter === 'all' ? [] : [{ field: 'needs', op: 'is' as const, value: groupFilter }]), ...orderRules(reverse)]}
+          onChange={(v) => { setGroupFilter((v.find((r) => r.field === 'needs')?.value ?? 'all') as GroupFilter); setReverse(isReversed(v)); setPage(1) }}
           trailing={trailing}
         />
 
@@ -538,7 +541,7 @@ export default function MaintenanceTab({
                   message={problems.length === 0
                     ? 'Nothing to do. Vehicles that need a service, a check or papers appear here.'
                     : 'No vehicles match your search or filters.'}
-                  onClear={() => { onSearchChange(''); setGroupFilter('all'); setPage(1) }}
+                  onClear={() => { onSearchChange(''); setGroupFilter('all'); setReverse(false); setPage(1) }}
                 />
               )}
             </div>

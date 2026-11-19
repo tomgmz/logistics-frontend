@@ -165,7 +165,7 @@ export const supportService = {
   },
 
   /** One page of the Tickets table; status, search and counts are server-side. */
-  async listPage(params: PageRequest & { status: 'open' | 'resolved' | 'all'; search?: string }): Promise<
+  async listPage(params: PageRequest & { status: 'open' | 'resolved' | 'all'; search?: string; sort?: 'asc' | 'desc' }): Promise<
     PagedResponse<SupportTicket, { counts: { all: number; open: number; resolved: number } }> & { inbox: string; replyTracking: boolean; replyAddress: string | null }
   > {
     const { data } = await proxyApi.get<

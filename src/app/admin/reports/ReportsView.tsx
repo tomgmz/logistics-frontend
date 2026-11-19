@@ -41,6 +41,7 @@ import FilterBar from '@/components/ui/FilterBar'
 import { TableCard } from '@/components/ui/untitled/table-card'
 import { TabsMinimal } from '@/components/ui/untitled/tabs'
 import { formatDate, formatTime } from '@/app/utils/timeFormat'
+import { ORDER_LABELS, isReversed, orderField, orderRules, reverseParam, withoutOrder } from '@/lib/table-order'
 
 /**
  * The Reports module — the staff side of the driver app's Reports tab.
@@ -108,14 +109,16 @@ export default function ReportsView() {
 
   // Server-side pages: the server filters, searches and counts the tabs, and
   // sends only the rows on screen (10 on phones, 20 from tablet up).
+  const [reverse, setReverse] = useState(false)
   const table = useServerTable(
     (q) => fetchDriverReportsPage({
       ...q,
       status: statusFilter,
       type:   typeFilter,
       ...(debouncedSearch && { search: debouncedSearch }),
+      ...reverseParam(reverse),
     }),
-    `${statusFilter}|${typeFilter}|${debouncedSearch}`,
+    `${statusFilter}|${typeFilter}|${debouncedSearch}|${reverse}`,
     { errorMessage: 'Could not load reports. Please try again.', cacheKey: 'driver-reports' },
   )
   const { rows: reports, loading, error, page, setPage, pageSize: PAGE_SIZE, total, totalPages } = table
@@ -297,9 +300,9 @@ export default function ReportsView() {
                 ...typeOptions.map((k) => ({ value: k, label: INCIDENT_LABELS[k] })),
                 ...(isFleet ? [] : [{ value: 'unspecified', label: 'Unspecified Emergency' }]),
               ],
-            }]}
-            values={typeFilter === 'all' ? [] : [{ field: 'type', op: 'is' as const, value: typeFilter }]}
-            onChange={(v) => setTypeFilter((v.find((r) => r.field === 'type')?.value ?? 'all') as typeof typeFilter)}
+            }, orderField(ORDER_LABELS.newest)]}
+            values={[...(typeFilter === 'all' ? [] : [{ field: 'type', op: 'is' as const, value: typeFilter }]), ...orderRules(reverse)]}
+            onChange={(v) => { setTypeFilter((v.find((r) => r.field === 'type')?.value ?? 'all') as typeof typeFilter); setReverse(isReversed(v)) }}
           />
 
           {loading ? (
@@ -379,7 +382,7 @@ export default function ReportsView() {
                   message={counts.all === 0
                     ? (isFleet ? 'Vehicle-related reports from drivers appear here.' : 'Reports and SOS alerts raised by drivers appear here.')
                     : 'No reports match your search or filters.'}
-                  onClear={() => { setSearch(''); setStatusFilter('all'); setTypeFilter('all'); setPage(1) }}
+                  onClear={() => { setSearch(''); setStatusFilter('all'); setTypeFilter('all'); setReverse(false); setPage(1) }}
                 />
               )}
             </div>

@@ -16,6 +16,7 @@ export async function adminFetchTrucksPaginated(params: {
   limit: number
   status: string
   search: string
+  reverse?: 1
 }): Promise<{
   rows: Truck[]
   meta: { total: number; page: number; limit: number; totalPages: number }
@@ -30,6 +31,7 @@ export async function adminFetchTrucksPaginated(params: {
       limit:    params.limit,
       status:   params.status,
       search:   params.search || undefined,
+      reverse:  params.reverse,
     },
   })
   return {
