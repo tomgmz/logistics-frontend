@@ -282,13 +282,13 @@ export default function TransactionHistoryView() {
   async function handleExport() {
     setExporting(true)
     try {
-      const { rows: exportRows, truncated } = await transactionHistoryService.exportRows(filters)
+      const { rows: exportRows, crewChanges, truncated } = await transactionHistoryService.exportRows(filters)
       if (exportRows.length === 0) {
         appToast.error('Nothing to export for these filters.')
         return
       }
       const stamp = dateFrom && dateTo ? `${dateFrom}_${dateTo}` : new Date().toISOString().slice(0, 10)
-      await downloadDispatchXlsx(`transactions_${stamp}.xlsx`, exportRows)
+      await downloadDispatchXlsx(`transactions_${stamp}.xlsx`, exportRows, crewChanges)
       const bookings = new Set(exportRows.map((r) => r.booking_id)).size
       appToast.success(`Exported ${bookings.toLocaleString()} booking${bookings === 1 ? '' : 's'} (${exportRows.length.toLocaleString()} rows).`)
       if (truncated) {

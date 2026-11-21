@@ -1,6 +1,7 @@
 import proxyApi from '@/lib/api/auth.api'
 import type { BookingWithRelations } from '@/lib/types/booking-relations'
-import { downloadXlsx, type XlsxColumn } from '@/lib/xlsx-export'
+import { downloadXlsxSheets, manilaCellDate, type XlsxColumn } from '@/lib/xlsx-export'
+import { roleLabel } from '@/lib/roles'
 
 /**
  * Staff transaction history.
@@ -172,6 +173,19 @@ export interface TransactionRecord {
   /** The passed inspection the vehicle was assigned on, if any. */
   inspection:  RecordInspection | null
   approvals:   TransactionApprovals
+  /** Every change of driver, second driver, helper and vehicle, and navigation take-overs, oldest first. */
+  crew_changes?: CrewChangeEvent[]
+}
+
+/** One crew change (one assignment / replacement / swap) or one navigation take-over. */
+export interface CrewChangeEvent {
+  at:      string
+  kind:    'crew_changed' | 'navigation_moved'
+  title:   string
+  lines:   string[]
+  reason:  string | null
+  by:      string | null
+  by_role: string | null
 }
 
 interface ApiResponse<T> {
@@ -236,12 +250,12 @@ export const transactionHistoryService = {
   // JSON, so the CSV itself is assembled in the browser.
   exportRows: async (
     filters: TransactionFilters,
-  ): Promise<{ rows: ExportRow[]; truncated: boolean }> => {
+  ): Promise<{ rows: ExportRow[]; crewChanges: CrewChangeExportRow[]; truncated: boolean }> => {
     const { data: body } = await proxyApi.get<
-      ApiResponse<ExportRow[]> & { meta: { truncated: boolean; count: number } }
+      ApiResponse<ExportRow[]> & { crew_changes?: CrewChangeExportRow[]; meta: { truncated: boolean; count: number } }
     >(`${B}/export`, { params: toParams(filters) })
 
-    return { rows: body?.data ?? [], truncated: !!body?.meta?.truncated }
+    return { rows: body?.data ?? [], crewChanges: body?.crew_changes ?? [], truncated: !!body?.meta?.truncated }
   },
 }
 
@@ -279,10 +293,42 @@ export const DISPATCH_COLUMNS: XlsxColumn<ExportRow>[] = [
   { label: 'Destination',        width: 28, value: (r) => placeName(r.destination) },
 ]
 
-/** Builds and downloads the dispatch sheet (.xlsx) with the header in the sheet's blue. */
-export function downloadDispatchXlsx(fileName: string, rows: ExportRow[]): Promise<void> {
-  return downloadXlsx(fileName, 'Dispatch', rows, DISPATCH_COLUMNS, {
-    headerBackground: '#1F3D7A',
-    headerTextColor:  '#FFFFFF',
-  })
+/** One row of the "Driver Changes" sheet: one seat changed, or one navigation take-over. */
+export interface CrewChangeExportRow {
+  booking_id:       string
+  reference_number: string | null
+  changed_at:       string
+  change:           string
+  seat:             string
+  from:             string | null
+  to:               string | null
+  reason:           string | null
+  by:               string | null
+  by_role:          string | null
+}
+
+export const CREW_CHANGE_COLUMNS: XlsxColumn<CrewChangeExportRow>[] = [
+  { label: 'Booking',     width: 20, value: (r) => r.reference_number, align: 'center' },
+  { label: 'Date and Time', width: 18, value: (r) => manilaCellDate(r.changed_at), format: 'mm/dd/yyyy hh:mm', align: 'center' },
+  { label: 'Change',      width: 38, value: (r) => r.change },
+  { label: 'What',        width: 18, value: (r) => r.seat },
+  { label: 'From',        width: 28, value: (r) => r.from },
+  { label: 'To',          width: 28, value: (r) => r.to },
+  { label: 'Reason',      width: 40, value: (r) => r.reason },
+  { label: 'Changed By',  width: 26, value: (r) => r.by },
+  { label: 'Role',        width: 22, value: (r) => (r.by_role ? roleLabel(r.by_role) : null) },
+]
+
+const SHEET_HEADER = { headerBackground: '#1F3D7A', headerTextColor: '#FFFFFF' }
+
+/**
+ * Builds and downloads the export (.xlsx): the Dispatch sheet, and a "Driver
+ * Changes" sheet with every change of driver, second driver, helper and
+ * vehicle (and navigation take-overs) on the same bookings.
+ */
+export function downloadDispatchXlsx(fileName: string, rows: ExportRow[], crewChanges: CrewChangeExportRow[] = []): Promise<void> {
+  return downloadXlsxSheets(fileName, [
+    { name: 'Dispatch',       rows,                 columns: DISPATCH_COLUMNS,    options: SHEET_HEADER },
+    { name: 'Driver Changes', rows: crewChanges,    columns: CREW_CHANGE_COLUMNS, options: SHEET_HEADER },
+  ])
 }

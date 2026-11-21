@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import {
-  AlertCircle, AlertTriangle, Building2, Camera, ClipboardCheck, Package,
+  AlertCircle, AlertTriangle, Building2, Camera, ClipboardCheck, Package, Users,
   Route as RouteIcon, ShieldCheck, Truck, User, Video,
 } from 'lucide-react'
 
@@ -12,7 +12,7 @@ import { getApiErrorMessage } from '@/lib/api-error'
 import { roleLabel } from '@/lib/roles'
 import {
   transactionHistoryService,
-  type DecisionActor, type RecordInspection, type RecordReport, type RecordTrip,
+  type CrewChangeEvent, type DecisionActor, type RecordInspection, type RecordReport, type RecordTrip,
   type TransactionApprovals, type TransactionRecord as RecordData,
 } from '@/lib/services/admin/transaction-history.service'
 import { formatDate, formatDateTime } from './transaction-format'
@@ -517,6 +517,36 @@ function ApprovalsSection({ approvals, booking }: { approvals: TransactionApprov
   )
 }
 
+/**
+ * Every change of driver, second driver, helper and vehicle on the booking, with
+ * who made it, when and why, and every time navigation moved between the two
+ * drivers' phones (2026-11-21). Recorded by the database on every write path.
+ */
+function CrewChangesSection({ changes }: { changes: CrewChangeEvent[] }) {
+  if (!changes.length) return null
+  return (
+    <Panel icon={<Users {...ICON} />} title={`Driver and Vehicle Changes (${changes.length})`}>
+      {changes.map((c, i) => (
+        <Card key={`${c.at}-${i}`}>
+          <span className="text-sm font-bold text-white break-words">{c.title}</span>
+          {c.lines.map((l, j) => (
+            <span key={j} className="text-[12px] text-white/80 break-words">{l}</span>
+          ))}
+          {c.reason && (
+            <span className="text-[12px] text-white/80 whitespace-pre-wrap break-words">
+              <span className="font-semibold">Reason:</span> {c.reason}
+            </span>
+          )}
+          <span className="text-[11px]" style={{ color: MUTED }}>
+            {c.by ? `${c.by}${c.by_role ? ` (${roleLabel(c.by_role)})` : ''}` : 'Not recorded who'}
+            {` · ${formatDateTime(c.at)}`}
+          </span>
+        </Card>
+      ))}
+    </Panel>
+  )
+}
+
 // ─── Root ────────────────────────────────────────────────────────────────────
 
 export default function TransactionRecord({ booking, variant = 'full' }: {
@@ -568,12 +598,14 @@ export default function TransactionRecord({ booking, variant = 'full' }: {
       ) : record && variant === 'history' ? (
         <>
           <ApprovalsSection approvals={record.approvals} booking={booking} />
+          <CrewChangesSection changes={record.crew_changes ?? []} />
           {record.delivery?.trucks && <InspectionSection inspection={record.inspection} />}
           <ReportsSection reports={record.reports} />
         </>
       ) : record && (
         <>
           <CrewSection record={record} booking={booking} />
+          <CrewChangesSection changes={record.crew_changes ?? []} />
           <TripsSection trips={record.trips} booking={booking} />
           {record.delivery?.trucks && <InspectionSection inspection={record.inspection} />}
           <ReportsSection reports={record.reports} />

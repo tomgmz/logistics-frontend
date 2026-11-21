@@ -50,11 +50,30 @@ export async function xlsxBlob<T>(
   return (await workbook(sheet, rows, columns, options)).toBlob()
 }
 
-async function workbook<T>(sheet: string, rows: T[], columns: XlsxColumn<T>[], options: XlsxOptions) {
-  // Loaded on click so the writer stays out of the page bundle.
-  const { default: writeXlsxFile } = await import('write-excel-file/browser')
+/** One sheet of a workbook with several (downloadXlsxSheets). */
+export interface XlsxSheet<T> {
+  name:    string
+  rows:    T[]
+  columns: XlsxColumn<T>[]
+  options?: XlsxOptions
+}
 
-  return writeXlsxFile(rows, {
+/** One .xlsx with several sheets, e.g. Dispatch + Driver Changes. */
+export async function downloadXlsxSheets(fileName: string, sheets: XlsxSheet<any>[]): Promise<void> {
+  const { default: writeXlsxFile, getSheetData } = await import('write-excel-file/browser')
+  // write-excel-file 4.x: an array of { data, sheet, columns, ... } is a
+  // multi-sheet file. Here `data` must already be rows of cells (the library
+  // maps objects through `columns` only for a single sheet), so each sheet's
+  // objects go through getSheetData first; `columns` stays for the widths.
+  const parts = sheets.map((sh) => {
+    const spec = sheetSpec(sh.name, sh.columns, sh.options ?? {})
+    return { data: getSheetData(sh.rows, spec.columns as never), ...spec }
+  })
+  await (writeXlsxFile as unknown as (sheets: unknown[]) => { toFile: (name: string) => Promise<void> })(parts).toFile(fileName)
+}
+
+function sheetSpec<T>(sheet: string, columns: XlsxColumn<T>[], options: XlsxOptions) {
+  return {
     sheet,
     stickyRowsCount: 1,
     columns: columns.map((c) => ({
@@ -77,7 +96,14 @@ async function workbook<T>(sheet: string, rows: T[], columns: XlsxColumn<T>[], o
         return c.align && v != null ? { value: v, ...align } : v ?? null
       },
     })),
-  })
+  }
+}
+
+async function workbook<T>(sheet: string, rows: T[], columns: XlsxColumn<T>[], options: XlsxOptions) {
+  // Loaded on click so the writer stays out of the page bundle.
+  const { default: writeXlsxFile } = await import('write-excel-file/browser')
+
+  return writeXlsxFile(rows, sheetSpec(sheet, columns, options))
 }
 
 const MANILA_OFFSET_MS = 8 * 60 * 60 * 1000

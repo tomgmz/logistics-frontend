@@ -32,6 +32,9 @@ const DOT: Record<string, string> = {
   stop_failed:     PALETTE.red,
   drivers_swapped: PALETTE.purple,
   crew_replaced:   PALETTE.purple,
+  // Every change of driver, second driver, helper or vehicle (2026-11-21).
+  crew_changed:    PALETTE.purple,
+  navigation_moved: PALETTE.cyan,
   paused:          PALETTE.yellow,
   resumed:         PALETTE.yellow,
   late_received:   PALETTE.orange,
@@ -66,7 +69,7 @@ export default function DeliveryEventsPanel({ bookingId }: { bookingId: string }
       title={
         <span className="flex items-center gap-2 text-base font-bold text-white leading-tight">
           <TriangleAlert size={20} strokeWidth={2} className="shrink-0" style={{ color: PALETTE.cyan }} />
-          What happened on the road
+          What happened
         </span>
       }
     >

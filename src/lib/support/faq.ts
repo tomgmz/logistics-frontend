@@ -250,7 +250,8 @@ export const FAQ: FaqEntry[] = [
     question: 'Why are there two drivers on my booking?',
     answer:
       'Routes longer than 30 km by road always get a second driver for safety. Shorter routes have one driver, ' +
-      'sometimes with a helper.',
+      'sometimes with a helper. Both drivers can confirm the pickup, the drop-offs and the proof photos, so a ' +
+      'confirmation may show either driver’s name.',
     keywords: ['two drivers', 'second driver', 'helper', 'crew', 'driver name', 'who is the driver', 'driver'],
     category: 'delivery',
   },
