@@ -112,7 +112,7 @@ export const FAQ: FaqEntry[] = [
       'choose Edit & Resubmit: fix what the reason mentions (often the date, cargo details or an address) and ' +
       'resubmit; it goes back for approval with the same booking number. A booking can be resubmitted at most 3 ' +
       'times; after that you can only cancel it and make a new booking. Or choose Cancel Booking. If the reason ' +
-      'is unclear, open a ticket and we will explain.',
+      'is unclear, tap "Talk to our team" in the help assistant and we will explain.',
     keywords: ['rejected', 'reject', 'declined', 'denied', 'cancelled by', 'why rejected', 'reason'],
     link: { href: '/client/history', label: 'Open Transaction History' },
     category: 'booking',
@@ -122,8 +122,8 @@ export const FAQ: FaqEntry[] = [
     question: 'Can I change or cancel a booking?',
     answer:
       'Once a booking is approved, changes and cancellations go through our team so the vehicle and driver can ' +
-      'be updated too. Open a ticket with the booking reference and what you need changed, and we will reply ' +
-      'by email.',
+      'be updated too. In the help assistant tap "Talk to our team" and send the booking reference and what you ' +
+      'need changed; we reply in the same conversation (and by email if you are away).',
     keywords: ['cancel', 'cancellation', 'change', 'edit', 'modify', 'reschedule', 'update booking', 'wrong date', 'wrong address'],
     category: 'booking',
   },
@@ -206,8 +206,9 @@ export const FAQ: FaqEntry[] = [
     question: 'How will you contact me about my bookings?',
     answer:
       'Through the bell at the top of the portal (approval, rejection, delivery finished and more) and by email ' +
-      'for the important steps, like a finished delivery that needs your confirmation. Our team also writes to ' +
-      'you in Messages (8338 Team), where you can reply. Support tickets are answered by email.',
+      'for the important steps, like a finished delivery that needs your confirmation. When you talk to our team ' +
+      'in the help assistant, their replies show in Messages, and by email if you are away. Support tickets are ' +
+      'answered by email.',
     keywords: ['notification', 'notify', 'email', 'contact me', 'updates', 'alerts', 'bell', 'message'],
     category: 'account',
   },
@@ -230,8 +231,9 @@ export const FAQ: FaqEntry[] = [
     id: 'account-details',
     question: 'How do I change my company details or contact person?',
     answer:
-      'Company details are kept by our team so your bookings stay consistent. Open a ticket with what needs to ' +
-      'change (company name, address, contact person, phone) and we will update it and confirm by email.',
+      'Company details are kept by our team so your bookings stay consistent. In the help assistant tap "Talk to ' +
+      'our team" and tell us what needs to change (company name, address, contact person, phone); we update it ' +
+      'and confirm in the conversation.',
     keywords: ['company name', 'address', 'contact person', 'phone number', 'change details', 'update account', 'profile', 'account'],
     category: 'account',
   },
@@ -241,7 +243,7 @@ export const FAQ: FaqEntry[] = [
     answer:
       'This system handles bookings and deliveries only: no prices, amounts or payments are shown or taken ' +
       'here. Rates and payment are arranged with our team directly. Send us your question through the contact ' +
-      'form, or a ticket in the help assistant if you are already a client, and we will reply by email.',
+      'form, or through "Talk to our team" in the help assistant if you are already a client.',
     keywords: ['how much', 'price', 'pricing', 'cost', 'rate', 'quote', 'pay', 'payment', 'invoice', 'billing', 'charge', 'fee'],
     category: 'other',
   },

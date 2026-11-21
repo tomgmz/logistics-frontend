@@ -1,10 +1,10 @@
 import type { Metadata } from 'next'
-import SupportTicketsView from '@/app/admin/support-tickets/SupportTicketsView'
+import SupportDeskView from '@/app/admin/support-tickets/SupportDeskView'
 
 export const metadata: Metadata = {
   title: 'Tickets',
 }
 
 export default function SupportTickets() {
-  return <SupportTicketsView />
+  return <SupportDeskView />
 }

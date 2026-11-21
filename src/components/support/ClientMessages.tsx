@@ -2,17 +2,16 @@
 
 import { useStickToBottom } from '@/lib/hooks/useStickToBottom'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, ChevronRight, ImagePlus, Loader2, MessageSquare, Send, Truck, UserRound, Users, X } from 'lucide-react'
+import { ArrowLeft, ChevronRight, ImagePlus, Loader2, MessageSquare, Send, Truck, UserRound, X } from 'lucide-react'
 
 import { messagingService } from '@/lib/services/messaging.service'
 import { useMessagingRealtime } from '@/lib/hooks/useMessagingRealtime'
 import { useMessengerStore } from '@/lib/store/messenger.store'
 import { getApiErrorMessage } from '@/lib/api-error'
-import { nameWithRole, roleLabel } from '@/lib/roles'
+import { roleLabel } from '@/lib/roles'
 import { bookingRef } from '@/lib/booking'
-import { formatConversationTime, groupEventText } from '@/app/utils/messaging.utils'
-import { toGroup, toGroupMessage } from '@/app/types/messaging/messaging.types'
-import type { ConversationWithDetails, MessageRow, MessagableUser, Group, GroupMessage } from '@/app/types/messaging/messaging.types'
+import { formatConversationTime } from '@/app/utils/messaging.utils'
+import type { ConversationWithDetails, MessageRow, MessagableUser } from '@/app/types/messaging/messaging.types'
 import PhotoSendDialog, { MAX_PHOTO_BYTES } from '@/components/messaging/PhotoSendDialog'
 import MessageItem from '@/components/messaging/MessageItem'
 import { BookingMentionMenu, useBookingMentionPicker } from '@/components/messaging/BookingMention'
@@ -36,11 +35,6 @@ import { Tip } from '@/components/ui/tooltip'
 type Thread =
   | { kind: 'conversation'; id: string }
   | { kind: 'draft'; driver: MessagableUser }
-  /** The client's "8338 Team" chat (2026-11-22): every Operations Manager and Company Administrator. */
-  | { kind: 'team' }
-
-/** Shown for the team chat in place of a person. */
-export const TEAM_NAME = '8338 Team'
 
 const fullName = (u: { first_name: string | null; last_name: string | null }) =>
   `${u.first_name ?? ''} ${u.last_name ?? ''}`.trim() || 'Unknown'
@@ -80,10 +74,6 @@ export function useClientMessages(userId: string | undefined, visible: boolean) 
   const [messages,      setMessages]      = useState<MessageRow[]>([])
   const [threadLoading, setThreadLoading] = useState(false)
   const [sendError,     setSendError]     = useState<string | null>(null)
-  // The "8338 Team" chat: a group the server keeps (client + the team).
-  const [team,          setTeam]          = useState<Group | null>(null)
-  const [teamMessages,  setTeamMessages]  = useState<GroupMessage[]>([])
-  const [teamTyping,    setTeamTyping]    = useState<Record<string, true>>({})
   const setTotalUnread = useMessengerStore((s) => s.setTotalUnread)
 
   const threadRef  = useRef(thread)
@@ -108,12 +98,6 @@ export function useClientMessages(userId: string | undefined, visible: boolean) 
       apply(fresh)
     } catch { /* keep the last list */ }
     finally { setLoading(false) }
-    // The team chat (made by the server on the first load).
-    try {
-      const groups = await messagingService.getGroups()
-      const raw = groups.find((g) => g.client_id)
-      setTeam(raw ? toGroup(raw) : null)
-    } catch { /* keep the last one */ }
   }, [userId])
 
   // Loaded once for the unread badge, and again whenever the tab is shown:
@@ -123,10 +107,7 @@ export function useClientMessages(userId: string | undefined, visible: boolean) 
   useCatchUp(() => { void refresh() })
   useEffect(() => { if (visible) void refresh() }, [visible, refresh])
 
-  const totalUnread = useMemo(
-    () => conversations.reduce((n, c) => n + c.unread_count, 0) + (team?.unread_count ?? 0),
-    [conversations, team?.unread_count],
-  )
+  const totalUnread = useMemo(() => conversations.reduce((n, c) => n + c.unread_count, 0), [conversations])
   useEffect(() => { setTotalUnread(totalUnread) }, [totalUnread, setTotalUnread])
 
   const openConversation = useCallback(async (conversationId: string) => {
@@ -152,24 +133,7 @@ export function useClientMessages(userId: string | undefined, visible: boolean) 
     setThread({ kind: 'draft', driver })
   }, [conversations, openConversation])
 
-  const closeThread = useCallback(() => { setThread(null); setSendError(null); setTeamTyping({}) }, [])
-
-  const openTeam = useCallback(async () => {
-    if (!team) return
-    setThread({ kind: 'team' })
-    setSendError(null)
-    const key    = ['messaging', 'client-team', team.id] as const
-    const cached = cachedData<GroupMessage[]>(key)
-    setTeamMessages(cached ?? [])
-    setThreadLoading(!cached)
-    setTeam((t) => (t ? { ...t, unread_count: 0 } : t))
-    try {
-      setTeamMessages(await cachedFetch(key, async () =>
-        (await messagingService.getGroupMessages(team.id, { limit: 50 })).map(toGroupMessage)))
-      void messagingService.markGroupRead(team.id).catch(() => {})
-    } catch { /* the thread shows empty */ }
-    finally { setThreadLoading(false) }
-  }, [team])
+  const closeThread = useCallback(() => { setThread(null); setSendError(null) }, [])
 
   const append = useCallback((m: MessageRow) => {
     setMessages((prev) => (prev.some((x) => x.message_id === m.message_id) ? prev : [...prev, m]))
@@ -181,12 +145,7 @@ export function useClientMessages(userId: string | undefined, visible: boolean) 
     if (!t || (!content && !attachmentUrl)) return false
     setSendError(null)
     try {
-      if (t.kind === 'team') {
-        if (!team) return false
-        const raw = await messagingService.sendGroupMessage(team.id, { content, attachment_url: attachmentUrl })
-        const m = toGroupMessage(raw)
-        setTeamMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]))
-      } else if (t.kind === 'conversation') {
+      if (t.kind === 'conversation') {
         append(await messagingService.sendMessage(t.id, { content, attachment_url: attachmentUrl }))
       } else {
         const msg = await messagingService.sendDirectMessage({
@@ -201,7 +160,7 @@ export function useClientMessages(userId: string | undefined, visible: boolean) 
       setSendError(getApiErrorMessage(e, 'The message could not be sent. Please try again.'))
       return false
     }
-  }, [append, refresh, team])
+  }, [append, refresh])
 
   useMessagingRealtime({
     currentUserId: userId ?? '',
@@ -225,40 +184,11 @@ export function useClientMessages(userId: string | undefined, visible: boolean) 
       }).sort((a, b) => (b.last_message_at ?? '').localeCompare(a.last_message_at ?? '')))
       if (!known) void refresh()
     },
-    // The team chat's messages reach the client's own channel too.
-    onGroupMessage: (raw) => {
-      if (!team || raw.group_id !== team.id) { if (!team) void refresh(); return }
-      const m      = toGroupMessage(raw)
-      const isOpen = visibleRef.current && threadRef.current?.kind === 'team'
-      if (isOpen) {
-        setTeamMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]))
-        if (raw.sender_id !== userId) void messagingService.markGroupRead(team.id).catch(() => {})
-      }
-      setTeamTyping((p) => { const n = { ...p }; delete n[raw.sender_id]; return n })
-      setTeam((t) => t && ({
-        ...t,
-        last_message: { message_id: m.id, body: m.body, created_at: m.created_at, sender_id: m.sender_id },
-        unread_count: raw.sender_id === userId || isOpen || m.kind === 'system' ? t.unread_count : t.unread_count + 1,
-      }))
-    },
-  })
-
-  // "Maria is typing…" in the open team chat, and ours for the team to see.
-  const typingTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
-  const { broadcastTyping } = useMessagingRealtime({
-    currentUserId: thread?.kind === 'team' && team ? (userId ?? '') : '',
-    conversationId: team ? `group:${team.id}` : undefined,
-    onTyping: (who, isTyping) => {
-      if (typingTimers.current[who]) clearTimeout(typingTimers.current[who])
-      setTeamTyping((p) => { const n = { ...p }; if (isTyping) n[who] = true; else delete n[who]; return n })
-      if (isTyping) typingTimers.current[who] = setTimeout(() => setTeamTyping((p) => { const n = { ...p }; delete n[who]; return n }), 3000)
-    },
   })
 
   return {
     conversations, drivers, loading, thread, messages, threadLoading, sendError, totalUnread,
     openConversation, openDriver, closeThread, send,
-    team, teamMessages, teamTyping, openTeam, broadcastTyping,
   }
 }
 
@@ -271,7 +201,7 @@ export function ClientMessagesPanel({ state, userId, onAskAssistant, onClose }: 
   /** Shows a close (X) in a conversation's header (the help panel hides its own header there). */
   onClose?: () => void
 }) {
-  const { conversations, drivers, loading, thread, messages, threadLoading, sendError, team, teamMessages } = state
+  const { conversations, drivers, loading, thread, messages, threadLoading, sendError } = state
   const [input,   setInput]   = useState('')
   const [sending, setSending] = useState(false)
   const [photo,   setPhoto]   = useState<File | null>(null)
@@ -285,15 +215,11 @@ export function ClientMessagesPanel({ state, userId, onAskAssistant, onClose }: 
   const bottomRef = useRef<HTMLDivElement>(null)
   // Opens on your first unread message; after that follows only while you're at the bottom.
   const openConv = thread?.kind === 'conversation' ? conversations.find((c) => c.conversation_id === thread.id) : null
-  const isTeam   = thread?.kind === 'team'
   const chatMessages = useMemo(
-    () => isTeam
-      ? teamMessages.map((m) => ({ id: m.id, sender_id: m.sender_id, created_at: m.created_at }))
-      : messages.map((m) => ({ id: m.message_id, sender_id: m.sender_id, created_at: m.sent_at })),
-    [isTeam, teamMessages, messages],
+    () => messages.map((m) => ({ id: m.message_id, sender_id: m.sender_id, created_at: m.sent_at })),
+    [messages],
   )
-  const threadKey = thread?.kind === 'conversation' ? thread.id : thread?.kind === 'team' ? 'team' : thread ? 'draft' : null
-  const { scrollToLatest, atLatest } = useStickToBottom(bottomRef, threadKey, [messages, teamMessages, thread, state.teamTyping], {
+  const { scrollToLatest, atLatest } = useStickToBottom(bottomRef, thread?.kind === 'conversation' ? thread.id : thread ? 'draft' : null, [messages, thread], {
     ready: !threadLoading,
     messages: chatMessages,
     currentUserId: userId,
@@ -301,12 +227,6 @@ export function ClientMessagesPanel({ state, userId, onAskAssistant, onClose }: 
       ? (openConv.participant_a_id === userId ? openConv.participant_a_last_read_at : openConv.participant_b_last_read_at)
       : null,
   })
-
-  // The team members, for names on their messages and the typing line.
-  const teamMember = (id: string) => team?.members.find((m) => m.user_id === id)
-  const typingNames = Object.keys(state.teamTyping)
-    .map((id) => teamMember(id)?.first_name)
-    .filter((n): n is string => !!n)
 
   const driverIds = useMemo(() => new Set(drivers.map((d) => d.user_id)), [drivers])
 
@@ -343,37 +263,9 @@ export function ClientMessagesPanel({ state, userId, onAskAssistant, onClose }: 
           </div>
         )}
 
-        {/* The "8338 Team" chat: always first; the client writes to the whole team here. */}
-        {team && (
-          <button
-            type="button"
-            onClick={() => void state.openTeam()}
-            className="mb-4 flex w-full items-center gap-2.5 rounded-xl border border-[var(--color-cyan)]/25 bg-[var(--color-cyan)]/[0.05] px-3 py-2.5 text-left hover:bg-[var(--color-cyan)]/10"
-          >
-            <TeamAvatar />
-            <span className="min-w-0 flex-1">
-              <span className="flex items-center justify-between gap-2">
-                <span className="truncate text-[13px] font-semibold text-white">{TEAM_NAME}</span>
-                {team.last_message && <span className="shrink-0 text-[10px] text-white/35">{formatConversationTime(team.last_message.created_at)}</span>}
-              </span>
-              <span className={`block truncate text-[12px] ${team.unread_count > 0 ? 'font-semibold text-white' : 'text-white/55'}`}>
-                {team.last_message
-                  ? `${team.last_message.sender_id === userId ? 'You: ' : ''}${team.last_message.body || 'Photo'}`
-                  : 'Message our Operations Managers and Company Administrators'}
-              </span>
-            </span>
-            {team.unread_count > 0 ? (
-              <span className="min-w-[18px] rounded-full bg-[var(--color-cyan)] px-1.5 text-center text-[10px] font-bold leading-[18px] text-[#0a0a0a]">
-                {team.unread_count > 9 ? '9+' : team.unread_count}
-              </span>
-            ) : <ChevronRight size={14} className="text-[var(--color-cyan)]" />}
-          </button>
-        )}
-
         {loading && conversations.length === 0 ? (
           <p className="flex items-center gap-2 text-xs text-white/45"><Loader2 size={13} className="animate-spin" /> Loading your messages…</p>
         ) : conversations.length === 0 ? (
-          team ? null :
           <div className="flex flex-col items-center gap-3 py-10 text-center">
             <MessageSquare size={28} className="text-white/20" />
             <p className="text-xs leading-snug text-white/45">
@@ -428,8 +320,8 @@ export function ClientMessagesPanel({ state, userId, onAskAssistant, onClose }: 
 
   // ── One thread ─────────────────────────────────────────────────────────────
   const conv  = thread.kind === 'conversation' ? conversations.find((c) => c.conversation_id === thread.id) : null
-  const other = thread.kind === 'draft' ? thread.driver : thread.kind === 'team' ? undefined : conv?.other_user
-  const canSend = isTeam || thread.kind === 'draft' || (!!other && other.role === 'driver' && driverIds.has(other.user_id))
+  const other = thread.kind === 'draft' ? thread.driver : conv?.other_user
+  const canSend = thread.kind === 'draft' || (!!other && other.role === 'driver' && driverIds.has(other.user_id))
 
   const submit = async () => {
     if (!input.trim() || sending) return
@@ -465,19 +357,13 @@ export function ClientMessagesPanel({ state, userId, onAskAssistant, onClose }: 
           className="rounded-lg p-1.5 text-white/50 hover:bg-white/5 hover:text-white">
           <ArrowLeft size={16} />
         </button>
-        {isTeam ? <TeamAvatar /> : other && <Avatar role={other.role} />}
+        {other && <Avatar role={other.role} />}
         <div className="min-w-0 flex-1">
           <p className="flex flex-wrap items-center gap-1.5">
-            <span className="truncate text-[13px] font-semibold text-white">{isTeam ? TEAM_NAME : other ? fullName(other) : 'Conversation'}</span>
+            <span className="truncate text-[13px] font-semibold text-white">{other ? fullName(other) : 'Conversation'}</span>
             {other && <BookingRefs refs={bookingRefsFor(other.user_id, drivers, conv)} />}
           </p>
-          {isTeam ? (
-            <p className="truncate text-[11px] text-white/40">
-              {typingNames.length === 1 ? `${typingNames[0]} is typing…`
-                : typingNames.length > 1 ? 'Our team is typing…'
-                : 'Operations Managers and Company Administrators · Mon–Sat 8 AM–5 PM'}
-            </p>
-          ) : other && <p className="text-[11px] text-white/40">{roleLabel(other.role)}</p>}
+          {other && <p className="text-[11px] text-white/40">{roleLabel(other.role)}</p>}
         </div>
         {onClose && (
           <button type="button" onClick={onClose} aria-label="Close"
@@ -488,47 +374,7 @@ export function ClientMessagesPanel({ state, userId, onAskAssistant, onClose }: 
       </div>
 
       <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-        {isTeam ? (
-          threadLoading ? (
-            <p className="flex items-center gap-2 text-xs text-white/45"><Loader2 size={13} className="animate-spin" /> Loading messages…</p>
-          ) : teamMessages.length === 0 ? (
-            <p className="py-6 text-center text-xs leading-snug text-white/40">
-              Write to our Operations Managers and Company Administrators. Anyone on the team can answer, and you&apos;ll see who did.
-              Booking changes are made in Booking, not here.
-            </p>
-          ) : (
-            <ul className="flex flex-col gap-3">
-              {teamMessages.map((m, i) => {
-                if (m.kind === 'system') {
-                  return (
-                    <li key={m.id} className="mx-auto max-w-[90%] rounded-lg bg-white/[0.04] px-3 py-2 text-center text-[11px] leading-snug text-white/55">
-                      {groupEventText(m, userId, (id) => teamMember(id)?.first_name)}
-                    </li>
-                  )
-                }
-                const mine   = m.sender_id === userId
-                const sender = teamMember(m.sender_id)
-                const name   = mine ? 'You' : sender ? nameWithRole(sender.first_name, sender.last_name, sender.role) : TEAM_NAME
-                const next   = teamMessages[i + 1]
-                return (
-                  <MessageItem
-                    key={m.id}
-                    messageId={m.id}
-                    isMine={mine}
-                    currentUserId={userId}
-                    senderName={name}
-                    showName={!next || next.sender_id !== m.sender_id || next.kind === 'system'}
-                    initials={(sender ? `${sender.first_name[0] ?? ''}${sender.last_name[0] ?? ''}` : '8').toUpperCase() || '?'}
-                    createdAt={m.created_at}
-                    body={m.body}
-                    attachmentUrl={m.attachment_url}
-                    stamped={m.attachment_stamped}
-                  />
-                )
-              })}
-            </ul>
-          )
-        ) : threadLoading ? (
+        {threadLoading ? (
           <p className="flex items-center gap-2 text-xs text-white/45"><Loader2 size={13} className="animate-spin" /> Loading messages…</p>
         ) : messages.length === 0 ? (
           <p className="py-6 text-center text-xs text-white/40">
@@ -576,11 +422,11 @@ export function ClientMessagesPanel({ state, userId, onAskAssistant, onClose }: 
               <input
                 ref={inputRef}
                 value={input}
-                onChange={(e) => { setInput(e.target.value); mention.sync(); if (isTeam) state.broadcastTyping(e.target.value.length > 0) }}
+                onChange={(e) => { setInput(e.target.value); mention.sync() }}
                 onKeyDown={(e) => { mention.onKeyDown(e) }}
                 onSelect={mention.sync}
                 onBlur={() => setTimeout(mention.close, 150)}
-                placeholder={isTeam ? 'Message our team…' : 'Message your driver…'}
+                placeholder="Message your driver…"
                 aria-label="Message"
                 maxLength={5000}
                 className="w-full min-w-0 bg-transparent px-3.5 py-2.5 text-[15px] text-white outline-none placeholder:text-white/30"
@@ -608,14 +454,6 @@ export function ClientMessagesPanel({ state, userId, onAskAssistant, onClose }: 
         </div>
       )}
     </>
-  )
-}
-
-function TeamAvatar() {
-  return (
-    <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--color-cyan)]/15 text-[var(--color-cyan)]">
-      <Users size={15} />
-    </span>
   )
 }
 

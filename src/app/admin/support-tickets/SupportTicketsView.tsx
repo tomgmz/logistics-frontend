@@ -260,7 +260,7 @@ function resolveDescription(t: SupportTicket | null, tracking: boolean): string 
   return `${why} You can still resolve it; if they reply later, the ticket opens again by itself. ${base}`
 }
 
-export default function SupportTicketsView() {
+export default function SupportTicketsView({ switcher }: { switcher?: ReactNode } = {}) {
   // Tickets tier: Read Only sees the reply and resolve actions, disabled.
   const { canEdit } = useModuleAccess()
   const [inbox,   setInbox]   = useState('')
@@ -334,7 +334,8 @@ export default function SupportTicketsView() {
     <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-60px)] overflow-y-auto overflow-x-hidden lg:overflow-hidden bg-[#0a0a0a] text-white">
       {/* The table, and the open ticket's panel beside it (over the page below lg). */}
       <div className="flex flex-[1_0_auto] lg:flex-1 lg:min-h-0 lg:overflow-hidden">
-      <div className="flex flex-col flex-1 min-w-0 lg:min-h-0 px-3 py-3 lg:px-4 gap-6 lg:overflow-hidden">
+      <div className="flex flex-col flex-1 min-w-0 lg:min-h-0 px-3 py-3 lg:px-4 gap-3 lg:overflow-hidden">
+        {switcher}
         {/* Untitled UI's table card, as on Reports and Audit Logs: the header
             (title + count), then the filter row with the status tabs on the
             left (a dropdown on phones), search and Refresh. */}

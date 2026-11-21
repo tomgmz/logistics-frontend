@@ -7,7 +7,8 @@ import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
-  ArrowLeft, ArrowUp, Bot, CheckCircle2, ChevronRight, Home, Loader2, MessageCircleQuestion, MessageSquare, Search, Send, Ticket, X,
+  ArrowLeft, ArrowUp, Bot, CheckCircle2, ChevronRight, Home, ImagePlus, Inbox, Mail, MessageCircleQuestion,
+  MessageSquare, Search, Send, Ticket, UserRound, Users, X, Loader2,
 } from 'lucide-react'
 import { ASSETS } from '@/lib/data'
 import { roleLabel } from '@/lib/roles'
@@ -15,55 +16,52 @@ import { formatConversationTime } from '@/app/utils/messaging.utils'
 import SearchClearButton from '@/components/ui/SearchClearButton'
 import { useClientMessages, ClientMessagesPanel } from './ClientMessages'
 
-import authApi from '@/lib/api/auth.api'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { formatDateTime } from '@/app/utils/timeFormat'
-import { bookingRef } from '@/lib/booking'
 import { FAQ, matchFaq, smallTalk, STARTER_QUESTIONS, PUBLIC_STARTER_QUESTIONS, type FaqEntry, type FaqMatch } from '@/lib/support/faq'
 import {
   supportService, TICKET_CATEGORY_LABEL, OPEN_HELP_EVENT, openedByStaff,
-  type ChatLine, type HelpTab, type SupportTicket, type TicketCategory,
+  type HelpTab, type SupportTicket,
 } from '@/lib/services/support.service'
+import {
+  supportChatService, CHAT_STATUS_LABEL, canStillReopen,
+  type ChatConversation, type ChatDetail, type ChatMessage, type ChatStatus,
+} from '@/lib/services/support-chat.service'
+import { useSupportConversationChannel, useSupportUserChannel } from '@/lib/hooks/useSupportChat'
 import { useIsMobile } from '@/lib/hooks/useIsMobile'
 import { useTurnstile } from '@/lib/hooks/useTurnstile'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
-import { cachedFetch } from '@/lib/query/useApiQuery'
-import Dropdown from '@/components/ui/Dropdown'
-import Combobox from '@/components/ui/Combobox'
-import { FieldError, errorBorder } from '@/components/ui/FieldError'
+import PhotoSendDialog, { MAX_PHOTO_BYTES } from '@/components/messaging/PhotoSendDialog'
+import MessagePhoto from '@/components/messaging/MessagePhoto'
 
 /**
- * The help assistant: an FAQ chatbot, and a ticket to our team when it can't
- * help. Tickets are for signed-in clients only.
+ * The help assistant and the client's support conversations (Intercom model).
  *
- *   audience="client"  the client portal (layout): answers + tickets
- *   audience="public"  the landing page: answers for anyone; when it can't
- *                      help, a visitor is sent to the contact form (also
- *                      answered by email), while a signed-in client still
- *                      gets a ticket
- *
- * The bot answers from the curated FAQ (lib/support/faq). When nothing matches,
- * or the client says the answer didn't help, it offers a ticket. The ticket
- * carries the conversation so staff see what was already suggested, and is
- * answered by email.
- *
- * In the portal it is also the client's inbox (the "Messages" tab, see
- * ClientMessages): their driver and our team write to them here, and the
- * header's message icon opens it instead of the staff messenger.
+ *   audience="client"  the client portal: the assistant answers first; "Talk to
+ *                      our team" hands the SAME conversation to the Operations
+ *                      Managers and Company Administrators (staff inbox =
+ *                      Conversations tab on Tickets). Their replies come here,
+ *                      and by email when the client is away (replying to that
+ *                      email adds to the conversation). Saved on the server.
+ *   audience="public"  the landing page: assistant answers for anyone, not
+ *                      saved; when it can't help, a visitor is sent to the
+ *                      contact form (a signed-in client still hands over).
  *
  * Layout (user 2026-11-21, after Onfleet's Intercom messenger): 400 x up to
- * 704 px on desktop, full screen on phones. A Home screen (greeting, latest
- * message, "Ask a question", search for help) and, for clients, a bottom bar
- * Home / Messages / Tickets (Intercom's own Tickets space in place of Help).
- * The assistant chat opens over them with a back arrow, like Intercom's
- * conversation view.
+ * 704 px on desktop, full screen on phones. Home (greeting, recent message,
+ * "Ask a question", search for help) and, for clients, a bottom bar Home /
+ * Messages / Tickets. A conversation opens over them with a back arrow.
+ *
+ * Messages lists the conversations (2026-11-22). Older one-to-one messages a
+ * staff member sent the client (ClientMessages) stay under "Earlier messages",
+ * read-only.
  */
 
 interface Msg {
   id:    number
-  from:  'client' | 'bot'
+  from:  'client' | 'bot' | 'staff' | 'system'
   text:  string
   /** The FAQ answer this message is, for its link and the "did this help?" buttons. */
   faq?:  FaqEntry
@@ -73,9 +71,16 @@ interface Msg {
   offerTicket?: boolean
   /** Written by the AI (Gemini) from the FAQ, not one of our own answers word for word. */
   ai?: boolean
+  /** Loaded from the server: no Yes/No, no question buttons. */
+  history?: boolean
+  /** The server row, once saved (dedupes live messages). */
+  serverId?: string
+  /** Staff: "Maria Santos · Operations Manager". */
+  name?: string
+  attachmentUrl?: string | null
+  stamped?: boolean
+  via?: 'chat' | 'email'
 }
-
-interface BookingOption { booking_id: string; label: string }
 
 const noopSubscribe = () => () => {}
 
@@ -89,10 +94,10 @@ function typingDelay(text: string): number {
 }
 
 /** Three bouncing dots in a bot bubble, shown while the assistant "types". */
-function TypingBubble() {
+function TypingBubble({ label = 'The assistant is typing' }: { label?: string }) {
   const reduce = useReducedMotion()
   return (
-    <div className="flex justify-start gap-2" role="status" aria-label="The assistant is typing">
+    <div className="flex justify-start gap-2" role="status" aria-label={label}>
       <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-[var(--color-cyan)]">
         <Bot size={13} />
       </span>
@@ -121,13 +126,32 @@ const PUBLIC_GREETING =
   'Hi! I\'m the 8338 help assistant. Ask me about our delivery service, how to become a client, or how ' +
   'booking and tracking work. If I can\'t help, I\'ll point you to our team.'
 
+/** Status chip colours (fixed palette). */
+const STATUS_STYLE: Record<ChatStatus, { color: string; border: string; bg: string }> = {
+  assistant: { color: 'rgba(255,255,255,0.6)', border: 'rgba(255,255,255,0.15)', bg: 'rgba(255,255,255,0.04)' },
+  waiting:   { color: '#FFEA00', border: 'rgba(255,234,0,0.35)', bg: 'rgba(255,234,0,0.08)' },
+  replied:   { color: '#4DF9ED', border: 'rgba(77,249,237,0.35)', bg: 'rgba(77,249,237,0.08)' },
+  resolved:  { color: '#3AF626', border: 'rgba(58,246,38,0.35)', bg: 'rgba(58,246,38,0.08)' },
+}
+
+function StatusChip({ status }: { status: ChatStatus }) {
+  const s = STATUS_STYLE[status]
+  return (
+    <span className="inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[12px] font-bold"
+      style={{ color: s.color, borderColor: s.border, background: s.bg }}>
+      {CHAT_STATUS_LABEL[status]}
+    </span>
+  )
+}
+
 export default function HelpAssistant({ audience = 'client' }: { audience?: 'client' | 'public' }) {
   const user      = useAuthStore((s) => s.user)
   const pathname  = usePathname()
   const mounted   = useSyncExternalStore(noopSubscribe, () => true, () => false)
-  // Tickets need a client account; a visitor is pointed to the contact form.
+  // Conversations with the team need a client account; a visitor is pointed to the contact form.
   const canTicket = user?.role === 'client'
   const isPublic  = audience === 'public'
+  const saves     = canTicket // signed-in clients' conversations are kept on the server
 
   const [open, setOpen] = useState(false)
   const [tab,  setTab]  = useState<HelpTab>('home')
@@ -135,51 +159,102 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
   const [chatFrom, setChatFrom] = useState<Exclude<HelpTab, 'chat'>>('home')
   // The Home screen's "Search for help" box.
   const [helpQuery, setHelpQuery] = useState('')
+  // Messages: the older one-to-one staff messages, opened from their row.
+  const [showEarlier, setShowEarlier] = useState(false)
   // Below `sm` the panel is full-screen; keep the page under it still (iOS).
   const isMobile = useIsMobile()
   useBodyScrollLock(open && isMobile)
-  const inbox = useClientMessages(!isPublic && canTicket ? user?.user_id : undefined, open && tab === 'messages')
+  const inbox = useClientMessages(!isPublic && canTicket ? user?.user_id : undefined, open && tab === 'messages' && showEarlier)
   const { openConversation } = inbox
 
   const nextId = useRef(1)
-  const [messages, setMessages] = useState<Msg[]>(() => [
+  const freshGreeting = useCallback((): Msg[] => [
     isPublic && !canTicket
       ? { id: 0, from: 'bot', text: PUBLIC_GREETING, suggestions: PUBLIC_STARTER_QUESTIONS }
       : { id: 0, from: 'bot', text: GREETING, suggestions: STARTER_QUESTIONS },
-  ])
+  ], [isPublic, canTicket])
+  const [messages, setMessages] = useState<Msg[]>(freshGreeting)
   const [input, setInput] = useState('')
   const [helped, setHelped] = useState<Record<number, boolean>>({})
   // Where the common questions are offered: under the greeting (null) until the
-  // client answers "Did this answer it?" (Yes or No), and again once a ticket is
-  // sent. Each time they move to just below that message, the bottom of the
-  // chat at that moment, ready for the next question.
+  // client answers "Did this answer it?" (Yes or No). Each time they move to
+  // just below that message, the bottom of the chat at that moment.
   const [questionsAfter, setQuestionsAfter] = useState<number | null>(null)
 
-  // Ticket form, shown inside the chat when the client asks for a person.
-  const [ticketOpen, setTicketOpen] = useState(false)
-  const [category,   setCategory]   = useState<TicketCategory>('other')
-  const [subject,    setSubject]    = useState('')
-  const [details,    setDetails]    = useState('')
-  const [bookingId,  setBookingId]  = useState('')
-  const [bookings,   setBookings]   = useState<BookingOption[]>([])
+  // ── The open conversation (server) ──
+  const [convId,     setConvId]     = useState<string | null>(null)
+  const [conv,       setConv]       = useState<ChatConversation | null>(null)
+  const [authors,    setAuthors]    = useState<ChatDetail['authors']>({})
+  const [convLoading, setConvLoading] = useState(false)
+  const [sendError,  setSendError]  = useState<string | null>(null)
   const [sending,    setSending]    = useState(false)
-  const [formError,  setFormError]  = useState<string | null>(null)
-  // Send pressed: subject / details problems show under their fields, live.
-  const [ticketTried, setTicketTried] = useState(false)
-  const ticketErrors = {
-    subject: subject.trim().length < 3 ? 'Add a short subject.' : undefined,
-    details: details.trim().length < 10 ? 'Describe the problem in a sentence or two.' : undefined,
-  }
-  const ticketErr: Partial<typeof ticketErrors> = ticketTried ? ticketErrors : {}
+  const [handing,    setHanding]    = useState(false)
+  const [photo,      setPhoto]      = useState<File | null>(null)
+  const [staffTyping, setStaffTyping] = useState<string | null>(null)
+  const status: ChatStatus = conv?.status ?? 'assistant'
+  const withTeam = status !== 'assistant'
+  const fileRef  = useRef<HTMLInputElement>(null)
+
+  // ── The client's conversations ──
+  const [chats, setChats] = useState<ChatConversation[]>([])
+  const [chatsLoading, setChatsLoading] = useState(false)
+  const loadChats = useCallback(async () => {
+    if (!saves || isPublic) return
+    setChatsLoading(true)
+    try { setChats(await supportChatService.mine()) } catch { /* keep the last list */ }
+    finally { setChatsLoading(false) }
+  }, [saves, isPublic])
 
   const [tickets,        setTickets]        = useState<SupportTicket[]>([])
   const [ticketsLoading, setTicketsLoading] = useState(false)
 
   const scroller = useRef<HTMLDivElement>(null)
 
+  // ── Saving the assistant part: each question + answer, in order ──
+  const convIdRef = useRef<string | null>(null)
+  useEffect(() => { convIdRef.current = convId }, [convId])
+  const statusRef = useRef<ChatStatus>('assistant')
+  useEffect(() => { statusRef.current = status }, [status])
+  const queue = useRef<Promise<void>>(Promise.resolve())
+  // Which chat lines reached the server, so a handover sends any that didn't.
+  const savedIds = useRef<Set<number>>(new Set())
+
+  /** Make the conversation on the server (first question), once. */
+  const ensureConv = useCallback(async (title: string): Promise<string | null> => {
+    if (!saves || isPublic) return null
+    if (convIdRef.current) return convIdRef.current
+    const c = await supportChatService.start(title)
+    convIdRef.current = c.conversation_id
+    setConvId(c.conversation_id)
+    setConv(c)
+    return c.conversation_id
+  }, [saves, isPublic])
+
+  /** A chat line as the server stores it. */
+  const lineOf = (m: Pick<Msg, 'from' | 'text' | 'ai' | 'faq'>) => ({
+    author: (m.from === 'client' ? 'client' : 'assistant') as 'client' | 'assistant',
+    text:   m.text,
+    meta:   m.from === 'bot' ? { ai: !!m.ai, ...(m.faq ? { faq_id: m.faq.id } : {}) } : null,
+  })
+
+  /** Queue one line of the assistant part for the server (fire and forget, in order). */
+  const save = useCallback((msgId: number, line: { author: 'client' | 'assistant'; text: string; meta?: { ai?: boolean; faq_id?: string } | null }) => {
+    if (!saves || isPublic) return
+    queue.current = queue.current.then(async () => {
+      // Only while the assistant is the one answering (a new chat always is).
+      if (convIdRef.current && statusRef.current !== 'assistant') return
+      try {
+        const id = await ensureConv(line.author === 'client' ? line.text : 'Question for the assistant')
+        if (id) { await supportChatService.lines(id, [line]); savedIds.current.add(msgId) }
+      } catch { /* sent again at handover */ }
+    })
+  }, [saves, isPublic, ensureConv])
+
   const push = useCallback((m: Omit<Msg, 'id'>) => {
-    setMessages((prev) => [...prev, { ...m, id: nextId.current++ }])
-  }, [])
+    const id = nextId.current++
+    setMessages((prev) => [...prev, { ...m, id }])
+    if (m.from === 'client' || m.from === 'bot') save(id, lineOf(m))
+  }, [save])
 
   // A bot reply to something the client asked or tapped: "typing…" first, then
   // the message. While it types, new questions wait (the send button and the
@@ -197,6 +272,100 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
     }, typingDelay(m.text))
   }, [push])
 
+  /** A server message as a chat line. */
+  const toMsg = useCallback((m: ChatMessage, who: ChatDetail['authors']): Msg => {
+    const a = m.author_id ? who[m.author_id] : undefined
+    return {
+      id: nextId.current++,
+      serverId: m.message_id,
+      from: m.author === 'client' ? 'client' : m.author === 'assistant' ? 'bot' : m.author,
+      text: m.content,
+      history: true,
+      ai: !!m.meta?.ai,
+      faq: m.meta?.faq_id ? FAQ.find((f) => f.id === m.meta?.faq_id) : undefined,
+      name: m.author === 'staff' ? (a ? `${a.name} · ${roleLabel(a.role)}` : 'Our team') : undefined,
+      attachmentUrl: m.attachment_url,
+      stamped: m.attachment_stamped,
+      via: m.via,
+    }
+  }, [])
+
+  /** Open one of the client's conversations from the list (or a notification). */
+  const openChatConversation = useCallback(async (id: string, from: Exclude<HelpTab, 'chat'> = 'messages') => {
+    setChatFrom(from)
+    setTab('chat')
+    setConvLoading(true)
+    setSendError(null)
+    setQuestionsAfter(null)
+    setHelped({})
+    try {
+      const d = await supportChatService.get(id)
+      convIdRef.current = d.conversation_id
+      statusRef.current = d.status
+      savedIds.current = new Set()
+      setConvId(d.conversation_id)
+      setConv(d)
+      setAuthors(d.authors)
+      setMessages(d.messages.map((m) => toMsg(m, d.authors)))
+      void supportChatService.read(id).catch(() => {})
+      setChats((prev) => prev.map((c) => (c.conversation_id === id ? { ...c, unread_count: 0 } : c)))
+    } catch (e) {
+      setSendError(getApiErrorMessage(e, 'This conversation could not be opened.'))
+    } finally {
+      setConvLoading(false)
+    }
+  }, [toMsg])
+
+  /** A new conversation: the assistant's greeting, nothing saved until the first question. */
+  const newChat = useCallback((from: Exclude<HelpTab, 'chat'>) => {
+    queue.current = Promise.resolve()
+    savedIds.current = new Set()
+    convIdRef.current = null
+    statusRef.current = 'assistant'
+    setConvId(null)
+    setConv(null)
+    setAuthors({})
+    setMessages(freshGreeting())
+    setHelped({})
+    setQuestionsAfter(null)
+    setSendError(null)
+    setInput('')
+    setChatFrom(from)
+    setTab('chat')
+  }, [freshGreeting])
+
+  // Live: new messages in the open conversation (the team's replies, system
+  // lines) and "… is typing". A photo's link is made for each reader by the
+  // server, so a live photo reloads the conversation.
+  const { sendTyping } = useSupportConversationChannel({
+    conversationId: open && tab === 'chat' && withTeam ? convId : null,
+    userId: user?.user_id,
+    onMessage: (m) => {
+      if (m.attachment_url) { if (convId) void openChatConversation(convId, chatFrom); return }
+      setStaffTyping(null)
+      setMessages((prev) => (prev.some((x) => x.serverId === m.message_id) ? prev : [...prev, toMsg(m, authors)]))
+      if (m.author === 'staff' && !authors[m.author_id ?? '']) {
+        // A colleague who hadn't written before: fetch names once.
+        if (convId) void supportChatService.get(convId).then((d) => setAuthors(d.authors)).catch(() => {})
+      }
+      if (m.author === 'staff' && convId) void supportChatService.read(convId).catch(() => {})
+      if (m.author === 'system' || m.author === 'staff') {
+        setConv((c) => (c ? { ...c, status: m.author === 'staff' ? 'replied' : c.status } : c))
+      }
+    },
+    onTyping: (who, isTyping) => {
+      const a = authors[who]
+      setStaffTyping(isTyping ? (a?.name?.split(' ')[0] ?? 'Our team') : null)
+    },
+  })
+  useSupportUserChannel(!isPublic && saves ? user?.user_id : undefined, (id) => {
+    void loadChats()
+    // Resolved / reopened while open: pick up the new status.
+    if (id === convIdRef.current && open && tab === 'chat') {
+      void supportChatService.get(id).then((d) => setConv(d)).catch(() => {})
+    }
+  })
+
   // Opened from elsewhere in the portal (the dashboard's help card).
   useEffect(() => {
     const onOpen = (e: Event) => {
@@ -204,7 +373,7 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
       setOpen(true)
       setTab(detail?.tab ?? 'home')
       setChatFrom('home')
-      if (detail?.conversationId) void openConversation(detail.conversationId)
+      if (detail?.conversationId) { setShowEarlier(true); void openConversation(detail.conversationId) }
     }
     window.addEventListener(OPEN_HELP_EVENT, onOpen)
     return () => window.removeEventListener(OPEN_HELP_EVENT, onOpen)
@@ -220,7 +389,7 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
     setOpen(true)
     setTab(wanted)
     const conversationId = params.get('conversation')
-    if (conversationId) void openConversation(conversationId)
+    if (conversationId) { setShowEarlier(true); void openConversation(conversationId) }
     params.delete('chat')
     params.delete('conversation')
     const rest = params.toString()
@@ -252,7 +421,7 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
 
   useEffect(() => {
     scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: 'smooth' })
-  }, [messages, ticketOpen, typing])
+  }, [messages, typing, staffTyping])
 
   const loadTickets = useCallback(async () => {
     setTicketsLoading(true)
@@ -260,32 +429,14 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
     finally { setTicketsLoading(false) }
   }, [])
 
-  // Loaded when the panel opens (not only on the Tickets tab) so the bottom
-  // bar's Tickets badge shows the open count straight away.
-  useEffect(() => { if (open && canTicket) void loadTickets() }, [open, canTicket, loadTickets])
+  // Loaded when the panel opens (not only on their tab) so the bottom bar's
+  // badges and Home's "Recent message" are right straight away.
+  useEffect(() => { if (open && canTicket) { void loadTickets(); void loadChats() } }, [open, canTicket, loadTickets, loadChats])
+  // Also once on load, for the launcher's unread badge.
+  useEffect(() => { void loadChats() }, [loadChats])
   useLiveTable(['live:support_tickets'], () => { void loadTickets() }, { enabled: open && canTicket })
 
-  // The client's bookings, for "which booking is this about?".
-  useEffect(() => {
-    if (!ticketOpen || bookings.length > 0) return
-    const clientId = user?.clients?.client_id
-    if (!clientId) return
-    type Row = { booking_id: string; reference_number?: string | null; schedule_date?: string | null; status: string }
-    const apply = (rows: Row[]) => setBookings(rows.slice(0, 30).map((b) => ({
-      booking_id: b.booking_id,
-      label: `${bookingRef(b)}${b.schedule_date ? ` · ${b.schedule_date}` : ''} · ${b.status.replace(/_/g, ' ')}`,
-    })))
-    cachedFetch(['help', 'ticket-bookings', clientId],
-      async () => ((await authApi.get(`/booking/client/${clientId}`)).data?.data ?? []) as Row[], apply)
-      .then(apply)
-      .catch(() => setBookings([]))
-  }, [ticketOpen, bookings.length, user])
-
-  const answer = useCallback((entry: FaqEntry) => {
-    reply({ from: 'bot', text: entry.answer, faq: entry })
-  }, [reply])
-
-  /** No confident answer: offer the near matches, else a ticket. */
+  /** No confident answer: offer the near matches, else the team. */
   const noAnswer = useCallback((matches: FaqMatch[]): Omit<Msg, 'id'> => (
     matches.length > 0
       ? {
@@ -297,7 +448,7 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
       : {
           from: 'bot',
           text: canTicket
-            ? 'Sorry, I don\'t have an answer for that. Our team can help: open a ticket and they will reply by email.'
+            ? 'Sorry, I don\'t have an answer for that. Our team can help: tap "Talk to our team" and they will reply here.'
             : 'Sorry, I don\'t have an answer for that. Our team can help: send them a message and they will reply by email.',
           offerTicket: true,
         }
@@ -310,10 +461,8 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
 
   /**
    * Ask the AI: an answer written from the knowledge and citing it, "off
-   * topic", or nothing (then the keyword fallback). Signed-in clients ask with
-   * their session; visitors on the landing page ask the public endpoint
-   * (public knowledge only). The typing bubble shows while it thinks, at least
-   * as long as for a keyword answer.
+   * topic", or nothing (then the keyword fallback). The typing bubble shows
+   * while it thinks, at least as long as for a keyword answer.
    */
   const askAi = useCallback(async (q: string, earlier: string[], matches: FaqMatch[]) => {
     if (typingTimer.current) { clearTimeout(typingTimer.current); typingTimer.current = null }
@@ -367,9 +516,7 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
 
     // Every typed question goes to the AI, which reads the whole FAQ and
     // understands Filipino / Taglish and rewording. The keyword matches are
-    // only the fallback ("Is it one of these?") when the AI can't answer:
-    // a single English word ("book" in "hanggang anong oras pwede mag book?")
-    // must never pick the answer by itself.
+    // only the fallback ("Is it one of these?") when the AI can't answer.
     const matches = matchFaq(q, 3, !canTicket)
     void askAi(q, earlier, matches)
   }, [push, reply, askAi, canTicket, isPublic, typing, messages])
@@ -377,51 +524,71 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
   const pick = useCallback((entry: FaqEntry) => {
     if (typing) return
     push({ from: 'client', text: entry.question })
-    answer(entry)
-  }, [answer, push, typing])
+    reply({ from: 'bot', text: entry.answer, faq: entry })
+  }, [push, reply, typing])
 
-  const startTicket = useCallback(() => {
-    const asked    = messages.filter((m) => m.from === 'client').map((m) => m.text)
-    const lastFaq  = [...messages].reverse().find((m) => m.faq)?.faq
-    setCategory(lastFaq?.category ?? 'other')
-    setSubject((asked[0] ?? '').slice(0, 120))
-    setDetails(asked.join('\n'))
-    setFormError(null)
-    setTicketTried(false)
-    setTicketOpen(true)
-  }, [messages])
-
-  const submitTicket = useCallback(async () => {
-    setTicketTried(true)
-    if (subject.trim().length < 3 || details.trim().length < 10) return
-    setSending(true)
-    setFormError(null)
+  /** "Talk to our team": the same conversation goes to the staff inbox. */
+  const handOver = useCallback(async () => {
+    if (handing) return
+    setHanding(true)
+    setSendError(null)
     try {
-      const transcript: ChatLine[] = messages
-        .filter((m) => m.id !== 0)
-        .map((m) => ({ from: m.from, text: m.text }))
-      const ticket = await supportService.open({
-        category, subject: subject.trim(), message: details.trim(),
-        booking_id: bookingId || null, transcript,
-      })
-      setTicketOpen(false)
-      setQuestionsAfter(nextId.current)
-      push({
-        from: 'bot',
-        text: `Done — ticket ${ticket.reference} is open. We emailed you a copy${user?.email ? ` at ${user.email}` : ''}. ` +
-              'Our team will reply by email; you can follow it under My tickets.',
-      })
-      setBookingId('')
+      await queue.current
+      const lastQuestion = [...messages].reverse().find((m) => m.from === 'client')?.text
+      const firstQuestion = messages.find((m) => m.from === 'client')?.text
+      const id = await ensureConv(firstQuestion ?? lastQuestion ?? 'Question for our team')
+      if (!id) return
+      // Anything the queue couldn't save goes now, in order, so the team sees it all.
+      const missing = messages.filter((m) => m.id !== 0 && !m.history && (m.from === 'client' || m.from === 'bot') && !savedIds.current.has(m.id))
+      for (let i = 0; i < missing.length; i += 10) {
+        await supportChatService.lines(id, missing.slice(i, i + 10).map(lineOf))
+      }
+      missing.forEach((m) => savedIds.current.add(m.id))
+      await supportChatService.handOver(id)
+      await openChatConversation(id, chatFrom)
+      void loadChats()
     } catch (e) {
-      setFormError(getApiErrorMessage(e, 'The ticket could not be sent. Please try again.'))
+      setSendError(getApiErrorMessage(e, 'Could not reach our team. Please try again.'))
+    } finally {
+      setHanding(false)
+    }
+  }, [handing, messages, ensureConv, openChatConversation, chatFrom, loadChats])
+
+  /** After the handover: a message (or photo) to the team. */
+  const sendToTeam = useCallback(async (content: string, attachmentUrl?: string) => {
+    if (!convId || sending) return
+    setSending(true)
+    setSendError(null)
+    try {
+      const m = await supportChatService.send(convId, { content, ...(attachmentUrl ? { attachment_url: attachmentUrl } : {}) })
+      sendTyping(false)
+      if (attachmentUrl) await openChatConversation(convId, chatFrom)
+      else setMessages((prev) => (prev.some((x) => x.serverId === m.message_id) ? prev : [...prev, toMsg(m, authors)]))
+      setInput('')
+      setConv((c) => (c ? { ...c, status: 'waiting', resolved_at: null } : c))
+      void loadChats()
+    } catch (e) {
+      setSendError(getApiErrorMessage(e, 'The message could not be sent. Please try again.'))
     } finally {
       setSending(false)
     }
-  }, [subject, details, messages, category, bookingId, push, user?.email])
+  }, [convId, sending, sendTyping, openChatConversation, chatFrom, toMsg, authors, loadChats])
+
+  const pickPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    if (!file.type.startsWith('image/')) { setSendError('Only photos can be sent'); return }
+    if (file.size > MAX_PHOTO_BYTES) { setSendError('Photos can be up to 10 MB'); return }
+    setSendError(null)
+    setPhoto(file)
+  }
 
   const openCount = useMemo(() => tickets.filter((t) => t.status === 'open').length, [tickets])
+  const chatUnread = useMemo(() => chats.reduce((n, c) => n + (c.unread_count ?? 0), 0), [chats])
+  const totalUnread = inbox.totalUnread + chatUnread
 
-  /** A visitor can't open a ticket: take them to the contact form instead. */
+  /** A visitor can't hand over: take them to the contact form instead. */
   const toContactForm = useCallback(() => {
     setOpen(false)
     const el = document.getElementById('contact')
@@ -429,10 +596,12 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
     else window.location.href = '/#contact'
   }, [])
 
-  const openChat = useCallback((from: Exclude<HelpTab, 'chat'>) => {
-    setChatFrom(from)
-    setTab('chat')
-  }, [])
+  /** Home's "Ask a question": carry on with an unfinished question, else a new one. */
+  const askFromHome = useCallback(() => {
+    if (convId && status === 'assistant') { setChatFrom('home'); setTab('chat'); return }
+    if (!convId && messages.length > 1) { setChatFrom('home'); setTab('chat'); return }
+    newChat('home')
+  }, [convId, status, messages.length, newChat])
 
   // Home's "Search for help": the common questions, or the FAQ entries that
   // match what's typed.
@@ -442,11 +611,9 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
     return matchFaq(q, 5, !canTicket).map((m) => m.entry)
   }, [helpQuery, isPublic, canTicket])
 
-  // Home's "Recent message": the newest conversation in the inbox.
-  const recent = useMemo(
-    () => [...inbox.conversations].sort((a, b) => (b.last_message_at ?? '').localeCompare(a.last_message_at ?? ''))[0],
-    [inbox.conversations],
-  )
+  // Home's "Recent message": the newest conversation that reached the team.
+  const recent = useMemo(() => chats.find((c) => c.status !== 'assistant') ?? null, [chats])
+  const earlierCount = inbox.conversations.length
 
   if (!mounted) return null
   if (!isPublic && !canTicket) return null
@@ -461,14 +628,14 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
       onPointerDownCapture={markInside}
       whileHover={{ scale: 1.05 }}
       whileTap={{ scale: 0.95 }}
-      aria-label={open ? 'Close help' : inbox.totalUnread > 0 ? `Help and messages, ${inbox.totalUnread} unread` : 'Help and messages'}
+      aria-label={open ? 'Close help' : totalUnread > 0 ? `Help and messages, ${totalUnread} unread` : 'Help and messages'}
       className={`fixed right-5 ${lift} z-[58] flex items-center justify-center rounded-full shadow-xl`}
       style={{ width: 52, height: 52, background: 'var(--color-cyan)', color: '#0a0a0a', boxShadow: '0 10px 30px rgba(77,249,237,0.25)' }}
     >
       {open ? <X size={22} /> : <MessageCircleQuestion size={24} />}
-      {!open && inbox.totalUnread > 0 && (
+      {!open && totalUnread > 0 && (
         <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-[20px] items-center justify-center rounded-full border-2 border-[#0d0d0d] bg-red-500 px-1 text-[12px] font-bold text-white">
-          {inbox.totalUnread > 9 ? '9+' : inbox.totalUnread}
+          {totalUnread > 9 ? '9+' : totalUnread}
         </span>
       )}
     </motion.button>
@@ -487,18 +654,48 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
     </div>
   )
 
-  // Floating at the bottom of Messages and Tickets, as Intercom's "Send us a message".
+  // Floating at the bottom of Messages and Tickets, as Intercom's "Send us a message": a new conversation.
   const askPill = (from: Exclude<HelpTab, 'chat'>) => (
     <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center">
       <button
         type="button"
-        onClick={() => openChat(from)}
+        onClick={() => newChat(from)}
         className="pointer-events-auto inline-flex items-center gap-2 rounded-xl bg-[var(--color-cyan)] px-4 py-2.5 text-[15px] font-bold text-[#0a0a0a] shadow-[0_8px_24px_rgba(0,0,0,0.45)] hover:brightness-110"
       >
         Ask a question <Send size={14} />
       </button>
     </div>
   )
+
+  /** One conversation row (Messages, Home's recent card). */
+  const chatRow = (c: ChatConversation) => (
+    <span className="flex items-center gap-3">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: 'rgba(77,249,237,0.12)', color: 'var(--color-cyan)' }}>
+        {c.status === 'assistant' ? <Bot size={18} /> : <Users size={18} />}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center justify-between gap-2">
+          <span className={`truncate text-[15px] ${(c.unread_count ?? 0) > 0 ? 'font-bold text-white' : 'font-semibold text-white/90'}`}>
+            {c.title || 'Question'}
+          </span>
+          <span className="shrink-0 text-[13px] text-white/40">{formatConversationTime(c.last_message_at)}</span>
+        </span>
+        <span className="mt-0.5 flex items-center gap-2">
+          <span className={`min-w-0 flex-1 truncate text-[14px] ${(c.unread_count ?? 0) > 0 ? 'text-white' : 'text-white/55'}`}>
+            {c.last_message
+              ? `${c.last_message.author === 'client' ? 'You: ' : ''}${c.last_message.content}`
+              : 'No messages yet'}
+          </span>
+          {(c.unread_count ?? 0) > 0 && <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--color-cyan)]" aria-label="Unread" />}
+        </span>
+        <span className="mt-1 block"><StatusChip status={c.status} /></span>
+      </span>
+    </span>
+  )
+
+  // What the composer does now.
+  const closedForGood = withTeam && conv ? !canStillReopen(conv) : false
+  const teamName = staffTyping
 
   const panel = (
     <AnimatePresence>
@@ -532,44 +729,29 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
                 </h2>
 
                 <div className="mt-6 space-y-3">
-                  {/* Recent message: the newest conversation in the client's inbox. */}
-                  {canTicket && recent?.last_message && (
+                  {/* Recent message: the newest conversation with the team. */}
+                  {canTicket && recent && (
                     <button
                       type="button"
-                      onClick={() => { setTab('messages'); void openConversation(recent.conversation_id) }}
+                      onClick={() => void openChatConversation(recent.conversation_id, 'home')}
                       className={`${CARD} block w-full p-4 text-left hover:border-white/[0.14]`}
                     >
-                      <span className="block text-[15px] font-bold text-white">Recent message</span>
-                      <span className="mt-3 flex items-center gap-3">
-                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: 'rgba(77,249,237,0.12)', color: 'var(--color-cyan)' }}>
-                          <MessageSquare size={18} />
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="flex items-center justify-between gap-2">
-                            <span className="truncate text-[15px] font-semibold text-white">
-                              {`${recent.other_user.first_name ?? ''} ${recent.other_user.last_name ?? ''}`.trim() || 'Our team'}
-                              <span className="font-normal text-white/40"> · {roleLabel(recent.other_user.role)}</span>
-                            </span>
-                            <span className="shrink-0 text-[13px] text-white/40">{formatConversationTime(recent.last_message.sent_at)}</span>
-                          </span>
-                          <span className={`block truncate text-[14px] ${recent.unread_count > 0 ? 'font-semibold text-white' : 'text-white/55'}`}>
-                            {recent.last_message.sender_id === user?.user_id ? 'You: ' : ''}{recent.last_message.content || 'Photo'}
-                          </span>
-                        </span>
-                        {recent.unread_count > 0 && <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--color-cyan)]" aria-label="Unread" />}
-                      </span>
+                      <span className="mb-3 block text-[15px] font-bold text-white">Recent message</span>
+                      {chatRow(recent)}
                     </button>
                   )}
 
                   <button
                     type="button"
-                    onClick={() => openChat('home')}
+                    onClick={askFromHome}
                     className={`${CARD} flex w-full items-center gap-3 p-4 text-left hover:border-white/[0.14]`}
                   >
                     <span className="min-w-0 flex-1">
-                      <span className="block text-[15px] font-bold text-white">{messages.length > 1 ? 'Continue your question' : 'Ask a question'}</span>
+                      <span className="block text-[15px] font-bold text-white">
+                        {(convId && status === 'assistant') || (!convId && messages.length > 1) ? 'Continue your question' : 'Ask a question'}
+                      </span>
                       <span className="block text-[14px] text-white/50">
-                        {canTicket ? 'Instant answers · or message our team in Messages' : 'Instant answers about our service'}
+                        {canTicket ? 'Instant answers · our team takes over if needed' : 'Instant answers about our service'}
                       </span>
                     </span>
                     <Send size={17} className="shrink-0 text-[var(--color-cyan)]" />
@@ -582,8 +764,9 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
                         e.preventDefault()
                         const q = helpQuery.trim()
                         if (!q || typing) return
-                        openChat('home')
-                        ask(q)
+                        newChat('home')
+                        // The new chat's state lands first; ask on the next tick.
+                        setTimeout(() => ask(q), 0)
                         setHelpQuery('')
                       }}
                       className="relative"
@@ -608,7 +791,7 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
                         <li key={s.id}>
                           <button
                             type="button"
-                            onClick={() => { if (typing) return; openChat('home'); pick(s); setHelpQuery('') }}
+                            onClick={() => { if (typing) return; newChat('home'); setTimeout(() => pick(s), 0); setHelpQuery('') }}
                             className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-[15px] text-white/75 hover:bg-white/[0.04] hover:text-white"
                           >
                             <span className="min-w-0 flex-1">{s.question}</span>
@@ -628,19 +811,72 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
             </div>
           ) : tab === 'messages' && canTicket && user ? (
             // ── Messages ─────────────────────────────────────────────────────
-            inbox.thread ? (
-              <ClientMessagesPanel state={inbox} userId={user.user_id} onAskAssistant={() => openChat('messages')} onClose={() => setOpen(false)} />
+            showEarlier ? (
+              inbox.thread ? (
+                <ClientMessagesPanel state={inbox} userId={user.user_id} onAskAssistant={() => newChat('messages')} onClose={() => setOpen(false)} />
+              ) : (
+                <>
+                  <div className="relative flex shrink-0 items-center justify-center border-b border-white/[0.07] px-12 py-3.5">
+                    <button type="button" onClick={() => setShowEarlier(false)} aria-label="Back to messages"
+                      className="absolute left-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-white/60 hover:bg-white/5 hover:text-white">
+                      <ArrowLeft size={18} />
+                    </button>
+                    <p className="text-[15px] font-bold text-white">Earlier messages</p>
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2">{closeButton}</div>
+                  </div>
+                  <div className="relative flex min-h-0 flex-1 flex-col">
+                    <ClientMessagesPanel state={inbox} userId={user.user_id} onAskAssistant={() => newChat('messages')} />
+                  </div>
+                </>
+              )
             ) : (
               <>
                 {titleBar('Messages')}
                 <div className="relative flex min-h-0 flex-1 flex-col">
-                  <ClientMessagesPanel state={inbox} userId={user.user_id} onAskAssistant={() => openChat('messages')} />
+                  <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-20 pt-2">
+                    {chatsLoading && chats.length === 0 ? (
+                      <p className="flex items-center gap-2 py-4 text-[14px] text-white/45"><Loader2 size={13} className="animate-spin" /> Loading your messages…</p>
+                    ) : chats.length === 0 && earlierCount === 0 ? (
+                      <div className="flex flex-col items-center gap-3 py-10 text-center">
+                        <MessageSquare size={28} className="text-white/20" />
+                        <p className="text-[14px] leading-snug text-white/45">
+                          No messages yet. Ask a question: the assistant answers right away, and our team takes over when it can&apos;t.
+                        </p>
+                      </div>
+                    ) : (
+                      <ul className="divide-y divide-white/[0.07]">
+                        {chats.map((c) => (
+                          <li key={c.conversation_id}>
+                            <button type="button" onClick={() => void openChatConversation(c.conversation_id, 'messages')}
+                              className="block w-full py-3 text-left hover:bg-white/[0.02]">
+                              {chatRow(c)}
+                            </button>
+                          </li>
+                        ))}
+                        {earlierCount > 0 && (
+                          <li>
+                            <button type="button" onClick={() => setShowEarlier(true)} className="flex w-full items-center gap-3 py-3 text-left hover:bg-white/[0.02]">
+                              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-white/60"><UserRound size={18} /></span>
+                              <span className="min-w-0 flex-1">
+                                <span className="block text-[15px] font-semibold text-white/90">Earlier messages</span>
+                                <span className="block text-[14px] text-white/50">
+                                  {earlierCount} message{earlierCount !== 1 ? 's' : ''} our team sent you before conversations
+                                </span>
+                              </span>
+                              {inbox.totalUnread > 0 && <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--color-cyan)]" aria-label="Unread" />}
+                              <ChevronRight size={15} className="text-white/40" />
+                            </button>
+                          </li>
+                        )}
+                      </ul>
+                    )}
+                  </div>
                   {askPill('messages')}
                 </div>
               </>
             )
           ) : tab === 'chat' ? (
-            // ── Assistant chat (over the tabs, back arrow) ───────────────────
+            // ── A conversation: the assistant, then our team ─────────────────
             <>
               <div className="flex shrink-0 items-center gap-2 border-b border-white/[0.07] px-2 py-2.5">
                 <button type="button" onClick={() => setTab(chatFrom)} aria-label="Back"
@@ -648,32 +884,50 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
                   <ArrowLeft size={18} />
                 </button>
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full" style={{ background: 'rgba(77,249,237,0.12)', color: 'var(--color-cyan)' }}>
-                  <Bot size={16} />
+                  {withTeam ? <Users size={16} /> : <Bot size={16} />}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[16px] font-bold text-white">8338 Help Assistant</p>
-                  <p className="truncate text-[13px] text-white/40">{canTicket ? 'Instant answers · our team is in Messages' : 'Instant answers about our service'}</p>
+                  <p className="truncate text-[16px] font-bold text-white">{withTeam ? '8338 Team' : '8338 Help Assistant'}</p>
+                  <p className="truncate text-[13px] text-white/40">
+                    {withTeam
+                      ? (teamName ? `${teamName} is typing…` : `${CHAT_STATUS_LABEL[status]} · Mon–Sat 8 AM–5 PM`)
+                      : canTicket ? 'Instant answers · our team takes over if needed' : 'Instant answers about our service'}
+                  </p>
                 </div>
                 {closeButton}
               </div>
               <div ref={scroller} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
+                {convLoading && (
+                  <p className="flex items-center gap-2 text-[14px] text-white/45"><Loader2 size={13} className="animate-spin" /> Loading the conversation…</p>
+                )}
                 {messages.map((m) => (
+                  m.from === 'system' ? (
+                    <p key={m.id} className="mx-auto max-w-[92%] rounded-lg bg-white/[0.04] px-3 py-2 text-center text-[13px] leading-snug text-white/55">
+                      {m.text}
+                    </p>
+                  ) : (
                   <Fragment key={m.id}>
                   <div className={`flex ${m.from === 'client' ? 'justify-end' : 'justify-start'} gap-2`}>
-                    {m.from === 'bot' && (
+                    {m.from !== 'client' && (
                       <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-[var(--color-cyan)]">
-                        <Bot size={13} />
+                        {m.from === 'staff' ? <UserRound size={13} /> : <Bot size={13} />}
                       </span>
                     )}
                     <div className={`max-w-[85%] space-y-2 ${m.from === 'client' ? 'items-end' : ''}`}>
+                      {m.from === 'staff' && m.name && <p className="text-[12px] text-white/45">{m.name}</p>}
                       <div
                         className={`whitespace-pre-line rounded-2xl px-3.5 py-2.5 text-[15px] leading-relaxed ${
                           m.from === 'client'
                             ? 'rounded-br-md bg-[var(--color-cyan)] text-[#0a0a0a]'
                             : 'rounded-bl-md bg-white/[0.06] text-white/90'}`}
                       >
-                        {m.text}
+                        {m.attachmentUrl || m.from === 'staff' || (m.from === 'client' && m.history)
+                          ? <MessagePhoto body={m.text} attachmentUrl={m.attachmentUrl} stamped={m.stamped} />
+                          : m.text}
                       </div>
+                      {m.via === 'email' && (
+                        <p className={`flex items-center gap-1 text-[12px] text-white/35 ${m.from === 'client' ? 'justify-end' : ''}`}><Mail size={11} /> Sent by email</p>
+                      )}
 
                       {m.ai && (
                         <p className="text-[12px] leading-snug text-white/35">
@@ -691,7 +945,7 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
                         </Link>
                       )}
 
-                      {(m.faq || m.ai) && helped[m.id] === undefined && (
+                      {!m.history && !withTeam && (m.faq || m.ai) && helped[m.id] === undefined && (
                         <div className="flex items-center gap-2 text-[13px] text-white/45">
                           Did this answer it?
                           <button type="button" onClick={() => {
@@ -707,7 +961,7 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
                             reply({
                               from: 'bot',
                               text: canTicket
-                                ? 'Sorry about that. Our team can look into it: open a ticket and they will reply by email.'
+                                ? 'Sorry about that. Our team can look into it: tap "Talk to our team" and they will reply here.'
                                 : 'Sorry about that. Our team can help: send them a message and they will reply by email.',
                               offerTicket: true,
                             })
@@ -716,7 +970,7 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
                       )}
 
                       {/* The greeting's common questions, until a wrapped-up question moves them down. */}
-                      {m.suggestions && m.suggestions.length > 0 && !(m.id === 0 && questionsAfter !== null) && (
+                      {!m.history && !withTeam && m.suggestions && m.suggestions.length > 0 && !(m.id === 0 && questionsAfter !== null) && (
                         <div className="flex flex-wrap gap-1.5">
                           {m.suggestions.map((s) => (
                             <button
@@ -731,19 +985,21 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
                         </div>
                       )}
 
-                      {m.offerTicket && !ticketOpen && (
+                      {!m.history && !withTeam && m.offerTicket && (
                         <button
                           type="button"
-                          onClick={canTicket ? startTicket : toContactForm}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--color-cyan)] px-3 py-1.5 text-[13px] font-bold text-[#0a0a0a] hover:opacity-90"
+                          onClick={canTicket ? () => void handOver() : toContactForm}
+                          disabled={handing}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--color-cyan)] px-3 py-1.5 text-[13px] font-bold text-[#0a0a0a] hover:opacity-90 disabled:opacity-50"
                         >
-                          <Ticket size={13} /> {canTicket ? 'Talk to our team' : 'Message our team'}
+                          {handing ? <Loader2 size={13} className="animate-spin" /> : <Users size={13} />}
+                          {canTicket ? 'Talk to our team' : 'Message our team'}
                         </button>
                       )}
                     </div>
                   </div>
                     {/* The common questions, moved here when the question above was wrapped up. */}
-                    {m.id === questionsAfter && (
+                    {!withTeam && m.id === questionsAfter && (
                       <div className="flex gap-2 pt-1">
                         <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-[var(--color-cyan)]">
                           <MessageCircleQuestion size={13} />
@@ -766,54 +1022,19 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
                       </div>
                     )}
                   </Fragment>
+                  )
                 ))}
 
                 {typing && <TypingBubble />}
+                {withTeam && staffTyping && <TypingBubble label={`${staffTyping} is typing`} />}
 
-                {ticketOpen && (
-                  <div className="space-y-2.5 rounded-xl border border-white/[0.08] bg-white/[0.02] p-3">
-                    <p className="text-[14px] font-bold text-white">Open a ticket</p>
-                    <p className="text-[13px] leading-snug text-white/45">
-                      Our team replies by email{user?.email ? ` to ${user.email}` : ''}. This conversation is attached so you don&apos;t have to repeat yourself.
-                    </p>
-                    <label className="block">
-                      <span className="text-[12px] font-bold uppercase text-white/40">Topic</span>
-                      <Dropdown value={category} onChange={(e) => setCategory(e.target.value as TicketCategory)}
-                        className="mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-2.5 py-2 text-[14px] text-white outline-none">
-                        {(Object.keys(TICKET_CATEGORY_LABEL) as TicketCategory[]).map((c) => (
-                          <option key={c} value={c}>{TICKET_CATEGORY_LABEL[c]}</option>
-                        ))}
-                      </Dropdown>
-                    </label>
-                    <label className="block">
-                      <span className="text-[12px] font-bold uppercase text-white/40">Booking (optional)</span>
-                      <Combobox value={bookingId} onChange={(e) => setBookingId(e.target.value)}
-                        className="mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-2.5 py-2 text-[14px] text-white outline-none">
-                        <option value="">Not about a specific booking</option>
-                        {bookings.map((b) => <option key={b.booking_id} value={b.booking_id}>{b.label}</option>)}
-                      </Combobox>
-                    </label>
-                    <label className="block">
-                      <span className="text-[12px] font-bold uppercase text-white/40">Subject</span>
-                      <input id="help-ticket-subject" name="subject" value={subject} onChange={(e) => setSubject(e.target.value)} maxLength={150} aria-invalid={!!ticketErr.subject}
-                        className={`mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-2.5 py-2 text-[14px] text-white outline-none focus:border-[var(--color-cyan)]/50 ${errorBorder(ticketErr.subject)}`} />
-                      <FieldError>{ticketErr.subject}</FieldError>
-                    </label>
-                    <label className="block">
-                      <span className="text-[12px] font-bold uppercase text-white/40">What happened?</span>
-                      <textarea id="help-ticket-details" name="details" value={details} onChange={(e) => setDetails(e.target.value)} rows={4} maxLength={4000} aria-invalid={!!ticketErr.details}
-                        className={`mt-1 w-full resize-none rounded-lg border border-white/10 bg-[#111] px-2.5 py-2 text-[14px] text-white outline-none focus:border-[var(--color-cyan)]/50 ${errorBorder(ticketErr.details)}`} />
-                      <FieldError>{ticketErr.details}</FieldError>
-                    </label>
-                    {formError && <p className="text-[13px] text-red-400">{formError}</p>}
-                    <div className="flex justify-end gap-2">
-                      <button type="button" onClick={() => setTicketOpen(false)} disabled={sending}
-                        className="rounded-lg border border-white/10 px-3 py-1.5 text-[13px] text-white/70 hover:bg-white/5">Cancel</button>
-                      <button type="button" onClick={() => void submitTicket()} disabled={sending}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--color-cyan)] px-3 py-1.5 text-[13px] font-bold text-[#0a0a0a] disabled:opacity-50">
-                        {sending ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />} Send ticket
-                      </button>
-                    </div>
+                {/* Still with the assistant: a way to the team at any time. */}
+                {canTicket && !withTeam && !convLoading && messages.some((m) => m.from === 'client') && (
+                  <div className="flex justify-center pt-1">
+                    <button type="button" onClick={() => void handOver()} disabled={handing || typing}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-[13px] text-white/70 hover:border-[var(--color-cyan)]/40 hover:text-white disabled:opacity-40">
+                      <Users size={13} /> Talk to our team
+                    </button>
                   </div>
                 )}
               </div>
@@ -821,27 +1042,50 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
               {/* Invisible unless Cloudflare asks this visitor for a tick. */}
               {visitor && <div className="relative px-3">{captcha.element}</div>}
 
-              <form
-                onSubmit={(e) => { e.preventDefault(); ask(input) }}
-                className="shrink-0 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2"
-              >
-                <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-[#111] py-1.5 pl-3.5 pr-1.5 transition-colors focus-within:border-[var(--color-cyan)]/60">
-                  <input
-                    id="help-question"
-                    name="question"
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    placeholder="Ask a question…"
-                    aria-label="Your question"
-                    maxLength={300}
-                    className="min-w-0 flex-1 bg-transparent py-2 text-[15px] text-white outline-none placeholder:text-white/30"
-                  />
-                  <button type="submit" disabled={!input.trim() || typing} aria-label="Send"
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--color-cyan)] text-[#0a0a0a] transition-colors disabled:bg-white/[0.06] disabled:text-white/30">
-                    <ArrowUp size={17} />
-                  </button>
+              {sendError && <p className="px-4 pb-1 text-[13px] text-red-400">{sendError}</p>}
+              <PhotoSendDialog file={photo} onCancel={() => setPhoto(null)} onSend={(url, caption) => { setPhoto(null); void sendToTeam(caption, url) }} />
+
+              {closedForGood ? (
+                <div className="shrink-0 border-t border-white/[0.07] px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-center text-[13px] text-white/50">
+                  This conversation is closed.{' '}
+                  <button type="button" onClick={() => newChat(chatFrom)} className="font-semibold text-[var(--color-cyan)]">Start a new one</button>
                 </div>
-              </form>
+              ) : (
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    if (withTeam) { if (input.trim()) void sendToTeam(input.trim()) }
+                    else ask(input)
+                  }}
+                  className="shrink-0 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2"
+                >
+                  <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-[#111] py-1.5 pl-3.5 pr-1.5 transition-colors focus-within:border-[var(--color-cyan)]/60">
+                    <input
+                      id="help-question"
+                      name="question"
+                      value={input}
+                      onChange={(e) => { setInput(e.target.value); if (withTeam) sendTyping(e.target.value.length > 0) }}
+                      placeholder={withTeam ? 'Message our team…' : 'Ask a question…'}
+                      aria-label={withTeam ? 'Message our team' : 'Your question'}
+                      maxLength={withTeam ? 4000 : 300}
+                      className="min-w-0 flex-1 bg-transparent py-2 text-[15px] text-white outline-none placeholder:text-white/30"
+                    />
+                    {withTeam && (
+                      <>
+                        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={pickPhoto} />
+                        <button type="button" onClick={() => fileRef.current?.click()} disabled={sending} aria-label="Send a photo"
+                          className="shrink-0 rounded-md p-1.5 text-white/40 hover:bg-white/5 hover:text-white/75 disabled:opacity-30">
+                          <ImagePlus size={17} />
+                        </button>
+                      </>
+                    )}
+                    <button type="submit" disabled={!input.trim() || typing || sending} aria-label="Send"
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--color-cyan)] text-[#0a0a0a] transition-colors disabled:bg-white/[0.06] disabled:text-white/30">
+                      {sending ? <Loader2 size={16} className="animate-spin" /> : <ArrowUp size={17} />}
+                    </button>
+                  </div>
+                </form>
+              )}
             </>
           ) : (
             // ── Tickets (Intercom's Tickets space, in place of Help) ─────────
@@ -853,9 +1097,8 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
                 <p className="flex items-center gap-2 text-[14px] text-white/45"><Loader2 size={13} className="animate-spin" /> Loading your tickets…</p>
               ) : tickets.length === 0 ? (
                 <div className="flex flex-col items-center gap-3 py-10 text-center">
-                  <Ticket size={28} className="text-white/20" />
-                  <p className="text-[14px] text-white/45">No tickets yet. Ask the assistant first; if it can&apos;t help, it opens one for you.</p>
-                  <button type="button" onClick={() => openChat('tickets')} className="text-[14px] font-semibold text-[var(--color-cyan)]">Ask the assistant</button>
+                  <Inbox size={28} className="text-white/20" />
+                  <p className="text-[14px] text-white/45">No tickets. When something needs a formal follow-up, our team opens a ticket from your conversation and it shows here.</p>
                 </div>
               ) : (
                 <ul className="space-y-2">
@@ -887,7 +1130,7 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
                 </ul>
               )}
               <p className="mt-4 text-[12px] leading-snug text-white/30">
-                Replies come by email. To add details to a ticket, reply to its email.
+                Ticket replies come by email. To add details to a ticket, reply to its email.
               </p>
             </div>
             {askPill('tickets')}
@@ -895,18 +1138,18 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
             </>
           )}
 
-          {/* Bottom bar: clients only, hidden in the chat and inside a conversation. */}
-          {canTicket && tab !== 'chat' && !(tab === 'messages' && inbox.thread) && (
+          {/* Bottom bar: clients only, hidden in a conversation. */}
+          {canTicket && tab !== 'chat' && !(tab === 'messages' && showEarlier && inbox.thread) && (
             <nav className="grid shrink-0 grid-cols-3 border-t border-white/[0.07] bg-[#0d0d0d] pb-[env(safe-area-inset-bottom)]" role="tablist" aria-label="Help sections">
               {([['home', 'Home', Home], ['messages', 'Messages', MessageSquare], ['tickets', 'Tickets', Ticket]] as const).map(([key, label, Icon]) => {
-                const badge = key === 'messages' ? inbox.totalUnread : key === 'tickets' ? openCount : 0
+                const badge = key === 'messages' ? totalUnread : key === 'tickets' ? openCount : 0
                 return (
                   <button
                     key={key}
                     type="button"
                     role="tab"
                     aria-selected={tab === key}
-                    onClick={() => setTab(key)}
+                    onClick={() => { setTab(key); if (key === 'messages') setShowEarlier(false) }}
                     className={`flex flex-col items-center gap-1 py-2.5 text-[14px] font-bold transition-colors ${tab === key ? 'text-[var(--color-cyan)]' : 'text-white/50 hover:text-white/80'}`}
                   >
                     <span className="relative">
@@ -935,4 +1178,3 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
 
   return createPortal(<>{panel}{!hideLauncher && launcher}</>, document.body)
 }
-
