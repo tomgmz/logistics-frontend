@@ -192,7 +192,9 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
   const [photo,      setPhoto]      = useState<File | null>(null)
   const [staffTyping, setStaffTyping] = useState<string | null>(null)
   const status: ChatStatus = conv?.status ?? 'assistant'
-  const withTeam = status !== 'assistant'
+  // With the team once handed over; an assistant-only chat that closed after
+  // 24 quiet hours carries on with the assistant.
+  const withTeam = status !== 'assistant' && !(status === 'resolved' && !conv?.handed_over_at)
   const fileRef  = useRef<HTMLInputElement>(null)
 
   // ── The client's conversations ──
@@ -298,6 +300,15 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
     setSendError(null)
     setQuestionsAfter(null)
     setHelped({})
+    // Point at this conversation at once (not after it loads), and show none
+    // of the previous chat: anything typed meanwhile belongs here, never to a
+    // new conversation (found by CHAT-002, 2026-11-22). The box stays disabled
+    // until it has loaded.
+    queue.current = Promise.resolve()
+    convIdRef.current = id
+    setConvId(id)
+    setConv(null)
+    setMessages([])
     try {
       const d = await supportChatService.get(id)
       convIdRef.current = d.conversation_id
@@ -1054,6 +1065,7 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
                 <form
                   onSubmit={(e) => {
                     e.preventDefault()
+                    if (convLoading) return
                     if (withTeam) { if (input.trim()) void sendToTeam(input.trim()) }
                     else ask(input)
                   }}
@@ -1065,6 +1077,7 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
                       name="question"
                       value={input}
                       onChange={(e) => { setInput(e.target.value); if (withTeam) sendTyping(e.target.value.length > 0) }}
+                      disabled={convLoading}
                       placeholder={withTeam ? 'Message our team…' : 'Ask a question…'}
                       aria-label={withTeam ? 'Message our team' : 'Your question'}
                       maxLength={withTeam ? 4000 : 300}
@@ -1098,7 +1111,7 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
               ) : tickets.length === 0 ? (
                 <div className="flex flex-col items-center gap-3 py-10 text-center">
                   <Inbox size={28} className="text-white/20" />
-                  <p className="text-[14px] text-white/45">No tickets. When something needs a formal follow-up, our team opens a ticket from your conversation and it shows here.</p>
+                  <p className="text-[14px] text-white/45">No tickets. When something needs a formal follow-up, our team opens a ticket for you and it shows here.</p>
                 </div>
               ) : (
                 <ul className="space-y-2">

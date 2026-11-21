@@ -1,10 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { AlertTriangle, Bot, CheckCircle2, ChevronRight, Eye, Hand, ImagePlus, Loader2, Mail, MessagesSquare, Send, Ticket, UserRound } from 'lucide-react'
+import { AlertTriangle, ArrowUp, Bot, CheckCircle2, ChevronRight, Eye, Hand, ImagePlus, Loader2, Mail, MessagesSquare, UserRound } from 'lucide-react'
 import TableEmptyState from '@/components/ui/TableEmptyState'
 import SidePanel from '@/components/ui/SidePanel'
-import ReusableModal from '@/components/layout/ReusableModal'
 import { useModuleAccess, writeAccess } from '@/components/layout/ModuleAccess'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { useServerTable } from '@/lib/hooks/useServerTable'
@@ -17,15 +16,12 @@ import { roleLabel } from '@/lib/roles'
 import { formatDate, formatDateTime, formatTime } from '@/app/utils/timeFormat'
 import Pagination from '@/components/ui/Pagination'
 import FilterBar from '@/components/ui/FilterBar'
-import Dropdown from '@/components/ui/Dropdown'
-import { FieldError, errorBorder } from '@/components/ui/FieldError'
 import { TableCard } from '@/components/ui/untitled/table-card'
 import { TabsMinimal } from '@/components/ui/untitled/tabs'
 import { TruncatedText } from '@/components/ui/TruncatedText'
 import { ORDER_LABELS, isReversed, orderField, orderRules } from '@/lib/table-order'
 import MessagePhoto from '@/components/messaging/MessagePhoto'
 import PhotoSendDialog, { MAX_PHOTO_BYTES } from '@/components/messaging/PhotoSendDialog'
-import { TICKET_CATEGORY_LABEL, type TicketCategory } from '@/lib/services/support.service'
 import {
   supportChatService, CHAT_STATUS_LABEL,
   type ChatDetail, type ChatMessage, type ChatStatus, type InboxStatus,
@@ -35,7 +31,7 @@ import {
  * Client conversations, the staff side (2026-11-22): what the help assistant
  * passed to the team, answered here by any Operations Manager or Company
  * Administrator (the client sees who). Waiting = the team owes a reply;
- * Team replied = the client does (3 quiet days close it); Resolved; All (also
+ * Team replied = the client does (reminder at 3 quiet days, closed at 7); Resolved; All (also
  * what the assistant answered alone). Replies the client misses for 15
  * minutes are emailed to them; their emailed answers land here marked "by email".
  *
@@ -186,7 +182,9 @@ export default function ConversationsView({ switcher }: { switcher?: ReactNode }
                         <td className={`${TD} whitespace-nowrap ${c.assigned_to === me?.user_id ? 'text-[var(--color-cyan)]' : 'text-[#c4c4c4]'}`}>
                           {c.assigned_to ? (c.assigned_to === me?.user_id ? 'You' : c.assignee_name ?? 'A colleague') : <span className="text-[#818181]">Nobody yet</span>}
                         </td>
-                        <td className={TD}><StatusBadge status={c.status} /></td>
+                        <td className={TD}>
+                          <StatusBadge status={c.status} />
+                        </td>
                         <td className={TD}><ChevronRight size={18} className="text-[#818181]" aria-hidden /></td>
                       </tr>
                     )
@@ -242,7 +240,6 @@ function ConversationPanel({ id, meId, meName, canEdit, onClose, onChanged }: {
   const [photo,   setPhoto]   = useState<File | null>(null)
   const [typingName, setTypingName] = useState<string | null>(null)
   const [resolving,  setResolving]  = useState(false)
-  const [ticketOpen, setTicketOpen] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const fileRef   = useRef<HTMLInputElement>(null)
 
@@ -387,37 +384,34 @@ function ConversationPanel({ id, meId, meName, canEdit, onClose, onChanged }: {
                 </button>
               </div>
             ) : (
-              <form onSubmit={(e) => { e.preventDefault(); if (input.trim()) void send(input.trim()) }} className="flex items-end gap-2">
+              // Same composer as the client's help panel: one rounded box, photo
+              // button and a round send button inside (user 2026-11-22).
+              <form onSubmit={(e) => { e.preventDefault(); if (input.trim()) void send(input.trim()) }}
+                className={`flex items-end gap-2 rounded-2xl border border-white/10 bg-[#111] py-1.5 pl-3.5 pr-1.5 transition-colors focus-within:border-[var(--color-cyan)]/60 ${canEdit ? '' : 'opacity-50'}`}>
                 <textarea
                   value={input}
                   onChange={(e) => { setInput(e.target.value); sendTyping(e.target.value.length > 0) }}
                   onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (input.trim()) void send(input.trim()) } }}
-                  rows={2}
+                  rows={1}
                   maxLength={4000}
                   placeholder={canEdit ? 'Reply to the client… (they see your name)' : 'Read Only: you can read this conversation'}
                   aria-label="Reply"
                   disabled={!canEdit}
-                  className="min-h-[44px] flex-1 resize-none rounded-lg border border-white/10 bg-[#111] px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-[var(--color-cyan)]/50 disabled:opacity-50"
+                  className="max-h-32 min-h-[36px] flex-1 resize-none bg-transparent py-2 text-sm text-white outline-none [field-sizing:content] placeholder:text-white/30"
                 />
                 <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={pickPhoto} />
                 <button type="button" onClick={() => fileRef.current?.click()} aria-label="Send a photo" {...writeAccess(canEdit)}
-                  className="rounded-lg p-2.5 text-white/50 hover:bg-white/5 hover:text-white disabled:opacity-30">
-                  <ImagePlus size={18} />
+                  className="mb-0.5 shrink-0 rounded-md p-1.5 text-white/40 hover:bg-white/5 hover:text-white/75 disabled:opacity-30">
+                  <ImagePlus size={17} />
                 </button>
                 <button type="submit" aria-label="Send reply" {...writeAccess(canEdit && !!input.trim() && !sending)}
-                  className="flex h-11 w-11 items-center justify-center rounded-lg text-[#0a0a0a] disabled:opacity-40" style={{ background: 'var(--color-cyan)' }}>
-                  {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--color-cyan)] text-[#0a0a0a] transition-colors disabled:bg-white/[0.06] disabled:text-white/30">
+                  {sending ? <Loader2 size={16} className="animate-spin" /> : <ArrowUp size={17} />}
                 </button>
               </form>
             )}
             {error && <p className="text-xs text-red-400">{error}</p>}
             <div className="flex flex-wrap items-center justify-end gap-2">
-              {!detail.ticket_id && !inAssistant && (
-                <button type="button" onClick={() => setTicketOpen(true)} {...writeAccess(canEdit)}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 px-2.5 py-1.5 text-xs font-semibold text-white/80 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40">
-                  <Ticket size={13} /> Turn into ticket
-                </button>
-              )}
               {detail.status !== 'resolved' && !inAssistant && (
                 <button type="button" onClick={() => void resolve()} {...writeAccess(canEdit && !resolving)}
                   className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold text-[#0a0a0a] disabled:cursor-not-allowed disabled:opacity-40"
@@ -455,14 +449,6 @@ function ConversationPanel({ id, meId, meName, canEdit, onClose, onChanged }: {
 
       <PhotoSendDialog file={photo} onCancel={() => setPhoto(null)} onSend={(url, caption) => { setPhoto(null); void send(caption, url) }} />
 
-      {detail && (
-        <TicketFromConversation
-          open={ticketOpen}
-          detail={detail}
-          onClose={() => setTicketOpen(false)}
-          onDone={() => { setTicketOpen(false); if (id) void fetchDetail(id, true); onChanged() }}
-        />
-      )}
     </>
   )
 }
@@ -491,67 +477,5 @@ function Bubble({ m, authors, clientName }: { m: ChatMessage; authors: ChatDetai
         <MessagePhoto body={m.content} attachmentUrl={m.attachment_url} stamped={m.attachment_stamped} />
       </div>
     </div>
-  )
-}
-
-function TicketFromConversation({ open, detail, onClose, onDone }: {
-  open: boolean; detail: ChatDetail; onClose: () => void; onDone: () => void
-}) {
-  const [category, setCategory] = useState<TicketCategory>('other')
-  const [subject,  setSubject]  = useState('')
-  const [tried,    setTried]    = useState(false)
-  const [busy,     setBusy]     = useState(false)
-  const [error,    setError]    = useState<string | null>(null)
-  useEffect(() => {
-    if (open) { setSubject((detail.title || '').slice(0, 150)); setCategory('other'); setTried(false); setError(null) }
-  }, [open, detail.title])
-  const subjectError = tried && subject.trim().length < 3 ? 'Add a short subject.' : undefined
-
-  async function confirm() {
-    setTried(true)
-    if (subject.trim().length < 3) return
-    setBusy(true)
-    setError(null)
-    try {
-      const t = await supportChatService.toTicket(detail.conversation_id, { category, subject: subject.trim() })
-      appToast.success(`Ticket ${t.reference} opened and emailed to the client.`, { action: 'support-chat-ticket', entityId: detail.conversation_id })
-      onDone()
-    } catch (e) {
-      setError(getApiErrorMessage(e, 'The ticket could not be opened.'))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <ReusableModal
-      open={open}
-      title="Turn into a ticket?"
-      description="For something that needs a formal follow-up. The ticket carries this conversation, is emailed to the client, and replies continue by email."
-      confirmLabel={busy ? 'Opening…' : 'Open ticket'}
-      cancelLabel="Cancel"
-      disableBackdropClose={busy}
-      onConfirm={() => { void confirm() }}
-      onCancel={() => { if (!busy) onClose() }}
-    >
-      <div className="mt-3 flex flex-col gap-3 text-left">
-        <label className="block">
-          <span className="text-xs font-semibold text-white/60">Topic</span>
-          <Dropdown value={category} onChange={(e) => setCategory(e.target.value as TicketCategory)}
-            className="mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-2.5 py-2 text-sm text-white outline-none">
-            {(Object.keys(TICKET_CATEGORY_LABEL) as TicketCategory[]).map((c) => (
-              <option key={c} value={c}>{TICKET_CATEGORY_LABEL[c]}</option>
-            ))}
-          </Dropdown>
-        </label>
-        <label className="block">
-          <span className="text-xs font-semibold text-white/60">Subject</span>
-          <input value={subject} onChange={(e) => setSubject(e.target.value)} maxLength={150} aria-invalid={!!subjectError}
-            className={`mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-2.5 py-2 text-sm text-white outline-none focus:border-[var(--color-cyan)]/50 ${errorBorder(subjectError)}`} />
-          <FieldError>{subjectError}</FieldError>
-        </label>
-        {error && <p className="text-xs text-red-400">{error}</p>}
-      </div>
-    </ReusableModal>
   )
 }

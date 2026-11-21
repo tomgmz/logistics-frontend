@@ -13,7 +13,7 @@ const NAV_ITEMS = [
   { href: '/operations_admin/transit-tracking', label: 'Transit Tracking', icon: <MapPin size={20} /> },
   { href: '/operations_admin/reports', label: 'Reports', icon: <TriangleAlert size={20} /> },
   { href: '/operations_admin/document-management', label: 'Document Management', icon: <Files size={20} /> },
-  { href: '/operations_admin/support-tickets', label: 'Tickets', icon: <Ticket size={20} /> },
+  { href: '/operations_admin/support-tickets', label: 'Support', icon: <Ticket size={20} /> },
   // Every archived record of this portal, one tab per module (2026-11-11).
   archiveNavItem('operations_admin'),
 ]

@@ -1,6 +1,5 @@
 import proxyApi, { initCsrf } from '@/lib/api/auth.api'
 import type { PagedResponse, PageRequest } from '@/lib/hooks/useServerTable'
-import type { TicketCategory, SupportTicket } from '@/lib/services/support.service'
 
 /**
  * Client support conversations (2026-11-22): the help assistant, our team and
@@ -144,11 +143,6 @@ export const supportChatService = {
   async resolve(id: string): Promise<ChatConversation> {
     await initCsrf()
     const { data } = await proxyApi.post<{ data: ChatConversation }>(`/support/inbox/${id}/resolve`)
-    return data.data
-  },
-  async toTicket(id: string, input: { category: TicketCategory; subject: string; booking_id?: string | null }): Promise<SupportTicket> {
-    await initCsrf()
-    const { data } = await proxyApi.post<{ data: SupportTicket }>(`/support/inbox/${id}/ticket`, input)
     return data.data
   },
 }

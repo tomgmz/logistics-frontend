@@ -15,7 +15,7 @@ export const NAV_ITEMS_BY_ROLE: Record<string, { href: string; label: string; ic
     { href: '/admin/document-management', label: 'Document Management', icon: <Files size={20} /> },
     { href: '/admin/system-maintenance', label: 'System Maintenance', icon: <MonitorCog size={20} /> },
     { href: '/admin/audit-logs', label: 'Audit Logs', icon: <ListMinus size={20} /> },
-    { href: '/admin/support-tickets', label: 'Tickets', icon: <Ticket size={20} /> },
+    { href: '/admin/support-tickets', label: 'Support', icon: <Ticket size={20} /> },
   ],
   client: [
     { href: '/client/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },

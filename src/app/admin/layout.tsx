@@ -74,7 +74,7 @@ const adminNavItems = [
   },
   {
     href: '/admin/support-tickets',
-    label: 'Tickets',
+    label: 'Support',
     icon: <Ticket size={20} />,
   },
   // Every archived record of this portal, one tab per module (2026-11-11).

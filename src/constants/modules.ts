@@ -97,8 +97,9 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   'audit-logs':           'Audit Logs (Company Administrator)',
   // Incidents drivers raise from the road (the driver app's Reports tab).
   'reports':              'Reports',
-  // Client support tickets: the Tickets page and the dashboard queue.
-  'support-tickets':      'Tickets',
+  // Client support: the Support page (Conversations + Tickets, renamed from
+  // "Tickets" 2026-11-22) and the dashboard queue. The key stays.
+  'support-tickets':      'Support',
 }
 
 // Modules with nothing to change: the matrix only offers Read Only for them
