@@ -5,6 +5,7 @@ import IosViewportFix from '@/components/IosViewportFix';
 import { alegreyaSansSC, alegreyaSans, aboreto, fredoka, leagueSpartan, eurostile, darkerGrotesque, dmSans, geist } from '@/app/fonts';
 import StoreProvider from '@/lib/store/StoreProvider';
 import QueryProvider from '@/lib/query/QueryProvider';
+import NoAutofill from '@/components/NoAutofill';
 import { LastPageTracker } from '@/lib/navigation/lastPage';
 import AuthRehydrator from '@/components/AuthRehydrator';
 import AppToaster from '@/components/ui/AppToaster';
@@ -50,6 +51,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <CsrfInit />
         <IosViewportFix />
         <StickyHeaderScrollbar />
+        <NoAutofill />
         <QueryProvider>
           <StoreProvider>
             <AuthRehydrator />

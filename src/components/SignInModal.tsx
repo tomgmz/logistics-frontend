@@ -454,6 +454,7 @@ function ItAdminOtpResetStep({
                 ref={el => { inputRefs.current[i] = el }}
                 type="text"
                 inputMode="numeric"
+                autoComplete={i === 0 ? 'one-time-code' : 'off'}
                 maxLength={1}
                 value={digit}
                 onChange={e => handleChange(i, e.target.value)}
@@ -671,6 +672,7 @@ function EmailStep({ onSuccess }: { onSuccess: (email: string) => void }) {
         <GlassInput icon={<IconMail />} label="Email">
           <input
             type="email"
+            autoComplete="username"
             value={email}
             onChange={e => { setEmail(e.target.value); setError('') }}
             placeholder="email@example.com"
@@ -1106,6 +1108,7 @@ function OtpStep({
             ref={el => { inputRefs.current[i] = el }}
             type="text"
             inputMode="numeric"
+            autoComplete={i === 0 ? 'one-time-code' : 'off'}
             maxLength={1}
             value={digit}
             onChange={e => handleChange(i, e.target.value)}
@@ -1362,6 +1365,7 @@ function PasswordStep({
         <GlassInput icon={<IconLock />} label="Password">
           <input
             type={showPassword ? 'text' : 'password'}
+            autoComplete="current-password"
             value={password}
             onChange={e => { setPassword(e.target.value); setError('') }}
             placeholder="••••••••"

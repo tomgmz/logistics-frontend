@@ -56,14 +56,13 @@ const TEXT_FIELDS: {
   key:          'first_name' | 'last_name' | 'email' | 'phone';
   label:        string;
   type:         string;
-  autoComplete: string;
   maxLength?:   number;
   optional?:    boolean;
 }[] = [
-  { key: 'first_name', label: 'First Name', type: 'text',  autoComplete: 'given-name',  maxLength: 50 },
-  { key: 'last_name',  label: 'Last Name',  type: 'text',  autoComplete: 'family-name', maxLength: 50 },
-  { key: 'email',      label: 'Email',      type: 'email', autoComplete: 'email',       maxLength: 254 },
-  { key: 'phone',      label: 'Phone',      type: 'tel',   autoComplete: 'tel', optional: true },
+  { key: 'first_name', label: 'First Name', type: 'text',  maxLength: 50 },
+  { key: 'last_name',  label: 'Last Name',  type: 'text',  maxLength: 50 },
+  { key: 'email',      label: 'Email',      type: 'email', maxLength: 254 },
+  { key: 'phone',      label: 'Phone',      type: 'tel',   optional: true },
 ];
 
 const NAME_FIELDS = new Set(['first_name', 'last_name']);
@@ -224,7 +223,7 @@ export default function ContactSection() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 short:gap-3 mb-4">
-                {TEXT_FIELDS.map(({ key, label, type, autoComplete, maxLength, optional }) => (
+                {TEXT_FIELDS.map(({ key, label, type, maxLength, optional }) => (
                   <div key={key}>
                     <label htmlFor={`contact-${key}`} className={labelClass}>
                       {label}
@@ -243,7 +242,7 @@ export default function ContactSection() {
                       <input
                         id={`contact-${key}`}
                         type={type}
-                        autoComplete={autoComplete}
+                        autoComplete="off"
                         maxLength={maxLength}
                         autoCapitalize={NAME_FIELDS.has(key) ? 'words' : key === 'email' ? 'none' : undefined}
                         spellCheck={key === 'email' ? false : undefined}

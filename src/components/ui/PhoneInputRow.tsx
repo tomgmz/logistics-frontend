@@ -60,7 +60,7 @@ export default function PhoneInputRow({
         aria-invalid={!!error}
         type="tel"
         inputMode="numeric"
-        autoComplete="tel-national"
+        autoComplete="off"
         value={formatPhone(value)}
         onChange={e => {
           const digits = e.target.value.replace(/\D/g, '').slice(0, MAX_DIGITS)
