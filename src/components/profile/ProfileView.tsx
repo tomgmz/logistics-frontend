@@ -153,7 +153,7 @@ function DetailsCard({ profile }: { profile: Profile }) {
   const owner = detailsOwner(profile.role)
   return (
     <section className={`${CARD} p-4 sm:p-5`}>
-      <SectionTitle hint={owner ?? undefined}>Account details</SectionTitle>
+      <SectionTitle hint={owner ?? undefined}>Account Details</SectionTitle>
       <dl className="grid gap-4 sm:grid-cols-2">
         {profile.company_name && <Field label="Company" value={profile.company_name} />}
         <Field label="Email" value={profile.email} />
