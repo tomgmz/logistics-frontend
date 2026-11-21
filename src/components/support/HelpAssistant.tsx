@@ -633,13 +633,13 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
                     </label>
                     <label className="block">
                       <span className="text-[10px] font-bold uppercase text-white/40">Subject</span>
-                      <input value={subject} onChange={(e) => setSubject(e.target.value)} maxLength={150} aria-invalid={!!ticketErr.subject}
+                      <input id="help-ticket-subject" name="subject" value={subject} onChange={(e) => setSubject(e.target.value)} maxLength={150} aria-invalid={!!ticketErr.subject}
                         className={`mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-2.5 py-2 text-xs text-white outline-none focus:border-[var(--color-cyan)]/50 ${errorBorder(ticketErr.subject)}`} />
                       <FieldError>{ticketErr.subject}</FieldError>
                     </label>
                     <label className="block">
                       <span className="text-[10px] font-bold uppercase text-white/40">What happened?</span>
-                      <textarea value={details} onChange={(e) => setDetails(e.target.value)} rows={4} maxLength={4000} aria-invalid={!!ticketErr.details}
+                      <textarea id="help-ticket-details" name="details" value={details} onChange={(e) => setDetails(e.target.value)} rows={4} maxLength={4000} aria-invalid={!!ticketErr.details}
                         className={`mt-1 w-full resize-none rounded-lg border border-white/10 bg-[#111] px-2.5 py-2 text-xs text-white outline-none focus:border-[var(--color-cyan)]/50 ${errorBorder(ticketErr.details)}`} />
                       <FieldError>{ticketErr.details}</FieldError>
                     </label>
@@ -664,6 +664,8 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
                 className="flex items-center gap-2 border-t border-white/[0.07] px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
               >
                 <input
+                  id="help-question"
+                  name="question"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   placeholder="Type your question…"

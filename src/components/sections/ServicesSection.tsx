@@ -82,8 +82,10 @@ function ServiceCard({ img, label, index }: { img: string; label: string; index:
         <Image
           src={img}
           alt={label}
-          fill
-          className="object-cover rounded-[15px] transition-transform duration-500 ease-out group-hover:scale-[1.04]"
+          width={1200}
+          height={800}
+          sizes="(min-width: 1280px) 25vw, 50vw"
+          className="absolute inset-0 h-full w-full object-cover rounded-[15px] transition-transform duration-500 ease-out group-hover:scale-[1.04]"
         />
       </div>
       <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />

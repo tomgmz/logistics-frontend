@@ -44,8 +44,9 @@ export default function AboutSection() {
               <Image
                 src={ASSETS.l300Van}
                 alt="L300 Delivery Van"
-                fill
-                className="object-contain drop-shadow-xl"
+                width={643}
+                height={362}
+                className="absolute inset-0 h-full w-full object-contain drop-shadow-xl"
                 sizes="90vw"
               />
             </div>
@@ -69,8 +70,9 @@ export default function AboutSection() {
               <Image
                 src={ASSETS.cargoTruck}
                 alt="Cargo Truck"
-                fill
-                className="object-contain drop-shadow-xl"
+                width={1800}
+                height={1207}
+                className="absolute inset-0 h-full w-full object-contain drop-shadow-xl"
                 sizes="90vw"
               />
             </div>
@@ -112,8 +114,9 @@ export default function AboutSection() {
             <Image
               src={ASSETS.l300Van}
               alt="L300 Delivery Van"
-              fill
-              className="object-contain drop-shadow-2xl"
+              width={643}
+              height={362}
+              className="absolute inset-0 h-full w-full object-contain drop-shadow-2xl"
               sizes="46vw"
             />
           </div>
@@ -129,8 +132,9 @@ export default function AboutSection() {
             <Image
               src={ASSETS.cargoTruck}
               alt="Cargo Truck"
-              fill
-              className="object-contain drop-shadow-2xl"
+              width={1800}
+              height={1207}
+              className="absolute inset-0 h-full w-full object-contain drop-shadow-2xl"
               sizes="54vw"
             />
           </div>

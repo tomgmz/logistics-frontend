@@ -149,8 +149,10 @@ export default function MetricsSection({ metrics }: { metrics: PublicMetrics | n
             <Image
               src={ASSETS.metricsBg ?? ASSETS.heroContainers}
               alt="Logistics network"
-              fill
-              className="object-cover"
+              width={816}
+              height={710}
+              sizes="(min-width: 1024px) 33vw, 50vw"
+              className="absolute inset-0 h-full w-full object-cover"
             />
             <div className="absolute inset-0 bg-[#0a0a0a]/50" />
           </motion.div>
