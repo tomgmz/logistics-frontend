@@ -27,6 +27,15 @@ export const BOOKING_DOCUMENT_TYPES = ['proof_of_delivery', 'other'] as const sa
 /** What can be picked when uploading to a vehicle (its Fleet folder). */
 export const VEHICLE_DOCUMENT_TYPES = ['vehicle_registration', 'vehicle_insurance', 'other'] as const satisfies readonly StaffDocumentType[]
 
+/**
+ * Same list as the backend's REVIEWED_DOCUMENT_TYPES: only these wait for a
+ * second person. Vehicle papers and Other are approved on upload.
+ */
+export const REVIEWED_DOCUMENT_TYPES = ['contract', 'proof_of_delivery'] as const satisfies readonly StaffDocumentType[]
+export function needsReview(type: StaffDocumentType): boolean {
+  return (REVIEWED_DOCUMENT_TYPES as readonly string[]).includes(type)
+}
+
 /** Where an upload is filed. */
 export type UploadTarget = 'booking' | 'client' | 'vehicle'
 

@@ -97,7 +97,7 @@ export function ReviewStatusBadge({ doc }: { doc: LibraryDocument }) {
     return <Tip label="Recorded by the delivery or fleet flow; no review needed"><span className="text-[11px] text-white/35">Recorded</span></Tip>
   }
   const st = reviewStyle(doc.review_status)
-  return (
+  const badge = (
     <span
       className="inline-flex text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border whitespace-nowrap"
       style={{ color: st.color, borderColor: st.border, background: st.bg }}
@@ -105,4 +105,8 @@ export function ReviewStatusBadge({ doc }: { doc: LibraryDocument }) {
       {REVIEW_STATUS_LABELS[doc.review_status]}
     </span>
   )
+  // Vehicle papers and Other are approved on upload, so nobody reviewed them.
+  return doc.review_status === 'approved' && !doc.reviewed_by_name
+    ? <Tip label="This type needs no review">{badge}</Tip>
+    : badge
 }

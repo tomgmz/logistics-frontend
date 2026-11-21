@@ -13,6 +13,7 @@ import {
   fileSizeLabel,
   type BookingOption,
   type ClientOption,
+  needsReview,
   type StaffDocumentType,
   type UploadTarget,
   type VehicleOption,
@@ -206,7 +207,7 @@ export default function UploadDocumentModal({
     if (!canSubmit) return
     setBusy(true)
     try {
-      const { document_ids } = await uploadDocuments({
+      const { document_ids, needs_review } = await uploadDocuments({
         bookingId:    target === 'booking' ? booking?.booking_id : null,
         clientId:     isContract ? client?.client_id : null,
         truckId:      isVehicle ? truck?.truck_id : null,
@@ -216,12 +217,14 @@ export default function UploadDocumentModal({
         files,
       })
       const n = `${document_ids.length} document${document_ids.length === 1 ? '' : 's'}`
+      // An older backend does not send needs_review; fall back to the type.
+      const after = (needs_review ?? needsReview(docType)) ? ' Awaiting review.' : ''
       appToast.success(
         isContract
-          ? `${n} added to the contracts of ${client?.company_name ?? 'the client'}. Awaiting review.`
+          ? `${n} added to the contracts of ${client?.company_name ?? 'the client'}.${after}`
           : isVehicle
-          ? `${n} added to ${truck?.plate_number ?? 'the vehicle'}. Awaiting review.`
-          : `${n} attached to ${booking?.reference_number ?? 'the booking'}. Awaiting review.`,
+          ? `${n} added to ${truck?.plate_number ?? 'the vehicle'}.${after}`
+          : `${n} attached to ${booking?.reference_number ?? 'the booking'}.${after}`,
         { action: 'document-upload', entityId: isContract ? client?.client_id : isVehicle ? truck?.truck_id : booking?.booking_id },
       )
       onUploaded()
@@ -262,7 +265,8 @@ export default function UploadDocumentModal({
               <div>
                 <h2 className="text-base font-bold text-white">Upload Document</h2>
                 <p className="text-[11px] text-white/40 mt-0.5">
-                  {isContract ? 'Add a contract to a client.' : isVehicle ? 'Add paperwork to a vehicle.' : 'Attach paperwork to a booking.'} It will wait for another reviewer to approve it.
+                  {isContract ? 'Add a contract to a client.' : isVehicle ? 'Add paperwork to a vehicle.' : 'Attach paperwork to a booking.'}{' '}
+                  {needsReview(docType) ? 'It will wait for another reviewer to approve it.' : 'This type needs no review.'}
                 </p>
               </div>
               <button type="button" disabled={busy} onClick={onClose} className="p-2 rounded-lg hover:bg-white/5 text-white/50" aria-label="Close">

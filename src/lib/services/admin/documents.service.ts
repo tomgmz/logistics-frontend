@@ -117,7 +117,7 @@ export async function uploadDocuments(input: {
   otherLabel?:  string | null
   notes:        string
   files:        File[]
-}): Promise<{ document_ids: string[] }> {
+}): Promise<{ document_ids: string[]; needs_review?: boolean }> {
   await initCsrf()
   const form = new FormData()
   if (input.bookingId) form.append('booking_id', input.bookingId)
@@ -128,7 +128,7 @@ export async function uploadDocuments(input: {
   if (input.notes.trim()) form.append('notes', input.notes.trim())
   input.files.forEach((f) => form.append('documents', f))
 
-  const { data } = await proxyApi.post<{ data: { document_ids: string[] } }>(B, form, {
+  const { data } = await proxyApi.post<{ data: { document_ids: string[]; needs_review?: boolean } }>(B, form, {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
   return data.data

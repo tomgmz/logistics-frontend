@@ -77,7 +77,8 @@ import { Tip } from '@/components/ui/tooltip'
  * Most files are evidence recorded by another flow (the client's attachments,
  * the driver's proof photos, the fleet's odometer photos and service receipts):
  * viewable and downloadable, never editable. Paperwork staff attach here goes
- * through review: someone other than the uploader approves or rejects it.
+ * through review when it is a Contract or Proof of Delivery: someone other than
+ * the uploader approves or rejects it. Vehicle papers and Other count at once.
  *
  * `fleetOnly` (the Fleet Manager's portal, 2026-11-08) starts at Fleet and
  * never shows clients or bookings. The server enforces the same scope on
