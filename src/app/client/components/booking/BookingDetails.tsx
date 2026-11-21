@@ -2104,9 +2104,9 @@ function DimensionUnitSelect({ value, onChange }: { value: DimensionUnit; onChan
     <Dropdown value={value} aria-label="Dimension unit"
       onChange={(e) => onChange(e.target.value as DimensionUnit)}
       className={`${SELECT_BOX} w-[72px] shrink-0`}>
-      <option value="cm">CM</option>
-      <option value="m">M</option>
-      <option value="in">IN</option>
+      <option value="cm" data-hint="centimetres">CM</option>
+      <option value="m" data-hint="metres">M</option>
+      <option value="in" data-hint="inches">IN</option>
     </Dropdown>
   )
 }
@@ -2116,8 +2116,8 @@ function WeightUnitSelect({ value, onChange }: { value: WeightUnit; onChange: (u
     <Dropdown value={value} aria-label="Weight unit"
       onChange={(e) => onChange(e.target.value as WeightUnit)}
       className={`${SELECT_BOX} w-[72px] shrink-0`}>
-      <option value="kg">KG</option>
-      <option value="lbs">LBS</option>
+      <option value="kg" data-hint="kilograms">KG</option>
+      <option value="lbs" data-hint="pounds">LBS</option>
     </Dropdown>
   )
 }

@@ -5,6 +5,7 @@ import { useRef, useState, useSyncExternalStore } from 'react'
 
 import { cn } from '@/lib/utils'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 /*
  * Every dropdown on the web (user 2026-11-16: shadcn Select everywhere, the
@@ -24,6 +25,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
  *   the event is real on tablets and desktop.
  * - className styles the closed box on both; it gets a chevron of its own, so
  *   don't add one (pass chevron={false} when the page draws its own).
+ * - <option data-hint="centimetres">CM</option> gives a short choice its full
+ *   name. Tablets and desktop: a tooltip on the item (hover or keyboard) and on
+ *   the closed box. Phones (no hover): the phone's own list reads
+ *   "CM – centimetres" while the closed box still shows "CM".
  * **Rule: never use a plain <select> or MUI Select on the web; use Dropdown
  * (or Combobox for long lists that need a search).**
  */
@@ -56,6 +61,8 @@ export interface PickerOption {
   /** The label as plain text (search, the native fallback). */
   text:     string
   disabled: boolean
+  /** Full name of a short choice (<option data-hint>): tooltip on desktop, spelled out on phones. */
+  hint?:    string
 }
 
 function nodeText(node: React.ReactNode): string {
@@ -72,7 +79,7 @@ export function readOptions(children: React.ReactNode): PickerOption[] {
   const walk = (nodes: React.ReactNode) => {
     React.Children.forEach(nodes, (child) => {
       if (!React.isValidElement(child)) return
-      const props = child.props as { value?: string | number; disabled?: boolean; children?: React.ReactNode }
+      const props = child.props as { value?: string | number; disabled?: boolean; children?: React.ReactNode; 'data-hint'?: string }
       if (child.type === React.Fragment) { walk(props.children); return }
       if (child.type !== 'option') return
       const text = nodeText(props.children).replace(/\s+/g, ' ').trim()
@@ -81,6 +88,7 @@ export function readOptions(children: React.ReactNode): PickerOption[] {
         label:    props.children,
         text,
         disabled: !!props.disabled,
+        ...(props['data-hint'] ? { hint: props['data-hint'] } : {}),
       })
     })
   }
@@ -112,19 +120,45 @@ export type DropdownProps =
 export function NativeDropdown({ className, style, chevron = true, value, children, ...props }: DropdownProps) {
   const rest = { ...props }
   delete rest.contentClassName
-  return (
+  const current = value == null ? '' : String(value)
+  const options = readOptions(children)
+  const hinted = options.some((o) => o.hint)
+
+  const select = (
     <select
       {...rest}
-      value={value == null ? '' : String(value)}
+      value={current}
       className={cn(className, 'cursor-pointer appearance-none disabled:cursor-not-allowed', chevron && 'pr-8')}
       style={{
         colorScheme: 'dark',
         ...(chevron ? { backgroundImage: CHEVRON, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 10px center' } : {}),
+        // The box's own text is hidden; the short label is drawn over it (below).
+        ...(hinted ? { color: 'transparent', WebkitTextFillColor: 'transparent' } : {}),
         ...style,
       }}
     >
-      {children}
+      {hinted
+        ? options.map((o) => (
+          <option key={o.value} value={o.value} disabled={o.disabled} style={{ color: '#fff', WebkitTextFillColor: '#fff' }}>
+            {o.hint ? `${o.text} – ${o.hint}` : o.text}
+          </option>
+        ))
+        : children}
     </select>
+  )
+  if (!hinted) return select
+
+  // The phone's list spells each choice out ("CM – centimetres"); the closed box
+  // keeps the short label, drawn in the box's own padding and font.
+  const shown = options.find((o) => o.value === current)
+  return (
+    <span className="relative inline-flex shrink-0">
+      {select}
+      <span aria-hidden
+        className={cn(className, 'pointer-events-none absolute inset-0 flex items-center overflow-hidden whitespace-nowrap border-transparent bg-transparent', chevron && 'pr-8')}>
+        {shown?.text ?? ''}
+      </span>
+    </span>
   )
 }
 
@@ -144,6 +178,17 @@ export default function Dropdown(props: DropdownProps) {
   return <DesktopDropdown {...props} />
 }
 
+/** Wraps a trigger or menu item in a tooltip with the option's full name (hover / keyboard focus). */
+function withHint(hint: string | undefined, side: 'right' | 'bottom', node: React.ReactElement) {
+  if (!hint) return node
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{node}</TooltipTrigger>
+      <TooltipContent side={side}>{hint}</TooltipContent>
+    </Tooltip>
+  )
+}
+
 function DesktopDropdown({
   value, onChange, children, className, style, chevron = true, contentClassName,
   id, name, disabled, required, autoFocus, title,
@@ -160,6 +205,7 @@ function DesktopDropdown({
   const radixValue = current === '' ? (emptyIsChoice ? EMPTY_VALUE : '') : current
 
   const { ref, font, capture } = useTriggerFont()
+  const currentHint = options.find((o) => o.value === current)?.hint
 
   // aria-*, data-* and the like go on the button.
   const triggerProps = Object.fromEntries(
@@ -175,27 +221,33 @@ function DesktopDropdown({
       required={required}
       name={name}
     >
-      <SelectTrigger
-        ref={ref}
-        id={id}
-        title={title}
-        autoFocus={autoFocus}
-        chevron={chevron}
-        onBlur={onBlur as unknown as React.FocusEventHandler<HTMLButtonElement>}
-        onFocus={onFocus as unknown as React.FocusEventHandler<HTMLButtonElement>}
-        className={className}
-        style={style}
-        {...triggerProps}
-      >
-        <span className="min-w-0 flex-1 truncate">
-          <SelectValue placeholder={emptyOption && !emptyIsChoice ? emptyOption.label : undefined} />
-        </span>
-      </SelectTrigger>
+      {withHint(currentHint, 'bottom',
+        <SelectTrigger
+          ref={ref}
+          id={id}
+          title={title}
+          autoFocus={autoFocus}
+          chevron={chevron}
+          onBlur={onBlur as unknown as React.FocusEventHandler<HTMLButtonElement>}
+          onFocus={onFocus as unknown as React.FocusEventHandler<HTMLButtonElement>}
+          className={className}
+          style={style}
+          {...triggerProps}
+        >
+          <span className="min-w-0 flex-1 truncate">
+            <SelectValue placeholder={emptyOption && !emptyIsChoice ? emptyOption.label : undefined} />
+          </span>
+        </SelectTrigger>,
+      )}
       <SelectContent className={contentClassName} style={font ? { fontFamily: font } : undefined}>
         {items.map((o) => (
-          <SelectItem key={o.value || EMPTY_VALUE} value={o.value === '' ? EMPTY_VALUE : o.value} disabled={o.disabled}>
-            {o.label}
-          </SelectItem>
+          <React.Fragment key={o.value || EMPTY_VALUE}>
+            {withHint(o.hint, 'right',
+              <SelectItem value={o.value === '' ? EMPTY_VALUE : o.value} disabled={o.disabled}>
+                {o.label}
+              </SelectItem>,
+            )}
+          </React.Fragment>
         ))}
       </SelectContent>
     </Select>

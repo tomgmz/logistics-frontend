@@ -130,3 +130,50 @@ describe('Combobox', () => {
     expect(screen.getByTestId('value').textContent).toBe('Wing Van')
   })
 })
+
+describe('option hints (data-hint)', () => {
+  const units = (
+    <>
+      <option value="cm" data-hint="centimetres">CM</option>
+      <option value="in" data-hint="inches">IN</option>
+    </>
+  )
+
+  it('reads the hint', () => {
+    expect(readOptions(units).map((o) => o.hint)).toEqual(['centimetres', 'inches'])
+  })
+
+  it('phones: the list spells each choice out, the closed box keeps the short label', () => {
+    setWidth(false)
+    const { container } = render(<Dropdown aria-label="Dimension unit" value="in" className="box">{units}</Dropdown>)
+    const select = screen.getByRole('combobox', { name: 'Dimension unit' }) as HTMLSelectElement
+    expect(Array.from(select.options).map((o) => o.text)).toEqual(['CM – centimetres', 'IN – inches'])
+    expect(select.value).toBe('in')
+    expect(container.querySelector('span[aria-hidden]')?.textContent).toBe('IN')
+  })
+
+  it('desktop: items carry the full name and still pick', async () => {
+    setWidth(true)
+    function Units() {
+      const [v, setV] = useState('cm')
+      return (
+        <>
+          <Dropdown aria-label="Dimension unit" value={v} onChange={(e) => setV(e.target.value)}>{units}</Dropdown>
+          <output data-testid="unit">{v}</output>
+        </>
+      )
+    }
+    render(<Units />)
+    const trigger = screen.getByRole('combobox', { name: 'Dimension unit' })
+    expect(trigger.textContent).toContain('CM')
+    await act(async () => { fireEvent.keyDown(trigger, { key: 'Enter' }) })
+    await act(async () => { fireEvent.click(screen.getByRole('option', { name: 'IN' })) })
+    expect(screen.getByTestId('unit').textContent).toBe('in')
+  })
+
+  it('phones: a dropdown without hints renders as before', () => {
+    setWidth(false)
+    const { container } = render(<Dropdown aria-label="Plain" value="a"><option value="a">A</option></Dropdown>)
+    expect(container.firstElementChild?.tagName).toBe('SELECT')
+  })
+})
