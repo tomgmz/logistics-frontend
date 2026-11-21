@@ -24,6 +24,8 @@ export type CargoMode   = 'loose' | 'palletized'
 export type ServiceType = 'fmcg' | null
 /** Weight units the client can type in; everything is converted to kg before sending. */
 export type WeightUnit  = 'kg' | 'lbs'
+/** Size units the client can type in; everything is converted to cm before sending. */
+export type DimensionUnit = 'cm' | 'm' | 'in'
 
 export interface ItemGroup {
   id: string
@@ -31,6 +33,8 @@ export interface ItemGroup {
   looseLength: string
   looseWidth: string
   looseHeight: string
+  /** Missing on drafts saved before 2026-11-21: read as cm. */
+  dimUnit?: DimensionUnit
   weight: string
   weightUnit: WeightUnit
   perItem: 'Per Item' | 'Total'
@@ -41,6 +45,8 @@ export interface ItemGroup {
   palletLength: string
   palletWidth: string
   palletHeight: string
+  /** Missing on drafts saved before 2026-11-21: read as cm. */
+  palletDimUnit?: DimensionUnit
   palletWeightUnit: WeightUnit
   grossWeightPerPallet: string
   netWeightPerPallet: string
@@ -106,6 +112,7 @@ export function makeDefaultGroup(): ItemGroup {
     looseLength: '',
     looseWidth: '',
     looseHeight: '',
+    dimUnit: 'cm',
     weight: '',
     weightUnit: 'kg',
     perItem: 'Per Item',
@@ -116,6 +123,7 @@ export function makeDefaultGroup(): ItemGroup {
     palletLength: '120',
     palletWidth: '100',
     palletHeight: '',
+    palletDimUnit: 'cm',
     palletWeightUnit: 'kg',
     grossWeightPerPallet: '',
     netWeightPerPallet: '',

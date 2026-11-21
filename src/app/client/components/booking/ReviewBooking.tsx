@@ -75,6 +75,8 @@ function buildCargoItems(
         ...(r.lengthCm !== null && { length_cm: r.lengthCm }),
         ...(r.widthCm  !== null && { width_cm:  r.widthCm  }),
         ...(r.heightCm !== null && { height_cm: r.heightCm }),
+        // Sizes are sent in cm; the unit is kept so every screen shows them as typed.
+        ...((r.lengthCm !== null || r.widthCm !== null || r.heightCm !== null) && { dimension_unit: r.dimensionUnit }),
       })
     }
   }
@@ -466,7 +468,7 @@ export default function StepReview({ selectedService, pendingFiles, onBack, onNe
                                     label="Dimensions (L × W × H)"
                                     value={
                                       g.looseLength && g.looseWidth && g.looseHeight
-                                        ? `${g.looseLength} × ${g.looseWidth} × ${g.looseHeight} cm`
+                                        ? `${g.looseLength} × ${g.looseWidth} × ${g.looseHeight} ${g.dimUnit ?? 'cm'}`
                                         : '—'
                                     }
                                   />
@@ -487,7 +489,7 @@ export default function StepReview({ selectedService, pendingFiles, onBack, onNe
                                     label="Dimensions (L × W × H)"
                                     value={
                                       g.palletLength && g.palletWidth && g.palletHeight
-                                        ? `${g.palletLength} × ${g.palletWidth} × ${g.palletHeight} cm`
+                                        ? `${g.palletLength} × ${g.palletWidth} × ${g.palletHeight} ${g.palletDimUnit ?? 'cm'}`
                                         : '—'
                                     }
                                   />

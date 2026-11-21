@@ -123,6 +123,7 @@ import { useResolvedBookingKey } from '@/lib/booking-url'
 import { TruncatedText } from '@/components/ui/TruncatedText'
 import { ORDER_LABELS, isReversed, orderField, orderRules, reverseParam, withoutOrder } from '@/lib/table-order'
 import { Tip } from '@/components/ui/tooltip'
+import { formatSize } from '@/lib/cargo/units'
 
 const BOOKING_STATUSES: AdminBookingLifecycleStatus[] = [
   'pending',
@@ -283,6 +284,19 @@ function DelayedBadge({ minutes }: { minutes: number | null }) {
   )
 }
 
+/** Badge: still Assigned 15+ min after its call time (late-start.scheduler). */
+function LateStartBadge({ className = 'mt-1' }: { className?: string }) {
+  return (
+    <Tip label="Still Assigned 15 minutes or more after the call time"><span
+      className={`flex w-fit items-center gap-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border whitespace-nowrap ${className}`}
+      style={{ color: '#F62626', borderColor: '#F6262655', background: '#F6262614' }}
+    >
+      <Clock size={9} />
+      Late start
+    </span></Tip>
+  )
+}
+
 /** List badge: the delivery is paused (weather, breakdown, closed stop…). */
 function PausedBadge({ reason }: { reason: string }) {
   return (
@@ -320,6 +334,8 @@ interface ListRow {
   pause_reason: string | null
   /** Minutes late when flagged delayed (and not paused); null otherwise. */
   delayed: number | null | undefined
+  /** Still Assigned 15+ min after its call time (late-start.scheduler). */
+  late_start: boolean
   /** The driver reported a breakdown and the office hasn't paused or closed it. */
   breakdown: boolean
   /** Late confirmations from a previous main driver waiting for Accept / Dismiss (staff only). */
@@ -352,6 +368,7 @@ function toRows(raw: Record<string, unknown>[]): ListRow[] {
       pause_reason:      b.paused_at && typeof b.pause_reason === 'string' ? b.pause_reason : null,
       // undefined = not delayed; a paused delivery is explained by its pause.
       delayed:           b.delayed_since && !b.paused_at ? (typeof b.delay_minutes === 'number' ? b.delay_minutes : null) : undefined,
+      late_start:        b.status === 'assigned' && !!b.late_start_for,
       breakdown:         !!b.breakdown_reported_at && !b.paused_at,
       late_pending:      typeof b.late_pending === 'number' ? b.late_pending : 0,
       issue_open:        hasOpenClientIssue(b),
@@ -2329,6 +2346,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                               {r.partly_failed && <PartlyFailedBadge booking={r.raw} />}
                               {r.pause_reason && <PausedBadge reason={r.pause_reason} />}
                               {r.delayed !== undefined && <DelayedBadge minutes={r.delayed} />}
+                              {r.late_start && <LateStartBadge />}
                               {['assigned', 'in_transit'].includes(r.status) &&
                                 crewLicenseFlags(allAssignments.find((x) => x.booking_id === r.booking_id), r.schedule_date).length > 0 && (
                                 <Tip label="A driver's license expires before, during or within 7 days of this delivery"><span
@@ -2409,6 +2427,9 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                       <>
                         <ResubmittedBadge className="" tone="red" count={resubmissionsOf(detail)} />
                         <SharedDelayedBadge className="" booking={detail} />
+                        {detail.status === 'assigned' && !!(detail as { late_start_for?: string | null }).late_start_for && (
+                          <LateStartBadge className="" />
+                        )}
                         <span className="inline-flex flex-col items-start">
                           <Tag color={statusColor(detail.status)} size="md">{fmtStatus(detail.status)}</Tag>
                           {hasOpenClientIssue(detail as unknown as Record<string, unknown>) && (
@@ -2477,7 +2498,6 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                           </SectionHeading>
                           <div className="space-y-3">
                             {cargoItems.map((item, idx) => {
-                              const hasDims = item.length_cm && item.width_cm && item.height_cm
                               const dropOff = item.destination_id ? stopNumberById.get(item.destination_id) ?? null : null
                               return (
                                 <CargoItemCard
@@ -2491,7 +2511,9 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                                   ashc={item.ashc?.name ?? item.ashc?.code ?? item.ashc_text ?? null}
                                   weight={fmtNum(item.weight_kg, 'KG')}
                                   volume={fmtNum(item.volume_cbm, 'CBM', 4)}
-                                  dims={hasDims ? `${item.length_cm} × ${item.width_cm} × ${item.height_cm} cm` : null}
+                                  dims={item.length_cm && item.width_cm && item.height_cm
+                                    ? formatSize(item.length_cm, item.width_cm, item.height_cm, item.dimension_unit)
+                                    : null}
                                   notes={item.notes}
                                 />
                               )

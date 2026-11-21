@@ -21,7 +21,8 @@ import {
   makeDefaultGroup,
   removeExistingDocument,
 } from '@/lib/store/booking.store'
-import type { CargoMode, ItemGroup, WeightUnit } from '@/lib/store/booking.store'
+import type { CargoMode, DimensionUnit, ItemGroup, WeightUnit } from '@/lib/store/booking.store'
+import { CM_PER_UNIT, DIMENSION_UNIT_NAME as UNIT_NAME, toCm } from '@/lib/cargo/units'
 import { documentName, draftFingerprint } from '@/lib/booking-resubmit'
 
 // Stable empty list, so the selector below does not hand back a new array
@@ -89,17 +90,27 @@ const PALLET_DIMENSIONS: Record<
   Custom:   { palletLength: '',    palletWidth: '',    palletHeight: '' },
 }
 
-// The pallet type that matches a typed length × width (cm), either way round
+// The pallet type that matches a typed length × width, either way round
 // (a 80 × 120 pallet is the same Euro pallet turned); anything else is Custom.
-function palletTypeFor(length: string, width: string): ItemGroup['palletType'] {
-  const l = Number(length), w = Number(width)
-  if (!length.trim() || !width.trim() || !Number.isFinite(l) || !Number.isFinite(w)) return 'Custom'
+// The presets are in cm, so a size typed in m or inches is compared in cm, to
+// within half a centimetre (47.24 × 39.37 in is still a Standard pallet).
+function palletTypeFor(length: string, width: string, unit: DimensionUnit | undefined): ItemGroup['palletType'] {
+  const ln = Number(length), wn = Number(width)
+  if (!length.trim() || !width.trim() || !Number.isFinite(ln) || !Number.isFinite(wn)) return 'Custom'
+  const l = toCm(ln, unit), w = toCm(wn, unit)
+  const near = (a: number, b: number) => Math.abs(a - b) <= 0.5
   for (const type of ['Standard', 'Euro', 'Half'] as const) {
     const p = PALLET_DIMENSIONS[type]
     const pl = Number(p.palletLength), pw = Number(p.palletWidth)
-    if ((l === pl && w === pw) || (l === pw && w === pl)) return type
+    if ((near(l, pl) && near(w, pw)) || (near(l, pw) && near(w, pl))) return type
   }
   return 'Custom'
+}
+
+/** A preset's cm size written in another unit, trimmed to 2 decimals ("47.24", "1.2"). */
+function presetIn(cm: string, unit: DimensionUnit): string {
+  if (!cm) return ''
+  return String(Math.round((Number(cm) / CM_PER_UNIT[unit]) * 100) / 100)
 }
 
 /** `name` if free, else "base (1).ext", "base (2).ext"… (case-insensitive, like Windows/macOS). */
@@ -1245,7 +1256,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                     <p><span className="text-[var(--color-cyan)]">Net Weight</span> = Pallets × Net/Pallet</p>
                     <p><span className="text-[var(--color-cyan)]">Volume</span> = Pallets × (L × W × H) ÷ 1,000,000</p>
                     <p className="text-white/30 text-[10px] mt-1 pt-1 border-t border-white/[0.07]">
-                      Dimensions in cm → result in CBM
+                      Dimensions converted to cm → result in CBM
                     </p>
                   </div>
                 ) : (
@@ -1254,7 +1265,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                     <p><span className="text-[var(--color-cyan)]">Volume</span> = Pieces × (L × W × H) ÷ 1,000,000</p>
                     <p><span className="text-[var(--color-cyan)]">Density</span> = Gross Weight ÷ Volume</p>
                     <p className="text-white/30 text-[10px] mt-1 pt-1 border-t border-white/[0.07]">
-                      Dimensions in cm → result in CBM · lbs auto-converted to kg
+                      Dimensions converted to cm → result in CBM · lbs auto-converted to kg
                     </p>
                   </div>
                 )}
@@ -1366,14 +1377,15 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                                           <TextField value={g[dim]}
                                             onChange={(e) => setGroupField(section.dropoffIndex, g.id, dim, decimalOnly(e.target.value))}
                                             onBlur={() => touchField(`${g.id}:${dim}`)}
-                                            inputProps={{ inputMode: 'decimal' }}
+                                            inputProps={{ inputMode: 'decimal', 'aria-label': `${dim === 'looseLength' ? 'Length' : dim === 'looseWidth' ? 'Width' : 'Height'} in ${UNIT_NAME[g.dimUnit ?? 'cm']}` }}
                                             placeholder={dim === 'looseLength' ? 'L' : dim === 'looseWidth' ? 'W' : 'H'}
                                             variant="outlined" error={!!gErr[dim]}
                                             sx={{ ...fieldSx(INPUT_BG_CARD, BORDER_CARD, !!gErr[dim]), width: '100%' }} />
                                           {gErr[dim] && <FormHelperText sx={HELPER_SX}>{gErr[dim]}</FormHelperText>}
                                         </div>
                                       ))}
-                                      <DimensionUnitSelect />
+                                      <DimensionUnitSelect value={g.dimUnit ?? 'cm'}
+                                        onChange={(u) => handleUpdateGroup(section.dropoffIndex, g.id, { dimUnit: u })} />
                                     </div>
                                   </div>
 
@@ -1430,12 +1442,13 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                                     <Dropdown value={g.palletType} aria-label="Pallet type"
                                       onChange={(e) => {
                                         const type = e.target.value as ItemGroup['palletType']
-                                        handleUpdateGroup(section.dropoffIndex, g.id, { palletType: type, ...PALLET_DIMENSIONS[type] })
+                                        // The preset sizes are cm, so picking one switches the size unit back to cm.
+                                        handleUpdateGroup(section.dropoffIndex, g.id, { palletType: type, palletDimUnit: 'cm', ...PALLET_DIMENSIONS[type] })
                                       }}
                                       className={`${SELECT_BOX} w-full`}>
-                                      <option value="Standard">Standard (120×100)</option>
-                                      <option value="Euro">Euro (120×80)</option>
-                                      <option value="Half">Half (60×80)</option>
+                                      <option value="Standard">Standard (120×100 cm)</option>
+                                      <option value="Euro">Euro (120×80 cm)</option>
+                                      <option value="Half">Half (60×80 cm)</option>
                                       <option value="Custom">Custom</option>
                                     </Dropdown>
                                   </div>
@@ -1453,10 +1466,10 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                                               const length = dim === 'palletLength' ? value : g.palletLength
                                               const width  = dim === 'palletWidth'  ? value : g.palletWidth
                                               touchField(`${g.id}:${dim}`)
-                                              handleUpdateGroup(section.dropoffIndex, g.id, { [dim]: value, palletType: palletTypeFor(length, width) })
+                                              handleUpdateGroup(section.dropoffIndex, g.id, { [dim]: value, palletType: palletTypeFor(length, width, g.palletDimUnit) })
                                             }}
                                             onBlur={() => touchField(`${g.id}:${dim}`)}
-                                            inputProps={{ inputMode: 'decimal' }}
+                                            inputProps={{ inputMode: 'decimal', 'aria-label': `${dim === 'palletLength' ? 'Length' : dim === 'palletWidth' ? 'Width' : 'Height'} in ${UNIT_NAME[g.palletDimUnit ?? 'cm']}` }}
                                             placeholder={dim === 'palletLength' ? 'L' : dim === 'palletWidth' ? 'W' : 'H'}
                                             variant="outlined" error={!!gErr[dim as keyof GroupErrors]}
                                             sx={{ ...fieldSx(INPUT_BG_CARD, BORDER_CARD, !!gErr[dim as keyof GroupErrors]), width: '100%' }} />
@@ -1465,7 +1478,16 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                                           )}
                                         </div>
                                       ))}
-                                      <DimensionUnitSelect />
+                                      <DimensionUnitSelect value={g.palletDimUnit ?? 'cm'}
+                                        onChange={(u) => {
+                                          // Typed numbers keep their value and take the new unit (like the weight unit).
+                                          // A preset's size was filled in by us, not typed, so it is rewritten in the
+                                          // new unit and the pallet stays Standard / Euro / Half.
+                                          const preset = g.palletType !== 'Custom' ? PALLET_DIMENSIONS[g.palletType] : null
+                                          handleUpdateGroup(section.dropoffIndex, g.id, preset
+                                            ? { palletDimUnit: u, palletLength: presetIn(preset.palletLength, u), palletWidth: presetIn(preset.palletWidth, u) }
+                                            : { palletDimUnit: u })
+                                        }} />
                                     </div>
                                   </div>
 
@@ -2065,11 +2087,15 @@ function CheckRow({ checked, onChange, label }: { checked: boolean; onChange: (v
   )
 }
 
-/** Dimensions are entered in centimetres; the box shows the unit the way the Figma does. */
-function DimensionUnitSelect() {
+/** The size unit the client types in; summary.ts converts every size to cm before it is used or sent. */
+function DimensionUnitSelect({ value, onChange }: { value: DimensionUnit; onChange: (u: DimensionUnit) => void }) {
   return (
-    <Dropdown value="cm" aria-label="Dimension unit" className={`${SELECT_BOX} w-[72px] shrink-0`}>
+    <Dropdown value={value} aria-label="Dimension unit"
+      onChange={(e) => onChange(e.target.value as DimensionUnit)}
+      className={`${SELECT_BOX} w-[72px] shrink-0`}>
       <option value="cm">CM</option>
+      <option value="m">M</option>
+      <option value="in">IN</option>
     </Dropdown>
   )
 }

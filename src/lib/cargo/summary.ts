@@ -1,4 +1,5 @@
-import type { CargoMode, DropoffSection, ItemGroup } from '@/lib/store/booking.store'
+import type { CargoMode, DimensionUnit, DropoffSection, ItemGroup } from '@/lib/store/booking.store'
+import { dimensionUnit, toCm } from './units'
 
 /**
  * The one cargo summary calculation.
@@ -25,6 +26,12 @@ const LBS_TO_KG = 0.453592
 
 const toKg = (value: number, unit: 'kg' | 'lbs'): number =>
   unit === 'lbs' ? value * LBS_TO_KG : value
+
+/** A positive size converted to cm, or null. */
+function positiveCm(raw: string | undefined, unit: DimensionUnit | undefined): number | null {
+  const n = positive(raw)
+  return n === null ? null : toCm(n, unit)
+}
 
 /** A finite number strictly greater than zero, or null. */
 function positive(raw: string | number | undefined): number | null {
@@ -100,9 +107,9 @@ export function palletizedGroup(g: ItemGroup) {
 
   const grossPer = nonNegative(g.grossWeightPerPallet)
   const netPer   = nonNegative(g.netWeightPerPallet)
-  const l        = positive(g.palletLength)
-  const w        = positive(g.palletWidth)
-  const h        = positive(g.palletHeight)
+  const l        = positiveCm(g.palletLength, g.palletDimUnit)
+  const w        = positiveCm(g.palletWidth,  g.palletDimUnit)
+  const h        = positiveCm(g.palletHeight, g.palletDimUnit)
 
   const hasDims = l !== null && w !== null && h !== null
 
@@ -114,6 +121,8 @@ export function palletizedGroup(g: ItemGroup) {
     lengthCm:      l,
     widthCm:       w,
     heightCm:      h,
+    /** The unit the sizes were typed in; stored on the line so screens show them as typed. */
+    dimensionUnit: dimensionUnit(g.palletDimUnit),
     // A pallet the client did not mark stackable must not be double-decked.
     stackable:     !!g.stackable,
     // A loaded pallet is never turned onto its side.
@@ -127,9 +136,9 @@ export function looseGroup(g: ItemGroup) {
   if (pieces === null) return null
 
   const weight = positive(g.weight)
-  const l      = positive(g.looseLength)
-  const w      = positive(g.looseWidth)
-  const h      = positive(g.looseHeight)
+  const l      = positiveCm(g.looseLength, g.dimUnit)
+  const w      = positiveCm(g.looseWidth,  g.dimUnit)
+  const h      = positiveCm(g.looseHeight, g.dimUnit)
 
   const hasDims = l !== null && w !== null && h !== null
 
@@ -146,6 +155,7 @@ export function looseGroup(g: ItemGroup) {
     lengthCm:      l,
     widthCm:       w,
     heightCm:      h,
+    dimensionUnit: dimensionUnit(g.dimUnit),
     stackable:     !g.nonStackable,
     tiltable:      !g.nonTiltable,
   }

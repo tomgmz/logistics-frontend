@@ -22,6 +22,7 @@ import { CARD_CLASS, SectionHeading, Tag } from '@/app/admin/booking-management/
 import { BORDER_C, CYAN, MUTED, ERROR, AMBER, GREEN } from './transaction-theme'
 import { FileViewButton, ProtectedImg } from '@/components/ui/FileViewer'
 import { usePanelSection } from '@/components/ui/PanelReady'
+import { formatSize } from '@/lib/cargo/units'
 
 /**
  * The staff-only half of a transaction: everything attached to the booking that
@@ -379,6 +380,7 @@ function CargoLinesSection({ booking }: { booking: Booking }) {
     item_id: string
     quantity?: number | null; weight_kg?: number | null; volume_cbm?: number | null
     length_cm?: number | null; width_cm?: number | null; height_cm?: number | null
+    dimension_unit?: string | null
     notes?: string | null
     product_text?: string | null; commodity_text?: string | null
     products?: { name?: string; unit?: string | null } | null
@@ -392,8 +394,7 @@ function CargoLinesSection({ booking }: { booking: Booking }) {
     <Panel icon={<Package {...ICON} />} title={`Cargo Lines (${items.length})`}>
       {items.map((it) => {
         const name = it.products?.name ?? it.product_text ?? it.commodities?.name ?? it.commodity_text ?? 'Item'
-        const dims = [it.length_cm, it.width_cm, it.height_cm].every((n) => n != null)
-          ? `${it.length_cm} × ${it.width_cm} × ${it.height_cm} cm` : null
+        const dims = formatSize(it.length_cm, it.width_cm, it.height_cm, it.dimension_unit)
         const handling = [it.shc?.code, it.ashc?.code].filter(Boolean).join(', ')
         return (
           <Card key={it.item_id}>

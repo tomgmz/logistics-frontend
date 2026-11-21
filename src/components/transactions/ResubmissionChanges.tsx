@@ -15,6 +15,7 @@ import Dropdown from '@/components/ui/Dropdown'
 import { DesignCard } from '@/app/admin/booking-management/BookingDetailParts'
 import { FileViewButton } from '@/components/ui/FileViewer'
 import { usePanelSection } from '@/components/ui/PanelReady'
+import { formatSize } from '@/lib/cargo/units'
 
 /**
  * The old and resubmitted values of a booking the client corrected after a
@@ -52,9 +53,7 @@ function yesNo(v: unknown): string {
 }
 
 function cargoLine(c: Record<string, unknown>): string {
-  const dims = [c.length_cm, c.width_cm, c.height_cm].every((x) => x != null)
-    ? `${Number(c.length_cm)} × ${Number(c.width_cm)} × ${Number(c.height_cm)} CM`
-    : ''
+  const dims = formatSize(c.length_cm, c.width_cm, c.height_cm, c.dimension_unit, { upper: true }) ?? ''
   return [
     [c.product, c.commodity ? `(${c.commodity})` : ''].filter(Boolean).join(' '),
     c.quantity != null ? `${Number(c.quantity)}${c.unit ? ` ${c.unit}` : ''}` : '',
@@ -150,8 +149,7 @@ interface ChangeGroup { label: string; rows: Array<{ before: string; after: stri
 
 function cargoParts(c: Record<string, unknown> | undefined): Array<[string, string]> {
   if (!c) return []
-  const dims = [c.length_cm, c.width_cm, c.height_cm].every((x) => x != null)
-    ? `${Number(c.length_cm)} × ${Number(c.width_cm)} × ${Number(c.height_cm)} CM` : ''
+  const dims = formatSize(c.length_cm, c.width_cm, c.height_cm, c.dimension_unit, { upper: true }) ?? ''
   return [
     ['Product',   String(c.product ?? '')],
     ['Commodity', String(c.commodity ?? '')],

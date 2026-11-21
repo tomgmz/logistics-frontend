@@ -62,6 +62,8 @@ export interface CargoItemPayload {
   length_cm?:      number
   width_cm?:       number
   height_cm?:      number
+  /** Unit the client typed the size in; the *_cm fields are always cm. */
+  dimension_unit?: 'cm' | 'm' | 'in'
   notes?:          string
 }
 

@@ -1,5 +1,6 @@
 import type { BookingWithRelations } from '@/lib/types/booking-relations'
 import { makeDefaultGroup, type DropoffSection, type ItemGroup } from '@/lib/store/booking.store'
+import { dimensionUnit, fromCm } from '@/lib/cargo/units'
 
 /**
  * Whether a booking is an 8338 rejection still waiting on the client — the
@@ -64,6 +65,7 @@ type StoredCargoItem = {
   length_cm?:      number | string | null
   width_cm?:       number | string | null
   height_cm?:      number | string | null
+  dimension_unit?: string | null
   products?:       { name: string } | null
   commodities?:    { name: string } | null
   shc?:            { code: string } | null
@@ -96,12 +98,16 @@ export function bookingToResubmitDraft(b: BookingWithRelations): ResubmitDraft {
   for (const item of (b.booking_cargo_items ?? []) as StoredCargoItem[]) {
     // A line not tied to a stop belongs with the first one.
     const index = (item.destination_id && indexByDestination.get(item.destination_id)) || 0
+    const dimUnit = dimensionUnit(item.dimension_unit)
+    const sizeStr = (v: unknown): string => { const n = num(v); return n != null ? String(fromCm(n, dimUnit)) : '' }
     const group: ItemGroup = {
       ...makeDefaultGroup(),
       pieces:        str(item.quantity),
-      looseLength:   str(item.length_cm),
-      looseWidth:    str(item.width_cm),
-      looseHeight:   str(item.height_cm),
+      // Back in the unit the client typed them in (stored as cm).
+      dimUnit,
+      looseLength:   sizeStr(item.length_cm),
+      looseWidth:    sizeStr(item.width_cm),
+      looseHeight:   sizeStr(item.height_cm),
       weight:        str(item.weight_kg),
       weightUnit:    'kg',
       // Stored weight is the line's total, not per piece.

@@ -127,6 +127,8 @@ export interface BookingDetail {
     length_cm?:      number | null
     width_cm?:       number | null
     height_cm?:      number | null
+    /** Unit the client typed the size in; sizes are cm. null = cm. */
+    dimension_unit?: string | null
     notes?:          string | null
     commodities?:    { name: string; category?: string | null } | null
     products?:       { name: string; unit?: string | null } | null
