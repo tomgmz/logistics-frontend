@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { PauseCircle } from 'lucide-react'
 import { CARD_TOGGLE, ToggleBox } from '@/components/ui/accordion'
 
-import { pauseService, pauseReasonLabel, PAUSE_REASON_LABEL, type BookingPause, type PauseReason } from '@/lib/services/admin/pause.service'
+import { pauseService, pauseReasonLabel, PAUSE_REASON_LABEL, resumeRequestOpen, type BookingPause, type PauseReason } from '@/lib/services/admin/pause.service'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { appToast } from '@/lib/toast'
@@ -123,6 +123,8 @@ export default function PausePanel({ bookingId, pausedAt, inTransit, canControl,
   const [pauses, setPauses]   = useState<BookingPause[]>([])
   const [showPast, setShowPast] = useState(false)
   const [asking, setAsking]   = useState(false)
+  // "Not yet" to the driver's "Ready to continue", while its reason is written.
+  const [declining, setDeclining] = useState(false)
   const [pausing, setPausing] = useState(false)
   const [reason, setReason]   = useState<PauseReason | ''>('')
   const [busy, setBusy]       = useState(false)
@@ -202,6 +204,21 @@ export default function PausePanel({ bookingId, pausedAt, inTransit, canControl,
       onUpdated()
     } catch (err) {
       appToast.error(getApiErrorMessage(err, 'Could not set the continuation date.'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function declineRequest(note: string) {
+    setBusy(true)
+    try {
+      await pauseService.declineRequest(bookingId, note)
+      appToast.success('Answer sent. The driver was told to keep waiting, with your reason.')
+      setDeclining(false)
+      await load()
+      onUpdated()
+    } catch (err) {
+      appToast.error(getApiErrorMessage(err, 'Could not send the answer.'))
     } finally {
       setBusy(false)
     }
@@ -313,6 +330,39 @@ export default function PausePanel({ bookingId, pausedAt, inTransit, canControl,
             <Link href={reportHref(open.report_id)} className="text-xs font-bold underline self-start" style={{ color: PALETTE.orange }}>
               Breakdown report filed — open it in Reports
             </Link>
+          )}
+
+          {/* The driver pressed "Ready to continue" on the paused banner. Ending the
+              pause (End Pause below) is the yes; "Not yet" keeps it paused with a reason. */}
+          {resumeRequestOpen(open) && open.resume_requested_at && (
+            <div className="rounded-[15px] border px-3.5 sm:px-4 py-3 flex flex-col gap-2"
+              style={{ borderColor: PALETTE.yellow, background: '#262305' }}>
+              <h4 className="text-sm font-bold leading-tight" style={{ color: PALETTE.yellow }}>Driver ready to continue</h4>
+              <p className="text-xs font-bold leading-snug" style={{ color: MUTED }}>
+                {personName(open.requester ?? null) ?? 'The driver'} asked at {formatDateTime(open.resume_requested_at)}
+                {' '}({duration(open.resume_requested_at, null)} ago)
+              </p>
+              {open.resume_request_note && (
+                <p className="text-xs font-bold text-white leading-snug whitespace-pre-wrap break-words">
+                  &ldquo;{open.resume_request_note}&rdquo;
+                </p>
+              )}
+              <p className="text-xs font-bold leading-snug" style={{ color: MUTED }}>
+                End the pause if it is safe to go, or answer &ldquo;Not yet&rdquo; with a reason for the driver.
+              </p>
+              {canAct && (
+                <button type="button" disabled={busy} onClick={() => setDeclining(true)} {...writeAccess(allowed)}
+                  className={tealSmall} style={{ background: 'transparent', borderColor: PALETTE.yellow, color: PALETTE.yellow }}>
+                  Not yet
+                </button>
+              )}
+            </div>
+          )}
+          {!resumeRequestOpen(open) && open.resume_declined_at && (
+            <p className="text-xs font-bold leading-snug whitespace-pre-wrap break-words" style={{ color: MUTED }}>
+              The driver asked to continue; {personName(open.decliner ?? null) ?? 'the office'} answered &ldquo;Not yet&rdquo; at{' '}
+              {formatDateTime(open.resume_declined_at)}{open.resume_decline_note ? `: ${open.resume_decline_note}` : ''}
+            </p>
           )}
 
           {/* When it continues: a date for the client, plus a call time for the driver. */}
@@ -428,6 +478,20 @@ export default function PausePanel({ bookingId, pausedAt, inTransit, canControl,
           </Dropdown>
         </div>
       </RemarksModal>
+
+      <RemarksModal
+        open={declining}
+        title="Keep the delivery paused?"
+        description="The driver is told the office answered not yet, with your reason. They can ask again later."
+        remarksLabel="Reason for the driver"
+        remarksPlaceholder="e.g. Still flooded at the next drop-off — wait for our call."
+        confirmLabel="Send"
+        busy={busy}
+        minRemarks={3}
+        minRemarksMessage="Say why the delivery stays paused (at least 3 characters)."
+        onConfirm={(note) => void declineRequest(note)}
+        onCancel={() => setDeclining(false)}
+      />
 
       <RemarksModal
         open={asking}

@@ -36,8 +36,21 @@ export interface BookingPause {
   expected_resume_date:      string | null
   /** The driver's call time for that day (HH:MM[:SS]). */
   expected_resume_call_time: string | null
+  /** The driver's latest "Ready to continue", and the office's latest "Not yet". */
+  resume_requested_at: string | null
+  resume_request_note: string | null
+  resume_declined_at:  string | null
+  resume_decline_note: string | null
   pauser:      PersonName | null
   resumer:     PersonName | null
+  requester?:  PersonName | null
+  decliner?:   PersonName | null
+}
+
+/** The driver's "Ready to continue" is waiting for an answer. */
+export function resumeRequestOpen(p: Pick<BookingPause, 'resumed_at' | 'resume_requested_at' | 'resume_declined_at'>): boolean {
+  if (p.resumed_at || !p.resume_requested_at) return false
+  return !p.resume_declined_at || Date.parse(p.resume_declined_at) < Date.parse(p.resume_requested_at)
 }
 
 const B = '/admin/assignments'
@@ -62,6 +75,13 @@ export const pauseService = {
   setContinuation: async (bookingId: string, date: string, callTime: string) => {
     await initCsrf()
     const { data } = await proxyApi.patch<ApiResponse<unknown>>(`${B}/${bookingId}/pause/continuation`, { date, call_time: callTime })
+    return data.data
+  },
+
+  /** "Not yet" to the driver's request: the reason goes to the driver; the delivery stays paused. */
+  declineRequest: async (bookingId: string, note: string) => {
+    await initCsrf()
+    const { data } = await proxyApi.patch<ApiResponse<unknown>>(`${B}/${bookingId}/resume-request/decline`, { note })
     return data.data
   },
 
