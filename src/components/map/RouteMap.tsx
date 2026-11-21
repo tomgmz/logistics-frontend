@@ -464,7 +464,7 @@ export default function RouteMap({ initialBookingId }: { initialBookingId?: stri
   )
 
   return (
-    <APIProvider apiKey={GOOGLE_MAPS_KEY} libraries={['routes']}>
+    <APIProvider apiKey={GOOGLE_MAPS_KEY}>
 
       <div
         className="hidden lg:flex h-dvh overflow-hidden flex-col"

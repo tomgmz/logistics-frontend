@@ -440,7 +440,7 @@ export default function TransitTrackingView() {
   }
 
   return (
-    <APIProvider apiKey={GOOGLE_MAPS_KEY} libraries={['routes']}>
+    <APIProvider apiKey={GOOGLE_MAPS_KEY}>
       <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-60px)] overflow-hidden" style={PAGE_FONT}>
         {/* No header bar over the map (status badge dropped, as on RouteMap) and
             no Refresh: the list follows live:bookings (trips, stops and
