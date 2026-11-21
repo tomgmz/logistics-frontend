@@ -3,12 +3,11 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import {
-  AlertOctagon, AlertTriangle, ArrowUp, CheckCircle2, ExternalLink, Loader2, Minus, XCircle,
+  CheckCircle2, ChevronDown, ChevronUp, ExternalLink, Loader2,
   Mail, MapPin, Bell, ScanLine, Cloud, ShieldAlert, Plug,
 } from 'lucide-react'
-import { Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
-import { systemLogService, type SystemLogEventType, type SystemLogLevel } from '@/lib/services/admin/system-logs.service'
+import { systemLogService, type IssueAction, type SystemLogEventType, type SystemLogLevel } from '@/lib/services/admin/system-logs.service'
 import {
   itDashboardService,
   type ItDashboardSummary,
@@ -17,10 +16,8 @@ import {
   type ServiceHealth,
   type ServiceStatus,
   type SecurityWindow,
-  type ItDashboardTrend,
-  type TrendLevel,
-  type TrendRange,
 } from '@/lib/services/admin/it-dashboard.service'
+import { OverallBanner, HealthGrid, TodayCard, plainProblem, PLAIN_LEVEL } from './PlainOverview'
 import { formatDateTime } from '@/app/utils/timeFormat'
 import { roleLabel } from '@/lib/roles'
 
@@ -52,17 +49,6 @@ const EVENT_LABEL: Record<SystemLogEventType, string> = {
   external_api: 'External service',
   cron_job:     'Scheduled job',
   db_event:     'Database',
-}
-
-const LEVEL_COLOR: Record<SystemLogLevel, string> = {
-  info:     COLOR.cyan,
-  warn:     COLOR.amber,
-  error:    COLOR.red,
-  critical: COLOR.critical,
-}
-
-const LEVEL_LABEL: Record<SystemLogLevel, string> = {
-  info: 'Info', warn: 'Warning', error: 'Error', critical: 'Critical',
 }
 
 const SCHEDULER_STATUS: Record<SchedulerStatus, { label: string; color: string }> = {
@@ -109,12 +95,11 @@ function every(minutes: number): string {
 }
 
 /** Deep link into Logs → System Logs with filters pre-applied. */
-function logsHref(params: { level?: SystemLogLevel; event_type?: SystemLogEventType; search?: string; resolved?: boolean } = {}) {
+function logsHref(params: { level?: SystemLogLevel; event_type?: SystemLogEventType; search?: string } = {}) {
   const q = new URLSearchParams({ tab: 'system' })
   if (params.level)      q.set('level', params.level)
   if (params.event_type) q.set('event_type', params.event_type)
   if (params.search)     q.set('search', params.search)
-  if (params.resolved !== undefined) q.set('resolved', String(params.resolved))
   return `/it_admin/logs?${q.toString()}`
 }
 
@@ -211,244 +196,78 @@ function Stat({ label, value, color, href, hint }: {
     : <Tip label={hint}><div className={cls}>{body}</div></Tip>
 }
 
-// ── A · Problems waiting ─────────────────────────────────────────────────────
-
-const LEVEL_METRIC: Record<TrendLevel, { label: string; plural: string; icon: ReactNode; color: string }> = {
-  critical: { label: 'Unresolved critical', plural: 'Critical entries', icon: <AlertOctagon size={20} />,  color: COLOR.critical },
-  error:    { label: 'Unresolved errors',   plural: 'Errors',           icon: <XCircle size={20} />,       color: COLOR.red },
-  warn:     { label: 'Unresolved warnings', plural: 'Warnings',         icon: <AlertTriangle size={20} />, color: COLOR.amber },
-}
+// ── A · Problems to look at ──────────────────────────────────────────────────
 
 /**
- * dashboard-04's metric row: each card is also the chart's switch, the chosen
- * one ringed in cyan. The number is what is still unresolved; the badge is how
- * many were logged in the last 24 hours, resolved or not.
+ * Open issues: repeated errors grouped (Sentry-style), so one Resolve closes
+ * every occurrence. Critical first, then most recently seen.
  */
-function ProblemMetrics({ data, level, onLevel }: {
-  data: ItDashboardSummary['problems']; level: TrendLevel; onLevel: (level: TrendLevel) => void
-}) {
-  return (
-    <div className="flex flex-col gap-4 md:flex-row md:flex-wrap md:gap-5">
-      {(['critical', 'error', 'warn'] as const).map((key) => {
-        const m = LEVEL_METRIC[key]
-        const value = data.unresolved[key]
-        const day = data.last_24h[key]
-        const selected = key === level
-        return (
-          <button
-            key={key}
-            type="button"
-            onClick={() => onLevel(key)}
-            aria-pressed={selected}
-            className={`min-w-0 flex-1 rounded-xl bg-[#1b1b1b] text-left shadow-[0_1px_2px_rgba(0,0,0,0.3)] ring-inset transition md:min-w-[260px] ${
-              selected ? 'ring-2 ring-[#4df9ed]' : 'ring-1 ring-[#424242] [@media(hover:hover)]:hover:ring-[#5a5a5a]'
-            }`}
-          >
-            <div className="flex flex-col gap-4 px-4 py-5 md:flex-row md:px-5">
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-lg ring-1 ring-[#424242] ring-inset shadow-[0_1px_2px_rgba(0,0,0,0.4)]">
-                {m.icon}
-              </span>
-              <div className="flex w-full min-w-0 flex-col gap-2">
-                <p className="text-sm font-semibold text-[#818181]">{m.label}</p>
-                <div className="flex w-full flex-wrap items-center justify-between gap-4">
-                  <p className="flex-1 text-3xl font-semibold leading-none font-mono" style={{ color: value > 0 ? m.color : COLOR.muted }}>
-                    {value.toLocaleString()}
-                  </p>
-                  <span className="flex items-center gap-1 rounded-md py-0.5 pl-1.5 pr-2 text-sm font-medium ring-1 ring-[#424242] ring-inset">
-                    {day > 0 ? <ArrowUp size={14} className="text-[#818181]" /> : <Minus size={14} className="text-[#818181]" />}
-                    {day.toLocaleString()} in 24 hours
-                  </span>
-                </div>
-              </div>
-            </div>
-          </button>
-        )
-      })}
-    </div>
-  )
-}
-
-const RANGE_ITEMS: { id: TrendRange; label: string }[] = [
-  { id: '12m', label: '12 months' },
-  { id: '30d', label: '30 days' },
-  { id: '7d',  label: '7 days' },
-  { id: '24h', label: '24 hours' },
-]
-
-const MANILA = 'Asia/Manila'
-
-/** A bucket's axis tick and its tooltip title, in Manila time. */
-function bucketLabels(startIso: string, range: TrendRange): { tick: string; title: string } {
-  const d = new Date(startIso)
-  const f = (o: Intl.DateTimeFormatOptions) => d.toLocaleString('en-PH', { timeZone: MANILA, ...o })
-  if (range === '24h') return { tick: f({ hour: '2-digit', minute: '2-digit', hour12: false }), title: f({ month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) }
-  if (range === '12m') return { tick: f({ month: 'short' }), title: f({ month: 'long', year: 'numeric' }) }
-  return { tick: f({ month: 'short', day: 'numeric' }), title: f({ weekday: 'short', month: 'short', day: 'numeric' }) }
-}
-
-/**
- * Untitled UI's button group (dashboard-05's time range): bordered, the picked
- * button filled. Full width on phones, each button an equal share.
- */
-function RangeGroup({ value, onChange }: { value: TrendRange; onChange: (r: TrendRange) => void }) {
-  return (
-    <div role="group" aria-label="Time range"
-         className="flex w-full overflow-hidden rounded-lg shadow-[0_1px_2px_rgba(0,0,0,0.3)] ring-1 ring-[#424242] ring-inset sm:w-auto">
-      {RANGE_ITEMS.map((r, i) => {
-        const on = r.id === value
-        return (
-          <button
-            key={r.id}
-            type="button"
-            aria-pressed={on}
-            onClick={() => onChange(r.id)}
-            className={`flex-1 whitespace-nowrap px-2.5 py-2 text-sm font-semibold transition sm:flex-none sm:px-3.5 ${
-              i > 0 ? 'border-l border-[#424242]' : ''
-            } ${on ? 'bg-[#262626] text-[#e5e5e5]' : 'text-[#818181] [@media(hover:hover)]:hover:bg-[#1f1f1f] [@media(hover:hover)]:hover:text-[#e5e5e5]'}`}
-          >
-            {r.label}
-          </button>
-        )
-      })}
-    </div>
-  )
-}
-
-/** The dotted trend line: each bucket averaged with its neighbours. */
-function withTrend<T extends { count: number }>(points: T[]): (T & { trend: number })[] {
-  return points.map((p, i) => {
-    const near = points.slice(Math.max(0, i - 1), i + 2)
-    return { ...p, trend: near.reduce((s, x) => s + x.count, 0) / near.length }
-  })
-}
-
-/**
- * dashboard-05's chart (Untitled UI, "Site traffic"): title with the change on
- * the period before, the range as a button group, thin bars with a dotted
- * trend line over them, month/day/hour labels only. Bars are neutral; which
- * level is shown is the ringed metric card above. More problems than before
- * reads red, fewer green. Reloads with the summary (`reloadKey`) so it stays
- * as current as the cards.
- */
-function TrendSection({ level, reloadKey }: { level: TrendLevel; reloadKey: string }) {
-  const [range, setRange] = useState<TrendRange>('30d')
-  const [trend, setTrend] = useState<ItDashboardTrend | null>(null)
-  const [failed, setFailed] = useState(false)
-
-  useEffect(() => {
-    let live = true
-    const key = `it-dashboard|trend|${range}|${level}`
-    const cached = cachedData<ItDashboardTrend>(['page', key])
-    // After this render (not inside it): show the last trend for this range/level.
-    if (cached) queueMicrotask(() => { if (live) setTrend(cached) })
-    itDashboardService.getTrend(range, level)
-      .then((t) => { storeData(['page', key], t); if (live) { setTrend(t); setFailed(false) } })
-      .catch(() => { if (live) setFailed(true) })
-    return () => { live = false }
-  }, [range, level, reloadKey])
-
-  const m = LEVEL_METRIC[level]
-  // Only the data for what is chosen now: an older answer is not shown under a new heading.
-  const shown = trend && trend.range === range && trend.level === level ? trend : null
-  const points = withTrend((shown?.buckets ?? []).map((b) => ({ ...bucketLabels(b.start, range), count: b.count })))
-  const change = shown && shown.previous_total > 0
-    ? Math.round(((shown.total - shown.previous_total) / shown.previous_total) * 1000) / 10
-    : null
-
-  return (
-    <section className="flex flex-col gap-5">
-      <div className="flex flex-col items-start justify-between gap-4 lg:flex-row lg:items-center">
-        <h2 className="flex flex-wrap items-baseline gap-x-2 text-lg font-semibold text-white">
-          {m.plural} logged
-          <span className="font-mono">{shown ? shown.total.toLocaleString() : '—'}</span>
-          {change !== null && (
-            <Tip label="Against the same length of time just before"><span
-                  style={{ color: change > 0 ? COLOR.red : change < 0 ? COLOR.green : COLOR.muted }}>
-              {change > 0 ? '+' : ''}{change}%
-            </span></Tip>
-          )}
-        </h2>
-        <div className="flex w-full flex-wrap items-center gap-3 lg:w-auto">
-          <RangeGroup value={range} onChange={setRange} />
-          <CardLink href={logsHref({ level })}>View in Logs</CardLink>
-        </div>
-      </div>
-
-      <div className="h-60">
-        {failed && !shown ? (
-          <div className="flex h-full items-center justify-center rounded-xl ring-1 ring-[#2a2a2a] ring-inset text-sm text-[#818181]">
-            The chart could not be loaded.
-          </div>
-        ) : !shown ? (
-          <Skeleton className="h-full w-full rounded-xl" />
-        ) : (
-          <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={points} barCategoryGap="35%" margin={{ top: 8, right: 0, bottom: 0, left: 0 }}>
-              <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.08)" />
-              <XAxis dataKey="tick" tick={{ fill: '#818181', fontSize: 12 }} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={16} />
-              <YAxis hide allowDecimals={false} />
-              <Tooltip
-                cursor={{ fill: 'rgba(255,255,255,0.04)' }}
-                contentStyle={{ background: '#111', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, fontSize: 12 }}
-                labelStyle={{ color: '#e5e5e5' }}
-                itemStyle={{ color: '#e5e5e5' }}
-                labelFormatter={(_, p) => (p?.[0]?.payload as { title?: string } | undefined)?.title ?? ''}
-                formatter={(v, name) => name === 'trend'
-                  ? [Number(v).toLocaleString(undefined, { maximumFractionDigits: 1 }), 'Average']
-                  : [Number(v).toLocaleString(), m.plural]}
-              />
-              <Bar dataKey="count" fill="#a3a3a3" radius={[3, 3, 0, 0]} maxBarSize={10} isAnimationActive={false} />
-              <Line type="monotone" dataKey="trend" stroke="#4df9ed" strokeWidth={1.5} strokeDasharray="2 4"
-                    dot={false} activeDot={false} isAnimationActive={false} />
-            </ComposedChart>
-          </ResponsiveContainer>
-        )}
-      </div>
-    </section>
-  )
-}
-
-function ProblemsCard({ data, now, onResolve, resolving }: {
+function ProblemsCard({ data, now, onAct, busy }: {
   data: ItDashboardSummary['problems']; now: number
-  onResolve: (id: string) => void; resolving: Set<string>
+  onAct: (issueId: string, body: IssueAction) => void; busy: Set<string>
 }) {
+  const open = data.open_issues ?? data.unresolved.critical + data.unresolved.error
   return (
     <TableCard.Root>
       <TableCard.Header
-        title="Problems waiting"
-        contentTrailing={<CardLink href={logsHref({ resolved: false })}>All unresolved</CardLink>}
+        title={open > data.latest.length ? `Problems to look at (${data.latest.length} of ${open.toLocaleString()})` : 'Problems to look at'}
+        contentTrailing={<CardLink href="/it_admin/logs?tab=issues">See all</CardLink>}
       />
-      <Table head={['Level', 'Type', 'Message', 'When', '']} minWidth="min-w-[760px]">
+      <p className="border-b border-[#2a2a2a] px-4 md:px-6 py-3 text-sm text-[#a3a3a3]">
+        The same problem happening many times is one line. Press Resolve once it is fixed; if it happens again it comes back here.
+      </p>
+      <Table head={['How bad', 'What happened', 'Times', 'Last time', '']} minWidth="min-w-[820px]">
         {data.latest.length === 0 ? (
           <EmptyRow cols={5}>
             <span className="inline-flex items-center gap-2">
-              <CheckCircle2 size={15} className="text-[#3af626]" /> Nothing critical or failing is waiting.
+              <CheckCircle2 size={15} className="text-[#3af626]" /> Nothing to look at.
             </span>
           </EmptyRow>
-        ) : data.latest.map((row) => (
-          <tr key={row.log_id}>
-            <td className={`${TD} whitespace-nowrap`}><Pill label={LEVEL_LABEL[row.log_level]} color={LEVEL_COLOR[row.log_level]} /></td>
-            <td className={TD}>
-              <p className="whitespace-nowrap text-white">{EVENT_LABEL[row.event_type] ?? row.event_type}</p>
-              <p className="text-xs text-[#818181] break-words">{systemSourceLabel(row.source)}</p>
-            </td>
-            <td className={`${TD} text-white break-words`}>{row.message}</td>
-            <Tip label={formatDateTime(row.timestamp)}><td className={`${TD} whitespace-nowrap`}>
-              {ago(row.timestamp, now)}
-            </td></Tip>
-            <td className={`${TD} text-right`}>
-              <button
-                type="button"
-                onClick={() => onResolve(row.log_id)}
-                disabled={resolving.has(row.log_id)}
-                className="inline-flex items-center gap-1 rounded-lg border border-[#3af626]/30 bg-[#3af626]/10 px-2.5 py-1 text-xs font-medium text-[#3af626] transition [@media(hover:hover)]:hover:bg-[#3af626]/20 disabled:opacity-50"
-              >
-                {resolving.has(row.log_id) ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
-                Resolve
-              </button>
-            </td>
-          </tr>
-        ))}
+        ) : data.latest.map((row) => {
+          const id = row.issue_id ?? row.log_id
+          const lvl = PLAIN_LEVEL[row.log_level === 'critical' ? 'critical' : 'error']
+          return (
+            <tr key={id}>
+              <td className={`${TD} whitespace-nowrap`}><Pill label={lvl.word} color={lvl.color} /></td>
+              <td className={TD}>
+                <p className="text-white">
+                  {plainProblem(row.log_level, row.event_type, row.source)}
+                  {row.regressed && <span className="ml-2 text-xs text-[#ff7a30]">Came back after being resolved</span>}
+                </p>
+                <Tip label={`${EVENT_LABEL[row.event_type] ?? row.event_type} · ${row.source}`}>
+                  <p className="mt-0.5 text-xs text-[#818181] break-words">{systemSourceLabel(row.source)}: {row.message}</p>
+                </Tip>
+              </td>
+              <Tip label={row.first_seen ? `First seen ${formatDateTime(row.first_seen)}` : undefined}>
+                <td className={`${TD} whitespace-nowrap font-mono text-white`}>{(row.event_count ?? 1).toLocaleString()}</td>
+              </Tip>
+              <Tip label={formatDateTime(row.timestamp)}><td className={`${TD} whitespace-nowrap`}>
+                {ago(row.timestamp, now)}
+              </td></Tip>
+              <td className={`${TD} text-right whitespace-nowrap`}>
+                <span className="inline-flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onAct(id, { action: 'resolve' })}
+                    disabled={busy.has(id)}
+                    className="inline-flex items-center gap-1 rounded-lg border border-[#3af626]/30 bg-[#3af626]/10 px-2.5 py-1 text-xs font-medium text-[#3af626] transition [@media(hover:hover)]:hover:bg-[#3af626]/20 disabled:opacity-50"
+                  >
+                    {busy.has(id) ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
+                    Resolve
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onAct(id, { action: 'ignore', hours: 24 })}
+                    disabled={busy.has(id)}
+                    className="inline-flex items-center rounded-lg border border-[#424242] px-2.5 py-1 text-xs font-medium text-[#e0e0e0] transition [@media(hover:hover)]:hover:bg-white/5 disabled:opacity-50"
+                  >
+                    Ignore 24 hours
+                  </button>
+                </span>
+              </td>
+            </tr>
+          )
+        })}
       </Table>
     </TableCard.Root>
   )
@@ -460,10 +279,10 @@ function SchedulersCard({ data, now }: { data: SchedulerHealth[]; now: number })
   return (
     <TableCard.Root>
       <TableCard.Header
-        title="Scheduled jobs"
-        contentTrailing={<CardLink href={logsHref({ event_type: 'cron_job' })}>Job logs</CardLink>}
+        title="Automatic tasks"
+        contentTrailing={<CardLink href={logsHref({ event_type: 'cron_job' })}>Task logs</CardLink>}
       />
-      <Table head={['Job', 'Runs', 'Status', 'Last run', 'Errors today']} minWidth="min-w-[820px]">
+      <Table head={['Task', 'Runs', 'Status', 'Last run', 'Failures today']} minWidth="min-w-[820px]">
         {data.map((s) => {
           const st = SCHEDULER_STATUS[s.status]
           return (
@@ -492,8 +311,8 @@ function SchedulersCard({ data, now }: { data: SchedulerHealth[]; now: number })
         })}
       </Table>
       <Footnote>
-        A job is Late after two missed runs and Stopped after four. That usually means the backend
-        server restarted or went to sleep.
+        A task is Late after two missed runs and Stopped after four. That usually means the server
+        restarted or went to sleep.
       </Footnote>
     </TableCard.Root>
   )
@@ -508,7 +327,7 @@ function ServicesCard({ data, now }: { data: ServiceHealth[]; now: number }) {
   return (
     <TableCard.Root>
       <TableCard.Header
-        title="External services"
+        title="Connected services"
         contentTrailing={<CardLink href={logsHref({ event_type: 'external_api' })}>Service logs</CardLink>}
       />
       <Table head={['Service', 'Status', 'Last hour', '24 hours', '7 days', 'Last failure']} minWidth="min-w-[900px]">
@@ -561,8 +380,8 @@ function SecurityCard({ data }: { data: ItDashboardSummary['security'] }) {
             <ShieldAlert size={16} />
           </span>
           <div className="min-w-0">
-            <h2 className="text-base font-semibold text-white">Sign-in security</h2>
-            <p className="text-sm text-[#818181]">Counts and accounts only. IP addresses are never recorded.</p>
+            <h2 className="text-base font-semibold text-white">Sign-in safety</h2>
+            <p className="text-sm text-[#818181]">Who had trouble signing in, and what the system blocked. IP addresses are never recorded.</p>
           </div>
         </div>
         <TabsMinimal
@@ -576,19 +395,20 @@ function SecurityCard({ data }: { data: ItDashboardSummary['security'] }) {
       <div className="p-4 md:p-6">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <Stat label="Failed sign-ins" value={w.failed_sign_ins} color={COLOR.amber}
-                hint="Wrong password, or a locked or inactive account" />
-          <Stat label="Account lockouts" value={w.lockouts} color={COLOR.red} />
-          <Stat label="Rate limit hits" value={w.rate_limit_trips} color={COLOR.amber}
+                hint="Wrong password, or the account was locked or switched off" />
+          <Stat label="Accounts locked" value={w.lockouts} color={COLOR.red}
+                hint="Locked after too many wrong passwords" />
+          <Stat label="Blocked for trying too fast" value={w.rate_limit_trips} color={COLOR.amber}
                 href={logsHref({ event_type: 'auth_event', search: 'rate-limit' })}
-                hint="Too many requests to sign-in or reset endpoints" />
-          <Stat label="Critical sign-in alerts" value={w.critical_auth_alerts} color={COLOR.critical}
+                hint="Someone (or a bot) tried to sign in or reset a password too many times in a row" />
+          <Stat label="Unsafe sign-ins blocked" value={w.critical_auth_alerts} color={COLOR.critical}
                 href={logsHref({ event_type: 'auth_event', level: 'critical' })}
-                hint="Permanent lockouts and reuse of an already-replaced session token" />
-          <Stat label="Passkey failures" value={w.passkey_failures} color={COLOR.amber}
+                hint="A copied or old sign-in was used again, or an account was locked for good" />
+          <Stat label="Passkey problems" value={w.passkey_failures} color={COLOR.amber}
                 href={logsHref({ search: 'webauthn.service' })} />
           <Stat label="Password reset requests" value={w.reset_requests} color={COLOR.cyan} />
-          <Stat label="Passkeys enrolled" value={w.passkeys_enrolled} color={COLOR.cyan} />
-          <Stat label="Sessions ended by the system" value={w.sessions_revoked} color={COLOR.cyan}
+          <Stat label="New passkeys set up" value={w.passkeys_enrolled} color={COLOR.cyan} />
+          <Stat label="Signed out by the system" value={w.sessions_revoked} color={COLOR.cyan}
                 hint="Signed in elsewhere, password reset, deactivation or revoked passkey. Sign-outs are not counted." />
         </div>
 
@@ -633,9 +453,9 @@ function SecurityCard({ data }: { data: ItDashboardSummary['security'] }) {
       </div>
 
       <div className="flex flex-wrap items-center gap-x-6 gap-y-1 border-t border-[#2a2a2a] px-4 md:px-6 py-3 text-sm text-[#818181]">
-        <span>Signed-in sessions now: <span className="font-mono text-white">{data.active_sessions}</span></span>
+        <span>Signed in right now: <span className="font-mono text-white">{data.active_sessions}</span></span>
         <span>
-          Open password reset requests:{' '}
+          Password reset requests waiting:{' '}
           <Link href="/it_admin/administrator-management" className={data.open_reset_requests > 0 ? 'font-mono text-[#ffea00] hover:underline' : 'font-mono text-white'}>
             {data.open_reset_requests}
           </Link>
@@ -672,46 +492,6 @@ function AccountsCard({ data }: { data: ItDashboardSummary['accounts'] }) {
   )
 }
 
-// ── Overall banner ───────────────────────────────────────────────────────────
-
-function attentionItems(s: ItDashboardSummary): string[] {
-  const items: string[] = []
-  const { critical, error } = s.problems.unresolved
-  if (critical) items.push(`${critical} unresolved critical log entr${critical === 1 ? 'y' : 'ies'}`)
-  if (error)    items.push(`${error} unresolved error${error === 1 ? '' : 's'}`)
-  for (const j of s.schedulers) {
-    if (j.status === 'down')    items.push(`${j.label} has stopped`)
-    if (j.status === 'late')    items.push(`${j.label} is late`)
-    if (j.status === 'failing') items.push(`${j.label} is failing`)
-  }
-  for (const v of s.services) if (v.status === 'failing') items.push(`${v.label} is failing`)
-  const locked = s.security.locked_accounts.length
-  if (locked) items.push(`${locked} locked account${locked === 1 ? '' : 's'}`)
-  if (!s.accounts.it_admin && !s.accounts.it_standin) items.push('No active IT Administrator')
-  return items
-}
-
-function StatusBanner({ summary }: { summary: ItDashboardSummary }) {
-  const items = attentionItems(summary)
-  if (items.length === 0) {
-    return (
-      <div className="flex items-center gap-2 rounded-xl border border-[#3af626]/25 bg-[#3af626]/[0.06] px-4 py-3 text-sm text-[#3af626]">
-        <CheckCircle2 size={16} /> All systems normal. Nothing needs your attention.
-      </div>
-    )
-  }
-  return (
-    <div className="rounded-xl border border-[#f62626]/30 bg-[#f62626]/[0.06] px-4 py-3">
-      <p className="flex items-center gap-2 text-sm font-semibold text-[#f62626]">
-        <AlertOctagon size={16} /> {items.length} item{items.length === 1 ? '' : 's'} need{items.length === 1 ? 's' : ''} attention
-      </p>
-      <ul className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 pl-6 text-xs text-[#f62626] list-disc">
-        {items.map((t) => <li key={t}>{t}</li>)}
-      </ul>
-    </div>
-  )
-}
-
 // ── Loading ──────────────────────────────────────────────────────────────────
 
 const CARD = 'rounded-xl bg-[#1b1b1b] shadow-[0_1px_2px_rgba(0,0,0,0.3)] ring-1 ring-[#424242] ring-inset'
@@ -743,28 +523,20 @@ function ItDashboardSkeleton() {
     <div className="flex flex-col gap-5 lg:gap-6" aria-busy="true" aria-label="Loading dashboard">
       <Skeleton className="h-12 w-full rounded-xl" />
 
-      <div className="flex flex-col gap-4 md:flex-row md:flex-wrap md:gap-5">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className={`${CARD} flex min-w-0 flex-1 flex-col gap-4 px-4 py-5 md:min-w-[260px] md:flex-row md:px-5`}>
-            <Skeleton className="size-10 shrink-0 rounded-lg" />
-            <div className="flex w-full flex-col gap-3">
-              <Skeleton className="h-3.5 w-32" />
-              <div className="flex items-center justify-between gap-4">
-                <Skeleton className="h-8 w-14" />
-                <Skeleton className="h-6 w-28" />
-              </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 3xl:grid-cols-4">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className={`${CARD} space-y-3 px-4 py-4`}>
+            <div className="flex items-center justify-between gap-4">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-5 w-20 rounded-full" />
             </div>
+            <Skeleton className="h-3 w-48 max-w-full" />
+            <Skeleton className="h-3.5 w-full" />
           </div>
         ))}
       </div>
 
-      <section className="flex flex-col gap-5">
-        <div className="flex flex-col items-start justify-between gap-4 lg:flex-row lg:items-center">
-          <Skeleton className="h-6 w-56" />
-          <Skeleton className="h-9 w-full rounded-lg lg:w-[460px]" />
-        </div>
-        <Skeleton className="h-60 w-full rounded-xl" />
-      </section>
+      <Skeleton className="h-60 w-full rounded-xl" />
 
       <div className={CARD}>
         <div className="flex items-center gap-3 border-b border-[#424242] px-4 py-5 md:px-6">
@@ -798,7 +570,7 @@ export default function ItAdminDashboard() {
   const [error, setError]         = useState<string | null>(null)
   const [now, setNow]             = useState(() => Date.now())
   const [resolving, setResolving] = useState<Set<string>>(new Set())
-  const [chartLevel, setChartLevel] = useState<TrendLevel>('error')
+  const [showDetails, setShowDetails] = useState(false)
   const inFlight = useRef(false)
 
   const load = useCallback(async () => {
@@ -828,7 +600,7 @@ export default function ItAdminDashboard() {
 
   // Long debounce: system_logs is a busy topic (scheduler heartbeats, sign-in
   // bursts) and the dashboard only needs to be current, not instant.
-  useLiveTable(['live:system_logs', 'live:audit_logs', 'live:users', 'live:password_resets'], load, { debounceMs: 5_000 })
+  useLiveTable(['live:system_logs', 'live:system_log_issues', 'live:audit_logs', 'live:users', 'live:password_resets'], load, { debounceMs: 5_000 })
 
   // Staleness ("Late", "x min ago") moves with the clock even when no row does.
   useEffect(() => {
@@ -838,16 +610,16 @@ export default function ItAdminDashboard() {
     return () => window.clearInterval(tick)
   }, [load])
 
-  const resolve = useCallback(async (id: string) => {
-    setResolving((s) => new Set(s).add(id))
+  const act = useCallback(async (issueId: string, body: IssueAction) => {
+    setResolving((s) => new Set(s).add(issueId))
     try {
-      await systemLogService.setResolved(id, true)
+      await systemLogService.actOnIssue(issueId, body)
       await load()
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } }; message?: string }
-      setError(err.response?.data?.message ?? err.message ?? 'Could not resolve that entry')
+      setError(err.response?.data?.message ?? err.message ?? 'Could not update that issue')
     } finally {
-      setResolving((s) => { const n = new Set(s); n.delete(id); return n })
+      setResolving((s) => { const n = new Set(s); n.delete(issueId); return n })
     }
   }, [load])
 
@@ -868,14 +640,29 @@ export default function ItAdminDashboard() {
           loading && <ItDashboardSkeleton />
         ) : (
           <>
-            <StatusBanner summary={summary} />
-            <ProblemMetrics data={summary.problems} level={chartLevel} onLevel={setChartLevel} />
-            <TrendSection level={chartLevel} reloadKey={summary.generated_at} />
+            <OverallBanner summary={summary} />
+            {summary.health && <HealthGrid parts={summary.health} />}
+            {summary.traffic && <TodayCard t={summary.traffic} />}
+            <ProblemsCard data={summary.problems} now={now} onAct={act} busy={resolving} />
             <SecurityCard data={summary.security} />
-            <ProblemsCard data={summary.problems} now={now} onResolve={resolve} resolving={resolving} />
-            <SchedulersCard data={summary.schedulers} now={now} />
-            <ServicesCard data={summary.services} now={now} />
             <AccountsCard data={summary.accounts} />
+
+            {/* The detail behind the tiles, for whoever has to fix something. */}
+            <button
+              type="button"
+              onClick={() => setShowDetails((v) => !v)}
+              aria-expanded={showDetails}
+              className="inline-flex items-center gap-2 self-start rounded-lg px-3 py-2 text-sm font-semibold text-[#e5e5e5] ring-1 ring-[#424242] ring-inset transition [@media(hover:hover)]:hover:bg-[#262626]"
+            >
+              {showDetails ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              {showDetails ? 'Hide technical details' : 'Show technical details'}
+            </button>
+            {showDetails && (
+              <>
+                <SchedulersCard data={summary.schedulers} now={now} />
+                <ServicesCard data={summary.services} now={now} />
+              </>
+            )}
           </>
         )}
 

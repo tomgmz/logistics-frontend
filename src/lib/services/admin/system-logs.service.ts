@@ -44,10 +44,66 @@ export interface SystemLog {
   source:      string
   message:     string
   metadata:    Record<string, unknown> | null
+  /** @deprecated Error/critical rows are resolved through their issue. */
   resolved:    boolean
   user_id:     string | null
   timestamp:   string
+  /** The issue an error/critical row is grouped into; null for info/warning. */
+  issue_id?:   string | null
+  issue?:      { status: SystemLogIssueStatus; event_count: number } | null
 }
+
+/**
+ * Repeated error/critical rows grouped by fingerprint (Sentry-style, built
+ * 2026-11-21). The issue is what gets resolved; the rows are never changed.
+ * Resolved + happens again = reopens (a regression); 7 quiet days = auto-resolved.
+ */
+export type SystemLogIssueStatus = 'open' | 'resolved' | 'ignored'
+
+export const ISSUE_STATUS_LABEL: Record<SystemLogIssueStatus, string> = {
+  open:     'Open',
+  resolved: 'Resolved',
+  ignored:  'Ignored',
+}
+
+export interface SystemLogIssue {
+  issue_id:            string
+  log_level:           'error' | 'critical'
+  event_type:          SystemLogEventType
+  source:              string
+  title:               string
+  last_message:        string
+  last_log_id:         string | null
+  status:              SystemLogIssueStatus
+  event_count:         number
+  first_seen:          string
+  last_seen:           string
+  resolved_at:         string | null
+  resolved_by:         string | null
+  resolved_by_name:    string | null
+  resolution:          'manual' | 'auto' | null
+  ignored_until:       string | null
+  ignored_by:          string | null
+  regressed_at:        string | null
+  times_regressed:     number
+  count_while_ignored: number
+}
+
+export interface GetSystemLogIssuesParams {
+  page?:       number
+  limit?:      number
+  sort?:       'asc' | 'desc'
+  status?:     SystemLogIssueStatus
+  log_level?:  'error' | 'critical'
+  event_type?: SystemLogEventType
+  search?:     string
+}
+
+export type IssueAction =
+  | { action: 'resolve' }
+  | { action: 'reopen' }
+  /** hours: 24 or 168; null = until reopened by hand. */
+  | { action: 'ignore'; hours: 24 | 168 | null }
 
 export interface SystemLogStats {
   total:      number
@@ -55,10 +111,13 @@ export interface SystemLogStats {
   warn:       number
   error:      number
   critical:   number
+  /** Open issues, not rows. */
   unresolved: number
 }
 
 export interface GetSystemLogsParams {
+  /** Only the rows grouped into this issue. */
+  issue_id?:   string
   page?:       number
   limit?:      number
   sort?:       'asc' | 'desc'
@@ -90,6 +149,7 @@ async function get<T>(url: string, params?: Record<string, unknown>): Promise<T>
 }
 
 const B = '/admin/system-logs'
+const I = '/admin/system-log-issues'
 
 export const systemLogService = {
   getAll: (params: GetSystemLogsParams): Promise<GetSystemLogsResponse> =>
@@ -108,11 +168,17 @@ export const systemLogService = {
   getById: (id: string): Promise<SystemLog> =>
     get<SystemLog>(`${B}/${id}`),
 
-  /** Triage: mark an incident handled (or reopen it). */
-  setResolved: (id: string, resolved: boolean): Promise<{ log_id: string; resolved: boolean }> =>
+  getIssues: (params: GetSystemLogIssuesParams): Promise<{ data: SystemLogIssue[]; total: number; page: number; limit: number }> =>
     proxyApi
-      .patch<ApiResponse<{ log_id: string; resolved: boolean }>>(`${B}/${id}/resolve`, { resolved })
-      .then((r) => r.data.data),
+      .get<ApiResponse<SystemLogIssue[]> & { total: number; page: number; limit: number }>(I, { params })
+      .then((r) => ({ data: r.data.data, total: r.data.total, page: r.data.page, limit: r.data.limit })),
+
+  getIssue: (id: string): Promise<SystemLogIssue> =>
+    get<SystemLogIssue>(`${I}/${id}`),
+
+  /** Resolve, ignore or reopen one issue (all its occurrences at once). */
+  actOnIssue: (id: string, body: IssueAction): Promise<SystemLogIssue> =>
+    proxyApi.patch<ApiResponse<SystemLogIssue>>(`${I}/${id}`, body).then((r) => r.data.data),
 }
 
 export type ExportSystemLogsParams = Omit<GetSystemLogsParams, 'page' | 'limit'>
@@ -126,7 +192,7 @@ const SYSTEM_XLSX_COLUMNS: XlsxColumn<SystemLog>[] = [
   { label: 'Event Type',      width: 14, value: (l) => SYSTEM_LOG_EVENT_LABEL[l.event_type] ?? l.event_type },
   { label: 'Source',          width: 32, value: (l) => systemSourceLabel(l.source) },
   { label: 'Message',         width: 70, value: (l) => l.message },
-  { label: 'Resolved',        width: 10, value: (l) => (l.resolved ? 'Yes' : 'No') },
+  { label: 'Issue',           width: 10, value: (l) => (l.issue ? ISSUE_STATUS_LABEL[l.issue.status] : null) },
   { label: 'User ID',         width: 38, value: (l) => l.user_id },
   { label: 'Metadata',        width: 60, value: (l) => (l.metadata ? JSON.stringify(l.metadata) : null) },
   { label: 'Log ID',          width: 38, value: (l) => l.log_id },

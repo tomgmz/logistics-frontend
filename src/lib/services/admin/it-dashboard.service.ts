@@ -16,6 +16,14 @@ export interface DashboardLogRow {
   timestamp:  string
 }
 
+/** An open issue in the dashboard queue; log_id is its newest row, timestamp its last seen. */
+export interface DashboardIssueRow extends DashboardLogRow {
+  issue_id:    string
+  event_count: number
+  first_seen:  string
+  regressed:   boolean
+}
+
 export type SchedulerStatus = 'ok' | 'failing' | 'late' | 'down' | 'never'
 export type ServiceStatus   = 'ok' | 'degraded' | 'failing'
 
@@ -82,13 +90,50 @@ export interface StaffAccount {
   created_at:    string | null
 }
 
+/** Plain-language health (Apple System Status / Statuspage style); see backend it-dashboard.types.ts. */
+export type HealthState = 'working' | 'trouble' | 'down' | 'unknown'
+
+export interface HealthPart {
+  key:     string
+  name:    string
+  what:    string
+  state:   HealthState
+  summary: string
+  last_problem_at: string | null
+}
+
+export interface TrafficWindow {
+  requests: number
+  /** The system failed the request (5xx). */
+  failed:   number
+  /** Turned away on purpose (4xx: wrong password, no permission). */
+  refused:  number
+  avg_ms:   number | null
+  /** Took 3 seconds or more. */
+  slow:     number
+}
+
+export interface TrafficSection {
+  last_15m:        TrafficWindow
+  last_24h:        TrafficWindow
+  db_avg_ms:       number | null
+  db_failures_15m: number
+  hourly:          { start: string; requests: number; failed: number; avg_ms: number | null }[]
+  measured_since:  string | null
+}
+
 export interface ItDashboardSummary {
   generated_at: string
+  health:       HealthPart[]
+  traffic:      TrafficSection
   problems: {
+    /** Open issues for critical/error; warn = warnings logged in the last 24 hours. */
     unresolved: { critical: number; error: number; warn: number }
-    /** Logged in the last 24 hours, resolved or not. */
+    /** Rows logged in the last 24 hours, resolved or not. */
     last_24h:   { critical: number; error: number; warn: number }
-    latest:     DashboardLogRow[]
+    /** Open issues, critical first, then most recently seen. */
+    latest:     DashboardIssueRow[]
+    open_issues?: number
   }
   schedulers: SchedulerHealth[]
   services:   ServiceHealth[]

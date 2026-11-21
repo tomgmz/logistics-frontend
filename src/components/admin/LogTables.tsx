@@ -5,6 +5,9 @@ import type { AuditLog, LogType } from '@/lib/services/admin/audit-logs.service'
 import {
   SYSTEM_LOG_EVENT_LABEL,
   SYSTEM_LOG_LEVEL_LABEL,
+  ISSUE_STATUS_LABEL,
+  type SystemLogIssue,
+  type SystemLogIssueStatus,
   type SystemLog,
   type SystemLogEventType,
   type SystemLogLevel,
@@ -14,6 +17,7 @@ import { expandCode, roleLabel } from '@/lib/roles'
 import { auditActionLabel, systemSourceLabel } from '@/lib/log-labels'
 import { TruncatedText } from '@/components/ui/TruncatedText'
 import { Tip } from '@/components/ui/tooltip'
+import type { ReactNode } from 'react'
 
 /**
  * The two log tables in the table format (Figma 3234:594 System Logs,
@@ -170,7 +174,7 @@ export function SystemLogTable({ logs, loading, pageSize, selectedId, onSelect }
           <th>event</th>
           <th>source</th>
           <th>message</th>
-          <th className="text-right">resolved</th>
+          <th className="text-right">issue</th>
         </tr>
       </thead>
       <tbody>
@@ -192,8 +196,9 @@ export function SystemLogTable({ logs, loading, pageSize, selectedId, onSelect }
             </td>
             <td><Tip label={log.source}><span className={CODE_PILL}>{systemSourceLabel(log.source)}</span></Tip></td>
             <td className="max-w-[420px] truncate"><TruncatedText>{log.message}</TruncatedText></td>
-            <td className={`ff-sc text-right ${log.resolved ? 'text-[#3af626]' : 'text-[#f62626]'}`}>
-              {log.resolved ? 'Yes' : 'No'}
+            {/* Error/critical rows are grouped into an issue; info and warnings are records only. */}
+            <td className={`ff-sc text-right whitespace-nowrap ${log.issue ? ISSUE_STATUS_TEXT[log.issue.status] : 'text-[#818181]'}`}>
+              {log.issue ? ISSUE_STATUS_LABEL[log.issue.status] : '—'}
             </td>
           </tr>
         ))}
@@ -203,17 +208,19 @@ export function SystemLogTable({ logs, loading, pageSize, selectedId, onSelect }
 }
 
 /** The clicked row's full record, under the filter row. */
-export function LogDetail({ title, rows, metadata, onClose }: {
+export function LogDetail({ title, rows, metadata, actions, onClose }: {
   title:     string
   rows:      [string, string][]
   metadata?: unknown
+  /** Buttons under the record (an issue's Resolve / Ignore / Reopen). */
+  actions?:  ReactNode
   onClose:   () => void
 }) {
   return (
     <div className="shrink-0 border-b border-[#424242] bg-[#131313] px-5 py-4 text-sm">
       <div className="mb-3 flex items-center justify-between">
         <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#4df9ed]">{title}</span>
-        <button onClick={onClose} aria-label="Close" className="text-lg leading-none text-[#818181] hover:text-white">✕</button>
+        <button onClick={onClose} aria-label="Close" className="text-lg leading-none text-[#818181] [@media(hover:hover)]:hover:text-white">✕</button>
       </div>
       <div className="grid grid-cols-1 gap-x-8 gap-y-2 md:grid-cols-2">
         {rows.map(([k, v]) => (
@@ -223,6 +230,7 @@ export function LogDetail({ title, rows, metadata, onClose }: {
           </div>
         ))}
       </div>
+      {actions && <div className="mt-4 flex flex-wrap gap-2">{actions}</div>}
       {metadata != null && (
         <div className="mt-3">
           <span className="text-[10px] uppercase tracking-[0.1em] text-[#818181]">Metadata</span>
@@ -255,6 +263,85 @@ export function systemDetailRows(log: SystemLog): [string, string][] {
     ['Event',     SYSTEM_LOG_EVENT_LABEL[log.event_type] ?? log.event_type],
     ['Source',    systemSourceLabel(log.source)],
     ['Message',   log.message],
-    ['Resolved',  log.resolved ? 'Yes' : 'No'],
+    ['Issue',     log.issue ? `${ISSUE_STATUS_LABEL[log.issue.status]} · ${log.issue.event_count.toLocaleString()} occurrence${log.issue.event_count === 1 ? '' : 's'}` : 'None (info and warnings are not grouped)'],
+  ]
+}
+
+// ── Issues: repeated errors grouped (Sentry-style), resolved as one ─────────
+
+export const ISSUE_STATUS_TEXT: Record<SystemLogIssueStatus, string> = {
+  open:     'text-[#f62626]',
+  resolved: 'text-[#3af626]',
+  ignored:  'text-[#818181]',
+}
+
+export const ISSUE_STATUS_OPTIONS: FilterOption[] = [
+  { value: 'open',     label: 'Open' },
+  { value: 'resolved', label: 'Resolved' },
+  { value: 'ignored',  label: 'Ignored' },
+]
+
+export function IssueTable({ logs: issues, loading, pageSize, selectedId, onSelect }: TableProps<SystemLogIssue>) {
+  return (
+    <table className="data-table min-w-[1000px]">
+      <thead className="sticky top-0 z-10">
+        <tr>
+          <th>last seen</th>
+          <th>level</th>
+          <th>event</th>
+          <th>source</th>
+          <th>message</th>
+          <th className="text-right">occurrences</th>
+          <th className="text-right">status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {loading ? <SkeletonRows cols={7} rows={pageSize} /> : issues.map((i) => (
+          <tr key={i.issue_id} onClick={() => onSelect(i)} className={rowClass(selectedId === i.issue_id)}>
+            <td className="whitespace-nowrap">
+              <p className="t-name">{formatDate(i.last_seen)}</p>
+              <p className="t-sub">{formatTime(i.last_seen)}</p>
+            </td>
+            <td>
+              <span className={`t-badge ${LEVEL_COLOR[i.log_level]}`}>
+                {SYSTEM_LOG_LEVEL_LABEL[i.log_level] ?? i.log_level}
+              </span>
+            </td>
+            <td>
+              <span className={`t-badge text-white ${EVENT_COLOR[i.event_type] ?? 'border-[#818181]'}`}>
+                {SYSTEM_LOG_EVENT_LABEL[i.event_type] ?? i.event_type.replace(/_/g, ' ')}
+              </span>
+            </td>
+            <td><Tip label={i.source}><span className={CODE_PILL}>{systemSourceLabel(i.source)}</span></Tip></td>
+            <td className="max-w-[420px] truncate"><TruncatedText>{i.last_message}</TruncatedText></td>
+            <td className="text-right font-mono">{i.event_count.toLocaleString()}</td>
+            <td className={`ff-sc text-right whitespace-nowrap ${ISSUE_STATUS_TEXT[i.status]}`}>
+              {ISSUE_STATUS_LABEL[i.status]}{i.status === 'open' && i.regressed_at ? ' · Came back' : ''}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
+
+export function issueDetailRows(i: SystemLogIssue): [string, string][] {
+  const status =
+    i.status === 'resolved'
+      ? `Resolved ${i.resolved_at ? formatDateTime(i.resolved_at) : ''}${i.resolution === 'auto' ? ' (automatically, quiet for 7 days)' : i.resolved_by_name ? ` by ${i.resolved_by_name}` : ''}`
+      : i.status === 'ignored'
+        ? `Ignored ${i.ignored_until ? `until ${formatDateTime(i.ignored_until)}` : 'until reopened'}`
+        : i.regressed_at ? `Open (came back ${formatDateTime(i.regressed_at)})` : 'Open'
+  return [
+    ['Status',      status.trim()],
+    ['Level',       SYSTEM_LOG_LEVEL_LABEL[i.log_level] ?? i.log_level],
+    ['Event',       SYSTEM_LOG_EVENT_LABEL[i.event_type] ?? i.event_type],
+    ['Source',      systemSourceLabel(i.source)],
+    ['Occurrences', `${i.event_count.toLocaleString()}${i.count_while_ignored ? ` (${i.count_while_ignored.toLocaleString()} while ignored)` : ''}`],
+    ['First seen',  formatDateTime(i.first_seen)],
+    ['Last seen',   formatDateTime(i.last_seen)],
+    ['Came back',   i.times_regressed ? `${i.times_regressed} time${i.times_regressed === 1 ? '' : 's'} after being resolved` : 'Never'],
+    ['Grouped as',  i.title],
+    ['Latest',      i.last_message],
   ]
 }
