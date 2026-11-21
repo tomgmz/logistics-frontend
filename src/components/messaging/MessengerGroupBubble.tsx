@@ -27,6 +27,7 @@ import MessageInput from './MessageInput'
 import type { DeleteScope } from './ConfirmDeleteDialog'
 import { cachedFetch } from '@/lib/query/useApiQuery'
 import { useCatchUp } from '@/lib/hooks/useLiveTable'
+import { Tip } from '@/components/ui/tooltip'
 
 const BUBBLE_W   = 338
 const BUBBLE_GAP = 10
@@ -50,10 +51,10 @@ function SeenByAvatars({ seenBy }: { seenBy: GroupMember[] }) {
   return (
     <div className="flex items-center gap-0.5 mt-0.5 justify-end">
       {visible.map(m => (
-        <div key={m.user_id} title={`${m.first_name} ${m.last_name}`}
+        <Tip label={`${m.first_name} ${m.last_name}`} key={m.user_id}><div
           className="w-3 h-3 rounded-full bg-[var(--color-surface-dark)] border border-white/20 flex items-center justify-center">
           <span className="font-card text-[0.3rem] text-white/70 leading-none">{m.first_name[0]?.toUpperCase() ?? '?'}</span>
-        </div>
+        </div></Tip>
       ))}
       {overflow > 0 && <span className="ff-body text-[8px] text-white/30">+{overflow}</span>}
     </div>

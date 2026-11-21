@@ -44,6 +44,7 @@ import FilterBar, {
 import { useServerTable } from '@/lib/hooks/useServerTable'
 import { TruncatedText } from '@/components/ui/TruncatedText'
 import { ORDER_LABELS, isReversed, orderField, orderRules, reverseParam, withoutOrder } from '@/lib/table-order'
+import { Tip } from '@/components/ui/tooltip'
 // No IT Administrator tab: IT Administrators are the IT Administrator's own
 // business, and a new one is only made through their handover (2026-10-25).
 type UserMgmtTab = Extract<UserTab, 'clients' | 'drivers'>
@@ -194,14 +195,13 @@ function LockedRow({ holder, onView }: { holder: string; onView: () => void }) {
   return (
     <div className="flex items-center justify-end gap-1.5">
       <RecordLockBadge holder={holder} />
-      <button
+      <Tip label="View Details"><button
         onClick={onView}
-        title="View Details"
         aria-label="View Details"
         className="rounded-md p-1.5 text-[#818181] transition [@media(hover:hover)]:hover:bg-[#2a2a2a] [@media(hover:hover)]:hover:text-white"
       >
         <Eye size={15} />
-      </button>
+      </button></Tip>
     </div>
   )
 }
@@ -426,12 +426,11 @@ function LicenseExpiryBadge({ expiry }: { expiry: string | null }) {
     : 'bg-amber-500/15 text-amber-400 border-amber-500/30'
 
   return (
-    <span
-      title="Update this driver's license details once it is renewed."
+    <Tip label="Update this driver's license details once it is renewed."><span
       className={`t-badge gap-1 whitespace-nowrap ${cls}`}
     >
       <AlertTriangle size={11} /> {label}
-    </span>
+    </span></Tip>
   )
 }
 

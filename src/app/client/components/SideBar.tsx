@@ -14,6 +14,7 @@ import ReusableModal from '@/components/layout/ReusableModal'
 import SigningOutOverlay from '@/components/layout/SigningOutOverlay'
 import { History, CalendarCheck, MapPin, CreditCard } from 'lucide-react'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
+import { Tip } from '@/components/ui/tooltip'
 
 const SIDEBAR_COLLAPSED = 56
 const SIDEBAR_EXPANDED  = 260
@@ -200,13 +201,12 @@ interface NavItemProps {
 function NavItem({ item, isActive, index, expanded, onNavigate }: NavItemProps) {
   return (
     <Link href={item.href} onClick={onNavigate} prefetch={false}>
-      <motion.div
+      <Tip side="right" label={!expanded ? item.label : undefined}><motion.div
         initial={{ opacity: 0, x: -18 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ delay: index * 0.06, duration: 0.3 }}
         whileHover={{ x: expanded ? 3 : 0 }}
         whileTap={{ scale: 0.97 }}
-        title={!expanded ? item.label : undefined}
         className={`relative w-full flex items-center gap-3 rounded-xl text-left
                     transition-colors group py-3 px-2 cursor-pointer
                     ${isActive ? 'text-[var(--color-cyan)]' : 'hover:[var(--color-cyan)]'}`}
@@ -228,7 +228,7 @@ function NavItem({ item, isActive, index, expanded, onNavigate }: NavItemProps) 
         >
           {item.label}
         </motion.span>
-      </motion.div>
+      </motion.div></Tip>
     </Link>
   )
 }

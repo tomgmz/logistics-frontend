@@ -23,6 +23,7 @@ import { writeAccess } from '@/components/layout/ModuleAccess'
 import { cachedFetch } from '@/lib/query/useApiQuery'
 import { DesignCard } from '@/app/admin/booking-management/BookingDetailParts'
 import { usePanelSection } from '@/components/ui/PanelReady'
+import { Tip } from '@/components/ui/tooltip'
 
 const ORANGE = PALETTE.orange
 
@@ -383,18 +384,16 @@ function StopBlock({ title, subtitle, note, steps, times, workLabel, canEdit, al
               <div key={key} className="contents">
                 <dt className="text-sm font-bold text-[#818181] min-w-0">{label}</dt>
                 <dd className="m-0 flex items-center justify-end gap-1.5 text-sm font-bold text-right text-[#818181]">
-                  <span className={v ? 'text-white/85' : ''}
-                    title={notRecorded ? 'The driver’s app was an older version without this step.' : undefined}>
+                  <Tip label={notRecorded ? 'The driver’s app was an older version without this step.' : undefined}><span className={v ? 'text-white/85' : ''}>
                     {v ? formatDateTime(v.at) : notRecorded ? 'Not recorded (older app)' : '----'}
-                  </span>
+                  </span></Tip>
                   {v?.corrected && (
-                    <span className="text-[11px] font-semibold" title={v.note ?? undefined}>(corrected)</span>
+                    <Tip label={v.note ?? undefined}><span className="text-[11px] font-semibold">(corrected)</span></Tip>
                   )}
                   {v?.clock_adjusted && canEdit && (
-                    <span className="text-[11px] font-semibold" style={{ color: ORANGE }}
-                      title="The driver's phone clock was changed before this synced; the time was moved to keep the steps in order. Check it.">
+                    <Tip label="The driver's phone clock was changed before this synced; the time was moved to keep the steps in order. Check it."><span className="text-[11px] font-semibold" style={{ color: ORANGE }}>
                       (check time)
-                    </span>
+                    </span></Tip>
                   )}
                   {editable && (
                     <button type="button" onClick={() => onEdit(key as TimelineStage, label)}
@@ -442,20 +441,18 @@ function StopBlock({ title, subtitle, note, steps, times, workLabel, canEdit, al
             <div key={key} className="contents">
               <dt className="text-[12px] text-white/70 min-w-0">{label}</dt>
               <dd className="m-0 flex items-center justify-end gap-1.5 text-[12px] text-right">
-                <span className={v ? 'text-white' : ''} style={v ? undefined : { color: MUTED }}
-                  title={notRecorded ? 'The driver’s app was an older version without this step.' : undefined}>
+                <Tip label={notRecorded ? 'The driver’s app was an older version without this step.' : undefined}><span className={v ? 'text-white' : ''} style={v ? undefined : { color: MUTED }}>
                   {v ? formatDateTime(v.at) : notRecorded ? 'Not recorded (older app)' : '—'}
-                </span>
+                </span></Tip>
                 {v?.corrected && (
-                  <span className="text-[10px] font-semibold" style={{ color: MUTED }} title={v.note ?? undefined}>
+                  <Tip label={v.note ?? undefined}><span className="text-[10px] font-semibold" style={{ color: MUTED }}>
                     (corrected)
-                  </span>
+                  </span></Tip>
                 )}
                 {v?.clock_adjusted && canEdit && (
-                  <span className="text-[10px] font-semibold" style={{ color: ORANGE }}
-                    title="The driver's phone clock was changed before this synced; the time was moved to keep the steps in order. Check it.">
+                  <Tip label="The driver's phone clock was changed before this synced; the time was moved to keep the steps in order. Check it."><span className="text-[10px] font-semibold" style={{ color: ORANGE }}>
                     (check time)
-                  </span>
+                  </span></Tip>
                 )}
                 {editable && (
                   <button type="button" onClick={() => onEdit(key as TimelineStage, label)}

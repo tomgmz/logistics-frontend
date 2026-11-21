@@ -4,6 +4,7 @@ import { memo, useState } from 'react'
 import { Truck as TruckIcon } from 'lucide-react'
 import type { Truck, TruckInspection } from '@/app/types/truck.types'
 import { ProtectedImg } from '@/components/ui/FileViewer'
+import { Tip } from '@/components/ui/tooltip'
 
 /** Display helpers shared by the Vehicle Management tabs. */
 
@@ -32,13 +33,12 @@ export const ModelThumb = memo(function ModelThumb({
   const dim = `${size}px`
   if (!imageUrl || broken) {
     return (
-      <div
+      <Tip label={label}><div
         className="rounded-lg border border-white/10 bg-white/[0.04] flex items-center justify-center shrink-0"
         style={{ width: dim, height: dim }}
-        title={label}
       >
         <TruckIcon size={Math.round(size * 0.42)} className="text-white/25" aria-hidden />
-      </div>
+      </div></Tip>
     )
   }
   return (
@@ -155,13 +155,12 @@ export function TruckStatusBadge({ status }: { status: string }) {
 export function InspectionBadge({ inspection, dueRecheck }: { inspection: TruckInspection | null; dueRecheck?: boolean }) {
   if (!inspection) {
     return (
-      <span
+      <Tip label="Never inspected — cannot be assigned to a booking"><span
         className={TABLE_TAG}
         style={{ color: '#818181', borderColor: '#818181', background: 'rgba(129,129,129,0.1)' }}
-        title="Never inspected — cannot be assigned to a booking"
       >
         Not inspected
-      </span>
+      </span></Tip>
     )
   }
 
@@ -176,13 +175,12 @@ export function InspectionBadge({ inspection, dueRecheck }: { inspection: TruckI
   if (inspection.passed && dueRecheck) {
     return (
       <span className="flex flex-col gap-0.5 items-start">
-        <span
+        <Tip label="Back from a booking since its last check — inspect it again before it can be assigned"><span
           className={TABLE_TAG}
           style={{ color: '#ffea00', borderColor: '#ffea00', background: 'rgba(255,234,0,0.12)' }}
-          title="Back from a booking since its last check — inspect it again before it can be assigned"
         >
           Re-check due
-        </span>
+        </span></Tip>
         <span className="text-[11px] text-[#818181]/70 tabular-nums">last {whenLabel}</span>
       </span>
     )
@@ -190,19 +188,18 @@ export function InspectionBadge({ inspection, dueRecheck }: { inspection: TruckI
 
   return (
     <span className="flex flex-col gap-0.5 items-start">
-      <span
+      <Tip label={inspection.passed
+          ? 'Cleared — the Operations Manager can assign this vehicle'
+          : 'Failed — blocked from assignment until it passes a re-check'}><span
         className={TABLE_TAG}
         style={
           inspection.passed
             ? { color: '#4df9ed', borderColor: '#4df9ed', background: 'rgba(77,249,237,0.19)' }
             : { color: '#f62626', borderColor: '#f62626', background: 'rgba(246,38,38,0.13)' }
         }
-        title={inspection.passed
-          ? 'Cleared — the Operations Manager can assign this vehicle'
-          : 'Failed — blocked from assignment until it passes a re-check'}
       >
         {inspection.passed ? 'Passed' : 'Failed'}
-      </span>
+      </span></Tip>
       <span className="text-[11px] text-[#818181]/70 tabular-nums">{whenLabel}</span>
     </span>
   )

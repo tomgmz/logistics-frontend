@@ -17,6 +17,7 @@ import {
   type ReportStatus,
 } from '@/app/types/driver-report.types'
 import { FileViewButton, ProtectedImg } from '@/components/ui/FileViewer'
+import { Tip } from '@/components/ui/tooltip'
 
 function fmtWhen(iso: string | null | undefined): string {
   if (!iso) return '—'
@@ -49,14 +50,13 @@ export function ReportStatusBadge({ status }: { status: ReportStatus }) {
 
 export function UrgentBadge() {
   return (
-    <span
+    <Tip label="Sent as an emergency alert, or the driver said the trip cannot continue"><span
       className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border"
       style={{ color: '#f62626', borderColor: 'rgba(246,38,38,0.45)', background: 'rgba(246,38,38,0.15)' }}
-      title="Sent as an emergency alert, or the driver said the trip cannot continue"
     >
       <AlertTriangle size={10} />
       Emergency
-    </span>
+    </span></Tip>
   )
 }
 

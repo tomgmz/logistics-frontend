@@ -2,6 +2,7 @@ import { Clock } from 'lucide-react'
 
 import { PALETTE } from '@/lib/palette'
 import { formatDuration } from '@/lib/duration'
+import { Tip } from '@/components/ui/tooltip'
 
 const ORANGE = PALETTE.orange
 
@@ -34,13 +35,12 @@ export default function DelayedBadge({ booking, className = 'mt-1' }: {
     ? `Delayed${d.minutes ? ` · ${formatDuration(d.minutes)}` : ''}`
     : `Was delayed · up to ${formatDuration(d.minutes ?? 0)}`
   return (
-    <span
-      title={d.now ? 'Running late against the planned arrival' : 'Ran late against the planned arrival during this delivery'}
+    <Tip label={d.now ? 'Running late against the planned arrival' : 'Ran late against the planned arrival during this delivery'}><span
       className={`flex w-fit items-center gap-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border whitespace-nowrap ${className}`}
       style={{ color: ORANGE, borderColor: `${ORANGE}55`, background: `${ORANGE}14` }}
     >
       <Clock size={9} />
       {label}
-    </span>
+    </span></Tip>
   )
 }

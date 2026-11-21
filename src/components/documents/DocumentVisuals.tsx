@@ -10,6 +10,7 @@ import {
   type LibraryDocumentType,
   type ReviewStatus,
 } from '@/app/types/documents.types'
+import { Tip } from '@/components/ui/tooltip'
 
 /**
  * The thumbnail source: photos are shown themselves (scaled by the box), every
@@ -93,7 +94,7 @@ export function ReviewStatusBadge({ doc }: { doc: LibraryDocument }) {
     )
   }
   if (!doc.review_status) {
-    return <span className="text-[11px] text-white/35" title="Recorded by the delivery or fleet flow; no review needed">Recorded</span>
+    return <Tip label="Recorded by the delivery or fleet flow; no review needed"><span className="text-[11px] text-white/35">Recorded</span></Tip>
   }
   const st = reviewStyle(doc.review_status)
   return (

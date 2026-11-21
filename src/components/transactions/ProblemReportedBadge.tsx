@@ -1,6 +1,7 @@
 import { AlertTriangle } from 'lucide-react'
 
 import { ERROR } from './transaction-theme'
+import { Tip } from '@/components/ui/tooltip'
 
 /**
  * The client reported a problem with a delivered booking and staff have not
@@ -25,13 +26,12 @@ export default function ProblemReportedBadge({ note, className = 'mt-1' }: {
   className?: string
 }) {
   return (
-    <span
-      title={note ? `Problem reported by the client: ${note}` : 'Problem reported by the client'}
+    <Tip label={note ? `Problem reported by the client: ${note}` : 'Problem reported by the client'}><span
       className={`flex w-fit items-center gap-1 whitespace-nowrap text-[10px] font-bold uppercase tracking-wide leading-none ${className}`}
       style={{ color: ERROR }}
     >
       <AlertTriangle size={10} aria-hidden />
       Problem Reported
-    </span>
+    </span></Tip>
   )
 }

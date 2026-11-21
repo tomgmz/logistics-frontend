@@ -44,6 +44,7 @@ import AccountActionConfirm, { statusConfirmCopy, type AccountConfirm } from '@/
 import { useServerTable } from '@/lib/hooks/useServerTable'
 import { TruncatedText } from '@/components/ui/TruncatedText'
 import { ORDER_LABELS, isReversed, orderField, orderRules, reverseParam, withoutOrder } from '@/lib/table-order'
+import { Tip } from '@/components/ui/tooltip'
 type AdminMgmtTab = Extract<
   UserTab,
   'admins' | 'general-managers' | 'fleet-admins' | 'operations-admins'
@@ -218,10 +219,10 @@ function LockedRow({ holder, onView }: { holder: string; onView: () => void }) {
   return (
     <div className="flex items-center justify-end gap-1.5">
       <RecordLockBadge holder={holder} />
-      <button onClick={onView} title="View Details" aria-label="View Details"
+      <Tip label="View Details"><button onClick={onView} aria-label="View Details"
         className="rounded-md p-1.5 text-[#818181] transition [@media(hover:hover)]:hover:bg-[#2a2a2a] [@media(hover:hover)]:hover:text-white">
         <Eye size={15} />
-      </button>
+      </button></Tip>
     </div>
   )
 }

@@ -65,6 +65,7 @@ import { phDayPlusMonth, phEarliestBookableDay } from '@/lib/ph-date'
 import { FileViewButton } from '@/components/ui/FileViewer'
 import { fetchStoredFile } from '@/lib/files/fileAccess'
 import { cachedFetch } from '@/lib/query/useApiQuery'
+import { Tip } from '@/components/ui/tooltip'
 
 interface Props {
   onNext: () => void
@@ -1848,9 +1849,9 @@ function ComboboxField({
           </button>
         )}
         {value && (
-          <span className="pl-1 pr-2.5 shrink-0 flex items-center" title="From catalog">
+          <Tip label="From catalog"><span className="pl-1 pr-2.5 shrink-0 flex items-center">
             <FormIcon name="catalog-dot.svg" size={6} />
-          </span>
+          </span></Tip>
         )}
         {isCustom && (
           <span className="px-2 text-[10px] text-white/30 shrink-0 font-mono">custom</span>

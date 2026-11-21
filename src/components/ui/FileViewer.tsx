@@ -10,6 +10,7 @@ import { Download, FileQuestion, ImageOff, Loader2, X } from 'lucide-react'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 import { downloadFile } from '@/app/types/documents.types'
 import { isSealedFileLink, useStoredFile } from '@/lib/files/fileAccess'
+import { Tip } from '@/components/ui/tooltip'
 
 /*
  * Every file in the web app (photos, PDFs, videos, documents) opens HERE,
@@ -146,15 +147,14 @@ export function FilePreview({ url, name, onDownload }: { url: string; name: stri
         className={`w-full h-full ${zoomed ? 'overflow-auto' : 'flex items-center justify-center overflow-hidden'}`}
         onContextMenu={blockMenu}
       >
-        <ProtectedImg
+        <Tip label={zoomed ? 'Tap to fit' : 'Tap to zoom'}><ProtectedImg
           src={shown}
           alt={name}
           onClick={() => setZoomed((z) => !z)}
-          title={zoomed ? 'Tap to fit' : 'Tap to zoom'}
           className={zoomed
             ? 'max-w-none cursor-zoom-out'
             : 'max-h-full max-w-full object-contain cursor-zoom-in'}
-        />
+        /></Tip>
       </div>
     )
   }
@@ -241,11 +241,10 @@ export function FileViewer({ url, name, onClose, canDownload = true }: {
           <h2 className="min-w-0 truncate text-sm font-bold text-white">{title}</h2>
           <div className="flex items-center gap-1 shrink-0">
             {download && (
-              <button type="button" onClick={download}
-                className="p-2 rounded-lg text-white/60 [@media(hover:hover)]:hover:bg-white/5"
-                title="Download" aria-label="Download">
+              <Tip label="Download"><button type="button" onClick={download}
+                className="p-2 rounded-lg text-white/60 [@media(hover:hover)]:hover:bg-white/5" aria-label="Download">
                 <Download size={17} />
-              </button>
+              </button></Tip>
             )}
             <button type="button" onClick={onClose}
               className="p-2 rounded-lg text-white/50 [@media(hover:hover)]:hover:bg-white/5"
@@ -280,10 +279,10 @@ export function FileViewButton({ url, name, className, title, ariaLabel, childre
   const onClick = (e: ReactMouseEvent) => { e.preventDefault(); e.stopPropagation(); setOpen(true) }
   return (
     <>
-      <button type="button" onClick={onClick} onContextMenu={blockMenu}
-        className={`${className ?? ''} text-left cursor-pointer`} title={title} aria-label={ariaLabel}>
+      <Tip label={title}><button type="button" onClick={onClick} onContextMenu={blockMenu}
+        className={`${className ?? ''} text-left cursor-pointer`} aria-label={ariaLabel}>
         {children}
-      </button>
+      </button></Tip>
       {open && <FileViewer url={url} name={name} onClose={() => setOpen(false)} canDownload={canDownload} />}
     </>
   )

@@ -30,6 +30,7 @@ import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { CARD_CLASS, SectionHeading, CrewCard, SLIM_TEAL_BUTTON_CLASS, TEAL_BUTTON_CLASS, TEAL_BUTTON_STYLE, type CrewSummary } from '@/app/admin/booking-management/BookingDetailParts'
 import Dropdown from '@/components/ui/Dropdown'
 import { FieldError } from '@/components/ui/FieldError'
+import { Tip } from '@/components/ui/tooltip'
 
 const ORANGE = PALETTE.orange
 
@@ -290,11 +291,10 @@ export default function ReplaceCrewPanel({
               </button>
             ) : (
               <>
-                <button type="button" disabled={!paused || busy} onClick={() => setEditing(true)} {...writeAccess(allowed)}
-                  title={paused ? undefined : 'Pause the delivery first to replace the driver or vehicle.'}
+                <Tip label={paused ? undefined : 'Pause the delivery first to replace the driver or vehicle.'}><button type="button" disabled={!paused || busy} onClick={() => setEditing(true)} {...writeAccess(allowed)}
                   className={SLIM_TEAL_BUTTON_CLASS} style={TEAL_BUTTON_STYLE}>
                   <Pencil size={16} /> Edit
-                </button>
+                </button></Tip>
                 {!paused && (
                   <p className="text-xs font-bold leading-snug -mt-1" style={{ color: MUTED }}>
                     Pause the delivery first to replace the driver or vehicle.

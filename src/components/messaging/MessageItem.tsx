@@ -10,6 +10,7 @@ import { QUICK_REACTIONS } from './EmojiPicker'
 import MessagePhoto from './MessagePhoto'
 import ConfirmDeleteDialog, { type DeleteScope } from './ConfirmDeleteDialog'
 import { BookingMentionCards } from './BookingMention'
+import { Tip } from '@/components/ui/tooltip'
 
 /*
  * One chat message, per the Figma Messages design (docs/figma/messaging,
@@ -232,26 +233,25 @@ export default function MessageItem({
                 className={`absolute -top-5 z-10 flex items-center gap-1.5 rounded-lg bg-[#222] px-2 py-1.5 shadow-xl ring-1 ring-white/10 ${isMine ? 'right-2' : 'left-2'}`}
               >
                 {onReact && QUICK_REACTIONS.map(emoji => (
-                  <button
-                    key={emoji} type="button" title={`React ${emoji}`} aria-label={`React ${emoji}`}
+                  <Tip label={`React ${emoji}`} key={emoji}><button type="button" aria-label={`React ${emoji}`}
                     onClick={() => { onReact(emoji); setOpen(false) }}
                     className={`flex size-6 items-center justify-center rounded transition-transform duration-75 hover:scale-125 active:scale-90 ${myReaction === emoji ? 'bg-[var(--color-cyan)]/20' : ''}`}
                   >
                     <span className="text-[15px] leading-none select-none">{emoji}</span>
-                  </button>
+                  </button></Tip>
                 ))}
                 {onReact && (onReply || canDelete) && <span className="mx-0.5 h-4 w-px bg-white/15" />}
                 {onReply && (
-                  <button type="button" title="Reply" aria-label="Reply" onClick={() => { onReply(); setOpen(false) }}
+                  <Tip label="Reply"><button type="button" aria-label="Reply" onClick={() => { onReply(); setOpen(false) }}
                     className="rounded p-0.5 text-white/45 transition-colors duration-100 hover:text-white/80">
                     <Reply size={16} />
-                  </button>
+                  </button></Tip>
                 )}
                 {canDelete && (
-                  <button type="button" title="Remove message" aria-label="Remove message" onClick={() => { setConfirmingDelete(true); setOpen(false) }}
+                  <Tip label="Remove message"><button type="button" aria-label="Remove message" onClick={() => { setConfirmingDelete(true); setOpen(false) }}
                     className="rounded p-0.5 text-white/45 transition-colors duration-100 hover:text-[var(--color-red,#f62626)]">
                     <Trash2 size={16} />
-                  </button>
+                  </button></Tip>
                 )}
               </motion.div>
             )}

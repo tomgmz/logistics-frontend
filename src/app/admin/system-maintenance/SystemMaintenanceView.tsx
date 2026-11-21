@@ -39,6 +39,7 @@ import { useDebouncedValue } from '@/lib/hooks/useDebouncedValue'
 import { cachedData, storeData } from '@/lib/query/useApiQuery'
 import Combobox from '@/components/ui/Combobox'
 import { FieldError, errorBorder } from '@/components/ui/FieldError'
+import { Tip } from '@/components/ui/tooltip'
 
 
 const TABS = [
@@ -1316,30 +1317,28 @@ function RowButtons({ lockedBy, busy, deleting, name, onEdit, onDelete }: {
     <div className="flex items-center gap-1 shrink-0">
       <RecordLockBadge holder={lockedBy} />
       {onEdit && (
-        <button
+        <Tip label={lockedBy ? `${lockedBy} is editing this` : undefined}><button
           type="button"
           onClick={onEdit}
           disabled={busy}
           className="flex h-9 w-9 items-center justify-center rounded-md text-white/45 transition-colors hover:bg-white/5 hover:text-white/80 disabled:opacity-30"
           aria-label={`Edit ${name}`}
-          title={lockedBy ? `${lockedBy} is editing this` : undefined}
         >
           <Pencil size={15} />
-        </button>
+        </button></Tip>
       )}
       {onDelete && (
-        <button
+        <Tip label={lockedBy ? `${lockedBy} is editing this` : undefined}><button
           type="button"
           onClick={onDelete}
           disabled={busy}
           className="flex h-9 w-9 items-center justify-center rounded-md text-white/45 transition-colors hover:bg-red-500/10 hover:text-red-400 disabled:opacity-30"
           aria-label={`Delete ${name}`}
-          title={lockedBy ? `${lockedBy} is editing this` : undefined}
         >
           {deleting
             ? <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border border-white/20 border-t-white/60" />
             : <Trash2 size={15} />}
-        </button>
+        </button></Tip>
       )}
     </div>
   )

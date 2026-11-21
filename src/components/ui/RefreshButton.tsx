@@ -1,5 +1,7 @@
 'use client'
 
+import { Tip } from '@/components/ui/tooltip'
+
 /**
  * The one Refresh button, as the Figma draws it (client Transaction History):
  * a grey outlined pill, the refresh icon, "Refresh" in bold small caps. Every
@@ -25,19 +27,18 @@ export default function RefreshButton({
 }) {
   if (iconOnly) {
     return (
-      <button
+      <Tip label="Refresh"><button
         type="button"
         onClick={onClick}
         disabled={disabled}
         aria-label={ariaLabel ?? 'Refresh'}
-        title="Refresh"
         className={`inline-flex items-center justify-center size-[30px] rounded-full border border-[#818181] shrink-0
                     cursor-pointer transition-colors hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/icons/ui/refresh.svg" alt="" width={16} height={16} draggable={false}
           className={`shrink-0 ${loading ? 'animate-spin' : ''}`} />
-      </button>
+      </button></Tip>
     )
   }
 

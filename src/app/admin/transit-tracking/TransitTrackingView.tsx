@@ -29,6 +29,7 @@ import { RouteStepper, bookingRouteSteps, dropoffSummary } from '@/components/ma
 import { formatDuration } from '@/lib/duration'
 import SearchClearButton from '@/components/ui/SearchClearButton'
 import StatusFilterDropdown, { filterByStatus, type StatusFilter } from '@/components/map/StatusFilterDropdown'
+import { Tip } from '@/components/ui/tooltip'
 
 const GOOGLE_MAPS_KEY    = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
 const GOOGLE_MAPS_MAP_ID = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID
@@ -532,13 +533,11 @@ export default function TransitTrackingView() {
                 ] as const).map(({ mode, label, disabled }) => {
                   const active = (mode === 'single') === showSingle
                   return (
-                    <button
-                      key={mode}
+                    <Tip label={disabled ? 'Select a booking from the list or a truck on the map' : undefined} key={mode}><button
                       type="button"
                       disabled={disabled}
                       aria-pressed={active}
                       onClick={() => setMapMode(mode)}
-                      title={disabled ? 'Select a booking from the list or a truck on the map' : undefined}
                       className="px-3 py-2 text-[11px] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-40"
                       style={{
                         background: active ? 'rgba(77,249,237,0.12)' : 'transparent',
@@ -546,7 +545,7 @@ export default function TransitTrackingView() {
                       }}
                     >
                       {label}
-                    </button>
+                    </button></Tip>
                   )
                 })}
               </div>

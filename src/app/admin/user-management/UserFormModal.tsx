@@ -50,6 +50,7 @@ import { ProtectedImg } from '@/components/ui/FileViewer'
 import Dropdown from '@/components/ui/Dropdown'
 import DatePicker from '@/components/ui/DatePicker'
 import { FieldError, errorBorder } from '@/components/ui/FieldError'
+import { Tip } from '@/components/ui/tooltip'
 
 interface UserFormModalProps {
   tab: UserTab
@@ -852,14 +853,13 @@ export default function UserFormModal({
           <Pencil size={11} /> Edit
         </button>
       ) : key in lockValues ? (
-        <button
+        <Tip label={`Back to ${lockValues[key] || 'empty'} and lock it again`}><button
           type="button"
           onClick={() => relockScanned(key)}
-          title={`Back to ${lockValues[key] || 'empty'} and lock it again`}
           className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#818181] transition [@media(hover:hover)]:hover:text-white"
         >
           <Undo2 size={11} /> Undo{String(form[key] ?? '') !== lockValues[key] ? ` (was ${lockValues[key] || 'empty'})` : ''}
-        </button>
+        </button></Tip>
       ) : undefined,
     }
   }
@@ -1369,15 +1369,14 @@ export default function UserFormModal({
               >
                 Cancel
               </button>
-              <button
+              <Tip label={lock.readOnly ? 'Someone else is editing this account' : isEdit && !isDirty ? 'No changes to save' : undefined}><button
                 type="submit"
                 disabled={isSaveDisabled || lock.readOnly}
-                title={lock.readOnly ? 'Someone else is editing this account' : isEdit && !isDirty ? 'No changes to save' : undefined}
                 className="flex items-center gap-2 rounded-lg bg-[#4df9ed] px-5 py-2.5 text-sm font-semibold text-[#0a0a0a] transition hover:bg-[#7bfbf5] disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {loading && <Loader2 size={15} className="animate-spin" />}
                 {loading ? 'Saving…' : isEdit ? 'Save Changes' : `Create ${formLabel}`}
-              </button>
+              </button></Tip>
             </div>
             )}
           </form>

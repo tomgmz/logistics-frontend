@@ -7,7 +7,7 @@
  * BookingManagementView.
  */
 
-import { useCallback, useEffect, useId, useState, type ReactNode, type RefObject } from 'react'
+import { useCallback, useEffect, useState, type ReactNode, type RefObject } from 'react'
 import {
   Info,
   MapPin,
@@ -28,6 +28,7 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { PALETTE } from '@/lib/palette'
 import { ToggleBox } from '@/components/ui/accordion'
 import { FileViewButton } from '@/components/ui/FileViewer'
+import { Tip, Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 /** Panel surfaces and greys from the design. Not badge colours, so not in the palette. */
 export const PANEL_BG    = '#2a2828'
@@ -45,15 +46,14 @@ export function Tag({
 }: { color: string | null; children: ReactNode; size?: 'sm' | 'md'; title?: string }) {
   const c = color ?? MUTED
   return (
-    <span
-      title={title}
+    <Tip label={title}><span
       className={`inline-flex items-center justify-center rounded-[5px] border px-1 whitespace-nowrap leading-none ${
         size === 'md' ? 'text-base py-1' : 'text-sm py-0.5'
       }`}
       style={{ color: c, borderColor: c, background: `${c}${color ? '26' : '1a'}` }}
     >
       {children}
-    </span>
+    </span></Tip>
   )
 }
 
@@ -295,27 +295,24 @@ export function DashedDivider() {
 /** "(i)" next to a card title: the explanation shows on hover, focus or tap. */
 export function InfoTip({ text }: { text: string }) {
   const [open, setOpen] = useState(false)
-  const id = useId()
+  // Hover/focus open it through onOpenChange; a tap toggles it (touch never
+  // fires a Radix tooltip on its own).
   return (
-    <span className="relative shrink-0">
-      <button
-        type="button"
-        aria-label="About this"
-        aria-describedby={open ? id : undefined}
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-        onBlur={() => setOpen(false)}
-        className="flex p-0.5 rounded-full text-[#818181] [@media(hover:hover)]:hover:text-white"
-      >
-        <Info size={18} strokeWidth={1.75} />
-      </button>
-      {open && (
-        <span id={id} role="tooltip"
-          className="absolute right-0 top-full mt-1.5 z-20 w-[min(260px,70vw)] rounded-lg border border-[#424242] bg-[#111] px-3 py-2 text-xs font-normal normal-case leading-snug text-white/80 shadow-xl">
-          {text}
-        </span>
-      )}
-    </span>
+    <Tooltip open={open} onOpenChange={setOpen}>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          aria-label="About this"
+          onClick={(e) => { e.preventDefault(); setOpen((v) => !v) }}
+          className="flex shrink-0 p-0.5 rounded-full text-[#818181] [@media(hover:hover)]:hover:text-white"
+        >
+          <Info size={18} strokeWidth={1.75} />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" align="end" className="max-w-[min(260px,70vw)] text-xs font-normal normal-case">
+        {text}
+      </TooltipContent>
+    </Tooltip>
   )
 }
 

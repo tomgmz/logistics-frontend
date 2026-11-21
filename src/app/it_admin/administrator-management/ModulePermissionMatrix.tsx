@@ -11,6 +11,7 @@ import {
   flagsToLevel,
   levelToFlags,
 } from '@/constants/modules'
+import { Tip } from '@/components/ui/tooltip'
 
 /** The levels a module offers: a view-only module has nothing to change, so only Read Only. */
 export function levelsFor(m: ModuleKey) {
@@ -70,18 +71,17 @@ export default function ModulePermissionMatrix({
                   <td key={l.key} className="px-3 py-3 text-center">
                     {/* Nothing to change in a view-only module, so only Read Only is offered. */}
                     {l.key === 'all' && VIEW_ONLY_MODULES.includes(m) ? (
-                      <span className="text-[#424242]" title="This module has nothing to change">—</span>
+                      <Tip label="This module has nothing to change"><span className="text-[#424242]">—</span></Tip>
                     ) : (
-                    <input
+                    <Tip label={locked ? 'This module only has Read Only, so it is always granted' : undefined}><input
                       type="checkbox"
                       // Its only box: always ticked, and locked so it can't be unticked.
                       checked={locked ? true : current === l.key}
                       disabled={disabled || !!locked}
                       onChange={() => selectLevel(m, l.key)}
                       className={`${cb} ${locked ? 'disabled:opacity-60' : ''}`}
-                      title={locked ? 'This module only has Read Only, so it is always granted' : undefined}
                       aria-label={`${MODULE_LABELS[m]} ${l.label}`}
-                    />
+                    /></Tip>
                     )}
                   </td>
                 ))}

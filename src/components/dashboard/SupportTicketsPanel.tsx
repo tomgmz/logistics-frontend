@@ -13,6 +13,7 @@ import { formatDateTime } from '@/app/utils/timeFormat'
 import { supportService, TICKET_CATEGORY_LABEL, type TicketCategory } from '@/lib/services/support.service'
 import type { DashboardTicket } from '@/lib/services/admin/staff-dashboard.service'
 import NewTicketModal from '@/components/support/NewTicketModal'
+import { Tip } from '@/components/ui/tooltip'
 
 /**
  * Client support tickets waiting on a reply, oldest first: the queue the help
@@ -50,15 +51,15 @@ export function MailAction({ href, title, allowed, children }: {
   const cls = 'inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-2.5 py-1.5 text-[11px] font-semibold text-white/80 hover:bg-white/5'
   if (!allowed) {
     return (
-      <span role="link" aria-disabled="true" title={READ_ONLY_HINT} className={`${cls} cursor-not-allowed opacity-40 hover:bg-transparent`}>
+      <Tip label={READ_ONLY_HINT}><span role="link" aria-disabled="true" className={`${cls} cursor-not-allowed opacity-40 hover:bg-transparent`}>
         {children}
-      </span>
+      </span></Tip>
     )
   }
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer" title={title} className={cls}>
+    <Tip label={title}><a href={href} target="_blank" rel="noopener noreferrer" className={cls}>
       {children}
-    </a>
+    </a></Tip>
   )
 }
 

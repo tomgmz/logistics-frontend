@@ -6,6 +6,7 @@ import type { ServiceStatus } from '@/app/types/truck.types'
 import type { RegistrationStatus } from '@/lib/registration-expiry'
 import { ProtectedImg } from '@/components/ui/FileViewer'
 import { FieldError, errorBorder } from '@/components/ui/FieldError'
+import { Tip } from '@/components/ui/tooltip'
 
 /** Shared bits for odometer readings and routine service. */
 
@@ -208,7 +209,7 @@ export function ServiceStatusBadge({ status }: { status: ServiceStatus | undefin
     : `Due ${fmtDay(status.due_date)} or at ${fmtKm(status.due_km)}, whichever comes first`
 
   return (
-    <span className="flex flex-col gap-0.5 items-start" title={detail}>
+    <Tip label={detail}><span className="flex flex-col gap-0.5 items-start">
       <span
         className="inline-flex text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border"
         style={{ color: tone.color, borderColor: tone.border, background: tone.bg }}
@@ -222,6 +223,6 @@ export function ServiceStatusBadge({ status }: { status: ServiceStatus | undefin
             : `${status.km_left.toLocaleString()} km · ${status.days_left} d left`}
         </span>
       )}
-    </span>
+    </span></Tip>
   )
 }

@@ -58,6 +58,7 @@ import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
 import { useServerTable } from '@/lib/hooks/useServerTable'
 import { bookingQuery } from '@/lib/booking-url'
 import { TruncatedText } from '@/components/ui/TruncatedText'
+import { Tip } from '@/components/ui/tooltip'
 
 /**
  * Document Management — one library over every file the system keeps, shared
@@ -597,25 +598,23 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
       )}
       {canReview(previewDoc) && (
         <>
-          <button
+          <Tip label={isOwn(previewDoc) ? 'You uploaded this — another reviewer has to approve it' : undefined}><button
             type="button"
             disabled={busy || isOwn(previewDoc)}
-            title={isOwn(previewDoc) ? 'You uploaded this — another reviewer has to approve it' : undefined}
             onClick={() => setRejectOf(previewDoc)}
             className="px-3 py-2 rounded-lg border border-red-400/35 text-sm font-semibold text-red-300 hover:bg-red-500/10 disabled:opacity-40"
           >
             Reject
-          </button>
-          <button
+          </button></Tip>
+          <Tip label={isOwn(previewDoc) ? 'You uploaded this — another reviewer has to approve it' : undefined}><button
             type="button"
             disabled={busy || isOwn(previewDoc)}
-            title={isOwn(previewDoc) ? 'You uploaded this — another reviewer has to approve it' : undefined}
             onClick={() => setApproveOf(previewDoc)}
             className="px-4 py-2 rounded-lg text-sm font-bold text-black disabled:opacity-40"
             style={{ background: 'var(--color-cyan)' }}
           >
             Approve
-          </button>
+          </button></Tip>
         </>
       )}
     </>
@@ -765,12 +764,11 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
                   </span>
                 )}
                 {isFiles && canExport && (
-                  <Button size="toolbar" color="tool" iconLeading={Download} onClick={() => void handleExport()} disabled={exporting || (selected.size === 0 && total === 0)}
-                    title={selected.size === 0
+                  <Tip label={selected.size === 0
                       ? 'Download every document shown here (all pages) as one ZIP, with a list of them'
-                      : 'Download the ticked documents as one ZIP, with a list of them'}>
+                      : 'Download the ticked documents as one ZIP, with a list of them'}><Button size="toolbar" color="tool" iconLeading={Download} onClick={() => void handleExport()} disabled={exporting || (selected.size === 0 && total === 0)}>
                     {exporting ? 'Downloading…' : selected.size === 0 ? 'Download All' : 'Download Selected Files'}
-                  </Button>
+                  </Button></Tip>
                 )}
                 {canCreate && !archivedView && (
                   <Button size="toolbar" color="accent" iconLeading={Upload01} onClick={() => setUploadOpen(true)}>
@@ -886,14 +884,14 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
                               <RowActionMenu label={`Actions for ${d.file_name}`} heading={d.file_name} actions={rowActions(d)} />
                             </div>
                           </div>
-                          <p className="ff-regular truncate text-sm text-white" title={d.file_name}>{d.file_name}</p>
+                          <Tip label={d.file_name}><p className="ff-regular truncate text-sm text-white">{d.file_name}</p></Tip>
                           <p className="ff-regular truncate text-xs text-[#818181]">
                             {showRefColumn ? (d.reference_number ?? d.plate_number ?? '—') : (d.detail ?? DOCUMENT_SOURCE_LABELS[d.source])}
                             {d.uploaded_at && ` · ${formatDate(d.uploaded_at)}`}
                           </p>
                           <div className="flex items-center gap-1.5">
                             <ReviewStatusBadge doc={d} />
-                            {d.override_reason && <span title="Taken away from the stop"><MapPinOff size={12} className="text-amber-300" /></span>}
+                            {d.override_reason && <Tip label="Taken away from the stop"><span><MapPinOff size={12} className="text-amber-300" /></span></Tip>}
                           </div>
                         </div>
                       </div>
@@ -963,9 +961,9 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
                           <td className={`${TD} hidden xl:table-cell`}>
                             <TruncatedText as="p" className="max-w-[260px]">{d.detail ?? d.notes ?? '—'}</TruncatedText>
                             {d.override_reason && (
-                              <p className="mt-0.5 flex items-center gap-1 text-xs text-amber-300" title={d.override_reason}>
+                              <Tip label={d.override_reason}><p className="mt-0.5 flex items-center gap-1 text-xs text-amber-300">
                                 <MapPinOff size={11} /> Taken away from the stop
-                              </p>
+                              </p></Tip>
                             )}
                           </td>
                           <td className={`${TD} whitespace-nowrap`}>

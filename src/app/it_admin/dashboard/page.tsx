@@ -30,6 +30,7 @@ import { TabsMinimal } from '@/components/ui/untitled/tabs'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { systemSourceLabel } from '@/lib/log-labels'
 import { cachedData, storeData } from '@/lib/query/useApiQuery'
+import { Tip } from '@/components/ui/tooltip'
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Scheduler staleness is a function of time, not of any row changing. */
@@ -206,8 +207,8 @@ function Stat({ label, value, color, href, hint }: {
   )
   const cls = 'block rounded-xl bg-[#141414] ring-1 ring-[#2a2a2a] ring-inset px-4 py-3 min-w-0'
   return href
-    ? <Link href={href} title={hint} className={`${cls} transition [@media(hover:hover)]:hover:ring-[#424242]`}>{body}</Link>
-    : <div title={hint} className={cls}>{body}</div>
+    ? <Tip label={hint}><Link href={href} className={`${cls} transition [@media(hover:hover)]:hover:ring-[#424242]`}>{body}</Link></Tip>
+    : <Tip label={hint}><div className={cls}>{body}</div></Tip>
 }
 
 // ── A · Problems waiting ─────────────────────────────────────────────────────
@@ -361,10 +362,10 @@ function TrendSection({ level, reloadKey }: { level: TrendLevel; reloadKey: stri
           {m.plural} logged
           <span className="font-mono">{shown ? shown.total.toLocaleString() : '—'}</span>
           {change !== null && (
-            <span title="Against the same length of time just before"
+            <Tip label="Against the same length of time just before"><span
                   style={{ color: change > 0 ? COLOR.red : change < 0 ? COLOR.green : COLOR.muted }}>
               {change > 0 ? '+' : ''}{change}%
-            </span>
+            </span></Tip>
           )}
         </h2>
         <div className="flex w-full flex-wrap items-center gap-3 lg:w-auto">
@@ -432,9 +433,9 @@ function ProblemsCard({ data, now, onResolve, resolving }: {
               <p className="text-xs text-[#818181] break-words">{systemSourceLabel(row.source)}</p>
             </td>
             <td className={`${TD} text-white break-words`}>{row.message}</td>
-            <td className={`${TD} whitespace-nowrap`} title={formatDateTime(row.timestamp)}>
+            <Tip label={formatDateTime(row.timestamp)}><td className={`${TD} whitespace-nowrap`}>
               {ago(row.timestamp, now)}
-            </td>
+            </td></Tip>
             <td className={`${TD} text-right`}>
               <button
                 type="button"
@@ -476,9 +477,9 @@ function SchedulersCard({ data, now }: { data: SchedulerHealth[]; now: number })
               </td>
               <td className={`${TD} whitespace-nowrap`}>{every(s.interval_minutes)}</td>
               <td className={TD}><Pill label={st.label} color={st.color} /></td>
-              <td className={`${TD} whitespace-nowrap`} title={s.last_success_at ? formatDateTime(s.last_success_at) : undefined}>
+              <Tip label={s.last_success_at ? formatDateTime(s.last_success_at) : undefined}><td className={`${TD} whitespace-nowrap`}>
                 {ago(s.last_success_at, now)}
-              </td>
+              </td></Tip>
               <td className={`${TD} whitespace-nowrap`}>
                 {s.errors_24h > 0 ? (
                   <Link href={logsHref({ event_type: 'cron_job', search: s.source })} className="font-mono text-[#f62626] hover:underline">
@@ -529,7 +530,7 @@ function ServicesCard({ data, now }: { data: ServiceHealth[]; now: number }) {
               <td className={`${TD} text-xs`}>
                 {s.last_failure_at ? (
                   <>
-                    <p className="whitespace-nowrap" title={formatDateTime(s.last_failure_at)}>{ago(s.last_failure_at, now)}</p>
+                    <Tip label={formatDateTime(s.last_failure_at)}><p className="whitespace-nowrap">{ago(s.last_failure_at, now)}</p></Tip>
                     {s.last_failure_message && <p className="mt-0.5 text-[#f62626] break-words">{s.last_failure_message}</p>}
                   </>
                 ) : <span className="text-[#818181]">None</span>}

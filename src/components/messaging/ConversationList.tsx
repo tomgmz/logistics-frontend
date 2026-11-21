@@ -8,6 +8,7 @@ import { ArrowLeft, MessageCirclePlus, Search } from 'lucide-react'
 import type { Conversation, Group, UnifiedListItem } from '@/app/types/messaging/messaging.types'
 import { formatConversationTime } from '@/app/utils/messaging.utils'
 import SearchClearButton from '@/components/ui/SearchClearButton'
+import { Tip } from '@/components/ui/tooltip'
 
 interface ConversationListProps {
   items:              UnifiedListItem[]
@@ -45,10 +46,10 @@ export default function ConversationList({
           </div>
           {/* One button: the New Message dialog has both DIRECT and GROUP tabs
               (user 2026-11-10: the separate new-group icon was removed). */}
-          <button type="button" onClick={onNewConversation} title="New message" aria-label="New message"
+          <Tip label="New message"><button type="button" onClick={onNewConversation} aria-label="New message"
             className="p-1.5 rounded-lg text-[var(--color-cyan)] hover:bg-white/5 transition-colors">
             <MessageCirclePlus size={16} />
-          </button>
+          </button></Tip>
         </div>
         <div className="relative">
           <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/60 pointer-events-none" />

@@ -19,6 +19,7 @@ import { useAuthStore } from "@/lib/store/auth.store";
 import { helpTabFromUrl, openHelpAssistant } from "@/lib/services/support.service";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import Dropdown from "@/components/ui/Dropdown";
+import { Tip } from '@/components/ui/tooltip'
 
 const timeAgo = (iso: string): string => {
   const diff = now() - new Date(iso).getTime();
@@ -561,13 +562,13 @@ export default function NotificationIcon() {
               </div>
 
               {isUnread && (
-                <button
-                  title="Mark as read"
+                <Tip label="Mark as read"><button
+                  aria-label="Mark as read"
                   onClick={(e) => { e.stopPropagation(); markRead(n.notification_id); }}
                   className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 cursor-pointer transition-all border bg-white/[0.03] border-white/10 text-white/40 hover:border-white/25 hover:bg-white/[0.08] hover:text-white"
                 >
                   <Check size={12} />
-                </button>
+                </button></Tip>
               )}
             </div>
           </div>

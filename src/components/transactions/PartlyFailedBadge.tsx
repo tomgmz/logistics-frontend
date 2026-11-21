@@ -1,6 +1,7 @@
 import { CircleSlash } from 'lucide-react'
 
 import { ERROR } from './transaction-theme'
+import { Tip } from '@/components/ui/tooltip'
 
 /**
  * Delivered or Completed, but at least one drop-off failed (user 2026-11-14).
@@ -31,13 +32,12 @@ export default function PartlyFailedBadge({ booking, className = 'mt-1' }: {
 }) {
   const n = booking ? failedCount(booking) : null
   return (
-    <span
-      title={n && n.total > 0 ? `${n.failed} of ${n.total} drop-offs could not be delivered` : 'Some drop-offs could not be delivered'}
+    <Tip label={n && n.total > 0 ? `${n.failed} of ${n.total} drop-offs could not be delivered` : 'Some drop-offs could not be delivered'}><span
       className={`flex w-fit items-center gap-1 whitespace-nowrap text-[10px] font-bold uppercase tracking-wide leading-none ${className}`}
       style={{ color: ERROR }}
     >
       <CircleSlash size={10} aria-hidden />
       Partly Failed
-    </span>
+    </span></Tip>
   )
 }

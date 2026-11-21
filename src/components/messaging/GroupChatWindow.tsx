@@ -26,6 +26,7 @@ import { toGroupMessage, PHOTO_PLACEHOLDER } from '@/app/types/messaging/messagi
 import { groupChatKey, isChatFresh, markChatFresh } from './chatFreshness'
 import { cachedData, storeData } from '@/lib/query/useApiQuery'
 import { useCatchUp } from '@/lib/hooks/useLiveTable'
+import { Tip } from '@/components/ui/tooltip'
 
 interface ReplyTo     { messageId: string; content: string; senderName: string }
 
@@ -54,10 +55,10 @@ function SeenByAvatars({ seenBy }: { seenBy: GroupMember[] }) {
   return (
     <div className="flex items-center gap-0.5 mt-0.5 justify-end">
       {visible.map(m => (
-        <div key={m.user_id} title={`${m.first_name} ${m.last_name}`}
+        <Tip label={`${m.first_name} ${m.last_name}`} key={m.user_id}><div
           className="w-3.5 h-3.5 rounded-full bg-[var(--color-surface-dark)] border border-white/20 flex items-center justify-center">
           <span className="font-card text-[0.35rem] text-white/70 leading-none">{m.first_name[0]?.toUpperCase() ?? '?'}</span>
-        </div>
+        </div></Tip>
       ))}
       {overflow > 0 && <span className="ff-body text-[9px] text-white/30">+{overflow}</span>}
     </div>

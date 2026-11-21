@@ -5,6 +5,7 @@ import { FileDown, FileSpreadsheet } from 'lucide-react'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { Button } from '@/components/ui/untitled/button'
+import { Tip } from '@/components/ui/tooltip'
 
 /**
  * "Export" for the logs toolbars. `run` fetches the filtered rows and
@@ -48,28 +49,26 @@ export default function ExportLogsButton({
 
   if (untitled) {
     return (
-      <Button
+      <Tip label="Download every row matching the current filters as an Excel file"><Button
         size="toolbar"
         color="accent"
         iconLeading={FileDown}
         onClick={() => void handleClick()}
         disabled={exporting || disabled}
-        title="Download every row matching the current filters as an Excel file"
       >
         {exporting ? 'Exporting…' : 'Export'}
-      </Button>
+      </Button></Tip>
     )
   }
 
   return (
-    <button
+    <Tip label="Download every row matching the current filters as an Excel file"><button
       type="button"
       onClick={() => void handleClick()}
       disabled={exporting || disabled}
-      title="Download every row matching the current filters as an Excel file"
       className="flex items-center gap-1.5 rounded-lg border border-[#424242] px-3 py-2 text-sm text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white disabled:opacity-40"
     >
       <FileSpreadsheet size={13} /> {exporting ? 'Exporting…' : 'Export'}
-    </button>
+    </button></Tip>
   )
 }

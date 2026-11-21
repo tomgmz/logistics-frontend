@@ -122,6 +122,7 @@ import { FieldError } from '@/components/ui/FieldError'
 import { useResolvedBookingKey } from '@/lib/booking-url'
 import { TruncatedText } from '@/components/ui/TruncatedText'
 import { ORDER_LABELS, isReversed, orderField, orderRules, reverseParam, withoutOrder } from '@/lib/table-order'
+import { Tip } from '@/components/ui/tooltip'
 
 const BOOKING_STATUSES: AdminBookingLifecycleStatus[] = [
   'pending',
@@ -218,13 +219,12 @@ function getPrefillFromBookingDetail(detail: BookingDetail, trucks: TruckType[])
  */
 function AfterHoursBadge() {
   return (
-    <span
-      title="Submitted after 5:00 PM today — due for review when the office opens"
+    <Tip label="Submitted after 5:00 PM today — due for review when the office opens"><span
       className="inline-flex text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border mt-0.5"
       style={{ color: '#ffea00', borderColor: '#facc1555', background: '#facc1514' }}
     >
       After hours
-    </span>
+    </span></Tip>
   )
 }
 
@@ -237,14 +237,13 @@ const OUT_OF_SERVICE_WORDS: Record<string, string> = {
 /** List badge: the vehicle on this booking was taken out of service. */
 function VehiclePulledBadge({ plate, status }: { plate: string; status: string }) {
   return (
-    <span
-      title={`${plate} is ${OUT_OF_SERVICE_WORDS[status] ?? status}. Choose another vehicle.`}
+    <Tip label={`${plate} is ${OUT_OF_SERVICE_WORDS[status] ?? status}. Choose another vehicle.`}><span
       className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border mt-0.5"
       style={{ color: '#f62626', borderColor: '#f8717155', background: '#f8717114' }}
     >
       <AlertTriangle size={9} />
       Vehicle out of service
-    </span>
+    </span></Tip>
   )
 }
 
@@ -274,28 +273,26 @@ function VehiclePulledBanner({
 /** List badge: the next stop is running 15+ min past its planned window (delay.scheduler). */
 function DelayedBadge({ minutes }: { minutes: number | null }) {
   return (
-    <span
-      title="Running late against the planned arrival"
+    <Tip label="Running late against the planned arrival"><span
       className="flex w-fit items-center gap-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border mt-1"
       style={{ color: '#FF7A30', borderColor: '#FF7A3055', background: '#FF7A3014' }}
     >
       <Clock size={9} />
       Delayed{minutes ? ` · ${formatDuration(minutes)}` : ''}
-    </span>
+    </span></Tip>
   )
 }
 
 /** List badge: the delivery is paused (weather, breakdown, closed stop…). */
 function PausedBadge({ reason }: { reason: string }) {
   return (
-    <span
-      title={`Paused: ${pauseReasonLabel(reason)}`}
+    <Tip label={`Paused: ${pauseReasonLabel(reason)}`}><span
       className="flex w-fit items-center gap-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border mt-1"
       style={{ color: '#ffea00', borderColor: '#fbbf2455', background: '#fbbf2414' }}
     >
       <PauseCircle size={9} />
       Paused · {pauseReasonLabel(reason)}
-    </span>
+    </span></Tip>
   )
 }
 
@@ -1121,9 +1118,7 @@ function BlowbagetsRecord({ check }: { check: BlowbagetsCheck }) {
         {BLOWBAGETS_ITEMS.map((it) => {
           const on = !!check.items[it.key]
           return (
-            <span
-              key={it.key}
-              title={`${it.label} — ${on ? 'passed' : 'failed'}`}
+            <Tip label={`${it.label} — ${on ? 'passed' : 'failed'}`} key={it.key}><span
               className="inline-flex items-center gap-1 text-[11px] font-bold px-1.5 py-0.5 rounded-md border"
               style={
                 on
@@ -1133,7 +1128,7 @@ function BlowbagetsRecord({ check }: { check: BlowbagetsCheck }) {
             >
               {on ? <Check size={11} strokeWidth={3} /> : <X size={11} strokeWidth={3} />}
               {it.label}
-            </span>
+            </span></Tip>
           )
         })}
       </div>
@@ -2271,25 +2266,25 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                               {r.delayed !== undefined && <DelayedBadge minutes={r.delayed} />}
                               {['assigned', 'in_transit'].includes(r.status) &&
                                 crewLicenseFlags(allAssignments.find((x) => x.booking_id === r.booking_id), r.schedule_date).length > 0 && (
-                                <span title="A driver's license expires before, during or within 7 days of this delivery"
+                                <Tip label="A driver's license expires before, during or within 7 days of this delivery"><span
                                   className="flex w-fit items-center gap-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border mt-1"
                                   style={{ color: '#FFEA00', borderColor: '#FFEA0055', background: '#FFEA0014' }}>
                                   License expiring
-                                </span>
+                                </span></Tip>
                               )}
                               {r.breakdown && (
-                                <span title="The driver reported a breakdown: pause the delivery or close it"
+                                <Tip label="The driver reported a breakdown: pause the delivery or close it"><span
                                   className="flex w-fit items-center gap-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border mt-1"
                                   style={{ color: '#F62626', borderColor: '#F6262655', background: '#F6262614' }}>
                                   Breakdown · needs decision
-                                </span>
+                                </span></Tip>
                               )}
                               {r.late_pending > 0 && (
-                                <span title="The previous main driver's phone sent a confirmation after the drivers were changed: accept or dismiss it in the booking"
+                                <Tip label="The previous main driver's phone sent a confirmation after the drivers were changed: accept or dismiss it in the booking"><span
                                   className="flex w-fit items-center gap-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border mt-1"
                                   style={{ color: '#FF7A30', borderColor: '#FF7A3055', background: '#FF7A3014' }}>
                                   Late confirmation{r.late_pending > 1 ? `s · ${r.late_pending}` : ''} · needs decision
-                                </span>
+                                </span></Tip>
                               )}
                               <ResubmittedBadge count={r.resubmissions} />
                             </td>

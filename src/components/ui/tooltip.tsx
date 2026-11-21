@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Tooltip as TooltipPrimitive } from "radix-ui"
+import { Slot, Tooltip as TooltipPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 
@@ -58,4 +58,63 @@ function TooltipContent({
   )
 }
 
-export { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger }
+/* Width/flex classes a disabled child's wrapper has to copy so the layout holds. */
+const LAYOUT_CLASS = /^(?:[a-z0-9]+:)*(?:w-|min-w-|max-w-|flex-1$|flex-auto$|flex-none$|grow|shrink|basis-|self-)/
+
+/**
+ * The app's one way to show a hover hint: wrap any element instead of giving
+ * it a native `title`. `label` empty/undefined = no tooltip, child as is.
+ * Props and ref from a parent `asChild` trigger (Popover, Dialog…) pass
+ * through to the child. A disabled control fires no pointer events, so it
+ * gets a focusable span around it (Radix's documented pattern) that carries
+ * the hover and its width classes.
+ */
+type TipOwnProps = {
+  label?: React.ReactNode
+  side?: React.ComponentProps<typeof TooltipPrimitive.Content>["side"]
+  align?: React.ComponentProps<typeof TooltipPrimitive.Content>["align"]
+  contentClassName?: string
+  children: React.ReactElement
+}
+
+const Tip = React.forwardRef<
+  HTMLElement,
+  TipOwnProps & Omit<React.HTMLAttributes<HTMLElement>, keyof TipOwnProps>
+>(function Tip({ label, side, align, contentClassName, children, ...rest }, ref) {
+  const child = React.Children.only(children) as React.ReactElement<{
+    disabled?: boolean
+    className?: string
+    style?: React.CSSProperties
+  }>
+  if (label == null || label === "" || label === false) {
+    return (
+      <Slot.Root ref={ref} {...rest}>
+        {child}
+      </Slot.Root>
+    )
+  }
+  let trigger: React.ReactElement = child
+  if (child.props.disabled) {
+    const layout = String(child.props.className ?? "")
+      .split(/\s+/)
+      .filter((c) => LAYOUT_CLASS.test(c))
+      .join(" ")
+    trigger = (
+      <span tabIndex={0} className={cn("inline-flex cursor-not-allowed", layout)}>
+        {React.cloneElement(child, { style: { ...child.props.style, pointerEvents: "none" } })}
+      </span>
+    )
+  }
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild ref={ref as React.Ref<HTMLButtonElement>} {...rest}>
+        {trigger}
+      </TooltipTrigger>
+      <TooltipContent side={side} align={align} className={contentClassName}>
+        {label}
+      </TooltipContent>
+    </Tooltip>
+  )
+})
+
+export { Tip, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger }

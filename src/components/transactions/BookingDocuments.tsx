@@ -18,6 +18,7 @@ import { formatDateTime } from './transaction-format'
 import { BG_PANEL, BG_CARD, BORDER, BORDER_C, CYAN, MUTED, ERROR } from './transaction-theme'
 import { FileViewButton } from '@/components/ui/FileViewer'
 import { cachedFetch } from '@/lib/query/useApiQuery'
+import { Tip } from '@/components/ui/tooltip'
 
 /**
  * Every file on one booking that its client may see, for the client's own
@@ -55,12 +56,11 @@ function FileRow({ doc }: { doc: ClientBookingDocument }) {
           title="View" ariaLabel={`View ${doc.file_name}`}>
           <Eye size={14} style={{ color: MUTED }} />
         </FileViewButton>
-        <button type="button"
+        <Tip label="Download"><button type="button"
           onClick={() => { void downloadFile(doc.file_url, doc.file_name) }}
-          className="p-2 rounded-lg hover:bg-white/5" style={{ color: CYAN }}
-          title="Download" aria-label={`Download ${doc.file_name}`}>
+          className="p-2 rounded-lg hover:bg-white/5" style={{ color: CYAN }} aria-label={`Download ${doc.file_name}`}>
           <Download size={14} />
-        </button>
+        </button></Tip>
       </div>
     </div>
   )

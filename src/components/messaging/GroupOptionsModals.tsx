@@ -11,6 +11,7 @@ import { getApiErrorMessage } from '@/lib/api-error'
 import type { Group, GroupMember } from '@/app/types/messaging/messaging.types'
 import { cachedFetch } from '@/lib/query/useApiQuery'
 import SearchClearButton from '@/components/ui/SearchClearButton'
+import { Tip } from '@/components/ui/tooltip'
 
 export type GroupOptionsView = 'members' | 'add' | 'rename' | 'requests'
 
@@ -124,12 +125,12 @@ function MembersModal({ group, currentUserId, onClose, onChanged }: {
       )
     }
     return (
-      <button type="button" title={isCreator ? 'Remove from group' : 'Ask the creator to remove'}
+      <Tip label={isCreator ? 'Remove from group' : 'Ask the creator to remove'}><button type="button"
         aria-label={`${isCreator ? 'Remove' : 'Ask to remove'} ${m.first_name} ${m.last_name}`}
         onClick={() => setConfirmId(m.user_id)}
         className="shrink-0 p-1.5 rounded-lg text-white/30 hover:text-red-400 hover:bg-white/5 transition-colors">
         <UserMinus size={14} />
-      </button>
+      </button></Tip>
     )
   }
 

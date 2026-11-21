@@ -89,6 +89,7 @@ import DatePicker from '@/components/ui/DatePicker'
 import Combobox from '@/components/ui/Combobox'
 import { TruncatedText } from '@/components/ui/TruncatedText'
 import { ORDER_LABELS, isReversed, orderField, orderRules, reverseParam, withoutOrder } from '@/lib/table-order'
+import { Tip } from '@/components/ui/tooltip'
 
 type FormMode    = 'create' | 'edit' | null
 
@@ -1119,11 +1120,9 @@ export default function VehicleManagementView({ archive }: {
                       const modelLabel = t.truck_model?.name ?? 'Vehicle'
                       const thumbUrl   = resolveModelImageUrl((t.truck_model?.image_url as string | null | undefined) ?? null)
                       return (
-                        <tr
-                          key={t.truck_id}
+                        <Tip label={archive ? 'View details' : 'Open in the Maintenance tab'} key={t.truck_id}><tr
                           role="button"
                           tabIndex={0}
-                          title={archive ? 'View details' : 'Open in the Maintenance tab'}
                           onClick={() => (archive ? setViewTruck(t) : openInMaintenance(t))}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (archive) setViewTruck(t); else openInMaintenance(t) }
@@ -1209,7 +1208,7 @@ export default function VehicleManagementView({ archive }: {
                               <ChevronRight size={18} className="text-[#818181]" aria-hidden />
                             </div>
                           </td>
-                        </tr>
+                        </tr></Tip>
                       )
                     })}
                   </tbody>
@@ -1386,11 +1385,10 @@ export default function VehicleManagementView({ archive }: {
                       const url    = resolveModelImageUrl(m.image_url ?? null)
                       const picked = form.model_id === m.model_id
                       return (
-                        <button
-                          key={m.model_id}
+                        <Tip label={`${m.name} · ${m.vehicle_type}`} key={m.model_id}><button
                           type="button"
                           onClick={() => applyModelPick(m.model_id)}
-                          title={`${m.name} · ${m.vehicle_type}`}
+                          aria-label={`${m.name} · ${m.vehicle_type}`}
                           className={`shrink-0 flex flex-col items-center gap-1.5 w-[88px] p-2 rounded-xl border transition-colors ${
                             picked
                               ? 'border-[var(--color-cyan)] bg-[rgba(77,249,237,0.08)]'
@@ -1404,7 +1402,7 @@ export default function VehicleManagementView({ archive }: {
                           <span className="text-[9px] text-white/35 text-center leading-tight">
                             {m.vehicle_type}
                           </span>
-                        </button>
+                        </button></Tip>
                       )
                     })}
                   </div>
@@ -1703,15 +1701,14 @@ export default function VehicleManagementView({ archive }: {
               {/* Footer: stays below the scrolling form, so the scrollbar stops above it. */}
               <div className="shrink-0 bg-[var(--color-surface)] flex items-center justify-between gap-2 px-4 py-3 border-t border-white/[0.07]">
                 {modalMode === 'edit' && editingTruck && canDelete && (
-                  <button
+                  <Tip label={editingTruck.status === 'in_use' ? 'Out on a booking — archive it once it is back in the yard' : undefined}><button
                     type="button"
                     onClick={() => handleArchiveClick(editingTruck)}
                     disabled={truckLock.readOnly || editingTruck.status === 'in_use'}
-                    title={editingTruck.status === 'in_use' ? 'Out on a booking — archive it once it is back in the yard' : undefined}
                     className="text-xs font-semibold text-yellow-400 hover:underline disabled:opacity-40 disabled:no-underline"
                   >
                     Archive vehicle…
-                  </button>
+                  </button></Tip>
                 )}
                 <div className="flex gap-2 ml-auto">
                   <button
@@ -1721,16 +1718,15 @@ export default function VehicleManagementView({ archive }: {
                   >
                     Cancel
                   </button>
-                  <button
+                  <Tip label={truckLock.readOnly ? 'Someone else is editing this vehicle' : isUnchanged ? 'No changes to save' : undefined}><button
                     type="button"
                     onClick={handleSaveClick}
                     disabled={isUnchanged || truckLock.readOnly}
-                    title={truckLock.readOnly ? 'Someone else is editing this vehicle' : isUnchanged ? 'No changes to save' : undefined}
                     className="px-4 py-2 rounded-lg text-sm font-bold text-black disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
                     style={{ background: 'var(--color-cyan)' }}
                   >
                     {modalMode === 'create' ? 'Create' : 'Save'}
-                  </button>
+                  </button></Tip>
                 </div>
               </div>
             </motion.div>

@@ -9,6 +9,7 @@ import EmojiPicker from './EmojiPicker'
 import PhotoSendDialog, { MAX_PHOTO_BYTES } from './PhotoSendDialog'
 import { BookingMentionMenu, useBookingMentionPicker } from './BookingMention'
 import JumpToLatest from './JumpToLatest'
+import { Tip } from '@/components/ui/tooltip'
 
 export interface ReplyToPreview {
   messageId: string
@@ -198,9 +199,9 @@ export default function MessageInput({
         <div className={`flex items-end ${compact ? 'gap-1' : 'gap-2.5'}`}>
           <div className={`flex shrink-0 items-center ${slotH}`}>
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={pickPhoto} />
-            <button type="button" onClick={() => fileRef.current?.click()} title="Send a photo (up to 10 MB)" aria-label="Send a photo" className={iconBtn}>
+            <Tip label="Send a photo (up to 10 MB)"><button type="button" onClick={() => fileRef.current?.click()} aria-label="Send a photo" className={iconBtn}>
               <ImageIcon size={iconSize} strokeWidth={1.6} />
-            </button>
+            </button></Tip>
           </div>
 
           {/* The pill is this wrapper, so the scrollbar sits inside it, clear
@@ -229,15 +230,14 @@ export default function MessageInput({
             style={{ height: lineHeight, maxHeight }}
           />
             <div className="relative shrink-0" style={{ height: lineHeight }}>
-              <button
+              <Tip label="Emoji"><button
                 type="button"
                 onClick={() => setShowEmoji(v => !v)}
-                title="Emoji"
                 aria-label="Emoji"
                 className={`inline-flex h-full items-center justify-center rounded-full px-0.5 transition-colors duration-100 hover:text-white ${showEmoji ? 'text-[var(--color-cyan)]' : 'text-white/70'}`}
               >
                 <Smile size={compact ? 18 : 22} strokeWidth={1.8} />
-              </button>
+              </button></Tip>
               <AnimatePresence>
                 {showEmoji && (
                   <EmojiPicker

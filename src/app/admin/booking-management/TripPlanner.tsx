@@ -36,6 +36,7 @@ import {
 } from './BookingDetailParts'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { usePanelSection } from '@/components/ui/PanelReady'
+import { Tip } from '@/components/ui/tooltip'
 
 /**
  * How many runs the assigned vehicle makes, which drop-offs each serves, and
@@ -490,13 +491,12 @@ export default function TripPlanner({ detail, canEdit, allowed = true, capacity 
                     {destinations.map((dest) => {
                       const on = draft.destinationIds.includes(dest.destination_id)
                       return (
-                        <button
-                          key={dest.destination_id}
+                        <Tip label={dest.address} key={dest.destination_id}><button
                           type="button"
                           disabled={saving}
                           onClick={() => toggleStop(draft.key, dest.destination_id)}
                           aria-pressed={on}
-                          title={dest.address}
+                          aria-label={dest.address}
                           className="w-full min-h-[42px] px-3 py-2 rounded-[8px] border text-sm font-bold uppercase transition-colors disabled:opacity-40"
                           style={on
                             ? { borderColor: PALETTE.cyan, color: PALETTE.cyan, background: '#244543' }
@@ -506,7 +506,7 @@ export default function TripPlanner({ detail, canEdit, allowed = true, capacity 
                             <Check size={15} className="shrink-0" />
                             <span className="truncate">Drop off {destNo.get(dest.destination_id)} - {dest.address}</span>
                           </span>
-                        </button>
+                        </button></Tip>
                       )
                     })}
                   </div>
@@ -764,10 +764,10 @@ function QtyRow({ line, value, max, disabled, onChange }: {
   const box = 'w-9 h-9 flex items-center justify-center rounded-[6px] border border-[#424242] text-[#818181] disabled:opacity-30'
   return (
     <div className="flex flex-wrap items-center justify-between gap-2">
-      <span className="text-sm font-bold text-[#818181] min-w-0 break-words" title={line.label}>
+      <Tip label={line.label}><span className="text-sm font-bold text-[#818181] min-w-0 break-words">
         {line.label}
         <span className="text-white"> · {fmtNum(value, 3)} {line.unit} of {fmtNum(line.total, 3)}</span>
-      </span>
+      </span></Tip>
       <div className="flex items-center gap-1 shrink-0">
         <button type="button" aria-label={`Less ${line.label}`} disabled={disabled || value <= 0}
           onClick={() => onChange(Math.max(0, value - step))} className={box}>

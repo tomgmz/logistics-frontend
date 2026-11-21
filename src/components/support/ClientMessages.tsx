@@ -18,6 +18,7 @@ import { BookingMentionMenu, useBookingMentionPicker } from '@/components/messag
 import JumpToLatest from '@/components/messaging/JumpToLatest'
 import { cachedData, cachedFetch } from '@/lib/query/useApiQuery'
 import { useCatchUp } from '@/lib/hooks/useLiveTable'
+import { Tip } from '@/components/ui/tooltip'
 
 /**
  * The client's messages, inside the help assistant rather than the staff
@@ -422,11 +423,10 @@ export function ClientMessagesPanel({ state, userId, onAskAssistant }: {
                 className="w-full min-w-0 bg-transparent px-3.5 py-2.5 text-[15px] text-white outline-none placeholder:text-white/30"
               />
               <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={pickPhoto} />
-              <button type="button" onClick={() => fileRef.current?.click()} disabled={sending}
-                title="Send a photo (up to 10 MB)" aria-label="Send a photo"
+              <Tip label="Send a photo (up to 10 MB)"><button type="button" onClick={() => fileRef.current?.click()} disabled={sending} aria-label="Send a photo"
                 className="mr-1.5 shrink-0 rounded-md p-1.5 text-white/40 transition-colors hover:bg-white/5 hover:text-white/75 disabled:opacity-30">
                 <ImagePlus size={16} />
-              </button>
+              </button></Tip>
             </div>
             <button type="submit" disabled={!input.trim() || sending} aria-label="Send"
               className="flex shrink-0 items-center justify-center rounded-lg bg-[var(--color-cyan)] p-3 text-[#0a0a0a] shadow-xs transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:bg-white/[0.05] disabled:text-white/25">

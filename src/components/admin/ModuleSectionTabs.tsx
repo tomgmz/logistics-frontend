@@ -1,6 +1,7 @@
 'use client'
 
 import { KeyRound, Users } from 'lucide-react'
+import { Tip } from '@/components/ui/tooltip'
 
 /**
  * The two halves of a people-management module.
@@ -75,7 +76,7 @@ export default function ModuleSectionTabs({
             {t.label}
 
             {showCount && (
-              <span
+              <Tip label={`${pendingCount} awaiting action`}><span
                 className={large
                   // Figma: a 22×18 pill, yellow while the tab is not open, cyan when it is.
                   ? `inline-flex h-[16px] 3xl:h-[18px] min-w-[20px] 3xl:min-w-[22px] items-center justify-center rounded-[10px] border-[0.5px] px-1 text-[12px] 3xl:text-[14px] font-bold leading-none
@@ -84,10 +85,9 @@ export default function ModuleSectionTabs({
                   ${active
                     ? 'bg-[#4df9ed] text-[#0a0a0a]'
                     : 'bg-yellow-500/20 text-yellow-400'}`}
-                title={`${pendingCount} awaiting action`}
               >
                 {pendingCount! > 99 ? '99+' : pendingCount}
-              </span>
+              </span></Tip>
             )}
 
             {/* The active underline covers the divider. The divider is an inset shadow,

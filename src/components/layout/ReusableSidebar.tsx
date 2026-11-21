@@ -14,6 +14,7 @@ import SigningOutOverlay from '@/components/layout/SigningOutOverlay'
 import { roleLabel } from '@/lib/roles'
 import { ROLE_ROUTES } from '@/constants/roles'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
+import { Tip } from '@/components/ui/tooltip'
 
 // Figma 3241:1835 (collapsed) and 3241:1930 (open); the rail is slimmer than
 // the Figma's 73px (the user's call, 2026-10-29).
@@ -227,11 +228,10 @@ export default function ReusableSidebar({
                 "LOGISTICS SERVICES" while the logo's own arrows shrink and slide
                 onto the rail; opening plays it back. */}
             <div className="h-[80px] shrink-0 pt-[18px]">
-              <button
+              <Tip side="right" label={sidebarOpen ? undefined : 'Open sidebar'}><button
                 type="button"
                 onClick={() => toggleSidebar(!sidebarOpen)}
                 aria-label={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
-                title={sidebarOpen ? undefined : 'Open sidebar'}
                 className="ml-[21px] block h-[38px] w-[150px] transition-opacity hover:opacity-80"
               >
                 <motion.span
@@ -243,7 +243,7 @@ export default function ReusableSidebar({
                 >
                   <Image src={ASSETS.logo} alt="8338 Logistics" width={150} height={38} className="h-[38px] w-[150px] object-contain object-left" />
                 </motion.span>
-              </button>
+              </button></Tip>
             </div>
 
             <nav
@@ -327,10 +327,9 @@ export default function ReusableSidebar({
                   className={`ml-[12px] block h-px w-[248px] max-w-none transition-opacity ${sidebarOpen ? 'opacity-100' : 'opacity-0'}`}
                 />
 
-                <button
+                <Tip side="right" label={sidebarOpen ? undefined : 'Sign out'}><button
                   type="button"
                   onClick={() => setLogoutModalOpen(true)}
-                  title={sidebarOpen ? undefined : 'Sign out'}
                   aria-label="Sign out"
                   className="flex h-[46px] w-full items-center gap-[18px] rounded-[8px] pl-[12px] text-left text-[#F62626] transition-colors [@media(hover:hover)]:hover:bg-[#F62626]/10 active:bg-[#F62626]/15"
                 >
@@ -338,7 +337,7 @@ export default function ReusableSidebar({
                   <span className={`ff-regular text-[14px] leading-[20px] whitespace-nowrap transition-opacity ${sidebarOpen ? 'opacity-100' : 'opacity-0'}`}>
                     Sign out
                   </span>
-                </button>
+                </button></Tip>
               </div>
             </div>
           </motion.div>
@@ -375,17 +374,16 @@ function ProfileLink({ href, active, expanded, onNavigate, children }: {
   const className = 'group flex h-[70px] w-full items-center gap-[14px] rounded-[10px] pl-[10px] text-left'
   if (!href) return <div className={className}>{children}</div>
   return (
-    <Link
+    <Tip side="right" label={expanded ? undefined : 'Profile'}><Link
       href={href}
       prefetch={false}
       onClick={onNavigate}
       aria-label="Profile"
       aria-current={active ? 'page' : undefined}
-      title={expanded ? undefined : 'Profile'}
       className={className}
     >
       {children}
-    </Link>
+    </Link></Tip>
   )
 }
 
@@ -404,11 +402,10 @@ interface NavItemProps {
 function NavItem({ item, isActive, index, expanded, onNavigate }: NavItemProps) {
   return (
     <Link href={item.href} onClick={onNavigate} prefetch={false}>
-      <motion.div
+      <Tip side="right" label={!expanded ? item.label : undefined}><motion.div
         initial={{ opacity: 0, x: -18 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ delay: index * 0.04, duration: 0.3 }}
-        title={!expanded ? item.label : undefined}
         className={`relative flex h-[46px] w-full items-center gap-[18px] pl-[25px] text-left transition-colors cursor-pointer
                     ${isActive ? 'text-[#4DF9ED]' : 'text-white [@media(hover:hover)]:hover:text-[#4DF9ED]'}`}
       >
@@ -436,7 +433,7 @@ function NavItem({ item, isActive, index, expanded, onNavigate }: NavItemProps) 
         >
           {item.label}
         </span>
-      </motion.div>
+      </motion.div></Tip>
     </Link>
   )
 }

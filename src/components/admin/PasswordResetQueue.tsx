@@ -23,6 +23,7 @@ import { useServerTable } from '@/lib/hooks/useServerTable'
 import { useDebouncedValue } from '@/lib/hooks/useDebouncedValue'
 import { TruncatedText } from '@/components/ui/TruncatedText'
 import { ORDER_LABELS, isReversed, orderField, orderRules, reverseParam, withoutOrder } from '@/lib/table-order'
+import { Tip } from '@/components/ui/tooltip'
 
 /**
  * The pending-reset queue on the IT Admin's User Management page. Since
@@ -342,11 +343,10 @@ export default function PasswordResetQueue({
                           {canEdit && (() => {
                             const live = CANCELLABLE.includes(r.status) && !busy
                             return (
-                              <button
+                              <Tip label={live ? 'Reject this request' : undefined}><button
                                 type="button"
                                 onClick={() => setPending({ kind: 'cancel', request: r })}
                                 disabled={!live}
-                                title={live ? 'Reject this request' : undefined}
                                 className={`${BTN_BASE} border ${live
                                   ? 'border-[#818181] text-[#818181] hover:border-[#f62626] hover:text-[#f62626]'
                                   : 'border-[#424242] text-[#424242]'}`}
@@ -354,7 +354,7 @@ export default function PasswordResetQueue({
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img src={live ? '/icons/password-reset/reject.svg' : '/icons/password-reset/reject-disabled.svg'} alt="" width={16} height={16} draggable={false} />
                                 Reject
-                              </button>
+                              </button></Tip>
                             )
                           })()}
                         </div>

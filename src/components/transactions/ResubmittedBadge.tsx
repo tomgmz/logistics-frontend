@@ -1,6 +1,7 @@
 import { RotateCcw } from 'lucide-react'
 
 import { AMBER, ERROR } from './transaction-theme'
+import { Tip } from '@/components/ui/tooltip'
 
 /**
  * How many times the client corrected and resubmitted this booking after a
@@ -21,13 +22,12 @@ export default function ResubmittedBadge({ count, className = 'mt-1', tone = 'am
   if (count <= 0) return null
   const c = tone === 'red' ? ERROR : AMBER
   return (
-    <span
-      title={`Corrected and resubmitted by the client after a rejection${count > 1 ? ` (${count} times)` : ''}`}
+    <Tip label={`Corrected and resubmitted by the client after a rejection${count > 1 ? ` (${count} times)` : ''}`}><span
       className={`flex w-fit items-center gap-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border whitespace-nowrap ${className}`}
       style={{ color: c, borderColor: tone === 'red' ? c : `${c}55`, background: `${c}14` }}
     >
       {tone === 'amber' && <RotateCcw size={9} />}
       Resubmitted{count > 1 ? ` ×${count}` : ''}
-    </span>
+    </span></Tip>
   )
 }

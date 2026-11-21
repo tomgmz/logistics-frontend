@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Search } from 'lucide-react'
 import SearchClearButton from '@/components/ui/SearchClearButton'
+import { Tip } from '@/components/ui/tooltip'
 
 interface EmojiSkin {
   unified: string
@@ -247,14 +248,14 @@ export default function EmojiPicker({ onSelect, onClose, position = 'top' }: Emo
 
         {/* Skin tone button */}
         <div className="relative">
-          <button
+          <Tip label="Skin tone"><button
             type="button"
-            title="Skin tone"
+            aria-label="Skin tone"
             onClick={() => setSkinBarOpen(o => !o)}
             className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-white/10 transition-colors"
           >
             <span className="text-[18px] leading-none">{getNative('raised_hand', skinTone) || '✋'}</span>
-          </button>
+          </button></Tip>
 
           <AnimatePresence>
             {skinBarOpen && (
@@ -266,10 +267,9 @@ export default function EmojiPicker({ onSelect, onClose, position = 'top' }: Emo
                 className="absolute right-0 top-full mt-1 flex gap-0.5 bg-[var(--color-bg)] border border-white/10 rounded-xl p-1 shadow-xl z-20"
               >
                 {SKIN_TONES.map(({ label, index }) => (
-                  <button
-                    key={index}
+                  <Tip label={label} key={index}><button
                     type="button"
-                    title={label}
+                    aria-label={label}
                     onClick={() => { setSkinTone(index); setSkinBarOpen(false) }}
                     className={`
                       w-7 h-7 flex items-center justify-center rounded-lg transition-all
@@ -277,7 +277,7 @@ export default function EmojiPicker({ onSelect, onClose, position = 'top' }: Emo
                     `}
                   >
                     <span className="text-[18px] leading-none">{getNative('raised_hand', index)}</span>
-                  </button>
+                  </button></Tip>
                 ))}
               </motion.div>
             )}
@@ -294,18 +294,17 @@ export default function EmojiPicker({ onSelect, onClose, position = 'top' }: Emo
           {categories.map((cat, i) => {
             const meta = CATEGORY_META[cat.id]
             return (
-              <button
-                key={cat.id}
+              <Tip label={meta?.label ?? cat.id} key={cat.id}><button
                 type="button"
                 onClick={() => setActiveCatIndex(i)}
-                title={meta?.label ?? cat.id}
+                aria-label={meta?.label ?? cat.id}
                 className={`
                   shrink-0 w-7 h-7 flex items-center justify-center rounded-lg transition-all
                   ${activeCatIndex === i ? 'bg-white/10' : 'hover:bg-white/[0.05]'}
                 `}
               >
                 <span className="text-[16px] leading-none">{meta?.icon ?? '🔷'}</span>
-              </button>
+              </button></Tip>
             )
           })}
         </div>
@@ -344,10 +343,9 @@ export default function EmojiPicker({ onSelect, onClose, position = 'top' }: Emo
                   const native = getNative(id, skinTone)
                   if (!native) return null
                   return (
-                    <button
-                      key={id}
+                    <Tip label={data?.emojis[id]?.name} key={id}><button
                       type="button"
-                      title={data?.emojis[id]?.name}
+                      aria-label={data?.emojis[id]?.name}
                       onClick={() => handleSelect(id)}
                       onContextMenu={e => handleContextMenu(e, id)}
                       className="
@@ -357,7 +355,7 @@ export default function EmojiPicker({ onSelect, onClose, position = 'top' }: Emo
                       "
                     >
                       <span className="text-[20px] leading-none select-none">{native}</span>
-                    </button>
+                    </button></Tip>
                   )
                 })}
               </div>
@@ -391,10 +389,9 @@ export default function EmojiPicker({ onSelect, onClose, position = 'top' }: Emo
               "
             >
               {emojiSkins.skins.map((skin, i) => (
-                <button
-                  key={i}
+                <Tip label={SKIN_TONES[i]?.label ?? `Skin ${i}`} key={i}><button
                   type="button"
-                  title={SKIN_TONES[i]?.label ?? `Skin ${i}`}
+                  aria-label={SKIN_TONES[i]?.label ?? `Skin ${i}`}
                   onClick={() => {
                     onSelect(skin.native)
                     onClose()
@@ -406,7 +403,7 @@ export default function EmojiPicker({ onSelect, onClose, position = 'top' }: Emo
                   "
                 >
                   <span className="text-[20px] leading-none select-none">{skin.native}</span>
-                </button>
+                </button></Tip>
               ))}
             </motion.div>
           </>

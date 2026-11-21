@@ -2,6 +2,7 @@
 
 import { Lock, PauseCircle } from 'lucide-react'
 import type { RecordLock } from '@/lib/hooks/useRecordLock'
+import { Tip } from '@/components/ui/tooltip'
 
 /**
  * The strip a locked record shows above its fields.
@@ -68,13 +69,12 @@ export default function RecordLockBanner({
 export function RecordLockBadge({ holder }: { holder: string | undefined }) {
   if (!holder) return null
   return (
-    <span
+    <Tip label={`${holder} is updating this`}><span
       role="img"
-      title={`${holder} is updating this`}
       aria-label={`${holder} is updating this`}
       className="inline-flex items-center justify-center rounded-md border border-amber-400/30 bg-amber-400/[0.08] p-1 text-amber-200 shrink-0"
     >
       <Lock size={12} className="shrink-0" />
-    </span>
+    </span></Tip>
   )
 }

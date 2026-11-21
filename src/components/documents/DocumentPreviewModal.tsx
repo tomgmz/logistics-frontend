@@ -17,6 +17,7 @@ import {
   type LibraryDocument,
 } from '@/app/types/documents.types'
 import { DocumentTypeBadge, ReviewStatusBadge } from './DocumentVisuals'
+import { Tip } from '@/components/ui/tooltip'
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -73,15 +74,14 @@ export default function DocumentPreviewModal({
                 </p>
               </div>
               <div className="flex items-center gap-1 shrink-0">
-                <button
+                <Tip label="Download"><button
                   type="button"
                   onClick={() => { void downloadFile(doc.file_url, doc.file_name) }}
                   className="p-2 rounded-lg hover:bg-white/5 text-white/60"
-                  title="Download"
                   aria-label="Download"
                 >
                   <Download size={17} />
-                </button>
+                </button></Tip>
                 <button type="button" onClick={onClose} className="p-2 rounded-lg hover:bg-white/5 text-white/50" aria-label="Close">
                   <X size={18} />
                 </button>

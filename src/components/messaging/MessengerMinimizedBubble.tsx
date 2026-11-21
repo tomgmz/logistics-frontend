@@ -5,6 +5,7 @@ import { nameWithRole } from '@/lib/roles'
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Users } from 'lucide-react'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useMessengerStore } from '@/lib/store/messenger.store'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { messagingService } from '@/lib/services/messaging.service'
@@ -116,25 +117,9 @@ function MinimizedBubbleItem({ chat, stackIndex }: MinimizedBubbleItemProps) {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      {/* Tooltip */}
-      <AnimatePresence>
-        {hovered && (
-          <motion.div
-            initial={{ opacity: 0, x: 8, scale: 0.95 }}
-            animate={{ opacity: 1, x: 0, scale: 1 }}
-            exit={{ opacity: 0, x: 6, scale: 0.95 }}
-            transition={{ duration: 0.15, ease: [0.4, 0, 0.2, 1] }}
-            className="absolute right-[calc(100%+10px)] bg-[var(--color-bg)] border border-white/[0.09] rounded-2xl px-3 py-2 shadow-2xl min-w-[160px] max-w-[220px] pointer-events-none"
-          >
-            <p className="ff-body text-[11px] font-semibold text-white truncate">{name}</p>
-            {previewText && (
-              <p className="ff-body text-[10px] text-white/40 truncate mt-0.5">{previewText}</p>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* Avatar */}
+      <Tooltip open={hovered}>
+      <TooltipTrigger asChild>
       <button
         type="button"
         onClick={() => toggleMinimizeChat(chat.id)}
@@ -173,6 +158,12 @@ function MinimizedBubbleItem({ chat, stackIndex }: MinimizedBubbleItemProps) {
           )}
         </AnimatePresence>
       </button>
+      </TooltipTrigger>
+      <TooltipContent side="left" className="ff-body min-w-[160px] max-w-[220px]">
+        <p className="truncate font-semibold">{name}</p>
+        {previewText && <p className="truncate text-xs text-white/50">{previewText}</p>}
+      </TooltipContent>
+      </Tooltip>
     </motion.div>
   )
 }

@@ -21,6 +21,7 @@ import { continuationDayLabel, openContinuation, pausedPlanState } from '@/lib/p
 import { formatDuration } from '@/lib/duration'
 import { ProtectedImg } from '@/components/ui/FileViewer'
 import { cachedFetch } from '@/lib/query/useApiQuery'
+import { Tip } from '@/components/ui/tooltip'
 
 // Text follows the page's --map-font (Transit Tracking: Darker Grotesque),
 // else Alegreya Sans SC; the status line keeps SC everywhere.
@@ -302,14 +303,12 @@ export function DetailsPanelContent({
 
       <div className="flex items-center justify-center gap-2 pt-3 pb-1">
         {STAGE_ICONS.map(({ Icon, label }) => (
-          <div
-            key={label}
+          <Tip label={label} key={label}><div
             className="w-[26px] h-[26px] rounded-full flex items-center justify-center"
             style={{ background: 'var(--color-surface-dark)' }}
-            title={label}
           >
             <Icon size={14} strokeWidth={1.75} style={{ color: 'var(--color-cyan, #4df9ed)' }} />
-          </div>
+          </div></Tip>
         ))}
       </div>
 

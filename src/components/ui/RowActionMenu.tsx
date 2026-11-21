@@ -5,6 +5,7 @@ import { MoreVertical } from 'lucide-react'
 
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useIsMobile } from '@/lib/hooks/useIsMobile'
+import { Tip } from '@/components/ui/tooltip'
 
 export interface RowAction {
   label:     string
@@ -114,12 +115,11 @@ export default function RowActionMenu({
                 {phone && a.section && a.section !== prev?.section && (
                   <p className="px-3 pb-1 pt-1.5 text-[10px] font-bold uppercase tracking-wider text-[#555]">{a.section}</p>
                 )}
-                <button
+                <Tip label={a.title}><button
                   type="button"
                   role="menuitem"
                   disabled={a.disabled}
                   aria-disabled={a.disabled || undefined}
-                  title={a.title}
                   onClick={() => pick(a)}
                   className={`flex w-full items-center rounded-lg text-left transition disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent ${toneOf(a)} ${
                     phone ? 'gap-3 px-3 py-2.5' : 'gap-2.5 px-2.5 py-2 text-sm'
@@ -138,7 +138,7 @@ export default function RowActionMenu({
                   ) : (
                     <>{a.icon} {a.label}</>
                   )}
-                </button>
+                </button></Tip>
               </div>
             )
           })}

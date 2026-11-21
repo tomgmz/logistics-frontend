@@ -1,6 +1,7 @@
 'use client'
 
 import { Check, Truck, X } from 'lucide-react'
+import { Tip } from '@/components/ui/tooltip'
 
 /**
  * The route as a stepper: the pickup, then every drop-off in route order.
@@ -212,12 +213,12 @@ export function RouteStepper({
     return (
       <div className="flex w-full items-center" role="list" aria-label="Route progress">
         {steps.map((step, i) => (
-          <div key={step.key} className={`flex items-center ${i === 0 ? '' : 'flex-1'}`} role="listitem" title={step.title ?? step.label}>
+          <Tip label={step.title ?? step.label} key={step.key}><div className={`flex items-center ${i === 0 ? '' : 'flex-1'}`} role="listitem">
             {i > 0 && (
               <span className="mx-1 h-[2px] flex-1 rounded-full" style={{ background: lineInto(step) }} />
             )}
             <Dot step={step} size={isActive(step) ? 10 : 8} live={live} showContent={false} />
-          </div>
+          </div></Tip>
         ))}
       </div>
     )
@@ -236,10 +237,8 @@ export function RouteStepper({
         {steps.map((step, i) => {
           const next = steps[i + 1]
           return (
-            <li
-              key={step.key}
+            <Tip label={step.title ?? step.label} key={step.key}><li
               className="relative flex flex-col items-center px-1"
-              title={step.title ?? step.label}
               aria-current={isActive(step) ? 'step' : undefined}
             >
               {next && (
@@ -281,7 +280,7 @@ export function RouteStepper({
                   {step.loads.done}/{step.loads.total} loads
                 </span>
               )}
-            </li>
+            </li></Tip>
           )
         })}
       </ol>

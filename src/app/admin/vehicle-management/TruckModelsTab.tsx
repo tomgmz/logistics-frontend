@@ -36,6 +36,7 @@ import { ProtectedImg } from '@/components/ui/FileViewer'
 import Dropdown from '@/components/ui/Dropdown'
 import { TruncatedText } from '@/components/ui/TruncatedText'
 import { ORDER_LABELS, isReversed, orderField, orderRules, reverseParam, withoutOrder } from '@/lib/table-order'
+import { Tip } from '@/components/ui/tooltip'
 
 
 interface ModelFormState {
@@ -912,16 +913,15 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete, archive 
                   Close
                 </button>
                 {canEdit && !viewModel.archived_at && (
-                <button
+                <Tip label={modelLocks.has(viewModel.model_id) ? `${modelLocks.get(viewModel.model_id)} is editing this model` : undefined}><button
                   type="button"
                   disabled={modelLocks.has(viewModel.model_id)}
-                  title={modelLocks.has(viewModel.model_id) ? `${modelLocks.get(viewModel.model_id)} is editing this model` : undefined}
                   onClick={() => { const m = viewModel; setViewModel(null); openEdit(m) }}
                   className="px-4 py-2 rounded-lg text-sm font-bold text-black disabled:opacity-40"
                   style={{ background: 'var(--color-cyan)' }}
                 >
                   Update Details
-                </button>
+                </button></Tip>
                 )}
               </div>
             </motion.div>

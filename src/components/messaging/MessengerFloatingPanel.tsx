@@ -19,6 +19,7 @@ import type { Conversation, Group } from '@/app/types/messaging/messaging.types'
 import { cachedData, storeData } from '@/lib/query/useApiQuery'
 import { useCatchUp } from '@/lib/hooks/useLiveTable'
 import SearchClearButton from '@/components/ui/SearchClearButton'
+import { Tip } from '@/components/ui/tooltip'
 
 type Tab = 'All' | 'Unread'
 type PanelItem =
@@ -149,9 +150,9 @@ export default function MessengerFloatingPanel() {
           <div className="px-4 pt-4 pb-2 flex items-center justify-between shrink-0">
             <h3 className="font-spartan text-white text-sm tracking-[0.15em] uppercase">Chats</h3>
             <div className="flex items-center gap-1">
-              <button type="button" onClick={() => { closePanel(); router.push('/messages') }} title="Open full Messages" className="p-1.5 rounded-lg hover:bg-white/5 text-white/40 hover:text-white transition-colors">
+              <Tip label="Open full Messages"><button type="button" onClick={() => { closePanel(); router.push('/messages') }} aria-label="Open full Messages" className="p-1.5 rounded-lg hover:bg-white/5 text-white/40 hover:text-white transition-colors">
                 <Expand size={14} />
-              </button>
+              </button></Tip>
               <button type="button" onClick={closePanel} className="p-1.5 rounded-lg hover:bg-white/5 text-white/40 hover:text-white transition-colors">
                 <X size={14} />
               </button>

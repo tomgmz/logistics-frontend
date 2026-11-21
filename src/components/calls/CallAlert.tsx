@@ -3,6 +3,7 @@
 import { useSyncExternalStore, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { X, type LucideIcon } from 'lucide-react'
+import { Tip } from '@/components/ui/tooltip'
 
 /**
  * The one call alert, after Untitled UI's floating alert
@@ -133,15 +134,14 @@ export function CallCircleButton({
     : kind === 'decline' ? 'bg-[#f62626] text-white'
     : 'bg-white/10 text-white/80'
   return (
-    <button
+    <Tip label={label}><button
       type="button"
       onClick={onClick}
       disabled={disabled}
       aria-label={label}
-      title={label}
       className={`flex h-10 w-10 items-center justify-center rounded-full disabled:opacity-50 ${look} ${busy ? 'animate-pulse' : ''}`}
     >
       <Icon size={18} />
-    </button>
+    </button></Tip>
   )
 }
