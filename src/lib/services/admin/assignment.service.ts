@@ -27,6 +27,8 @@ export interface AssignBookingPayload {
   second_vendor_driver_user_id?: string | null
   /** Helper's name on a route of 30 km or less. Information only. */
   helper_name?: string | null
+  /** Why an assigned crew is being changed; the server requires it when the crew changes. */
+  change_reason?: string | null
 }
 
 /**

@@ -118,7 +118,7 @@ import {
 import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
 import { formatDuration } from '@/lib/duration'
 import Dropdown from '@/components/ui/Dropdown'
-import { FieldError } from '@/components/ui/FieldError'
+import { FieldError, errorBorder } from '@/components/ui/FieldError'
 import { useResolvedBookingKey } from '@/lib/booking-url'
 import { TruncatedText } from '@/components/ui/TruncatedText'
 import { ORDER_LABELS, isReversed, orderField, orderRules, reverseParam, withoutOrder } from '@/lib/table-order'
@@ -1242,6 +1242,11 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
   const [assignTruckId, setAssignTruckId]   = useState<string>('')
   // Optional helper on a short route, by name ('' for none).
   const [assignHelperName, setAssignHelperName] = useState<string>('')
+  // Why an assigned crew is being changed (2026-11-21, like Bringg's reassign
+  // reason). Asked in the confirmation only when the booking already has a crew
+  // and the pick changes it; the server requires it too.
+  const [assignReason, setAssignReason] = useState('')
+  const [assignReasonError, setAssignReasonError] = useState<string | null>(null)
   // The open booking's road distance. Read when the crew pop-up opens (cached
   // server-side), since it decides second driver vs helper.
   const [routeDistance, setRouteDistance]   = useState<RouteDistance | null>(null)
@@ -1791,6 +1796,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
     const helperName = rule.helper ? assignHelperName.trim() || null : null
     // The confirmation already showed these, so the reply's warning needs no toast.
     const warnedBeforeSave = assignFitProblems.length > 0
+    const changeReason = crewChangeNeedsReason() ? assignReason.trim() : null
     setAssignBusy(true)
     try {
       const result = assignVendorMode
@@ -1801,12 +1807,14 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
             vendor_vehicle_type:   vendorForm.vendor_vehicle_type.trim() || undefined,
             second_vendor_driver_user_id: keepSecond ? vendorForm.second_vendor_driver_user_id || null : null,
             helper_name:           helperName,
+            change_reason:         changeReason,
           })
         : await assignmentService.assignBooking(selectedId, {
             driver_id: assignDriverId,
             truck_id:  assignTruckId,
             second_driver_id: keepSecond ? assignSecondDriverId || null : null,
             helper_name:      helperName,
+            change_reason:    changeReason,
           })
       setCommittedAssignment({
         driverId:       assignDriverId,
@@ -1815,6 +1823,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
         helperName:     helperName ?? '',
       })
       setAssignEditMode(false)
+      setAssignReason('')
       await openDetail(selectedId)
       await loadPage()
       assignmentService.getAll().then(setAllAssignments).catch(() => null)
@@ -2010,6 +2019,36 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
   const bookingReadOnly = bookingLock.readOnly
   // The crew record on the open booking (vendor snapshot, helper), for the replacement pop-up.
   const currentAssignment = detail ? allAssignments.find((a) => a.booking_id === detail.booking_id) : undefined
+
+  /**
+   * Whether this pick changes a crew already on the booking (driver, second
+   * driver, helper or vehicle). The first assignment, or the same crew saved
+   * again, needs no reason. Mirrors the server's check in assignBookingService.
+   */
+  const crewChangeNeedsReason = (): boolean => {
+    const a = currentAssignment
+    if (!a || !(a.driver_id || a.vendor_driver_user_id || a.truck_id || a.vendor_vehicle_plate)) return false
+    const rule   = crewRule(routeDistance)
+    const helper = (rule.helper ? assignHelperName.trim() : '') || null
+    const n = (v: unknown) => (typeof v === 'string' ? v.trim().toUpperCase() : v ?? null) || null
+    if (assignVendorMode) {
+      const second = rule.second !== 'hidden' ? vendorForm.second_vendor_driver_user_id || null : null
+      return n(a.driver_id) !== null
+        || n(a.vendor_driver_user_id) !== n(vendorForm.vendor_driver_user_id)
+        || n(a.second_driver?.users?.user_id) !== n(second)
+        || n(a.helper_name) !== n(helper)
+        || n(a.truck_id) !== null
+        || n(a.vendor_vehicle_plate) !== n(vendorForm.vendor_vehicle_plate)
+    }
+    const second = rule.second !== 'hidden' ? assignSecondDriverId || null : null
+    return n(a.driver_id) !== n(assignDriverId)
+      || n(a.vendor_driver_user_id) !== null
+      || n(a.second_driver?.driver_id) !== n(second)
+      || n(a.helper_name) !== n(helper)
+      || n(a.truck_id) !== n(assignTruckId)
+      || n(a.vendor_vehicle_plate) !== null
+  }
+  const needsChangeReason = confirmAssign && crewChangeNeedsReason()
   const stage = detail ? normalizeBookingStatus(detail.status) : 'pending'
 
   // The crew card on the road and after (Figma "Driver and Vehicle Assignment").
@@ -2129,9 +2168,35 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
         confirmLabel={assignFitProblems.length > 0 ? 'Assign anyway' : 'Yes'}
         cancelLabel={assignFitProblems.length > 0 ? 'Go back' : 'No'}
         zClassName="z-[80]"
-        onConfirm={() => { setConfirmAssign(false); void handleAssign() }}
+        onConfirm={() => {
+          if (needsChangeReason && assignReason.trim().length < 3) {
+            setAssignReasonError('Say why the driver, second driver, helper or vehicle is being changed.')
+            return
+          }
+          setConfirmAssign(false)
+          void handleAssign()
+        }}
         onCancel={() => setConfirmAssign(false)}
       >
+        {needsChangeReason && (
+          <div className="mt-3 text-left">
+            <label htmlFor="assign-change-reason" className="text-[11px] text-white/40 block mb-1">
+              Reason for the change<span className="text-red-400"> *</span>
+            </label>
+            <textarea
+              id="assign-change-reason"
+              value={assignReason}
+              onChange={(e) => { setAssignReason(e.target.value); if (assignReasonError) setAssignReasonError(null) }}
+              maxLength={500}
+              rows={3}
+              placeholder="e.g. Juan is on sick leave; Pedro takes the booking."
+              aria-invalid={!!assignReasonError}
+              className={`${selectClass} resize-none ${errorBorder(assignReasonError)}`}
+            />
+            <FieldError>{assignReasonError}</FieldError>
+            <p className="text-[10px] text-white/35 mt-1 leading-snug">Kept in the booking’s Driver and Vehicle Changes.</p>
+          </div>
+        )}
         {assignFitProblems.length > 0 && (
           <ul className="mt-3 m-0 pl-0 list-none flex flex-col gap-1.5">
             {assignFitProblems.map((p) => (
@@ -2644,7 +2709,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                                 return next
                               })
                             }
-                            onAssign={() => setConfirmAssign(true)}
+                            onAssign={() => { setAssignReason(''); setAssignReasonError(null); setConfirmAssign(true) }}
                             onOpenPicker={() => setAssignEditMode(true)}
                             canEdit={canEdit}
                             onClosePicker={() => {
