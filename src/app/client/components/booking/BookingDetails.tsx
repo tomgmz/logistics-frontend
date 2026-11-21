@@ -228,6 +228,15 @@ function fieldSx(bg: string, borderColor: string, hasError = false): SxProps<The
   }
 }
 
+/** The small L / W / H inside a size box: stays visible after typing, unlike the placeholder. */
+const DIM_TAG_SX: SxProps<Theme> = {
+  '& .MuiInputBase-adornedStart': { paddingLeft: '10px' },
+  '& .MuiInputBase-adornedStart .MuiInputBase-input': { paddingLeft: '6px' },
+}
+function dimTag(letter: 'L' | 'W' | 'H') {
+  return <span aria-hidden className="ff-regular text-xs text-[#818181] select-none shrink-0">{letter}</span>
+}
+
 const HELPER_SX: SxProps<Theme> = {
   color: ERROR_COLOR, fontSize: '0.7rem', marginTop: '3px',
   marginLeft: '2px', fontFamily: 'inherit', lineHeight: 1.3,
@@ -1370,7 +1379,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                                   </div>
 
                                   <div className="flex flex-col gap-1 min-w-0 col-span-2 lg:col-span-1 lg:flex-1">
-                                    <label className="ff-regular booking-text text-xs whitespace-nowrap">Dimensions<Req /></label>
+                                    <label className="ff-regular booking-text text-xs whitespace-nowrap">Dimensions (L × W × H)<Req /></label>
                                     <div className="flex gap-1.5 items-start">
                                       {(['looseLength', 'looseWidth', 'looseHeight'] as const).map((dim) => (
                                         <div key={dim} className="flex flex-col gap-0.5 flex-1 min-w-0">
@@ -1378,9 +1387,10 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                                             onChange={(e) => setGroupField(section.dropoffIndex, g.id, dim, decimalOnly(e.target.value))}
                                             onBlur={() => touchField(`${g.id}:${dim}`)}
                                             inputProps={{ inputMode: 'decimal', 'aria-label': `${dim === 'looseLength' ? 'Length' : dim === 'looseWidth' ? 'Width' : 'Height'} in ${UNIT_NAME[g.dimUnit ?? 'cm']}` }}
-                                            placeholder={dim === 'looseLength' ? 'L' : dim === 'looseWidth' ? 'W' : 'H'}
+                                            InputProps={{ startAdornment: dimTag(dim === 'looseLength' ? 'L' : dim === 'looseWidth' ? 'W' : 'H') }}
+                                            placeholder="0"
                                             variant="outlined" error={!!gErr[dim]}
-                                            sx={{ ...fieldSx(INPUT_BG_CARD, BORDER_CARD, !!gErr[dim]), width: '100%' }} />
+                                            sx={{ ...fieldSx(INPUT_BG_CARD, BORDER_CARD, !!gErr[dim]), ...DIM_TAG_SX, width: '100%' } as SxProps<Theme>} />
                                           {gErr[dim] && <FormHelperText sx={HELPER_SX}>{gErr[dim]}</FormHelperText>}
                                         </div>
                                       ))}
@@ -1454,7 +1464,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                                   </div>
 
                                   <div className="flex flex-col gap-1 w-full sm:min-w-[260px] sm:flex-1">
-                                    <label className="ff-regular booking-text text-xs whitespace-nowrap">Dimensions<Req /></label>
+                                    <label className="ff-regular booking-text text-xs whitespace-nowrap">Dimensions (L × W × H)<Req /></label>
                                     <div className="flex gap-1.5 items-start">
                                       {(['palletLength', 'palletWidth', 'palletHeight'] as const).map((dim) => (
                                         <div key={dim} className="flex flex-col gap-0.5 flex-1 min-w-0">
@@ -1470,9 +1480,10 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                                             }}
                                             onBlur={() => touchField(`${g.id}:${dim}`)}
                                             inputProps={{ inputMode: 'decimal', 'aria-label': `${dim === 'palletLength' ? 'Length' : dim === 'palletWidth' ? 'Width' : 'Height'} in ${UNIT_NAME[g.palletDimUnit ?? 'cm']}` }}
-                                            placeholder={dim === 'palletLength' ? 'L' : dim === 'palletWidth' ? 'W' : 'H'}
+                                            InputProps={{ startAdornment: dimTag(dim === 'palletLength' ? 'L' : dim === 'palletWidth' ? 'W' : 'H') }}
+                                            placeholder="0"
                                             variant="outlined" error={!!gErr[dim as keyof GroupErrors]}
-                                            sx={{ ...fieldSx(INPUT_BG_CARD, BORDER_CARD, !!gErr[dim as keyof GroupErrors]), width: '100%' }} />
+                                            sx={{ ...fieldSx(INPUT_BG_CARD, BORDER_CARD, !!gErr[dim as keyof GroupErrors]), ...DIM_TAG_SX, width: '100%' } as SxProps<Theme>} />
                                           {gErr[dim as keyof GroupErrors] && (
                                             <FormHelperText sx={HELPER_SX}>{gErr[dim as keyof GroupErrors]}</FormHelperText>
                                           )}
