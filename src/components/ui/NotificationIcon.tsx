@@ -73,6 +73,8 @@ const ACTIONABLE_TYPES = new Set([
   "booking.late_confirmation_unhandled",
   "booking.stop_order_changed",
   "booking.driver_call_reminder",
+  "booking.late_start_driver",
+  "booking.late_start_staff",
   "driver.emergency",
   "driver.report",
   "driver.license_expiring_staff",
@@ -186,6 +188,8 @@ const VALUE_LABELS: Record<string, Record<string, string>> = {
     late_confirmation_unhandled: "Late confirmation still waiting",
     stop_order_changed:         "Driver changed the drop-off order",
     driver_call_reminder:  "Call time in 1 hour",
+    late_start_driver:     "Your delivery has not started",
+    late_start_staff:      "Delivery not started",
   },
   window: {
     day_before: "Day before dispatch",

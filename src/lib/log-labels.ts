@@ -121,6 +121,7 @@ const SYSTEM_SOURCE_LABEL: Record<string, string> = {
   'contract-expiry.scheduler':     'Contract expiry reminders',
   'delay.scheduler':               'Delay check',
   'driver-call.scheduler':         'Driver call time reminders',
+  'late-start.scheduler':          'Late start check',
   'fleet-recheck.scheduler':       'Vehicle re-check reminders',
   'it-admin-render.scheduler':     'IT Administrator handover',
   'license-expiry.scheduler':      'License expiry reminders',
