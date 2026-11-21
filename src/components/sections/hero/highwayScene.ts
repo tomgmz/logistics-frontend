@@ -25,6 +25,7 @@ export type HighwayOptions = {
 };
 
 const L = 420; // visible road length
+const WRAP = L * 100; // 42000: divisible by 14 and 7 (dashes, studs)
 const W = 26; // total width: two 11-wide roadways and a 4-wide median
 const AMP = new THREE.Vector2(26, 5);
 
@@ -223,7 +224,8 @@ export function createHighway(opts: HighwayOptions): { dispose: () => void } {
       const xs = c.pair ? [-c.pair, c.pair] : [0];
       for (const dx of xs) {
         off.push(c.x + dx, c.y, z0);
-        met.push(c.r, c.len, c.speed);
+        // Speeds on a 0.01 grid, so every light repeats within WRAP (see frame()).
+        met.push(c.r, c.len, Math.round(c.speed * 100) / 100);
         col.push(c.color.r, c.color.g, c.color.b);
       }
     }
@@ -340,7 +342,11 @@ export function createHighway(opts: HighwayOptions): { dispose: () => void } {
     const k = (speed - BASE) / (FAST - BASE); // 0..1 acceleration
 
     shared.uTime.value = time;
-    shared.uTravel.value = travel;
+    // The shaders get the distance wrapped, or float precision makes the trails
+    // jitter after a few hours. WRAP = 100 road lengths: a multiple of L (and so of
+    // every light's loop, speeds being on a 0.01 grid) and of the 14 / 7 unit
+    // lane-dash and stud spacing, so the wrap is invisible.
+    shared.uTravel.value = travel % WRAP;
     shared.uTrail.value = 1 + k * 1.6;
 
     pointer.x += (pointer.tx - pointer.x) * Math.min(1, dt * 2.2);
