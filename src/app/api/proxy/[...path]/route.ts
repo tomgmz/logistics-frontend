@@ -25,6 +25,13 @@ async function handler(
   { params }: { params: Promise<{ path: string[] }> }
 ) {
   const { path: pathSegments } = await params
+  // The segments arrive decoded, so %2e%2e is already "..". Joined as they are,
+  // "/api/proxy/%2e%2e/x" would reach the backend's /x, outside /api. Refuse any
+  // dot segment or a segment hiding a slash (%2F, %5C); the proxy only ever
+  // forwards inside API_URL.
+  if (pathSegments.some((s) => s === '.' || s === '..' || s.includes('/') || s.includes('\\'))) {
+    return NextResponse.json({ status: 'error', message: 'Route not found' }, { status: 404 })
+  }
   const path = pathSegments.join('/')
 
   const search = req.nextUrl.search
