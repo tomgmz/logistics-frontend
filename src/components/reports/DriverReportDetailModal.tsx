@@ -97,6 +97,7 @@ function DetailHeader({ report, onClose }: { report: DriverReport; onClose: () =
 
 /** Everything the driver sent, and who handled it. The caller supplies the scrolling frame. */
 function DetailContent({ report, banner }: { report: DriverReport; banner?: ReactNode }) {
+  const bbItems = report.blowbagets_check?.items
   return (
     <>
       {banner}
@@ -156,13 +157,15 @@ function DetailContent({ report, banner }: { report: DriverReport; banner?: Reac
 
       {/* The driver's roadside re-check. A tick means "I looked at this",
           not "it passed" — so unticked items are "not checked", never failed. */}
-      {report.blowbagets_check && (
+      {/* Guard the shape, not just the field: a malformed check (old seed data
+          wrote it flat, without `items`) must not crash the whole panel. */}
+      {bbItems && (
         <div>
           <p className="text-[11px] font-bold uppercase tracking-wide text-white/40 mb-1.5">
             Driver&apos;s BLOWBAGETS check
           </p>
           <div className="flex flex-wrap gap-1.5">
-            {BLOWBAGETS_ITEMS.filter((it) => report.blowbagets_check!.items[it.key]).map((it) => (
+            {BLOWBAGETS_ITEMS.filter((it) => bbItems[it.key]).map((it) => (
               <span
                 key={it.key}
                 className="text-[10px] font-bold px-2 py-0.5 rounded-md border"
@@ -173,7 +176,7 @@ function DetailContent({ report, banner }: { report: DriverReport; banner?: Reac
             ))}
           </div>
           {(() => {
-            const notChecked = BLOWBAGETS_ITEMS.filter((it) => !report.blowbagets_check!.items[it.key])
+            const notChecked = BLOWBAGETS_ITEMS.filter((it) => !bbItems[it.key])
             return notChecked.length > 0 ? (
               <p className="text-[11px] text-white/40 mt-1.5">
                 Not checked: {notChecked.map((it) => it.label).join(', ')}
