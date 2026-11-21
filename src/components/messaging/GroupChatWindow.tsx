@@ -106,7 +106,10 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
   useEffect(() => { setMembers(group.members) }, [group.members])
 
   // Only the creator renames the group and changes who is in it; everyone else asks.
-  const isCreator = group.created_by === currentUserId
+  // A client's "8338 Team" chat: members and name are kept by the server, so
+  // there is nothing to add, rename or approve (2026-11-22).
+  const isTeamThread = !!group.client_id
+  const isCreator = group.created_by === currentUserId && !isTeamThread
   const [requests, setRequests] = useState<GroupMemberRequest[]>([])
   // Read on open, then again only when this group's requests may have changed:
   // a group_updated broadcast for it (new request, decision) or a change made
@@ -133,7 +136,9 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
   const invitedBy       = memberMap[members.find(m => m.user_id === currentUserId)?.invited_by ?? '']
   const invitedByName   = invitedBy ? `${invitedBy.first_name} ${invitedBy.last_name}` : 'Someone'
   const nameOf          = (id: string) => memberMap[id] ? `${memberMap[id].first_name} ${memberMap[id].last_name}`.trim() : undefined
-  const creatorLine     = group.created_by === currentUserId
+  const creatorLine     = isTeamThread
+    ? 'Client chat with every Operations Manager and Company Administrator. The client sees who replies.'
+    : group.created_by === currentUserId
     ? 'You created this group'
     : `${nameOf(group.created_by) ?? 'Someone'} created this group`
 
@@ -321,7 +326,7 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
           subheading={isPending ? 'Invite pending' : `${acceptedMembers.length} member${acceptedMembers.length !== 1 ? 's' : ''}`}
           actions={[
             { label: 'See All Members', icon: <Users size={15} />, onSelect: () => setOptionsView('members'), description: 'Everyone in this group' },
-            ...(!isPending ? [
+            ...(!isPending && !isTeamThread ? [
               { label: isCreator ? 'Add People' : 'Ask to Add People', icon: <UserPlus size={15} />, onSelect: () => setOptionsView('add'),
                 description: isCreator ? 'Add someone to the group' : 'The group creator approves it' },
               ...(isCreator ? [
@@ -407,12 +412,12 @@ export default function GroupChatWindow({ group, currentUserId, onBack, onInvite
                 <p className="ff-body text-base text-white font-semibold mt-1 break-words max-w-full">{group.name}</p>
                 <p className="ff-body text-xs text-white/45">{creatorLine}</p>
                 <div className="flex items-start gap-6 mt-3">
-                  <button type="button" onClick={() => setOptionsView('add')} className="flex flex-col items-center gap-1.5 group">
+                  {!isTeamThread && <button type="button" onClick={() => setOptionsView('add')} className="flex flex-col items-center gap-1.5 group">
                     <span className="w-10 h-10 rounded-full bg-white/[0.07] group-hover:bg-white/[0.12] flex items-center justify-center transition-colors">
                       <UserPlus size={16} className="text-white/80" />
                     </span>
                     <span className="ff-body text-xs text-white/70">Add</span>
-                  </button>
+                  </button>}
                   {isCreator && (
                     <button type="button" onClick={() => setOptionsView('rename')} className="flex flex-col items-center gap-1.5 group">
                       <span className="w-10 h-10 rounded-full bg-white/[0.07] group-hover:bg-white/[0.12] flex items-center justify-center transition-colors">

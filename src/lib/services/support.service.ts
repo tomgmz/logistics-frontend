@@ -209,7 +209,7 @@ export const supportService = {
  * client's messages live in it too: tab 'messages', optionally on one
  * conversation.
  */
-export type HelpTab = 'chat' | 'messages' | 'tickets'
+export type HelpTab = 'home' | 'chat' | 'messages' | 'tickets'
 export const OPEN_HELP_EVENT = 'open-help-assistant'
 export function openHelpAssistant(tab: HelpTab = 'chat', conversationId?: string): void {
   if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(OPEN_HELP_EVENT, { detail: { tab, conversationId } }))
@@ -225,7 +225,7 @@ export function helpTabFromUrl(url: string): HelpTab | null {
   const u = new URL(url, 'http://local')
   if (!u.pathname.startsWith('/client')) return null
   const tab = u.searchParams.get('chat')
-  return tab === 'chat' || tab === 'messages' || tab === 'tickets' ? tab : null
+  return tab === 'home' || tab === 'chat' || tab === 'messages' || tab === 'tickets' ? tab : null
 }
 
 /** Where the client's messages open from outside the portal (e.g. /messages, a push tap). */

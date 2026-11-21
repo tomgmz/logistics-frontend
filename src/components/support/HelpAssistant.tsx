@@ -3,11 +3,16 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
-  Bot, CheckCircle2, ChevronRight, LifeBuoy, Loader2, MessageCircleQuestion, Send, Ticket, X,
+  ArrowLeft, ArrowUp, Bot, CheckCircle2, ChevronRight, Home, Loader2, MessageCircleQuestion, MessageSquare, Search, Send, Ticket, X,
 } from 'lucide-react'
+import { ASSETS } from '@/lib/data'
+import { roleLabel } from '@/lib/roles'
+import { formatConversationTime } from '@/app/utils/messaging.utils'
+import SearchClearButton from '@/components/ui/SearchClearButton'
 import { useClientMessages, ClientMessagesPanel } from './ClientMessages'
 
 import authApi from '@/lib/api/auth.api'
@@ -47,6 +52,13 @@ import { FieldError, errorBorder } from '@/components/ui/FieldError'
  * In the portal it is also the client's inbox (the "Messages" tab, see
  * ClientMessages): their driver and our team write to them here, and the
  * header's message icon opens it instead of the staff messenger.
+ *
+ * Layout (user 2026-11-21, after Onfleet's Intercom messenger): 400 x up to
+ * 704 px on desktop, full screen on phones. A Home screen (greeting, latest
+ * message, "Ask a question", search for help) and, for clients, a bottom bar
+ * Home / Messages / Tickets (Intercom's own Tickets space in place of Help).
+ * The assistant chat opens over them with a back arrow, like Intercom's
+ * conversation view.
  */
 
 interface Msg {
@@ -102,6 +114,9 @@ const GREETING =
   'Hi! I\'m the 8338 help assistant. Ask me about bookings, tracking, deliveries or your account, ' +
   'or pick a common question below. If I can\'t help, I\'ll pass you to our team.'
 
+/** A card on the Home screen. */
+const CARD = 'rounded-2xl border border-white/[0.08] bg-[#161616] shadow-[0_6px_24px_rgba(0,0,0,0.35)] transition-colors'
+
 const PUBLIC_GREETING =
   'Hi! I\'m the 8338 help assistant. Ask me about our delivery service, how to become a client, or how ' +
   'booking and tracking work. If I can\'t help, I\'ll point you to our team.'
@@ -115,7 +130,11 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
   const isPublic  = audience === 'public'
 
   const [open, setOpen] = useState(false)
-  const [tab,  setTab]  = useState<HelpTab>('chat')
+  const [tab,  setTab]  = useState<HelpTab>('home')
+  // Where the chat's back arrow returns to.
+  const [chatFrom, setChatFrom] = useState<Exclude<HelpTab, 'chat'>>('home')
+  // The Home screen's "Search for help" box.
+  const [helpQuery, setHelpQuery] = useState('')
   // Below `sm` the panel is full-screen; keep the page under it still (iOS).
   const isMobile = useIsMobile()
   useBodyScrollLock(open && isMobile)
@@ -183,7 +202,8 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
     const onOpen = (e: Event) => {
       const detail = (e as CustomEvent<{ tab?: HelpTab; conversationId?: string }>).detail
       setOpen(true)
-      setTab(detail?.tab ?? 'chat')
+      setTab(detail?.tab ?? 'home')
+      setChatFrom('home')
       if (detail?.conversationId) void openConversation(detail.conversationId)
     }
     window.addEventListener(OPEN_HELP_EVENT, onOpen)
@@ -240,8 +260,10 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
     finally { setTicketsLoading(false) }
   }, [])
 
-  useEffect(() => { if (open && tab === 'tickets') void loadTickets() }, [open, tab, loadTickets])
-  useLiveTable(['live:support_tickets'], () => { void loadTickets() }, { enabled: open && tab === 'tickets' })
+  // Loaded when the panel opens (not only on the Tickets tab) so the bottom
+  // bar's Tickets badge shows the open count straight away.
+  useEffect(() => { if (open && canTicket) void loadTickets() }, [open, canTicket, loadTickets])
+  useLiveTable(['live:support_tickets'], () => { void loadTickets() }, { enabled: open && canTicket })
 
   // The client's bookings, for "which booking is this about?".
   useEffect(() => {
@@ -407,6 +429,25 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
     else window.location.href = '/#contact'
   }, [])
 
+  const openChat = useCallback((from: Exclude<HelpTab, 'chat'>) => {
+    setChatFrom(from)
+    setTab('chat')
+  }, [])
+
+  // Home's "Search for help": the common questions, or the FAQ entries that
+  // match what's typed.
+  const helpMatches = useMemo(() => {
+    const q = helpQuery.trim()
+    if (q.length < 2) return (isPublic && !canTicket ? PUBLIC_STARTER_QUESTIONS : STARTER_QUESTIONS).slice(0, 5)
+    return matchFaq(q, 5, !canTicket).map((m) => m.entry)
+  }, [helpQuery, isPublic, canTicket])
+
+  // Home's "Recent message": the newest conversation in the inbox.
+  const recent = useMemo(
+    () => [...inbox.conversations].sort((a, b) => (b.last_message_at ?? '').localeCompare(a.last_message_at ?? ''))[0],
+    [inbox.conversations],
+  )
+
   if (!mounted) return null
   if (!isPublic && !canTicket) return null
 
@@ -426,11 +467,37 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
     >
       {open ? <X size={22} /> : <MessageCircleQuestion size={24} />}
       {!open && inbox.totalUnread > 0 && (
-        <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-[20px] items-center justify-center rounded-full border-2 border-[#0d0d0d] bg-red-500 px-1 text-[10px] font-bold text-white">
+        <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-[20px] items-center justify-center rounded-full border-2 border-[#0d0d0d] bg-red-500 px-1 text-[12px] font-bold text-white">
           {inbox.totalUnread > 9 ? '9+' : inbox.totalUnread}
         </span>
       )}
     </motion.button>
+  )
+
+  const closeButton = (
+    <button type="button" onClick={() => setOpen(false)} aria-label="Close" className="rounded-lg p-1.5 text-white/50 hover:bg-white/5 hover:text-white">
+      <X size={18} />
+    </button>
+  )
+
+  const titleBar = (title: string) => (
+    <div className="relative flex shrink-0 items-center justify-center border-b border-white/[0.07] px-12 py-3.5">
+      <p className="text-[15px] font-bold text-white">{title}</p>
+      <div className="absolute right-2 top-1/2 -translate-y-1/2">{closeButton}</div>
+    </div>
+  )
+
+  // Floating at the bottom of Messages and Tickets, as Intercom's "Send us a message".
+  const askPill = (from: Exclude<HelpTab, 'chat'>) => (
+    <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center">
+      <button
+        type="button"
+        onClick={() => openChat(from)}
+        className="pointer-events-auto inline-flex items-center gap-2 rounded-xl bg-[var(--color-cyan)] px-4 py-2.5 text-[15px] font-bold text-[#0a0a0a] shadow-[0_8px_24px_rgba(0,0,0,0.45)] hover:brightness-110"
+      >
+        Ask a question <Send size={14} />
+      </button>
+    </div>
   )
 
   const panel = (
@@ -444,57 +511,152 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 16, scale: 0.98 }}
           transition={{ duration: 0.18 }}
-          className="ff-darker fixed inset-0 z-[59] flex flex-col overflow-hidden bg-[#0d0d0d] sm:inset-auto sm:bottom-24 sm:right-5 sm:h-[min(620px,calc(100dvh-120px))] sm:w-[400px] sm:rounded-2xl sm:border sm:border-white/[0.08] sm:shadow-2xl"
+          className="ff-darker fixed inset-0 font-medium z-[59] flex flex-col overflow-hidden bg-[#0d0d0d] sm:inset-auto sm:bottom-[88px] sm:right-5 sm:h-[min(704px,calc(100dvh-112px))] sm:w-[400px] sm:rounded-2xl sm:border sm:border-white/[0.08] sm:shadow-2xl"
         >
-          {/* Header */}
-          <div className="flex items-center justify-between gap-3 border-b border-white/[0.07] px-4 py-3">
-            <div className="flex items-center gap-2.5">
-              <span className="flex h-8 w-8 items-center justify-center rounded-full" style={{ background: 'rgba(77,249,237,0.12)', color: 'var(--color-cyan)' }}>
-                <LifeBuoy size={16} />
-              </span>
-              <div>
-                <p className="text-sm font-bold text-white">Chat Support</p>
-                <p className="text-[11px] text-white/40">
-                  {/* Drivers and clients can't message each other: the inbox is the office's messages only. */}
-                  {tab === 'messages' && canTicket ? 'Messages from our team' : 'Answers right away · our team replies by email'}
-                </p>
+          {tab === 'home' || (tab !== 'chat' && !canTicket) ? (
+            // ── Home ─────────────────────────────────────────────────────────
+            <div className="relative min-h-0 flex-1 overflow-y-auto">
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-x-0 top-0 h-80"
+                style={{ background: 'linear-gradient(180deg, rgba(77,249,237,0.22) 0%, rgba(77,249,237,0.08) 45%, rgba(13,13,13,0) 100%)' }}
+              />
+              <div className="relative px-4 pb-5 pt-4">
+                <div className="flex items-center justify-between">
+                  <Image src={ASSETS.logo} alt="8338 Logistics" width={110} height={28} className="h-7 w-auto object-contain" />
+                  {closeButton}
+                </div>
+                <h2 className="mt-10 text-[30px] font-bold leading-[1.1] text-white">
+                  <span className="block text-white/60">Hi {user?.first_name?.trim() || 'there'},</span>
+                  How can we help?
+                </h2>
+
+                <div className="mt-6 space-y-3">
+                  {/* Recent message: the newest conversation in the client's inbox. */}
+                  {canTicket && recent?.last_message && (
+                    <button
+                      type="button"
+                      onClick={() => { setTab('messages'); void openConversation(recent.conversation_id) }}
+                      className={`${CARD} block w-full p-4 text-left hover:border-white/[0.14]`}
+                    >
+                      <span className="block text-[15px] font-bold text-white">Recent message</span>
+                      <span className="mt-3 flex items-center gap-3">
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: 'rgba(77,249,237,0.12)', color: 'var(--color-cyan)' }}>
+                          <MessageSquare size={18} />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="flex items-center justify-between gap-2">
+                            <span className="truncate text-[15px] font-semibold text-white">
+                              {`${recent.other_user.first_name ?? ''} ${recent.other_user.last_name ?? ''}`.trim() || 'Our team'}
+                              <span className="font-normal text-white/40"> · {roleLabel(recent.other_user.role)}</span>
+                            </span>
+                            <span className="shrink-0 text-[13px] text-white/40">{formatConversationTime(recent.last_message.sent_at)}</span>
+                          </span>
+                          <span className={`block truncate text-[14px] ${recent.unread_count > 0 ? 'font-semibold text-white' : 'text-white/55'}`}>
+                            {recent.last_message.sender_id === user?.user_id ? 'You: ' : ''}{recent.last_message.content || 'Photo'}
+                          </span>
+                        </span>
+                        {recent.unread_count > 0 && <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--color-cyan)]" aria-label="Unread" />}
+                      </span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => openChat('home')}
+                    className={`${CARD} flex w-full items-center gap-3 p-4 text-left hover:border-white/[0.14]`}
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[15px] font-bold text-white">{messages.length > 1 ? 'Continue your question' : 'Ask a question'}</span>
+                      <span className="block text-[14px] text-white/50">
+                        {canTicket ? 'Instant answers · or message our team in Messages' : 'Instant answers about our service'}
+                      </span>
+                    </span>
+                    <Send size={17} className="shrink-0 text-[var(--color-cyan)]" />
+                  </button>
+
+                  {/* Search for help: live FAQ matches; Enter asks the assistant. */}
+                  <div className={`${CARD} p-2`}>
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault()
+                        const q = helpQuery.trim()
+                        if (!q || typing) return
+                        openChat('home')
+                        ask(q)
+                        setHelpQuery('')
+                      }}
+                      className="relative"
+                    >
+                      <input
+                        id="help-search"
+                        name="help-search"
+                        value={helpQuery}
+                        onChange={(e) => setHelpQuery(e.target.value)}
+                        placeholder="Search for help"
+                        aria-label="Search for help"
+                        maxLength={300}
+                        className="w-full rounded-xl bg-white/[0.06] py-3 pl-3.5 pr-16 text-[15px] text-white outline-none placeholder:text-white/75 focus:ring-1 focus:ring-[var(--color-cyan)]/40"
+                      />
+                      <SearchClearButton value={helpQuery} onClear={() => setHelpQuery('')} className="right-8" />
+                      <button type="submit" aria-label="Ask the assistant" className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-[var(--color-cyan)]">
+                        <Search size={16} />
+                      </button>
+                    </form>
+                    <ul className="mt-1">
+                      {helpMatches.map((s) => (
+                        <li key={s.id}>
+                          <button
+                            type="button"
+                            onClick={() => { if (typing) return; openChat('home'); pick(s); setHelpQuery('') }}
+                            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-[15px] text-white/75 hover:bg-white/[0.04] hover:text-white"
+                          >
+                            <span className="min-w-0 flex-1">{s.question}</span>
+                            <ChevronRight size={15} className="shrink-0 text-[var(--color-cyan)]" />
+                          </button>
+                        </li>
+                      ))}
+                      {helpMatches.length === 0 && (
+                        <li className="px-3 py-2.5 text-[14px] leading-snug text-white/45">
+                          No matching help article. Press Enter to ask the assistant.
+                        </li>
+                      )}
+                    </ul>
+                  </div>
+                </div>
               </div>
             </div>
-            <button type="button" onClick={() => setOpen(false)} aria-label="Close" className="rounded-lg p-1.5 text-white/50 hover:bg-white/5 hover:text-white">
-              <X size={18} />
-            </button>
-          </div>
-
-          {/* Tabs — "My tickets" only for a signed-in client */}
-          {canTicket && (
-          <div className="flex border-b border-white/[0.07] px-2" role="tablist">
-            {([['chat', 'Assistant'], ['messages', 'Messages'], ['tickets', 'My tickets']] as const).map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                role="tab"
-                aria-selected={tab === key}
-                onClick={() => setTab(key)}
-                className={`relative px-3 py-2.5 text-xs font-bold transition-colors ${tab === key ? 'text-[var(--color-cyan)]' : 'text-white/50 hover:text-white/80'}`}
-              >
-                {label}
-                {key === 'messages' && inbox.totalUnread > 0 && (
-                  <span className="ml-1.5 rounded-full bg-[var(--color-cyan)] px-1.5 text-[10px] font-bold tabular-nums text-[#0a0a0a]">{inbox.totalUnread}</span>
-                )}
-                {key === 'tickets' && openCount > 0 && (
-                  <span className="ml-1.5 rounded-full bg-white/10 px-1.5 text-[10px] tabular-nums text-white/70">{openCount}</span>
-                )}
-                {tab === key && <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-[var(--color-cyan)]" />}
-              </button>
-            ))}
-          </div>
-          )}
-
-          {tab === 'messages' && canTicket && user ? (
-            <ClientMessagesPanel state={inbox} userId={user.user_id} onAskAssistant={() => setTab('chat')} />
-          ) : tab === 'chat' || !canTicket ? (
+          ) : tab === 'messages' && canTicket && user ? (
+            // ── Messages ─────────────────────────────────────────────────────
+            inbox.thread ? (
+              <ClientMessagesPanel state={inbox} userId={user.user_id} onAskAssistant={() => openChat('messages')} onClose={() => setOpen(false)} />
+            ) : (
+              <>
+                {titleBar('Messages')}
+                <div className="relative flex min-h-0 flex-1 flex-col">
+                  <ClientMessagesPanel state={inbox} userId={user.user_id} onAskAssistant={() => openChat('messages')} />
+                  {askPill('messages')}
+                </div>
+              </>
+            )
+          ) : tab === 'chat' ? (
+            // ── Assistant chat (over the tabs, back arrow) ───────────────────
             <>
-              <div ref={scroller} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
+              <div className="flex shrink-0 items-center gap-2 border-b border-white/[0.07] px-2 py-2.5">
+                <button type="button" onClick={() => setTab(chatFrom)} aria-label="Back"
+                  className="rounded-lg p-1.5 text-white/60 hover:bg-white/5 hover:text-white">
+                  <ArrowLeft size={18} />
+                </button>
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full" style={{ background: 'rgba(77,249,237,0.12)', color: 'var(--color-cyan)' }}>
+                  <Bot size={16} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[16px] font-bold text-white">8338 Help Assistant</p>
+                  <p className="truncate text-[13px] text-white/40">{canTicket ? 'Instant answers · our team is in Messages' : 'Instant answers about our service'}</p>
+                </div>
+                {closeButton}
+              </div>
+              <div ref={scroller} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
                 {messages.map((m) => (
                   <Fragment key={m.id}>
                   <div className={`flex ${m.from === 'client' ? 'justify-end' : 'justify-start'} gap-2`}>
@@ -505,7 +667,7 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
                     )}
                     <div className={`max-w-[85%] space-y-2 ${m.from === 'client' ? 'items-end' : ''}`}>
                       <div
-                        className={`whitespace-pre-line rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed ${
+                        className={`whitespace-pre-line rounded-2xl px-3.5 py-2.5 text-[15px] leading-relaxed ${
                           m.from === 'client'
                             ? 'rounded-br-md bg-[var(--color-cyan)] text-[#0a0a0a]'
                             : 'rounded-bl-md bg-white/[0.06] text-white/90'}`}
@@ -514,7 +676,7 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
                       </div>
 
                       {m.ai && (
-                        <p className="text-[10px] leading-snug text-white/35">
+                        <p className="text-[12px] leading-snug text-white/35">
                           AI answer based on our help articles. If something looks wrong, ask our team.
                         </p>
                       )}
@@ -523,14 +685,14 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
                         <Link
                           href={m.faq.link.href}
                           onClick={() => setOpen(false)}
-                          className="inline-flex items-center gap-1 rounded-lg border border-[var(--color-cyan)]/30 px-2.5 py-1.5 text-[11px] font-semibold text-[var(--color-cyan)] hover:bg-[var(--color-cyan)]/10"
+                          className="inline-flex items-center gap-1 rounded-lg border border-[var(--color-cyan)]/30 px-2.5 py-1.5 text-[13px] font-semibold text-[var(--color-cyan)] hover:bg-[var(--color-cyan)]/10"
                         >
                           {m.faq.link.label} <ChevronRight size={12} />
                         </Link>
                       )}
 
                       {(m.faq || m.ai) && helped[m.id] === undefined && (
-                        <div className="flex items-center gap-2 text-[11px] text-white/45">
+                        <div className="flex items-center gap-2 text-[13px] text-white/45">
                           Did this answer it?
                           <button type="button" onClick={() => {
                             setHelped((h) => ({ ...h, [m.id]: true }))
@@ -561,7 +723,7 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
                               key={s.id}
                               type="button"
                               onClick={() => pick(s)}
-                              className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-left text-[11px] text-white/75 hover:border-[var(--color-cyan)]/40 hover:text-white"
+                              className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-left text-[13px] text-white/75 hover:border-[var(--color-cyan)]/40 hover:text-white"
                             >
                               {s.question}
                             </button>
@@ -573,7 +735,7 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
                         <button
                           type="button"
                           onClick={canTicket ? startTicket : toContactForm}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--color-cyan)] px-3 py-1.5 text-[11px] font-bold text-[#0a0a0a] hover:opacity-90"
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--color-cyan)] px-3 py-1.5 text-[13px] font-bold text-[#0a0a0a] hover:opacity-90"
                         >
                           <Ticket size={13} /> {canTicket ? 'Talk to our team' : 'Message our team'}
                         </button>
@@ -587,14 +749,14 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
                           <MessageCircleQuestion size={13} />
                         </span>
                         <div className="max-w-[85%] space-y-1.5">
-                          <p className="text-[11px] text-white/45">Have another question?</p>
+                          <p className="text-[13px] text-white/45">Have another question?</p>
                           <div className="flex flex-wrap gap-1.5">
                             {(isPublic && !canTicket ? PUBLIC_STARTER_QUESTIONS : STARTER_QUESTIONS).map((s) => (
                               <button
                                 key={s.id}
                                 type="button"
                                 onClick={() => pick(s)}
-                                className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-left text-[11px] text-white/75 hover:border-[var(--color-cyan)]/40 hover:text-white"
+                                className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-left text-[13px] text-white/75 hover:border-[var(--color-cyan)]/40 hover:text-white"
                               >
                                 {s.question}
                               </button>
@@ -610,45 +772,45 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
 
                 {ticketOpen && (
                   <div className="space-y-2.5 rounded-xl border border-white/[0.08] bg-white/[0.02] p-3">
-                    <p className="text-xs font-bold text-white">Open a ticket</p>
-                    <p className="text-[11px] leading-snug text-white/45">
+                    <p className="text-[14px] font-bold text-white">Open a ticket</p>
+                    <p className="text-[13px] leading-snug text-white/45">
                       Our team replies by email{user?.email ? ` to ${user.email}` : ''}. This conversation is attached so you don&apos;t have to repeat yourself.
                     </p>
                     <label className="block">
-                      <span className="text-[10px] font-bold uppercase text-white/40">Topic</span>
+                      <span className="text-[12px] font-bold uppercase text-white/40">Topic</span>
                       <Dropdown value={category} onChange={(e) => setCategory(e.target.value as TicketCategory)}
-                        className="mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-2.5 py-2 text-xs text-white outline-none">
+                        className="mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-2.5 py-2 text-[14px] text-white outline-none">
                         {(Object.keys(TICKET_CATEGORY_LABEL) as TicketCategory[]).map((c) => (
                           <option key={c} value={c}>{TICKET_CATEGORY_LABEL[c]}</option>
                         ))}
                       </Dropdown>
                     </label>
                     <label className="block">
-                      <span className="text-[10px] font-bold uppercase text-white/40">Booking (optional)</span>
+                      <span className="text-[12px] font-bold uppercase text-white/40">Booking (optional)</span>
                       <Combobox value={bookingId} onChange={(e) => setBookingId(e.target.value)}
-                        className="mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-2.5 py-2 text-xs text-white outline-none">
+                        className="mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-2.5 py-2 text-[14px] text-white outline-none">
                         <option value="">Not about a specific booking</option>
                         {bookings.map((b) => <option key={b.booking_id} value={b.booking_id}>{b.label}</option>)}
                       </Combobox>
                     </label>
                     <label className="block">
-                      <span className="text-[10px] font-bold uppercase text-white/40">Subject</span>
+                      <span className="text-[12px] font-bold uppercase text-white/40">Subject</span>
                       <input id="help-ticket-subject" name="subject" value={subject} onChange={(e) => setSubject(e.target.value)} maxLength={150} aria-invalid={!!ticketErr.subject}
-                        className={`mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-2.5 py-2 text-xs text-white outline-none focus:border-[var(--color-cyan)]/50 ${errorBorder(ticketErr.subject)}`} />
+                        className={`mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-2.5 py-2 text-[14px] text-white outline-none focus:border-[var(--color-cyan)]/50 ${errorBorder(ticketErr.subject)}`} />
                       <FieldError>{ticketErr.subject}</FieldError>
                     </label>
                     <label className="block">
-                      <span className="text-[10px] font-bold uppercase text-white/40">What happened?</span>
+                      <span className="text-[12px] font-bold uppercase text-white/40">What happened?</span>
                       <textarea id="help-ticket-details" name="details" value={details} onChange={(e) => setDetails(e.target.value)} rows={4} maxLength={4000} aria-invalid={!!ticketErr.details}
-                        className={`mt-1 w-full resize-none rounded-lg border border-white/10 bg-[#111] px-2.5 py-2 text-xs text-white outline-none focus:border-[var(--color-cyan)]/50 ${errorBorder(ticketErr.details)}`} />
+                        className={`mt-1 w-full resize-none rounded-lg border border-white/10 bg-[#111] px-2.5 py-2 text-[14px] text-white outline-none focus:border-[var(--color-cyan)]/50 ${errorBorder(ticketErr.details)}`} />
                       <FieldError>{ticketErr.details}</FieldError>
                     </label>
-                    {formError && <p className="text-[11px] text-red-400">{formError}</p>}
+                    {formError && <p className="text-[13px] text-red-400">{formError}</p>}
                     <div className="flex justify-end gap-2">
                       <button type="button" onClick={() => setTicketOpen(false)} disabled={sending}
-                        className="rounded-lg border border-white/10 px-3 py-1.5 text-[11px] text-white/70 hover:bg-white/5">Cancel</button>
+                        className="rounded-lg border border-white/10 px-3 py-1.5 text-[13px] text-white/70 hover:bg-white/5">Cancel</button>
                       <button type="button" onClick={() => void submitTicket()} disabled={sending}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--color-cyan)] px-3 py-1.5 text-[11px] font-bold text-[#0a0a0a] disabled:opacity-50">
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--color-cyan)] px-3 py-1.5 text-[13px] font-bold text-[#0a0a0a] disabled:opacity-50">
                         {sending ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />} Send ticket
                       </button>
                     </div>
@@ -661,41 +823,48 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
 
               <form
                 onSubmit={(e) => { e.preventDefault(); ask(input) }}
-                className="flex items-center gap-2 border-t border-white/[0.07] px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+                className="shrink-0 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2"
               >
-                <input
-                  id="help-question"
-                  name="question"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder="Type your question…"
-                  maxLength={300}
-                  className="flex-1 rounded-xl border border-white/10 bg-[#111] px-3 py-2.5 text-[13px] text-white outline-none placeholder:text-white/30 focus:border-[var(--color-cyan)]/50"
-                />
-                <button type="submit" disabled={!input.trim() || typing} aria-label="Send"
-                  className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-cyan)] text-[#0a0a0a] disabled:opacity-30">
-                  <Send size={16} />
-                </button>
+                <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-[#111] py-1.5 pl-3.5 pr-1.5 transition-colors focus-within:border-[var(--color-cyan)]/60">
+                  <input
+                    id="help-question"
+                    name="question"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    placeholder="Ask a question…"
+                    aria-label="Your question"
+                    maxLength={300}
+                    className="min-w-0 flex-1 bg-transparent py-2 text-[15px] text-white outline-none placeholder:text-white/30"
+                  />
+                  <button type="submit" disabled={!input.trim() || typing} aria-label="Send"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--color-cyan)] text-[#0a0a0a] transition-colors disabled:bg-white/[0.06] disabled:text-white/30">
+                    <ArrowUp size={17} />
+                  </button>
+                </div>
               </form>
             </>
           ) : (
-            <div className="flex-1 overflow-y-auto px-4 py-4">
+            // ── Tickets (Intercom's Tickets space, in place of Help) ─────────
+            <>
+            {titleBar('Tickets')}
+            <div className="relative flex min-h-0 flex-1 flex-col">
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-20 pt-4">
               {ticketsLoading && tickets.length === 0 ? (
-                <p className="flex items-center gap-2 text-xs text-white/45"><Loader2 size={13} className="animate-spin" /> Loading your tickets…</p>
+                <p className="flex items-center gap-2 text-[14px] text-white/45"><Loader2 size={13} className="animate-spin" /> Loading your tickets…</p>
               ) : tickets.length === 0 ? (
                 <div className="flex flex-col items-center gap-3 py-10 text-center">
                   <Ticket size={28} className="text-white/20" />
-                  <p className="text-xs text-white/45">No tickets yet. Ask the assistant first; if it can&apos;t help, it opens one for you.</p>
-                  <button type="button" onClick={() => setTab('chat')} className="text-xs font-semibold text-[var(--color-cyan)]">Ask the assistant</button>
+                  <p className="text-[14px] text-white/45">No tickets yet. Ask the assistant first; if it can&apos;t help, it opens one for you.</p>
+                  <button type="button" onClick={() => openChat('tickets')} className="text-[14px] font-semibold text-[var(--color-cyan)]">Ask the assistant</button>
                 </div>
               ) : (
                 <ul className="space-y-2">
                   {tickets.map((t) => (
                     <li key={t.ticket_id} className="rounded-xl border border-white/[0.08] bg-white/[0.02] p-3">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="font-mono text-[11px] font-bold text-white/70">{t.reference}</span>
+                        <span className="font-mono text-[13px] font-bold text-white/70">{t.reference}</span>
                         <span
-                          className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold"
+                          className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[12px] font-bold"
                           style={t.status === 'open'
                             ? { color: '#ffea00', borderColor: 'rgba(255,234,0,0.35)', background: 'rgba(255,234,0,0.08)' }
                             : { color: 'var(--color-cyan)', borderColor: 'rgba(77,249,237,0.35)', background: 'rgba(77,249,237,0.08)' }}
@@ -703,24 +872,56 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
                           {t.status === 'open' ? 'Waiting for reply' : <><CheckCircle2 size={10} /> Resolved</>}
                         </span>
                       </div>
-                      <p className="mt-1.5 text-[13px] font-semibold text-white">{t.subject}</p>
-                      <p className="text-[11px] text-white/40">
+                      <p className="mt-1.5 text-[15px] font-semibold text-white">{t.subject}</p>
+                      <p className="text-[13px] text-white/40">
                         {TICKET_CATEGORY_LABEL[t.category]}
                         {t.bookings?.reference_number ? ` · ${t.bookings.reference_number}` : ''}
                         {' · '}{formatDateTime(t.created_at)}
                         {openedByStaff(t) ? ' · Opened by our team' : ''}
                       </p>
                       {t.resolution_note && (
-                        <p className="mt-2 rounded-lg bg-white/[0.04] px-2.5 py-2 text-[11px] leading-snug text-white/70">{t.resolution_note}</p>
+                        <p className="mt-2 rounded-lg bg-white/[0.04] px-2.5 py-2 text-[13px] leading-snug text-white/70">{t.resolution_note}</p>
                       )}
                     </li>
                   ))}
                 </ul>
               )}
-              <p className="mt-4 text-[10px] leading-snug text-white/30">
+              <p className="mt-4 text-[12px] leading-snug text-white/30">
                 Replies come by email. To add details to a ticket, reply to its email.
               </p>
             </div>
+            {askPill('tickets')}
+            </div>
+            </>
+          )}
+
+          {/* Bottom bar: clients only, hidden in the chat and inside a conversation. */}
+          {canTicket && tab !== 'chat' && !(tab === 'messages' && inbox.thread) && (
+            <nav className="grid shrink-0 grid-cols-3 border-t border-white/[0.07] bg-[#0d0d0d] pb-[env(safe-area-inset-bottom)]" role="tablist" aria-label="Help sections">
+              {([['home', 'Home', Home], ['messages', 'Messages', MessageSquare], ['tickets', 'Tickets', Ticket]] as const).map(([key, label, Icon]) => {
+                const badge = key === 'messages' ? inbox.totalUnread : key === 'tickets' ? openCount : 0
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    role="tab"
+                    aria-selected={tab === key}
+                    onClick={() => setTab(key)}
+                    className={`flex flex-col items-center gap-1 py-2.5 text-[14px] font-bold transition-colors ${tab === key ? 'text-[var(--color-cyan)]' : 'text-white/50 hover:text-white/80'}`}
+                  >
+                    <span className="relative">
+                      <Icon size={20} />
+                      {badge > 0 && (
+                        <span className={`absolute -right-3 -top-1.5 min-w-[18px] rounded-full px-1 text-center text-[12px] font-bold leading-[18px] tabular-nums ${key === 'messages' ? 'bg-[var(--color-cyan)] text-[#0a0a0a]' : 'bg-white/15 text-white/80'}`}>
+                          {badge > 9 ? '9+' : badge}
+                        </span>
+                      )}
+                    </span>
+                    {label}
+                  </button>
+                )
+              })}
+            </nav>
           )}
         </motion.div>
       )}

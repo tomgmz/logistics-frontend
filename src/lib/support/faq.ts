@@ -206,8 +206,8 @@ export const FAQ: FaqEntry[] = [
     question: 'How will you contact me about my bookings?',
     answer:
       'Through the bell at the top of the portal (approval, rejection, delivery finished and more) and by email ' +
-      'for the important steps, like a finished delivery that needs your confirmation. Support tickets are ' +
-      'answered by email.',
+      'for the important steps, like a finished delivery that needs your confirmation. Our team also writes to ' +
+      'you in Messages (8338 Team), where you can reply. Support tickets are answered by email.',
     keywords: ['notification', 'notify', 'email', 'contact me', 'updates', 'alerts', 'bell', 'message'],
     category: 'account',
   },

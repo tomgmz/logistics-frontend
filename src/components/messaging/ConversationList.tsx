@@ -185,7 +185,8 @@ function GroupItem({ group, index, isSelected, onSelect, currentUserId }: {
   return (
     <Row
       initials={initialsOf(group.name)}
-      name={group.name}
+      // A client's "8338 Team" chat (2026-11-22): the company's name, marked as a client.
+      name={group.client_id ? `${group.name} · Client` : group.name}
       preview={preview}
       time={last ? formatConversationTime(last.created_at) : undefined}
       unread={hasUnread}

@@ -108,8 +108,8 @@ function MembersModal({ group, currentUserId, onClose, onChanged }: {
   }
 
   const removeControl = (m: GroupMember) => {
-    // Nobody removes themselves or the creator.
-    if (m.user_id === currentUserId || m.user_id === group.created_by) return null
+    // Nobody removes themselves or the creator; a client's team chat keeps its own members.
+    if (group.client_id || m.user_id === currentUserId || m.user_id === group.created_by) return null
     if (confirmId === m.user_id) {
       return (
         <div className="shrink-0 flex items-center gap-1">
@@ -141,7 +141,7 @@ function MembersModal({ group, currentUserId, onClose, onChanged }: {
 
   const tag = (m: GroupMember) => (
     <span className="shrink-0 ff-body text-[10px] text-white/35">
-      {m.user_id === currentUserId ? 'You' : m.user_id === group.created_by ? 'Created the group' : ''}
+      {m.user_id === currentUserId ? 'You' : m.user_id === group.created_by ? (group.client_id ? 'Client' : 'Created the group') : ''}
     </span>
   )
 

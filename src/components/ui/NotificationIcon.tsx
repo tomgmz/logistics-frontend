@@ -84,6 +84,8 @@ const ACTIONABLE_TYPES = new Set([
   "support.ticket_logged",
   "support.ticket_replied",
   "support.ticket_reopened",
+  "messaging.client_message",
+  "messaging.team_reply",
   "vehicle.registration_expiring",
   "client.contract_expiring",
   "client.contract_expiring_staff",

@@ -172,6 +172,8 @@ export type GroupSystemEvent =
   | { event: 'removed'; user_id: string; name: string }
   /** An invited person accepted; the line is sent in their name (2026-11-06). */
   | { event: 'joined'; user_id: string; name: string }
+  /** The automatic "our team is back at 8 AM" line in a client's team chat. */
+  | { event: 'after_hours' }
 
 export interface GroupMemberRaw {
   status: 'pending' | 'accepted' | 'declined'
@@ -196,6 +198,8 @@ export interface GroupRaw {
   last_message: { message_id: string; content: string; sent_at: string; sender_id: string } | null
   unread_count: number
   my_status: 'pending' | 'accepted' | 'declined'
+  /** Set: this group is that client's "8338 Team" chat (2026-11-22). */
+  client_id?: string | null
 }
 
 export interface GroupMessage {
@@ -233,6 +237,8 @@ export interface Group {
   unread_count: number
   my_status: 'pending' | 'accepted' | 'declined'
   created_at: string
+  /** Set: a client's "8338 Team" chat; its name and members are managed automatically. */
+  client_id?: string | null
 }
 
 export function toGroup(raw: GroupRaw): Group {
@@ -241,6 +247,7 @@ export function toGroup(raw: GroupRaw): Group {
     name:       raw.name,
     created_by: raw.created_by,
     created_at: raw.created_at,
+    client_id:  raw.client_id ?? null,
     members: raw.members.map(m => ({
       user_id:      m.user.user_id,
       first_name:   m.user.first_name ?? '',
