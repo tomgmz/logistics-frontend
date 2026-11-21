@@ -1,23 +1,22 @@
 'use client';
 
+import type { PointerEvent as ReactPointerEvent } from 'react';
 import { motion } from 'framer-motion';
-import Image from 'next/image';
-import { ASSETS } from '@/lib/data';
+import HeroHighway from './hero/HeroHighway';
+
+// The CTA's light follows the pointer across it (CSS vars read by the overlay).
+function trackSpot(e: ReactPointerEvent<HTMLElement>) {
+  const r = e.currentTarget.getBoundingClientRect();
+  e.currentTarget.style.setProperty('--spot-x', `${e.clientX - r.left}px`);
+  e.currentTarget.style.setProperty('--spot-y', `${e.clientY - r.top}px`);
+}
 
 export default function HeroSection() {
   return (
     <section id="hero" className="relative w-full min-h-svh bg-[#0a0a0a] overflow-hidden flex items-center">
 
       <div className="absolute inset-0 z-0">
-        <Image
-          src={ASSETS.heroContainers}
-          alt=""
-          fill
-          className="object-cover opacity-50 pointer-events-none select-none"
-          priority
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#0a0a0a]/90 via-[#0a0a0a]/60 to-[#0a0a0a]/20" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-transparent to-transparent" />
+        <HeroHighway />
       </div>
 
       <div className="relative z-10 w-full max-w-[1600px] mx-auto px-5 sm:px-8 md:px-12 lg:px-[60px] pt-28 sm:pt-32 pb-16 sm:pb-24 text-center sm:text-left">
@@ -77,11 +76,17 @@ export default function HeroSection() {
         >
           <a
             href="#contact"
-            className="ff-sc glass border border-white/30 text-white px-5 sm:px-8 py-3 sm:py-4 rounded-[12px] sm:rounded-[15px]
+            onPointerMove={trackSpot}
+            className="group relative overflow-hidden ff-sc glass border border-white/30 text-white px-5 sm:px-8 py-3 sm:py-4 rounded-[12px] sm:rounded-[15px]
              text-sm sm:text-sm md:text-base lg:text-xl tracking-wider
               hover:bg-white/[0.15] hover:border-white/60 transition-all duration-300 no-underline inline-block"
           >
-            Be our partner
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+              style={{ background: 'radial-gradient(140px circle at var(--spot-x, 50%) var(--spot-y, 50%), rgba(77,249,237,0.28), transparent 70%)' }}
+            />
+            <span className="relative">Be our partner</span>
           </a>
         </motion.div>
       </div>
