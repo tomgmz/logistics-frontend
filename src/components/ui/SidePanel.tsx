@@ -37,6 +37,7 @@ export default function SidePanel({
   subtitle,
   children,
   footer,
+  className,
 }: {
   open:      boolean
   onClose:   () => void
@@ -46,6 +47,8 @@ export default function SidePanel({
   subtitle?: ReactNode
   children:  ReactNode
   footer?:   ReactNode
+  /** Extra classes on the panel, e.g. a font family ("ff-darker"). */
+  className?: string
 }) {
   const overlay = useIsOverlayWidth()
   // Only below lg does the panel cover the page; beside the table the page keeps scrolling.
@@ -66,8 +69,8 @@ export default function SidePanel({
             initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 28, stiffness: 260 }}
             aria-label={label}
-            className="fixed lg:relative z-[50] inset-y-0 right-0 w-full max-w-[455px] shrink-0 h-dvh lg:h-auto
-                       border-l border-[#424242] flex flex-col bg-[var(--color-surface)] shadow-2xl lg:shadow-none"
+            className={`fixed lg:relative z-[50] inset-y-0 right-0 w-full max-w-[455px] shrink-0 h-dvh lg:h-auto
+                       border-l border-[#424242] flex flex-col bg-[var(--color-surface)] shadow-2xl lg:shadow-none ${className ?? ''}`}
           >
             <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-white/[0.07] shrink-0">
               <div className="min-w-0">

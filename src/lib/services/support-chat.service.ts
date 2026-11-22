@@ -1,5 +1,6 @@
 import proxyApi, { initCsrf } from '@/lib/api/auth.api'
 import type { PagedResponse, PageRequest } from '@/lib/hooks/useServerTable'
+import type { SupportTicket, TicketCategory } from '@/lib/services/support.service'
 
 /**
  * Client support conversations (2026-11-22): the help assistant, our team and
@@ -44,6 +45,8 @@ export interface ChatConversation {
   resolved_at:         string | null
   resolved_reason:     'staff' | 'auto' | null
   ticket_id:           string | null
+  /** The ticket it was turned into (reference only; the conversation closed then). */
+  ticket_reference?:   string | null
   created_at:          string
   /** List rows only. */
   last_message?:       { author: ChatAuthor; content: string; created_at: string } | null
@@ -129,6 +132,12 @@ export const supportChatService = {
   async reply(id: string, body: { content: string; attachment_url?: string; last_seen_message_id?: string | null; force?: boolean }): Promise<ChatMessage> {
     await initCsrf()
     const { data } = await proxyApi.post<{ data: ChatMessage }>(`/support/inbox/${id}/messages`, body)
+    return data.data
+  },
+  /** Turn the conversation into a ticket; the conversation closes ("Continued as ticket …"). */
+  async toTicket(id: string, input: { category: TicketCategory; subject: string; booking_id?: string | null }): Promise<SupportTicket> {
+    await initCsrf()
+    const { data } = await proxyApi.post<{ data: SupportTicket }>(`/support/inbox/${id}/ticket`, input)
     return data.data
   },
   async takeOver(id: string): Promise<ChatConversation> {

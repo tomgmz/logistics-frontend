@@ -38,15 +38,31 @@ async function openHelp(page: Page) {
 // the API once per run and keeps that session, unless the browser takes the
 // account over (one session per account), when it signs in again next time.
 const sessions = new Map<string, Api>()
+// The TEST setup's link to the sign-in service drops now and then (timeouts /
+// resets, which the app reports as "Invalid credentials": an open gap). Sign-ins
+// retry up to 3 times so one network blip doesn't block the whole run.
 async function session(tag: string): Promise<Api> {
   let s = sessions.get(tag)
-  if (!s) { s = await apiAs(tag); sessions.set(tag, s) }
+  for (let attempt = 1; !s; attempt++) {
+    try { s = await apiAs(tag) } catch (e) { if (attempt >= 3) throw e; await new Promise((r) => setTimeout(r, 3_000)) }
+  }
+  sessions.set(tag, s)
   return s
 }
 async function browserSignIn(page: Page, tag: string) {
   const s = sessions.get(tag)
   if (s) { await s.dispose(); sessions.delete(tag) }
-  await signInWithPassword(page, tag)
+  for (let attempt = 1; ; attempt++) {
+    await signInWithPassword(page, tag)
+    try {
+      // Left the landing page = signed in.
+      await page.waitForURL((u) => !/^\/?$/.test(u.pathname), { timeout: 30_000 })
+      return
+    } catch (e) {
+      if (attempt >= 3) throw e
+      await page.goto('/?signedout=1')
+    }
+  }
 }
 test.afterAll(async () => { for (const s of sessions.values()) await s.dispose() })
 
@@ -322,4 +338,104 @@ test('CHAT-026 an email reply shows on the open ticket without reloading', async
 
   await expect(page.getByText('Email replies (1)')).toBeVisible({ timeout: 20_000 })
   await expect(page.getByText('Thanks, received by email.')).toBeVisible()
+})
+
+// ── Submit a ticket (user 2026-11-22: Zendesk's "Submit a request" next to chat)
+async function resolveOpenTicketsOf(clientTag: string) {
+  const client = await session(clientTag)
+  const mine: { ticket_id: string; status: string }[] = await client.get('support/tickets/mine')
+  const ops = await session(OPS)
+  for (const t of mine.filter((x) => x.status === 'open')) await ops.patch(`support/tickets/${t.ticket_id}/resolve`, { note: 'Test clean-up.' })
+}
+
+test('CHAT-027 client submits a ticket from the Tickets tab', async ({ page }) => {
+  await resolveOpenTicketsOf(CLIENT)
+  await browserSignIn(page, CLIENT)
+  await expectSignedInto(page, PORTAL.client)
+  await openHelp(page)
+  const panel = page.getByRole('dialog', { name: 'Help assistant' })
+  await panel.getByRole('tab', { name: /Tickets$/ }).click()
+  await panel.getByRole('button', { name: /Submit a ticket/ }).click()
+
+  await panel.getByRole('button', { name: 'Submit ticket' }).click()
+  await expect(panel.getByText('Add a short subject.')).toBeVisible()
+  await expect(panel.getByText(/Describe the problem in a sentence or two/)).toBeVisible()
+
+  const subject = `Damaged cartons ${Date.now()}`
+  await panel.locator('#ticket-subject').fill(subject)
+  await panel.locator('#ticket-details').fill('Two cartons arrived crushed at the Makati drop-off.')
+  await panel.getByRole('button', { name: 'Submit ticket' }).click()
+  await expect(panel.getByText(/Ticket TCK-\d+ is open\. We emailed you a copy/)).toBeVisible({ timeout: 15_000 })
+  await expect(panel.getByText(subject)).toBeVisible()
+})
+
+test('CHAT-028 only one "Talk to our team" button in a chat', async ({ page }) => {
+  await browserSignIn(page, CLIENT)
+  await expectSignedInto(page, PORTAL.client)
+  await openHelp(page)
+  const panel = page.getByRole('dialog', { name: 'Help assistant' })
+  await panel.getByRole('button', { name: /Ask a question/ }).first().click()
+  const box = panel.getByRole('textbox', { name: 'Your question' })
+  await box.fill('zxq qwv plorf')
+  await box.press('Enter')
+  // The test setup has no AI key: the keyword fallback offers the team.
+  await expect(panel.getByText(/Sorry, I don't have an answer|Is it one of these/)).toBeVisible({ timeout: 15_000 })
+  await expect(panel.getByRole('button', { name: 'Talk to our team' })).toHaveCount(1)
+})
+
+test('CHAT-029 a sixth open ticket is refused', async () => {
+  await resolveOpenTicketsOf(CLIENT)
+  const client = await session(CLIENT)
+  for (let i = 0; i < 5; i++) {
+    await client.post('support/tickets', { category: 'other', subject: `Limit check ${i}`, message: 'Filling up to the open-ticket limit.' })
+  }
+  const sixth = await client.tryCall('POST', 'support/tickets', { category: 'other', subject: 'One too many', message: 'This one should be refused.' })
+  expect(sixth.status).toBe(429)
+  expect(sixth.body.message).toMatch(/open tickets/)
+  await resolveOpenTicketsOf(CLIENT)
+})
+
+test('CHAT-030 turn a conversation into a ticket (simple hand-off)', async () => {
+  const ops = await session(OPS)
+  const before = await ops.get(`support/inbox/${convId}`)
+  // CHAT-007 left ops001 as the owner; take it in case another run moved it.
+  if (before.assigned_to && before.assignee_name && before.status !== 'resolved') await ops.post(`support/inbox/${convId}/take-over`)
+  const ticket = await ops.post(`support/inbox/${convId}/ticket`, { category: 'booking', subject: 'Booking help from chat' })
+  expect(ticket.reference).toMatch(/^TCK-/)
+  const after = await ops.get(`support/inbox/${convId}`)
+  expect(after.status).toBe('resolved')
+  expect(after.ticket_reference).toBe(ticket.reference)
+  expect(after.messages.at(-1).content).toMatch(new RegExp(`Continued as ticket ${ticket.reference}`))
+  expect((await ops.tryCall('POST', `support/inbox/${convId}/ticket`, { category: 'booking', subject: 'Again' })).status).toBe(409)
+
+  const client = await session(CLIENT)
+  const mine: { reference: string; status: string }[] = await client.get('support/tickets/mine')
+  expect(mine.find((t) => t.reference === ticket.reference)?.status).toBe('open')
+  // A new message reopens the chat; the ticket is left alone.
+  await client.post(`support/conversations/${convId}/messages`, { content: 'One more question, not about the ticket.' })
+  expect((await client.get(`support/conversations/${convId}`)).status).toBe('waiting')
+  const still: { reference: string; status: string }[] = await client.get('support/tickets/mine')
+  expect(still.find((t) => t.reference === ticket.reference)?.status).toBe('open')
+})
+
+test('CHAT-031 staff reply to a ticket from the Support page', async ({ page }) => {
+  const client = await session(CLIENT)
+  const clientId = ((await client.get('support/conversations'))[0]?.client_id) as string
+  const subject = `Reply on the page ${Date.now()}`
+  const ops = await session(OPS)
+  await ops.post('support/tickets/staff', { client_id: clientId, category: 'other', subject, message: 'Opened by the ticket-reply test.' })
+
+  await browserSignIn(page, ADMIN)
+  await expectSignedInto(page, PORTAL.admin)
+  await page.goto(`${PORTAL.admin}/support-tickets?tab=tickets`)
+  await page.getByRole('button', { name: new RegExp(subject) }).click()
+  await expect(page.getByRole('link', { name: /Open thread in Gmail/ })).toHaveCount(1)
+  await expect(page.getByText(/Reply all in Gmail|New email/)).toHaveCount(0)
+
+  const reply = 'Hello! We checked the booking and corrected the drop-off address.'
+  await page.getByRole('textbox', { name: 'Reply to the client' }).fill(reply)
+  await page.getByRole('button', { name: 'Send reply' }).click()
+  await expect(page.getByText('Email replies (1)')).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByText(reply)).toBeVisible()
+  await expect(page.getByText(/\(our team\)/)).toBeVisible()
 })

@@ -2,11 +2,12 @@
 
 import TableEmptyState from '@/components/ui/TableEmptyState'
 import { useState, type ReactNode } from 'react'
-import { CheckCircle2, ChevronRight, ExternalLink, Mail, Ticket } from 'lucide-react'
+import { ArrowUp, Loader2 } from 'lucide-react'
+import { CheckCircle2, ChevronRight, ExternalLink, Ticket } from 'lucide-react'
 import SidePanel from '@/components/ui/SidePanel'
 
 import { RemarksModal } from '@/components/layout/ReusableModal'
-import { MailAction, gmailComposeUrl, gmailThreadUrl } from '@/components/dashboard/SupportTicketsPanel'
+import { MailAction, gmailThreadUrl } from '@/components/dashboard/SupportTicketsPanel'
 import { useModuleAccess, writeAccess } from '@/components/layout/ModuleAccess'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { appToast } from '@/lib/toast'
@@ -107,7 +108,8 @@ function ReplyList({ ticket: t }: { ticket: SupportTicket }) {
   const replies = [...(t.support_ticket_replies ?? [])].sort((a, b) => a.received_at.localeCompare(b.received_at))
   if (replies.length === 0) return null
   const who = (r: (typeof replies)[number]) =>
-    r.direction === 'staff' ? 'Our team' : r.from_name ? `${r.from_name} (${r.from_email})` : r.from_email
+    r.direction === 'staff' ? (r.from_name ? `${r.from_name} (our team)` : 'Our team')
+      : r.from_name ? `${r.from_name} (${r.from_email})` : r.from_email
   return (
     <div>
       <p className="text-[11px] font-bold uppercase tracking-wide text-white/40 mb-1.5">Email replies ({replies.length})</p>
@@ -200,36 +202,25 @@ function TicketDetail({ ticket: t, tracking }: { ticket: SupportTicket; tracking
 }
 
 /** The side panel's footer: answer by email, then mark it resolved. */
-function TicketActions({ ticket: t, inbox, replyAddress, canEdit, onResolve }: {
+function TicketActions({ ticket: t, inbox, canEdit, onResolve }: {
   ticket:    SupportTicket
   inbox:     string
-  /** The ticket reply address: CC'd on New email so it is recorded. */
-  replyAddress: string | null
   canEdit:   boolean
   onResolve: () => void
 }) {
-  // The thread is with the client's account, even when staff opened the ticket.
-  const clientEmail = t.clients?.users?.email ?? (openedByStaff(t) ? null : t.opener?.email) ?? null
-  const compose = clientEmail && inbox
-    ? gmailComposeUrl(inbox, clientEmail, `[${t.reference}] ${t.subject}`, replyAddress)
-    : null
   const open = t.status === 'open'
   if (!inbox && !open) return null
   return (
-    <div className="flex flex-wrap items-center justify-end gap-2 px-4 py-3 border-t border-white/[0.07] shrink-0">
-      {/* Replying is a write; reading a resolved thread is not. */}
+    <div className="flex flex-wrap items-center justify-end gap-2">
+      {/* Reading the full email thread (attachments, forwards) is not a write. Replies are
+          written on this page (2026-11-22, the Zendesk model), so Reply all / New email went. */}
       {inbox && (
         <MailAction
           href={gmailThreadUrl(inbox, t.reference)}
-          title={`Opens the ${t.reference} thread in ${inbox}. Use Reply all so your answer reaches the client in the same thread.`}
-          allowed={canEdit || !open}
+          title={`Opens the ${t.reference} email thread in ${inbox}, to read it. Reply here on the page.`}
+          allowed
         >
-          <ExternalLink size={12} /> {open ? 'Reply all in Gmail' : 'Open thread in Gmail'}
-        </MailAction>
-      )}
-      {compose && open && (
-        <MailAction href={compose} title={`New email to ${clientEmail}`} allowed={canEdit}>
-          <Mail size={12} /> New email
+          <ExternalLink size={12} /> Open thread in Gmail
         </MailAction>
       )}
       {open && (
@@ -248,11 +239,65 @@ function TicketActions({ ticket: t, inbox, replyAddress, canEdit, onResolve }: {
 }
 
 /**
+ * Reply to the client from the page (2026-11-22): the system emails it in the
+ * ticket's thread, signed with your name, and records it here at once, so a
+ * plain Gmail "Reply" (which the system never saw) is no longer needed.
+ */
+function TicketReplyBox({ ticket: t, canEdit, onSent }: { ticket: SupportTicket; canEdit: boolean; onSent: () => void }) {
+  const [body,    setBody]    = useState('')
+  const [sending, setSending] = useState(false)
+  const [error,   setError]   = useState<string | null>(null)
+  const clientEmail = t.clients?.users?.email ?? null
+
+  async function send() {
+    const text = body.trim()
+    if (!text || sending) return
+    setSending(true)
+    setError(null)
+    try {
+      await supportService.reply(t.ticket_id, text)
+      setBody('')
+      appToast.success(`Reply emailed to ${clientEmail ?? 'the client'}.`, { action: 'support-ticket-reply', entityId: t.ticket_id })
+      onSent()
+    } catch (e) {
+      setError(getApiErrorMessage(e, 'The reply could not be sent. Please try again.'))
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <form onSubmit={(e) => { e.preventDefault(); void send() }}
+        className={`flex items-end gap-2 rounded-2xl border border-white/10 bg-[#111] py-1.5 pl-3.5 pr-1.5 transition-colors focus-within:border-[var(--color-cyan)]/60 ${canEdit ? '' : 'opacity-50'}`}>
+        <textarea
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send() } }}
+          rows={1}
+          maxLength={4000}
+          placeholder={canEdit ? `Reply to ${clientEmail ?? 'the client'} by email…` : 'Read Only: you can read this ticket'}
+          aria-label="Reply to the client"
+          disabled={!canEdit}
+          className="max-h-32 min-h-[36px] flex-1 resize-none bg-transparent py-2 text-sm text-white outline-none [field-sizing:content] placeholder:text-white/30"
+        />
+        <button type="submit" aria-label="Send reply" {...writeAccess(canEdit && !!body.trim() && !sending)}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--color-cyan)] text-[#0a0a0a] transition-colors disabled:bg-white/[0.06] disabled:text-white/30">
+          {sending ? <Loader2 size={16} className="animate-spin" /> : <ArrowUp size={17} />}
+        </button>
+      </form>
+      {error && <p role="alert" className="text-xs text-red-400">{error}</p>}
+      {t.status === 'resolved' && <p className="text-[11px] text-white/40">This ticket is resolved; replying doesn&apos;t reopen it.</p>}
+    </div>
+  )
+}
+
+/**
  * The resolve dialog's text. Zendesk lets an agent solve without a customer
  * reply (a reply later reopens it), so this warns rather than blocks.
  */
 function resolveDescription(t: SupportTicket | null, tracking: boolean): string {
-  const base = "The client is emailed that the ticket is resolved, with this note. Answer them first in Gmail (Reply all on the ticket email) if you haven't."
+  const base = "The client is emailed that the ticket is resolved, with this note. Answer them first with the reply box if you haven't."
   if (!t || !tracking || replyStateOf(t, tracking) === 'client_replied') return base
   const why = t.client_last_reply_at
     ? "The client hasn't replied since your team's last email."
@@ -266,7 +311,7 @@ export default function SupportTicketsView({ switcher }: { switcher?: ReactNode 
   const [inbox,   setInbox]   = useState('')
   // Replies are recorded only when the server has a ticket reply address.
   const [tracking, setTracking] = useState(false)
-  const [replyAddress, setReplyAddress] = useState<string | null>(null)
+  const [, setReplyAddress] = useState<string | null>(null)
 
   const [search,       setSearch]       = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('open')
@@ -458,7 +503,12 @@ export default function SupportTicketsView({ switcher }: { switcher?: ReactNode 
         label="Ticket details"
         title={selected?.reference ?? ''}
         subtitle={selected ? `Raised ${formatDateTime(selected.created_at)}` : undefined}
-        footer={selected && <TicketActions ticket={selected} inbox={inbox} replyAddress={replyAddress} canEdit={canEdit} onResolve={() => setResolving(selected)} />}
+        footer={selected && (
+          <div className="flex w-full flex-col gap-2 px-4 py-3 border-t border-white/[0.07] shrink-0">
+            {selected.clients?.users?.email && <TicketReplyBox ticket={selected} canEdit={canEdit} onSent={() => { void load(true) }} />}
+            <TicketActions ticket={selected} inbox={inbox} canEdit={canEdit} onResolve={() => setResolving(selected)} />
+          </div>
+        )}
       >
         {selected && <TicketDetail ticket={selected} tracking={tracking} />}
       </SidePanel>

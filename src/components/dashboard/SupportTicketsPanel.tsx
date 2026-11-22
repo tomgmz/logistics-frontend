@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
-import { CheckCircle2, ExternalLink, Mail, Plus, Ticket } from 'lucide-react'
+import Link from 'next/link'
+import { CheckCircle2, MessageSquareReply, Plus, Ticket } from 'lucide-react'
 
 import { RemarksModal } from '@/components/layout/ReusableModal'
 import { READ_ONLY_HINT, writeAccess } from '@/components/layout/ModuleAccess'
@@ -64,11 +65,11 @@ export function MailAction({ href, title, allowed, children }: {
 }
 
 export default function SupportTicketsPanel({
-  count, items, inbox, onChanged,
+  count, items, onChanged,
 }: {
   count:     number
   items:     DashboardTicket[]
-  /** The support inbox (a Gmail address) the tickets were sent to. */
+  /** The support inbox (a Gmail address); kept for callers, replies are written on the Support page now. */
   inbox:     string
   onChanged: () => void
 }) {
@@ -124,7 +125,6 @@ export default function SupportTicketsPanel({
       ) : (
         <ul className="divide-y divide-white/[0.05]">
           {items.map((t) => {
-            const compose = t.email ? gmailComposeUrl(inbox, t.email, `[${t.reference}] ${t.subject}`) : null
             return (
               <li key={t.ticket_id} className="flex flex-col gap-2 px-3.5 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
@@ -138,18 +138,14 @@ export default function SupportTicketsPanel({
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
-                  <MailAction
-                    href={gmailThreadUrl(inbox, t.reference)}
-                    title={`Opens the ${t.reference} thread in ${inbox}. Use Reply all so your answer reaches the client in the same thread.`}
-                    allowed={allowed}
+                  {/* Replies are written on the Support page, which emails them and records
+                      them (2026-11-22, the Zendesk model); no Gmail buttons here. */}
+                  <Link
+                    href={`${user?.role === 'operations_manager' ? '/operations_admin' : '/admin'}/support-tickets?tab=tickets`}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-2.5 py-1.5 text-[11px] font-semibold text-white/80 hover:bg-white/5"
                   >
-                    <ExternalLink size={12} /> Reply all in Gmail
-                  </MailAction>
-                  {compose && (
-                    <MailAction href={compose} title={`New email to ${t.email}`} allowed={allowed}>
-                      <Mail size={12} /> New email
-                    </MailAction>
-                  )}
+                    <MessageSquareReply size={12} /> Reply
+                  </Link>
                   <button
                     type="button"
                     onClick={() => setResolving(t)}

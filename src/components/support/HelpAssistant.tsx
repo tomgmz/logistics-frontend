@@ -35,6 +35,7 @@ import { useTurnstile } from '@/lib/hooks/useTurnstile'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 import PhotoSendDialog, { MAX_PHOTO_BYTES } from '@/components/messaging/PhotoSendDialog'
 import MessagePhoto from '@/components/messaging/MessagePhoto'
+import TicketRequestForm from './TicketRequestForm'
 
 /**
  * The help assistant and the client's support conversations (Intercom model).
@@ -208,6 +209,9 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
   }, [saves, isPublic])
 
   const [tickets,        setTickets]        = useState<SupportTicket[]>([])
+  // Tickets tab: the "Submit a ticket" form, and the last one sent (confirmation).
+  const [requestOpen,    setRequestOpen]    = useState(false)
+  const [submitted,      setSubmitted]      = useState<SupportTicket | null>(null)
   const [ticketsLoading, setTicketsLoading] = useState(false)
 
   const scroller = useRef<HTMLDivElement>(null)
@@ -996,7 +1000,9 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
                         </div>
                       )}
 
-                      {!m.history && !withTeam && m.offerTicket && (
+                      {/* Clients use the single "Talk to our team" button below the chat; a
+                          visitor's goes to the contact form, under the answer. */}
+                      {!m.history && !withTeam && m.offerTicket && !canTicket && (
                         <button
                           type="button"
                           onClick={canTicket ? () => void handOver() : toContactForm}
@@ -1103,15 +1109,37 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
           ) : (
             // ── Tickets (Intercom's Tickets space, in place of Help) ─────────
             <>
+            {requestOpen ? (
+              <>
+                <div className="relative flex shrink-0 items-center justify-center border-b border-white/[0.07] px-12 py-3.5">
+                  <button type="button" onClick={() => setRequestOpen(false)} aria-label="Back to tickets"
+                    className="absolute left-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-white/60 hover:bg-white/5 hover:text-white">
+                    <ArrowLeft size={18} />
+                  </button>
+                  <p className="text-[15px] font-bold text-white">Submit a ticket</p>
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2">{closeButton}</div>
+                </div>
+                <TicketRequestForm
+                  onCancel={() => setRequestOpen(false)}
+                  onDone={(t) => { setRequestOpen(false); setSubmitted(t); void loadTickets() }}
+                />
+              </>
+            ) : (
+            <>
             {titleBar('Tickets')}
             <div className="relative flex min-h-0 flex-1 flex-col">
             <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-20 pt-4">
+              {submitted && (
+                <p role="status" className="mb-3 rounded-lg border border-[#3AF626]/30 bg-[#3AF626]/[0.06] px-3 py-2 text-[13px] leading-snug text-[#3AF626]">
+                  Ticket {submitted.reference} is open. We emailed you a copy{user?.email ? ` at ${user.email}` : ''}; our team replies by email.
+                </p>
+              )}
               {ticketsLoading && tickets.length === 0 ? (
                 <p className="flex items-center gap-2 text-[14px] text-white/45"><Loader2 size={13} className="animate-spin" /> Loading your tickets…</p>
               ) : tickets.length === 0 ? (
                 <div className="flex flex-col items-center gap-3 py-10 text-center">
                   <Inbox size={28} className="text-white/20" />
-                  <p className="text-[14px] text-white/45">No tickets. When something needs a formal follow-up, our team opens a ticket for you and it shows here.</p>
+                  <p className="text-[14px] text-white/45">No tickets yet. Submit one for something that needs a formal record, like a complaint or a claim. For a quick question, ask in Messages.</p>
                 </div>
               ) : (
                 <ul className="space-y-2">
@@ -1146,9 +1174,20 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
                 Ticket replies come by email. To add details to a ticket, reply to its email.
               </p>
             </div>
-            {askPill('tickets')}
+            {/* Zendesk's "Submit a request", next to chat. */}
+            <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center">
+              <button
+                type="button"
+                onClick={() => { setSubmitted(null); setRequestOpen(true) }}
+                className="pointer-events-auto inline-flex items-center gap-2 rounded-xl bg-[var(--color-cyan)] px-4 py-2.5 text-[15px] font-bold text-[#0a0a0a] shadow-[0_8px_24px_rgba(0,0,0,0.45)] hover:brightness-110"
+              >
+                Submit a ticket <Send size={14} />
+              </button>
+            </div>
             </div>
             </>
+            )}
+          </>
           )}
 
           {/* Bottom bar: clients only, hidden in a conversation. */}

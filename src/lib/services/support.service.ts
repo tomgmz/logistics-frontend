@@ -197,6 +197,12 @@ export const supportService = {
     return data.data ?? []
   },
 
+  /** Staff reply from the Support page: emailed to the client in the ticket's thread and recorded. */
+  async reply(ticketId: string, body: string): Promise<void> {
+    await initCsrf()
+    await proxyApi.post(`/support/tickets/${ticketId}/reply`, { body })
+  },
+
   async resolve(ticketId: string, note: string | null): Promise<SupportTicket> {
     await initCsrf()
     const { data } = await proxyApi.patch<{ data: SupportTicket }>(`/support/tickets/${ticketId}/resolve`, { note })

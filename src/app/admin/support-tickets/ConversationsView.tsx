@@ -1,7 +1,11 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { AlertTriangle, ArrowUp, Bot, CheckCircle2, ChevronRight, Eye, Hand, ImagePlus, Loader2, Mail, MessagesSquare, UserRound } from 'lucide-react'
+import { AlertTriangle, ArrowUp, Bot, CheckCircle2, ChevronRight, Eye, Hand, ImagePlus, Loader2, Mail, MessagesSquare, Ticket, UserRound } from 'lucide-react'
+import ReusableModal from '@/components/layout/ReusableModal'
+import Dropdown from '@/components/ui/Dropdown'
+import { FieldError, errorBorder } from '@/components/ui/FieldError'
+import { TICKET_CATEGORY_LABEL, type TicketCategory } from '@/lib/services/support.service'
 import TableEmptyState from '@/components/ui/TableEmptyState'
 import SidePanel from '@/components/ui/SidePanel'
 import { useModuleAccess, writeAccess } from '@/components/layout/ModuleAccess'
@@ -354,6 +358,7 @@ function ConversationPanel({ id, meId, meName, canEdit, onClose, onChanged }: {
   const inAssistant = detail?.status === 'assistant'
   // Someone else owns it: read it, or take it over to reply.
   const ownedByOther = !!detail?.assigned_to && detail.assigned_to !== meId
+  const [ticketOpen, setTicketOpen] = useState(false)
 
   return (
     <>
@@ -361,6 +366,8 @@ function ConversationPanel({ id, meId, meName, canEdit, onClose, onChanged }: {
         open={!!id}
         onClose={onClose}
         label="Conversation"
+        // Darker Grotesque, as in the client's chat (user 2026-11-22).
+        className="ff-darker"
         title={detail ? `${detail.reference} · ${detail.company_name ?? 'Client'}` : 'Conversation'}
         subtitle={detail ? `${detail.client_name ?? ''}${detail.client_email ? ` · ${detail.client_email}` : ''}` : undefined}
         footer={detail && (
@@ -412,6 +419,13 @@ function ConversationPanel({ id, meId, meName, canEdit, onClose, onChanged }: {
             )}
             {error && <p className="text-xs text-red-400">{error}</p>}
             <div className="flex flex-wrap items-center justify-end gap-2">
+              {/* Simple hand-off (2026-11-22): the ticket carries the conversation, which closes. */}
+              {!detail.ticket_id && !inAssistant && (
+                <button type="button" onClick={() => setTicketOpen(true)} {...writeAccess(canEdit)}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 px-2.5 py-1.5 text-xs font-semibold text-white/80 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40">
+                  <Ticket size={13} /> Turn into ticket
+                </button>
+              )}
               {detail.status !== 'resolved' && !inAssistant && (
                 <button type="button" onClick={() => void resolve()} {...writeAccess(canEdit && !resolving)}
                   className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold text-[#0a0a0a] disabled:cursor-not-allowed disabled:opacity-40"
@@ -434,6 +448,7 @@ function ConversationPanel({ id, meId, meName, canEdit, onClose, onChanged }: {
               </span>
               <span>· Started {formatDateTime(detail.created_at)}</span>
               {detail.handed_over_at && <span>· Asked for the team {formatDateTime(detail.handed_over_at)}</span>}
+              {detail.ticket_reference && <span className="text-[#FF7A30]">· Continued as ticket {detail.ticket_reference}</span>}
             </div>
             {viewers.length > 0 && (
               <p className="flex items-center gap-1.5 text-xs text-[#FFEA00]/80">
@@ -449,6 +464,14 @@ function ConversationPanel({ id, meId, meName, canEdit, onClose, onChanged }: {
 
       <PhotoSendDialog file={photo} onCancel={() => setPhoto(null)} onSend={(url, caption) => { setPhoto(null); void send(caption, url) }} />
 
+      {detail && (
+        <TicketFromConversation
+          open={ticketOpen}
+          detail={detail}
+          onClose={() => setTicketOpen(false)}
+          onDone={() => { setTicketOpen(false); if (id) void fetchDetail(id, true); onChanged() }}
+        />
+      )}
     </>
   )
 }
@@ -477,5 +500,72 @@ function Bubble({ m, authors, clientName }: { m: ChatMessage; authors: ChatDetai
         <MessagePhoto body={m.content} attachmentUrl={m.attachment_url} stamped={m.attachment_stamped} />
       </div>
     </div>
+  )
+}
+
+/** "Turn into ticket": topic + subject; the ticket carries the conversation and is emailed to the client. */
+function TicketFromConversation({ open, detail, onClose, onDone }: {
+  open: boolean; detail: ChatDetail; onClose: () => void; onDone: () => void
+}) {
+  const [category, setCategory] = useState<TicketCategory>('other')
+  const [subject,  setSubject]  = useState('')
+  const [tried,    setTried]    = useState(false)
+  const [busy,     setBusy]     = useState(false)
+  const [error,    setError]    = useState<string | null>(null)
+  const [seen,     setSeen]     = useState<string | null>(null)
+  // Fill the subject from the conversation each time it opens (adjust-state-on-prop pattern).
+  if (open && seen !== detail.conversation_id) {
+    setSeen(detail.conversation_id)
+    setSubject((detail.title || '').slice(0, 150)); setCategory('other'); setTried(false); setError(null)
+  }
+  if (!open && seen !== null) setSeen(null)
+  const subjectError = tried && subject.trim().length < 3 ? 'Add a short subject.' : undefined
+
+  async function confirm() {
+    setTried(true)
+    if (subject.trim().length < 3) return
+    setBusy(true)
+    setError(null)
+    try {
+      const t = await supportChatService.toTicket(detail.conversation_id, { category, subject: subject.trim() })
+      appToast.success(`Ticket ${t.reference} opened and emailed to the client; the conversation is closed.`, { action: 'support-chat-ticket', entityId: detail.conversation_id })
+      onDone()
+    } catch (e) {
+      setError(getApiErrorMessage(e, 'The ticket could not be opened.'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <ReusableModal
+      open={open}
+      title="Turn into a ticket?"
+      description="For something that needs a formal record. The ticket carries this whole conversation and is emailed to the client; replies continue by email. This conversation closes."
+      confirmLabel={busy ? 'Opening…' : 'Open ticket'}
+      cancelLabel="Cancel"
+      disableBackdropClose={busy}
+      onConfirm={() => { void confirm() }}
+      onCancel={() => { if (!busy) onClose() }}
+    >
+      <div className="mt-3 flex flex-col gap-3 text-left">
+        <label className="block">
+          <span className="text-xs font-semibold text-white/60">Topic</span>
+          <Dropdown value={category} onChange={(e) => setCategory(e.target.value as TicketCategory)}
+            className="mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-2.5 py-2 text-sm text-white outline-none">
+            {(Object.keys(TICKET_CATEGORY_LABEL) as TicketCategory[]).map((c) => (
+              <option key={c} value={c}>{TICKET_CATEGORY_LABEL[c]}</option>
+            ))}
+          </Dropdown>
+        </label>
+        <label className="block">
+          <span className="text-xs font-semibold text-white/60">Subject</span>
+          <input value={subject} onChange={(e) => setSubject(e.target.value)} maxLength={150} aria-invalid={!!subjectError}
+            className={`mt-1 w-full rounded-lg border border-white/10 bg-[#111] px-2.5 py-2 text-sm text-white outline-none focus:border-[var(--color-cyan)]/50 ${errorBorder(subjectError)}`} />
+          <FieldError>{subjectError}</FieldError>
+        </label>
+        {error && <p role="alert" className="text-xs text-red-400">{error}</p>}
+      </div>
+    </ReusableModal>
   )
 }
