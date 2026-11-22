@@ -17,7 +17,8 @@ import { apiAs, type Api } from './support/api'
  * after-hours need a clock / inbox hook and are not automated here.
  * Runs in order; a failure skips the rest (Blocked in the workbook).
  */
-test.describe.configure({ mode: 'serial' })
+// Longer than the default 90 s: sign-ins may retry on the flaky TEST network.
+test.describe.configure({ mode: 'serial', timeout: 240_000 })
 
 const CLIENT = 'client011'
 const OTHER_CLIENT = 'client012'
@@ -187,9 +188,12 @@ test('CHAT-006 take over, then reply', async () => {
   expect(d.status).toBe('replied')
   // The previous owner was told.
   const ops = await session(OPS)
-  const notes = await ops.get('notifications')
-  const list = (Array.isArray(notes) ? notes : notes.notifications ?? notes.items ?? []) as { type: string; data?: { conversation_id?: string } }[]
-  expect(list.some((n) => n.type === 'support.chat_taken_over' && n.data?.conversation_id === convId)).toBeTruthy()
+  // The notice is sent just after the take-over (in the background): wait for it.
+  await expect.poll(async () => {
+    const notes = await ops.get('notifications')
+    const list = (Array.isArray(notes) ? notes : notes.notifications ?? notes.items ?? []) as { type: string; data?: { conversation_id?: string } }[]
+    return list.some((n) => n.type === 'support.chat_taken_over' && n.data?.conversation_id === convId)
+  }, { timeout: 10_000 }).toBeTruthy()
 })
 
 test('CHAT-007 a reply after a colleague reply you had not seen asks to confirm', async () => {
