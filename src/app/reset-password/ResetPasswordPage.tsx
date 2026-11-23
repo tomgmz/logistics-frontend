@@ -17,6 +17,7 @@ import {
   getStrength,
   meetsRequirements,
 } from '@/components/auth/password-fields'
+import { clearResetToken, peekResetToken } from '@/lib/auth/reset-handoff'
 
 /**
  * The page an administrator's reset link lands on.
@@ -55,7 +56,10 @@ function extractErrorMessage(err: unknown, fallback: string): string {
 export default function ResetPasswordPage() {
   const router       = useRouter()
   const searchParams = useSearchParams()
-  const token        = searchParams.get('token') ?? ''
+  // From an emailed link (?token=) or handed over in memory by a code screen
+  // (lib/auth/reset-handoff). Held in state: the address is cleaned below, so
+  // the token does not stay in the address bar or the browser history.
+  const [token] = useState(() => searchParams.get('token') || peekResetToken() || '')
 
   /**
    * Driver links carry ?app=1 (set in buildResetUrl). Drivers work entirely out
@@ -84,6 +88,16 @@ export default function ResetPasswordPage() {
   const allMet         = meetsRequirements(password)
   const passwordsMatch = password === confirm && confirm.length > 0
   const canSubmit      = allMet && passwordsMatch && !loading
+
+  useEffect(() => {
+    clearResetToken()
+    if (searchParams.get('token')) {
+      const keep = searchParams.get('app') === '1' ? '?app=1' : ''
+      window.history.replaceState(window.history.state, '', `/reset-password${keep}`)
+    }
+    // Once, on arrival.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     if (!token) { setTokenState('invalid'); return }

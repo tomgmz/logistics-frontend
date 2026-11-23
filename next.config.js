@@ -35,6 +35,16 @@ const nextConfig = {
   // iOS mirror of the assetlinks content-type trap.
   async headers() {
     return [
+      // The reset page may carry a one-time token in its address (emailed link):
+      // never send that address to another site, and never keep the page in a
+      // cache (2026-11-23).
+      {
+        source: '/reset-password',
+        headers: [
+          { key: 'Referrer-Policy', value: 'no-referrer' },
+          { key: 'Cache-Control', value: 'no-store' },
+        ],
+      },
       {
         source: '/.well-known/apple-app-site-association',
         headers: [{ key: 'Content-Type', value: 'application/json' }],

@@ -5,13 +5,15 @@ import { useRouter } from 'next/navigation'
 import { AxiosError } from 'axios'
 import { BookOpen, ExternalLink, KeyRound } from 'lucide-react'
 import ReusableModal from '@/components/layout/ReusableModal'
-import { FieldError, errorBorder } from '@/components/ui/FieldError'
+import { FieldError } from '@/components/ui/FieldError'
+import OtpCodeInput, { type OtpCodeInputHandle } from '@/components/auth/OtpCodeInput'
 import {
   requestItAdminResetOtp,
   requestPasswordReset,
   verifyItAdminResetOtp,
   type Profile,
 } from '@/lib/api/auth.api'
+import { handOffResetToken } from '@/lib/auth/reset-handoff'
 
 /**
  * Two Profile cards (2026-11-23): the user guide, and a password reset.
@@ -150,6 +152,7 @@ function SelfResetPassword({ email }: { email: string }) {
   const [error,     setError]     = useState('')
   const [resendSec, setResendSec] = useState(0)
   const sentAt = useRef(0)
+  const codeRef = useRef<OtpCodeInputHandle>(null)
   // Latched once a code is traded for a token: the page is leaving, and a second
   // press would spend a code that is already used.
   const done = useRef(false)
@@ -176,6 +179,7 @@ function SelfResetPassword({ email }: { email: string }) {
       setResendSec(RESEND_SECS)
       setCode('')
       setStage('code')
+      setTimeout(() => codeRef.current?.focus(), 250)
     } catch (err) {
       setError(errorText(err, 'Could not send a code. Please try again.'))
     } finally {
@@ -193,13 +197,22 @@ function SelfResetPassword({ email }: { email: string }) {
     try {
       const { token } = await verifyItAdminResetOtp(email, code)
       done.current = true
-      router.push(`/reset-password?token=${encodeURIComponent(token)}`)
+      // In memory, not in the address: see lib/auth/reset-handoff.
+      handOffResetToken(token)
+      router.push('/reset-password')
     } catch (err) {
       setError(errorText(err, 'That code did not work. Please try again.'))
       setCode('')
       setBusy(false)
+      setTimeout(() => codeRef.current?.focus(), 50)
     }
   }
+
+  // The 6th digit sends it, as on the sign-in screen.
+  useEffect(() => {
+    if (stage === 'code' && code.length === CODE_LENGTH && !error) void verify()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code, stage])
 
   return (
     <section className={`${CARD} p-4 sm:p-5`}>
@@ -241,22 +254,15 @@ function SelfResetPassword({ email }: { email: string }) {
         disableBackdropClose
       >
         <div className="mt-4 flex flex-col gap-1">
-          <label htmlFor="profile-reset-code" className="text-[13px] tracking-wide text-white/60">
-            Code
-          </label>
-          <input
-            id="profile-reset-code"
-            type="text"
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            maxLength={CODE_LENGTH}
+          <OtpCodeInput
+            ref={codeRef}
             value={code}
+            length={CODE_LENGTH}
             disabled={busy}
-            onChange={(e) => { setCode(e.target.value.replace(/\D/g, '').slice(0, CODE_LENGTH)); setError('') }}
-            onKeyDown={(e) => { if (e.key === 'Enter') void verify() }}
-            aria-invalid={!!error}
-            aria-describedby={error ? 'profile-reset-code-error' : undefined}
-            className={`h-12 w-full rounded-lg border border-white/10 bg-black/30 px-3 text-center text-[20px] tracking-[0.5em] text-white outline-none focus:border-[#4df9ed]/50 disabled:opacity-50 ${errorBorder(error)}`}
+            invalid={!!error}
+            describedBy={error ? 'profile-reset-code-error' : undefined}
+            onChange={(c) => { setCode(c); setError('') }}
+            onEnter={() => void verify()}
           />
           <FieldError id="profile-reset-code-error">{error}</FieldError>
           <button

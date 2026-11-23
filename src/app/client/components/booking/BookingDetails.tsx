@@ -5,7 +5,6 @@ import { useCallback, useState, useRef, useEffect, useSyncExternalStore } from '
 import { createPortal } from 'react-dom'
 import {
   Plus, X, Check, Info, File,
-  ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import { useBookingStore } from '@/lib/store/booking.store'
 import {
@@ -62,7 +61,8 @@ import type { ResolvedPlace } from '@/lib/hooks/usePlacesAutoComplete'
 import { nowDate } from '@/app/utils/serverTime'
 import { OFFICE_HOURS_LABEL, isWithinOfficeHours } from '@/lib/office-hours'
 import ContractEndedBanner from '@/components/client/ContractEndedBanner'
-import { phDayPlusMonth, phEarliestBookableDay } from '@/lib/ph-date'
+import { phDay, phDayPlusMonth, phEarliestBookableDay } from '@/lib/ph-date'
+import CalendarPanel, { formatDisplayDate } from '@/components/ui/CalendarPanel'
 import { FileViewButton } from '@/components/ui/FileViewer'
 import { fetchStoredFile } from '@/lib/files/fileAccess'
 import { cachedFetch } from '@/lib/query/useApiQuery'
@@ -166,35 +166,7 @@ function to24(h12: number, period: Period) {
   return String((h12 % 12) + (period === 'PM' ? 12 : 0)).padStart(2, '0')
 }
 
-const MONTHS = [
-  'January','February','March','April','May','June',
-  'July','August','September','October','November','December',
-]
-const DOW = ['Su','Mo','Tu','We','Th','Fr','Sa']
-
-function calDays(year: number, month: number) {
-  const first = new Date(year, month, 1).getDay()
-  const total = new Date(year, month + 1, 0).getDate()
-  return { first, total }
-}
-
-function toDateStr(y: number, m: number, d: number) {
-  return `${y}-${String(m + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`
-}
-
-function parseDateStr(s: string): { y: number; m: number; d: number } | null {
-  if (!s) return null
-  const [y, m, d] = s.split('-').map(Number)
-  if (!y || !m || !d) return null
-  return { y, m: m - 1, d }
-}
-
-function formatDisplayDate(s: string) {
-  const p = parseDateStr(s)
-  if (!p) return ''
-  const dt = new Date(p.y, p.m, p.d)
-  return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
+// Date helpers (calendar, parsing, display) live in components/ui/CalendarPanel.
 
 function formatDisplayTime(s: string) {
   if (!s) return ''
@@ -284,11 +256,6 @@ function DatePickerPopup({
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
-  const today = new Date()
-  const parsed = parseDateStr(value)
-  const [viewYear,  setViewYear]  = useState(parsed?.y  ?? today.getFullYear())
-  const [viewMonth, setViewMonth] = useState(parsed?.m  ?? today.getMonth())
-
   useEffect(() => {
     if (!open) return
     const handler = (e: MouseEvent) => {
@@ -298,47 +265,18 @@ function DatePickerPopup({
     return () => document.removeEventListener('mousedown', handler)
   }, [open])
 
-  const { first, total } = calDays(viewYear, viewMonth)
-  const blanks = first
-
-  const prevMonth = () => {
-    if (viewMonth === 0) { setViewMonth(11); setViewYear(v => v - 1) }
-    else setViewMonth(v => v - 1)
-  }
-  const nextMonth = () => {
-    if (viewMonth === 11) { setViewMonth(0); setViewYear(v => v + 1) }
-    else setViewMonth(v => v + 1)
-  }
-
-  const selectDay = (d: number) => {
-    onChange(toDateStr(viewYear, viewMonth, d))
-    setOpen(false)
-  }
-
-  const todayY = today.getFullYear()
-  const todayM = today.getMonth()
-  const todayD = today.getDate()
-
   // Today stays pickable until 12:00 noon, Monday to Saturday (the office needs
   // the afternoon to dispatch it); after that tomorrow is the earliest day.
   // Every weekday is open for transit, Sundays included — only the office (the
   // acceptance of bookings) keeps Monday-to-Saturday hours.
   // And no further out than one month: the same day next month is the last
   // bookable one (the API refuses anything later). All in Manila days, as the
-  // validator and the API judge them.
+  // validator and the API judge them. The calendar (CalendarPanel, shared with
+  // every other date field) has the month and year choosers too (2026-11-23).
   const serverNow = nowDate()
   const earliest  = phEarliestBookableDay(serverNow)
   const latest    = phDayPlusMonth(serverNow)
-  const isDisabled = (d: number) => {
-    const str = toDateStr(viewYear, viewMonth, d)
-    return str < earliest || str > latest
-  }
-  // Nothing to show past the month that holds the last bookable day.
-  const lastDay = parseDateStr(latest)!
-  const atLastMonth = viewYear > lastDay.y ||
-    (viewYear === lastDay.y && viewMonth >= lastDay.m)
-
-  const nextAvailable = parseDateStr(earliest)!
+  const todayStr  = phDay(serverNow)
 
   const idleBorder   = hasError ? ERROR_BORDER : BORDER_PANEL
   const activeBorder = hasError ? ERROR_COLOR   : `${CYAN}66`
@@ -379,76 +317,23 @@ function DatePickerPopup({
               border: `1px solid ${BORDER_PANEL}`,
             }}
           >
-            <div className="flex items-center justify-between mb-3">
-              <button type="button" onClick={prevMonth}
-                className="p-1 rounded hover:bg-white/10 transition-colors cursor-pointer text-white/60 hover:text-white">
-                <ChevronLeft size={15} />
-              </button>
-              <span className="ff-sc text-xs font-bold text-white tracking-wider">
-                {MONTHS[viewMonth]} {viewYear}
-              </span>
-              <button type="button" onClick={nextMonth} disabled={atLastMonth}
-                aria-label="Next month"
-                className="p-1 rounded hover:bg-white/10 transition-colors cursor-pointer text-white/60 hover:text-white disabled:opacity-20 disabled:cursor-not-allowed">
-                <ChevronRight size={15} />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-7 mb-1">
-              {DOW.map((d) => (
-                <div key={d} className="text-center ff-sc text-[10px] py-0.5 text-white/30">
-                  {d}
-                </div>
-              ))}
-            </div>
-
-            <div className="grid grid-cols-7 gap-y-0.5">
-              {Array.from({ length: blanks }).map((_, i) => <div key={`b${i}`} />)}
-              {Array.from({ length: total }, (_, i) => i + 1).map(d => {
-                const str = toDateStr(viewYear, viewMonth, d)
-                const isSelected = str === value
-                const isToday    = viewYear === todayY && viewMonth === todayM && d === todayD
-                const disabled   = isDisabled(d)
-                return (
-                  <button
-                    key={d}
-                    type="button"
-                    disabled={disabled}
-                    onClick={() => selectDay(d)}
-                    className="h-8 w-full flex items-center justify-center rounded-md text-xs ff-sc
-                               transition-all cursor-pointer"
-                    style={{
-                      background:  isSelected ? CYAN : isToday ? 'rgba(77,249,237,0.12)' : 'transparent',
-                      color:       disabled ? 'rgba(255,255,255,0.15)'
-                                 : isSelected ? '#000'
-                                 : isToday    ? CYAN
-                                 : '#fff',
-                      cursor: disabled ? 'not-allowed' : 'pointer',
-                      fontWeight:  isSelected || isToday ? 700 : 400,
-                    }}
-                  >
-                    {d}
-                  </button>
-                )
-              })}
-            </div>
-
-            <div className="mt-3 pt-2 border-t border-white/[0.07] flex justify-center">
-              <button
-                type="button"
-                onClick={() => {
-                  const { y, m } = nextAvailable
-                  onChange(earliest)
-                  setViewYear(y)
-                  setViewMonth(m)
-                  setOpen(false)
-                }}
-                className="ff-sc text-xs cursor-pointer transition-colors"
-                style={{ color: CYAN }}
-              >
-                Next available
-              </button>
-            </div>
+            <CalendarPanel
+              value={value}
+              today={todayStr}
+              min={earliest}
+              max={latest}
+              onPick={(v) => { onChange(v); setOpen(false) }}
+              footer={
+                <button
+                  type="button"
+                  onClick={() => { onChange(earliest); setOpen(false) }}
+                  className="ff-sc text-xs cursor-pointer transition-colors"
+                  style={{ color: CYAN }}
+                >
+                  Next available
+                </button>
+              }
+            />
           </motion.div>
         )}
       </AnimatePresence>

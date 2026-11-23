@@ -12,6 +12,7 @@ import { useAuthStore } from '@/lib/store/auth.store'
 import { ROLE_ROUTES } from '@/constants/roles'
 import { now } from '@/app/utils/serverTime'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
+import { handOffResetToken } from '@/lib/auth/reset-handoff'
 
 const OTP_LENGTH  = 6
 const RESEND_SECS = 60
@@ -377,7 +378,9 @@ function ItAdminOtpResetStep({
       // page already checks the token, enforces the password rules and reports a
       // token that died on the way — duplicating that here would be a second
       // implementation of the only step that actually changes a password.
-      router.push(`/reset-password?token=${encodeURIComponent(token)}`)
+      // In memory, not in the address: see lib/auth/reset-handoff.
+      handOffResetToken(token)
+      router.push('/reset-password')
     } catch (err) {
       setError(extractErrorMessage(err, 'That code did not work. Please try again.'))
       setCode(Array(OTP_LENGTH).fill(''))
