@@ -717,7 +717,7 @@ export default function VehicleManagementView({ archive }: {
     // (Maintenance flags it) but saving other changes is not held up by it.
     if (isCreate && !form.registration_expiry) {
       errs.registration = 'Enter the date the registration is valid until.'
-    } else if (form.registration_expiry && !/^d{4}-d{2}-d{2}$/.test(form.registration_expiry)) {
+    } else if (form.registration_expiry && !/^\d{4}-\d{2}-\d{2}$/.test(form.registration_expiry)) {
       errs.registration = 'Enter a valid registration expiry date.'
     } else if (!isCreate && editingTruck?.registration_expiry && !form.registration_expiry) {
       errs.registration = 'The registration expiry date cannot be cleared — enter the renewed date instead.'

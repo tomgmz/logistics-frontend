@@ -301,7 +301,7 @@ function FieldDropdown({ field, values, onChange }: {
         align="start"
         sideOffset={6}
         collisionPadding={16}
-        className="ff-regular w-[min(240px,calc(100vw-32px))] gap-0 rounded-xl border border-[#424242] bg-[#1b1b1b] p-1 text-white shadow-[0_20px_40px_rgba(0,0,0,0.6)] ring-0"
+        className="ff-regular z-[1500] w-[min(240px,calc(100vw-32px))] gap-0 rounded-xl border border-[#424242] bg-[#1b1b1b] p-1 text-white shadow-[0_20px_40px_rgba(0,0,0,0.6)] ring-0"
       >
         <div role="menu" aria-label={field.label} className="flex max-h-[min(50dvh,var(--radix-popover-content-available-height))] flex-col overflow-y-auto overscroll-contain">
           {/* "All" (or "Any time"): nothing picked, the field doesn't narrow the list. */}
@@ -463,7 +463,7 @@ function FiltersButton({ fields, values, onApply, compact = false }: {
         align="end"
         sideOffset={6}
         collisionPadding={16}
-        className="ff-regular w-[min(640px,calc(100vw-32px))] gap-0 rounded-xl border border-[#424242] bg-[#1b1b1b] p-0 text-white shadow-[0_20px_40px_rgba(0,0,0,0.6)] ring-0"
+        className="ff-regular z-[1500] w-[min(640px,calc(100vw-32px))] gap-0 rounded-xl border border-[#424242] bg-[#1b1b1b] p-0 text-white shadow-[0_20px_40px_rgba(0,0,0,0.6)] ring-0"
       >
         <div className="flex max-h-[min(55dvh,var(--radix-popover-content-available-height))] flex-col gap-3 overflow-y-auto overscroll-contain p-4 max-sm:gap-4">
           {draft.map((r) => {
