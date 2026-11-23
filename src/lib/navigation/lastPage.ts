@@ -14,10 +14,15 @@ import { usePathname } from 'next/navigation'
  */
 const KEY = 'nav:last-page'
 
+// Pages whose address carries a one-time token (reset link, driver set-up
+// link). Never copied into storage (2026-11-23); nobody returns to them from
+// Messages anyway.
+const NEVER_REMEMBER = ['/messages', '/reset-password', '/driver-setup', '/change-password']
+
 export function useRememberLastPage(): void {
   const pathname = usePathname()
   useEffect(() => {
-    if (!pathname || pathname === '/messages') return
+    if (!pathname || NEVER_REMEMBER.some((p) => pathname === p || pathname.startsWith(p + '/'))) return
     try {
       sessionStorage.setItem(KEY, pathname + window.location.search)
     } catch { /* storage blocked: nothing remembered */ }

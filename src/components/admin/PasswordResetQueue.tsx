@@ -305,6 +305,11 @@ export default function PasswordResetQueue({
                           <span className={`t-badge min-w-[90px] 3xl:min-w-[102px] ${cfg.cls}`}>
                             {cfg.label}
                           </span>
+                          {/* IT Administrator / Company Administrator / General Manager
+                              get their link straight away (2026-11-23): a record, no action. */}
+                          {r.sent_by && r.sent_by === r.user_id && (
+                            <span className="text-[10px] text-[#818181]">sent automatically</span>
+                          )}
                           {r.status === 'sent' && left !== null && (
                             <span className="text-[10px] text-[#818181]">expires in {left}m</span>
                           )}

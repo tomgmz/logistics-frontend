@@ -1,4 +1,4 @@
-import path from 'node:path'
+import crypto from 'node:crypto'
 import { test, expect, request, type Page } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
 import { PORTAL, signInWithPassword, expectSignedInto, startSignIn } from './support/session'
@@ -6,23 +6,22 @@ import { API } from './support/api'
 
 // Test case IDs refer to docs/testing/8338 Test Cases.xlsx (Test Cases sheet, PROF-…).
 //
-// The test backend has no email provider, so a requested reset code never
-// reaches a mailbox (the server closes the request when the send fails). The
-// code tests therefore plant a request with a KNOWN code in the TEST database
-// and type that code in the browser: the request, verify and hand-off to the
-// reset page all run for real. They stop on the new-password form, so the seeded
-// accounts keep their password. Every planted or created request is closed again.
+// The test backend has no email provider, so a reset link never reaches a
+// mailbox (a self-service link whose email fails is closed again). The tests
+// therefore check the request side through the TEST database, and open the reset
+// page with a link they plant themselves (known token, hashed the way the server
+// hashes it). They stop on the new-password form, so the seeded accounts keep
+// their password. Every planted or created request is closed again.
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { backendEnv, seedEmail, BACKEND } = require('./support/env.cjs')
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const bcrypt = require(path.join(BACKEND, 'node_modules', 'bcrypt'))
+const { backendEnv, seedEmail } = require('./support/env.cjs')
 
 const db = createClient(backendEnv.SUPABASE_URL, backendEnv.SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
 })
 
-const KNOWN_CODE = '246810'
+const hashToken = (t: string) =>
+  crypto.createHash('sha256').update(t + backendEnv.TOKEN_PEPPER).digest('hex')
 
 async function userOf(tag: string): Promise<{ user_id: string; email: string; role: string }> {
   const { data, error } = await db.from('users').select('user_id, email, role').eq('email', seedEmail(tag)).single()
@@ -38,25 +37,31 @@ async function closeRequests(userId: string) {
     .in('status', ['pending', 'sent', 'expired'])
 }
 
-/** An open code request whose code is KNOWN_CODE, as if it had been emailed. */
-async function plantCode(tag: string) {
+/** A live self-service link, as if emailed `sentSecondsAgo` seconds ago. */
+async function plantLink(tag: string, sentSecondsAgo = 0) {
   const u = await userOf(tag)
   await closeRequests(u.user_id)
-  const now = Date.now()
-  const { error } = await db.from('password_reset_requests').insert({
-    user_id:         u.user_id,
-    email:           u.email,
-    requested_role:  u.role,
-    handler_group:   'it_admin',
-    delivery_method: 'otp',
-    status:          'pending',
-    otp_hash:        await bcrypt.hash(KNOWN_CODE, 4),
-    otp_expires_at:  new Date(now + 10 * 60_000).toISOString(),
-    otp_sent_at:     new Date(now).toISOString(),
-    otp_attempts:    0,
-  })
-  if (error) throw new Error(`could not plant code for ${tag}: ${error.message}`)
-  return u
+  const token  = crypto.randomBytes(32).toString('base64url')
+  const sentAt = Date.now() - sentSecondsAgo * 1000
+  const { data, error } = await db.from('password_reset_requests').insert({
+    user_id:          u.user_id,
+    email:            u.email,
+    requested_role:   u.role,
+    handler_group:    'it_admin',
+    delivery_method:  'link',
+    status:           'sent',
+    token_hash:       hashToken(token),
+    token_expires_at: new Date(sentAt + 5 * 60_000).toISOString(),
+    sent_by:          u.user_id,
+    sent_at:          new Date(sentAt).toISOString(),
+  }).select('request_id').single()
+  if (error || !data) throw new Error(`could not plant link for ${tag}: ${error?.message}`)
+  return { token, requestId: data.request_id as string, userId: u.user_id, email: u.email }
+}
+
+async function statusOf(requestId: string) {
+  const { data } = await db.from('password_reset_requests').select('status').eq('request_id', requestId).single()
+  return data?.status
 }
 
 async function openProfile(page: Page, tag: string, portal: string) {
@@ -67,84 +72,55 @@ async function openProfile(page: Page, tag: string, portal: string) {
 }
 
 test.describe('Profile: password', () => {
-  test('PROF-001 General Manager resets by emailed code and reaches the new-password page', async ({ page }) => {
+  test('PROF-001 General Manager emails themselves a reset link straight away', async ({ page }) => {
     const gm = await userOf('gm001')
+    await closeRequests(gm.user_id)
+    const since = new Date(Date.now() - 5_000).toISOString()
     try {
       await openProfile(page, 'gm001', PORTAL.gm)
       await expect(page.getByRole('button', { name: 'Request Password Reset' })).toHaveCount(0)
-      await page.getByRole('button', { name: 'Reset Password' }).click()
-      await expect(page.getByRole('dialog')).toContainText('Reset your password?')
-      await page.getByRole('button', { name: 'Email Me A Code' }).click()
-      await expect(page.getByRole('dialog')).toContainText('Enter your code')
+      await page.getByRole('button', { name: 'Email Me A Reset Link' }).click()
+      await expect(page.getByRole('dialog')).toContainText('Email you a reset link?')
+      await page.getByRole('button', { name: 'Send Link' }).click()
+      await expect(page.getByText(/^Link sent\. Check your email/)).toBeVisible()
 
-      // Stand in for the mailbox: the real send failed (no email key on TEST).
-      await plantCode('gm001')
-      // Six boxes, as on the sign-in screen. A whole code in the first box (what
-      // paste and phone autofill do) spreads over the boxes and sends itself.
-      await expect(page.getByRole('textbox', { name: /^Code digit \d of 6$/ })).toHaveCount(6)
-      const consoleLines: string[] = []
-      page.on('console', (m) => consoleLines.push(m.text()))
-      const verified = page.waitForResponse((r) => r.url().includes('/auth/it-admin/verify-otp'))
-      await page.getByRole('textbox', { name: 'Code digit 1 of 6' }).fill(KNOWN_CODE)
-      const token: string = (await (await verified).json()).data.token
-      expect(token).toBeTruthy()
-
-      // No token in the address: it was handed over in memory.
-      await expect(page).toHaveURL(/\/reset-password$/, { timeout: 30_000 })
-      await expect(page.getByRole('heading', { name: 'Set A New Password' })).toBeVisible({ timeout: 30_000 })
-      // The address is shown masked, never in full.
-      await expect(page.getByText(/Resetting the password for 83•+@gmail\.com/)).toBeVisible()
-      await expect(page.getByPlaceholder('Create a strong password')).toBeVisible()
-
-      // Nothing sensitive left where DevTools keeps it: not in the address (or
-      // history), not in any storage, not in the console.
-      expect(new URL(page.url()).search).toBe('')
-      const stored = await page.evaluate(() => JSON.stringify({ ...localStorage }) + JSON.stringify({ ...sessionStorage }) + document.cookie)
-      expect(stored).not.toContain(token)
-      expect(stored).not.toContain(KNOWN_CODE)
-      expect(consoleLines.join(' ')).not.toContain(token)
+      // The server minted the link and marked it sent by the person themselves:
+      // no approval. (TEST has no mail, so the row is then closed as undeliverable.)
+      const { data } = await db.from('password_reset_requests')
+        .select('delivery_method, sent_by, sent_at').eq('user_id', gm.user_id).gte('created_at', since)
+      expect(data?.length).toBe(1)
+      expect(data![0]).toMatchObject({ delivery_method: 'link', sent_by: gm.user_id })
+      expect(data![0].sent_at).toBeTruthy()
     } finally {
       await closeRequests(gm.user_id)
     }
   })
 
-  test('PROF-002 Company Administrator is offered the emailed code', async ({ page }, info) => {
-    const admin = await userOf('admin001')
-    try {
-      await openProfile(page, 'admin001', PORTAL.admin)
-      await page.getByRole('button', { name: 'Reset Password' }).click()
-      await page.getByRole('button', { name: 'Email Me A Code' }).click()
-      const dialog = page.getByRole('dialog')
-      await expect(dialog).toContainText('Enter your code')
-      await expect(dialog.getByRole('group', { name: 'Code' })).toBeVisible()
-      await expect(dialog.getByRole('textbox', { name: 'Code digit 1 of 6' })).toBeFocused()
-      // The six boxes fit the narrowest phone.
-      await page.setViewportSize({ width: 320, height: 700 })
-      const last = await dialog.getByRole('textbox', { name: 'Code digit 6 of 6' }).boundingBox()
-      expect(last && last.x + last.width <= 320).toBeTruthy()
-      await page.screenshot({ path: info.outputPath('code-boxes-320.png') })
-      await expect(dialog.getByRole('button', { name: /Resend in \d+s/ })).toBeDisabled()
-    } finally {
-      await closeRequests(admin.user_id)
-    }
+  test('PROF-002 Company Administrator is offered the reset link, not a request', async ({ page }) => {
+    await openProfile(page, 'admin001', PORTAL.admin)
+    await expect(page.getByText(/We email a one-time link to .+ straight away/)).toBeVisible()
+    await page.getByRole('button', { name: 'Email Me A Reset Link' }).click()
+    await expect(page.getByRole('dialog')).toContainText('It works once and expires in 5 minutes')
+    await page.getByRole('button', { name: 'Cancel' }).click()
   })
 
-  test('PROF-003 wrong code is refused under the field with attempts left', async ({ page }) => {
+  test('PROF-003 a new link cancels the old one; asking again within a minute sends nothing', async () => {
+    const ctx = await request.newContext({ baseURL: API })
     const gm = await userOf('gm001')
     try {
-      await openProfile(page, 'gm001', PORTAL.gm)
-      await page.getByRole('button', { name: 'Reset Password' }).click()
-      await page.getByRole('button', { name: 'Email Me A Code' }).click()
-      await plantCode('gm001')
-      // Typed one digit at a time: the cursor moves box to box, the 6th sends it.
-      await page.getByRole('textbox', { name: 'Code digit 1 of 6' }).click()
-      await page.keyboard.type('000000', { delay: 40 })
-      await expect(page.getByText(/Incorrect code\. 4 attempts left/)).toBeVisible()
-      // Boxes emptied and the first one ready for the next try.
-      await expect(page.getByRole('textbox', { name: 'Code digit 1 of 6' })).toHaveValue('')
-      await expect(page.getByRole('textbox', { name: 'Code digit 1 of 6' })).toBeFocused()
-      await expect(page).toHaveURL(/\/general_manager\/profile/)
+      // Within the minute: the live link is kept and nothing new is made.
+      const fresh = await plantLink('gm001', 10)
+      await ctx.post('auth/forgot-password', { data: { email: gm.email } })
+      expect(await statusOf(fresh.requestId)).toBe('sent')
+
+      // After the minute: the old link is cancelled and no longer opens.
+      const old = await plantLink('gm001', 90)
+      await ctx.post('auth/forgot-password', { data: { email: gm.email } })
+      expect(await statusOf(old.requestId)).toBe('cancelled')
+      const check = await ctx.post('auth/reset-password/verify', { data: { token: old.token } })
+      expect((await check.json()).data.valid).toBe(false)
     } finally {
+      await ctx.dispose()
       await closeRequests(gm.user_id)
     }
   })
@@ -154,7 +130,7 @@ test.describe('Profile: password', () => {
     await closeRequests(ops.user_id)
     try {
       await openProfile(page, 'ops001', PORTAL.ops)
-      await expect(page.getByRole('button', { name: 'Reset Password', exact: true })).toHaveCount(0)
+      await expect(page.getByRole('button', { name: 'Email Me A Reset Link' })).toHaveCount(0)
       await page.getByRole('button', { name: 'Request Password Reset' }).click()
       await page.getByRole('button', { name: 'Send Request' }).click()
       await expect(page.getByText(/Request sent\. The IT Administrator has been notified/)).toBeVisible()
@@ -168,21 +144,23 @@ test.describe('Profile: password', () => {
     }
   })
 
-  test('PROF-005 client sees Request Password Reset, not the code', async ({ page }) => {
+  test('PROF-005 client sees Request Password Reset, not the instant link', async ({ page }) => {
     await openProfile(page, 'client002', PORTAL.client)
     await expect(page.getByRole('button', { name: 'Request Password Reset' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Reset Password', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Email Me A Reset Link' })).toHaveCount(0)
   })
 
-  test('PROF-006 server refuses a reset code for a role that cannot self-reset', async () => {
-    const ops = await plantCode('ops001')
+  test('PROF-006 server never sends an instant link to a role that needs approval', async () => {
+    const ops = await userOf('ops001')
+    await closeRequests(ops.user_id)
     const ctx = await request.newContext({ baseURL: API })
     try {
-      const res = await ctx.post('auth/it-admin/verify-otp', { data: { email: ops.email, code: KNOWN_CODE } })
-      const body = await res.json()
-      expect(res.ok()).toBeFalsy()
-      expect(body.message).toMatch(/invalid or has expired/i)
-      expect(body.data?.token).toBeUndefined()
+      const res = await ctx.post('auth/forgot-password', { data: { email: ops.email } })
+      // The same reply a senior role gets, so it reveals nothing about the account.
+      expect((await res.json()).message).toMatch(/straight away for IT Administrator, Company Administrator and General Manager accounts/)
+      const { data } = await db.from('password_reset_requests')
+        .select('status, token_hash, sent_by').eq('user_id', ops.user_id).in('status', ['pending', 'sent'])
+      expect(data).toEqual([{ status: 'pending', token_hash: null, sent_by: null }])
     } finally {
       await ctx.dispose()
       await closeRequests(ops.user_id)
@@ -190,11 +168,30 @@ test.describe('Profile: password', () => {
   })
 })
 
-test('PROF-011 reset link token leaves the address bar and is never sent to other sites', async ({ page }) => {
-  const res = await page.goto('/reset-password?token=not-a-real-token')
-  expect(res?.headers()['referrer-policy']).toBe('no-referrer')
-  expect(res?.headers()['cache-control']).toContain('no-store')
-  await expect(page).toHaveURL(/\/reset-password$/)
+test('PROF-011 reset link: a refresh keeps working, nothing goes to other sites', async ({ page }) => {
+  const link = await plantLink('gm001')
+  try {
+    const consoleLines: string[] = []
+    page.on('console', (m) => consoleLines.push(m.text()))
+    const res = await page.goto(`/reset-password?token=${link.token}`)
+    expect(res?.headers()['referrer-policy']).toBe('no-referrer')
+    expect(res?.headers()['cache-control']).toContain('no-store')
+    await expect(page.getByRole('heading', { name: 'Set A New Password' })).toBeVisible({ timeout: 30_000 })
+    // The address is shown masked, never in full.
+    await expect(page.getByText(/Resetting the password for 83•+@gmail\.com/)).toBeVisible()
+
+    await page.reload()
+    await expect(page.getByRole('heading', { name: 'Set A New Password' })).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByPlaceholder('Create a strong password')).toBeVisible()
+
+    // Not copied into storage or the console.
+    const stored = await page.evaluate(() =>
+      JSON.stringify({ ...localStorage }) + JSON.stringify({ ...sessionStorage }) + document.cookie)
+    expect(stored).not.toContain(link.token)
+    expect(consoleLines.join(' ')).not.toContain(link.token)
+  } finally {
+    await closeRequests(link.userId)
+  }
 })
 
 test.describe('Profile: user guide', () => {
@@ -219,13 +216,13 @@ test.describe('Profile: user guide', () => {
 })
 
 test.describe('Profile: sign-in and layout', () => {
-  test('PROF-010 Forgot password offers the emailed code to all three senior roles', async ({ page }) => {
+  test('PROF-010 Forgot password: one Request Reset Link for everyone, no code option', async ({ page }) => {
     await startSignIn(page, 'client002')
     await page.getByRole('button', { name: /^Password/ }).click()
     await page.getByRole('button', { name: /Forgot password/i }).click()
-    await expect(page.getByRole('button', {
-      name: 'IT Administrator, Company Administrator or General Manager? Reset with an emailed code',
-    })).toBeVisible()
+    await expect(page.getByText(/Administrator, Company Administrator and General Manager accounts get it straight away/)).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Request Reset Link' })).toBeVisible()
+    await expect(page.getByRole('button', { name: /emailed code/i })).toHaveCount(0)
   })
 
   test('PROF-009 Profile fits 320, 375, tablet and desktop widths', async ({ page }, info) => {
@@ -235,11 +232,9 @@ test.describe('Profile: sign-in and layout', () => {
       await page.waitForTimeout(300)
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
       expect(overflow, `sideways scroll at ${width}px`).toBeLessThanOrEqual(0)
-      for (const name of ['Reset Password']) {
-        const box = await page.getByRole('button', { name, exact: true }).boundingBox()
-        expect(box && box.x >= 0 && box.x + box.width <= width, `${name} inside ${width}px`).toBeTruthy()
-      }
-      const guide = await page.getByRole('link', { name: /Open User Guide/ })
+      const box = await page.getByRole('button', { name: 'Email Me A Reset Link' }).boundingBox()
+      expect(box && box.x >= 0 && box.x + box.width <= width, `reset button inside ${width}px`).toBeTruthy()
+      const guide = page.getByRole('link', { name: /Open User Guide/ })
       await guide.scrollIntoViewIfNeeded()
       const gbox = await guide.boundingBox()
       expect(gbox && gbox.x >= 0 && gbox.x + gbox.width <= width, `guide link inside ${width}px`).toBeTruthy()

@@ -297,7 +297,8 @@ export async function changePassword(password: string): Promise<void> {
 }
 
 /**
- * Ask an administrator to send a reset link.
+ * Ask for a reset link: sent straight away to IT Administrator, Company
+ * Administrator and General Manager accounts, after approval for everyone else.
  *
  * Resolves the same way whether or not the address has an account — the API
  * answers neutrally on purpose, so the UI must not try to infer anything from it.
@@ -310,47 +311,6 @@ export async function requestPasswordReset(email: string): Promise<string> {
     { email }
   )
   return data.message
-}
-
-/**
- * The IT Admin's self-service reset: ask for a 6-digit code by email.
- *
- * Everyone else's reset goes through an admin queue. The IT Admin's cannot -
- * the queue they would be waiting on is the one they staff - so they prove
- * control of the registered mailbox with a code instead.
- *
- * Resolves the same way for an address that is not an IT Admin's as for one that
- * is, by design. The UI must not read anything into it.
- */
-export async function requestItAdminResetOtp(email: string): Promise<string> {
-  const { data } = await directApi.post<{ status: string; message: string }>(
-    '/auth/it-admin/forgot-password',
-    { email }
-  )
-  return data.message
-}
-
-export interface ResetOtpVerification {
-  token:      string
-  expires_at: string
-}
-
-/**
- * Trade a correct code for a one-time reset token.
- *
- * The token is the same one an emailed link would have carried, so the caller
- * carries on to /reset-password exactly as a link recipient does - the code never
- * travels alongside the new password.
- */
-export async function verifyItAdminResetOtp(
-  email: string,
-  code:  string,
-): Promise<ResetOtpVerification> {
-  const { data } = await directApi.post<{ status: string; data: ResetOtpVerification }>(
-    '/auth/it-admin/verify-otp',
-    { email, code }
-  )
-  return data.data
 }
 
 export interface ResetTokenStatus {

@@ -6,13 +6,12 @@ import { useRouter } from 'next/navigation'
 import { AxiosError } from 'axios'
 import {
   requestOtp, verifyOtp, loginWithPassword, getMe, getAuthStatus,
-  requestPasswordReset, requestItAdminResetOtp, verifyItAdminResetOtp, AuthUser,
+  requestPasswordReset, AuthUser,
 } from '@/lib/api/auth.api'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { ROLE_ROUTES } from '@/constants/roles'
 import { now } from '@/app/utils/serverTime'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
-import { handOffResetToken } from '@/lib/auth/reset-handoff'
 
 const OTP_LENGTH  = 6
 const RESEND_SECS = 60
@@ -270,7 +269,7 @@ function PermanentLockScreen({
           Your account has been permanently locked due to too many failed login attempts.
         </span>
         <span>
-          {`Request a password reset and your ${approverLabel(role)} will send you a link to set a new password. That also unlocks your account.`}
+          {`Request a password reset to get a link that sets a new password: straight away for IT Administrator, Company Administrator and General Manager accounts, after your ${approverLabel(role)} approves it for everyone else. That also unlocks your account.`}
         </span>
       </div>
 
@@ -279,240 +278,6 @@ function PermanentLockScreen({
       </PrimaryButton>
 
       <BackButton onClick={onBack} label="Change email" />
-    </motion.div>
-  )
-}
-
-/**
- * The self-service reset: IT Administrator, and since 2026-11-23 also Company
- * Administrator and General Manager (canSelfResetByOtp on the server).
- *
- * Everyone else raises a request and waits for an admin to press Send. These
- * three prove control of the registered mailbox with a 6-digit code instead.
- *
- * Verifying the code does not set a password here. It hands back the same
- * one-time token an emailed link would have carried, and this screen forwards to
- * /reset-password with it, so the password is chosen on the one page that does
- * that job and by the one endpoint that finishes a reset.
- */
-function ItAdminOtpResetStep({
-  email,
-  onBack,
-}: {
-  email: string
-  onBack: () => void
-}) {
-  const router = useRouter()
-  const submitting = useRef(false)
-  const codeSentAt = useRef<number>(0)
-
-  const [stage,     setStage]     = useState<'intro' | 'code'>('intro')
-  const [code,      setCode]      = useState<string[]>(Array(OTP_LENGTH).fill(''))
-  const [sending,   setSending]   = useState(false)
-  const [verifying, setVerifying] = useState(false)
-  const [resendSec, setResendSec] = useState(0)
-  const [error,     setError]     = useState('')
-  const inputRefs = useRef<(HTMLInputElement | null)[]>([])
-
-  const joined = code.join('')
-
-  useEffect(() => {
-    if (resendSec <= 0) return
-    const interval = setInterval(() => {
-      setResendSec(Math.max(0, Math.ceil((codeSentAt.current + RESEND_SECS * 1000 - now()) / 1000)))
-    }, 500)
-    return () => clearInterval(interval)
-  }, [resendSec])
-
-  const focusInput = (idx: number) => inputRefs.current[idx]?.focus()
-
-  const handleSend = async () => {
-    if (sending) return
-    setSending(true); setError('')
-    try {
-      await requestItAdminResetOtp(email)
-      codeSentAt.current = now()
-      setResendSec(RESEND_SECS)
-      setCode(Array(OTP_LENGTH).fill(''))
-      setStage('code')
-      setTimeout(() => focusInput(0), 120)
-    } catch (err) {
-      setError(extractErrorMessage(err, 'Could not send a code. Please try again.'))
-    } finally {
-      setSending(false)
-    }
-  }
-
-  const handleChange = (idx: number, val: string) => {
-    const char = val.replace(/\D/g, '').slice(-1)
-    const next = [...code]; next[idx] = char; setCode(next); setError('')
-    if (char && idx < OTP_LENGTH - 1) focusInput(idx + 1)
-  }
-
-  const handleKeyDown = (idx: number, e: React.KeyboardEvent) => {
-    if (e.key === 'Backspace') {
-      if (code[idx]) { const n = [...code]; n[idx] = ''; setCode(n) }
-      else if (idx > 0) focusInput(idx - 1)
-    } else if (e.key === 'ArrowLeft'  && idx > 0)              focusInput(idx - 1)
-      else if (e.key === 'ArrowRight' && idx < OTP_LENGTH - 1) focusInput(idx + 1)
-  }
-
-  const handlePaste = (e: React.ClipboardEvent) => {
-    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, OTP_LENGTH)
-    if (!pasted) return
-    e.preventDefault()
-    const next = Array(OTP_LENGTH).fill('')
-    pasted.split('').forEach((c, i) => { next[i] = c })
-    setCode(next)
-    focusInput(Math.min(pasted.length, OTP_LENGTH - 1))
-  }
-
-  const handleVerify = useCallback(async () => {
-    if (submitting.current) return
-    if (joined.length !== OTP_LENGTH) return
-    submitting.current = true
-    setVerifying(true); setError('')
-    try {
-      const { token } = await verifyItAdminResetOtp(email, joined)
-      // Deliberately a navigation, not a third screen in this modal. The reset
-      // page already checks the token, enforces the password rules and reports a
-      // token that died on the way — duplicating that here would be a second
-      // implementation of the only step that actually changes a password.
-      // In memory, not in the address: see lib/auth/reset-handoff.
-      handOffResetToken(token)
-      router.push('/reset-password')
-    } catch (err) {
-      setError(extractErrorMessage(err, 'That code did not work. Please try again.'))
-      setCode(Array(OTP_LENGTH).fill(''))
-      focusInput(0)
-      submitting.current = false
-      setVerifying(false)
-    }
-    // On success the ref stays latched: the page is navigating away, and a second
-    // submission would spend a code that has already been traded for a token.
-  }, [email, joined, router])
-
-  useEffect(() => {
-    if (joined.length === OTP_LENGTH) handleVerify()
-  }, [joined, handleVerify])
-
-  return (
-    <motion.div
-      key="it-admin-reset"
-      initial={{ opacity: 0, x: 20 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -20 }}
-      transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
-      className="flex flex-col gap-6"
-    >
-      <div className="flex items-center gap-2 text-white/55">
-        <IconShield />
-        <span
-          className="text-[0.72rem] font-semibold tracking-[0.18em] uppercase"
-          style={{ fontFamily: "var(--font-league-spartan), 'League Spartan', sans-serif" }}
-        >
-          {stage === 'intro' ? 'Reset With A Code' : 'Enter Your Code'}
-        </span>
-      </div>
-
-      {stage === 'intro' ? (
-        <>
-          <p
-            className="text-[0.82rem] leading-relaxed text-white/50"
-            style={{ fontFamily: "var(--font-league-spartan), 'League Spartan', sans-serif" }}
-          >
-            IT Administrator, Company Administrator and General Manager accounts reset their own
-            password, without waiting on a request. We will email a 6-digit code to{' '}
-            <span className="text-[#4df9ed]/80">{email}</span>, and you set a new password
-            once it checks out.
-          </p>
-
-          <AnimatePresence>
-            {error && <ErrorMessage message={error} />}
-          </AnimatePresence>
-
-          <PrimaryButton loading={sending} onClick={handleSend}>
-            Email Me A Code
-          </PrimaryButton>
-
-          <BackButton onClick={onBack} label="Back" />
-        </>
-      ) : (
-        <>
-          <p
-            className="text-white/40 text-[0.8rem] leading-relaxed"
-            style={{ fontFamily: "var(--font-league-spartan), 'League Spartan', sans-serif" }}
-          >
-            6-digit code sent to{' '}
-            <span className="text-[#4df9ed]/70 break-all" style={{ fontFamily: 'monospace' }}>
-              {email}
-            </span>
-            . It expires in 10 minutes.
-          </p>
-
-          <div className="flex gap-2" onPaste={handlePaste}>
-            {code.map((digit, i) => (
-              <motion.input
-                key={i}
-                ref={el => { inputRefs.current[i] = el }}
-                type="text"
-                inputMode="numeric"
-                autoComplete={i === 0 ? 'one-time-code' : 'off'}
-                maxLength={1}
-                value={digit}
-                onChange={e => handleChange(i, e.target.value)}
-                onKeyDown={e => handleKeyDown(i, e)}
-                onFocus={e => e.target.select()}
-                disabled={verifying}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.04 }}
-                className={`flex-1 min-w-0 h-14 text-center text-xl font-bold outline-none
-                  rounded-2xl transition-all duration-200
-                  disabled:opacity-40 disabled:cursor-not-allowed
-                  ${error ? 'shake' : ''}`}
-                style={{
-                  background: digit ? 'rgba(77,249,237,0.08)' : 'rgba(255,255,255,0.08)',
-                  border: digit
-                    ? '1px solid rgba(77,249,237,0.4)'
-                    : '1px solid rgba(255,255,255,0.13)',
-                  backdropFilter: 'blur(12px)',
-                  WebkitBackdropFilter: 'blur(12px)',
-                  color: digit ? '#4df9ed' : '#fff',
-                  fontFamily: 'monospace',
-                }}
-              />
-            ))}
-          </div>
-
-          <AnimatePresence>
-            {error && <ErrorMessage message={error} />}
-          </AnimatePresence>
-
-          <PrimaryButton
-            loading={verifying}
-            disabled={joined.length !== OTP_LENGTH}
-            onClick={handleVerify}
-          >
-            Verify & Set New Password
-          </PrimaryButton>
-
-          <div className="flex items-center justify-between">
-            <BackButton onClick={onBack} label="Back" />
-
-            <button
-              onClick={handleSend}
-              disabled={resendSec > 0 || sending || verifying}
-              className="text-[0.78rem] bg-transparent border-none cursor-pointer transition-colors
-                disabled:text-white/25 disabled:cursor-not-allowed
-                enabled:text-[#4df9ed]/70 enabled:hover:text-[#4df9ed]"
-              style={{ fontFamily: "var(--font-league-spartan), 'League Spartan', sans-serif" }}
-            >
-              {sending ? 'Sending…' : resendSec > 0 ? `Resend in ${resendSec}s` : 'Resend code'}
-            </button>
-          </div>
-        </>
-      )}
     </motion.div>
   )
 }
@@ -528,17 +293,10 @@ function ForgotPasswordStep({
   email,
   role,
   onBack,
-  onItAdminReset,
 }: {
   email: string
   role?: string | null
   onBack: () => void
-  /**
-   * The IT Administrator's self-reset by emailed code. Offered to everyone:
-   * the sign-in screen no longer learns anyone's role before sign-in (security
-   * review 2026-11-19), and the code endpoint answers the same for any address.
-   */
-  onItAdminReset?: () => void
 }) {
   const [loading, setLoading] = useState(false)
   const [sent,    setSent]    = useState(false)
@@ -588,8 +346,9 @@ function ForgotPasswordStep({
             }}
           >
             <span>
-              If <span className="text-[#4df9ed]/80">{email}</span> has an account, your{' '}
-              {approverLabel(role)} has been notified and will email you a reset link.
+              If <span className="text-[#4df9ed]/80">{email}</span> has an account, a reset link is on its way:
+              straight away for IT Administrator, Company Administrator and General Manager accounts, after
+              your {approverLabel(role)} approves it for everyone else.
             </span>
             <span className="text-white/40 text-[0.76rem]">
               The link works once and expires 5 minutes after it is sent, so open it soon. You can close this window —
@@ -612,10 +371,9 @@ function ForgotPasswordStep({
             className="text-[0.82rem] leading-relaxed text-white/50"
             style={{ fontFamily: "var(--font-league-spartan), 'League Spartan', sans-serif" }}
           >
-            Password resets go through an Administrator. We will let your{' '}
-            <span className="text-white/75">{approverLabel(role)}</span> know that{' '}
-            <span className="text-[#4df9ed]/80">{email}</span> needs a reset, and they will send a
-            one-time link to that address.
+            We will email a one-time link to <span className="text-[#4df9ed]/80">{email}</span>. IT
+            Administrator, Company Administrator and General Manager accounts get it straight away;
+            everyone else once the <span className="text-white/75">{approverLabel(role)}</span> approves it.
           </p>
 
           <AnimatePresence>
@@ -625,17 +383,6 @@ function ForgotPasswordStep({
           <PrimaryButton loading={loading} onClick={handleRequest}>
             Request Reset Link
           </PrimaryButton>
-
-          {onItAdminReset && (
-            <button
-              type="button"
-              onClick={onItAdminReset}
-              className="-mt-2 self-center bg-transparent border-none cursor-pointer p-0 text-[0.75rem] underline underline-offset-2 text-white/40"
-              style={{ fontFamily: "var(--font-league-spartan), 'League Spartan', sans-serif" }}
-            >
-              IT Administrator, Company Administrator or General Manager? Reset with an emailed code
-            </button>
-          )}
 
           <BackButton onClick={onBack} label="Back" />
         </>
@@ -1523,11 +1270,6 @@ export default function SignInModal({ isOpen, onClose, notice }: SignInModalProp
   const [step,   setStep]   = useState<Step>('email')
   const [email,  setEmail]  = useState('')
   const [method, setMethod] = useState<'otp' | 'password' | null>(null)
-  // Only used to name the right approver ("your Company Admin" vs "your IT Admin")
-  // on the reset screens. Best effort — the copy falls back to "administrator".
-  // Which reset screen 'forgot' shows. Chosen by the person, never looked up:
-  // /auth/status no longer says what role an email has.
-  const [itAdminReset, setItAdminReset] = useState(false)
   const resendExpiresAt     = useRef<number>(0)
   const redirectTimer       = useRef<ReturnType<typeof setTimeout> | null>(null)
   const router              = useRouter()
@@ -1551,7 +1293,6 @@ export default function SignInModal({ isOpen, onClose, notice }: SignInModalProp
 
   const handleEmailSuccess = (e: string) => {
     setEmail(e)
-    setItAdminReset(false)
     setStep('method')
   }
 
@@ -1715,20 +1456,11 @@ export default function SignInModal({ isOpen, onClose, notice }: SignInModalProp
                     />
                   )}
                   {step === 'forgot' && (
-                    itAdminReset ? (
-                      <ItAdminOtpResetStep
-                        key="forgot-otp"
-                        email={email}
-                        onBack={() => setItAdminReset(false)}
-                      />
-                    ) : (
-                      <ForgotPasswordStep
-                        key="forgot"
-                        email={email}
-                        onBack={() => setStep(method === 'password' ? 'password' : 'otp')}
-                        onItAdminReset={() => setItAdminReset(true)}
-                      />
-                    )
+                    <ForgotPasswordStep
+                      key="forgot"
+                      email={email}
+                      onBack={() => setStep(method === 'password' ? 'password' : 'otp')}
+                    />
                   )}
                   {step === 'otp' && (
                     <OtpStep
@@ -1737,7 +1469,7 @@ export default function SignInModal({ isOpen, onClose, notice }: SignInModalProp
                       resendExpiresAt={resendExpiresAt}
                       onSuccess={handleAuthSuccess}
                       onBack={() => setStep('method')}
-                      onRequestReset={() => { setItAdminReset(false); setStep('forgot') }}
+                      onRequestReset={() => setStep('forgot')}
                     />
                   )}
                   {step === 'password' && (
@@ -1746,7 +1478,7 @@ export default function SignInModal({ isOpen, onClose, notice }: SignInModalProp
                       email={email}
                       onSuccess={handleAuthSuccess}
                       onBack={() => setStep('method')}
-                      onRequestReset={() => { setItAdminReset(false); setStep('forgot') }}
+                      onRequestReset={() => setStep('forgot')}
                     />
                   )}
                   {step === 'success' && (
