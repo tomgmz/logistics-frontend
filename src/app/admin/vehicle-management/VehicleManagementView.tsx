@@ -1120,7 +1120,8 @@ export default function VehicleManagementView({ archive }: {
                       const modelLabel = t.truck_model?.name ?? 'Vehicle'
                       const thumbUrl   = resolveModelImageUrl((t.truck_model?.image_url as string | null | undefined) ?? null)
                       return (
-                        <Tip label={archive ? 'View details' : 'Open in the Maintenance tab'} key={t.truck_id}><tr
+                        <tr
+                          key={t.truck_id}
                           role="button"
                           tabIndex={0}
                           onClick={() => (archive ? setViewTruck(t) : openInMaintenance(t))}
@@ -1208,7 +1209,7 @@ export default function VehicleManagementView({ archive }: {
                               <ChevronRight size={18} className="text-[#818181]" aria-hidden />
                             </div>
                           </td>
-                        </tr></Tip>
+                        </tr>
                       )
                     })}
                   </tbody>
