@@ -283,11 +283,11 @@ function PermanentLockScreen({
 }
 
 /**
- * The IT Admin's self-service reset.
+ * The self-service reset: IT Administrator, and since 2026-11-23 also Company
+ * Administrator and General Manager (canSelfResetByOtp on the server).
  *
- * Everyone else raises a request and waits for an admin to press Send. The IT
- * Admin cannot, because the queue they would be waiting on is the one they staff
- * — so they prove control of the registered mailbox with a 6-digit code.
+ * Everyone else raises a request and waits for an admin to press Send. These
+ * three prove control of the registered mailbox with a 6-digit code instead.
  *
  * Verifying the code does not set a password here. It hands back the same
  * one-time token an emailed link would have carried, and this screen forwards to
@@ -408,7 +408,7 @@ function ItAdminOtpResetStep({
           className="text-[0.72rem] font-semibold tracking-[0.18em] uppercase"
           style={{ fontFamily: "var(--font-league-spartan), 'League Spartan', sans-serif" }}
         >
-          {stage === 'intro' ? 'IT Administrator Reset' : 'Enter Your Code'}
+          {stage === 'intro' ? 'Reset With A Code' : 'Enter Your Code'}
         </span>
       </div>
 
@@ -418,8 +418,8 @@ function ItAdminOtpResetStep({
             className="text-[0.82rem] leading-relaxed text-white/50"
             style={{ fontFamily: "var(--font-league-spartan), 'League Spartan', sans-serif" }}
           >
-            As IT Administrator you reset your own password — there is no queue above you to
-            approve it. We will email a 6-digit code to{' '}
+            IT Administrator, Company Administrator and General Manager accounts reset their own
+            password, without waiting on a request. We will email a 6-digit code to{' '}
             <span className="text-[#4df9ed]/80">{email}</span>, and you set a new password
             once it checks out.
           </p>
@@ -630,7 +630,7 @@ function ForgotPasswordStep({
               className="-mt-2 self-center bg-transparent border-none cursor-pointer p-0 text-[0.75rem] underline underline-offset-2 text-white/40"
               style={{ fontFamily: "var(--font-league-spartan), 'League Spartan', sans-serif" }}
             >
-              IT Administrator? Reset with an emailed code
+              IT Administrator, Company Administrator or General Manager? Reset with an emailed code
             </button>
           )}
 

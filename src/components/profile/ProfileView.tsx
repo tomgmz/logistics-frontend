@@ -8,12 +8,15 @@ import { formatContractDay } from '@/lib/contract-status'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { cachedFetch } from '@/lib/query/useApiQuery'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
+import { PasswordCard, UserGuideCard } from './ProfileActions'
 
 /**
  * The Profile page (2026-11-07), opened from the user card in the sidebar.
  * Shows the account's own details (changed by whoever manages the account, not
- * here). Read-only: no password change (it goes through the Company
- * Administrator) and no device sign-out (user, 2026-11-07).
+ * here). No device sign-out (user, 2026-11-07). Since 2026-11-23 it also has
+ * the user guide (PDF, new tab) and a password reset: an emailed code for the
+ * IT Administrator, Company Administrator and General Manager, a request to the
+ * IT Administrator for everyone else (ProfileActions.tsx).
  */
 
 const CARD = 'rounded-[10px] border-[0.5px] border-[#424242] bg-[#141414]'
@@ -87,6 +90,8 @@ export default function ProfileView() {
             {/* A client also sees their company's contract, as one more card
                 under their details (no tabs, user 2026-11-07). */}
             {profile.role === 'client' && <ContractCard profile={profile} />}
+            <PasswordCard profile={profile} />
+            <UserGuideCard />
           </>
         )}
       </div>

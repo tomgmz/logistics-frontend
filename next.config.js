@@ -4,6 +4,11 @@ const nextConfig = {
   // TEST Supabase project baked in, so the normal .next build is never
   // overwritten by one that points elsewhere.
   distDir: process.env.NEXT_DIST_DIR || '.next',
+  // The user guide PDF is read from disk by src/app/user-guide/route.ts (it is
+  // kept out of /public so only signed-in people can open it).
+  outputFileTracingIncludes: {
+    '/user-guide': ['./private/user-guide.pdf'],
+  },
   images: {
     remotePatterns: [
       {
