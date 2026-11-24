@@ -20,7 +20,7 @@ export const BOOKING_STATUS_FILTERS = [
   { value: 'delivered',  label: 'Delivered' },
   { value: 'completed',  label: 'Completed' },
   { value: 'failed',     label: 'Failed' },
-  { value: 'cancelled',  label: 'Cancelled' },
+  { value: 'cancelled',  label: 'Rejected' },
 ] as const
 
 export type StatusFilter = (typeof BOOKING_STATUS_FILTERS)[number]['value']

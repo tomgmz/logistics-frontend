@@ -4,46 +4,11 @@ import { motion } from 'framer-motion'
 import CheckCircleIcon  from '@mui/icons-material/CheckCircle'
 import PlaceIcon        from '@mui/icons-material/Place'
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'
-import { bookingStatusColor } from '@/lib/palette'
-import ProblemReportedBadge from '@/components/transactions/ProblemReportedBadge'
-import PartlyFailedBadge, { isPartlyFailed } from '@/components/transactions/PartlyFailedBadge'
 
 export type BookingStatus =
   | 'PENDING' | 'ASSIGNED' | 'IN_TRANSIT' | 'IN TRANSIT'
   | 'COMPLETED' | 'CANCELLED' | 'BOOKED'
   | string
-
-const STATUS_LABEL: Record<string, string> = {
-  PENDING: 'Pending', BOOKED: 'Booked', APPROVED: 'Approved', ASSIGNED: 'Assigned',
-  IN_TRANSIT: 'In Transit', 'IN TRANSIT': 'In Transit', ARRIVED: 'Arrived',
-  DELIVERED: 'Delivered', COMPLETED: 'Completed', FAILED: 'Failed', CANCELLED: 'Cancelled',
-}
-
-const STATUS_MAP: Record<string, { label: string; color: string; bg: string; border: string }> =
-  Object.fromEntries(Object.entries(STATUS_LABEL).map(([key, label]) => {
-    const color = bookingStatusColor(key)
-    return [key, { label, color, bg: `${color}1f`, border: `${color}4d` }]
-  }))
-
-export function StatusBadge({ status, problem = false, booking }: { status: string; problem?: boolean; booking?: Record<string, unknown> | null }) {
-  const key = status.toUpperCase().replace(/-/g, '_')
-  const cfg = STATUS_MAP[key] ?? STATUS_MAP.PENDING
-
-  // An open client problem is a substatus under Delivered, not a status of its own.
-  return (
-    <span className="inline-flex flex-col items-end">
-      <span
-        className="inline-flex items-center gap-1.5 text-[10px] font-bold tracking-widest px-2.5 py-1 rounded-full border whitespace-nowrap"
-        style={{ color: cfg.color, background: cfg.bg, borderColor: cfg.border }}
-      >
-        <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: cfg.color }} />
-        {cfg.label.toUpperCase()}
-      </span>
-      {problem && key === 'DELIVERED' && <ProblemReportedBadge />}
-      {booking && isPartlyFailed(booking) && <PartlyFailedBadge booking={booking} />}
-    </span>
-  )
-}
 
 export function RouteStop({
   sequenceNumber,

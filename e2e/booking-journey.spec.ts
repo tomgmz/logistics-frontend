@@ -151,7 +151,7 @@ test('Driver delivers through the driver API (pickup, drop-off, return to yard)'
   const stops = trip.booking_trip_stops ?? trip.stops ?? []
   expect(stops.length, 'the trip serves the drop-off').toBeGreaterThan(0)
 
-  // Pickup: arrive, start loading, confirm with the proof-of-loading photo.
+  // Pickup: arrive, start loading, confirm with the proof of pickup photo.
   await driver.post(`driver/bookings/${bookingId}/milestones`, { stage: 'arrived', trip_id: trip.trip_id, ...at(PLACES.pickup) })
   await driver.post(`driver/bookings/${bookingId}/milestones`, { stage: 'started', trip_id: trip.trip_id, ...at(PLACES.pickup) })
   const loading = await driver.upload('driver/proof-photo', 'image', 'proof.jpg', 'image/jpeg')

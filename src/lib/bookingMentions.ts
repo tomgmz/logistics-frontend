@@ -62,8 +62,9 @@ export function insertMention(text: string, start: number, caret: number, ref: s
   return { text: next, caret: start + insert.length }
 }
 
-/** "in_transit" → "In Transit". */
+/** "in_transit" → "In Transit"; a cancelled booking reads "Rejected" (user 2026-11-24). */
 export function bookingStatusLabel(status: string): string {
+  if (status === 'cancelled') return 'Rejected'
   return status.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
 }
 

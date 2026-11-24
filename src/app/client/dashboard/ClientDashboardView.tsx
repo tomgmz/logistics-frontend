@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import {
-  AlertCircle, Truck, Clock, CheckCircle2, MapPin, Plus, ChevronRight, XCircle, OctagonX,
+  AlertCircle, Truck, Clock, CheckCircle2, MapPin, Plus, ChevronRight, XCircle,
 } from 'lucide-react'
 
 import { bookingService } from '@/lib/services/client/booking.service'
@@ -11,9 +11,9 @@ import { useAuthStore } from '@/lib/store/auth.store'
 import type { BookingWithRelations, BookingDestination } from '@/lib/types/booking-relations'
 import { type BookingStatus, asBookingStatus } from '@/app/types/maps/routemap.types'
 import { bookingRef } from '@/lib/booking'
-import { bookingStatusColor } from '@/lib/palette'
-import ProblemReportedBadge, { hasOpenClientIssue } from '@/components/transactions/ProblemReportedBadge'
-import PartlyFailedBadge, { isPartlyFailed } from '@/components/transactions/PartlyFailedBadge'
+import { PALETTE } from '@/lib/palette'
+import BookingStatusTag from '@/components/transactions/BookingStatusTag'
+import { hasOpenClientIssue } from '@/components/transactions/ProblemReportedBadge'
 import { isAwaitingResubmit } from '@/lib/booking-resubmit'
 import { useBookingClosed } from '@/lib/contract-status'
 import RejectionPanel from '@/components/transactions/RejectionPanel'
@@ -48,26 +48,6 @@ const ACTIVE_STATUSES: BookingStatus[] = ['APPROVED', 'ASSIGNED', 'IN_TRANSIT', 
 
 // Delivered first: it is the one waiting on the client's confirmation.
 const ACTIVE_SORT: Record<string, number> = { DELIVERED: -1, IN_TRANSIT: 0, ASSIGNED: 1, APPROVED: 2 }
-
-const STATUS_META: Record<BookingStatus, { label: string; color: string; icon: React.ReactNode }> = {
-  BOOKED:     { label: 'Booked',     color: bookingStatusColor('BOOKED'),  icon: <CheckCircle2 size={11} /> },
-  PENDING:    { label: 'Pending',    color: bookingStatusColor('PENDING'), icon: <Clock        size={11} /> },
-  APPROVED:   { label: 'Approved',   color: bookingStatusColor('APPROVED'),  icon: <CheckCircle2 size={11} /> },
-  ASSIGNED:   { label: 'Assigned',   color: bookingStatusColor('ASSIGNED'),  icon: <Truck        size={11} /> },
-  IN_TRANSIT: { label: 'In Transit', color: bookingStatusColor('IN_TRANSIT'), icon: <Truck        size={11} /> },
-  ARRIVED:    { label: 'Arrived',    color: bookingStatusColor('ARRIVED'), icon: <MapPin       size={11} /> },
-  DELIVERED:  { label: 'Delivered — Please Confirm', color: bookingStatusColor('DELIVERED'), icon: <CheckCircle2 size={11} /> },
-  COMPLETED:  { label: 'Completed',  color: bookingStatusColor('COMPLETED'),  icon: <CheckCircle2 size={11} /> },
-  FAILED:     { label: 'Failed',     color: bookingStatusColor('FAILED'), icon: <OctagonX     size={11} /> },
-  CANCELLED:  { label: 'Cancelled',  color: bookingStatusColor('CANCELLED'), icon: <XCircle      size={11} /> },
-}
-
-const UNKNOWN_META = { label: 'Unknown', color: MUTED, icon: <AlertCircle size={11} /> }
-
-function statusMeta(status: string) {
-  const normalized = asBookingStatus(status)
-  return normalized !== 'UNKNOWN' ? STATUS_META[normalized] : UNKNOWN_META
-}
 
 // ── helpers ────────────────────────────────────────────────────────────────
 // Same shapes BookingHistoryModule reads. BookingWithRelations carries an index
@@ -124,25 +104,6 @@ function phToday(): string {
 
 // ── presentational ─────────────────────────────────────────────────────────
 
-function StatusBadge({ status, problem = false, booking }: { status: string; problem?: boolean; booking?: Record<string, unknown> }) {
-  // With a reported problem the status reads plain "Delivered" (not "please
-  // confirm": the client already answered) and the problem is a substatus under it.
-  const base = statusMeta(status)
-  const m = problem ? { ...base, label: 'Delivered' } : base
-  return (
-    <span className="inline-flex flex-col items-start">
-      <span
-        className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-sm whitespace-nowrap"
-        style={{ color: m.color, background: `${m.color}1f`, border: `1px solid ${m.color}` }}
-      >
-        {m.icon}{m.label}
-      </span>
-      {problem && <ProblemReportedBadge />}
-      {booking && isPartlyFailed(booking) && <PartlyFailedBadge booking={booking} />}
-    </span>
-  )
-}
-
 /** CardLink's shape in cyan with a plus, for starting a booking. */
 function NewBookingLink() {
   // Contract ended: no new bookings (the banner says why).
@@ -179,7 +140,15 @@ function ActiveShipmentRow({ booking }: { booking: BookingWithRelations }) {
           {bookingRef(booking)}
         </Link>
       </td>
-      <td><StatusBadge status={booking.status} problem={hasOpenClientIssue(booking as unknown as Record<string, unknown>)} booking={booking as unknown as Record<string, unknown>} /></td>
+      <td>
+        <BookingStatusTag
+          booking={booking as unknown as Record<string, unknown>}
+          // Delivered waits on the client: say so unless they already reported a problem.
+          extra={asBookingStatus(booking.status) === 'DELIVERED' && !hasOpenClientIssue(booking as unknown as Record<string, unknown>)
+            ? [{ key: 'confirm', label: 'Please Confirm', color: PALETTE.yellow, hint: 'The driver finished. Confirm the delivery, or report a problem.' }]
+            : []}
+        />
+      </td>
       <td className="whitespace-nowrap">
         {formatDate(booking.schedule_date)}
         {typeof booking.call_time === 'string' && <span style={{ color: MUTED }}> · {booking.call_time}</span>}

@@ -33,7 +33,7 @@ const STATUS_LABEL: Record<string, string> = {
   delivered:  'Delivered, awaiting client',
   completed:  'Completed',
   failed:     'Failed, nothing delivered',
-  cancelled:  'Cancelled',
+  cancelled:  'Rejected',
 }
 const STATUS_ORDER = ['pending', 'approved', 'assigned', 'in_transit', 'delivered', 'completed', 'failed', 'cancelled']
 

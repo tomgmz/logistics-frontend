@@ -22,11 +22,9 @@ import { appToast } from '@/lib/toast'
 import StaffTransactionDetail from '@/components/transactions/StaffTransactionDetail'
 import TransactionRecord from '@/components/transactions/TransactionRecord'
 import { getStatusMeta } from '@/components/transactions/TransactionStatus'
-import { PANEL_BG, Tag } from '@/app/admin/booking-management/BookingDetailParts'
-import ProblemReportedBadge, { hasOpenClientIssue } from '@/components/transactions/ProblemReportedBadge'
-import PartlyFailedBadge, { isPartlyFailed } from '@/components/transactions/PartlyFailedBadge'
-import ResubmittedBadge, { resubmissionsOf } from '@/components/transactions/ResubmittedBadge'
-import DelayedBadge from '@/components/transactions/DelayedBadge'
+import { PANEL_BG } from '@/app/admin/booking-management/BookingDetailParts'
+import { resubmissionsOf } from '@/components/transactions/ResubmittedBadge'
+import BookingStatusTag from '@/components/transactions/BookingStatusTag'
 import ResubmissionChanges from '@/components/transactions/ResubmissionChanges'
 import {
   formatDate, getCompanyName, getDropoffs,
@@ -83,7 +81,8 @@ const TABS: { key: string; label: string }[] = [
   { key: 'partly_failed', label: 'Partly Failed' },
   // No drop-off delivered (stolen truck, accident…): final.
   { key: 'failed',     label: 'Failed' },
-  { key: 'cancelled',  label: 'Cancelled' },
+  // Stored as cancelled; shown as Rejected (user 2026-11-24).
+  { key: 'cancelled',  label: 'Rejected' },
 ]
 
 const DATE_BASES: { key: DateBasis; label: string }[] = [
@@ -397,7 +396,6 @@ export default function TransactionHistoryView() {
                         const drops  = getDropoffs(b)
                         const route  = [b.origin as string | undefined, drops[0]]
                           .filter(Boolean).join(' → ')
-                        const meta   = getStatusMeta(b.status)
                         return (
                           <tr key={id} role="button" tabIndex={0}
                             onClick={() => setSelected(b)}
@@ -428,16 +426,7 @@ export default function TransactionHistoryView() {
                               </TruncatedText>
                             </td>
                             <td>
-                              {/* Untitled UI's pill with a dot, in the status colour. */}
-                              <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset"
-                                style={{ color: meta.color, background: `${meta.color}1a`, ['--tw-ring-color' as string]: `${meta.color}4d` }}>
-                                <span aria-hidden className="size-1.5 rounded-full" style={{ background: meta.color }} />
-                                {meta.label}
-                              </span>
-                              {hasOpenClientIssue(b) && <ProblemReportedBadge note={b.client_issue_note as string | null | undefined} />}
-                              {isPartlyFailed(b) && <PartlyFailedBadge booking={b} />}
-                              <ResubmittedBadge count={resubmissionsOf(b)} />
-                              <DelayedBadge booking={b} />
+                              <BookingStatusTag booking={b} staff />
                             </td>
                           </tr>
                         )
@@ -487,17 +476,7 @@ export default function TransactionHistoryView() {
                                 min-h-[59px] border-b border-[#424242]">
                   <span className="text-base font-bold uppercase text-[#818181]">Transaction</span>
                   <div className="flex items-center gap-1.5 min-w-0">
-                    <ResubmittedBadge className="" count={resubmissionsOf(selected)} />
-                    <DelayedBadge className="" booking={selected} />
-                    <span className="inline-flex flex-col items-start">
-                      <Tag color={getStatusMeta(selected.status).color} size="md">
-                        {getStatusMeta(selected.status).label}
-                      </Tag>
-                      {hasOpenClientIssue(selected) && (
-                        <ProblemReportedBadge note={selected.client_issue_note as string | null | undefined} />
-                      )}
-                      {isPartlyFailed(selected) && <PartlyFailedBadge booking={selected} />}
-                    </span>
+                    <BookingStatusTag booking={selected} staff size="md" />
                     <button type="button" onClick={() => setSelected(null)} aria-label="Close"
                       className="p-2 rounded-lg hover:bg-white/5 text-[#818181] hover:text-white transition-colors cursor-pointer">
                       <X size={19} strokeWidth={2} />

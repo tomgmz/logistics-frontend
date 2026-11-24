@@ -66,7 +66,7 @@ function InfoTile({ label, value, accent, mono }: {
   )
 }
 
-/** Sub-heading inside a card ("Driver", "Vehicle", "Proof of Loading"). */
+/** Sub-heading inside a card ("Driver", "Vehicle", "Proof of Pickup"). */
 function SubLabel({ icon, children, divided }: { icon?: React.ReactNode; children: React.ReactNode; divided?: boolean }) {
   return (
     <div className={`flex items-center gap-1.5 text-xs font-bold uppercase text-[#818181] ${
@@ -221,7 +221,7 @@ function TripsSection({ trips, booking }: { trips: RecordTrip[]; booking: Bookin
                 distance={booking.pickup_proof_distance_m as number | null}
                 override={booking.pickup_proof_override_reason as string | null} />
             </div>
-          ) : <NoPhoto label="No proof of loading on file." />}
+          ) : <NoPhoto label="No proof of pickup on file." />}
         </Card>
         {dests.map((d, i) => (
           <Card key={d.destination_id}>
@@ -249,14 +249,14 @@ function TripsSection({ trips, booking }: { trips: RecordTrip[]; booking: Bookin
           </div>
           {trip.notes && <p className="text-xs text-white/60">{trip.notes}</p>}
 
-          <SubLabel>Proof of Loading</SubLabel>
+          <SubLabel>Proof of Pickup</SubLabel>
           {trip.pickup_proof_photo_url ? (
             <div className="flex gap-3">
               <Photo url={trip.pickup_proof_photo_url} />
               <ProofMeta at={trip.pickup_proof_at} distance={trip.pickup_proof_distance_m}
                 override={trip.pickup_proof_override_reason} />
             </div>
-          ) : <NoPhoto label="No proof of loading on file." />}
+          ) : <NoPhoto label="No proof of pickup on file." />}
 
           {trip.booking_trip_stops.map((stop) => (
             <div key={stop.trip_stop_id} className="flex flex-col gap-1.5 pt-2.5 border-t-[0.5px] border-[#818181]">

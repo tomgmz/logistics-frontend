@@ -23,18 +23,15 @@ import { useAuthStore }    from '@/lib/store/auth.store'
 import type {
   BookingWithRelations,
 } from '@/lib/types/booking-relations'
-import { type BookingStatus, asBookingStatus } from '@/app/types/maps/routemap.types'
+import { type BookingStatus } from '@/app/types/maps/routemap.types'
 import { bookingRef } from '@/lib/booking'
 
 import TransactionDetail from '@/components/transactions/TransactionDetail'
 import RejectionPanel from '@/components/transactions/RejectionPanel'
 import CompletionPanel from '@/components/transactions/CompletionPanel'
 import BookingDocuments from '@/components/transactions/BookingDocuments'
-import { StatusBadge, getStatusMeta } from '@/components/transactions/TransactionStatus'
-import ProblemReportedBadge, { hasOpenClientIssue } from '@/components/transactions/ProblemReportedBadge'
-import PartlyFailedBadge, { isPartlyFailed } from '@/components/transactions/PartlyFailedBadge'
-import ResubmittedBadge, { resubmissionsOf } from '@/components/transactions/ResubmittedBadge'
-import DelayedBadge from '@/components/transactions/DelayedBadge'
+import { resubmissionsOf } from '@/components/transactions/ResubmittedBadge'
+import BookingStatusTag from '@/components/transactions/BookingStatusTag'
 import ResubmissionChanges from '@/components/transactions/ResubmissionChanges'
 import {
   formatDate, getDropoffs,
@@ -104,25 +101,6 @@ function SkeletonCard() {
   )
 }
 
-/** The status as the Figma tags it: coloured outline, tinted fill, no icon. */
-function StatusTag({ status, problem = false, booking }: { status: string; problem?: boolean; booking?: Record<string, unknown> }) {
-  const m = getStatusMeta(status)
-  // Delivered (awaiting the client's confirmation) is white in the Figma, not
-  // the green Completed uses. A reported problem is a substatus under it.
-  const delivered = asBookingStatus(status) === 'DELIVERED'
-  const color = delivered ? '#ffffff' : m.color
-  return (
-    <span className="inline-flex flex-col items-end">
-      <span className="ff-sc !text-xs sm:!text-sm leading-none px-1.5 py-1 rounded-[5px] border whitespace-nowrap"
-        style={{ color, borderColor: color, background: delivered ? 'rgba(255,255,255,0.2)' : `${color}1f` }}>
-        {m.label}
-      </span>
-      {problem && delivered && <ProblemReportedBadge />}
-      {booking && isPartlyFailed(booking) && <PartlyFailedBadge booking={booking} />}
-    </span>
-  )
-}
-
 /** "16 items  1600.0 KG  13.00 CBM" — whatever of it the booking has. */
 function cargoLine(booking: BookingWithRelations): string {
   const items  = (booking.booking_cargo_items as Array<{ quantity?: number | null }> | undefined) ?? []
@@ -160,10 +138,8 @@ function BookingCard({ booking, onSelect }: {
             <HistoryIcon name="calendar.svg" size={16} />
             <span className="truncate">Scheduled {formatDate(schedDate)}</span>
           </div>
-          <ResubmittedBadge className="" count={resubmissionsOf(booking)} />
-          <DelayedBadge className="" booking={booking} />
         </div>
-        <StatusTag status={booking.status} problem={hasOpenClientIssue(booking)} booking={booking} />
+        <BookingStatusTag booking={booking} align="end" />
       </div>
 
       <div className="flex flex-col gap-1.5">
@@ -311,9 +287,7 @@ export default function BookingHistoryModule() {
         </h1>
         {view === 'detail' && selected && (
           <div className="ml-auto flex items-center gap-2">
-            <ResubmittedBadge className="" count={resubmissionsOf(selected)} />
-            <DelayedBadge className="" booking={selected} />
-            <StatusBadge status={selected.status} problem={hasOpenClientIssue(selected)} partlyFailed={isPartlyFailed(selected)} booking={selected} />
+            <BookingStatusTag booking={selected} size="md" align="end" />
           </div>
         )}
       </div>

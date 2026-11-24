@@ -75,6 +75,8 @@ interface Props {
   /** The Booking Management tier allows it. Read Only sees the buttons disabled. */
   allowed?: boolean
   capacity?: TripCapacity | null
+  /** The driver call time was saved here (the progress step shows it too). */
+  onCallTimeSaved?: (time: string | null, date: string | null) => void
 }
 
 /** One cargo line as the planner works with it. */
@@ -142,7 +144,7 @@ function loadOf(lines: Line[], qty: (itemId: string) => number) {
   return { weightKg, volumeCbm }
 }
 
-export default function TripPlanner({ detail, canEdit, allowed = true, capacity }: Props) {
+export default function TripPlanner({ detail, canEdit, allowed = true, capacity, onCallTimeSaved }: Props) {
   const bookingId = detail.booking_id
 
   const [trips, setTrips]     = useState<Trip[]>([])
@@ -422,6 +424,7 @@ export default function TripPlanner({ detail, canEdit, allowed = true, capacity 
         canEdit={canEdit}
         allowed={allowed}
         editable={(detail.status ?? '').toLowerCase() === 'assigned'}
+        onSaved={onCallTimeSaved}
       />
 
       {loading ? (
@@ -706,14 +709,14 @@ export default function TripPlanner({ detail, canEdit, allowed = true, capacity 
                   {trip.pickup_proof_photo_url ? (
                     <FileViewButton
                       url={trip.pickup_proof_photo_url}
-                      name="Proof of loading"
+                      name="Proof of pickup"
                       className="inline-flex items-center gap-1.5 pt-2 text-xs text-[#818181] [@media(hover:hover)]:hover:text-white transition-colors"
                     >
-                      <Camera size={13} /> Proof of loading
+                      <Camera size={13} /> Proof of pickup
                       {trip.pickup_proof_at ? ` · ${fmtDayTime(trip.pickup_proof_at)}` : ''}
                     </FileViewButton>
                   ) : trip.status !== 'pending' ? (
-                    <p className="pt-2 text-xs text-[#818181]">No proof of loading on file.</p>
+                    <p className="pt-2 text-xs text-[#818181]">No proof of pickup on file.</p>
                   ) : null}
                 </li>
               )

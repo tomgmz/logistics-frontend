@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { tripService } from '@/lib/services/admin/trip.service'
 import { appToast } from '@/lib/toast'
@@ -15,9 +15,11 @@ import { FieldError, errorBorder } from '@/components/ui/FieldError'
  * The driver's call time: when operations wants the driver at the pickup point.
  *
  * Separate from the client's call time, which stays what the client booked.
- * Left empty, the driver follows the client's time. It is guidance, not a gate —
- * the driver can still start the delivery earlier — and the driver app reminds
- * the crew one hour before it. Editable until the delivery starts.
+ * Required after assignment (user 2026-11-24): it is a step of the booking's
+ * progress, and once saved it can't be cleared — "Same as Client's Time" saves
+ * the client's time as the value. Still guidance, not a gate: the driver can
+ * start without it or earlier, and the driver app reminds the crew one hour
+ * before it. Editable until the delivery starts.
  *
  * It has its own day (user 2026-11-17): the booking day or the day before, so a
  * 12:00 AM start can have a 10:00 PM call the night before. It can't be after
@@ -41,6 +43,10 @@ interface Props {
   allowed?:        boolean
   /** Only an assigned booking — once started a call time has nothing left to say. */
   editable:        boolean
+  /** Saved: the panel updates the booking (and the other copy of this card). */
+  onSaved?:        (time: string | null, date: string | null) => void
+  /** 'card' = the Trips box; 'step' = inside the progress step (no frame or title of its own). */
+  variant?:        'card' | 'step'
 }
 
 const HOURS   = Array.from({ length: 12 }, (_, i) => i + 1)
@@ -107,7 +113,10 @@ const selectClass =
   'rounded-lg border border-white/10 bg-[#1a1a1a] text-sm text-white px-2 py-2 outline-none ' +
   'focus:border-[var(--color-cyan)]/50 disabled:opacity-50'
 
-export default function DriverCallTime({ bookingId, clientCallTime, scheduleDate, driverCallTime, driverCallDate, canEdit, allowed = true, editable }: Props) {
+export default function DriverCallTime({
+  bookingId, clientCallTime, scheduleDate, driverCallTime, driverCallDate, canEdit, allowed = true, editable,
+  onSaved, variant = 'card',
+}: Props) {
   const scheduleDay = (scheduleDate ?? '').slice(0, 10)
   const dayBefore   = scheduleDay ? shiftDay(scheduleDay, -1) : ''
   const [saved, setSaved]       = useState<string | null>(driverCallTime ? driverCallTime.slice(0, 5) : null)
@@ -117,6 +126,17 @@ export default function DriverCallTime({ bookingId, clientCallTime, scheduleDate
   const [draft, setDraft]       = useState(() => split(saved ?? clientCallTime))
   const [draftDay, setDraftDay] = useState(savedDay ?? scheduleDay)
   const [showErrors, setShowErrors] = useState(false)
+
+  // The same call time shows in the progress step and in Trips: follow the
+  // booking when the other copy (or someone else) saves, unless mid-edit.
+  const propTime = driverCallTime ? driverCallTime.slice(0, 5) : null
+  const propDay  = driverCallTime ? (driverCallDate ?? scheduleDay) : null
+  useEffect(() => {
+    if (editing) return
+    setSaved(propTime)
+    setSavedDay(propDay)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [propTime, propDay])
 
   const canChange  = canEdit && editable
   const draftTime  = join(draft.hour, draft.minute, draft.pm)
@@ -130,17 +150,24 @@ export default function DriverCallTime({ bookingId, clientCallTime, scheduleDate
     setEditing(true)
   }
 
-  const save = async (value: string | null, day: string | null = null) => {
+  // The client's own start as the call: booking day + the client's time.
+  // Allowed (equal to the start is fine) unless it has already passed.
+  const clientClock  = clientCallTime ? clientCallTime.slice(0, 5) : null
+  const clientError  = clientClock && scheduleDay ? callError(scheduleDay, clientClock, scheduleDay, clientCallTime) : 'No client call time'
+  const sameAsClient = !!clientClock && saved === clientClock && savedDay === scheduleDay
+
+  const save = async (value: string, day: string) => {
     setSaving(true)
     try {
       const next = await tripService.setDriverCallTime(bookingId, value, day)
-      setSaved(next.time ? next.time.slice(0, 5) : null)
-      setSavedDay(next.time ? (next.date ?? scheduleDay) : null)
+      const time = next.time ? next.time.slice(0, 5) : null
+      const date = next.time ? (next.date ?? scheduleDay) : null
+      setSaved(time)
+      setSavedDay(date)
       setEditing(false)
+      onSaved?.(time, date)
       appToast.success(
-        next.time
-          ? `Driver call time set to ${formatDriverCall(next.time, next.date, scheduleDay)}. The driver is reminded 1 hour before.`
-          : 'Driver call time cleared. The driver follows the client\'s call time.',
+        `Driver call time set to ${formatDriverCall(next.time, next.date, scheduleDay)}. The driver is reminded 1 hour before.`,
         { action: 'driver-call-time', entityId: bookingId },
       )
     } catch (e) {
@@ -155,16 +182,19 @@ export default function DriverCallTime({ bookingId, clientCallTime, scheduleDate
   // Figma "Trips" (2026-11-14): the value in cyan when set, red "No call time
   // set" when the driver follows the client; the full-width teal button.
   const smallBtn = 'flex-1 min-w-[80px] min-h-[40px] py-2 rounded-[10px] border text-sm font-bold transition-colors disabled:opacity-40'
+  const isStep = variant === 'step'
   return (
-    <div className="rounded-[15px] border border-[#424242] bg-[#2a2828] px-3.5 sm:px-4 py-3 space-y-3">
-      <p className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-base font-bold">
-        <span className="text-white">Driver Call Time:</span>
-        {!editing && (
-          <span style={{ color: saved ? PALETTE.cyan : PALETTE.red }}>
-            {saved ? formatDriverCall(saved, savedDay, scheduleDay) : 'No call time set'}
-          </span>
-        )}
-      </p>
+    <div className={isStep ? 'space-y-3' : 'rounded-[15px] border border-[#424242] bg-[#2a2828] px-3.5 sm:px-4 py-3 space-y-3'}>
+      {!isStep && (
+        <p className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-base font-bold">
+          <span className="text-white">Driver Call Time:</span>
+          {!editing && (
+            <span style={{ color: saved ? PALETTE.cyan : PALETTE.red }}>
+              {saved ? formatDriverCall(saved, savedDay, scheduleDay) : 'Required, not set yet'}
+            </span>
+          )}
+        </p>
+      )}
 
       {editing && (
         <>
@@ -196,9 +226,9 @@ export default function DriverCallTime({ bookingId, clientCallTime, scheduleDate
             <button type="button" onClick={() => setEditing(false)} disabled={saving} className={smallBtn} style={GREY_BUTTON_STYLE}>
               Cancel
             </button>
-            {saved && (
-              <button type="button" onClick={() => void save(null)} disabled={saving} className={`${smallBtn} min-w-[120px]`} style={GREY_BUTTON_STYLE}>
-                Use Client&apos;s Time
+            {clientClock && !clientError && !sameAsClient && (
+              <button type="button" onClick={() => void save(clientClock, scheduleDay)} disabled={saving} className={`${smallBtn} min-w-[150px]`} style={GREY_BUTTON_STYLE}>
+                Same as Client&apos;s Time
               </button>
             )}
             <button type="button" onClick={() => { setShowErrors(true); if (!draftError) void save(draftTime, draftDay) }} disabled={saving}
@@ -209,17 +239,20 @@ export default function DriverCallTime({ bookingId, clientCallTime, scheduleDate
         </>
       )}
 
-      <p className="text-xs font-bold uppercase leading-snug text-[#818181]">
-        {saved
-          ? `Client's call time: ${formatCallClock(clientCallTime)} on the booking day. `
-          : `Not set, so the driver follows the client's call time (${formatCallClock(clientCallTime)}). `}
-        The driver is notified in the app 1 hour before and can still start the delivery early.
-      </p>
+      {/* Inside the progress step the step itself explains this. */}
+      {!isStep && (
+        <p className="text-xs font-bold uppercase leading-snug text-[#818181]">
+          {saved
+            ? `Client's call time: ${formatCallClock(clientCallTime)} on the booking day. `
+            : `Required. Until it is set the driver goes by the client's call time (${formatCallClock(clientCallTime)}). `}
+          The driver is notified in the app 1 hour before and can still start the delivery early.
+        </p>
+      )}
 
       {!editing && canChange && (
-        <button type="button" onClick={begin} {...writeAccess(allowed)}
+        <button type="button" onClick={begin} disabled={saving} {...writeAccess(allowed)}
           className={`${TEAL_BUTTON_CLASS} min-h-[40px] text-sm`} style={TEAL_BUTTON_STYLE}>
-          {saved ? 'Change' : 'Set Call Time'}
+          {saved ? 'Change' : 'Pick a Time'}
         </button>
       )}
     </div>

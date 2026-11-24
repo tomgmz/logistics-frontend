@@ -196,7 +196,7 @@ export const FAQ: FaqEntry[] = [
     question: 'Where can I see the proof of delivery?',
     answer:
       'Open the booking in Transaction History. It shows the photo taken at each drop-off (with time, place and ' +
-      'plate stamped on it), the loading photos, and the delivery documents our team has approved.',
+      'plate stamped on it), the proof of pickup photos, and the delivery documents our team has approved.',
     keywords: ['proof', 'pod', 'photo', 'picture', 'receipt', 'documents', 'delivery receipt', 'dr', 'signed', 'evidence'],
     link: { href: '/client/history', label: 'Open Transaction History' },
     category: 'documents',

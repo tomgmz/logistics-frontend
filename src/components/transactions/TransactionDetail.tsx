@@ -8,8 +8,8 @@ import {
 
 import type { BookingWithRelations } from '@/lib/types/booking-relations'
 import { bookingRef } from '@/lib/booking'
-import { StatusBadge, StatusTimeline } from './TransactionStatus'
-import { hasOpenClientIssue } from './ProblemReportedBadge'
+import { StatusTimeline } from './TransactionStatus'
+import BookingStatusTag from './BookingStatusTag'
 import {
   formatDate, formatDateTime, fileNameFromUrl,
   buildCargoSummary, getDropoffs,
@@ -121,7 +121,7 @@ export default function TransactionDetail({ booking, animated = true, showCrew =
               <span>Booked on {formatDateTime(createdAt)}</span>
             </div>
           </div>
-          <StatusBadge status={booking.status} problem={hasOpenClientIssue(booking as unknown as Record<string, unknown>)} />
+          <BookingStatusTag booking={booking as unknown as Record<string, unknown>} />
         </div>
 
         <div className="grid grid-cols-2 gap-3 pt-2 border-t" style={{ borderColor: BORDER }}>

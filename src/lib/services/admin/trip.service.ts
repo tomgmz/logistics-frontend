@@ -14,7 +14,7 @@ interface ApiResponse<T> {
  * second vehicle — it is the same truck shuttling: load at the origin, run to a
  * drop-off, come back empty, load again. Operations decides how many runs that
  * takes when it crews the booking, and the driver app works through them in
- * order, taking a fresh proof-of-loading photo at each one.
+ * order, taking a fresh proof of pickup photo at each one.
  */
 
 export type TripStatus     = 'pending' | 'in_transit' | 'completed' | 'cancelled'
@@ -59,7 +59,7 @@ export interface Trip {
   booking_id:  string
   trip_number: number
   status:      TripStatus
-  /** Proof of loading for THIS run. One photo per run, never one per booking. */
+  /** Proof of pickup for THIS run. One photo per run, never one per booking. */
   pickup_proof_photo_url: string | null
   pickup_proof_at:        string | null
   /** The planned estimate, chained run to run — see backend planned-eta.service.ts. */

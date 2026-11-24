@@ -3,8 +3,6 @@
 import {
   MapPin, Truck, Clock, Check, CheckCircle2, XCircle, AlertCircle, Loader2, PackageCheck, OctagonX,
 } from 'lucide-react'
-import ProblemReportedBadge from './ProblemReportedBadge'
-import PartlyFailedBadge from './PartlyFailedBadge'
 
 import { type BookingStatus, asBookingStatus } from '@/app/types/maps/routemap.types'
 import type { BookingWithRelations } from '@/lib/types/booking-relations'
@@ -36,7 +34,7 @@ export const STATUS_META: Record<
   DELIVERED:  { label: 'Delivered',  color: S.DELIVERED, bg: `${S.DELIVERED}18`, icon: <PackageCheck size={12} /> },
   COMPLETED:  { label: 'Completed',  color: S.COMPLETED, bg: `${S.COMPLETED}18`,  icon: <CheckCircle2 size={12} /> },
   FAILED:     { label: 'Failed',     color: S.FAILED, bg: `${S.FAILED}18`, icon: <OctagonX     size={12} /> },
-  CANCELLED:  { label: 'Cancelled',  color: S.CANCELLED, bg: `${S.CANCELLED}18`, icon: <XCircle      size={12} /> },
+  CANCELLED:  { label: 'Rejected',   color: S.CANCELLED, bg: `${S.CANCELLED}18`, icon: <XCircle      size={12} /> },
 }
 
 const UNKNOWN_META = {
@@ -62,7 +60,7 @@ export const TIMELINE_LABELS: Record<BookingStatus, string> = {
   DELIVERED:  'Delivered — Awaiting Confirmation',
   COMPLETED:  'Completed',
   FAILED:     'Failed — Nothing Delivered',
-  CANCELLED:  'Cancelled',
+  CANCELLED:  'Rejected',
 }
 
 export function getStepState(
@@ -82,28 +80,6 @@ export function getStepState(
   if (stepIdx < currentIdx)   return 'done'
   if (stepIdx === currentIdx) return 'active'
   return 'upcoming'
-}
-
-/**
- * `problem`: an open client-reported problem (hasOpenClientIssue), shown as a substatus under Delivered.
- * `booking`: when given and some drop-offs failed (isPartlyFailed), "Partly Failed" shows under it.
- */
-export function StatusBadge({ status, problem = false, partlyFailed = false, booking }: {
-  status: string; problem?: boolean; partlyFailed?: boolean; booking?: Record<string, unknown> | null
-}) {
-  const m = getStatusMeta(status)
-  return (
-    <span className="inline-flex flex-col items-start">
-      <span
-        className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-sm"
-        style={{ color: m.color, background: m.bg, border: `1px solid ${m.color}40` }}
-      >
-        {m.icon}{m.label}
-      </span>
-      {problem && asBookingStatus(status) === 'DELIVERED' && <ProblemReportedBadge />}
-      {partlyFailed && <PartlyFailedBadge booking={booking} />}
-    </span>
-  )
 }
 
 export function StatusTimeline({ booking }: { booking: BookingWithRelations }) {

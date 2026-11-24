@@ -21,12 +21,10 @@ import {
   Check,
   ClipboardCheck,
   AlertTriangle,
-  PauseCircle,
   Boxes,
   History,
   CalendarRange,
   Pencil,
-  Clock,
 } from 'lucide-react'
 
 import { subscribeBroadcast } from '@/lib/realtime/sharedBroadcast'
@@ -34,7 +32,6 @@ import { pickDriver, pickTruck, type CrewSelection, type PairFilled } from '@/li
 import { codingFlagFor, type CodingFlag } from '@/lib/number-coding'
 import { formatPhDateTime, submittedAfterCloseToday } from '@/lib/office-hours'
 import { licenseFlagForDelivery } from '@/lib/license-expiry'
-import { statusColor } from '@/components/map/status.colors'
 import { useModuleAccess, writeAccess } from '@/components/layout/ModuleAccess'
 import type { BookingDetail } from '@/app/types/maps/routemap.types'
 import {
@@ -69,18 +66,19 @@ import {
 import type { RouteDistance, SecondDriverRecord } from '@/lib/services/admin/assignment.service'
 import ReusableModal, { RemarksModal } from '@/components/layout/ReusableModal'
 import TripPlanner from './TripPlanner'
+import BookingProgress, { type ProgressBooking } from './BookingProgress'
+import type { StepKey } from '@/lib/booking-progress'
+import DriverCallTime from './DriverCallTime'
 import VehiclePicker, { cargoSummaryFromBooking, fitProblems } from './VehiclePicker'
 import DriverPicker, { type DriverPickerOption } from './DriverPicker'
 import CompletionPanel from '@/components/transactions/CompletionPanel'
 import TransactionRecord from '@/components/transactions/TransactionRecord'
 import DeliveryStopsCard from './DeliveryStopsCard'
 import { formatPlateNumber, plateError } from '@/lib/validation/plate'
-import ProblemReportedBadge, { hasOpenClientIssue } from '@/components/transactions/ProblemReportedBadge'
-import PartlyFailedBadge, { isPartlyFailed } from '@/components/transactions/PartlyFailedBadge'
-import ResubmittedBadge, { resubmissionsOf } from '@/components/transactions/ResubmittedBadge'
+import { resubmissionsOf } from '@/components/transactions/ResubmittedBadge'
 import { MAX_RESUBMISSIONS } from '@/lib/booking-resubmit'
-import SharedDelayedBadge from '@/components/transactions/DelayedBadge'
 import ResubmissionChanges from '@/components/transactions/ResubmissionChanges'
+import BookingStatusTag, { mainStatusLabel } from '@/components/transactions/BookingStatusTag'
 import ReplaceCrewPanel, { ReplacementHistory } from '@/components/transactions/ReplaceCrewPanel'
 import StopTimesPanel from '@/components/transactions/StopTimesPanel'
 import PausePanel from '@/components/transactions/PausePanel'
@@ -88,7 +86,6 @@ import BreakdownPanel from '@/components/transactions/BreakdownPanel'
 import OfficeProgressPanel from '@/components/transactions/OfficeProgressPanel'
 import LateConfirmationsPanel from '@/components/transactions/LateConfirmationsPanel'
 import DeliveryEventsPanel from '@/components/transactions/DeliveryEventsPanel'
-import { pauseReasonLabel } from '@/lib/services/admin/pause.service'
 import type { BookingWithRelations } from '@/lib/types/booking-relations'
 import { useRecordLock, useRecordLocks } from '@/lib/hooks/useRecordLock'
 import RecordLockBanner, { RecordLockBadge } from '@/components/ui/RecordLockBanner'
@@ -98,7 +95,6 @@ import { PALETTE } from '@/lib/palette'
 import {
   CARD_CLASS,
   PANEL_BG,
-  Tag,
   SectionHeading,
   AssetIcon,
   BookingInfoCard,
@@ -116,7 +112,6 @@ import {
 } from './BookingDetailParts'
 
 import { useTablePageSize } from '@/lib/hooks/useTablePageSize'
-import { formatDuration } from '@/lib/duration'
 import Dropdown from '@/components/ui/Dropdown'
 import { FieldError, errorBorder } from '@/components/ui/FieldError'
 import { useResolvedBookingKey } from '@/lib/booking-url'
@@ -175,6 +170,16 @@ type DetailWithExtra = BookingDetail & {
   // The GM's remarks when a booking was not approved.
   rejection_reason?:  string | null
   blowbagets_check?:  BlowbagetsCheck | null
+  // Milestone times for the progress steps (older backends leave them out).
+  gm_reviewed_at?:    string | null
+  ops_assigned_at?:   string | null
+  delivered_at?:      string | null
+  cancelled_at?:      string | null
+  completion_confirmed_at?: string | null
+  completion_auto?:   boolean | null
+  late_start_for?:    string | null
+  client_issue_reported_at?: string | null
+  client_issue_resolved_at?: string | null
 }
 
 type CargoItem = NonNullable<BookingDetail['booking_cargo_items']>[number]
@@ -271,45 +276,6 @@ function VehiclePulledBanner({
   )
 }
 
-/** List badge: the next stop is running 15+ min past its planned window (delay.scheduler). */
-function DelayedBadge({ minutes }: { minutes: number | null }) {
-  return (
-    <Tip label="Running late against the planned arrival"><span
-      className="flex w-fit items-center gap-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border mt-1"
-      style={{ color: '#FF7A30', borderColor: '#FF7A3055', background: '#FF7A3014' }}
-    >
-      <Clock size={9} />
-      Delayed{minutes ? ` · ${formatDuration(minutes)}` : ''}
-    </span></Tip>
-  )
-}
-
-/** Badge: still Assigned 15+ min after its call time (late-start.scheduler). */
-function LateStartBadge({ className = 'mt-1' }: { className?: string }) {
-  return (
-    <Tip label="Still Assigned 15 minutes or more after the call time"><span
-      className={`flex w-fit items-center gap-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border whitespace-nowrap ${className}`}
-      style={{ color: '#F62626', borderColor: '#F6262655', background: '#F6262614' }}
-    >
-      <Clock size={9} />
-      Late start
-    </span></Tip>
-  )
-}
-
-/** List badge: the delivery is paused (weather, breakdown, closed stop…). */
-function PausedBadge({ reason }: { reason: string }) {
-  return (
-    <Tip label={`Paused: ${pauseReasonLabel(reason)}`}><span
-      className="flex w-fit items-center gap-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border mt-1"
-      style={{ color: '#ffea00', borderColor: '#fbbf2455', background: '#fbbf2414' }}
-    >
-      <PauseCircle size={9} />
-      Paused · {pauseReasonLabel(reason)}
-    </span></Tip>
-  )
-}
-
 /** Server-corrected "now", re-read each minute so the badge drops at midnight. */
 function useMinuteClock(): Date {
   const [now, setNow] = useState(() => nowDate())
@@ -330,23 +296,8 @@ interface ListRow {
   company?: string | null
   stops: number
   created_at: string | null
-  /** Set while the delivery is paused. */
-  pause_reason: string | null
-  /** Minutes late when flagged delayed (and not paused); null otherwise. */
-  delayed: number | null | undefined
-  /** Still Assigned 15+ min after its call time (late-start.scheduler). */
-  late_start: boolean
-  /** The driver reported a breakdown and the office hasn't paused or closed it. */
-  breakdown: boolean
   /** Late confirmations from a previous main driver waiting for Accept / Dismiss (staff only). */
   late_pending: number
-  /** True while the client's reported problem is unresolved. */
-  issue_open: boolean
-  issue_note: string | null
-  /** Times the client resubmitted it after a rejection. */
-  resubmissions: number
-  /** Delivered/Completed with at least one failed drop-off. */
-  partly_failed: boolean
   raw: Record<string, unknown>
 }
 
@@ -365,16 +316,7 @@ function toRows(raw: Record<string, unknown>[]): ListRow[] {
       company:           clients?.company_name ?? null,
       stops:             Array.isArray(dests) ? dests.length : 0,
       created_at:        typeof b.created_at === 'string' ? b.created_at : null,
-      pause_reason:      b.paused_at && typeof b.pause_reason === 'string' ? b.pause_reason : null,
-      // undefined = not delayed; a paused delivery is explained by its pause.
-      delayed:           b.delayed_since && !b.paused_at ? (typeof b.delay_minutes === 'number' ? b.delay_minutes : null) : undefined,
-      late_start:        b.status === 'assigned' && !!b.late_start_for,
-      breakdown:         !!b.breakdown_reported_at && !b.paused_at,
       late_pending:      typeof b.late_pending === 'number' ? b.late_pending : 0,
-      issue_open:        hasOpenClientIssue(b),
-      issue_note:        typeof b.client_issue_note === 'string' ? b.client_issue_note : null,
-      resubmissions:     resubmissionsOf(b),
-      partly_failed:     isPartlyFailed(b),
       raw:               b,
     }
   })
@@ -538,6 +480,7 @@ function AssignmentPanel({
   onOpenPicker,
   onClosePicker,
   canEdit,
+  hideEmptyCard = false,
 }: {
   detail:          BookingDetail
   drivers:         DriverUser[]
@@ -576,6 +519,8 @@ function AssignmentPanel({
   onClosePicker:   () => void
   /** Booking Management tier allows edits; Read Only sees the buttons disabled. */
   canEdit:         boolean
+  /** Not yet assigned: no card, only the pop-up (the progress step has the button). */
+  hideEmptyCard?:  boolean
 }) {
   // On an assigned booking "Edit" unlocks "Change vehicle and driver" first, so
   // a crew is never changed by accident. Keyed to the booking and the pop-up, so
@@ -747,7 +692,7 @@ function AssignmentPanel({
             </button>
           )}
         </CrewCard>
-      ) : (
+      ) : hideEmptyCard ? null : (
         <div className={`${CARD_CLASS} px-3.5 sm:px-4 pt-3 pb-4 space-y-3`}>
           <div className="flex items-center gap-2 min-w-0">
             <AssetIcon name="steering-wheel" />
@@ -1989,7 +1934,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
    * Not on `approved`: the whole question is how many times THIS truck has to go
    * back and forth, which cannot be answered before one is chosen. And not
    * hidden again once the run starts — the panel is where operations reads the
-   * per-run proof of loading, which only exists after the driver is moving.
+   * per-run proof of pickup, which only exists after the driver is moving.
    */
   // The assigned vehicle's limits, for the planner's per-trip warning.
   const plannerCapacity = useMemo(() => {
@@ -2106,6 +2051,67 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
         : a.trucks?.plate_number ?? null,
     }
   })()
+  // ── Progress steps ───────────────────────────────────────────────────────
+  const isOpsOrAdmin = roleView === 'admin' || roleView === 'operations_manager'
+  const crewLine = crewSummary ? [crewSummary.vehicle, crewSummary.driver].filter(Boolean).join(' · ') || null : null
+  const dropoffCounts = {
+    total:  sortedStops.length,
+    done:   sortedStops.filter((s) => s.status === 'delivered').length,
+    failed: sortedStops.filter((s) => s.status === 'failed').length,
+  }
+  const progressBooking: ProgressBooking | null = d ? {
+    ...d,
+    hasCrew: !!(currentAssignment?.driver_id || currentAssignment?.vendor_driver_user_id || d.driver?.driver_id),
+  } : null
+  // A call time saved in the step or in Trips: update the booking in place, no
+  // full reload (that would throw away an unsaved trip plan).
+  const applyCallTime = useCallback((time: string | null, date: string | null) => {
+    setDetail((prev) => (prev ? { ...prev, driver_call_time: time, driver_call_date: date } : prev))
+  }, [])
+  const stepButton = 'flex-1 min-w-[120px] min-h-[48px] px-3 py-2 rounded-[10px] border text-base font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed'
+  const progressActions: Partial<Record<StepKey, ReactNode>> = {}
+  if (detail && showStageActions) {
+    progressActions.approval = (
+      <fieldset disabled={bookingReadOnly} className="flex flex-wrap gap-2.5 min-w-0 border-0 p-0 m-0">
+        <button type="button" disabled={pendingStatus || pendingReject} onClick={() => setRejectModalOpen(true)}
+          {...writeAccess(canEdit)} className={stepButton}
+          style={{ background: '#3a0d0d', borderColor: PALETTE.red, color: PALETTE.red }}>
+          {pendingReject ? 'Rejecting…' : 'Reject'}
+        </button>
+        <button type="button" disabled={pendingStatus || pendingReject} onClick={() => setApproveModalOpen(true)}
+          {...writeAccess(canEdit)} className={stepButton} style={TEAL_BUTTON_STYLE}>
+          {pendingStatus ? 'Approving…' : 'Approve'}
+        </button>
+      </fieldset>
+    )
+  }
+  if (detail && showAssignment && stage === 'approved') {
+    progressActions.assignment = (
+      <button type="button" disabled={bookingReadOnly || assignBusy} onClick={() => setAssignEditMode(true)}
+        aria-haspopup="dialog" {...writeAccess(canEdit)}
+        className={`${TEAL_BUTTON_CLASS} min-h-[48px]`} style={TEAL_BUTTON_STYLE}>
+        Choose Vehicle and Driver
+      </button>
+    )
+  }
+  if (detail && isOpsOrAdmin && stage === 'assigned' && !detail.driver_call_time) {
+    progressActions.call_time = (
+      <DriverCallTime
+        key={`step-call-${detail.booking_id}`}
+        variant="step"
+        bookingId={detail.booking_id}
+        clientCallTime={detail.call_time}
+        scheduleDate={detail.schedule_date}
+        driverCallTime={detail.driver_call_time}
+        driverCallDate={detail.driver_call_date}
+        canEdit={!bookingReadOnly}
+        allowed={canEdit}
+        editable
+        onSaved={applyCallTime}
+      />
+    )
+  }
+
   // Badges are informational, so read-only viewers see them too.
   const bookingLocks    = useRecordLocks('booking')
   const clockNow        = useMinuteClock()
@@ -2273,7 +2279,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                     .flatMap((key) => (key === 'in_transit' ? [key, 'delayed'] : key === 'pending' ? [key, 'resubmitted'] : key === 'completed' ? [key, 'partly_failed'] : [key]))
                     .map((key) => ({
                       id: key,
-                      label: `${key === 'all' ? (hidePending ? 'All (active)' : 'All') : fmtStatus(key)} (${key === 'all' ? statusCounts.all : statusCounts[key] ?? 0})`,
+                      label: `${key === 'all' ? (hidePending ? 'All (active)' : 'All') : (BOOKING_STATUSES as string[]).includes(key) ? mainStatusLabel(key) : fmtStatus(key)} (${key === 'all' ? statusCounts.all : statusCounts[key] ?? 0})`,
                     }))}
                   selectedKey={statusFilter}
                   onSelectionChange={(key) => { setStatusFilter(key); setPage(0) }}
@@ -2310,7 +2316,6 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                     <tbody className="ff-regular text-[13px] 3xl:text-[16px] text-[#818181]">
                       {listRows.map((r) => {
                         const active = selectedId === r.booking_id
-                        const c      = statusColor(r.status)
                         return (
                           <tr
                             key={r.booking_id}
@@ -2335,41 +2340,22 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                                 <RecordLockBadge holder={bookingLocks.get(r.booking_id)} />
                               </div>
                             </td>
-                            <td className="font-[family-name:var(--font-alegreya-sc)]">
-                              <span
-                                className="inline-flex items-center justify-center whitespace-nowrap rounded-[5px] border p-1 text-[12px] 3xl:text-[16px] leading-none"
-                                style={{ color: c, borderColor: c, background: `${c}2e` }}
-                              >
-                                {fmtStatus(r.status)}
-                              </span>
-                              {r.issue_open && <ProblemReportedBadge note={r.issue_note} />}
-                              {r.partly_failed && <PartlyFailedBadge booking={r.raw} />}
-                              {r.pause_reason && <PausedBadge reason={r.pause_reason} />}
-                              {r.delayed !== undefined && <DelayedBadge minutes={r.delayed} />}
-                              {r.late_start && <LateStartBadge />}
-                              {['assigned', 'in_transit'].includes(r.status) &&
-                                crewLicenseFlags(allAssignments.find((x) => x.booking_id === r.booking_id), r.schedule_date).length > 0 && (
-                                <Tip label="A driver's license expires before, during or within 7 days of this delivery"><span
-                                  className="flex w-fit items-center gap-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border mt-1"
-                                  style={{ color: '#FFEA00', borderColor: '#FFEA0055', background: '#FFEA0014' }}>
-                                  License expiring
-                                </span></Tip>
-                              )}
-                              {r.breakdown && (
-                                <Tip label="The driver reported a breakdown: pause the delivery or close it"><span
-                                  className="flex w-fit items-center gap-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border mt-1"
-                                  style={{ color: '#F62626', borderColor: '#F6262655', background: '#F6262614' }}>
-                                  Breakdown · needs decision
-                                </span></Tip>
-                              )}
-                              {r.late_pending > 0 && (
-                                <Tip label="The previous main driver's phone sent a confirmation after the drivers were changed: accept or dismiss it in the booking"><span
-                                  className="flex w-fit items-center gap-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border mt-1"
-                                  style={{ color: '#FF7A30', borderColor: '#FF7A3055', background: '#FF7A3014' }}>
-                                  Late confirmation{r.late_pending > 1 ? `s · ${r.late_pending}` : ''} · needs decision
-                                </span></Tip>
-                              )}
-                              <ResubmittedBadge count={r.resubmissions} />
+                            <td>
+                              <BookingStatusTag
+                                booking={r.raw}
+                                staff
+                                extra={[
+                                  ...(['assigned', 'in_transit'].includes(r.status) &&
+                                    crewLicenseFlags(allAssignments.find((x) => x.booking_id === r.booking_id), r.schedule_date).length > 0
+                                    ? [{ key: 'license', label: 'License Expiring', color: PALETTE.yellow,
+                                        hint: "A driver's license expires before, during or within 7 days of this delivery" }]
+                                    : []),
+                                  ...(r.late_pending > 0
+                                    ? [{ key: 'late_confirmation', label: `Late Confirmation${r.late_pending > 1 ? `s · ${r.late_pending}` : ''}`, color: PALETTE.orange,
+                                        hint: "The previous main driver's phone sent a confirmation after the drivers were changed: accept or dismiss it in the booking" }]
+                                    : []),
+                                ]}
+                              />
                             </td>
                             <td className="whitespace-nowrap text-white">{r.schedule_date ?? '—'}</td>
                             <td className="max-w-[180px] 3xl:max-w-[260px] truncate hidden md:table-cell text-white"><TruncatedText>{r.company ?? '—'}</TruncatedText></td>
@@ -2425,20 +2411,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                   <div className="flex items-center gap-1.5 min-w-0">
                     {detail && !detailLoading && (
                       <>
-                        <ResubmittedBadge className="" tone="red" count={resubmissionsOf(detail)} />
-                        <SharedDelayedBadge className="" booking={detail} />
-                        {detail.status === 'assigned' && !!(detail as { late_start_for?: string | null }).late_start_for && (
-                          <LateStartBadge className="" />
-                        )}
-                        <span className="inline-flex flex-col items-start">
-                          <Tag color={statusColor(detail.status)} size="md">{fmtStatus(detail.status)}</Tag>
-                          {hasOpenClientIssue(detail as unknown as Record<string, unknown>) && (
-                            <ProblemReportedBadge note={(detail as { client_issue_note?: string | null }).client_issue_note} />
-                          )}
-                          {isPartlyFailed(detail as unknown as Record<string, unknown>) && (
-                            <PartlyFailedBadge booking={detail as unknown as Record<string, unknown>} />
-                          )}
-                        </span>
+                        <BookingStatusTag booking={detail as unknown as Record<string, unknown>} staff size="md" />
                       </>
                     )}
                     <button type="button" onClick={closeDetail} className="p-2 rounded-lg hover:bg-white/5 text-[#818181] hover:text-white transition-colors" aria-label="Close">
@@ -2458,6 +2431,14 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                     <PanelReadyGate key={detail.booking_id} fallback={<PanelSpinner />} className="space-y-[18px]">
                       <PanelSectionFlag loading={showAssignment && routeLoading} />
                       <RecordLockBanner lock={bookingLock} noun="booking" />
+
+                      {/* Step by step: what's done, what's next and who does it (2026-11-24). */}
+                      <BookingProgress
+                        booking={progressBooking!}
+                        crewLine={crewLine}
+                        dropoffs={dropoffCounts}
+                        actions={progressActions}
+                      />
 
                       {/* Booking info */}
                       <BookingInfoCard
@@ -2573,30 +2554,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                           </SectionHeading>
                         )}
 
-                        {showStageActions && (
-                          <fieldset disabled={bookingReadOnly} className="flex gap-2.5 min-w-0 border-0 p-0 m-0">
-                            <button
-                              type="button"
-                              disabled={pendingStatus || pendingReject}
-                              onClick={() => setRejectModalOpen(true)}
-                              {...writeAccess(canEdit)}
-                              className="flex-1 min-h-[56px] px-3 py-2 rounded-[10px] border text-lg font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                              style={{ background: '#3a0d0d', borderColor: PALETTE.red, color: PALETTE.red }}
-                            >
-                              {pendingReject ? 'Rejecting…' : 'Reject'}
-                            </button>
-                            <button
-                              type="button"
-                              disabled={pendingStatus || pendingReject}
-                              onClick={() => setApproveModalOpen(true)}
-                              {...writeAccess(canEdit)}
-                              className="flex-1 min-h-[56px] px-3 py-2 rounded-[10px] border text-lg font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                              style={TEAL_BUTTON_STYLE}
-                            >
-                              {pendingStatus ? 'Approving…' : 'Approve'}
-                            </button>
-                          </fieldset>
-                        )}
+                        {/* Approve / Reject live in the progress step at the top (2026-11-24). */}
 
                         {/* The GM's remarks on a rejected booking. */}
                         {d?.gm_status === 'rejected' && d?.rejection_reason && (
@@ -2734,6 +2692,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                             onAssign={() => { setAssignReason(''); setAssignReasonError(null); setConfirmAssign(true) }}
                             onOpenPicker={() => setAssignEditMode(true)}
                             canEdit={canEdit}
+                            hideEmptyCard
                             onClosePicker={() => {
                               setAssignEditMode(false)
                               const restore = committedAssignment.driverId || committedAssignment.truckId
@@ -2804,6 +2763,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                               canEdit={!bookingReadOnly}
                               allowed={canEdit}
                               capacity={plannerCapacity}
+                              onCallTimeSaved={applyCallTime}
                             />
                           </CollapsibleSection>
                         )}
