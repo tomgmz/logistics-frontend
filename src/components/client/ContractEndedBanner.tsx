@@ -14,7 +14,7 @@ function dayCount(n: number): string {
 }
 
 /**
- * The contract validity banner across the top of every client page
+ * The contract validity banner across the top of the client Dashboard and Profile
  * (lib/contract-status):
  *
  *   ended (7-day read-only period) — red, bookings closed
@@ -24,12 +24,15 @@ function dayCount(n: number): string {
  *
  * Nothing is shown when no end date is on file (older clients).
  */
+// Only the Dashboard and Profile show the banner; other modules stay clear
+// (an expired contract still gets the Booking page's own "Booking is closed").
+const BANNER_PAGES = ['/client/dashboard', '/client/profile']
+
 export default function ContractEndedBanner({ inline = false }: { inline?: boolean } = {}) {
   const contract = useContractStore((s) => s.contract)
   const pathname = usePathname()
-  // The Booking page places its own copy above the office-hours notice
-  // (BookingDetails, inline); the layout's copy stays off there.
-  if (!inline && pathname?.startsWith('/client/booking')) return <BannerSlot inline={inline} />
+  const shown = BANNER_PAGES.some((p) => pathname === p || pathname?.startsWith(`${p}/`))
+  if (!shown) return <BannerSlot inline={inline} />
   return <BannerSlot inline={inline} contract={contract} />
 }
 
