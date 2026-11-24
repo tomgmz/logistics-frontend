@@ -113,6 +113,12 @@ function presetIn(cm: string, unit: DimensionUnit): string {
   return String(Math.round((Number(cm) / CM_PER_UNIT[unit]) * 100) / 100)
 }
 
+/** "Standard (120×100 cm)", "Standard (47.24×39.37 in)", "Standard (1.2×1 m)": the preset in the chosen unit. */
+function palletOptionLabel(type: 'Standard' | 'Euro' | 'Half', unit: DimensionUnit): string {
+  const p = PALLET_DIMENSIONS[type]
+  return `${type} (${presetIn(p.palletLength, unit)}×${presetIn(p.palletWidth, unit)} ${unit})`
+}
+
 /** `name` if free, else "base (1).ext", "base (2).ext"… (case-insensitive, like Windows/macOS). */
 function uniqueFileName(name: string, taken: Set<string>): string {
   if (!taken.has(name.toLowerCase())) return name
@@ -1337,13 +1343,21 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                                     <Dropdown value={g.palletType} aria-label="Pallet type"
                                       onChange={(e) => {
                                         const type = e.target.value as ItemGroup['palletType']
-                                        // The preset sizes are cm, so picking one switches the size unit back to cm.
-                                        handleUpdateGroup(section.dropoffIndex, g.id, { palletType: type, palletDimUnit: 'cm', ...PALLET_DIMENSIONS[type] })
+                                        // The preset sizes are written in the unit already chosen (cm, m or in),
+                                        // so picking a pallet never flips the unit back to cm.
+                                        const unit = g.palletDimUnit ?? 'cm'
+                                        const p = PALLET_DIMENSIONS[type]
+                                        handleUpdateGroup(section.dropoffIndex, g.id, {
+                                          palletType: type, palletDimUnit: unit,
+                                          palletLength: presetIn(p.palletLength, unit),
+                                          palletWidth: presetIn(p.palletWidth, unit),
+                                          palletHeight: p.palletHeight,
+                                        })
                                       }}
                                       className={`${SELECT_BOX} w-full`}>
-                                      <option value="Standard">Standard (120×100 cm)</option>
-                                      <option value="Euro">Euro (120×80 cm)</option>
-                                      <option value="Half">Half (60×80 cm)</option>
+                                      {(['Standard', 'Euro', 'Half'] as const).map((type) => (
+                                        <option key={type} value={type}>{palletOptionLabel(type, g.palletDimUnit ?? 'cm')}</option>
+                                      ))}
                                       <option value="Custom">Custom</option>
                                     </Dropdown>
                                   </div>
