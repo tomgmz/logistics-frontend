@@ -1,7 +1,7 @@
 'use client'
 
 import TableEmptyState from '@/components/ui/TableEmptyState'
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { ArrowUp, Loader2 } from 'lucide-react'
 import { CheckCircle2, ChevronRight, ExternalLink, Ticket } from 'lucide-react'
 import SidePanel from '@/components/ui/SidePanel'
@@ -18,6 +18,7 @@ import {
   type ReplyState, type SupportTicket, type TicketCategory,
 } from '@/lib/services/support.service'
 import NewTicketModal from '@/components/support/NewTicketModal'
+import { useDiscardDraftGuard } from './useDiscardDraftGuard'
 import { Plus } from '@untitledui/icons'
 import { Button } from '@/components/ui/untitled/button'
 
@@ -211,7 +212,8 @@ function TicketActions({ ticket: t, inbox, canEdit, onResolve }: {
   const open = t.status === 'open'
   if (!inbox && !open) return null
   return (
-    <div className="flex flex-wrap items-center justify-end gap-2">
+    // The buttons share the full width (user 2026-11-25).
+    <div className="flex items-center gap-2 [&>*]:flex-1 [&>*]:justify-center">
       {/* Reading the full email thread (attachments, forwards) is not a write. Replies are
           written on this page (2026-11-22, the Zendesk model), so Reply all / New email went. */}
       {inbox && (
@@ -228,8 +230,7 @@ function TicketActions({ ticket: t, inbox, canEdit, onResolve }: {
           type="button"
           onClick={onResolve}
           {...writeAccess(canEdit)}
-          className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-bold text-[#0a0a0a] disabled:cursor-not-allowed disabled:opacity-40"
-          style={{ background: 'var(--color-cyan)' }}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-cyan)] px-2.5 py-1.5 text-[11px] font-bold text-[var(--color-cyan)] hover:bg-[var(--color-cyan)]/10 disabled:cursor-not-allowed disabled:opacity-40"
         >
           <CheckCircle2 size={12} /> Mark resolved
         </button>
@@ -243,10 +244,18 @@ function TicketActions({ ticket: t, inbox, canEdit, onResolve }: {
  * ticket's thread, signed with your name, and records it here at once, so a
  * plain Gmail "Reply" (which the system never saw) is no longer needed.
  */
-function TicketReplyBox({ ticket: t, canEdit, onSent }: { ticket: SupportTicket; canEdit: boolean; onSent: () => void }) {
+function TicketReplyBox({ ticket: t, canEdit, onSent, onDraftChange }: {
+  ticket: SupportTicket; canEdit: boolean; onSent: () => void
+  /** True while the box has unsent text, so closing the panel asks first. */
+  onDraftChange: (dirty: boolean) => void
+}) {
   const [body,    setBody]    = useState('')
   const [sending, setSending] = useState(false)
   const [error,   setError]   = useState<string | null>(null)
+  const hasDraft = body.trim().length > 0
+  useEffect(() => { onDraftChange(hasDraft) }, [hasDraft, onDraftChange])
+  // Gone with the panel: nothing left to lose.
+  useEffect(() => () => onDraftChange(false), [onDraftChange])
   const clientEmail = t.clients?.users?.email ?? null
 
   async function send() {
@@ -325,6 +334,8 @@ export default function SupportTicketsView({ switcher }: { switcher?: ReactNode 
   const [resolving,    setResolving]    = useState<SupportTicket | null>(null)
   const [busy,         setBusy]         = useState(false)
   const [creating,     setCreating]     = useState(false)
+  // An unsent reply asks before the panel closes or another row opens.
+  const draft = useDiscardDraftGuard()
 
   // Server-side pages: the server applies the tab and search, counts every
   // ticket for the header, and sends only the rows on screen.
@@ -439,7 +450,7 @@ export default function SupportTicketsView({ switcher }: { switcher?: ReactNode 
                   {tickets.map((t) => {
                     const isOpen = selectedId === t.ticket_id
                     const opener = openedByStaff(t) ? personName(t.clients?.users) : personName(t.opener)
-                    const open   = () => { setSnapshot(t); setSelectedId(t.ticket_id) }
+                    const open   = () => { if (!isOpen) draft.guard(() => { setSnapshot(t); setSelectedId(t.ticket_id) }) }
                     return (
                         <tr
                           key={t.ticket_id}
@@ -499,13 +510,14 @@ export default function SupportTicketsView({ switcher }: { switcher?: ReactNode 
 
       <SidePanel
         open={!!selected}
-        onClose={() => setSelectedId(null)}
+        onClose={() => draft.guard(() => setSelectedId(null))}
         label="Ticket details"
         title={selected?.reference ?? ''}
         subtitle={selected ? `Raised ${formatDateTime(selected.created_at)}` : undefined}
         footer={selected && (
           <div className="flex w-full flex-col gap-2 px-4 py-3 border-t border-white/[0.07] shrink-0">
-            {selected.clients?.users?.email && <TicketReplyBox ticket={selected} canEdit={canEdit} onSent={() => { void load(true) }} />}
+            {/* Keyed by ticket: a draft never carries over to another ticket. */}
+            {selected.clients?.users?.email && <TicketReplyBox key={selected.ticket_id} ticket={selected} canEdit={canEdit} onSent={() => { void load(true) }} onDraftChange={draft.setDirty} />}
             <TicketActions ticket={selected} inbox={inbox} canEdit={canEdit} onResolve={() => setResolving(selected)} />
           </div>
         )}
@@ -513,6 +525,8 @@ export default function SupportTicketsView({ switcher }: { switcher?: ReactNode 
         {selected && <TicketDetail ticket={selected} tracking={tracking} />}
       </SidePanel>
       </div>
+
+      {draft.modal}
 
       <NewTicketModal open={creating} onClose={() => setCreating(false)} onCreated={() => { void load(true) }} />
 

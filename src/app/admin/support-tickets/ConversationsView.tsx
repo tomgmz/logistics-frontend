@@ -26,6 +26,7 @@ import { TruncatedText } from '@/components/ui/TruncatedText'
 import { ORDER_LABELS, isReversed, orderField, orderRules } from '@/lib/table-order'
 import MessagePhoto from '@/components/messaging/MessagePhoto'
 import PhotoSendDialog, { MAX_PHOTO_BYTES } from '@/components/messaging/PhotoSendDialog'
+import { useDiscardDraftGuard } from './useDiscardDraftGuard'
 import {
   supportChatService, CHAT_STATUS_LABEL,
   type ChatDetail, type ChatMessage, type ChatStatus, type InboxStatus,
@@ -91,6 +92,8 @@ export default function ConversationsView({ switcher }: { switcher?: ReactNode }
   const [sort,         setSort]         = useState<'desc' | 'asc'>('desc')
   const debouncedSearch = useDebouncedValue(search.trim())
   const [selectedId,   setSelectedId]   = useState<string | null>(null)
+  // An unsent reply asks before the panel closes or another row opens.
+  const draft = useDiscardDraftGuard()
 
   const table = useServerTable(
     (q) => supportChatService.inboxPage({ ...q, status: statusFilter, sort, ...(debouncedSearch && { search: debouncedSearch }) }),
@@ -153,7 +156,7 @@ export default function ConversationsView({ switcher }: { switcher?: ReactNode }
                   {rows.map((c) => {
                     const isOpen = selectedId === c.conversation_id
                     const unread = (c.unread_count ?? 0) > 0
-                    const open   = () => setSelectedId(c.conversation_id)
+                    const open   = () => { if (!isOpen) draft.guard(() => setSelectedId(c.conversation_id)) }
                     return (
                       <tr
                         key={c.conversation_id}
@@ -221,16 +224,20 @@ export default function ConversationsView({ switcher }: { switcher?: ReactNode }
         meId={me?.user_id}
         meName={`${me?.first_name ?? ''} ${me?.last_name ?? ''}`.trim() || 'A colleague'}
         canEdit={canEdit}
-        onClose={() => setSelectedId(null)}
+        onClose={() => draft.guard(() => setSelectedId(null))}
         onChanged={() => { void load(true) }}
+        onDraftChange={draft.setDirty}
       />
+      {draft.modal}
       </div>
     </div>
   )
 }
 
-function ConversationPanel({ id, meId, meName, canEdit, onClose, onChanged }: {
+function ConversationPanel({ id, meId, meName, canEdit, onClose, onChanged, onDraftChange }: {
   id: string | null; meId: string | undefined; meName: string; canEdit: boolean; onClose: () => void; onChanged: () => void
+  /** True while the reply box shows unsent text, so closing asks first. */
+  onDraftChange: (dirty: boolean) => void
 }) {
   const [viewers,  setViewers]  = useState<{ user_id: string; name: string }[]>([])
   // A colleague replied after what was on screen: their reply is shown, yours waits.
@@ -359,6 +366,9 @@ function ConversationPanel({ id, meId, meName, canEdit, onClose, onChanged }: {
   // Someone else owns it: read it, or take it over to reply.
   const ownedByOther = !!detail?.assigned_to && detail.assigned_to !== meId
   const [ticketOpen, setTicketOpen] = useState(false)
+  // Only a reply the composer is showing counts as a draft.
+  const hasDraft = !!id && !!detail && !inAssistant && !ownedByOther && input.trim().length > 0
+  useEffect(() => { onDraftChange(hasDraft) }, [hasDraft, onDraftChange])
 
   return (
     <>
@@ -371,7 +381,8 @@ function ConversationPanel({ id, meId, meName, canEdit, onClose, onChanged }: {
         title={detail ? `${detail.reference} · ${detail.company_name ?? 'Client'}` : 'Conversation'}
         subtitle={detail ? `${detail.client_name ?? ''}${detail.client_email ? ` · ${detail.client_email}` : ''}` : undefined}
         footer={detail && (
-          <div className="flex w-full flex-col gap-2">
+          // Same frame as the ticket panel's footer: padded, divider on top (user 2026-11-25).
+          <div className="flex w-full shrink-0 flex-col gap-2 border-t border-white/[0.07] px-4 py-3">
             {stale && (
               <div className="flex flex-wrap items-center gap-2 rounded-lg border border-[#FFEA00]/30 bg-[#FFEA00]/[0.06] px-3 py-2 text-xs text-[#FFEA00]">
                 <AlertTriangle size={13} /> <span className="flex-1">{stale}</span>
@@ -417,19 +428,19 @@ function ConversationPanel({ id, meId, meName, canEdit, onClose, onChanged }: {
                 </button>
               </form>
             )}
-            {error && <p className="text-xs text-red-400">{error}</p>}
-            <div className="flex flex-wrap items-center justify-end gap-2">
+            {error && <p role="alert" className="text-xs text-red-400">{error}</p>}
+            {/* The buttons share the full width, as on the ticket panel (user 2026-11-25). */}
+            <div className="flex items-center gap-2 [&>*]:flex-1 [&>*]:justify-center">
               {/* Simple hand-off (2026-11-22): the ticket carries the conversation, which closes. */}
               {!detail.ticket_id && !inAssistant && (
                 <button type="button" onClick={() => setTicketOpen(true)} {...writeAccess(canEdit)}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 px-2.5 py-1.5 text-xs font-semibold text-white/80 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40">
-                  <Ticket size={13} /> Turn into ticket
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-2.5 py-1.5 text-[11px] font-semibold text-white/80 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40">
+                  <Ticket size={12} /> Turn into ticket
                 </button>
               )}
               {detail.status !== 'resolved' && !inAssistant && (
                 <button type="button" onClick={() => void resolve()} {...writeAccess(canEdit && !resolving)}
-                  className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold text-[#0a0a0a] disabled:cursor-not-allowed disabled:opacity-40"
-                  style={{ background: 'var(--color-cyan)' }}>
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-cyan)] px-2.5 py-1.5 text-[11px] font-bold text-[var(--color-cyan)] hover:bg-[var(--color-cyan)]/10 disabled:cursor-not-allowed disabled:opacity-40">
                   {resolving ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />} Mark resolved
                 </button>
               )}
