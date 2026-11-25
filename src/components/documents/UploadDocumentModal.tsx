@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Search, FileText, Trash2, ChevronLeft, ArrowUpFromLine } from 'lucide-react'
+import { X, Search, FileText, ChevronLeft, ArrowUpFromLine } from 'lucide-react'
+import ReusableModal from '@/components/layout/ReusableModal'
 
 import AccountTypePicker from '@/components/admin/AccountTypePicker'
 
@@ -59,16 +60,16 @@ const NOTES_HINT: Record<UploadTarget, string> = {
 }
 
 // The form's look (Figma): small-caps labels, dark rounded fields.
-const LABEL = 'ff-sc mb-2 block text-sm 3xl:text-base font-bold uppercase text-white'
-const FIELD = 'w-full rounded-xl border border-[#3a3a3a] bg-[#151515] px-4 text-sm 3xl:text-base text-white outline-none placeholder:text-[#818181] focus:border-[#4df9ed]/60'
-const PICKER_ROW = 'flex w-full items-center justify-between gap-3 border-b border-[#3a3a3a] px-4 py-2.5 text-left last:border-0 [@media(hover:hover)]:hover:bg-white/[0.04]'
+const LABEL = 'font-[family-name:var(--font-alegreya-sc)] mb-1.5 block text-xs font-bold uppercase text-white'
+const FIELD = 'w-full rounded-lg border border-[#3a3a3a] bg-[#151515] px-3 text-sm text-white outline-none placeholder:text-[#818181] focus:border-[#4df9ed]/60'
+const PICKER_ROW = 'flex w-full items-center justify-between gap-3 border-b border-[#3a3a3a] px-3 py-2 text-left last:border-0 [@media(hover:hover)]:hover:bg-white/[0.04]'
 
 function Required() {
   return <span aria-hidden className="ml-0.5 align-super text-xs text-[#f62626]">*</span>
 }
 
 function Muted({ children }: { children: ReactNode }) {
-  return <span className="ml-1 text-xs 3xl:text-sm font-bold text-[#818181]">{children}</span>
+  return <span className="ml-1 text-[11px] font-bold text-[#818181]">{children}</span>
 }
 
 /**
@@ -124,7 +125,16 @@ export default function UploadDocumentModal({
   const [dragging, setDragging] = useState(false)
   const [busy,     setBusy]     = useState(false)
   const [showErrors, setShowErrors] = useState(false)
+  // Asks first (user 2026-11-25): closing with something chosen or typed, and taking a file off.
+  const [confirmClose,  setConfirmClose]  = useState(false)
+  const [pendingRemove, setPendingRemove] = useState<File | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const hasInput = files.length > 0 || notes.trim().length > 0 || otherLabel.trim().length > 0
+  const requestClose = () => {
+    if (busy) return
+    if (hasInput) setConfirmClose(true)
+    else onClose()
+  }
 
   useBodyScrollLock(open)
 
@@ -295,7 +305,7 @@ export default function UploadDocumentModal({
       title="What is this document for?"
       options={TARGETS.map((t) => ({ key: t.id, label: t.title, hint: t.sub }))}
       onPick={chooseTarget}
-      onClose={onClose}
+      onClose={requestClose}
     />
     <AnimatePresence>
       {open && target && (
@@ -304,7 +314,7 @@ export default function UploadDocumentModal({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          onClick={() => { if (!busy) onClose() }}
+          onClick={requestClose}
         >
           <motion.div
             initial={{ y: 16, opacity: 0 }}
@@ -314,11 +324,11 @@ export default function UploadDocumentModal({
             role="dialog"
             aria-modal="true"
             aria-label="Upload document"
-            className="flex max-h-[90dvh] w-full flex-col overflow-hidden rounded-t-2xl border border-[#424242] bg-[#1b1b1b] shadow-2xl sm:max-w-[600px] sm:rounded-2xl"
+            className="flex max-h-[90dvh] w-full flex-col overflow-hidden rounded-t-2xl border border-[#424242] bg-[#1b1b1b] shadow-2xl sm:max-w-lg sm:rounded-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[#424242] px-5 py-4 sm:px-7 sm:py-5">
+            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[#424242] px-6 py-4">
               <div className="flex min-w-0 items-start gap-2">
                 {askedTarget && !vehicleOnly && (
                   <button
@@ -332,18 +342,18 @@ export default function UploadDocumentModal({
                   </button>
                 )}
                 <div className="min-w-0">
-                  <h2 className="ff-sc text-xl sm:text-2xl font-bold leading-tight text-white">Upload Document</h2>
-                  <p className="ff-sc mt-0.5 text-sm sm:text-base font-bold uppercase text-[#4df9ed]">{TARGETS.find((x) => x.id === target)?.title}</p>
+                  <h2 className="font-[family-name:var(--font-alegreya-sc)] text-lg font-bold leading-tight text-white">Upload Document</h2>
+                  <p className="font-[family-name:var(--font-alegreya-sc)] mt-0.5 text-xs font-bold uppercase text-[#4df9ed]">{TARGETS.find((x) => x.id === target)?.title}</p>
                 </div>
               </div>
-              <button type="button" disabled={busy} onClick={onClose} className="rounded-lg p-2 text-[#818181] [@media(hover:hover)]:hover:bg-white/5 [@media(hover:hover)]:hover:text-white" aria-label="Close">
-                <X size={24} />
+              <button type="button" disabled={busy} onClick={requestClose} className="rounded-lg p-2 text-[#818181] [@media(hover:hover)]:hover:bg-white/5 [@media(hover:hover)]:hover:text-white" aria-label="Close">
+                <X size={18} />
               </button>
             </div>
 
               <>
                 {/* Step 2: the form. */}
-                <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 py-5 sm:px-7 sm:py-6">
+                <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">
                   {/* Client: a dropdown of every client. */}
                   {isClient && (
                     <div>
@@ -355,7 +365,7 @@ export default function UploadDocumentModal({
                         searchPlaceholder="Search client…"
                         emptyText="No clients match."
                         onChange={(e) => setClient(clientOptions.find((o) => o.client_id === e.target.value) ?? null)}
-                        className={`${FIELD} h-12 ${errorBorder(shown.target)}`}
+                        className={`${FIELD} h-10 ${errorBorder(shown.target)}`}
                       >
                         <option value="" disabled>{clientsLoading ? 'Loading clients…' : 'Select client'}</option>
                         {/* The pre-picked client stays listed even before the list arrives. */}
@@ -394,12 +404,12 @@ export default function UploadDocumentModal({
                           {options.map((o) => (
                             <button key={o.booking_id} type="button" onClick={() => setBooking(o)} className={PICKER_ROW}>
                               <span className="min-w-0">
-                                <span className="block truncate text-sm 3xl:text-base font-bold text-white">{o.reference_number ?? o.booking_id.slice(0, 8)}</span>
-                                <span className="block truncate text-xs 3xl:text-sm font-bold text-[#818181]">
+                                <span className="block truncate text-sm font-bold text-white">{o.reference_number ?? o.booking_id.slice(0, 8)}</span>
+                                <span className="block truncate text-xs font-bold text-[#818181]">
                                   {o.company_name ?? 'Unknown client'}{o.schedule_date && ` · ${formatDate(o.schedule_date)}`}
                                 </span>
                               </span>
-                              <span className="shrink-0 text-xs 3xl:text-sm font-bold uppercase text-white">{mainStatusLabel(o.status)}</span>
+                              <span className="shrink-0 text-xs font-bold uppercase text-white">{mainStatusLabel(o.status)}</span>
                             </button>
                           ))}
                         </PickerList>
@@ -431,8 +441,8 @@ export default function UploadDocumentModal({
                           {truckOptions.map((o) => (
                             <button key={o.truck_id} type="button" onClick={() => setTruck(o)} className={PICKER_ROW}>
                               <span className="min-w-0">
-                                <span className="block truncate text-sm 3xl:text-base font-bold text-white">{o.plate_number ?? 'No plate on record'}</span>
-                                {o.description && <span className="block truncate text-xs 3xl:text-sm font-bold text-[#818181]">{o.description}</span>}
+                                <span className="block truncate text-sm font-bold text-white">{o.plate_number ?? 'No plate on record'}</span>
+                                {o.description && <span className="block truncate text-xs font-bold text-[#818181]">{o.description}</span>}
                               </span>
                             </button>
                           ))}
@@ -450,7 +460,7 @@ export default function UploadDocumentModal({
                       value={docType}
                       disabled={busy || TYPES_FOR[target].length === 1}
                       onChange={(e) => setDocType(e.target.value as StaffDocumentType)}
-                      className={`${FIELD} h-12 ${errorBorder(shown.docType)}`}
+                      className={`${FIELD} h-10 ${errorBorder(shown.docType)}`}
                     >
                       <option value="" disabled>Select document type</option>
                       {TYPES_FOR[target].map((t) => (
@@ -478,7 +488,7 @@ export default function UploadDocumentModal({
                         maxLength={OTHER_LABEL_MAX}
                         onChange={(e) => setOtherLabel(e.target.value)}
                         placeholder="e.g. Invoice"
-                        className={`${FIELD} h-12 ${errorBorder(shown.other)}`}
+                        className={`${FIELD} h-10 ${errorBorder(shown.other)}`}
                       />
                       <FieldError>{shown.other}</FieldError>
                       {hints.length > 0 && (
@@ -511,15 +521,15 @@ export default function UploadDocumentModal({
                         onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
                         onDragLeave={() => setDragging(false)}
                         onDrop={(e) => { e.preventDefault(); setDragging(false); addFiles(e.dataTransfer.files) }}
-                        className={`flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed px-4 transition-colors ${files.length ? 'py-6' : 'py-10 sm:py-14'} ${
+                        className={`flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed px-4 transition-colors ${files.length ? 'py-4' : 'py-6'} ${
                           dragging ? 'border-[#4df9ed]/70 bg-[#4df9ed]/[0.06]' : shown.files ? 'border-[#f62626]/60 bg-[#151515]' : 'border-[#818181] bg-[#151515]'
                         }`}
                       >
-                        <ArrowUpFromLine size={30} strokeWidth={1.5} className="mb-1 text-[#818181]" />
-                        <p className="ff-sc text-base font-bold text-white">
+                        <ArrowUpFromLine size={22} strokeWidth={1.5} className="mb-0.5 text-[#818181]" />
+                        <p className="font-[family-name:var(--font-alegreya-sc)] text-sm font-bold text-white">
                           Drop files here or <span className="uppercase text-[#4df9ed]">browse</span>
                         </p>
-                        <p className="ff-sc text-sm text-[#818181]">PDF, DOCX, XLSX, JPG, PNG, WEBP or HEIC</p>
+                        <p className="font-[family-name:var(--font-alegreya-sc)] text-xs text-[#818181]">PDF, DOCX, XLSX, JPG, PNG, WEBP or HEIC</p>
                         <input
                           ref={inputRef}
                           type="file"
@@ -541,11 +551,11 @@ export default function UploadDocumentModal({
                             <button
                               type="button"
                               disabled={busy}
-                              onClick={() => setFiles((prev) => prev.filter((_, j) => j !== i))}
+                              onClick={() => setPendingRemove(f)}
                               className="rounded p-1 text-[#818181] [@media(hover:hover)]:hover:bg-white/5 [@media(hover:hover)]:hover:text-[#f62626]"
                               aria-label={`Remove ${f.name}`}
                             >
-                              <Trash2 size={14} />
+                              <X size={15} />
                             </button>
                           </li>
                         ))}
@@ -570,12 +580,12 @@ export default function UploadDocumentModal({
                 </div>
 
                 {/* Buttons, outside the scrolling part. */}
-                <div className="grid shrink-0 grid-cols-2 gap-3 border-t border-[#424242] px-5 py-4 sm:gap-4 sm:px-7 sm:py-5">
+                <div className="grid shrink-0 grid-cols-2 gap-3 border-t border-[#424242] px-6 py-4">
                   <button
                     type="button"
                     disabled={busy}
-                    onClick={onClose}
-                    className="ff-sc h-12 sm:h-[54px] rounded-xl border border-[#818181] text-lg sm:text-xl font-bold text-[#818181] transition-colors disabled:opacity-40 [@media(hover:hover)]:hover:bg-white/[0.04] [@media(hover:hover)]:hover:text-white"
+                    onClick={requestClose}
+                    className="font-[family-name:var(--font-alegreya-sc)] h-10 rounded-lg border border-[#818181] text-base font-bold text-[#818181] transition-colors disabled:opacity-40 [@media(hover:hover)]:hover:bg-white/[0.04] [@media(hover:hover)]:hover:text-white"
                   >
                     Cancel
                   </button>
@@ -583,7 +593,7 @@ export default function UploadDocumentModal({
                     type="button"
                     disabled={busy}
                     onClick={() => void submit()}
-                    className="ff-sc h-12 sm:h-[54px] rounded-xl border border-[#4df9ed] bg-[#4df9ed]/[0.15] text-lg sm:text-xl font-bold text-[#4df9ed] transition-colors disabled:opacity-40 [@media(hover:hover)]:hover:bg-[#4df9ed]/25"
+                    className="font-[family-name:var(--font-alegreya-sc)] h-10 rounded-lg border border-[#4df9ed] bg-[#4df9ed]/[0.15] text-base font-bold text-[#4df9ed] transition-colors disabled:opacity-40 [@media(hover:hover)]:hover:bg-[#4df9ed]/25"
                   >
                     {busy ? 'Uploading…' : 'Upload'}
                   </button>
@@ -593,6 +603,30 @@ export default function UploadDocumentModal({
         </motion.div>
       )}
     </AnimatePresence>
+
+    <ReusableModal
+      open={!!pendingRemove}
+      title="Remove this file?"
+      description={pendingRemove ? `${pendingRemove.name} will be taken off this upload. You can add it again with browse.` : undefined}
+      confirmLabel="Remove"
+      cancelLabel="Keep"
+      onConfirm={() => {
+        const f = pendingRemove
+        setPendingRemove(null)
+        if (f) setFiles((prev) => prev.filter((x) => x !== f))
+      }}
+      onCancel={() => setPendingRemove(null)}
+    />
+
+    <ReusableModal
+      open={confirmClose}
+      title="Discard this upload?"
+      description="The files and notes you added haven't been uploaded. If you close, they will be lost."
+      confirmLabel="Discard"
+      cancelLabel="Keep editing"
+      onConfirm={() => { setConfirmClose(false); onClose() }}
+      onCancel={() => setConfirmClose(false)}
+    />
     </>
   )
 }
@@ -602,13 +636,13 @@ function SelectedRow({ title, sub, right, busy, onChange }: {
   title: string; sub?: string | null; right?: string; busy: boolean; onChange: () => void
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-xl border border-[#4df9ed]/40 bg-[#4df9ed]/[0.06] px-4 py-3">
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-[#4df9ed]/40 bg-[#4df9ed]/[0.06] px-3 py-2">
       <div className="min-w-0">
-        <p className="truncate text-sm 3xl:text-base font-bold text-white">{title}</p>
-        {sub && <p className="truncate text-xs 3xl:text-sm font-bold text-[#818181]">{sub}</p>}
+        <p className="truncate text-sm font-bold text-white">{title}</p>
+        {sub && <p className="truncate text-xs font-bold text-[#818181]">{sub}</p>}
       </div>
       <div className="flex shrink-0 items-center gap-3">
-        {right && <span className="text-xs 3xl:text-sm font-bold uppercase text-white">{right}</span>}
+        {right && <span className="text-xs font-bold uppercase text-white">{right}</span>}
         <button type="button" disabled={busy} onClick={onChange} className="text-xs font-bold text-[#4df9ed] [@media(hover:hover)]:hover:underline">
           Change
         </button>
@@ -623,19 +657,19 @@ function PickerList({ query, onQuery, placeholder, error, loading, empty, childr
   loading: boolean; empty: string; children: ReactNode[]
 }) {
   return (
-    <div className={`overflow-hidden rounded-xl border bg-[#151515] ${error ? 'border-[#f62626]/60' : 'border-[#3a3a3a]'}`}>
-      <div className="flex items-center gap-3 border-b border-[#3a3a3a] px-4">
-        <Search size={18} className="shrink-0 text-[#818181]" />
+    <div className={`overflow-hidden rounded-lg border bg-[#151515] ${error ? 'border-[#f62626]/60' : 'border-[#3a3a3a]'}`}>
+      <div className="flex items-center gap-2 border-b border-[#3a3a3a] px-3">
+        <Search size={15} className="shrink-0 text-[#818181]" />
         <input
           value={query}
           onChange={(e) => onQuery(e.target.value)}
           placeholder={placeholder}
           aria-label={placeholder}
-          className="h-12 min-w-0 flex-1 bg-transparent text-sm 3xl:text-base text-white outline-none placeholder:text-[#818181]"
+          className="h-10 min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-[#818181]"
         />
         <SearchClearButton value={query} onClear={() => onQuery('')} className="static size-6 shrink-0 translate-y-0" />
       </div>
-      <div className="max-h-[232px] overflow-y-auto">
+      <div className="max-h-[188px] overflow-y-auto">
         {loading ? (
           <p className="px-4 py-3 text-xs text-[#818181]">Searching…</p>
         ) : children.length === 0 ? (

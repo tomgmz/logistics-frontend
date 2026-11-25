@@ -902,16 +902,17 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
                   {/* Figma grid card: the file on top, then its type (cyan) with
                       the menu, its booking or plate and date, its name and who
                       uploaded it. */}
-                  <div className="grid gap-4 grid-cols-1 min-[420px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 3xl:grid-cols-5">
+                  {/* Cards stay 180–240 px wide (user 2026-11-25: "too big"): more per row on wider screens. */}
+                  <div className="grid gap-3 grid-cols-2 sm:grid-cols-[repeat(auto-fill,minmax(180px,1fr))] 3xl:grid-cols-[repeat(auto-fill,minmax(210px,1fr))]">
                     {docs.map((d) => (
                       <div
                         key={d.doc_key}
-                        className={`group relative cursor-pointer rounded-[14px] border bg-[#1b1b1b] p-2.5 transition-colors [@media(hover:hover)]:hover:bg-[#222222] ${selected.has(d.doc_key) ? 'border-[#4df9ed]' : 'border-[#424242]'}`}
+                        className={`group relative cursor-pointer rounded-xl border bg-[#1b1b1b] p-2 transition-colors [@media(hover:hover)]:hover:bg-[#222222] ${selected.has(d.doc_key) ? 'border-[#4df9ed]' : 'border-[#424242]'}`}
                         onClick={() => setPreviewKey(d.doc_key)}
                       >
                         {canExport && (
                           <label
-                            className="absolute left-4 top-4 z-[1] flex cursor-pointer rounded-md bg-black/70 p-2"
+                            className="absolute left-3 top-3 z-[1] flex cursor-pointer rounded-md bg-black/70 p-1.5"
                             onClick={(e) => e.stopPropagation()}
                           >
                             <SelectBox checked={selected.has(d.doc_key)} onChange={() => toggleDoc(d)} label={`Select ${d.file_name}`} />
@@ -922,28 +923,28 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
                             <ProtectedImg src={d.file_url} alt="" loading="lazy" className="size-full object-cover" />
                           ) : (
                             <span className="flex flex-col items-center gap-1.5 text-[#818181]">
-                              <FileIcon size={26} strokeWidth={1.5} />
+                              <FileIcon size={22} strokeWidth={1.5} />
                               <span className="max-w-[90%] truncate text-[10px] font-bold uppercase">{d.file_name.split('.').pop()}</span>
                             </span>
                           )}
                         </div>
-                        <div className="mt-2.5 min-w-0 px-1 pb-1">
+                        <div className="mt-2 min-w-0 px-0.5">
                           <div className="flex items-start justify-between gap-1">
-                            <p className="min-w-0 truncate font-[family-name:var(--font-darker)] text-base font-bold uppercase leading-tight text-[#4df9ed]">
+                            <p className="min-w-0 truncate font-[family-name:var(--font-darker)] text-sm font-bold uppercase leading-tight text-[#4df9ed]">
                               {documentTypeLabel(d)}
                             </p>
                             <div onClick={(e) => e.stopPropagation()} className="-mr-1 -mt-1 shrink-0">
                               <RowActionMenu label={`Actions for ${d.file_name}`} heading={d.file_name} actions={rowActions(d)} />
                             </div>
                           </div>
-                          <p className="truncate font-[family-name:var(--font-darker)] text-xs font-bold text-white">
+                          <p className="truncate font-[family-name:var(--font-darker)] text-[11px] font-bold text-[#c4c4c4]">
                             {[d.reference_number ?? d.plate_number, d.uploaded_at && formatDate(d.uploaded_at)].filter(Boolean).join(' · ') || '—'}
                           </p>
                           <Tip label={d.file_name}>
-                            <p className="mt-3 truncate font-[family-name:var(--font-darker)] text-base font-bold text-white">{d.file_name}</p>
+                            <p className="mt-1.5 truncate font-[family-name:var(--font-darker)] text-sm font-bold text-white">{d.file_name}</p>
                           </Tip>
-                          <p className={`${SUB} truncate`}>{uploaderLine(d)}</p>
-                          <div className="mt-2 flex items-center gap-1.5 text-xs">
+                          <p className={`${SUB} truncate text-[11px]!`}>{uploaderLine(d)}</p>
+                          <div className="mt-1 flex items-center gap-1.5 text-[11px]">
                             <DocStatusText doc={d} />
                             {d.override_reason && <Tip label="Taken away from the stop"><span><MapPinOff size={12} className="text-[#ff7a30]" /></span></Tip>}
                           </div>

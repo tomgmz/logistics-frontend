@@ -26,7 +26,7 @@ import { Tip } from '@/components/ui/tooltip'
  * `tone` is the outline and text colour.
  */
 export const PREVIEW_ACTION_CLASS =
-  'ff-sc h-11 3xl:h-12 min-w-0 rounded-[10px] border bg-transparent px-3 text-base 3xl:text-lg font-bold transition-colors disabled:opacity-40 [@media(hover:hover)]:enabled:hover:bg-white/[0.04]'
+  'font-[family-name:var(--font-alegreya-sc)] h-9 3xl:h-10 min-w-0 rounded-lg border bg-transparent px-3 text-sm 3xl:text-base font-bold transition-colors disabled:opacity-40 [@media(hover:hover)]:enabled:hover:bg-white/[0.04]'
 export const PREVIEW_TONE = {
   archive: { color: '#ffea00', borderColor: '#ffea00' },
   reject:  { color: '#f62626', borderColor: '#f62626' },
@@ -37,9 +37,9 @@ export const PREVIEW_TONE = {
 /** One row of the details box: grey small-caps label left, white value right. */
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-[#424242] px-4 py-3 last:border-0">
-      <span className="ff-sc shrink-0 text-xs 3xl:text-sm font-bold text-[#818181]">{label}</span>
-      <span className="ff-sc min-w-0 break-words text-right text-xs 3xl:text-sm font-bold text-white">{children}</span>
+    <div className="flex items-center justify-between gap-4 border-b border-[#424242] px-3 py-2 last:border-0">
+      <span className="font-[family-name:var(--font-alegreya-sc)] shrink-0 text-xs 3xl:text-[13px] font-bold text-[#818181]">{label}</span>
+      <span className="font-[family-name:var(--font-alegreya-sc)] min-w-0 break-words text-right text-xs 3xl:text-[13px] font-bold text-white">{children}</span>
     </div>
   )
 }
@@ -80,16 +80,16 @@ export default function DocumentPreviewModal({
             role="dialog"
             aria-modal="true"
             aria-label={`Document ${doc.file_name}`}
-            className="flex h-[92dvh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-[#424242] bg-[#1b1b1b] shadow-2xl"
+            className="flex h-[min(86dvh,820px)] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-[#424242] bg-[#1b1b1b] shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header: the file's name, then its type and booking or plate. */}
-            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[#424242] px-4 py-3 sm:px-6 sm:py-4">
+            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[#424242] px-4 py-2.5 sm:px-5 sm:py-3">
               <div className="min-w-0">
                 <Tip label={doc.file_name}>
-                  <h2 className="ff-sc truncate text-xl sm:text-2xl font-bold leading-tight text-white">{doc.file_name}</h2>
+                  <h2 className="font-[family-name:var(--font-alegreya-sc)] truncate text-base sm:text-lg font-bold leading-tight text-white">{doc.file_name}</h2>
                 </Tip>
-                <p className="ff-regular mt-0.5 truncate text-sm sm:text-base text-[#818181]">
+                <p className="ff-regular mt-0.5 truncate text-xs sm:text-sm text-[#818181]">
                   {documentTypeLabel(doc)}
                   {doc.reference_number && ` · ${doc.reference_number}`}
                   {doc.plate_number && ` · ${doc.plate_number}`}
@@ -102,7 +102,7 @@ export default function DocumentPreviewModal({
                   className="rounded-lg p-2 text-[#c4c4c4] [@media(hover:hover)]:hover:bg-white/5 [@media(hover:hover)]:hover:text-white"
                   aria-label="Download"
                 >
-                  <Download size={18} />
+                  <Download size={16} />
                 </button></Tip>
                 <button
                   type="button"
@@ -110,7 +110,7 @@ export default function DocumentPreviewModal({
                   className="rounded-lg p-2 text-[#818181] [@media(hover:hover)]:hover:bg-white/5 [@media(hover:hover)]:hover:text-white"
                   aria-label="Close"
                 >
-                  <X size={22} />
+                  <X size={18} />
                 </button>
               </div>
             </div>
@@ -120,14 +120,14 @@ export default function DocumentPreviewModal({
                 <FilePreview url={doc.file_url} name={doc.file_name} onDownload={() => { void downloadFile(doc.file_url, doc.file_name) }} />
               </div>
 
-              <aside className="flex max-h-[50%] min-h-0 shrink-0 flex-col border-t border-[#424242] lg:max-h-none lg:w-[380px] lg:border-l lg:border-t-0 3xl:w-[440px]">
-                <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 sm:p-5">
+              <aside className="flex max-h-[50%] min-h-0 shrink-0 flex-col border-t border-[#424242] lg:max-h-none lg:w-[320px] lg:border-l lg:border-t-0 3xl:w-[360px]">
+                <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
                   {/* Its type on the left, its status on the right. */}
                   <div className="flex items-start justify-between gap-3">
-                    <span className="font-[family-name:var(--font-darker)] text-base 3xl:text-lg font-bold uppercase leading-tight text-white">
+                    <span className="font-[family-name:var(--font-darker)] text-sm 3xl:text-base font-bold uppercase leading-tight text-white">
                       {documentTypeLabel(doc)}
                     </span>
-                    <span className="shrink-0 text-right font-[family-name:var(--font-darker)] text-base 3xl:text-lg font-bold uppercase leading-tight" style={{ color: docStatusOf(doc).color }}>
+                    <span className="shrink-0 text-right font-[family-name:var(--font-darker)] text-sm 3xl:text-base font-bold uppercase leading-tight" style={{ color: docStatusOf(doc).color }}>
                       {docStatusOf(doc).label}
                     </span>
                   </div>
@@ -180,7 +180,7 @@ export default function DocumentPreviewModal({
 
                   {doc.notes && (
                     <div>
-                      <p className="ff-sc mb-1 text-xs font-bold text-[#818181]">Notes</p>
+                      <p className="font-[family-name:var(--font-alegreya-sc)] mb-1 text-xs font-bold text-[#818181]">Notes</p>
                       <p className="ff-regular whitespace-pre-wrap text-sm text-[#c4c4c4]">{doc.notes}</p>
                     </div>
                   )}
@@ -195,7 +195,7 @@ export default function DocumentPreviewModal({
 
                 {actions && (
                   // Equal-width buttons in one row (one full-width button when it is alone).
-                  <div className="grid shrink-0 grid-flow-col auto-cols-fr gap-2 border-t border-[#424242] p-4 sm:p-5 lg:border-t-0 lg:pt-0">
+                  <div className="grid shrink-0 grid-flow-col auto-cols-fr gap-2 border-t border-[#424242] p-4 lg:border-t-0 lg:pt-0">
                     {actions}
                   </div>
                 )}
