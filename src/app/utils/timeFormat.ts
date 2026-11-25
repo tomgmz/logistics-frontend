@@ -3,6 +3,9 @@ const TIMEZONE = 'Asia/Manila'
 
 function toUTC(iso: string): string {
   if (iso.endsWith('Z') || iso.includes('+')) return iso
+  // A date alone ("2026-11-25", a schedule_date): Safari rejects "2026-11-25Z",
+  // so spell out midnight UTC (what Chrome already read it as).
+  if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) return `${iso}T00:00:00Z`
   return iso + 'Z'
 }
 

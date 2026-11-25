@@ -17,14 +17,19 @@ interface AccountTypePickerProps<K extends string> {
   options:  AccountTypeOption<K>[]
   onPick:   (key: K) => void
   onClose:  () => void
+  /** The small cyan line above the title. */
+  eyebrow?: string
+  title?:   string
 }
 
 /**
  * First step of "Create User": choose the kind of account, then the matching form
- * opens. Keeps the create form to the fields that kind actually needs.
+ * opens. Keeps the create form to the fields that kind actually needs. Document
+ * Management's Upload Document uses the same panel for "What is this document
+ * for?" (user 2026-11-25: same size), with its own eyebrow and title.
  */
 export default function AccountTypePicker<K extends string>({
-  open, options, onPick, onClose,
+  open, options, onPick, onClose, eyebrow = 'New Account', title = 'What type of account?',
 }: AccountTypePickerProps<K>) {
   useEffect(() => {
     if (!open) return
@@ -53,12 +58,13 @@ export default function AccountTypePicker<K extends string>({
           >
             <div className="flex items-center justify-between border-b border-[#2a2a2a] px-6 py-4">
               <div>
-                <p className="text-[10px] font-bold tracking-[0.14em] uppercase text-[#4df9ed]">New Account</p>
-                <h2 className="mt-0.5 text-lg font-bold text-white">What type of account?</h2>
+                <p className="text-[10px] font-bold tracking-[0.14em] uppercase text-[#4df9ed]">{eyebrow}</p>
+                <h2 className="mt-0.5 text-lg font-bold text-white">{title}</h2>
               </div>
               <button
                 type="button"
                 onClick={onClose}
+                aria-label="Close"
                 className="rounded-lg p-2 text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white"
               >
                 <X size={18} />

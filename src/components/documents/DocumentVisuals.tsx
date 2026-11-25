@@ -1,5 +1,6 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import { ProtectedImg } from '@/components/ui/FileViewer'
 import { FileText, FileSpreadsheet, File as FileIcon, Image as ImageIcon } from 'lucide-react'
 import {
@@ -83,6 +84,38 @@ function reviewStyle(status: ReviewStatus) {
     case 'approved': return { bg: 'rgba(58,246,38,0.12)',  color: '#3af626', border: 'rgba(58,246,38,0.35)' }
     default:         return { bg: 'rgba(246,38,38,0.12)', color: '#f62626', border: 'rgba(246,38,38,0.35)' }
   }
+}
+
+/**
+ * A file's status as plain coloured capitals (Figma document_management,
+ * 2026-11-25): Awaiting Review yellow, Approved green, Rejected red, Recorded
+ * (evidence from another flow, nothing to review) green, Archived grey.
+ */
+export function docStatusOf(doc: Pick<LibraryDocument, 'archived_at' | 'review_status'>): { label: string; color: string; hint?: string } {
+  if (doc.archived_at) return { label: 'Archived', color: '#818181' }
+  if (!doc.review_status) return { label: 'Recorded', color: '#3af626', hint: 'Recorded by the delivery or fleet flow; no review needed' }
+  const color = reviewStyle(doc.review_status).color
+  return { label: REVIEW_STATUS_LABELS[doc.review_status], color }
+}
+
+export function DocStatusText({ doc, className = '' }: { doc: LibraryDocument; className?: string }) {
+  const s = docStatusOf(doc)
+  const hint = s.hint ?? (doc.review_status === 'approved' && !doc.reviewed_by_name ? 'This type needs no review' : undefined)
+  const text = (
+    <span className={`whitespace-nowrap font-[family-name:var(--font-darker)] font-bold uppercase ${className}`} style={{ color: s.color }}>
+      {s.label}
+    </span>
+  )
+  return hint ? <Tip label={hint}>{text}</Tip> : text
+}
+
+/** The icon tile at the start of a document or folder row: a hairline square with a grey outline icon. */
+export function RowIconTile({ children }: { children: ReactNode }) {
+  return (
+    <span aria-hidden className="flex size-10 3xl:size-[46px] shrink-0 items-center justify-center overflow-hidden rounded-[10px] border border-[#424242] bg-[#1b1b1b] text-[#c4c4c4]">
+      {children}
+    </span>
+  )
 }
 
 export function ReviewStatusBadge({ doc }: { doc: LibraryDocument }) {
