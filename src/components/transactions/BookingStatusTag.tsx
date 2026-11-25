@@ -150,15 +150,34 @@ export function SubTagLine({ tags }: { tags: SubTag[] }) {
       {rest.length > 0 && (
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
+            {/* Hover: every sub-tag at a glance (user 2026-11-24). Click or tap
+                still opens the list with what each one means; the hint hides
+                while that list is open. */}
             <button
               type="button"
               // The row opens the booking on click; this only opens the list.
               onClick={(e) => e.stopPropagation()}
               onKeyDown={(e) => e.stopPropagation()}
               aria-label={`${rest.length} more: ${rest.map((t) => t.label).join(', ')}`}
-              className="shrink-0 cursor-pointer rounded-[3px] border-[0.5px] border-white/60 px-1 py-px text-white"
+              // Plain "+N", no box (user 2026-11-24).
+              className="shrink-0 cursor-pointer text-white"
             >
-              +{rest.length}
+              {/* The hover hint sits on the "+N" text itself, not the popover's
+                  button, so it works in every table row without opening the
+                  booking (user 2026-11-24). It lists every sub-tag. */}
+              <Tip
+                label={open ? undefined : (
+                  <span className="flex flex-col gap-1.5">
+                    {tags.map((t) => (
+                      <span key={t.key} className="font-[family-name:var(--font-darker)] text-[11px] font-bold uppercase leading-none" style={{ color: t.color }}>
+                        {t.label}
+                      </span>
+                    ))}
+                  </span>
+                )}
+              >
+                <span>+{rest.length}</span>
+              </Tip>
             </button>
           </PopoverTrigger>
           <PopoverContent
