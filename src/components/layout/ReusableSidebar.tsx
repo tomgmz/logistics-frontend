@@ -429,7 +429,9 @@ function NavItem({ item, isActive, index, expanded, onNavigate }: NavItemProps) 
           {item.icon}
         </span>
         <span
-          className={`relative z-10 ff-sc text-[14px] lg:text-[12.5px] whitespace-nowrap transition-opacity ${expanded ? 'opacity-100' : 'opacity-0'}`}
+          // `!` because the global .ff-sc steps (globals.css) come later in the
+          // utilities layer and would grow the label to 16–20px on big screens.
+          className={`relative z-10 ff-sc !text-[14px] md:!text-[15px] xl:!text-[16px] 2xl:!text-[17px] whitespace-nowrap transition-opacity ${expanded ? 'opacity-100' : 'opacity-0'}`}
         >
           {item.label}
         </span>
