@@ -95,12 +95,13 @@ function typingDelay(text: string): number {
 }
 
 /** Three bouncing dots in a bot bubble, shown while the assistant "types". */
-function TypingBubble({ label = 'The assistant is typing' }: { label?: string }) {
+function TypingBubble({ label = 'The assistant is typing', staff = false }: { label?: string; staff?: boolean }) {
   const reduce = useReducedMotion()
   return (
     <div className="flex justify-start gap-2" role="status" aria-label={label}>
-      <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-[var(--color-cyan)]">
-        <Bot size={13} />
+      {/* Client's view: our team green, the assistant orange (the client is cyan). */}
+      <span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/[0.06] ${staff ? 'text-green-500' : 'text-orange-500'}`}>
+        {staff ? <UserRound size={13} /> : <Bot size={13} />}
       </span>
       <div className="flex items-center gap-1 rounded-2xl rounded-bl-md bg-white/[0.06] px-3.5 py-3">
         {[0, 1, 2].map((i) => (
@@ -924,16 +925,16 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
                   <Fragment key={m.id}>
                   <div className={`flex ${m.from === 'client' ? 'justify-end' : 'justify-start'} gap-2`}>
                     {m.from !== 'client' && (
-                      <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-[var(--color-cyan)]">
+                      <span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/[0.06] ${m.from === 'staff' ? 'text-green-500' : 'text-orange-500'}`}>
                         {m.from === 'staff' ? <UserRound size={13} /> : <Bot size={13} />}
                       </span>
                     )}
                     <div className={`max-w-[85%] space-y-2 ${m.from === 'client' ? 'items-end' : ''}`}>
-                      {m.from === 'staff' && m.name && <p className="text-[12px] text-white/45">{m.name}</p>}
+                      {m.from === 'staff' && m.name && <p className="text-[12px] text-green-500">{m.name}</p>}
                       <div
                         className={`whitespace-pre-line rounded-2xl px-3.5 py-2.5 text-[15px] leading-relaxed ${
                           m.from === 'client'
-                            ? 'rounded-br-md bg-[var(--color-cyan)] text-[#0a0a0a]'
+                            ? 'rounded-br-md border border-[var(--color-cyan)] bg-[#063a37] text-white'
                             : 'rounded-bl-md bg-white/[0.06] text-white/90'}`}
                       >
                         {m.attachmentUrl || m.from === 'staff' || (m.from === 'client' && m.history)
@@ -1043,7 +1044,7 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
                 ))}
 
                 {typing && <TypingBubble />}
-                {withTeam && staffTyping && <TypingBubble label={`${staffTyping} is typing`} />}
+                {withTeam && staffTyping && <TypingBubble staff label={`${staffTyping} is typing`} />}
 
                 {/* Still with the assistant: a way to the team at any time. */}
                 {canTicket && !withTeam && !convLoading && messages.some((m) => m.from === 'client') && (

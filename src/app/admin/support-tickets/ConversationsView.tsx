@@ -496,16 +496,22 @@ function Bubble({ m, authors, clientName }: { m: ChatMessage; authors: ChatDetai
   const who    = m.author === 'client' ? (clientName ?? 'Client')
     : m.author === 'assistant' ? 'Help assistant'
     : a ? `${a.name} · ${roleLabel(a.role)}` : 'Our team'
+  // Staff's view: our team cyan, the assistant orange, the client green
+  // (the client's own chat swaps client and team).
+  const tone = m.author === 'assistant' ? 'text-orange-500' : m.author === 'client' ? 'text-green-500' : 'text-cyan-500'
   return (
     <div className={`flex flex-col gap-1 ${mine ? 'items-end' : 'items-start'}`}>
       <p className="flex items-center gap-1 text-xs text-white/45">
-        {m.author === 'assistant' ? <Bot size={11} /> : m.author === 'client' ? <UserRound size={11} /> : null}
-        {who} · {formatTime(m.created_at)}
+        <span className={`inline-flex items-center gap-1 ${tone}`}>
+          {m.author === 'assistant' ? <Bot size={11} /> : <UserRound size={11} />}
+          {who}
+        </span>
+        · {formatTime(m.created_at)}
         {m.via === 'email' && <span className="inline-flex items-center gap-0.5"> · <Mail size={11} /> by email</span>}
         {m.meta?.ai && <span> · AI answer</span>}
       </p>
       <div className={`max-w-[88%] whitespace-pre-line rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${
-        mine ? 'rounded-br-md bg-[var(--color-cyan)] text-[#0a0a0a]'
+        mine ? 'rounded-br-md border border-[var(--color-cyan)] bg-[#063a37] text-white'
           : m.author === 'assistant' ? 'rounded-bl-md border border-white/10 bg-transparent text-white/70'
           : 'rounded-bl-md bg-white/[0.07] text-white/90'}`}>
         <MessagePhoto body={m.content} attachmentUrl={m.attachment_url} stamped={m.attachment_stamped} />

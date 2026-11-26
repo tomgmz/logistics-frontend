@@ -19,9 +19,10 @@ import { delayOf } from './DelayedBadge'
  * Main tags: Pending, Approved, Assigned, In Transit, Delivered, Completed,
  * Failed, and Rejected (a cancelled booking reads "Rejected", user
  * 2026-11-24). Everything else about the booking (resubmitted, delayed,
- * problem reported, partly failed, paused…) is a sub-tag: a small outlined
- * pill under the main tag. Only the most important one is written out; the
- * rest are a "+N" inside that pill that opens the full list on click or tap.
+ * problem reported, partly failed, paused…) is a sub-tag under the main tag.
+ * In a table only the most important one is written out (plain coloured
+ * text) and the rest are a boxed "+N" that opens the full list; in a booking
+ * panel every sub-tag is shown in its own outlined box.
  */
 
 // ── main tag ───────────────────────────────────────────────────────────────
@@ -138,78 +139,101 @@ export function subTagsOf(b: Record<string, unknown>, { staff = false }: { staff
 }
 
 /**
- * Figma "sub-tag" (2308:1764, user 2026-11-26): a 12px pill with a hairline
+ * Figma "sub-tag" (2308:1764, user 2026-11-26): a 12px box (5px corners like the main tag, user 2026-11-26) with a hairline
  * border in the tag colour, no fill, Darker Grotesque bold 10px capitals.
+ * Sub-tags get their own box only in a booking panel; in a table they stay
+ * plain coloured text and only the "+N" is boxed (user 2026-11-26).
  */
-const PILL = 'inline-flex h-[12px] min-w-0 max-w-full items-center gap-1 whitespace-nowrap rounded-[8px] border-[0.5px] border-solid px-[2px] py-px font-[family-name:var(--font-darker)] text-[10px] font-bold uppercase leading-none'
+const PILL = 'inline-flex h-[12px] w-fit min-w-0 max-w-full shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border-[0.5px] border-solid px-[6px] py-px font-[family-name:var(--font-darker)] text-[10px] font-bold uppercase leading-none'
+const TEXT = 'font-[family-name:var(--font-darker)] text-[10px] font-bold uppercase leading-none'
 
 export function SubTagPill({ tag }: { tag: SubTag }) {
   return (
-    <span className={`${PILL} w-fit`} style={{ color: tag.color, borderColor: tag.color }}>
-      <span className="truncate">{tag.label}</span>
-    </span>
+    <Tip label={tag.hint}>
+      <span className={PILL} style={{ color: tag.color, borderColor: tag.color }}>
+        <span className="truncate">{tag.label}</span>
+      </span>
+    </Tip>
   )
 }
 
 /**
- * The sub-tag line: the first one written out in its pill, the rest as a
- * "+N" inside that same pill (user 2026-11-26), click / tap for the list.
+ * The sub-tags under the main tag.
+ * - `boxed` (a booking panel): every sub-tag in its own pill, wrapping.
+ * - otherwise (a table row): the first written out as plain text, the rest
+ *   as a boxed "+N" beside it, click / tap for the list.
  */
-export function SubTagLine({ tags }: { tags: SubTag[] }) {
+export function SubTagLine({ tags, boxed = false, align = 'start' }: {
+  tags:   SubTag[]
+  boxed?: boolean
+  align?: 'start' | 'end'
+}) {
   const [open, setOpen] = useState(false)
   if (tags.length === 0) return null
+  if (boxed) {
+    return (
+      <span className={`mt-1.5 flex max-w-[240px] flex-wrap gap-1 ${align === 'end' ? 'justify-end' : 'justify-start'}`}>
+        {tags.map((t) => <SubTagPill key={t.key} tag={t} />)}
+      </span>
+    )
+  }
   const [first, ...rest] = tags
   return (
-    <span className="mt-[3px] flex max-w-full">
-      <span className={PILL} style={{ color: first.color, borderColor: first.color }}>
-        <Tip label={first.hint}>
-          <span className="min-w-0 truncate">{first.label}</span>
-        </Tip>
-        {rest.length > 0 && (
-          <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
-              {/* Hover: every sub-tag at a glance (user 2026-11-24). Click or tap
-                  still opens the list with what each one means; the hint hides
-                  while that list is open. */}
-              <button
-                type="button"
-                // The row opens the booking on click; this only opens the list.
-                onClick={(e) => e.stopPropagation()}
-                onKeyDown={(e) => e.stopPropagation()}
-                aria-label={`${rest.length} more: ${rest.map((t) => t.label).join(', ')}`}
-                className="shrink-0 cursor-pointer text-white"
-              >
-                {/* The hover hint sits on the "+N" text itself, not the popover's
-                    button, so it works in every table row without opening the
-                    booking (user 2026-11-24). It lists every sub-tag. */}
-                <Tip
-                  label={open ? undefined : (
-                    <span className="flex flex-col items-start gap-1.5">
-                      {tags.map((t) => <SubTagPill key={t.key} tag={t} />)}
-                    </span>
-                  )}
-                >
-                  <span>+{rest.length}</span>
-                </Tip>
-              </button>
-            </PopoverTrigger>
-            <PopoverContent
-              align="start"
+    <span className={`mt-[3px] flex max-w-full items-center gap-1 ${TEXT}`}>
+      <Tip label={first.hint}>
+        <span className="truncate" style={{ color: first.color }}>{first.label}</span>
+      </Tip>
+      {rest.length > 0 && (
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            {/* Hover: every sub-tag at a glance (user 2026-11-24). Click or tap
+                still opens the list with what each one means; the hint hides
+                while that list is open. */}
+            <button
+              type="button"
+              // The row opens the booking on click; this only opens the list.
               onClick={(e) => e.stopPropagation()}
-              className="z-[1500] w-auto max-w-[min(320px,calc(100vw-32px))] gap-2 border border-white/10 bg-[#111] p-3 text-white"
+              onKeyDown={(e) => e.stopPropagation()}
+              aria-label={`${rest.length} more: ${rest.map((t) => t.label).join(', ')}`}
+              // "+N" in its own box (user 2026-11-26).
+              className={`${PILL} cursor-pointer border-white text-white`}
             >
-              <ul className="flex flex-col gap-2">
-                {tags.map((t) => (
-                  <li key={t.key} className="flex flex-col items-start gap-1">
-                    <SubTagPill tag={t} />
-                    <span className="text-xs leading-snug text-[#c4c4c4]">{t.hint}</span>
-                  </li>
-                ))}
-              </ul>
-            </PopoverContent>
-          </Popover>
-        )}
-      </span>
+              {/* The hover hint sits on the "+N" text itself, not the popover's
+                  button, so it works in every table row without opening the
+                  booking (user 2026-11-24). It lists every sub-tag. */}
+              <Tip
+                label={open ? undefined : (
+                  <span className="flex flex-col gap-1.5">
+                    {tags.map((t) => (
+                      <span key={t.key} className="font-[family-name:var(--font-darker)] text-[11px] font-bold uppercase leading-none" style={{ color: t.color }}>
+                        {t.label}
+                      </span>
+                    ))}
+                  </span>
+                )}
+              >
+                <span>+{rest.length}</span>
+              </Tip>
+            </button>
+          </PopoverTrigger>
+          <PopoverContent
+            align="start"
+            onClick={(e) => e.stopPropagation()}
+            className="z-[1500] w-auto max-w-[min(320px,calc(100vw-32px))] gap-2 border border-white/10 bg-[#111] p-3 text-white"
+          >
+            <ul className="flex flex-col gap-2">
+              {tags.map((t) => (
+                <li key={t.key} className="flex flex-col gap-0.5">
+                  <span className="font-[family-name:var(--font-darker)] text-[11px] font-bold uppercase leading-none" style={{ color: t.color }}>
+                    {t.label}
+                  </span>
+                  <span className="text-xs leading-snug text-[#c4c4c4]">{t.hint}</span>
+                </li>
+              ))}
+            </ul>
+          </PopoverContent>
+        </Popover>
+      )}
     </span>
   )
 }
@@ -233,7 +257,8 @@ export default function BookingStatusTag({ booking, staff = false, extra = [], s
   return (
     <span className={`inline-flex max-w-full flex-col ${align === 'end' ? 'items-end' : 'items-start'}`}>
       <MainStatusTag status={booking.status as string | undefined} size={size} />
-      <SubTagLine tags={tags} />
+      {/* md = a booking panel header: every sub-tag boxed (Figma 2308:1452). */}
+      <SubTagLine tags={tags} boxed={size === 'md'} align={align} />
     </span>
   )
 }

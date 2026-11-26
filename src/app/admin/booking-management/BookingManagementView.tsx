@@ -2406,12 +2406,12 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                 className="fixed lg:relative z-[50] inset-y-0 right-0 w-full max-w-[455px] shrink-0 border-l border-[#424242] flex flex-col shadow-2xl lg:shadow-none"
                 style={{ background: PANEL_BG }}
               >
-                <div className="shrink-0 flex items-center justify-between gap-3 pl-4 sm:pl-[26px] pr-2 sm:pr-3 min-h-[59px] border-b border-[#424242]">
+                <div className="shrink-0 flex items-center justify-between gap-3 pl-4 sm:pl-[26px] pr-2 sm:pr-3 py-3 min-h-[59px] border-b border-[#424242]">
                   <span className="text-base font-bold uppercase text-[#818181]">Booking</span>
                   <div className="flex items-center gap-1.5 min-w-0">
                     {detail && !detailLoading && (
                       <>
-                        <BookingStatusTag booking={detail as unknown as Record<string, unknown>} staff size="md" />
+                        <BookingStatusTag booking={detail as unknown as Record<string, unknown>} staff size="md" align="end" />
                       </>
                     )}
                     <button type="button" onClick={closeDetail} className="p-2 rounded-lg hover:bg-white/5 text-[#818181] hover:text-white transition-colors" aria-label="Close">
