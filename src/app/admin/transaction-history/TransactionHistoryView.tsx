@@ -473,10 +473,10 @@ export default function TransactionHistoryView() {
                 style={{ background: PANEL_BG }}
               >
                 <div className="shrink-0 flex items-center justify-between gap-3 pl-4 sm:pl-[26px] pr-2 sm:pr-3
-                                min-h-[59px] border-b border-[#424242]">
+                                py-3 min-h-[59px] border-b border-[#424242]">
                   <span className="text-base font-bold uppercase text-[#818181]">Transaction</span>
                   <div className="flex items-center gap-1.5 min-w-0">
-                    <BookingStatusTag booking={selected} staff size="md" />
+                    <BookingStatusTag booking={selected} staff size="md" align="end" />
                     <button type="button" onClick={() => setSelected(null)} aria-label="Close"
                       className="p-2 rounded-lg hover:bg-white/5 text-[#818181] hover:text-white transition-colors cursor-pointer">
                       <X size={19} strokeWidth={2} />
