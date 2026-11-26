@@ -20,7 +20,6 @@ import { getApiErrorMessage } from '@/lib/api-error'
 import { appToast } from '@/lib/toast'
 
 import StaffTransactionDetail from '@/components/transactions/StaffTransactionDetail'
-import { getStatusMeta } from '@/components/transactions/TransactionStatus'
 import { PANEL_BG } from '@/app/admin/booking-management/BookingDetailParts'
 import BookingStatusTag from '@/components/transactions/BookingStatusTag'
 import {
@@ -91,28 +90,6 @@ const SORTS: { key: SortKey; label: string }[] = [
   { key: 'date_desc',   label: 'Date — Newest First' },
   { key: 'date_asc',    label: 'Date — Oldest First' },
 ]
-
-// The cards above the table: one count per status, in that status's colour.
-const STATUS_CARDS: { key: string; label: string }[] = [
-  { key: 'pending',   label: 'Pending' },
-  { key: 'approved',  label: 'Approved' },
-  { key: 'delivered', label: 'Delivered' },
-  { key: 'completed', label: 'Completed' },
-]
-
-function KpiTile({ label, value, accent, sub }: {
-  label: string; value: string; accent?: string; sub?: string
-}) {
-  return (
-    <div className="rounded-xl border border-white/[0.08] bg-[#1b1b1b] px-3 py-2.5">
-      <p className="text-[10px] uppercase tracking-widest" style={{ color: MUTED }}>{label}</p>
-      <p className="mt-1 text-lg font-bold tabular-nums" style={{ color: accent ?? '#fff' }}>
-        {value}
-      </p>
-      {sub && <p className="text-[11px]" style={{ color: MUTED }}>{sub}</p>}
-    </div>
-  )
-}
 
 // Reports ?booking=<id>. Isolated so useSearchParams sits under its own
 // Suspense boundary.
@@ -304,15 +281,6 @@ export default function TransactionHistoryView() {
 
       <div className="flex lg:min-h-0 flex-[1_0_auto] lg:flex-1 lg:overflow-hidden">
         <div className="flex lg:min-h-0 min-w-0 flex-1 flex-col gap-3 p-3 lg:p-4">
-
-          {/* Four status counts under the current search and filters (the status
-              tab itself never narrows them). */}
-          <div className="grid shrink-0 grid-cols-2 gap-2 lg:grid-cols-4">
-            {STATUS_CARDS.map((c) => (
-              <KpiTile key={c.key} label={c.label} accent={getStatusMeta(c.key).color}
-                value={meta ? (statusCounts[c.key] ?? 0).toLocaleString() : '—'} />
-            ))}
-          </div>
 
           {/* The table format's filter row: search, the status switch, Select
               Date, Filters, and Export at the far right. */}

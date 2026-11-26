@@ -37,7 +37,6 @@ import { TableCard } from '@/components/ui/untitled/table-card'
 import { Button } from '@/components/ui/untitled/button'
 import { TabsMinimal } from '@/components/ui/untitled/tabs'
 import { UserPlus01 as UserPlusIcon } from '@untitledui/icons'
-import StatTiles from '@/components/ui/StatTiles'
 import FilterBar, {
   matchesFilter, optionsFrom, type FilterField, type FilterValues,
 } from '@/components/ui/FilterBar'
@@ -595,7 +594,6 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
   // The Filters panel's applied values. They belong to the tab (and view) they
   // were set on, so switching either clears them.
   const [filters,          setFilters]          = useState<FilterValues>([])
-  const [stats,            setStats]            = useState({ total: 0, active: 0, deactivated: 0, locked: 0 })
   const [showForm,         setShowForm]         = useState(false)
   const [editUser,         setEditUser]         = useState<AnyUser | null>(null)
   const [formViewOnly,     setFormViewOnly]     = useState(false)
@@ -644,8 +642,7 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
   }, [searchInput])
 
   // Server-side pages (10 on phones, 20 from tablet up): the server builds the
-  // tab's list, applies the filters and search, and sends one page. The stat
-  // tiles are re-read with it. `meta.tab` says which tab the rows belong to:
+  // tab's list, applies the filters and search, and sends one page. `meta.tab` says which tab the rows belong to:
   // drawing the previous tab's rows through the new tab's cells (company
   // drivers through the vendor columns, which read an `access` field they
   // don't have) crashed the page, so rows only show under their own tab.
@@ -658,17 +655,13 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
       const sent: FilterValues = tab === 'archived'
         ? [...filters.filter((r) => r.field !== 'status'), { field: 'status', op: 'is', value: 'archived' }]
         : filters.filter((r) => r.field !== 'status' || r.value !== 'archived')
-      const [res, statsResult] = await Promise.all([
-        userService.getDirectory({
-          ...q,
-          tab: tab === 'archived' ? 'all' : tab,
-          ...(sent.length && { filters: JSON.stringify(sent) }),
-          ...(search && { search }),
-          ...reverseParam(reverse),
-        }),
-        userService.getStats('client,driver'),
-      ])
-      setStats({ total: statsResult.total, active: statsResult.active, deactivated: statsResult.deactivated ?? 0, locked: statsResult.locked ?? 0 })
+      const res = await userService.getDirectory({
+        ...q,
+        tab: tab === 'archived' ? 'all' : tab,
+        ...(sent.length && { filters: JSON.stringify(sent) }),
+        ...(search && { search }),
+        ...reverseParam(reverse),
+      })
       return { data: res.data, meta: { ...res.meta, tab } }
     },
     `${activeTab}|${JSON.stringify(filters)}|${search}|${reverse}`,
@@ -809,15 +802,6 @@ export default function UserManagementClient({ mode = 'company-admin', sectionTa
     <ThemeProvider theme={muiTheme}>
       <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-60px)] overflow-y-auto overflow-x-hidden lg:overflow-hidden bg-[#0a0a0a] text-white">
         <div className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0 px-3 py-3 sm:px-4 lg:px-5 3xl:px-6 lg:pt-3 lg:pb-4 3xl:pb-5 gap-3 3xl:gap-4 lg:overflow-hidden">
-
-          {/* Stats (Figma 3234:1482). */}
-          {/* No count cards in the Archive module (user, 2026-11-11). */}
-          {!archive && <StatTiles tiles={[
-            { label: 'Total Users', value: stats.total,       color: 'text-[#3af626]' },
-            { label: 'Active',      value: stats.active,      color: 'text-[#4df9ed]' },
-            { label: 'Deactivated', value: stats.deactivated, color: 'text-[#ff7a30]' },
-            { label: 'Locked',      value: stats.locked,      color: 'text-[#f62626]' },
-          ]} />}
 
           {/* Table card */}
           <TableCard.Root className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0">
