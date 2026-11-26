@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 
-import { tripService } from '@/lib/services/admin/trip.service'
+import { tripService, type DriverCallCheck } from '@/lib/services/admin/trip.service'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { writeAccess } from '@/components/layout/ModuleAccess'
@@ -12,19 +12,22 @@ import Dropdown from '@/components/ui/Dropdown'
 import { FieldError, errorBorder } from '@/components/ui/FieldError'
 
 /**
- * The driver's call time: when operations wants the driver at the pickup point.
+ * The driver's call time: when the driver should start the delivery so the
+ * truck is at the pickup point by the client's pick-up time (user 2026-11-26).
  *
- * Separate from the client's call time, which stays what the client booked.
- * Required after assignment (user 2026-11-24): it is a step of the booking's
- * progress, and once saved it can't be cleared — "Same as Client's Time" saves
- * the client's time as the value. Still guidance, not a gate: the driver can
- * start without it or earlier, and the driver app reminds the crew one hour
- * before it. Editable until the delivery starts.
+ * Separate from the client's call time (the pick-up time), which stays what the
+ * client booked, and never the same: it must be before it, because the drive
+ * there takes time. Required after assignment (user 2026-11-24): a step of the
+ * booking's progress that can't be cleared. With none set, the driver gets no
+ * reminder and there is no Late start. Still guidance, not a gate: the driver
+ * can start without it or earlier. The app reminds the drivers 1 hour before.
+ * Editable until the delivery starts.
  *
  * It has its own day (user 2026-11-17): the booking day or the day before, so a
- * 12:00 AM start can have a 10:00 PM call the night before. It can't be after
- * the booking start (booking day + client's call time) or already past; the
- * server refuses the same.
+ * 12:00 AM pick-up can have a 10:00 PM call the night before. The server
+ * refuses the same rules. While picking, the drive time from the parking at
+ * that hour is checked and a warning shows when it would miss the pick-up
+ * (never a block).
  */
 
 interface Props {
@@ -102,11 +105,39 @@ export function formatDriverCall(time: string | null | undefined, day: string | 
 function callError(day: string, time: string, scheduleDay: string, clientCallTime: string | null | undefined): string | null {
   const at    = phMs(day, time)
   const start = clientCallTime ? phMs(scheduleDay, clientCallTime) : NaN
-  if (!Number.isNaN(start) && at > start) {
-    return `Can't be after the booking starts (${formatDay(scheduleDay)}, ${formatCallClock(clientCallTime)}).`
+  if (!Number.isNaN(start) && at >= start) {
+    return `Must be before the client's pick-up time (${formatDay(scheduleDay)}, ${formatCallClock(clientCallTime)}), so the truck can get there in time.`
   }
   if (at <= Date.now()) return 'This time has already passed. Pick a later time.'
   return null
+}
+
+/** A first guess: 1 hour before the client's pick-up time (the day before when that crosses midnight). */
+function defaultCall(scheduleDay: string, clientCallTime: string | null | undefined): { day: string; time: string } {
+  const start = clientCallTime ? phMs(scheduleDay, clientCallTime) : NaN
+  if (Number.isNaN(start)) return { day: scheduleDay, time: '07:00' }
+  const ph = new Date(start - 60 * 60_000 + 8 * 60 * 60_000)
+  return { day: ph.toISOString().slice(0, 10), time: ph.toISOString().slice(11, 16) }
+}
+
+/** "9:05 AM" from an ISO instant, Manila. */
+function clockOf(iso: string): string {
+  return new Date(iso).toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Manila' })
+}
+
+/** The drive-time check in words; `late` = it would miss the pick-up. */
+function checkText(c: DriverCallCheck | null): { text: string; late: boolean } | null {
+  if (!c) return null
+  if (c.reason === 'no_parking') return { text: "No parking position on record yet, so the drive time can't be checked.", late: false }
+  if (c.drive_minutes == null || !c.arrives_at) return null
+  const drive = c.drive_minutes >= 60
+    ? `${Math.floor(c.drive_minutes / 60)} h ${c.drive_minutes % 60} min`
+    : `${c.drive_minutes} min`
+  const base = `Driving from the parking takes about ${drive} at that hour, arriving around ${clockOf(c.arrives_at)}`
+  if (c.late_minutes != null && c.late_minutes > 0) {
+    return { text: `${base}: about ${c.late_minutes} min after the client's pick-up time. Pick an earlier time, or allow for it.`, late: true }
+  }
+  return { text: `${base}, in time for the pick-up. Allow extra for the pre-trip checks.`, late: false }
 }
 
 const selectClass =
@@ -123,8 +154,9 @@ export default function DriverCallTime({
   const [savedDay, setSavedDay] = useState<string | null>(driverCallTime ? (driverCallDate ?? scheduleDay) : null)
   const [editing, setEditing]   = useState(false)
   const [saving, setSaving]     = useState(false)
-  const [draft, setDraft]       = useState(() => split(saved ?? clientCallTime))
-  const [draftDay, setDraftDay] = useState(savedDay ?? scheduleDay)
+  const [draft, setDraft]       = useState(() => split(saved ?? defaultCall(scheduleDay, clientCallTime).time))
+  const [draftDay, setDraftDay] = useState(savedDay ?? defaultCall(scheduleDay, clientCallTime).day)
+  const [check, setCheck]       = useState<DriverCallCheck | null>(null)
   const [showErrors, setShowErrors] = useState(false)
 
   // The same call time shows in the progress step and in Trips: follow the
@@ -144,17 +176,27 @@ export default function DriverCallTime({
   const errClass   = errorBorder(showErrors && draftError)
 
   const begin = () => {
-    setDraft(split(saved ?? clientCallTime))
-    setDraftDay(savedDay ?? scheduleDay)
+    const g = defaultCall(scheduleDay, clientCallTime)
+    setDraft(split(saved ?? g.time))
+    setDraftDay(savedDay ?? g.day)
     setShowErrors(false)
+    setCheck(null)
     setEditing(true)
   }
 
-  // The client's own start as the call: booking day + the client's time.
-  // Allowed (equal to the start is fine) unless it has already passed.
-  const clientClock  = clientCallTime ? clientCallTime.slice(0, 5) : null
-  const clientError  = clientClock && scheduleDay ? callError(scheduleDay, clientClock, scheduleDay, clientCallTime) : 'No client call time'
-  const sameAsClient = !!clientClock && saved === clientClock && savedDay === scheduleDay
+  // The drive time at the picked hour, once the pick stops changing. Only a
+  // valid pick is checked (one Google call each, cached by the server).
+  useEffect(() => {
+    if (!editing || draftError || !draftDay) { setCheck(null); return }
+    let live = true
+    const t = setTimeout(() => {
+      tripService.checkDriverCall(bookingId, draftDay, draftTime)
+        .then((c) => { if (live) setCheck(c) })
+        .catch(() => { if (live) setCheck(null) })
+    }, 600)
+    return () => { live = false; clearTimeout(t) }
+  }, [editing, draftError, draftDay, draftTime, bookingId])
+  const warning = editing && !draftError ? checkText(check) : null
 
   const save = async (value: string, day: string) => {
     setSaving(true)
@@ -221,16 +263,16 @@ export default function DriverCallTime({
             </Dropdown>
           </div>
           <FieldError>{showErrors ? draftError : null}</FieldError>
+          {warning && (
+            <p className="mt-1.5 text-xs leading-snug" style={{ color: warning.late ? PALETTE.orange : '#9a9a9a' }}>
+              {warning.text}
+            </p>
+          )}
           </div>
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={() => setEditing(false)} disabled={saving} className={smallBtn} style={GREY_BUTTON_STYLE}>
               Cancel
             </button>
-            {clientClock && !clientError && !sameAsClient && (
-              <button type="button" onClick={() => void save(clientClock, scheduleDay)} disabled={saving} className={`${smallBtn} min-w-[150px]`} style={GREY_BUTTON_STYLE}>
-                Same as Client&apos;s Time
-              </button>
-            )}
             <button type="button" onClick={() => { setShowErrors(true); if (!draftError) void save(draftTime, draftDay) }} disabled={saving}
               className={smallBtn} style={TEAL_BUTTON_STYLE}>
               {saving ? 'Saving…' : 'Save'}
@@ -242,10 +284,10 @@ export default function DriverCallTime({
       {/* Inside the progress step the step itself explains this. */}
       {!isStep && (
         <p className="text-xs font-bold uppercase leading-snug text-[#818181]">
+          {`Client's pick-up time: ${formatCallClock(clientCallTime)} on the booking day. `}
           {saved
-            ? `Client's call time: ${formatCallClock(clientCallTime)} on the booking day. `
-            : `Required. Until it is set the driver goes by the client's call time (${formatCallClock(clientCallTime)}). `}
-          The driver is notified in the app 1 hour before and can still start the delivery early.
+            ? 'The driver is notified in the app 1 hour before and can still start the delivery early.'
+            : 'Required: when the driver should leave so the truck is there by then. Until it is set the driver gets no reminder.'}
         </p>
       )}
 

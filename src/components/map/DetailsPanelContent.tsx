@@ -14,7 +14,6 @@ import {
 import type { OptimizeRouteResponse, BookingDetail } from '@/app/types/maps/routemap.types'
 import { fetchTruckModels } from '@/lib/api/client/truck-model'
 import { formatEta, formatEtaClock, type StopEta } from '@/lib/hooks/useLiveDriverPosition'
-import { arrivalWindow, formatArrivalWindow, isPastWindow } from '@/lib/arrival-window'
 import { RouteStepper, routeSteps } from './RouteStepper'
 import { pauseReasonLabel } from '@/lib/pause-reasons'
 import { continuationDayLabel, openContinuation, pausedPlanState } from '@/lib/pause-continuation'
@@ -34,6 +33,14 @@ const STAGE_ICONS = [
   { Icon: Truck,         label: 'In Transit' },
   { Icon: PackageCheck,  label: 'Delivered'  },
 ]
+
+/** "08:00[:00]" → "8:00 AM"; '' when unreadable. */
+function clock12(t: string): string {
+  const m = /^(\d{2}):(\d{2})/.exec(t)
+  if (!m) return ''
+  const h = Number(m[1])
+  return `${h % 12 || 12}:${m[2]} ${h < 12 ? 'AM' : 'PM'}`
+}
 
 function fmtStatus(s: string) {
   return (s ?? '').replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase())
@@ -177,56 +184,34 @@ export function DetailsPanelContent({
   const vehicle     = assignedVehicle(bookingDetail)
   const truckType   = bookingDetail?.truck_type_needed ?? vehicle.type ?? 'To be assigned'
   const plateNumber = vehicle.plate ?? '—'
-  // The planned arrival at the last stop of the last run, as a window. Before
-  // it's planned (no truck yet) this falls back to the scheduled day.
-  const plannedAt   = bookingDetail?.estimated_delivery ?? null
-  const windowText  = formatArrivalWindow(plannedAt)
-  // Paused: the plan is real only once the office has set when it continues;
-  // until then (or once that time passes still paused) it would keep sliding.
+  // Paused: whether the office has set when it continues.
   const planState   = pausedPlanState(bookingDetail)
   const continuation = openContinuation(bookingDetail)
-  const estDelivery = planState === 'tbc'
-    ? 'To be confirmed'
-    : windowText
-      // Always the plan. "Now expected" only for a paused delivery whose
-      // continuation the office has set; a late delivery's new time is the
-      // Estimate Arrival and the Delayed banner, not this card.
-      ? (planState === 'planned' ? `Now expected ${windowText}` : windowText)
-      : scheduleDate
 
   // The final stop's live ETA, which is what "estimate arrival" has always meant
   // on this panel and never actually showed — `estimated_arrival` was a declared
   // field the backend never populated, so this rendered an em dash for everyone.
   const destEta = destStop ? etaByStop?.get(destStop.destination_id) : undefined
 
-  // Behind plan: the live ETA to the final stop lands after the planned window,
-  // or the window has closed with the delivery still open. Without a plan there
-  // is nothing to be late against.
-  const plannedEnd = arrivalWindow(plannedAt)?.end ?? null
   const done       = ['DELIVERED', 'COMPLETED', 'CANCELLED'].includes(status.toUpperCase())
   // Paused by the driver: the delay is explained on screen, so it is not
   // flagged "Late", and there is no countdown to an arrival that isn't moving.
   const pausedAt   = !done ? bookingDetail?.paused_at ?? null : null
   const pausedMin  = usePausedMinutes(pausedAt)
-  // The server's delay flag (delay.scheduler: next stop 15+ min past its
-  // window) counts too, so this badge and the client's notice agree.
+  // The server's delay mark (delay.scheduler): the truck is not at the pickup
+  // point by the client's pick-up time. Drop-offs have the live ETA only.
   const delayedFlag = !done && !pausedAt && !!bookingDetail?.delayed_since
-  const isLate     = delayedFlag || (!done && !pausedAt && !!plannedEnd && (
-    destEta ? Date.parse(destEta.eta_at) > plannedEnd.getTime() : isPastWindow(plannedAt)
-  ))
-  const delayNewWindow = delayedFlag ? formatArrivalWindow(bookingDetail?.delay_expected_at ?? null) : null
+  const delayNewTime = delayedFlag && bookingDetail?.delay_expected_at ? formatEtaClock(bookingDetail.delay_expected_at) : null
 
-  // The live ETA (dropped once older than 15 min, useLiveDriverPosition); else
-  // the server's new time for a late delivery; else, on the road, no estimate.
+  // The live ETA (dropped once older than 15 min, useLiveDriverPosition); on
+  // the road without one, no estimate; before the truck starts, nothing.
   const arrivalLabel = pausedAt
     ? 'Paused'
     : destEta
       ? `${formatEtaClock(destEta.eta_at)} · ${formatEta(destEta.eta_seconds)}`
-      : delayNewWindow
-        ? delayNewWindow
-        : status.toLowerCase() === 'in_transit'
-          ? 'No estimate'
-          : '—'
+      : status.toLowerCase() === 'in_transit'
+        ? 'No estimate'
+        : '—'
 
   // Time still to run, live, falling back to the planned duration before the
   // truck starts reporting.
@@ -312,8 +297,8 @@ export function DetailsPanelContent({
         ))}
       </div>
 
-      {/* Running late against the plan (and not paused): how late, and the new
-          expected time when the truck is reporting. */}
+      {/* Not at the pickup point by the pick-up time (and not paused): how late,
+          and when it is now expected there when the truck is reporting. */}
       {!isLoading && delayedFlag && (
         <div
           className="mx-3 mt-3 flex items-center gap-2 rounded-[8px] border px-3 py-2"
@@ -322,7 +307,8 @@ export function DetailsPanelContent({
           <Clock size={15} className="shrink-0" style={{ color: '#FF7A30' }} />
           <span className="text-[12px] leading-snug text-white/85" style={SC}>
             <span style={{ color: '#FF7A30' }}>Delayed{bookingDetail?.delay_minutes ? ` · about ${formatDuration(bookingDetail.delay_minutes)}` : ''}</span>
-            {' '}{delayNewWindow ? `Now expected ${delayNewWindow}.` : 'A new time will show once the truck reports its position.'}
+            {' '}The truck has not reached your pickup point by {clock12(callTime) || 'the pick-up time'}.{' '}
+            {delayNewTime ? `Now expected there at ${delayNewTime}.` : 'A new time will show once the truck reports its position.'}
           </span>
         </div>
       )}
@@ -501,23 +487,6 @@ export function DetailsPanelContent({
               </div>
             )}
           </div>
-        </div>
-      </div>
-
-      <div className="flex gap-1.5 px-3 pb-3">
-        <div className="flex-1 rounded-[8px] p-3 border" style={{ borderColor: 'var(--color-border)' }}>
-          <div className="flex items-center justify-between mb-1.5">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-muted)" strokeWidth="1.5">
-              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-            </svg>
-            {!isLoading && isLate && (
-              <span className="text-[10px] font-bold" style={{ color: '#f62626' }}>Late</span>
-            )}
-          </div>
-          <p className="text-[10px] mb-0.5" style={{ color: 'var(--color-muted)' }}>Planned Arrival</p>
-          <p className="text-white text-[13px]" style={SC}>
-            {isLoading ? <Skeleton style={{ width: '5rem' }} /> : estDelivery || '—'}
-          </p>
         </div>
       </div>
 

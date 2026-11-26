@@ -2273,7 +2273,7 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                   // Tags, not statuses: "Resubmitted" after Pending (or first,
                   // when Pending is hidden) = corrected by the client after a
                   // rejection, any status now; "Delayed" after In Transit =
-                  // in-transit bookings running late now.
+                  // not at the pickup point by the client's pick-up time now.
                   items={(['all', ...(hidePending ? ['resubmitted'] : []), ...BOOKING_STATUSES.filter((s) => !hidePending || s !== 'pending')])
                     // "Partly Failed" after Completed: Delivered/Completed with a failed drop-off.
                     .flatMap((key) => (key === 'in_transit' ? [key, 'delayed'] : key === 'pending' ? [key, 'resubmitted'] : key === 'completed' ? [key, 'partly_failed'] : [key]))

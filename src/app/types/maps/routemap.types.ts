@@ -67,7 +67,8 @@ export interface BookingDetail {
   created_at?:         string
   updated_at?:         string
 
-  estimated_delivery?: string | null
+  /** When the truck first reached the pickup point (delay.scheduler). */
+  pickup_arrived_at?:  string | null
 
   transaction_documents?:  string[] | null
 

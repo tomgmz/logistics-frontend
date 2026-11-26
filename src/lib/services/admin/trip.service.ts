@@ -29,7 +29,6 @@ export interface TripStop {
   status:          TripStopStatus
   delivered_at:    string | null
   /** Planned arrival (drive time + unloading at earlier stops). */
-  planned_arrival_at?: string | null
   proof_photo_url: string | null
   proof_at:        string | null
   /** How much of each cargo line this stop unloads on this run. */
@@ -63,9 +62,6 @@ export interface Trip {
   pickup_proof_photo_url: string | null
   pickup_proof_at:        string | null
   /** The planned estimate, chained run to run — see backend planned-eta.service.ts. */
-  planned_departure_at?: string | null
-  planned_arrival_at?:   string | null
-  planned_return_at?:    string | null
   notes:       string | null
   booking_trip_stops: TripStop[]
 }
@@ -123,6 +119,23 @@ export const tripService = {
     )
     return { time: data.data.driver_call_time, date: data.data.driver_call_date ?? null }
   },
+
+  /** Drive time from the parking to the pick-up if the driver leaves at that call (a warning only). */
+  checkDriverCall: async (bookingId: string, date: string, time: string) => {
+    const { data } = await proxyApi.get<ApiResponse<DriverCallCheck>>(
+      `${B}/${bookingId}/driver-call-check`, { params: { date, time } },
+    )
+    return data.data
+  },
+}
+
+export interface DriverCallCheck {
+  drive_minutes: number | null
+  arrives_at:    string | null
+  pickup_at:     string | null
+  /** Minutes after the client's pick-up time (≤ 0 = in time). */
+  late_minutes:  number | null
+  reason?:       'no_parking' | 'no_pickup_point' | 'no_route'
 }
 
 /* ── Reading a plan ───────────────────────────────────────────────────────── */

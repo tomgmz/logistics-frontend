@@ -16,8 +16,6 @@ import {
   type TransactionApprovals, type TransactionRecord as RecordData,
 } from '@/lib/services/admin/transaction-history.service'
 import { formatDate, formatDateTime } from './transaction-format'
-import { formatArrivalWindow } from '@/lib/arrival-window'
-import { pausedPlanState } from '@/lib/pause-continuation'
 import { CARD_CLASS, SectionHeading, Tag } from '@/app/admin/booking-management/BookingDetailParts'
 import { BORDER_C, CYAN, MUTED, ERROR, AMBER, GREEN } from './transaction-theme'
 import { FileViewButton, ProtectedImg } from '@/components/ui/FileViewer'
@@ -454,7 +452,7 @@ function ApprovalsSection({ approvals, booking }: { approvals: TransactionApprov
   const gmStatus  = String(booking.gm_status ?? '').toLowerCase()
   const opsStatus = String(booking.ops_status ?? '').toLowerCase()
   const cancelled = String(booking.status ?? '').toLowerCase() === 'cancelled'
-  const eta       = booking.estimated_delivery as string | null | undefined
+  const atPickup  = (booking as { pickup_arrived_at?: string | null }).pickup_arrived_at ?? null
 
   const review    = approvals.review
   const rejected  = (review?.outcome ?? gmStatus) === 'rejected'
@@ -502,16 +500,9 @@ function ApprovalsSection({ approvals, booking }: { approvals: TransactionApprov
           {approvals.issue.at && <span className="text-[11px]" style={{ color: MUTED }}>{formatDateTime(approvals.issue.at)}</span>}
         </Card>
       )}
-      {eta && (
+      {atPickup && (
         <Card>
-          <InfoTile
-            label="Planned Arrival"
-            // Paused with no continuation date (or it passed still paused): the
-            // plan would only keep sliding with the clock.
-            value={pausedPlanState(booking as Parameters<typeof pausedPlanState>[0]) === 'tbc'
-              ? 'To be confirmed (delivery paused)'
-              : formatArrivalWindow(eta) ?? formatDateTime(eta)}
-          />
+          <InfoTile label="Truck at the Pickup Point" value={formatDateTime(atPickup)} />
         </Card>
       )}
     </Panel>

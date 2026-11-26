@@ -97,6 +97,12 @@ function join(...parts: (string | null | undefined | false)[]): string | null {
   return p.length ? p.join(' · ') : null
 }
 
+/** The Delayed mark (delay.scheduler): not at the pick-up by the client's pick-up time. */
+function pickupDelayText(b: ProgressBooking): string {
+  const late = b.delay_minutes ? ` (about ${b.delay_minutes} min)` : ''
+  return `Delayed: the truck is not at the pickup point by the client's pick-up time, ${formatCallClock(b.call_time)}${late}. The client has been told.`
+}
+
 interface StepView {
   title: string
   meta:  string | null
@@ -131,7 +137,7 @@ function describe(key: StepKey, state: StepState, b: ProgressBooking, crewLine: 
       if (state === 'done') {
         return callText
           ? { title: 'Driver call time set', meta: callText }
-          : { title: 'Driver call time', meta: `Client's call time used (${formatCallClock(b.call_time)})` }
+          : { title: 'Driver call time', meta: 'Not set: the delivery started without one' }
       }
       if (state === 'stopped') return { title: 'Cancelled before the call time was set', meta: cancelledMeta }
       return { title: state === 'current' ? 'Set the driver call time' : 'Driver call time', meta: null }
@@ -184,18 +190,18 @@ function currentBody(key: StepKey, b: ProgressBooking, dropoffs: Props['dropoffs
     case 'approval':
       return { text: 'Check the pickup, drop-offs, cargo, documents and schedule, then approve or reject. The client is told either way.', alerts }
     case 'assignment':
+      if (b.delayed_since && !b.paused_at) alerts.push({ tone: PALETTE.red, text: pickupDelayText(b) })
       return { text: `Pick the vehicle and the driver for ${dayLabel(b.schedule_date)}. The drivers are notified once it is saved.`, alerts }
     case 'call_time':
+      if (b.delayed_since && !b.paused_at) alerts.push({ tone: PALETTE.red, text: pickupDelayText(b) })
       return {
-        text: `Required. When the driver must be at the pickup: the client's ${formatCallClock(b.call_time)} or earlier, on the booking day or the night before. The driver is reminded 1 hour before.`,
+        text: `Required. When the driver should leave so the truck is at the pickup by the client's pick-up time (${formatCallClock(b.call_time)}): before it, on the booking day or the night before. The driver is reminded 1 hour before.`,
         alerts,
       }
     case 'on_the_road': {
       if (status === 'in_transit') {
         if (b.paused_at) alerts.push({ tone: PALETTE.orange, text: `Paused${b.pause_reason ? `: ${pauseReasonLabel(b.pause_reason as never)}` : ''}. Resume it under Booking Status.` })
-        if (b.delayed_since && !b.paused_at) {
-          alerts.push({ tone: PALETTE.yellow, text: b.delay_minutes ? `Running about ${b.delay_minutes} min behind the planned arrival.` : 'Running behind the planned arrival.' })
-        }
+        if (b.delayed_since && !b.paused_at) alerts.push({ tone: PALETTE.yellow, text: pickupDelayText(b) })
         return {
           text: dropoffs.total
             ? `${dropoffs.done} of ${dropoffs.total} drop-off${dropoffs.total === 1 ? '' : 's'} delivered. Live position and stop times are below.`
@@ -205,9 +211,10 @@ function currentBody(key: StepKey, b: ProgressBooking, dropoffs: Props['dropoffs
       }
       const call = b.driver_call_time
         ? formatDriverCall(b.driver_call_time, b.driver_call_date, b.schedule_date?.slice(0, 10))
-        : formatCallClock(b.call_time)
+        : 'not set'
       if (b.late_start_for) alerts.push({ tone: PALETTE.red, text: 'Not started on time. The drivers and the office are being reminded every 30 minutes.' })
-      return { text: `The driver starts the delivery in the app. Call time: ${call}.`, alerts }
+      if (b.delayed_since && !b.paused_at) alerts.push({ tone: PALETTE.red, text: pickupDelayText(b) })
+      return { text: `The driver starts the delivery in the app. Driver call time: ${call}. Client's pick-up time: ${formatCallClock(b.call_time)}.`, alerts }
     }
     case 'completed': {
       const issueOpen = !!b.client_issue_reported_at && !b.client_issue_resolved_at

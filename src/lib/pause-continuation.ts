@@ -3,12 +3,10 @@
  *
  * While a delivery is paused (a typhoon, a closed road) the Company
  * Administrator or Operations Manager sets the day and driver call time it moves
- * again. The planned arrival (`estimated_delivery`) is then re-planned from that
- * call time, so it is a real window on the new day. Without a date — or once
- * the date has passed with the delivery still paused — the planned arrival is
- * only "now plus the rest of the trip" and keeps moving, so it is shown as "To
- * be confirmed" instead. The live ETA is blank throughout: it only exists while
- * the truck is moving.
+ * again. Without a date, or once the date has passed with the delivery still
+ * paused, it is "to be confirmed". The live ETA is blank throughout: it only
+ * exists while the truck is moving (there is no planned arrival since
+ * 2026-11-26).
  */
 
 export interface PauseContinuationRow {

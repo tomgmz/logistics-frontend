@@ -22,7 +22,6 @@ import {
 } from '@/lib/services/admin/trip.service'
 import type { BookingDetail } from '@/app/types/maps/routemap.types'
 import { appToast } from '@/lib/toast'
-import { formatArrivalWindow } from '@/lib/arrival-window'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { STOWAGE_FACTOR } from '@/lib/cargo/capacity'
 import DriverCallTime from './DriverCallTime'
@@ -651,18 +650,11 @@ export default function TripPlanner({ detail, canEdit, allowed = true, capacity,
                     </div>
                   </div>
 
-                  {/* Planned by the server from predicted traffic plus unloading and
-                      reloading allowances, chained run to run. */}
-                  {trip.planned_departure_at && (
+                  {/* Real times only: the planned departure / return / arrival were
+                      removed 2026-11-26 (live ETA only). */}
+                  {trip.pickup_proof_at && (
                     <p className="text-sm font-bold text-[#818181]">
-                      {trip.pickup_proof_at ? 'Left' : 'Leaves by'}:{' '}
-                      <span className="text-white">{fmtDayTime(trip.pickup_proof_at ?? trip.planned_departure_at)}</span>
-                      {trip.planned_return_at && (
-                        <>
-                          <span className="mx-2">·</span>Back by:{' '}
-                          <span className="text-white">{fmtDayTime(trip.planned_return_at)}</span>
-                        </>
-                      )}
+                      Left: <span className="text-white">{fmtDayTime(trip.pickup_proof_at)}</span>
                     </p>
                   )}
 
@@ -678,11 +670,6 @@ export default function TripPlanner({ detail, canEdit, allowed = true, capacity,
                             </span>
                             <Tag color={STOP_STATUS_COLOR[stop.status] ?? null}>{stop.status.toLowerCase()}</Tag>
                           </div>
-                          {stop.status === 'pending' && stop.planned_arrival_at && (
-                            <p className="py-2 border-b border-[#424242] text-sm font-bold text-[#818181]">
-                              Planned on:<span className="ml-3 text-white">{formatArrivalWindow(stop.planned_arrival_at)}</span>
-                            </p>
-                          )}
                           {(stop.booking_trip_cargo ?? []).map((c) => {
                             const line = lines.find((l) => l.itemId === c.item_id)
                             const planned = Number(c.planned_qty)

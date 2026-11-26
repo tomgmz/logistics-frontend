@@ -151,11 +151,12 @@ export const FAQ: FaqEntry[] = [
   },
   {
     id: 'arrival-window',
-    question: 'What does the planned arrival time mean?',
+    question: 'When will my delivery arrive?',
     answer:
-      'Once a vehicle is assigned, each drop-off gets a planned arrival shown as a 30-minute window. While the ' +
-      'truck is on the road, Transit Tracking also shows a live estimate based on traffic.',
-    keywords: ['planned', 'window', 'arrival time', 'estimate', 'late', 'delay', 'delayed', 'on time'],
+      'There is no planned arrival time given in advance. The truck must be at your pickup point by your call ' +
+      'time (the pick-up time you booked). Once the driver starts the delivery, Transit Tracking shows a live ' +
+      'estimate for each drop-off based on traffic, which updates as the truck moves.',
+    keywords: ['planned', 'window', 'arrival time', 'arrive', 'estimate', 'eta', 'late', 'delay', 'delayed', 'on time'],
     link: { href: '/client/tracking', label: 'Open Transit Tracking' },
     category: 'tracking',
   },
