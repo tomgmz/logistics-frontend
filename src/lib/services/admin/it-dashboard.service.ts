@@ -184,4 +184,63 @@ export const itDashboardService = {
       .then((r) => r.data.data),
 }
 
+// ── Logistics view (TailAdmin logistics layout, 2026-11-26) ─────────────────
+
+export type LogisticsPeriod = 'monthly' | 'quarterly' | 'annually'
+export type ActivityTab = 'all' | 'delivered' | 'in_transit' | 'pending' | 'processing'
+
+/** One booking as the activity table and the tracking card show it. Times are ISO with a zone. */
+export interface ActivityRow {
+  booking_id:       string
+  reference_number: string | null
+  category:         string | null
+  company:          string
+  origin:           string | null
+  destination:      string | null
+  stops:            number
+  status:           string
+  schedule_date:    string | null
+  started_at:       string | null
+  picked_up_at:     string | null
+  delivered_at:     string | null
+  driver:           string | null
+  plate:            string | null
+  /** What BookingStatusTag reads for its sub-tags (Paused, Delayed, Late Start…). Absent on an older backend. */
+  tag?:             Record<string, unknown>
+}
+
+export interface LogisticsOverview {
+  generated_at: string
+  totals: {
+    bookings: number; booked_30d: number; booked_prev_30d: number
+    in_transit: number; delivered: number; delivered_30d: number; delivered_prev_30d: number
+  }
+  vehicles:   { total: number; on_route: number }
+  statistics: {
+    period:  LogisticsPeriod
+    /** start = first day of the month / quarter / year, YYYY-MM-DD (Manila). */
+    buckets: { start: string; booked: number; started: number; delivered: number }[]
+    delivered_in_range: number
+  }
+  tracked: ActivityRow | null
+}
+
+export interface ActivityPage {
+  data:   ActivityRow[]
+  meta:   { page: number; limit: number; total: number; totalPages: number }
+  counts: Record<ActivityTab, number>
+}
+
+export const itLogisticsService = {
+  getOverview: (period: LogisticsPeriod): Promise<LogisticsOverview> =>
+    proxyApi
+      .get<{ status: string; data: LogisticsOverview }>('/admin/it-dashboard/logistics', { params: { period } })
+      .then((r) => r.data.data),
+
+  getActivities: (q: { tab: ActivityTab; search?: string; date_from?: string; date_to?: string; page: number; limit: number }): Promise<ActivityPage> =>
+    proxyApi
+      .get<{ status: string } & ActivityPage>('/admin/it-dashboard/activities', { params: q })
+      .then((r) => ({ data: r.data.data, meta: r.data.meta, counts: r.data.counts })),
+}
+
 export default itDashboardService

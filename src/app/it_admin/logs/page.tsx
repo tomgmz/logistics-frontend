@@ -3,7 +3,7 @@
 import TableEmptyState from '@/components/ui/TableEmptyState'
 import { ScrollText } from 'lucide-react'
 import Pagination from '@/components/ui/Pagination'
-import { useLivePending, useLiveTable } from '@/lib/hooks/useLiveTable'
+import { useLivePending } from '@/lib/hooks/useLiveTable'
 import NewEntriesBar from '@/components/ui/NewEntriesBar'
 import { useEffect, useState, useCallback, type ReactNode } from 'react'
 import FilterBar, { type FilterValues } from '@/components/ui/FilterBar'
@@ -12,8 +12,8 @@ import { TabsMinimal } from '@/components/ui/untitled/tabs'
 import type { DateRange } from '@/components/ui/untitled/date-range-picker'
 import ExportLogsButton from '@/components/admin/ExportLogsButton'
 import {
-  AuditLogTable, SystemLogTable, IssueTable, LogDetail, auditDetailRows, systemDetailRows, issueDetailRows,
-  AUDIT_TYPE_OPTIONS, SORT_OPTIONS, ISSUE_STATUS_OPTIONS,
+  AuditLogTable, SystemLogTable, LogDetail, auditDetailRows, systemDetailRows,
+  AUDIT_TYPE_OPTIONS, SORT_OPTIONS,
 } from '@/components/admin/LogTables'
 import {
   auditLogService,
@@ -30,9 +30,6 @@ import {
   type SystemLogLevel,
   type SystemLogEventType,
   type SystemLogStats,
-  type SystemLogIssue,
-  type SystemLogIssueStatus,
-  type IssueAction,
   SYSTEM_LOG_EVENT_LABEL,
   SYSTEM_LOG_LEVEL_LABEL,
 } from '@/lib/services/admin/system-logs.service'
@@ -46,7 +43,7 @@ export type { SystemLogLevel, SystemLogEventType, SystemLogStats }
 const EVENT_LABEL = SYSTEM_LOG_EVENT_LABEL
 const LEVEL_LABEL = SYSTEM_LOG_LEVEL_LABEL
 
-type ActiveTab = 'audit' | 'system' | 'issues'
+type ActiveTab = 'audit' | 'system'
 
 /** The value a Filters-panel rule picked for `field` ("is" rules only). */
 const pick = (v: FilterValues, field: string) => v.find((r) => r.field === field && r.op === 'is')?.value
@@ -246,7 +243,7 @@ function IssueFilterBar({ issue, onClear }: { issue: { issue_id: string; label: 
 
 function SystemLogsTab({ switcher, issue, onClearIssue }: {
   switcher:     ReactNode
-  /** Only this issue's rows (from the Issues tab's "Show all occurrences"). */
+  /** Only this issue's rows (the dashboard's "Show all occurrences"). */
   issue:        { issue_id: string; label: string } | null
   onClearIssue: () => void
 }) {
@@ -401,201 +398,22 @@ function SystemLogsTab({ switcher, issue, onClearIssue }: {
   )
 }
 
-const ISSUE_LEVELS = ['critical', 'error'] as const
-
-const ACTION_BTN = 'inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition disabled:opacity-50'
-const GREEN_BTN  = `${ACTION_BTN} border-[#3af626]/30 bg-[#3af626]/10 text-[#3af626] [@media(hover:hover)]:hover:bg-[#3af626]/20`
-const PLAIN_BTN  = `${ACTION_BTN} border-[#424242] bg-transparent text-[#e0e0e0] [@media(hover:hover)]:hover:bg-white/5`
-
-/**
- * Repeated errors grouped into issues (Sentry, Datadog Error Tracking, Google
- * Cloud Error Reporting): one Resolve closes every occurrence. A resolved issue
- * that happens again reopens by itself ("Came back"); one quiet for 7 days is
- * resolved automatically. Only error and critical rows are grouped.
- */
-function IssuesTab({ switcher, onShowOccurrences }: {
-  switcher:          ReactNode
-  onShowOccurrences: (issue: SystemLogIssue) => void
-}) {
-  const PAGE_SIZE = useTablePageSize()
-  const [issues, setIssues]                   = useState<SystemLogIssue[]>([])
-  const [total, setTotal]                     = useState(0)
-  const [page, setPage]                       = useState(1)
-  const [loading, setLoading]                 = useState(true)
-  const [error, setError]                     = useState<string | null>(null)
-  const [search, setSearch]                   = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
-  // Open by default: the queue is what is waiting.
-  const [status, setStatus]                   = useState<SystemLogIssueStatus | ''>('open')
-  const [level, setLevel]                     = useState<'critical' | 'error' | ''>('')
-  const [eventType, setEventType]             = useState<SystemLogEventType | ''>('')
-  const [sort, setSort]                       = useState<'desc' | 'asc'>('desc')
-  const [selected, setSelected]               = useState<SystemLogIssue | null>(null)
-  const [busy, setBusy]                       = useState(false)
-  const [reloadKey, setReloadKey]             = useState(0)
-
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 400)
-    return () => clearTimeout(t)
-  }, [search])
-
-  useEffect(() => { setPage(1) }, [debouncedSearch, status, level, eventType, sort])
-
-  // An issue changes when a new occurrence arrives. Re-read, slowly enough that
-  // an error burst doesn't re-read it once per row.
-  useLiveTable(['live:system_log_issues'], () => setReloadKey((k) => k + 1), { debounceMs: 5_000 })
-
-  const filters = {
-    sort,
-    ...(status          && { status }),
-    ...(level           && { log_level: level }),
-    ...(eventType       && { event_type: eventType }),
-    ...(debouncedSearch && { search: debouncedSearch }),
-  }
-  const filterKey = JSON.stringify(filters)
-
-  useEffect(() => {
-    let cancelled = false
-    const run = async () => {
-      const key    = ['it-logs', 'issues', filterKey, page, PAGE_SIZE] as const
-      const cached = cachedData<Awaited<ReturnType<typeof systemLogService.getIssues>>>(key)
-      if (cached) { setIssues(cached.data); setTotal(cached.total); setLoading(false) }
-      else if (reloadKey === 0) setLoading(true)
-      setError(null)
-      try {
-        const res = await systemLogService.getIssues({ ...JSON.parse(filterKey), page, limit: PAGE_SIZE })
-        storeData(key, res)
-        if (!cancelled) {
-          setIssues(res.data)
-          setTotal(res.total)
-          // Keep the open detail current: its count moves as occurrences arrive.
-          setSelected((cur) => (cur ? res.data.find((i) => i.issue_id === cur.issue_id) ?? cur : cur))
-        }
-      } catch (e: unknown) {
-        if (cached) return
-        const err = e as { response?: { data?: { message?: string } }; message?: string }
-        if (!cancelled) setError(err.response?.data?.message ?? err.message ?? 'Failed to fetch issues')
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-    run()
-    return () => { cancelled = true }
-  }, [filterKey, page, PAGE_SIZE, reloadKey])
-
-  const act = useCallback(async (issue: SystemLogIssue, body: IssueAction) => {
-    setBusy(true)
-    setError(null)
-    try {
-      const updated = await systemLogService.actOnIssue(issue.issue_id, body)
-      setSelected(updated)
-      setReloadKey((k) => k + 1)
-    } catch (e: unknown) {
-      const err = e as { response?: { data?: { message?: string } }; message?: string }
-      setError(err.response?.data?.message ?? err.message ?? 'Could not update that issue')
-    } finally {
-      setBusy(false)
-    }
-  }, [])
-
-  const totalPages = Math.ceil(total / PAGE_SIZE)
-  const safePage   = Math.min(page, Math.max(1, totalPages))
-  const filtered   = !!search || status !== 'open' || !!level || !!eventType
-
-  const actions = selected && (
-    <>
-      {selected.status !== 'resolved' && (
-        <button type="button" disabled={busy} className={GREEN_BTN} onClick={() => act(selected, { action: 'resolve' })}>Resolve</button>
-      )}
-      {selected.status === 'open' && (
-        <>
-          <button type="button" disabled={busy} className={PLAIN_BTN} onClick={() => act(selected, { action: 'ignore', hours: 24 })}>Ignore for 24 hours</button>
-          <button type="button" disabled={busy} className={PLAIN_BTN} onClick={() => act(selected, { action: 'ignore', hours: 168 })}>Ignore for 7 days</button>
-          <button type="button" disabled={busy} className={PLAIN_BTN} onClick={() => act(selected, { action: 'ignore', hours: null })}>Ignore until reopened</button>
-        </>
-      )}
-      {selected.status !== 'open' && (
-        <button type="button" disabled={busy} className={PLAIN_BTN} onClick={() => act(selected, { action: 'reopen' })}>Reopen</button>
-      )}
-      <button type="button" className={PLAIN_BTN} onClick={() => onShowOccurrences(selected)}>
-        Show all {selected.event_count.toLocaleString()} occurrence{selected.event_count === 1 ? '' : 's'}
-      </button>
-    </>
-  )
-
-  return (
-    <LogCard
-      toolbar={
-        <FilterBar
-          layout="split"
-          leading={switcher}
-          search={{ value: search, onChange: setSearch, placeholder: 'Search source or message' }}
-          fields={[
-            { key: 'status', label: 'Status', single: true, options: ISSUE_STATUS_OPTIONS },
-            { key: 'level',  label: 'Level',  single: true, options: ISSUE_LEVELS.map((l) => ({ value: l, label: LEVEL_LABEL[l] })) },
-            { key: 'event',  label: 'Event',  single: true, options: EVENT_TYPES.map((t) => ({ value: t, label: EVENT_LABEL[t] })) },
-            { key: 'sort',   label: 'Order',  single: true, options: SORT_OPTIONS },
-          ]}
-          values={[
-            ...(status    ? [{ field: 'status', op: 'is' as const, value: status }] : []),
-            ...(level     ? [{ field: 'level',  op: 'is' as const, value: level }] : []),
-            ...(eventType ? [{ field: 'event',  op: 'is' as const, value: eventType }] : []),
-            ...(sort !== 'desc' ? [{ field: 'sort', op: 'is' as const, value: sort }] : []),
-          ]}
-          onChange={(v) => {
-            setStatus((pick(v, 'status') ?? '') as SystemLogIssueStatus | '')
-            setLevel((pick(v, 'level') ?? '') as 'critical' | 'error' | '')
-            setEventType((pick(v, 'event') ?? '') as SystemLogEventType | '')
-            setSort(pick(v, 'sort') === 'asc' ? 'asc' : 'desc')
-          }}
-        />
-      }
-      detail={selected && (
-        <LogDetail
-          title={`Issue — ${selected.issue_id.slice(0, 8).toUpperCase()}`}
-          rows={issueDetailRows(selected)}
-          actions={actions}
-          onClose={() => setSelected(null)}
-        />
-      )}
-      error={error}
-      pending={0}
-      onLoadNew={() => setReloadKey((k) => k + 1)}
-      empty={!loading && !error && issues.length === 0 && (
-        <TableEmptyState
-          icon={ScrollText}
-          filtered={filtered}
-          title={filtered ? undefined : 'No open issues'}
-          message={filtered ? 'No issues match your search or filters.' : 'Repeated errors are grouped here. Nothing is waiting.'}
-          onClear={() => { setSearch(''); setStatus('open'); setLevel(''); setEventType(''); setPage(1) }}
-        />
-      ) || null}
-      table={
-        <IssueTable
-          logs={issues}
-          loading={loading}
-          pageSize={PAGE_SIZE}
-          selectedId={selected?.issue_id ?? null}
-          onSelect={(i) => setSelected((prev) => (prev?.issue_id === i.issue_id ? null : i))}
-        />
-      }
-      pagination={!loading && total > 0 && (
-        <Pagination page={safePage} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPageChange={setPage} />
-      )}
-    />
-  )
-}
-
 export default function LogsPage() {
   // System Logs is the first tab and the default; ?tab=audit opens Audit Logs.
   // Safe to read in the initialiser: the it_admin layout renders nothing until
   // the auth store has hydrated, so this page never renders on the server.
   const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
     const tab = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('tab') : null
-    return tab === 'audit' || tab === 'issues' ? tab : 'system'
+    return tab === 'audit' ? 'audit' : 'system'
   })
-  // The Issues tab's "Show all occurrences": System Logs filtered to that issue.
-  const [issueFilter, setIssueFilter] = useState<{ issue_id: string; label: string } | null>(null)
+  // The dashboard's "Show all occurrences" (?issue=…&issue_label=…): System
+  // Logs filtered to that issue. Issues themselves live on the dashboard since
+  // 2026-11-26; the Issues tab here was removed.
+  const [issueFilter, setIssueFilter] = useState<{ issue_id: string; label: string } | null>(() => {
+    const p = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
+    const id = p?.get('issue')
+    return id && /^[0-9a-f-]{36}$/i.test(id) ? { issue_id: id, label: p?.get('issue_label') || 'this issue' } : null
+  })
 
   // The switch in each table's filter row (Figma: System Logs | Audit Logs).
   const switcher = (
@@ -603,7 +421,6 @@ export default function LogsPage() {
       label="Logs"
       items={[
         { id: 'system' as const, label: 'System Logs' },
-        { id: 'issues' as const, label: 'Issues' },
         { id: 'audit' as const,  label: 'Audit Logs' },
       ]}
       selectedKey={activeTab}
@@ -615,15 +432,6 @@ export default function LogsPage() {
     <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-60px)] overflow-y-auto overflow-x-hidden lg:overflow-hidden bg-[#0a0a0a] text-white">
       <div className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0 px-3 py-3 sm:px-4 lg:px-5 3xl:px-9 3xl:pt-[34px] 3xl:pb-8 lg:overflow-hidden">
         {activeTab === 'system' && <SystemLogsTab switcher={switcher} issue={issueFilter} onClearIssue={() => setIssueFilter(null)} />}
-        {activeTab === 'issues' && (
-          <IssuesTab
-            switcher={switcher}
-            onShowOccurrences={(i) => {
-              setIssueFilter({ issue_id: i.issue_id, label: i.title.length > 90 ? `${i.title.slice(0, 89)}…` : i.title })
-              setActiveTab('system')
-            }}
-          />
-        )}
         {activeTab === 'audit'  && <AuditLogsTab  switcher={switcher} />}
       </div>
     </div>

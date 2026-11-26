@@ -95,13 +95,13 @@ function userName(log: AuditLog) {
   return [first_name, last_name].filter(Boolean).join(' ') || '—'
 }
 
-function rowClass(selected: boolean) {
+export function rowClass(selected: boolean) {
   return `cursor-pointer transition-colors ${selected
     ? 'bg-[#4df9ed]/[0.06] shadow-[inset_2px_0_0_#4df9ed]'
     : '[@media(hover:hover)]:hover:bg-[#2a2a2a]/40'}`
 }
 
-function SkeletonRows({ cols, rows }: { cols: number; rows: number }) {
+export function SkeletonRows({ cols, rows }: { cols: number; rows: number }) {
   return (
     <>
       {Array.from({ length: rows }).map((_, i) => (
