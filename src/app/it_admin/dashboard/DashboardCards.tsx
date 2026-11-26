@@ -95,20 +95,17 @@ export function StatCards({ o }: { o: LogisticsOverview }) {
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-/** "Nov", "Q4 2026" or "2026" from a YYYY-MM-DD bucket start (no Date parsing). */
+/** "Nov" or "2026" from a YYYY-MM-DD bucket start (no Date parsing). */
 function bucketLabel(start: string, period: LogisticsPeriod) {
   const [y, m] = start.split('-').map(Number)
-  if (period === 'annually') return String(y)
-  if (period === 'quarterly') return `Q${Math.floor((m - 1) / 3) + 1} ${y}`
-  return MONTHS[m - 1]
+  return period === 'annually' ? String(y) : MONTHS[m - 1]
 }
 
-const PERIOD_LABEL: Record<LogisticsPeriod, string> = { monthly: 'Monthly', quarterly: 'Quarterly', annually: 'Annually' }
-const RANGE_WORDS: Record<LogisticsPeriod, string> = { monthly: 'last 12 months', quarterly: 'last 8 quarters', annually: 'last 5 years' }
+const PERIOD_LABEL: Record<LogisticsPeriod, string> = { monthly: 'Monthly', annually: 'Yearly' }
+const RANGE_WORDS: Record<LogisticsPeriod, string> = { monthly: 'last 12 months', annually: 'last 5 years' }
 
 const SERIES = [
   { key: 'booked',    label: 'Booked',     color: CYAN },
-  { key: 'started',   label: 'In transit', color: YELLOW },
   { key: 'delivered', label: 'Delivered',  color: GREEN },
 ] as const
 

@@ -186,7 +186,7 @@ export const itDashboardService = {
 
 // ── Logistics view (TailAdmin logistics layout, 2026-11-26) ─────────────────
 
-export type LogisticsPeriod = 'monthly' | 'quarterly' | 'annually'
+export type LogisticsPeriod = 'monthly' | 'annually'
 export type ActivityTab = 'all' | 'delivered' | 'in_transit' | 'pending' | 'processing'
 
 /** One booking as the activity table and the tracking card show it. Times are ISO with a zone. */
@@ -218,8 +218,8 @@ export interface LogisticsOverview {
   vehicles:   { total: number; on_route: number }
   statistics: {
     period:  LogisticsPeriod
-    /** start = first day of the month / quarter / year, YYYY-MM-DD (Manila). */
-    buckets: { start: string; booked: number; started: number; delivered: number }[]
+    /** start = first day of the month / year, YYYY-MM-DD (Manila). */
+    buckets: { start: string; booked: number; delivered: number }[]
     delivered_in_range: number
   }
   tracked: ActivityRow | null
