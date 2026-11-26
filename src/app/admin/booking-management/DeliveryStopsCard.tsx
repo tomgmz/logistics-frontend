@@ -67,12 +67,13 @@ export function ProofRow({ url, at, label }: { url: string; at?: string | null; 
   )
 }
 
-function PointBox({ address, bright, statuses, current, right, children }: {
+function PointBox({ address, bright, statuses, current, right, note, children }: {
   address: string
   bright:  boolean
   statuses: ReadonlyArray<{ key: string; label: string; color: string }>
   current: string
   right?:  ReactNode
+  note?:   string | null
   children?: ReactNode
 }) {
   return (
@@ -82,14 +83,15 @@ function PointBox({ address, bright, statuses, current, right, children }: {
         {statuses.map((s) => (
           <Tag key={s.key} color={current === s.key ? s.color : null}>{s.label}</Tag>
         ))}
-        {right && <span className="ml-auto text-sm font-bold text-white whitespace-nowrap">{right}</span>}
+        {note && <span className="ml-auto text-xs font-bold uppercase" style={{ color: PALETTE.orange }}>{note}</span>}
+        {right && <span className={`${note ? '' : 'ml-auto '}text-sm font-bold text-white whitespace-nowrap`}>{right}</span>}
       </div>
       {children}
     </div>
   )
 }
 
-export default function DeliveryStopsCard({ bookingId, status, origin, stops, pickupProofUrl, pickupProofAt }: {
+export default function DeliveryStopsCard({ bookingId, status, origin, stops, pickupProofUrl, pickupProofAt, trips: givenTrips, pickupNote }: {
   bookingId: string
   /** Normalised booking status. */
   status:    string
@@ -98,10 +100,16 @@ export default function DeliveryStopsCard({ bookingId, status, origin, stops, pi
   /** The booking-level proof (older single-run bookings). */
   pickupProofUrl?: string | null
   pickupProofAt?:  string | null
+  /** The runs, when the screen already has them (Transaction History reads them
+   *  with its record, and its roles may not hold Booking Management). */
+  trips?: Array<Pick<Trip, 'trip_number' | 'status' | 'pickup_proof_photo_url' | 'pickup_proof_at'>> | null
+  /** Orange words on the pick-up point's tag row ("Delayed · 1 hr 20 min"). */
+  pickupNote?: string | null
 }) {
-  const wantTrips = HAS_TRIPS.includes(status)
-  const [trips, setTrips]   = useState<Trip[] | null>(null)
-  usePanelSection(wantTrips && trips === null)
+  const wantTrips = HAS_TRIPS.includes(status) && givenTrips === undefined
+  const [fetched, setTrips] = useState<Trip[] | null>(null)
+  const trips = givenTrips !== undefined ? givenTrips : fetched
+  usePanelSection(wantTrips && fetched === null)
 
   useEffect(() => {
     if (!wantTrips) return
@@ -148,6 +156,7 @@ export default function DeliveryStopsCard({ bookingId, status, origin, stops, pi
         statuses={PICKUP_STATUSES}
         current={pickupStatus}
         right={multi && active ? `Trip ${active.trip_number} of ${runs.length}` : null}
+        note={pickupNote}
       >
         {proofUrl && (
           <ProofRow url={proofUrl} at={proofAt}

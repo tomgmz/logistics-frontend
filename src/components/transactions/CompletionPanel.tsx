@@ -26,7 +26,7 @@ import { AMBER, BORDER_C, CYAN, ERROR, MUTED } from './transaction-theme'
 
 const AUTO_COMPLETE_DAYS = 3
 
-export default function CompletionPanel({ booking, mode, onUpdated, canAct = true, look = 'default' }: {
+export default function CompletionPanel({ booking, mode, onUpdated, canAct = true, look = 'default', showActions = true }: {
   booking:   BookingWithRelations
   mode:      'client' | 'staff'
   /** 'booking' = Booking Management's Figma card (delivered frame, 2026-11-14). */
@@ -34,6 +34,8 @@ export default function CompletionPanel({ booking, mode, onUpdated, canAct = tru
   onUpdated: (next: BookingWithRelations) => void
   /** Staff only: false on a Read Only Booking Management tier disables "Mark problem resolved". */
   canAct?:   boolean
+  /** Staff only: false on a read-only screen (Transaction History) draws the notice without the button. */
+  showActions?: boolean
 }) {
   const [busy, setBusy]         = useState(false)
   const [reporting, setReporting] = useState(false)
@@ -161,7 +163,7 @@ export default function CompletionPanel({ booking, mode, onUpdated, canAct = tru
       )}
 
       {mode === 'staff' ? (
-        openIssue && (
+        openIssue && showActions && (
           <div className="flex flex-wrap gap-2">
             <button type="button" disabled={busy} onClick={() => setAskResolve(true)} {...writeAccess(canAct)}
               className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"

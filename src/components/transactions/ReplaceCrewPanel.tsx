@@ -1,12 +1,9 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowRight, Pencil, Repeat, X } from 'lucide-react'
+import { Pencil, X } from 'lucide-react'
 
-import {
-  assignmentService,
-  type CrewReplacement,
-} from '@/lib/services/admin/assignment.service'
+import { assignmentService } from '@/lib/services/admin/assignment.service'
 import type { DriverUser } from '@/app/types/admin/user-management.types'
 import { externalDriverService, type VendorDriverUser } from '@/lib/services/admin/external-driver.service'
 import { isAssignable, type Truck } from '@/app/types/truck.types'
@@ -21,13 +18,9 @@ import VehiclePicker, { fitProblems } from '@/app/admin/booking-management/Vehic
 import DriverPicker, { type DriverPickerOption } from '@/app/admin/booking-management/DriverPicker'
 import { EMPTY_CARGO_SUMMARY } from '@/lib/cargo/summary'
 import type { CargoSummary } from '@/lib/cargo/summary'
-import { formatDateTime } from './transaction-format'
 import { PALETTE } from '@/lib/palette'
 import { CYAN, MUTED } from './transaction-theme'
-import { FileViewButton } from '@/components/ui/FileViewer'
-import { cachedData, cachedFetch } from '@/lib/query/useApiQuery'
-import { useLiveTable } from '@/lib/hooks/useLiveTable'
-import { CARD_CLASS, SectionHeading, CrewCard, SLIM_TEAL_BUTTON_CLASS, TEAL_BUTTON_CLASS, TEAL_BUTTON_STYLE, type CrewSummary } from '@/app/admin/booking-management/BookingDetailParts'
+import { CrewCard, SLIM_TEAL_BUTTON_CLASS, TEAL_BUTTON_CLASS, TEAL_BUTTON_STYLE, type CrewSummary } from '@/app/admin/booking-management/BookingDetailParts'
 import Dropdown from '@/components/ui/Dropdown'
 import { FieldError } from '@/components/ui/FieldError'
 import { Tip } from '@/components/ui/tooltip'
@@ -54,13 +47,8 @@ const ORANGE = PALETTE.orange
  * which part stays readable. Renders nothing when there is neither.
  */
 
-type Person = { driver_id: string; users: { first_name: string | null; last_name: string | null } | null } | null
 type Source = 'company' | 'vendor'
 
-const nameOf = (p: Person | { first_name: string | null; last_name: string | null } | null) => {
-  const u = p && 'users' in p ? p.users : p
-  return [u?.first_name, u?.last_name].filter(Boolean).join(' ').trim() || null
-}
 
 const vendorName = (v: VendorDriverUser) =>
   [v.first_name, v.middle_name, v.last_name, v.suffix].filter(Boolean).join(' ') || v.email
@@ -508,63 +496,5 @@ export default function ReplaceCrewPanel({
         )}
       </ReusableModal>
     </div>
-  )
-}
-
-/**
- * Every driver / vehicle replacement made on a booking (any status): who and
- * what was replaced by whom, why, and the load transfer. Shown in Booking
- * Management's History section (user 2026-11-17), not in the assignment card.
- */
-export function ReplacementHistory({ bookingId }: { bookingId: string }) {
-  // The kept copy shows at once; the fresh read replaces it.
-  const [history, setHistory] = useState<CrewReplacement[]>(
-    () => cachedData<CrewReplacement[]>(['booking', bookingId, 'replacements']) ?? [])
-  // Re-read when a live signal says a replacement may have been made.
-  const [tick, setTick] = useState(0)
-  useEffect(() => {
-    let cancelled = false
-    cachedFetch(['booking', bookingId, 'replacements'], () => assignmentService.getReplacements(bookingId))
-      .then((h) => { if (!cancelled) setHistory(h) })
-      .catch(() => { /* read-only extra; the rest of History still shows */ })
-    return () => { cancelled = true }
-  }, [bookingId, tick])
-  useLiveTable(['live:bookings'], () => setTick((n) => n + 1))
-
-  if (history.length === 0) return null
-  return (
-    <section>
-      <SectionHeading icon={<Repeat size={18} strokeWidth={2} />}>
-        Driver and vehicle replacements ({history.length})
-      </SectionHeading>
-      <ul className={`${CARD_CLASS} px-3.5 py-1 flex flex-col list-none m-0`}>
-        {history.map((r) => {
-          const oldPlate = r.old_truck?.plate_number ?? r.old_vehicle_plate
-          const newPlate = r.new_truck?.plate_number ?? r.new_vehicle_plate
-          return (
-            <li key={r.replacement_id} className="flex flex-col gap-0.5 py-2.5 border-b border-dashed border-[#818181]/60 last:border-b-0">
-              <span className="text-sm font-bold text-white flex flex-wrap items-center gap-1">
-                {nameOf(r.old_driver) ?? '—'}{oldPlate ? ` · ${oldPlate}` : ''}
-                <ArrowRight size={13} className="shrink-0" />
-                {nameOf(r.new_driver) ?? '—'}{newPlate ? ` · ${newPlate}` : ''}
-              </span>
-              <span className="text-xs text-white/75 whitespace-pre-wrap break-words">{r.reason_note}</span>
-              <span className="text-xs font-bold" style={{ color: MUTED }}>
-                {formatDateTime(r.replaced_at)}
-                {nameOf(r.replaced_by_user) ? ` · by ${nameOf(r.replaced_by_user)}` : ''}
-              </span>
-              {r.transfer_required && (
-                <span className="text-xs" style={{ color: r.transfer_confirmed_at ? MUTED : ORANGE }}>
-                  {r.transfer_confirmed_at
-                    ? <>Load moved to the new vehicle {formatDateTime(r.transfer_confirmed_at)}
-                        {r.transfer_photo_url && <> · <FileViewButton className="underline" url={r.transfer_photo_url} name="Load transfer photo">photo</FileViewButton></>}</>
-                    : 'Waiting for the new driver to confirm the load was moved to the new vehicle.'}
-                </span>
-              )}
-            </li>
-          )
-        })}
-      </ul>
-    </section>
   )
 }

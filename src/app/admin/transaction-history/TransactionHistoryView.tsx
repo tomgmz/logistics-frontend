@@ -20,12 +20,9 @@ import { getApiErrorMessage } from '@/lib/api-error'
 import { appToast } from '@/lib/toast'
 
 import StaffTransactionDetail from '@/components/transactions/StaffTransactionDetail'
-import TransactionRecord from '@/components/transactions/TransactionRecord'
 import { getStatusMeta } from '@/components/transactions/TransactionStatus'
 import { PANEL_BG } from '@/app/admin/booking-management/BookingDetailParts'
-import { resubmissionsOf } from '@/components/transactions/ResubmittedBadge'
 import BookingStatusTag from '@/components/transactions/BookingStatusTag'
-import ResubmissionChanges from '@/components/transactions/ResubmissionChanges'
 import {
   formatDate, getCompanyName, getDropoffs,
 } from '@/components/transactions/transaction-format'
@@ -34,7 +31,6 @@ import {
   type CompanyOption, type DateBasis, type SortKey,
   type TransactionFilters, type TransactionListMeta,
 } from '@/lib/services/admin/transaction-history.service'
-import StopTimesPanel from '@/components/transactions/StopTimesPanel'
 
 import FilterBar, { allowedValues } from '@/components/ui/FilterBar'
 import { TableCard } from '@/components/ui/untitled/table-card'
@@ -487,12 +483,9 @@ export default function TransactionHistoryView() {
                   {/* Nothing shows until every section has its first answer
                       (user 2026-11-14), so the panel doesn't fill in piece by piece. */}
                   <PanelReadyGate key={selected.booking_id as string} fallback={<PanelSpinner />} className="space-y-[18px]">
-                    <StaffTransactionDetail booking={selected} />
-                    <ResubmissionChanges key={`rev-${selected.booking_id as string}`} bookingId={selected.booking_id as string}
-                      resubmissionCount={resubmissionsOf(selected)} />
-                    {/* Staff-only: crew, vehicle, proof photos, inspections, reports. */}
-                    <TransactionRecord key={selected.booking_id as string} booking={selected} />
-                    <StopTimesPanel key={`times-${selected.booking_id as string}`} bookingId={selected.booking_id as string} staff />
+                    {/* Figma "transaction_history" (2026-11-26): the booking, then Trips,
+                        Stop Times, Changes after Rejection, Reports and History. */}
+                    <StaffTransactionDetail key={selected.booking_id as string} booking={selected} />
                   </PanelReadyGate>
                 </div>
               </motion.aside>

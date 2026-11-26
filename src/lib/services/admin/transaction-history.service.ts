@@ -108,6 +108,11 @@ export interface RecordDelivery {
   vendor_driver_email:   string | null
   vendor_vehicle_plate:  string | null
   vendor_vehicle_type:   string | null
+  helper_name?:          string | null
+  second_driver?: {
+    license_number?: string | null
+    users?: { first_name?: string; last_name?: string; phone?: string | null; email?: string | null } | null
+  } | null
   drivers?: {
     license_number?: string | null
     license_expiry?: string | null
@@ -133,7 +138,10 @@ export interface RecordReport {
   resolution_note:   string | null
   resolved_at:       string | null
   created_at:        string
-  drivers?: { users?: { first_name?: string; last_name?: string } | null } | null
+  latitude?:         number | string | null
+  longitude?:        number | string | null
+  drivers?: { users?: { first_name?: string; last_name?: string; phone?: string | null } | null } | null
+  trucks?:  { plate_number?: string | null; truck_models?: { name?: string | null; vehicle_type?: string | null } | null } | null
 }
 
 export interface RecordInspection {
@@ -175,6 +183,38 @@ export interface TransactionRecord {
   approvals:   TransactionApprovals
   /** Every change of driver, second driver, helper and vehicle, and navigation take-overs, oldest first. */
   crew_changes?: CrewChangeEvent[]
+  /** The History section's three groups; null when the server could not read it. */
+  history?:    BookingHistory | null
+}
+
+/** One card of the History section (backend booking-history.service.ts). */
+export interface HistoryItem {
+  key:      string
+  at:       string | null
+  /** Approvals and transaction cards show the date only; transit cards the time too. */
+  withTime: boolean
+  title:    string
+  by?:      { label: string; name: string | null; role: string | null } | null
+  lines?:   string[]
+  /** Yellow words after the last line. */
+  accent?:  string | null
+  place?:   { label: string; address: string; kind: string | null } | null
+  /** Orange line under the place. */
+  late?:    string | null
+  /** Grey "Trip 1 of 2". */
+  trip?:    string | null
+  remarks?: string | null
+  note?:    { text: string; tone: 'yellow' | 'orange' | 'red' } | null
+  /** An "Assigned" list that opens and closes. */
+  list?:    { title: string; rows: Array<{ label: string; value: string }> } | null
+  /** A photo row (the load moved onto the new vehicle). */
+  photo?:   { url: string; label: string } | null
+}
+
+export interface BookingHistory {
+  approvals:   HistoryItem[]
+  transaction: HistoryItem[]
+  transit:     HistoryItem[]
 }
 
 /** One crew change (one assignment / replacement / swap) or one navigation take-over. */

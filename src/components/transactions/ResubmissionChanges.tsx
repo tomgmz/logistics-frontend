@@ -16,6 +16,7 @@ import { DesignCard } from '@/app/admin/booking-management/BookingDetailParts'
 import { FileViewButton } from '@/components/ui/FileViewer'
 import { usePanelSection } from '@/components/ui/PanelReady'
 import { formatSize } from '@/lib/cargo/units'
+import type { HistoryItem } from '@/lib/services/admin/transaction-history.service'
 
 /**
  * The old and resubmitted values of a booking the client corrected after a
@@ -181,6 +182,45 @@ function groups(before: BookingSnapshot, after: BookingSnapshot): ChangeGroup[] 
     out.push({ label: c.label, rows: rows.length ? rows : [{ before: c.before, after: c.after }] })
   }
   return out
+}
+
+/**
+ * Each resubmission as a History card (Figma "transaction_history/History",
+ * 2026-11-26): "Booking Denied (Resubmission)", who turned it down, their
+ * remarks, and the changes as "Commodity (Cargo 1 · D1)" → the updated value.
+ */
+export function resubmissionHistoryItems(revisions: BookingRevision[]): HistoryItem[] {
+  return revisions.map((rev) => {
+    const b = rev.before_snapshot
+    const a = rev.after_snapshot
+    const rows: Array<{ label: string; value: string }> = []
+    for (const c of diff(b, a)) {
+      const m = /^Cargo (\d+)$/.exec(c.label)
+      if (!m) { rows.push({ label: c.label, value: c.after || 'Removed' }); continue }
+      const i = Number(m[1]) - 1
+      const bc = (b.cargo_items ?? [])[i]
+      const ac = (a.cargo_items ?? [])[i]
+      const drop = (ac ?? bc)?.dropoff_sequence_order
+      const where = `Cargo ${i + 1}${drop != null ? ` · D${drop}` : ''}`
+      if (!bc || !ac) { rows.push({ label: `${where}`, value: ac ? 'Added' : 'Removed' }); continue }
+      const bp = cargoParts(bc), ap = cargoParts(ac)
+      bp.forEach(([name, v], k) => {
+        if (v !== ap[k][1]) rows.push({ label: `${name} (${where})`, value: ap[k][1] || 'Removed' })
+      })
+    }
+    const role = b.gm_status === 'rejected' ? (b.rejected_role ?? 'general_manager') : (b.rejected_role ?? null)
+    return {
+      key:      `rev-${rev.revision_number}`,
+      // When it was turned down; the resubmission time when that was not kept.
+      at:       b.rejected_at ?? rev.created_at,
+      withTime: false,
+      title:    'Booking Denied (Resubmission)',
+      by:       role ? { label: 'Rejected by:', name: null, role } : null,
+      remarks:  b.rejection_reason ?? null,
+      lines:    rows.length ? [] : ['Resubmitted without changes.'],
+      list:     rows.length ? { title: 'Changes', rows } : null,
+    }
+  })
 }
 
 /** Booking Management's look. */

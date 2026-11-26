@@ -72,14 +72,14 @@ import DriverCallTime from './DriverCallTime'
 import VehiclePicker, { cargoSummaryFromBooking, fitProblems } from './VehiclePicker'
 import DriverPicker, { type DriverPickerOption } from './DriverPicker'
 import CompletionPanel from '@/components/transactions/CompletionPanel'
-import TransactionRecord from '@/components/transactions/TransactionRecord'
+import { BookingHistorySection } from '@/components/transactions/HistoryActivities'
 import DeliveryStopsCard from './DeliveryStopsCard'
 import { formatPlateNumber, plateError } from '@/lib/validation/plate'
 import { resubmissionsOf } from '@/components/transactions/ResubmittedBadge'
 import { MAX_RESUBMISSIONS } from '@/lib/booking-resubmit'
 import ResubmissionChanges from '@/components/transactions/ResubmissionChanges'
 import BookingStatusTag, { mainStatusLabel } from '@/components/transactions/BookingStatusTag'
-import ReplaceCrewPanel, { ReplacementHistory } from '@/components/transactions/ReplaceCrewPanel'
+import ReplaceCrewPanel from '@/components/transactions/ReplaceCrewPanel'
 import StopTimesPanel from '@/components/transactions/StopTimesPanel'
 import PausePanel from '@/components/transactions/PausePanel'
 import BreakdownPanel from '@/components/transactions/BreakdownPanel'
@@ -2795,14 +2795,11 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                               resubmissionCount={resubmissionsOf(detail)} look="booking" />
                           </CollapsibleSection>
                         )}
-                        {/* Who decided what, the vehicle's inspection and the driver's
-                            reports: read when opened, not before. */}
+                        {/* Figma "transaction_history/History" (2026-11-26): Approvals,
+                            Transaction Activities, Transit Activities — the same cards as
+                            Transaction History. Read when opened, not before. */}
                         <CollapsibleSection key={`hist-${detail.booking_id}`} title="History" lazy>
-                          <div className="flex flex-col gap-[18px]">
-                            <TransactionRecord booking={detail as unknown as BookingWithRelations} variant="history" />
-                            {/* Driver / vehicle replacements live here, not in the assignment card. */}
-                            <ReplacementHistory bookingId={detail.booking_id} />
-                          </div>
+                          <BookingHistorySection bookingId={detail.booking_id} resubmissionCount={resubmissionsOf(detail)} />
                         </CollapsibleSection>
                       </div>
                     </PanelReadyGate>
