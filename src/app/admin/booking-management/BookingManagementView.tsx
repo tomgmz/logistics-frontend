@@ -2330,14 +2330,17 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                             }`}
                           >
                             <td className="font-bold max-w-[200px]">
-                              <TruncatedText as="div" className="text-[#4df9ed]">{r.display_id}</TruncatedText>
+                              {/* The lock sits right of the booking number (user 2026-11-26), not under it. */}
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <TruncatedText as="div" className="text-[#4df9ed] min-w-0">{r.display_id}</TruncatedText>
+                                <RecordLockBadge holder={bookingLocks.get(r.booking_id)} />
+                              </div>
                               {/* Status-type badges keep the small-caps face. */}
                               <div className="font-[family-name:var(--font-alegreya-sc)]">
                                 {showAfterHours(r.status, r.created_at) && <AfterHoursBadge />}
                                 {pulledByBooking.get(r.booking_id) && (
                                   <VehiclePulledBadge {...pulledByBooking.get(r.booking_id)!} />
                                 )}
-                                <RecordLockBadge holder={bookingLocks.get(r.booking_id)} />
                               </div>
                             </td>
                             <td>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
   AlarmClock, BadgeCheck, Check, ChevronDown, FileText, Navigation, PackageCheck,
   ShieldCheck, Truck, TriangleAlert, X, type LucideIcon,
@@ -288,6 +289,10 @@ export default function BookingProgress({ booking, crewLine, dropoffs, actions =
   const counterColor = p.stop ? PALETTE.red : p.current ? PALETTE.cyan : PALETTE.green
 
   const visible = compact && focusKey ? STEP_ORDER.filter((k) => k === focusKey) : STEP_ORDER
+  // Opening and closing the full list: the other steps slide open around the
+  // current one (user 2026-11-26). Off for reduced motion.
+  const reduceMotion = useReducedMotion()
+  const slide = reduceMotion ? { duration: 0 } : { duration: 0.28, ease: [0.4, 0, 0.2, 1] as const }
 
   return (
     <section data-jump="Progress" aria-label="Booking progress" className={`${CARD_CLASS} overflow-hidden`}>
@@ -313,6 +318,7 @@ export default function BookingProgress({ booking, crewLine, dropoffs, actions =
       </div>
 
       <ol className="m-0 list-none px-3.5 sm:px-4 pt-3.5 pb-1">
+        <AnimatePresence initial={false}>
         {visible.map((key) => {
           const i = STEP_ORDER.indexOf(key)
           const state = p.states[key]
@@ -325,7 +331,14 @@ export default function BookingProgress({ booking, crewLine, dropoffs, actions =
           const action = isFocus ? actions[key] : null
           const owner = OWNER[key]
           return (
-            <li key={key} aria-current={isFocus ? 'step' : undefined} className="flex gap-3">
+            <motion.li key={key} aria-current={isFocus ? 'step' : undefined} className="flex gap-3"
+              // The current step never leaves, so it is never clipped (its ring
+              // reaches outside it); the others clip while they grow and shrink.
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={slide}
+              style={key === focusKey ? undefined : { overflow: 'hidden' }}>
               <div className="flex flex-col items-center">
                 <StepNode state={state} Icon={ICONS[key]} n={i + 1} />
                 {!last && (
@@ -383,16 +396,17 @@ export default function BookingProgress({ booking, crewLine, dropoffs, actions =
                   </div>
                 )}
               </div>
-            </li>
+            </motion.li>
           )
         })}
+        </AnimatePresence>
       </ol>
 
       {focusKey && (
         <button type="button" onClick={toggle} aria-expanded={!compact}
           className="flex w-full items-center justify-center gap-1.5 border-t border-[#424242] py-2 text-xs font-bold text-[#818181] transition-colors [@media(hover:hover)]:hover:text-white">
           {compact ? `Show all ${total} steps` : 'Show only the current step'}
-          <ChevronDown size={14} className={`transition-transform ${compact ? '' : 'rotate-180'}`} />
+          <ChevronDown size={14} className={`transition-transform duration-300 motion-reduce:transition-none ${compact ? '' : 'rotate-180'}`} />
         </button>
       )}
     </section>
