@@ -49,6 +49,9 @@ import { writeAccess } from '@/components/layout/ModuleAccess'
 import { ProtectedImg } from '@/components/ui/FileViewer'
 import Dropdown from '@/components/ui/Dropdown'
 import DatePicker from '@/components/ui/DatePicker'
+import { contractMaxDay } from '@/lib/contract-status'
+import { phDay } from '@/lib/ph-date'
+import { nowDate } from '@/app/utils/serverTime'
 import { FieldError, errorBorder } from '@/components/ui/FieldError'
 import { Tip } from '@/components/ui/tooltip'
 
@@ -216,6 +219,10 @@ async function submitForm(
       if (hadValue && isEmpty) clean[key] = null
     }
   }
+  // An unchanged contract date isn't resent: a client saved before the 1-year
+  // rule with a longer date can still be edited (the server checks only a
+  // changed date).
+  if (editId && initial && form.contract_valid_until === initial.contract_valid_until) delete clean.contract_valid_until
   if (clean.phone)    clean.phone    = attachCountryCode(String(clean.phone))
   if (clean.landline) clean.landline = attachCountryCode(String(clean.landline))
   if (clean.vendor_contact) clean.vendor_contact = attachCountryCode(String(clean.vendor_contact))
@@ -631,6 +638,8 @@ export default function UserFormModal({
     else                  delete payload.landline
     if (payload.vendor_contact) payload.vendor_contact = attachCountryCode(String(payload.vendor_contact))
     else                        delete payload.vendor_contact
+    // Same as submitForm: an unchanged contract date isn't checked on an edit.
+    if (isEdit && payload.contract_valid_until === initialState.contract_valid_until) delete payload.contract_valid_until
     return payload
   }
 
@@ -1216,6 +1225,8 @@ export default function UserFormModal({
                 <DatePicker
                   value={form.contract_valid_until as string}
                   onChange={v => set('contract_valid_until', v)}
+                  min={isEdit ? undefined : phDay(nowDate())}
+                  max={contractMaxDay(phDay(nowDate()))}
                   invalid={!!fe.contract_valid_until}
                   clearable={isEdit}
                   className={inputBase}

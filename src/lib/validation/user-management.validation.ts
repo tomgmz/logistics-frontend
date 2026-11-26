@@ -10,6 +10,9 @@ import {
   optionalMobileField,
   suffixField,
 } from './fields'
+import { CONTRACT_TOO_LONG, contractMaxDay } from '@/lib/contract-status'
+import { phDay } from '@/lib/ph-date'
+import { nowDate } from '@/app/utils/serverTime'
 
 export const USER_SUFFIXES = ['Jr.', 'Sr.', 'II', 'III', 'IV', 'V'] as const
 
@@ -57,18 +60,19 @@ const baseUpdateFields = {
   phone:       phoneOptional,
 }
 
-// Contract validity is a plain calendar date. A new client's contract can't
-// already have run out; an edit only checks the date is real, so a lapsed
-// client can still be saved. Mirrors the backend client schema.
+// Contract validity is a plain calendar date, 1 year at most from today
+// (Philippine time). A new client's contract can't already have run out; an
+// edit allows a past date, so a lapsed client can still be saved. On an edit
+// the form leaves out an unchanged date (UserFormModal), so a client saved
+// before the 1-year rule with a longer date can still be edited. Mirrors the
+// backend client schema + client.service.
 const contractDate = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format')
   .refine(val => !isNaN(new Date(`${val}T00:00:00Z`).getTime()), 'Invalid date')
+  .refine(val => val <= contractMaxDay(todayIso()), CONTRACT_TOO_LONG)
 
-const todayIso = () => {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
+const todayIso = () => phDay(nowDate())
 
 export const createClientSchema = z.object({
   ...baseCreateFields,

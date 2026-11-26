@@ -52,6 +52,20 @@ export function contractDaysLeft(day: string): number {
   return Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000)
 }
 
+/**
+ * A client contract runs 1 year at most (user, 2026-11-26): the latest
+ * Contract Valid Until is the same calendar day next year (Feb 29 → Feb 28).
+ * Mirrors contractMaxDay in logistics-backend/src/lib/contract-status.ts.
+ */
+export const CONTRACT_TOO_LONG = 'A contract can run for 1 year at most. Pick a date no later than one year from today.'
+
+export function contractMaxDay(today: string): string {
+  const [y, m, d] = today.split('-').map(Number)
+  const year = y + 1
+  const last = new Date(Date.UTC(year, m, 0)).getUTCDate()
+  return `${year}-${String(m).padStart(2, '0')}-${String(Math.min(d, last)).padStart(2, '0')}`
+}
+
 /** "December 1, 2026" from `YYYY-MM-DD`, without a timezone shift. */
 export function formatContractDay(day: string): string {
   const [y, m, d] = day.split('-').map(Number)
