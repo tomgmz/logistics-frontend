@@ -38,7 +38,6 @@ import { TableCard } from '@/components/ui/untitled/table-card'
 import { Button } from '@/components/ui/untitled/button'
 import { TabsMinimal } from '@/components/ui/untitled/tabs'
 import { UserPlus01 as UserPlusIcon } from '@untitledui/icons'
-import StatTiles from '@/components/ui/StatTiles'
 import RowActionMenu, { type RowAction } from '@/components/ui/RowActionMenu'
 import AccountActionConfirm, { statusConfirmCopy, type AccountConfirm } from '@/components/admin/AccountActionConfirm'
 import { useServerTable } from '@/lib/hooks/useServerTable'
@@ -83,9 +82,6 @@ const NEW_ACCOUNT_TYPES: AccountTypeOption<AdminMgmtTab>[] = [
   { key: 'operations-admins', label: 'Operations Manager',    hint: 'Plans trips and assigns the vehicle and driver.' },
   { key: 'fleet-admins',      label: 'Fleet Manager',         hint: 'Looks after vehicles, maintenance and odometer checks.' },
 ]
-
-// Roles aggregated by the "All Administrators" view and the stats cards.
-const ADMIN_ROLE_FILTER = 'admin,general_manager,fleet_manager,operations_manager'
 
 const muiTheme = createTheme({
   palette: {
@@ -205,7 +201,6 @@ function RoleBadge({ role }: { role: string }) {
 
 interface RowMenuProps {
   user: AnyUser
-  tab: TabValue
   onView: () => void
   onEdit: () => void
   onManageAccess: () => void
@@ -231,7 +226,7 @@ function staffName(u: AnyUser): string {
   return [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email
 }
 
-function RowMenu({ user, tab, onView, onEdit, onManageAccess, onStatusChange, lockedBy }: RowMenuProps) {
+function RowMenu({ user, onView, onEdit, onManageAccess, onStatusChange, lockedBy }: RowMenuProps) {
   if (lockedBy) return <LockedRow holder={lockedBy} onView={onView} />
 
   const status: RowAction[] = ([
@@ -245,7 +240,8 @@ function RowMenu({ user, tab, onView, onEdit, onManageAccess, onStatusChange, lo
 
   const actions: RowAction[] = [
     { label: 'View Details', icon: <Eye size={15} />, onSelect: onView, section: 'Details', description: 'Open the account read-only' },
-    ...(tab !== 'all' ? [{ label: 'Edit', icon: <Pencil size={15} />, onSelect: onEdit, section: 'Details', description: 'Change their details' }] : []),
+    // Every list, All Administrators included: openEdit picks the form from the row's role.
+    { label: 'Edit', icon: <Pencil size={15} />, onSelect: onEdit, section: 'Details', description: 'Change their details' },
     ...(isManagedRole(user.role)
       ? [{ label: 'Manage Access', icon: <SlidersHorizontal size={15} />, tone: 'accent' as const, onSelect: onManageAccess,
            section: 'Details', description: 'Read Only or Manage All per module' }]
@@ -368,7 +364,6 @@ export default function AdministratorManagementView({ archive }: {
   const [resetCount,       setResetCount]       = useState(0)
   const [searchInput,      setSearchInput]      = useState(linkedSearch)
   const [search,           setSearch]           = useState(linkedSearch)
-  const [stats,            setStats]            = useState({ total: 0, active: 0, archived: 0 })
   const [showForm,         setShowForm]         = useState(false)
   const [editUser,         setEditUser]         = useState<AnyUser | null>(null)
   const [formViewOnly,     setFormViewOnly]     = useState(false)
@@ -410,8 +405,8 @@ export default function AdministratorManagementView({ archive }: {
   }, [searchInput])
 
   // Server-side pages (10 on phones, 20 from tablet up): the server builds the
-  // tab's list, applies the Status pick and the search, and sends one page; the
-  // stat tiles are re-read with it. `meta.tab` keeps a response for a tab
+  // tab's list, applies the Status pick and the search, and sends one page.
+  // `meta.tab` keeps a response for a tab
   // already left off the screen. The resets panel and Clients & Drivers load
   // their own data.
   const directoryTab = activeTab === 'all' || activeTab === 'archived' ? 'all-admins' : activeTab
@@ -425,17 +420,13 @@ export default function AdministratorManagementView({ archive }: {
   const table = useServerTable(
     async (q) => {
       const tab = viewTab
-      const [res, statsResult] = await Promise.all([
-        userService.getDirectory({
-          ...q,
-          tab: directoryTab,
-          ...(sent.length && { filters: JSON.stringify(sent) }),
-          ...(search && { search }),
-          ...reverseParam(reverse),
-        }),
-        userService.getStats(ADMIN_ROLE_FILTER),
-      ])
-      setStats({ total: statsResult.total, active: statsResult.active, archived: statsResult.archived })
+      const res = await userService.getDirectory({
+        ...q,
+        tab: directoryTab,
+        ...(sent.length && { filters: JSON.stringify(sent) }),
+        ...(search && { search }),
+        ...reverseParam(reverse),
+      })
       return { data: res.data, meta: { ...res.meta, tab } }
     },
     `${viewTab}|${statusPick ?? ''}|${rolePick ?? ''}|${search}|${reverse}`,
@@ -613,12 +604,7 @@ export default function AdministratorManagementView({ archive }: {
       <div className="flex flex-1 min-h-0 flex-col h-[calc(100dvh-70px)] lg:h-[calc(100dvh-60px)] overflow-y-auto overflow-x-hidden lg:overflow-hidden bg-[#0a0a0a] text-white">
         <div className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0 px-3 py-3 sm:px-4 lg:px-5 3xl:px-6 lg:pt-3 lg:pb-4 3xl:pb-5 gap-3 3xl:gap-4 lg:overflow-hidden">
 
-          {/* Stats (Figma 3234:1321): white small-caps label, the count under it in its colour. */}
-          {/* No count cards in the Archive module (user, 2026-11-11). */}
-          {!archive && <StatTiles tiles={[
-            { label: 'Total Administrators', value: stats.total,    color: 'text-[#3af626]' },
-            { label: 'Active',               value: stats.active,   color: 'text-[#4df9ed]' },
-          ]} />}
+          {/* No count cards on this page (user, 2026-11-27). */}
 
           {/* Table card */}
           <TableCard.Root className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0">
@@ -711,7 +697,6 @@ export default function AdministratorManagementView({ archive }: {
                             ) : (
                               <RowMenu
                                 user={user}
-                                tab={activeTab}
                                 onView={() => openEdit(user, true)}
                                 onEdit={() => openEdit(user)}
                                 onManageAccess={() => setPermUser(user)}
@@ -752,8 +737,8 @@ export default function AdministratorManagementView({ archive }: {
           tab={formTab}
           user={editUser}
           startInView={formViewOnly}
-          // Same rule as the row menu: the combined list can't open the edit form.
-          canEdit={activeTab !== 'all' && editUser?.status !== 'archived'}
+          // Archived accounts are view-only; every current one can be edited from any list.
+          canEdit={editUser?.status !== 'archived'}
           lockedBy={editUser ? userLocks.get(editUser.user_id) : undefined}
           enablePermissions
           onClose={() => setShowForm(false)}
