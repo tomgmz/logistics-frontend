@@ -60,7 +60,20 @@ export interface StaffDashboard {
     status_mix:  Record<string, number>
     top_clients: { client: string; count: number }[]
     totals:      { bookings: number; completed: number; cancelled: number }
+    /** The Weekly / Monthly chart toggle (2026-11-27); missing from a backend that predates it. */
+    periods?:    Record<'weekly' | 'monthly', PeriodAnalytics>
   }
+}
+
+/** One toggle position: 12 week or month bars, plus the last 7 or 30 days' mix and clients. */
+export interface PeriodAnalytics {
+  window_days: number
+  /** `start` is the bucket's first day (a Monday, or the 1st), `YYYY-MM-DD`. */
+  series:      { start: string; created: number; delivered: number }[]
+  status_mix:  Record<string, number>
+  top_clients: { client: string; count: number }[]
+  /** Bookings created in the window. */
+  total:       number
 }
 
 export async function fetchStaffDashboard(): Promise<StaffDashboard> {

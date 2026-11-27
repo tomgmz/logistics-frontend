@@ -186,7 +186,7 @@ export const itDashboardService = {
 
 // ── Logistics view (TailAdmin logistics layout, 2026-11-26) ─────────────────
 
-export type LogisticsPeriod = 'monthly' | 'annually'
+export type LogisticsPeriod = 'weekly' | 'monthly' | 'annually'
 export type ActivityTab = 'all' | 'delivered' | 'in_transit' | 'pending' | 'processing'
 
 /** One booking as the activity table and the tracking card show it. Times are ISO with a zone. */

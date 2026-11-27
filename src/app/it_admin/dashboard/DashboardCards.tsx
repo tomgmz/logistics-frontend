@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react'
 import { ArrowDownRight, ArrowUpRight, CheckCircle2, Navigation, Package, Route, Truck, UserRound } from 'lucide-react'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import Dropdown from '@/components/ui/Dropdown'
+import PeriodToggle from '@/components/ui/PeriodToggle'
 import BookingStatusTag from '@/components/transactions/BookingStatusTag'
 import { Tip } from '@/components/ui/tooltip'
 import { TruncatedText } from '@/components/ui/TruncatedText'
@@ -95,14 +95,20 @@ export function StatCards({ o }: { o: LogisticsOverview }) {
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-/** "Nov" or "2026" from a YYYY-MM-DD bucket start (no Date parsing). */
+/** "Nov 24" (week), "Nov" or "2026" from a YYYY-MM-DD bucket start (no Date parsing). */
 function bucketLabel(start: string, period: LogisticsPeriod) {
-  const [y, m] = start.split('-').map(Number)
-  return period === 'annually' ? String(y) : MONTHS[m - 1]
+  const [y, m, d] = start.split('-').map(Number)
+  return period === 'annually' ? String(y) : period === 'weekly' ? `${MONTHS[m - 1]} ${d}` : MONTHS[m - 1]
 }
 
-const PERIOD_LABEL: Record<LogisticsPeriod, string> = { monthly: 'Monthly', annually: 'Yearly' }
-const RANGE_WORDS: Record<LogisticsPeriod, string> = { monthly: 'last 12 months', annually: 'last 5 years' }
+/** The tooltip's heading: which week, month or year the bar is. */
+function bucketTitle(start: string, period: LogisticsPeriod) {
+  const [y, m, d] = start.split('-').map(Number)
+  return period === 'annually' ? String(y) : period === 'weekly' ? `Week of ${MONTHS[m - 1]} ${d}, ${y}` : `${MONTHS[m - 1]} ${y}`
+}
+
+const PERIODS: readonly LogisticsPeriod[] = ['weekly', 'monthly', 'annually']
+const RANGE_WORDS: Record<LogisticsPeriod, string> = { weekly: 'last 12 weeks', monthly: 'last 12 months', annually: 'last 5 years' }
 
 const SERIES = [
   { key: 'booked',    label: 'Booked',     color: CYAN },
@@ -112,7 +118,9 @@ const SERIES = [
 export function DeliveryStatistics({ o, period, onPeriod, loading }: {
   o: LogisticsOverview; period: LogisticsPeriod; onPeriod: (p: LogisticsPeriod) => void; loading: boolean
 }) {
-  const data = o.statistics.buckets.map((b) => ({ ...b, label: bucketLabel(b.start, o.statistics.period) }))
+  const data = o.statistics.buckets.map((b) => ({
+    ...b, label: bucketLabel(b.start, o.statistics.period), title: bucketTitle(b.start, o.statistics.period),
+  }))
   return (
     <div className={`${CARD} flex min-w-0 flex-1 flex-col px-5 pt-5 pb-3`}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -123,19 +131,7 @@ export function DeliveryStatistics({ o, period, onPeriod, loading }: {
             <span className="font-semibold text-white">{en(o.statistics.delivered_in_range)}</span>
           </p>
         </div>
-        <div className="w-full shrink-0 sm:w-[150px]">
-          <Dropdown
-            value={period}
-            onChange={(e) => onPeriod(e.target.value as LogisticsPeriod)}
-            aria-label="Range"
-            disabled={loading}
-            className="ff-sc h-[38px] w-full cursor-pointer appearance-none rounded-[10px] border border-[#343434] bg-[#2a2828] pl-4 pr-10 text-[16px] md:text-[15px] text-white outline-hidden [color-scheme:dark] focus:border-[#4df9ed]"
-          >
-            {(Object.keys(PERIOD_LABEL) as LogisticsPeriod[]).map((p) => (
-              <option key={p} value={p} className="bg-[#1b1b1b] text-white">{PERIOD_LABEL[p]}</option>
-            ))}
-          </Dropdown>
-        </div>
+        <PeriodToggle<LogisticsPeriod> value={period} onChange={onPeriod} options={PERIODS} disabled={loading} label="Delivery statistics period" />
       </div>
 
       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
@@ -156,6 +152,7 @@ export function DeliveryStatistics({ o, period, onPeriod, loading }: {
               cursor={{ fill: 'rgba(255,255,255,0.04)' }}
               contentStyle={{ background: '#111', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, fontSize: 12 }}
               labelStyle={{ color: '#e5e5e5' }}
+              labelFormatter={(_l, p) => (p?.[0]?.payload as { title?: string } | undefined)?.title ?? String(_l)}
               formatter={(v, name) => [en(Number(v)), SERIES.find((s) => s.key === name)?.label ?? String(name)]}
             />
             {SERIES.map((s) => (

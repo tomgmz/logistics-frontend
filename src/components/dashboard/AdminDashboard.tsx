@@ -1,15 +1,15 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { ExternalLink } from 'lucide-react'
 import { Bar, BarChart, CartesianGrid, Cell, LabelList, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 
 import { TableCard } from '@/components/ui/untitled/table-card'
 import { Skeleton } from '@/components/ui/Skeleton'
-import { formatDate } from '@/app/utils/timeFormat'
+import PeriodToggle, { type ChartPeriod } from '@/components/ui/PeriodToggle'
 import { bookingStatusColor } from '@/lib/palette'
-import type { StaffDashboard as Data } from '@/lib/services/admin/staff-dashboard.service'
+import type { StaffDashboard as Data, PeriodAnalytics } from '@/lib/services/admin/staff-dashboard.service'
 import type { CardSpec } from './StaffDashboard'
 
 /**
@@ -97,22 +97,53 @@ function LegendDot({ color, label, value }: { color: string; label: string; valu
   )
 }
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/**
+ * One toggle position's data. A backend that predates the toggle sends only
+ * the 14-day / 30-day / all-time fields; they stand in for both positions.
+ */
+function periodData(d: Data, period: ChartPeriod): PeriodAnalytics {
+  const p = d.analytics.periods?.[period]
+  if (p) return p
+  return {
+    window_days: 30,
+    series:      d.analytics.series.map((s) => ({ start: s.day, created: s.created, delivered: s.delivered })),
+    status_mix:  d.analytics.status_mix,
+    top_clients: d.analytics.top_clients,
+    total:       d.analytics.totals.bookings,
+  }
+}
+
+/** Axis label ("Nov 24" for a week, "Nov" for a month) and tooltip heading, without Date parsing. */
+function bucketLabels(start: string, period: ChartPeriod) {
+  const [y, m, day] = start.split('-').map(Number)
+  return period === 'weekly'
+    ? { label: `${MONTHS[m - 1]} ${day}`, title: `Week of ${MONTHS[m - 1]} ${day}, ${y}` }
+    : { label: MONTHS[m - 1], title: `${MONTHS[m - 1]} ${y}` }
+}
+
+const WINDOW_WORDS: Record<ChartPeriod, string> = { weekly: 'last 7 days', monthly: 'last 30 days' }
+
 /** dashboard-04's chart section: a heading with the totals, then thin bars. */
 function BookingsChart({ d }: { d: Data }) {
-  const series = d.analytics.series.map((p) => ({ ...p, label: formatDate(p.day).replace(/,?\s*\d{4}$/, '') }))
+  const [period, setPeriod] = useState<ChartPeriod>('monthly')
+  const series = periodData(d, period).series.map((p) => ({ ...p, ...bucketLabels(p.start, period) }))
   const created   = series.reduce((s, p) => s + p.created, 0)
   const delivered = series.reduce((s, p) => s + p.delivered, 0)
+  const unit = period === 'weekly' ? 'week' : 'month'
 
   return (
     <section className="flex flex-col gap-5">
       <div className="flex flex-col items-start justify-between gap-3 lg:flex-row lg:items-center">
         <div>
-          <h2 className="text-lg font-semibold text-white">Bookings, last 14 days</h2>
-          <p className="text-sm text-[#818181]">Created per day against delivered per day</p>
+          <h2 className="text-lg font-semibold text-white">Bookings, last 12 {unit}s</h2>
+          <p className="text-sm text-[#818181]">Created per {unit} against delivered per {unit}</p>
         </div>
-        <div className="flex flex-wrap items-center gap-4">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
           <LegendDot color={SERIES.created} label="Created" value={created} />
           <LegendDot color={SERIES.delivered} label="Delivered" value={delivered} />
+          <PeriodToggle value={period} onChange={setPeriod} label="Bookings chart period" />
         </div>
       </div>
 
@@ -127,6 +158,7 @@ function BookingsChart({ d }: { d: Data }) {
               contentStyle={{ background: '#111', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, fontSize: 12 }}
               labelStyle={{ color: '#e5e5e5' }}
               itemStyle={{ color: '#e5e5e5' }}
+              labelFormatter={(l, p) => (p?.[0]?.payload as { title?: string } | undefined)?.title ?? String(l)}
             />
             <Bar dataKey="created"   name="Created"   fill={SERIES.created}   radius={[3, 3, 0, 0]} maxBarSize={10} isAnimationActive={false} />
             <Bar dataKey="delivered" name="Delivered" fill={SERIES.delivered} radius={[3, 3, 0, 0]} maxBarSize={10} isAnimationActive={false} />
@@ -167,15 +199,26 @@ function Swatch({ status }: { status: string }) {
  * In transit, Completed and Cancelled are legend rows.
  */
 function BookingsOverallCard({ d }: { d: Data }) {
-  const mix    = d.analytics.status_mix
-  const total  = d.analytics.totals.bookings
+  const [period, setPeriod] = useState<ChartPeriod>('monthly')
+  const pd     = periodData(d, period)
+  const mix    = pd.status_mix
+  const total  = pd.total
   const known  = STATUS_ORDER.filter((s) => s in STATUS_LABEL)
   const slices = known.filter((s) => (mix[s] ?? 0) > 0).map((s) => ({ status: s, name: STATUS_LABEL[s], value: mix[s] }))
   const sum    = slices.reduce((n, s) => n + s.value, 0)
 
   return (
     <TableCard.Root untitled className="flex flex-col">
-      <TableCard.Header title="Bookings overall" contentTrailing={<CardLink href={`${BASE}/booking-management`}>Booking Management</CardLink>} />
+      <TableCard.Header
+        title="Bookings overall"
+        description={`Booked in the ${WINDOW_WORDS[period]}, by where each one stands now`}
+        contentTrailing={
+          <div className="flex flex-wrap items-center gap-2">
+            <PeriodToggle value={period} onChange={setPeriod} label="Bookings overall period" />
+            <CardLink href={`${BASE}/booking-management`}>Booking Management</CardLink>
+          </div>
+        }
+      />
       <div className="flex flex-col items-center gap-6 p-4 md:flex-row md:gap-10 md:p-6">
         <div className="relative size-44 shrink-0 sm:size-52">
           {sum > 0 && (
@@ -238,12 +281,16 @@ function BookingsOverallCard({ d }: { d: Data }) {
 
 /** Untitled UI's horizontal bar card: one bar per client, count at the end. */
 function TopClientsCard({ d }: { d: Data }) {
-  const top = d.analytics.top_clients
+  const [period, setPeriod] = useState<ChartPeriod>('monthly')
+  const top = periodData(d, period).top_clients
   return (
     <TableCard.Root untitled className="flex flex-col">
-      <TableCard.Header title="Busiest clients, last 30 days" />
+      <TableCard.Header
+        title={`Busiest clients, ${WINDOW_WORDS[period]}`}
+        contentTrailing={<PeriodToggle value={period} onChange={setPeriod} label="Busiest clients period" />}
+      />
       {top.length === 0 ? (
-        <p className="px-4 md:px-6 py-6 text-sm text-[#818181]">No bookings in the last 30 days.</p>
+        <p className="px-4 md:px-6 py-6 text-sm text-[#818181]">No bookings in the {WINDOW_WORDS[period]}.</p>
       ) : (
         <div className="p-4 md:p-6" style={{ height: top.length * 44 + 32 }}>
           <ResponsiveContainer width="100%" height="100%">

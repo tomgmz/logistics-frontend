@@ -26,6 +26,8 @@ function Root({ children, className, untitled = false, ...props }: HTMLAttribute
 
 interface HeaderProps {
   title: string
+  /** A grey line under the title, e.g. what a chart counts. */
+  description?: string
   contentTrailing?: ReactNode
   className?: string
 }
@@ -34,10 +36,17 @@ interface HeaderProps {
  * A title row with buttons, for the few cards that are not a filtered table
  * (dashboard panels). Tables put their buttons in FilterBar's `trailing`.
  */
-function Header({ title, contentTrailing, className }: HeaderProps) {
+function Header({ title, description, contentTrailing, className }: HeaderProps) {
   return (
     <div className={cn('relative flex flex-col items-start gap-4 border-b border-[#424242] bg-[#1b1b1b] px-4 py-5 md:flex-row md:items-center md:px-6', className)}>
-      <h2 className="flex-1 text-base font-semibold text-white">{title}</h2>
+      {description ? (
+        <div className="min-w-0 flex-1">
+          <h2 className="text-base font-semibold text-white">{title}</h2>
+          <p className="text-sm text-[#818181]">{description}</p>
+        </div>
+      ) : (
+        <h2 className="flex-1 text-base font-semibold text-white">{title}</h2>
+      )}
       {contentTrailing}
     </div>
   )
