@@ -247,10 +247,10 @@ function approverLabel(role?: string | null): string {
 function PermanentLockScreen({
   onBack,
   onRequestReset,
-  role,
 }: {
   onBack: () => void
   onRequestReset: () => void
+  /** Still passed by callers; no longer shown since the approval wording was removed. */
   role?: string | null
 }) {
   return (
@@ -284,7 +284,7 @@ function PermanentLockScreen({
           Your account has been permanently locked due to too many failed login attempts.
         </span>
         <span>
-          {`Request a password reset to get a link that sets a new password: straight away for IT Administrator, Company Administrator and General Manager accounts, after your ${approverLabel(role)} approves it for everyone else. That also unlocks your account.`}
+          {`Request a password reset to get a link that sets a new password. That also unlocks your account.`}
         </span>
       </div>
 
@@ -361,9 +361,7 @@ function ForgotPasswordStep({
             }}
           >
             <span>
-              If <span className="text-[#4df9ed]/80">{email}</span> has an account, a reset link is on its way:
-              straight away for IT Administrator, Company Administrator and General Manager accounts, after
-              your {approverLabel(role)} approves it for everyone else.
+              If <span className="text-[#4df9ed]/80">{email}</span> has an account, a reset link is on its way.
             </span>
             <span className="text-white/40 text-[0.76rem]">
               The link works once and expires 5 minutes after it is sent, so open it soon. You can close this window —
@@ -386,9 +384,7 @@ function ForgotPasswordStep({
             className="text-[0.82rem] leading-relaxed text-white/50"
             style={{ fontFamily: "var(--font-league-spartan), 'League Spartan', sans-serif" }}
           >
-            We will email a one-time link to <span className="text-[#4df9ed]/80">{email}</span>. IT
-            Administrator, Company Administrator and General Manager accounts get it straight away;
-            everyone else once the <span className="text-white/75">{approverLabel(role)}</span> approves it.
+            We will email a one-time link to <span className="text-[#4df9ed]/80">{email}</span>.
           </p>
 
           <AnimatePresence>
