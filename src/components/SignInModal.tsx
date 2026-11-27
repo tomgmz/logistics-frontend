@@ -201,6 +201,21 @@ function BackButton({ onClick, label = 'Change email' }: { onClick: () => void; 
   )
 }
 
+/** Inline "Change email" after the address on the password and code screens: back to the email step, address kept. */
+function ChangeEmailLink({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="ml-2 inline-flex items-center py-1 text-white/45 underline underline-offset-2
+        decoration-white/25 hover:text-white/75 transition-colors bg-transparent border-none
+        cursor-pointer whitespace-nowrap"
+    >
+      Change email
+    </button>
+  )
+}
+
 function ErrorMessage({ message }: { message: string }) {
   return (
     <motion.p
@@ -391,8 +406,9 @@ function ForgotPasswordStep({
   )
 }
 
-function EmailStep({ onSuccess }: { onSuccess: (email: string) => void }) {
-  const [email,   setEmail]   = useState('')
+function EmailStep({ initialEmail = '', onSuccess }: { initialEmail?: string; onSuccess: (email: string) => void }) {
+  // Coming back via "Change email" keeps the address typed, so a typo is a quick fix.
+  const [email,   setEmail]   = useState(initialEmail)
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState('')
 
@@ -598,6 +614,7 @@ function OtpStep({
   resendExpiresAt,
   onSuccess,
   onBack,
+  onChangeEmail,
   onRequestReset,
   role,
 }: {
@@ -605,6 +622,7 @@ function OtpStep({
   resendExpiresAt: React.MutableRefObject<number>
   onSuccess: (user: AuthUser, portalUrl: string) => void
   onBack: () => void
+  onChangeEmail: () => void
   onRequestReset: () => void
   role?: string | null
 }) {
@@ -848,6 +866,7 @@ function OtpStep({
           <span className="text-[#4df9ed]/70 break-all" style={{ fontFamily: 'monospace' }}>
             {email}
           </span>
+          <ChangeEmailLink onClick={onChangeEmail} />
         </p>
       </div>
 
@@ -955,12 +974,14 @@ function PasswordStep({
   email,
   onSuccess,
   onBack,
+  onChangeEmail,
   onRequestReset,
   role,
 }: {
   email: string
   onSuccess: (user: AuthUser, portalUrl: string) => void
   onBack: () => void
+  onChangeEmail: () => void
   onRequestReset: () => void
   role?: string | null
 }) {
@@ -1108,6 +1129,7 @@ function PasswordStep({
           <span className="text-[#4df9ed]/70 break-all" style={{ fontFamily: 'monospace' }}>
             {email}
           </span>
+          <ChangeEmailLink onClick={onChangeEmail} />
         </p>
       </div>
 
@@ -1444,7 +1466,7 @@ export default function SignInModal({ isOpen, onClose, notice }: SignInModalProp
                     </p>
                   )}
                   {step === 'email' && (
-                    <EmailStep key="email" onSuccess={handleEmailSuccess} />
+                    <EmailStep key="email" initialEmail={email} onSuccess={handleEmailSuccess} />
                   )}
                   {step === 'method' && (
                     <MethodStep
@@ -1469,6 +1491,7 @@ export default function SignInModal({ isOpen, onClose, notice }: SignInModalProp
                       resendExpiresAt={resendExpiresAt}
                       onSuccess={handleAuthSuccess}
                       onBack={() => setStep('method')}
+                      onChangeEmail={() => setStep('email')}
                       onRequestReset={() => setStep('forgot')}
                     />
                   )}
@@ -1478,6 +1501,7 @@ export default function SignInModal({ isOpen, onClose, notice }: SignInModalProp
                       email={email}
                       onSuccess={handleAuthSuccess}
                       onBack={() => setStep('method')}
+                      onChangeEmail={() => setStep('email')}
                       onRequestReset={() => setStep('forgot')}
                     />
                   )}
