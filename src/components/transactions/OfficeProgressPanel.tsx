@@ -16,6 +16,7 @@ import { AssetIcon, CARD_CLASS, InfoTip, MUTED, TEAL_BUTTON_CLASS, TEAL_BUTTON_S
 import { formatDateTime } from './transaction-format'
 import { usePanelSection } from '@/components/ui/PanelReady'
 import Dropdown from '@/components/ui/Dropdown'
+import { TruncatedText } from '@/components/ui/TruncatedText'
 import StopPickerModal from './StopPickerModal'
 
 const INCIDENTS = [
@@ -221,15 +222,15 @@ export default function OfficeProgressPanel({ bookingId, status, fleetReturned, 
             {/* A pop-up list, not a dropdown: the addresses are too long (user 2026-11-27). */}
             <button type="button" disabled={locked} {...writeAccess(allowed)}
               onClick={() => setPickerOpen(true)} aria-haspopup="dialog"
-              className={`${selectClass} flex items-center justify-between gap-2 py-2 text-left`}>
-              <span className="min-w-0 flex-1">
-                {picked ? (
-                  <>
-                    <span className="block break-words">{picked.place}</span>
-                    {picked.address && <span className="block text-xs font-normal text-white/70 break-words">{picked.address}</span>}
-                  </>
-                ) : <span className="text-white/60">Choose</span>}
-              </span>
+              className={`${selectClass} h-[46px] flex items-center justify-between gap-2 text-left`}>
+              {/* One line, cut with an ellipsis, so the box stays the Activity box's
+                  height (user 2026-11-27); the full address is in the pop-up list. */}
+              {picked ? (
+                <TruncatedText className="flex-1" text={picked.address ? `${picked.place} · ${picked.address}` : picked.place}>
+                  {picked.place}
+                  {picked.address && <span className="font-normal text-white/70"> · {picked.address}</span>}
+                </TruncatedText>
+              ) : <span className="min-w-0 flex-1 text-white/60">Choose</span>}
               <ChevronDown aria-hidden size={16} className="shrink-0 text-[#818181]" />
             </button>
           </label>
