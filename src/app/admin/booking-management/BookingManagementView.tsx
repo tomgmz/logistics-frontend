@@ -65,6 +65,7 @@ import {
 } from '@/lib/services/admin/external-driver.service'
 import type { RouteDistance, SecondDriverRecord } from '@/lib/services/admin/assignment.service'
 import ReusableModal, { RemarksModal } from '@/components/layout/ReusableModal'
+import { useFormGuard } from '@/lib/hooks/useFormGuard'
 import TripPlanner from './TripPlanner'
 import BookingProgress, { type ProgressBooking } from './BookingProgress'
 import type { StepKey } from '@/lib/booking-progress'
@@ -1228,6 +1229,12 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
   const [vendorForm, setVendorForm]             = useState<VendorAssignForm>(emptyVendorForm)
   const [vendorDrivers, setVendorDrivers]       = useState<VendorDriverUser[]>([])
   const [vendorDriversLoading, setVendorDriversLoading] = useState(false)
+
+  // The crew picks as the "Choose vehicle and driver" pop-up opened: closing it
+  // after a change asks first (user 2026-11-27). Assign already asks Yes / No.
+  const crewNow = JSON.stringify([assignDriverId, assignTruckId, assignSecondDriverId, assignHelperName, assignVendorMode, vendorForm])
+  const [crewStart, setCrewStart] = useState('')
+  const crewGuard = useFormGuard(assignEditMode && crewNow !== crewStart)
 
   // Why the picked company vehicle may not take the load. The assign
   // confirmation lists these, so the warning comes before the save rather than
@@ -2693,10 +2700,10 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                               })
                             }
                             onAssign={() => { setAssignReason(''); setAssignReasonError(null); setConfirmAssign(true) }}
-                            onOpenPicker={() => setAssignEditMode(true)}
+                            onOpenPicker={() => { setCrewStart(crewNow); setAssignEditMode(true) }}
                             canEdit={canEdit}
                             hideEmptyCard
-                            onClosePicker={() => {
+                            onClosePicker={() => crewGuard.requestClose(() => {
                               setAssignEditMode(false)
                               const restore = committedAssignment.driverId || committedAssignment.truckId
                                 ? committedAssignment
@@ -2706,8 +2713,9 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                               setAssignSecondDriverId(committedAssignment.secondDriverId ?? '')
                               setAssignHelperName(committedAssignment.helperName ?? '')
                               setPairFilled(null)
-                            }}
+                            })}
                           />
+                          {crewGuard.modal}
                           </fieldset>
                         )}
 

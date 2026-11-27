@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Loader2, ShieldAlert, X } from 'lucide-react'
 import ReusableModal, { RemarksModal } from '@/components/layout/ReusableModal'
-import { itAdminService, type StandinCandidate } from '@/lib/services/admin/user-management.service'
+import { itAdminService } from '@/lib/services/admin/user-management.service'
+import { useFormGuard } from '@/lib/hooks/useFormGuard'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 import { useAuthStore } from '@/lib/store/auth.store'
 import { validateForm } from '@/lib/validation/user-management.validation'
@@ -12,7 +13,6 @@ import { extractApiError } from '@/lib/api-error'
 import { appToast } from '@/lib/toast'
 import PhoneInputRow, { attachCountryCode } from '@/components/ui/PhoneInputRow'
 import { blockPaste, confirmEmailError } from '@/lib/validation/fields'
-import Dropdown from '@/components/ui/Dropdown'
 
 /**
  * The IT Admin's handover form, two modes (2026-10-25):
@@ -71,13 +71,17 @@ export default function ItAdminTransitionModal({
   renderDays = 30,
   onClose,
   onDone,
+  forGm = false,
 }: {
   open:        boolean
-  mode:        'start' | 'add'
+  /** 'seat': the General Manager adds an IT Administrator when there is none at all (2026-11-27). */
+  mode:        'start' | 'add' | 'seat'
   /** The render target in days, from the API. */
   renderDays?: number
   onClose:     () => void
   onDone:      () => void | Promise<void>
+  /** The General Manager adding the new IT Administrator (2026-11-27): their wording. */
+  forGm?:      boolean
 }) {
   const me = useAuthStore((s) => s.user)
   const [form,       setForm]       = useState<FormState>(EMPTY)
@@ -87,21 +91,16 @@ export default function ItAdminTransitionModal({
   const [busy,       setBusy]       = useState(false)
   // Start mode only: the replacement is already known, so add them now.
   const [withSuccessor, setWithSuccessor] = useState(false)
-  const needsSuccessor = mode === 'add' || withSuccessor
-  // Start mode: the Company Administrator who takes over on day 30 if nobody has
-  // confirmed. Required (2026-11-06), so the IT Admin can't stay past the render time.
-  const [standinId,  setStandinId]  = useState('')
-  const [candidates, setCandidates] = useState<StandinCandidate[] | null>(null)
-
-  useEffect(() => {
-    if (!open || mode !== 'start' || candidates) return
-    itAdminService.standinCandidates().then(setCandidates).catch(() => setCandidates([]))
-  }, [open, mode, candidates])
+  const needsSuccessor = mode !== 'start' || withSuccessor
+  // Closing with anything typed asks first (user 2026-11-27); the steps below
+  // already ask before they save.
+  const guard = useFormGuard(open && (withSuccessor || Object.values(form).some((v) => !!String(v).trim())))
+  const requestClose = () => { if (!busy) guard.requestClose(onClose) }
 
   useBodyScrollLock(open || confirming)
 
   useEffect(() => {
-    if (!open) { setForm(EMPTY); setErrors({}); setApiError(''); setConfirming(false); setBusy(false); setWithSuccessor(false); setStandinId('') }
+    if (!open) { setForm(EMPTY); setErrors({}); setApiError(''); setConfirming(false); setBusy(false); setWithSuccessor(false) }
   }, [open])
 
   const set = (key: keyof FormState, value: string) => {
@@ -124,10 +123,6 @@ export default function ItAdminTransitionModal({
 
   /** Validate the replacement's details (when given), then ask for confirmation. */
   const handleReview = () => {
-    if (mode === 'start' && !standinId) {
-      setErrors((e) => ({ ...e, standin: 'Choose the Company Administrator who stands in after the render time.' }))
-      return
-    }
     if (needsSuccessor) {
       // Same schema as any IT Admin account.
       const found = validateForm('it-admins', false, payload())
@@ -148,11 +143,12 @@ export default function ItAdminTransitionModal({
     try {
       await appToast.promise(
         mode === 'start'
-          ? itAdminService.startHandover({ reason: reason!.trim(), standin_id: standinId, successor: needsSuccessor ? payload() : null })
+          ? itAdminService.startHandover({ reason: reason!.trim(), successor: needsSuccessor ? payload() : null })
+          : mode === 'seat' ? itAdminService.addToEmptySeat(payload())
           : itAdminService.addSuccessor(payload()),
         {
-          loading: mode === 'start' ? 'Starting the handover…' : 'Adding your replacement…',
-          success: mode === 'start' ? 'Handover started. Your render time has begun.' : 'Replacement added.',
+          loading: mode === 'start' ? 'Starting the handover…' : forGm ? 'Adding the new IT Administrator…' : 'Adding your replacement…',
+          success: mode === 'start' ? 'Handover started. Your render time has begun.' : forGm ? 'New IT Administrator added.' : 'Replacement added.',
           error:   (e) => extractApiError(e).message || 'Something went wrong.',
         },
         { action: 'it-admin-handover', entityId: me?.user_id },
@@ -183,7 +179,7 @@ export default function ItAdminTransitionModal({
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4"
-            onClick={onClose}
+            onClick={requestClose}
           >
             <motion.div
               initial={{ opacity: 0, scale: 0.97, y: 8 }}
@@ -197,16 +193,16 @@ export default function ItAdminTransitionModal({
               <div className="flex items-start justify-between gap-4 border-b border-[#2a2a2a] px-6 py-4">
                 <div>
                   <h2 className="text-lg font-bold text-white">
-                    {mode === 'start' ? 'Start the Handover' : 'Add Your Replacement'}
+                    {mode === 'start' ? 'Start the Handover' : forGm ? 'Add the New IT Administrator' : 'Add Your Replacement'}
                   </h2>
                   <p className="mt-0.5 text-[13px] text-[#818181]">
                     {mode === 'start'
                       ? 'Begin your render time. Add your replacement now or once you have one.'
-                      : 'Create the account of the person taking over from you.'}
+                      : forGm ? 'Create the account of the person taking over the IT Administrator role.' : 'Create the account of the person taking over from you.'}
                   </p>
                 </div>
                 <button
-                  onClick={onClose}
+                  onClick={requestClose}
                   className="rounded-lg p-1.5 text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white"
                   aria-label="Close"
                 >
@@ -219,38 +215,29 @@ export default function ItAdminTransitionModal({
                 <div className="flex gap-3 rounded-xl border border-yellow-500/25 bg-yellow-500/[0.07] px-4 py-3">
                   <ShieldAlert size={16} className="mt-0.5 shrink-0 text-yellow-400" />
                   <div className="text-[13px] leading-relaxed text-yellow-200/80">
-                    Your <span className="font-semibold">{renderDays}-day render time</span> starts
-                    {mode === 'start' ? ' now' : ' (already running)'}. You stay the IT Administrator until your
-                    replacement signs in and sets their own password; then your account is archived and
-                    signed out. If nobody has done so by day {renderDays}, your stand-in takes over and your
-                    account is archived then.
+                    {mode === 'seat' ? (
+                      <>
+                        There is no IT Administrator right now. The new one is emailed a temporary password (valid 7
+                        days) and has the IT Administrator pages once they sign in and set their own.
+                      </>
+                    ) : forGm ? (
+                      <>
+                        The new IT Administrator is emailed a temporary password. The handover ends when they sign in
+                        and set their own; then the outgoing IT Administrator&apos;s account is archived, and if you
+                        are standing in, the IT Administrator pages go back to them.
+                      </>
+                    ) : (
+                      <>
+                        Your <span className="font-semibold">{renderDays}-day render time</span> starts
+                        {mode === 'start' ? ' now' : ' (already running)'}. You stay the IT Administrator until your
+                        replacement signs in and sets their own password; then your account is archived and
+                        signed out. While you are away the General Manager can handle the handover, and if nobody
+                        has set their password by day {renderDays}, the General Manager takes over and your account
+                        is archived then.
+                      </>
+                    )}
                   </div>
                 </div>
-
-                {mode === 'start' && (
-                  <Field label="Stand-in after the render time" required error={errors.standin}
-                    hint="a Company Administrator">
-                    {candidates !== null && candidates.length === 0 ? (
-                      <p className="text-[13px] text-red-300">
-                        There is no active Company Administrator to name. One is needed before the handover can start.
-                      </p>
-                    ) : (
-                      <Dropdown
-                        className={inputBase}
-                        value={standinId}
-                        onChange={(e) => { setStandinId(e.target.value); setErrors((er) => ({ ...er, standin: '' })) }}
-                        aria-label="Company Administrator stand-in"
-                      >
-                        <option value="">{candidates === null ? 'Loading…' : 'Choose a Company Administrator'}</option>
-                        {(candidates ?? []).map((c) => (
-                          <option key={c.user_id} value={c.user_id}>
-                            {[c.first_name, c.last_name].filter(Boolean).join(' ') || c.email} ({c.email})
-                          </option>
-                        ))}
-                      </Dropdown>
-                    )}
-                  </Field>
-                )}
 
                 {mode === 'start' && (
                   <label className="flex cursor-pointer items-center gap-2.5 text-[13px] text-white">
@@ -305,7 +292,7 @@ export default function ItAdminTransitionModal({
               {/* Footer */}
               <div className="flex shrink-0 items-center justify-end gap-3 border-t border-[#2a2a2a] px-6 py-4">
                 <button
-                  onClick={onClose}
+                  onClick={requestClose}
                   className="rounded-xl border border-[#424242] px-4 py-2 text-sm text-[#818181] transition hover:bg-[#2a2a2a] hover:text-white"
                 >
                   Cancel
@@ -346,15 +333,18 @@ export default function ItAdminTransitionModal({
         onCancel={() => setConfirming(false)}
       />
       <ReusableModal
-        open={confirming && mode === 'add'}
-        title={`Add ${successorName || 'this person'} as your replacement?`}
-        description={`${form.email.trim().toLowerCase()} is emailed a temporary password. When they sign in and set their own, the handover ends and your account is archived.`}
+        open={confirming && mode !== 'start'}
+        title={forGm ? `Add ${successorName || 'this person'} as the new IT Administrator?` : `Add ${successorName || 'this person'} as your replacement?`}
+        description={forGm
+          ? `${form.email.trim().toLowerCase()} is emailed a temporary password. When they sign in and set their own, the handover ends.`
+          : `${form.email.trim().toLowerCase()} is emailed a temporary password. When they sign in and set their own, the handover ends and your account is archived.`}
         confirmLabel={busy ? 'Adding…' : 'Add Replacement'}
         cancelLabel="Back"
         disableBackdropClose
         onConfirm={() => void submit()}
         onCancel={() => setConfirming(false)}
       />
+      {guard.modal}
     </>
   )
 }

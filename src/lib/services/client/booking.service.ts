@@ -202,6 +202,13 @@ export const bookingService = {
     return post<CreateBookingResult>(`/booking/${bookingId}/resubmit`, input)
   },
 
+  // The whole booking, changed by the client while it still waits for the
+  // General Manager (same body as a resubmit; stays pending, same number).
+  editPendingBooking: async (bookingId: string, input: Omit<CreateBookingPayload, 'idempotency_key'>) => {
+    await initCsrf()
+    return post<CreateBookingResult>(`/booking/${bookingId}/edit`, input)
+  },
+
   // The client lets a rejected booking go instead of resubmitting it.
   closeRejectedBooking: async (bookingId: string): Promise<BookingWithRelations> => {
     await initCsrf()

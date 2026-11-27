@@ -15,6 +15,7 @@ import {
   adminUploadTruckModelImage,
 } from '@/lib/services/admin/trucks.service'
 import ReusableModal from '@/components/layout/ReusableModal'
+import { useFormGuard } from '@/lib/hooks/useFormGuard'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { createTruckModelSchema } from '@/lib/validation/truck-model.validation'
@@ -220,6 +221,12 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete, archive 
     setTouched(false)
     initialForm.current = null
   }
+
+  // Closing the model form with changes asks first (user 2026-11-27).
+  const closeDirty = !!formMode && (!!imageFile || (Object.keys(form) as (keyof ModelFormState)[])
+    .some((k) => form[k] !== (initialForm.current ?? emptyModelForm())[k]))
+  const formGuard = useFormGuard(closeDirty)
+  const requestCloseForm = () => formGuard.requestClose(closeForm)
 
   const ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/webp']
   const MAX_SIZE_BYTES = 5 * 1024 * 1024 // 5 MB
@@ -563,7 +570,7 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete, archive 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={closeForm}
+            onClick={requestCloseForm}
           >
             <motion.div
               initial={{ y: 12, opacity: 0 }}
@@ -578,7 +585,7 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete, archive 
                 <h2 className="text-sm font-bold text-white uppercase tracking-widest">
                   {formMode === 'create' ? 'New truck model' : 'Edit truck model'}
                 </h2>
-                <button type="button" onClick={closeForm} className="p-2 rounded-lg hover:bg-white/5 text-white/50">
+                <button type="button" onClick={requestCloseForm} className="p-2 rounded-lg hover:bg-white/5 text-white/50">
                   <X size={18} />
                 </button>
               </div>
@@ -811,7 +818,7 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete, archive 
                 <div className="flex gap-2 ml-auto">
                   <button
                     type="button"
-                    onClick={closeForm}
+                    onClick={requestCloseForm}
                     className="px-4 py-2 rounded-lg border border-white/15 text-sm text-white/80 hover:bg-white/5"
                   >
                     Cancel
@@ -928,6 +935,8 @@ export default function TruckModelsTab({ canCreate, canEdit, canDelete, archive 
           </motion.div>
         )}
       </AnimatePresence>
+
+      {formGuard.modal}
 
       <ReusableModal
         open={!!confirmKind}

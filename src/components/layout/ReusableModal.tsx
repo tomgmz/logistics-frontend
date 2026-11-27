@@ -299,7 +299,18 @@ export function RemarksModal({
   const handleCancel = () => {
     setRemarks("");
     setTried(false);
+    setAskDiscard(false);
     onCancel?.();
+  };
+
+  // Remarks typed and then Cancel / Esc / backdrop: "Discard your remarks?"
+  // first (user 2026-11-27). This pop-up is itself the decision's confirmation.
+  const [askDiscard, setAskDiscard] = useState(false);
+  const remarksDirty = !!remarks.trim() && remarks.trim() !== (initialRemarks ?? "").trim();
+  const requestCancel = () => {
+    if (busy) return;
+    if (remarksDirty) setAskDiscard(true);
+    else handleCancel();
   };
 
   const handleConfirm = () => {
@@ -317,15 +328,16 @@ export function RemarksModal({
     if (!open) return;
 
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !busy) {
-        handleCancel();
+      // The discard question handles its own Esc.
+      if (e.key === "Escape" && !busy && !askDiscard) {
+        requestCancel();
       }
     };
 
     window.addEventListener("keydown", handler);
 
     return () => window.removeEventListener("keydown", handler);
-  }, [open, busy]);
+  });
 
   useBodyScrollLock(open);
 
@@ -336,6 +348,7 @@ export function RemarksModal({
   const canConfirm = !!trimmed && !confirmDisabled;
 
   return (
+    <>
     <BodyPortal>
     <AnimatePresence>
       {open && (
@@ -349,7 +362,7 @@ export function RemarksModal({
           onClick={
             disableBackdropClose || busy
               ? undefined
-              : handleCancel
+              : requestCancel
           }
           aria-modal="true"
           role="dialog"
@@ -432,7 +445,7 @@ export function RemarksModal({
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.96 }}
                 disabled={busy}
-                onClick={handleCancel}
+                onClick={requestCancel}
                 className="flex items-center justify-center rounded-[8px] text-white cursor-pointer
                            select-none w-full h-[44px] sm:w-[88px] sm:h-[40px] disabled:opacity-40"
                 style={{
@@ -485,5 +498,16 @@ export function RemarksModal({
       )}
     </AnimatePresence>
     </BodyPortal>
+    <ReusableModal
+      open={open && askDiscard}
+      zClassName="z-[95]"
+      title="Discard your remarks?"
+      description="What you typed has not been saved. If you close now, it will be lost."
+      confirmLabel="Discard"
+      cancelLabel="Keep editing"
+      onConfirm={handleCancel}
+      onCancel={() => setAskDiscard(false)}
+    />
+    </>
   );
 }

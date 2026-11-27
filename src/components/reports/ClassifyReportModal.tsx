@@ -2,6 +2,7 @@
 
 import { motion, AnimatePresence } from 'framer-motion'
 import { X } from 'lucide-react'
+import { useFormGuard } from '@/lib/hooks/useFormGuard'
 
 import {
   INCIDENT_LABELS,
@@ -31,7 +32,18 @@ export default function ClassifyReportModal({
   onCancel:  () => void
   onConfirm: () => void
 }) {
+  // A pick made: closing asks first, and Classify asks once more because the
+  // classification cannot be changed afterwards (user 2026-11-27).
+  const guard = useFormGuard(!!value)
+  const requestClose = () => { if (!busy) guard.requestClose(onCancel) }
+  const requestConfirm = () => guard.confirmSubmit(onConfirm, {
+    title:        value ? `Classify as ${INCIDENT_LABELS[value]}?` : 'Classify this report?',
+    description:  'A classification cannot be changed afterwards.',
+    confirmLabel: 'Classify',
+  })
   return (
+    <>
+    {guard.modal}
     <AnimatePresence>
       {report && (
         <motion.div
@@ -39,7 +51,7 @@ export default function ClassifyReportModal({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          onClick={() => { if (!busy) onCancel() }}
+          onClick={requestClose}
         >
           <motion.div
             initial={{ y: 12, opacity: 0 }}
@@ -60,7 +72,7 @@ export default function ClassifyReportModal({
                   {report.trucks?.plate_number ? ` · ${report.trucks.plate_number}` : ''}
                 </p>
               </div>
-              <button type="button" onClick={onCancel} disabled={busy} className="p-2 rounded-lg hover:bg-white/5 text-white/50" aria-label="Close">
+              <button type="button" onClick={requestClose} disabled={busy} className="p-2 rounded-lg hover:bg-white/5 text-white/50" aria-label="Close">
                 <X size={18} />
               </button>
             </div>
@@ -106,7 +118,7 @@ export default function ClassifyReportModal({
             <div className="shrink-0 bg-[var(--color-surface)] flex justify-end gap-2 px-4 py-3 border-t border-white/[0.07]">
               <button
                 type="button"
-                onClick={onCancel}
+                onClick={requestClose}
                 disabled={busy}
                 className="px-4 py-2 rounded-lg border border-white/15 text-sm text-white/80 hover:bg-white/5"
               >
@@ -114,7 +126,7 @@ export default function ClassifyReportModal({
               </button>
               <button
                 type="button"
-                onClick={onConfirm}
+                onClick={requestConfirm}
                 disabled={!value || busy}
                 className="px-4 py-2 rounded-lg text-sm font-bold text-black disabled:opacity-40"
                 style={{ background: 'var(--color-cyan)' }}
@@ -126,5 +138,6 @@ export default function ClassifyReportModal({
         </motion.div>
       )}
     </AnimatePresence>
+    </>
   )
 }

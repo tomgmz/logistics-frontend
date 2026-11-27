@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Search, FileText, ChevronLeft, ArrowUpFromLine } from 'lucide-react'
 import ReusableModal from '@/components/layout/ReusableModal'
+import { useFormGuard } from '@/lib/hooks/useFormGuard'
 
 import AccountTypePicker from '@/components/admin/AccountTypePicker'
 
@@ -137,6 +138,8 @@ export default function UploadDocumentModal({
   }
 
   useBodyScrollLock(open)
+  // Upload asks once more before it saves (user 2026-11-27); closing already asks.
+  const submitGuard = useFormGuard(hasInput)
 
   /** A type is picked for you only when the target has just one (a client's Contract). */
   const defaultType = (t: UploadTarget): StaffDocumentType | '' => (TYPES_FOR[t].length === 1 ? TYPES_FOR[t][0] : '')
@@ -592,7 +595,14 @@ export default function UploadDocumentModal({
                   <button
                     type="button"
                     disabled={busy}
-                    onClick={() => void submit()}
+                    onClick={() => {
+                      if (!valid || !docType) { setShowErrors(true); return }
+                      submitGuard.confirmSubmit(() => void submit(), {
+                        title:        `Upload ${files.length} ${files.length === 1 ? 'file' : 'files'} as ${DOCUMENT_TYPE_LABELS[docType]}?`,
+                        description:  needsReview(docType) ? 'Another reviewer has to approve it before it counts.' : 'It is saved as approved; this type needs no review.',
+                        confirmLabel: 'Upload',
+                      })
+                    }}
                     className="font-[family-name:var(--font-alegreya-sc)] h-10 rounded-lg border border-[#4df9ed] bg-[#4df9ed]/[0.15] text-base font-bold text-[#4df9ed] transition-colors disabled:opacity-40 [@media(hover:hover)]:hover:bg-[#4df9ed]/25"
                   >
                     {busy ? 'Uploading…' : 'Upload'}
@@ -618,6 +628,7 @@ export default function UploadDocumentModal({
       onCancel={() => setPendingRemove(null)}
     />
 
+    {submitGuard.modal}
     <ReusableModal
       open={confirmClose}
       title="Discard this upload?"

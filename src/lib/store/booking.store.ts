@@ -73,6 +73,12 @@ export interface DropoffSection {
  * on that booking; the client keeps or removes them and may add more.
  */
 export interface ResubmitContext {
+  /**
+   * `resubmit`: correcting a rejected booking (Edit & Resubmit). `edit`: changing
+   * a booking still waiting for the General Manager (Edit Booking, 2026-11-27).
+   * Missing on a draft saved before edit existed: treat it as resubmit.
+   */
+  mode?:             'resubmit' | 'edit'
   bookingId:         string
   reference:         string | null
   rejectionReason:   string | null
@@ -274,6 +280,7 @@ export function loadResubmitDraft(dr: ResubmitDraft) {
     ...initialState,
     sidebarOpen: s.sidebarOpen,
     resubmit: {
+      mode:              dr.mode,
       bookingId:         dr.bookingId,
       reference:         dr.reference,
       rejectionReason:   dr.rejectionReason,

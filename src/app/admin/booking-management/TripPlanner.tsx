@@ -26,6 +26,7 @@ import { getApiErrorMessage } from '@/lib/api-error'
 import { STOWAGE_FACTOR } from '@/lib/cargo/capacity'
 import DriverCallTime from './DriverCallTime'
 import ReusableModal from '@/components/layout/ReusableModal'
+import { useFormGuard } from '@/lib/hooks/useFormGuard'
 import { writeAccess } from '@/components/layout/ModuleAccess'
 import { FileViewButton } from '@/components/ui/FileViewer'
 import { cachedFetch } from '@/lib/query/useApiQuery'
@@ -151,6 +152,10 @@ export default function TripPlanner({ detail, canEdit, allowed = true, capacity,
   const [saving, setSaving]   = useState(false)
   const [editing, setEditing] = useState(false)
   const [drafts, setDrafts]   = useState<Draft[]>([])
+  // The plan as editing began: Cancel after a change asks first, and Save Plan
+  // asks once more (user 2026-11-27).
+  const [draftStart, setDraftStart] = useState('')
+  const planGuard = useFormGuard(editing && JSON.stringify(drafts) !== draftStart)
   const [loadError, setLoadError] = useState<string | null>(null)
   usePanelSection(loading)
 
@@ -238,6 +243,7 @@ export default function TripPlanner({ detail, canEdit, allowed = true, capacity,
       next = [{ key: 't0', destinationIds: ids, qty }]
     }
     setDrafts(next)
+    setDraftStart(JSON.stringify(next))
     setEditing(true)
   }
 
@@ -401,6 +407,7 @@ export default function TripPlanner({ detail, canEdit, allowed = true, capacity,
       title="Trips of the assigned vehicle"
       info="One vehicle, one or more runs. When the load is bigger than the body the same truck returns to the pickup point and goes out again with the rest. It is never split onto a second vehicle."
     >
+      {planGuard.modal}
       <ReusableModal
         open={!!confirmRemove}
         title={`Remove trip ${confirmRemove?.tripNo ?? ''}?`}
@@ -618,11 +625,15 @@ export default function TripPlanner({ detail, canEdit, allowed = true, capacity,
           </p>
 
           <div className="grid grid-cols-2 gap-2.5">
-            <button type="button" onClick={() => setEditing(false)} disabled={saving}
+            <button type="button" onClick={() => planGuard.requestClose(() => setEditing(false))} disabled={saving}
               className={TEAL_BUTTON_CLASS} style={GREY_BUTTON_STYLE}>
               Cancel
             </button>
-            <button type="button" onClick={() => void save()} disabled={saving || !valid}
+            <button type="button" onClick={() => planGuard.confirmSubmit(() => void save(), {
+                title:        `Save this plan (${started.length + drafts.length} ${started.length + drafts.length === 1 ? 'trip' : 'trips'})?`,
+                description:  'The driver sees the trips and what to load on each.',
+                confirmLabel: 'Save Plan',
+              })} disabled={saving || !valid}
               className={TEAL_BUTTON_CLASS} style={TEAL_BUTTON_STYLE}>
               {saving ? 'Saving…' : 'Save Plan'}
             </button>

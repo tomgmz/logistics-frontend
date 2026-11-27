@@ -12,7 +12,7 @@ import {
 } from 'lucide-react'
 import { ASSETS } from '@/lib/data'
 import { roleLabel } from '@/lib/roles'
-import { formatConversationTime } from '@/app/utils/messaging.utils'
+import { formatChatStamp, formatConversationTime } from '@/app/utils/messaging.utils'
 import SearchClearButton from '@/components/ui/SearchClearButton'
 import { useClientMessages, ClientMessagesPanel } from './ClientMessages'
 
@@ -64,6 +64,8 @@ interface Msg {
   id:    number
   from:  'client' | 'bot' | 'staff' | 'system'
   text:  string
+  /** When it was written (ISO): the server's time, or the moment it appeared here. */
+  at?:   string
   /** The FAQ answer this message is, for its link and the "did this help?" buttons. */
   faq?:  FaqEntry
   /** Suggested questions, offered as buttons. */
@@ -172,8 +174,8 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
   const nextId = useRef(1)
   const freshGreeting = useCallback((): Msg[] => [
     isPublic && !canTicket
-      ? { id: 0, from: 'bot', text: PUBLIC_GREETING, suggestions: PUBLIC_STARTER_QUESTIONS }
-      : { id: 0, from: 'bot', text: GREETING, suggestions: STARTER_QUESTIONS },
+      ? { id: 0, from: 'bot', text: PUBLIC_GREETING, suggestions: PUBLIC_STARTER_QUESTIONS, at: new Date().toISOString() }
+      : { id: 0, from: 'bot', text: GREETING, suggestions: STARTER_QUESTIONS, at: new Date().toISOString() },
   ], [isPublic, canTicket])
   const [messages, setMessages] = useState<Msg[]>(freshGreeting)
   const [input, setInput] = useState('')
@@ -259,7 +261,7 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
 
   const push = useCallback((m: Omit<Msg, 'id'>) => {
     const id = nextId.current++
-    setMessages((prev) => [...prev, { ...m, id }])
+    setMessages((prev) => [...prev, { at: new Date().toISOString(), ...m, id }])
     if (m.from === 'client' || m.from === 'bot') save(id, lineOf(m))
   }, [save])
 
@@ -287,6 +289,7 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
       serverId: m.message_id,
       from: m.author === 'client' ? 'client' : m.author === 'assistant' ? 'bot' : m.author,
       text: m.content,
+      at: m.created_at,
       history: true,
       ai: !!m.meta?.ai,
       faq: m.meta?.faq_id ? FAQ.find((f) => f.id === m.meta?.faq_id) : undefined,
@@ -930,7 +933,13 @@ export default function HelpAssistant({ audience = 'client' }: { audience?: 'cli
                       </span>
                     )}
                     <div className={`max-w-[85%] space-y-2 ${m.from === 'client' ? 'items-end' : ''}`}>
-                      {m.from === 'staff' && m.name && <p className="text-[12px] text-green-500">{m.name}</p>}
+                      {/* Name · Role · Time on every line (user 2026-11-27). */}
+                      <p className={`text-[12px] leading-tight ${m.from === 'client' ? 'text-right' : ''}`}>
+                        <span className={m.from === 'staff' ? 'text-green-500' : m.from === 'bot' ? 'text-orange-500' : 'text-white/55'}>
+                          {m.from === 'staff' ? (m.name ?? 'Our team') : m.from === 'bot' ? 'Help Assistant' : 'You'}
+                        </span>
+                        {m.at && <span className="text-white/35">{' · '}{formatChatStamp(m.at)}</span>}
+                      </p>
                       <div
                         className={`whitespace-pre-line rounded-2xl px-3.5 py-2.5 text-[15px] leading-relaxed ${
                           m.from === 'client'

@@ -15,6 +15,7 @@ import { getApiErrorMessage } from '@/lib/api-error'
 import { useRecordLock } from '@/lib/hooks/useRecordLock'
 import RecordLockBanner from '@/components/ui/RecordLockBanner'
 import ReusableModal from '@/components/layout/ReusableModal'
+import { useFormGuard } from '@/lib/hooks/useFormGuard'
 
 /**
  * The fleet manager's BLOWBAGETS inspection of one vehicle.
@@ -115,8 +116,13 @@ export default function BlowbagetsInspectionModal({
     setConfirmOpen(true)
   }
 
+  // Closing with ticks or notes asks first (user 2026-11-27).
+  const guard = useFormGuard(doneCount > 0 || !!notes.trim())
+  const requestClose = () => { if (!busy) guard.requestClose(onClose) }
+
   return (
     <>
+    {guard.modal}
     <ReusableModal
       open={!!truck && confirmOpen}
       title={willPass ? 'Approve vehicle?' : 'Record failed inspection?'}
@@ -139,7 +145,7 @@ export default function BlowbagetsInspectionModal({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[60] bg-black/70"
-            onClick={() => !busy && onClose()}
+            onClick={requestClose}
           />
           <motion.div
             initial={{ opacity: 0, y: 16, scale: 0.98 }}
@@ -166,7 +172,7 @@ export default function BlowbagetsInspectionModal({
               </div>
               <button
                 type="button"
-                onClick={() => !busy && onClose()}
+                onClick={requestClose}
                 className="p-1.5 rounded-lg hover:bg-white/5 text-white/60 shrink-0"
                 aria-label="Close"
               >
@@ -309,7 +315,7 @@ export default function BlowbagetsInspectionModal({
               <button
                 type="button"
                 disabled={busy}
-                onClick={onClose}
+                onClick={requestClose}
                 className="flex-1 py-2 rounded-lg text-sm font-bold border border-white/10
                            text-white/50 hover:text-white transition-colors disabled:opacity-40"
               >

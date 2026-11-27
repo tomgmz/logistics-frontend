@@ -25,8 +25,20 @@ export function canResubmitAgain(b: BookingWithRelations): boolean {
   return isAwaitingResubmit(b) && used < MAX_RESUBMISSIONS
 }
 
-/** What the booking wizard is loaded with to correct a rejected booking. */
+/**
+ * Whether the client may still change the whole booking (Edit Booking): it
+ * waits for the General Manager and nobody is assigned. Mirrors the backend's
+ * editPendingBookingService / BookingModel.editPending (user 2026-11-27).
+ */
+export function isEditablePending(b: BookingWithRelations): boolean {
+  return String(b.status).toLowerCase() === 'pending'
+    && String(b.gm_status ?? 'pending').toLowerCase() === 'pending'
+    && b.ops_status !== 'assigned'
+}
+
+/** What the booking wizard is loaded with to correct a rejected booking, or edit a pending one. */
 export interface ResubmitDraft {
+  mode:             'resubmit' | 'edit'
   bookingId:        string
   reference:        string | null
   rejectionReason:  string | null
@@ -86,7 +98,7 @@ const str = (v: unknown): string => (num(v) != null ? String(num(v)) : '')
  * stacking flags are not stored, only what they added up to. The client sees
  * every figure on the form and can change it before resubmitting.
  */
-export function bookingToResubmitDraft(b: BookingWithRelations): ResubmitDraft {
+export function bookingToResubmitDraft(b: BookingWithRelations, mode: 'resubmit' | 'edit' = 'resubmit'): ResubmitDraft {
   const stops = ((b.booking_destinations ?? []) as unknown as StoredDestination[])
     .slice()
     .sort((x, y) => x.sequence_order - y.sequence_order)
@@ -132,9 +144,10 @@ export function bookingToResubmitDraft(b: BookingWithRelations): ResubmitDraft {
   }))
 
   return {
+    mode,
     bookingId:         b.booking_id,
     reference:         b.reference_number ?? null,
-    rejectionReason:   (b.rejection_reason as string | null | undefined) ?? null,
+    rejectionReason:   mode === 'edit' ? null : (b.rejection_reason as string | null | undefined) ?? null,
     existingDocuments: ((b.transaction_documents as string[] | null | undefined) ?? []).filter(Boolean),
     date:              String(b.schedule_date ?? '').slice(0, 10),
     time:              String(b.call_time ?? '').slice(0, 5),

@@ -9,6 +9,7 @@ import { roleLabel, matchesPersonSearch } from '@/lib/roles'
 import { cachedFetch } from '@/lib/query/useApiQuery'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 import SearchClearButton from '@/components/ui/SearchClearButton'
+import { useFormGuard } from '@/lib/hooks/useFormGuard'
 
 /**
  * New Message, per the Figma (docs/figma/messaging "new message [direct]" and
@@ -119,14 +120,24 @@ export default function NewMessageDialog({ initialTab, onClose, onConversationRe
   }
 
   const canCreate = !!groupName.trim() && selected.size > 0 && !creating
+  // A group being set up: closing asks first; creating asks once more (user 2026-11-27).
+  const guard = useFormGuard(tab === 'group' && (selected.size > 0 || !!groupName.trim()))
+  const requestClose = () => guard.requestClose(onClose)
+  const requestCreate = () => guard.confirmSubmit(() => void createGroup(), {
+    title:        `Create "${groupName.trim()}"?`,
+    description:  `With ${selected.size} ${selected.size === 1 ? 'person' : 'people'}. Each is asked to join.`,
+    confirmLabel: 'Create group',
+  })
 
   return (
+    <>
+    {guard.modal}
     <AnimatePresence>
       <motion.div
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
         className="ff-darker fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 px-0 sm:px-4"
         style={{ backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}
-        onClick={e => { if (e.target === e.currentTarget) onClose() }}
+        onClick={e => { if (e.target === e.currentTarget) requestClose() }}
       >
         <motion.div
           initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 24 }}
@@ -140,7 +151,7 @@ export default function NewMessageDialog({ initialTab, onClose, onConversationRe
               <MessageCirclePlus size={18} className="text-[var(--color-cyan)]" />
               <h3 className="text-white text-[18px] font-bold leading-none">New Message</h3>
             </div>
-            <button type="button" onClick={onClose} aria-label="Close" className="p-1 rounded-md text-white/45 hover:text-white transition-colors">
+            <button type="button" onClick={requestClose} aria-label="Close" className="p-1 rounded-md text-white/45 hover:text-white transition-colors">
               <X size={18} />
             </button>
           </div>
@@ -233,7 +244,7 @@ export default function NewMessageDialog({ initialTab, onClose, onConversationRe
               )}
               {error && users.length > 0 && <p className="text-[14px] font-medium text-[#f62626] mb-1.5">{error}</p>}
               <button
-                type="button" onClick={createGroup} disabled={!canCreate}
+                type="button" onClick={requestCreate} disabled={!canCreate}
                 className="mt-1 w-full h-10 rounded-[10px] bg-[#1d3d3a] border border-[var(--color-cyan)] flex items-center justify-center gap-2 text-[var(--color-cyan)] text-[18px] font-bold transition-opacity disabled:opacity-45"
               >
                 {creating ? <Loader2 size={18} className="animate-spin" /> : <Users size={20} />}
@@ -244,5 +255,6 @@ export default function NewMessageDialog({ initialTab, onClose, onConversationRe
         </motion.div>
       </motion.div>
     </AnimatePresence>
+    </>
   )
 }

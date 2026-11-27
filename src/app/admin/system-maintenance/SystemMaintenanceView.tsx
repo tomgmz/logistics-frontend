@@ -15,6 +15,7 @@ import { useIsMobile } from '@/lib/hooks/useIsMobile'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 import RecordLockBanner, { RecordLockBadge } from '@/components/ui/RecordLockBanner'
 import ReusableModal from '@/components/layout/ReusableModal'
+import { useFormGuard } from '@/lib/hooks/useFormGuard'
 import type {
   Commodity,
   CreateCommodityPayload,
@@ -243,7 +244,7 @@ export default function SystemMaintenanceView() {
   // Escape closes the sheet, as it does every other pop-up.
   useEffect(() => {
     if (!(compact && sheetOpen)) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closeSheet() }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !catalogGuard.asking) requestCloseSheet() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   })
@@ -313,6 +314,27 @@ export default function SystemMaintenanceView() {
   const cErr: Partial<typeof cCheck> = tried.c ? cCheck : {}
   const pErr: Partial<typeof pCheck> = tried.p ? pCheck : {}
   const lErr: Partial<typeof lCheck> = tried.l ? lCheck : {}
+
+  // The open form against what it started from: closing it after a change asks
+  // first, and saving asks once more (user 2026-11-27).
+  const same = (a: object, b: object) => JSON.stringify(a) === JSON.stringify(b)
+  const catalogDirty =
+    tab === 'handling'      ? !same(hForm, editingHandling ? { code: editingHandling.code, name: editingHandling.name, description: editingHandling.description ?? '', is_active: editingHandling.is_active } : initHandling)
+    : tab === 'commodities' ? !same(cForm, editingCommodity ? { name: editingCommodity.name, is_active: editingCommodity.is_active } : initCommodity)
+    : tab === 'products'    ? !same({ ...pForm, commodity_id: editingProduct ? pForm.commodity_id : '' }, editingProduct ? { commodity_id: pForm.commodity_id, name: editingProduct.name, is_active: editingProduct.is_active } : { ...initProduct, commodity_id: '' })
+                              || (!!editingProduct && pForm.commodity_id !== editingProduct.commodity_id)
+    : tab === 'landline'    ? !same(lForm, editingPrefix ? { prefix: editingPrefix.prefix, city: editingPrefix.city } : initLandline)
+    : tab === 'vehicle_types' ? !same(vForm, editingType ? { name: editingType.name, description: editingType.description ?? '', is_active: editingType.is_active } : initVehicleType)
+    : false
+  const catalogGuard = useFormGuard(catalogDirty)
+  const requestCloseSheet = () => { if (!saving) catalogGuard.requestClose(closeSheet) }
+  // `ok`: the form passes its checks. If not, the save runs as before and the
+  // checks show under the fields; nothing to confirm yet.
+  const askSave = (run: () => void, what: string, editing: boolean, ok: boolean) => !ok ? run() : catalogGuard.confirmSubmit(run, {
+    title:        editing ? `Save changes to ${what}?` : `Add ${what}?`,
+    description:  'It is used on the booking form and in the other modules straight away.',
+    confirmLabel: editing ? 'Save' : 'Add',
+  })
 
   async function submitHandling() {
     setTried(t => ({ ...t, h: true }))
@@ -668,7 +690,7 @@ export default function SystemMaintenanceView() {
     if (tab === 'handling') return (
       <div className="space-y-4">
         {editingHandling && <RecordLockBanner lock={handlingLock} noun="handling code" />}
-        {editingHandling && <EditingChip label={`Editing ${editingHandling.code}`} onCancel={closeSheet} />}
+        {editingHandling && <EditingChip label={`Editing ${editingHandling.code}`} onCancel={requestCloseSheet} />}
         <fieldset disabled={handlingLock.readOnly || saving} className="space-y-4 min-w-0 border-0 p-0 m-0">
         <Field label="Code *" error={hErr.code} hint={renameHint(editingHandling, !!editingHandling && hForm.code.trim().toUpperCase() !== editingHandling.code)}>
           <input
@@ -708,7 +730,7 @@ export default function SystemMaintenanceView() {
           label={editingHandling ? 'Save changes' : 'Add handling code'}
           icon={!editingHandling}
           busy={saving}
-          onClick={() => void submitHandling()}
+          onClick={() => askSave(() => void submitHandling(), `handling code ${hForm.code.trim() || ''}`.trim(), !!editingHandling, !hasError(hCheck))}
         />
         </fieldset>
       </div>
@@ -717,7 +739,7 @@ export default function SystemMaintenanceView() {
     if (tab === 'commodities') return (
       <div className="space-y-4">
         {editingCommodity && <RecordLockBanner lock={commodityLock} noun="commodity" />}
-        {editingCommodity && <EditingChip label={`Editing ${editingCommodity.name}`} onCancel={closeSheet} />}
+        {editingCommodity && <EditingChip label={`Editing ${editingCommodity.name}`} onCancel={requestCloseSheet} />}
         <fieldset disabled={commodityLock.readOnly || saving} className="space-y-4 min-w-0 border-0 p-0 m-0">
         <Field label="Name *" error={cErr.name} hint={renameHint(editingCommodity, !!editingCommodity && cForm.name.trim() !== editingCommodity.name)}>
           <input
@@ -738,7 +760,7 @@ export default function SystemMaintenanceView() {
           label={editingCommodity ? 'Save changes' : 'Add commodity'}
           icon={!editingCommodity}
           busy={saving}
-          onClick={() => void submitCommodity()}
+          onClick={() => askSave(() => void submitCommodity(), `commodity "${cForm.name.trim()}"`, !!editingCommodity, !hasError(cCheck))}
         />
         </fieldset>
       </div>
@@ -747,7 +769,7 @@ export default function SystemMaintenanceView() {
     if (tab === 'products') return (
       <div className="space-y-4">
         {editingProduct && <RecordLockBanner lock={productLock} noun="product" />}
-        {editingProduct && <EditingChip label={`Editing ${editingProduct.name}`} onCancel={closeSheet} />}
+        {editingProduct && <EditingChip label={`Editing ${editingProduct.name}`} onCancel={requestCloseSheet} />}
         <fieldset disabled={productLock.readOnly || saving} className="space-y-4 min-w-0 border-0 p-0 m-0">
         <Field label="Commodity *" error={pErr.commodity}>
           <Combobox
@@ -791,7 +813,7 @@ export default function SystemMaintenanceView() {
           label={editingProduct ? 'Save changes' : 'Add product'}
           icon={!editingProduct}
           busy={saving}
-          onClick={() => void submitProduct()}
+          onClick={() => askSave(() => void submitProduct(), `product "${pForm.name.trim()}"`, !!editingProduct, !hasError(pCheck))}
         />
         </fieldset>
       </div>
@@ -801,7 +823,7 @@ export default function SystemMaintenanceView() {
       <div className="space-y-4">
         {editingType && <RecordLockBanner lock={typeLock} noun="vehicle type" />}
         {editingType && (
-          <EditingChip label={`Editing ${editingType.name}`} onCancel={closeSheet} />
+          <EditingChip label={`Editing ${editingType.name}`} onCancel={requestCloseSheet} />
         )}
         <fieldset disabled={typeLock.readOnly || saving} className="space-y-4 min-w-0 border-0 p-0 m-0">
           <Field
@@ -844,7 +866,7 @@ export default function SystemMaintenanceView() {
             icon={!editingType}
             busy={saving}
             disabled={!vChanged}
-            onClick={() => void submitVehicleType()}
+            onClick={() => askSave(() => void submitVehicleType(), `vehicle type "${vForm.name.trim()}"`, !!editingType, !vErrors.name && !vErrors.description)}
           />
         </fieldset>
       </div>
@@ -855,7 +877,7 @@ export default function SystemMaintenanceView() {
       <div className="space-y-4">
         {editingPrefix && <RecordLockBanner lock={prefixLock} noun="prefix" />}
         {editingPrefix && (
-          <EditingChip label={`Editing (${editingPrefix.prefix}) ${editingPrefix.city}`} onCancel={closeSheet} />
+          <EditingChip label={`Editing (${editingPrefix.prefix}) ${editingPrefix.city}`} onCancel={requestCloseSheet} />
         )}
 
         <fieldset disabled={prefixLock.readOnly || saving} className="space-y-4 min-w-0 border-0 p-0 m-0">
@@ -885,7 +907,7 @@ export default function SystemMaintenanceView() {
             label={editingPrefix ? 'Save changes' : 'Add prefix'}
             icon={!editingPrefix}
             busy={saving}
-            onClick={() => void submitLandline()}
+            onClick={() => askSave(() => void submitLandline(), `prefix (${lForm.prefix.trim()}) ${lForm.city.trim()}`, !!editingPrefix, !hasError(lCheck))}
           />
         </fieldset>
       </div>
@@ -1253,7 +1275,7 @@ export default function SystemMaintenanceView() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={() => { if (!saving) closeSheet() }}
+            onClick={requestCloseSheet}
           >
             <motion.div
               role="dialog"
@@ -1275,7 +1297,7 @@ export default function SystemMaintenanceView() {
                 </div>
                 <button
                   type="button"
-                  onClick={closeSheet}
+                  onClick={requestCloseSheet}
                   disabled={saving}
                   className="-mr-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-white/50 disabled:opacity-40"
                   aria-label="Close"
@@ -1289,6 +1311,7 @@ export default function SystemMaintenanceView() {
         )}
       </AnimatePresence>
 
+      {catalogGuard.modal}
       <ReusableModal
         open={!!confirm}
         title={confirmTitle}

@@ -28,6 +28,7 @@ import { bookingRef } from '@/lib/booking'
 
 import TransactionDetail from '@/components/transactions/TransactionDetail'
 import RejectionPanel from '@/components/transactions/RejectionPanel'
+import PendingEditPanel from '@/components/transactions/PendingEditPanel'
 import CompletionPanel from '@/components/transactions/CompletionPanel'
 import BookingDocuments from '@/components/transactions/BookingDocuments'
 import { resubmissionsOf } from '@/components/transactions/ResubmittedBadge'
@@ -424,6 +425,8 @@ export default function BookingHistoryModule() {
                 setSelected(next)
                 setBookings((prev) => prev.map((b) => (b.booking_id === next.booking_id ? next : b)))
               }} />
+              {/* Still waiting for the General Manager: the client can change it. */}
+              <PendingEditPanel booking={selected} />
               <TransactionDetail booking={selected} showDocuments={false} />
               <ResubmissionChanges key={`rev-${selected.booking_id as string}`} bookingId={selected.booking_id as string}
                 resubmissionCount={resubmissionsOf(selected)} />

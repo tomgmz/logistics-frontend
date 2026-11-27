@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { useFormGuard } from '@/lib/hooks/useFormGuard'
 import Link from 'next/link'
 import { PauseCircle } from 'lucide-react'
 import { CARD_TOGGLE, ToggleBox } from '@/components/ui/accordion'
@@ -132,6 +133,10 @@ export default function PausePanel({ bookingId, pausedAt, inTransit, canControl,
   const [planning, setPlanning] = useState(false)
   const [planDate, setPlanDate] = useState('')
   const [planTime, setPlanTime] = useState('')
+  // What the plan form opened with: Cancel after a change asks first, and Save
+  // asks once more because it notifies the client and the driver (user 2026-11-27).
+  const [planStart, setPlanStart] = useState('')
+  const planGuard = useFormGuard(planning && `${planDate}|${planTime}` !== planStart)
   const canAct = canControl && PAUSE_ROLES.includes(role)
 
   const [loaded, setLoaded] = useState(false)
@@ -187,6 +192,7 @@ export default function PausePanel({ bookingId, pausedAt, inTransit, canControl,
   function beginPlan() {
     setPlanDate(open?.expected_resume_date ?? '')
     setPlanTime(open?.expected_resume_call_time?.slice(0, 5) ?? '')
+    setPlanStart(`${open?.expected_resume_date ?? ''}|${open?.expected_resume_call_time?.slice(0, 5) ?? ''}`)
     setPlanning(true)
   }
 
@@ -391,11 +397,15 @@ export default function PausePanel({ bookingId, pausedAt, inTransit, canControl,
                 ))}
                 {hint}
                 <div className="flex gap-2.5">
-                  <button type="button" disabled={busy} onClick={() => setPlanning(false)}
+                  <button type="button" disabled={busy} onClick={() => planGuard.requestClose(() => setPlanning(false))}
                     className={tealSmall} style={{ background: 'transparent', borderColor: MUTED, color: MUTED }}>
                     Cancel
                   </button>
-                  <button type="button" disabled={busy || !planDate || !planTime} onClick={() => void savePlan()}
+                  <button type="button" disabled={busy || !planDate || !planTime} onClick={() => planGuard.confirmSubmit(() => void savePlan(), {
+                      title:        'Save the continuation and notify?',
+                      description:  `${planDate ? dayLabel(planDate) : ''}, driver call time ${planTime ? formatCallClock(planTime) : ''}. The client and the driver are told.`,
+                      confirmLabel: 'Save and notify',
+                    })}
                     className={tealSmall} style={tealStyle}>
                     {busy ? 'Saving…' : 'Save and notify'}
                   </button>
@@ -452,6 +462,7 @@ export default function PausePanel({ bookingId, pausedAt, inTransit, canControl,
 
       {earlier}
 
+      {planGuard.modal}
       <RemarksModal
         open={pausing}
         title="Pause this delivery?"

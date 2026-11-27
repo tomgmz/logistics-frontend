@@ -12,6 +12,19 @@ export function formatMessageTime(iso: string): string {
   return d.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: PHT })
 }
 
+/**
+ * A chat line's time: "10:32 AM" today, "Nov 25, 10:32 AM" on an earlier day
+ * (Manila time), so an old conversation never reads as if it were today.
+ */
+export function formatChatStamp(iso: string): string {
+  const d = parseDate(iso)
+  if (isNaN(d.getTime())) return ''
+  const day = (x: Date) => x.toLocaleDateString('en-PH', { year: 'numeric', month: 'numeric', day: 'numeric', timeZone: PHT })
+  const time = formatMessageTime(iso)
+  if (day(d) === day(new Date())) return time
+  return `${d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', timeZone: PHT })}, ${time}`
+}
+
 export function formatConversationTime(iso: string): string {
   const d = parseDate(iso)
   if (isNaN(d.getTime())) return ''

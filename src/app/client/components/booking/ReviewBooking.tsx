@@ -92,6 +92,7 @@ export default function StepReview({ selectedService, pendingFiles, onBack, onNe
   const [error,          setError]          = useState<string | null>(null)
   const [docUploadState, setDocUploadState] = useState<'idle' | 'uploading' | 'done' | 'failed'>('idle')
   const [wasResubmit,    setWasResubmit]    = useState(false)
+  const [wasEdit,        setWasEdit]        = useState(false)
 
   // Set when correcting a rejected booking: it is resubmitted in place instead
   // of booked anew, and keeps whichever of its documents the client left on it.
@@ -222,7 +223,11 @@ export default function StepReview({ selectedService, pendingFiles, onBack, onNe
       }
 
       let result
-      if (resubmit) {
+      const editing = resubmit?.mode === 'edit'
+      if (resubmit && editing) {
+        // A booking still waiting for approval, changed in place (2026-11-27).
+        result = await bookingService.editPendingBooking(resubmit.bookingId, details)
+      } else if (resubmit) {
         result = await bookingService.resubmitBooking(resubmit.bookingId, details)
       } else {
         if (!attemptKey.current) attemptKey.current = crypto.randomUUID()
@@ -236,12 +241,13 @@ export default function StepReview({ selectedService, pendingFiles, onBack, onNe
       setUploadedUrls(null)
 
       setBookingId(bookingReference)
-      setWasResubmit(!!resubmit)
+      setWasResubmit(!!resubmit && !editing)
+      setWasEdit(editing)
       resetBooking()
       onClearFiles()
       setSubmitted(true)
 
-      appToast.success(resubmit ? 'Booking resubmitted for review.' : 'Booking submitted successfully.', {
+      appToast.success(editing ? 'Booking changes saved.' : resubmit ? 'Booking resubmitted for review.' : 'Booking submitted successfully.', {
         action: 'booking-create',
         ...(result?.booking_id != null ? { entityId: result.booking_id } : {}),
       })
@@ -267,7 +273,7 @@ export default function StepReview({ selectedService, pendingFiles, onBack, onNe
       : 'Not selected'
 
   const buttonLabel = (() => {
-    if (!loading) return resubmit ? 'Resubmit Booking' : 'Book Transit'
+    if (!loading) return resubmit?.mode === 'edit' ? 'Save Changes' : resubmit ? 'Resubmit Booking' : 'Book Transit'
     if (docUploadState === 'uploading') return 'Uploading documents…'
     return 'Processing…'
   })()
@@ -282,6 +288,7 @@ export default function StepReview({ selectedService, pendingFiles, onBack, onNe
             bookingReference={bookingId}
             onNewBooking={onNewBooking}
             resubmitted={wasResubmit}
+            edited={wasEdit}
           />
         ) : (
 

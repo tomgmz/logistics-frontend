@@ -10,7 +10,7 @@ import { useBookingStore } from '@/lib/store/booking.store'
 import { setStep, resetBooking, loadResubmitDraft } from '@/lib/store/booking.store'
 import { bookingService } from '@/lib/services/client/booking.service'
 import type { BookingWithRelations } from '@/lib/types/booking-relations'
-import { bookingToResubmitDraft, canResubmitAgain, isAwaitingResubmit, MAX_RESUBMISSIONS } from '@/lib/booking-resubmit'
+import { bookingToResubmitDraft, canResubmitAgain, isAwaitingResubmit, isEditablePending, MAX_RESUBMISSIONS } from '@/lib/booking-resubmit'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { appToast } from '@/lib/toast'
 import { loadDraftFiles, saveDraftFiles } from '@/lib/store/booking-draft'
@@ -39,9 +39,17 @@ function ResubmitLoader({ onLoaded, onLoading }: {
   onLoading: (loading: boolean) => void
 }) {
   const router       = useRouter()
-  // ?resubmit=202611-00193 (older links: the id). undefined = still looking it up.
-  const key          = useSearchParams().get('resubmit')
-  const resolved     = useResolvedBookingKey(key, 'resubmit', false)
+  // ?resubmit=202611-00193 (older links: the id) corrects a rejected booking;
+  // ?edit=202611-00193 changes one still waiting for approval (2026-11-27).
+  // undefined = still looking it up.
+  const params       = useSearchParams()
+  const editKey      = params.get('edit')
+  const mode: 'resubmit' | 'edit' = editKey ? 'edit' : 'resubmit'
+  const key          = editKey ?? params.get('resubmit')
+  const resolved     = useResolvedBookingKey(key, mode, false)
+  const refusal      = mode === 'edit'
+    ? 'This booking has already been reviewed, so it can no longer be edited. Open a support ticket to ask for a change.'
+    : 'This booking can no longer be edited and resubmitted.'
   const id           = resolved ?? null
   const loadedId     = useBookingStore((s) => s.resubmit?.bookingId ?? null)
   const loadedIdRef  = useRef(loadedId)
@@ -51,7 +59,7 @@ function ResubmitLoader({ onLoaded, onLoading }: {
     // Wait for the lookup, so a correction already loaded isn't dropped meanwhile.
     if (key && resolved === undefined) return
     if (key && resolved === null) {
-      appToast.error('This booking can no longer be edited and resubmitted.')
+      appToast.error(refusal)
       router.replace('/client/booking')
       return
     }
@@ -71,17 +79,17 @@ function ResubmitLoader({ onLoaded, onLoading }: {
       try {
         const booking = await bookingService.getBookingById(id) as BookingWithRelations
         if (cancelled) return
-        if (!booking || !isAwaitingResubmit(booking)) {
-          appToast.error('This booking can no longer be edited and resubmitted.')
+        if (!booking || !(mode === 'edit' ? isEditablePending(booking) : isAwaitingResubmit(booking))) {
+          appToast.error(refusal)
           router.replace('/client/booking')
           return
         }
-        if (!canResubmitAgain(booking)) {
+        if (mode === 'resubmit' && !canResubmitAgain(booking)) {
           appToast.error(`This booking was already resubmitted ${MAX_RESUBMISSIONS} times, the most allowed. Cancel it and make a new booking instead.`)
           router.replace('/client/booking')
           return
         }
-        loadResubmitDraft(bookingToResubmitDraft(booking))
+        loadResubmitDraft(bookingToResubmitDraft(booking, mode))
         onLoaded()
       } catch (err) {
         if (cancelled) return
@@ -92,7 +100,7 @@ function ResubmitLoader({ onLoaded, onLoading }: {
       }
     })()
     return () => { cancelled = true }
-  }, [key, resolved, id, router, onLoaded, onLoading])
+  }, [key, resolved, id, mode, refusal, router, onLoaded, onLoading])
 
   return null
 }
@@ -141,7 +149,7 @@ export default function BookingWizard() {
     setPendingFiles([])
     resetBooking()
     setWizardKey(k => k + 1)
-    // Drop a ?resubmit= left over from correcting a rejected booking.
+    // Drop a ?resubmit= / ?edit= left over from changing a booking.
     router.replace('/client/booking')
   }, [router])
 
@@ -161,7 +169,7 @@ export default function BookingWizard() {
                       grid grid-cols-[1fr_auto_1fr] items-center gap-4">
 
         <h1 className="font-[family-name:var(--font-alegreya-sc)] text-[17px] 3xl:text-[20px] font-bold text-white whitespace-nowrap">
-          {resubmit ? 'Edit & Resubmit' : 'New Booking'}
+          {resubmit ? (resubmit.mode === 'edit' ? 'Edit Booking' : 'Edit & Resubmit') : 'New Booking'}
           {resubmit?.reference ? (
             <>
               <span className="text-white/30 mx-1.5">/</span>
@@ -215,7 +223,7 @@ export default function BookingWizard() {
       )}
 
       {/* Why the booking being corrected was turned down, kept in view while editing. */}
-      {resubmit && (
+      {resubmit && resubmit.mode !== 'edit' && (
         <div className="shrink-0 flex items-start gap-2 px-4 lg:px-6 py-2.5 border-b border-white/[0.07]"
           style={{ background: 'rgba(246,38,38,0.08)' }}>
           <XCircle size={15} className="shrink-0 mt-0.5" style={{ color: '#f62626' }} />
@@ -231,6 +239,15 @@ export default function BookingWizard() {
               </p>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Editing a booking still waiting for approval: say what it does. */}
+      {resubmit?.mode === 'edit' && (
+        <div className="shrink-0 px-4 lg:px-6 py-2.5 border-b border-white/[0.07]" style={{ background: 'rgba(77,249,237,0.06)' }}>
+          <p className="ff-sc booking-text text-xs lg:text-sm text-white/85">
+            This booking is still waiting for approval, so you can change any detail. Saving keeps the same booking number and its place in the queue.
+          </p>
         </div>
       )}
 

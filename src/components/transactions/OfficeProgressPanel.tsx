@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { Lock, LockOpen } from 'lucide-react'
+import { ChevronDown, Lock, LockOpen } from 'lucide-react'
 import { ToggleBox } from '@/components/ui/accordion'
 
 import proxyApi, { initCsrf } from '@/lib/api/auth.api'
@@ -16,6 +16,7 @@ import { AssetIcon, CARD_CLASS, InfoTip, MUTED, TEAL_BUTTON_CLASS, TEAL_BUTTON_S
 import { formatDateTime } from './transaction-format'
 import { usePanelSection } from '@/components/ui/PanelReady'
 import Dropdown from '@/components/ui/Dropdown'
+import StopPickerModal from './StopPickerModal'
 
 const INCIDENTS = [
   { key: 'truck_stolen',   label: 'Truck stolen' },
@@ -26,10 +27,11 @@ const INCIDENTS = [
   { key: 'other',          label: 'Other' },
 ] as const
 
+/** `place` is the row title in the Location list; `address` wraps under it. */
 type Step =
-  | { kind: 'pickup'; id: string; label: string; place: string }
-  | { kind: 'stop';   id: string; label: string; place: string }
-  | { kind: 'return'; id: 'return'; label: string; place: string }
+  | { kind: 'pickup'; id: string; label: string; place: string; address?: string | null }
+  | { kind: 'stop';   id: string; label: string; place: string; address?: string | null }
+  | { kind: 'return'; id: 'return'; label: string; place: string; address?: string | null }
 
 /** What the driver does at each kind of place (the Activity picker). */
 const ACTIVITY: Record<Step['kind'], string> = {
@@ -71,6 +73,7 @@ export default function OfficeProgressPanel({ bookingId, status, fleetReturned, 
   // The Location / Activity pickers (Figma 2026-11-14): a step, then what was done there.
   const [placeId,  setPlaceId]  = useState('')
   const [activity, setActivity] = useState('')
+  const [pickerOpen, setPickerOpen] = useState(false)
   const [office,   setOffice]   = useState<RoadEvent[]>([])
   const [showEarlier, setShowEarlier] = useState(false)
 
@@ -125,7 +128,8 @@ export default function OfficeProgressPanel({ bookingId, status, fleetReturned, 
         steps.push({
           kind: 'stop', id: s.trip_stop_id,
           label: `Delivered: ${where}${multi ? ` (trip ${t.trip_number})` : ''}`,
-          place: `Drop-off${n != null ? ` ${n}` : ''} · ${where}${multi ? ` (trip ${t.trip_number})` : ''}`,
+          place: `Drop-off${n != null ? ` ${n}` : ''}${multi ? ` · trip ${t.trip_number}` : ''}`,
+          address: where,
         })
       }
     }
@@ -214,16 +218,20 @@ export default function OfficeProgressPanel({ bookingId, status, fleetReturned, 
         <div className="grid grid-cols-1 min-[380px]:grid-cols-2 gap-3">
           <label className="flex flex-col gap-1 min-w-0">
             <span className="text-sm font-bold" style={{ color: labelColor }}>Location</span>
-            <Dropdown value={placeId} disabled={locked} {...writeAccess(allowed)}
-              onChange={(e) => {
-                setPlaceId(e.target.value)
-                const next = steps.find((x) => x.id === e.target.value)
-                setActivity(next ? ACTIVITY[next.kind] : '')
-              }}
-              className={selectClass}>
-              <option value="" disabled>Choose</option>
-              {steps.map((x) => <option key={x.id} value={x.id}>{x.place}</option>)}
-            </Dropdown>
+            {/* A pop-up list, not a dropdown: the addresses are too long (user 2026-11-27). */}
+            <button type="button" disabled={locked} {...writeAccess(allowed)}
+              onClick={() => setPickerOpen(true)} aria-haspopup="dialog"
+              className={`${selectClass} flex items-center justify-between gap-2 py-2 text-left`}>
+              <span className="min-w-0 flex-1">
+                {picked ? (
+                  <>
+                    <span className="block break-words">{picked.place}</span>
+                    {picked.address && <span className="block text-xs font-normal text-white/70 break-words">{picked.address}</span>}
+                  </>
+                ) : <span className="text-white/60">Choose</span>}
+              </span>
+              <ChevronDown aria-hidden size={16} className="shrink-0 text-[#818181]" />
+            </button>
           </label>
           <label className="flex flex-col gap-1 min-w-0">
             <span className="text-sm font-bold" style={{ color: labelColor }}>Activity</span>
@@ -294,6 +302,18 @@ export default function OfficeProgressPanel({ bookingId, status, fleetReturned, 
         {unlocked ? <Lock size={16} /> : <LockOpen size={16} />}
         {unlocked ? 'Lock' : 'Unlock'}
       </button>
+
+      <StopPickerModal
+        open={pickerOpen}
+        options={steps.map((x) => ({ id: x.id, title: x.place, address: x.address }))}
+        value={placeId}
+        onPick={(id) => {
+          setPlaceId(id)
+          const next = steps.find((x) => x.id === id)
+          setActivity(next ? ACTIVITY[next.kind] : '')
+        }}
+        onClose={() => setPickerOpen(false)}
+      />
 
       <RemarksModal
         open={!!step}

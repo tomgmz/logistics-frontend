@@ -14,6 +14,7 @@ import { writeAccess } from '@/components/layout/ModuleAccess'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { appToast } from '@/lib/toast'
 import ReusableModal from '@/components/layout/ReusableModal'
+import { useFormGuard } from '@/lib/hooks/useFormGuard'
 import VehiclePicker, { fitProblems } from '@/app/admin/booking-management/VehiclePicker'
 import DriverPicker, { type DriverPickerOption } from '@/app/admin/booking-management/DriverPicker'
 import { EMPTY_CARGO_SUMMARY } from '@/lib/cargo/summary'
@@ -130,12 +131,17 @@ export default function ReplaceCrewPanel({
 
 
   useBodyScrollLock(open)
+  // Closing the pop-up after changing a pick or typing a reason asks first
+  // (user 2026-11-27). Above the early return below: it is a hook.
+  const formNow = JSON.stringify({ source, driverId, secondId, truckId, vendorId, vendorSecondId, plate: plate.trim().toUpperCase(), vehicleType, helper: helper.trim() })
+  const closeGuard = useFormGuard(open && (formNow !== initial || !!note.trim()))
+  function requestClose() { if (!busy) closeGuard.requestClose(() => setOpen(false)) }
   useEffect(() => {
     if (!open) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !busy) setOpen(false) }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !closeGuard.asking) requestClose() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [open, busy])
+  })
 
   // Company drivers who are free, plus whoever is on the booking now (kept).
   const driverOptions = useMemo(() => drivers.filter((d) => {
@@ -294,9 +300,10 @@ export default function ReplaceCrewPanel({
         </CrewCard>
       )}
 
+      {closeGuard.modal}
       {open && (
         <div role="dialog" aria-modal="true" aria-labelledby="replace-crew-title"
-          onClick={busy ? undefined : () => setOpen(false)}
+          onClick={requestClose}
           className="fixed inset-0 z-[70] flex items-end justify-center sm:items-center sm:p-4"
           style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
           <div onClick={(e) => e.stopPropagation()}
@@ -306,7 +313,7 @@ export default function ReplaceCrewPanel({
                 <h2 id="replace-crew-title" className="text-base font-bold text-white">Replace driver or vehicle</h2>
                 {reference && <p className="text-[11px] text-white/40 mt-0.5 truncate">{reference}</p>}
               </div>
-              <button type="button" onClick={() => setOpen(false)} disabled={busy} aria-label="Close"
+              <button type="button" onClick={requestClose} disabled={busy} aria-label="Close"
                 className="shrink-0 p-1 rounded-md text-white/45 hover:text-white transition-colors disabled:opacity-40">
                 <X size={16} />
               </button>
@@ -453,7 +460,7 @@ export default function ReplaceCrewPanel({
             </div>
 
             <div className="shrink-0 px-4 sm:px-5 py-3 border-t border-white/[0.06] flex gap-2">
-              <button type="button" disabled={busy} onClick={() => setOpen(false)}
+              <button type="button" disabled={busy} onClick={requestClose}
                 className="flex-1 py-2 rounded-lg text-sm font-bold border border-white/10 text-white/50 hover:text-white transition-colors disabled:opacity-40">
                 Cancel
               </button>

@@ -9,6 +9,7 @@ import { writeAccess } from '@/components/layout/ModuleAccess'
 import { PALETTE } from '@/lib/palette'
 import { GREY_BUTTON_STYLE, TEAL_BUTTON_CLASS, TEAL_BUTTON_STYLE } from './BookingDetailParts'
 import Dropdown from '@/components/ui/Dropdown'
+import { useFormGuard } from '@/lib/hooks/useFormGuard'
 import { FieldError, errorBorder } from '@/components/ui/FieldError'
 
 /**
@@ -158,6 +159,9 @@ export default function DriverCallTime({
   const [draftDay, setDraftDay] = useState(savedDay ?? defaultCall(scheduleDay, clientCallTime).day)
   const [check, setCheck]       = useState<DriverCallCheck | null>(null)
   const [showErrors, setShowErrors] = useState(false)
+  // The pick as editing began: Cancel after a change asks first, Save asks once
+  // more because the driver is reminded at this time (user 2026-11-27).
+  const [callStart, setCallStart] = useState('')
 
   // The same call time shows in the progress step and in Trips: follow the
   // booking when the other copy (or someone else) saves, unless mid-edit.
@@ -174,11 +178,13 @@ export default function DriverCallTime({
   const draftTime  = join(draft.hour, draft.minute, draft.pm)
   const draftError = scheduleDay ? callError(draftDay, draftTime, scheduleDay, clientCallTime) : null
   const errClass   = errorBorder(showErrors && draftError)
+  const callGuard  = useFormGuard(editing && `${draftDay}|${draftTime}` !== callStart)
 
   const begin = () => {
     const g = defaultCall(scheduleDay, clientCallTime)
     setDraft(split(saved ?? g.time))
     setDraftDay(savedDay ?? g.day)
+    setCallStart(`${savedDay ?? g.day}|${saved ?? g.time}`)
     setShowErrors(false)
     setCheck(null)
     setEditing(true)
@@ -238,6 +244,7 @@ export default function DriverCallTime({
         </p>
       )}
 
+      {callGuard.modal}
       {editing && (
         <>
           <div>
@@ -270,10 +277,18 @@ export default function DriverCallTime({
           )}
           </div>
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => setEditing(false)} disabled={saving} className={smallBtn} style={GREY_BUTTON_STYLE}>
+            <button type="button" onClick={() => callGuard.requestClose(() => setEditing(false))} disabled={saving} className={smallBtn} style={GREY_BUTTON_STYLE}>
               Cancel
             </button>
-            <button type="button" onClick={() => { setShowErrors(true); if (!draftError) void save(draftTime, draftDay) }} disabled={saving}
+            <button type="button" onClick={() => {
+              setShowErrors(true)
+              if (draftError) return
+              callGuard.confirmSubmit(() => void save(draftTime, draftDay), {
+                title:        `Set the driver call time to ${formatDriverCall(draftTime, draftDay, scheduleDay)}?`,
+                description:  'The driver is reminded 1 hour before.',
+                confirmLabel: 'Save',
+              })
+            }} disabled={saving}
               className={smallBtn} style={TEAL_BUTTON_STYLE}>
               {saving ? 'Saving…' : 'Save'}
             </button>

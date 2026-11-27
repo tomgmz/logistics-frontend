@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { useFormGuard } from '@/lib/hooks/useFormGuard'
 import { Clock, Package, Pencil, X } from 'lucide-react'
 
 import {
@@ -493,12 +494,16 @@ function EditStopTime({ bookingId, editing, onClose, onSaved }: {
   const [note, setNote]   = useState('')
   const [busy, setBusy]   = useState(false)
   useBodyScrollLock(true)
+  // Changed time or a reason typed: closing asks first, Save asks once more
+  // (user 2026-11-27).
+  const guard = useFormGuard(value !== toManilaInput(editing.current?.at) || !!note.trim())
+  const requestClose = () => { if (!busy) guard.requestClose(onClose) }
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !busy) onClose() }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !guard.asking) requestClose() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [busy, onClose])
+  })
 
   // The input is Manila wall time; send it with its zone so no browser guesses.
   const iso = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value) ? `${value}:00+08:00` : null
@@ -522,8 +527,10 @@ function EditStopTime({ bookingId, editing, onClose, onSaved }: {
 
   const field = 'w-full rounded-lg border border-white/10 bg-[#1b1b1b] px-2.5 py-2 text-sm text-white disabled:opacity-50'
   return (
+    <>
+    {guard.modal}
     <div role="dialog" aria-modal="true" aria-labelledby="stop-time-title"
-      onClick={busy ? undefined : onClose}
+      onClick={requestClose}
       className="fixed inset-0 z-[70] flex items-end justify-center sm:items-center sm:p-4"
       style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
       <div onClick={(e) => e.stopPropagation()}
@@ -535,7 +542,7 @@ function EditStopTime({ bookingId, editing, onClose, onSaved }: {
             </h2>
             <p className="text-[11px] text-white/40 mt-0.5 truncate">{editing.where}</p>
           </div>
-          <button type="button" onClick={onClose} disabled={busy} aria-label="Close"
+          <button type="button" onClick={requestClose} disabled={busy} aria-label="Close"
             className="shrink-0 p-1 rounded-md text-white/45 disabled:opacity-40 [@media(hover:hover)]:hover:text-white">
             <X size={16} />
           </button>
@@ -559,11 +566,15 @@ function EditStopTime({ bookingId, editing, onClose, onSaved }: {
           </div>
         </div>
         <div className="shrink-0 px-4 py-3 border-t border-white/[0.06] flex gap-2">
-          <button type="button" disabled={busy} onClick={onClose}
+          <button type="button" disabled={busy} onClick={requestClose}
             className="flex-1 py-2 rounded-lg text-sm font-bold border border-white/10 text-white/50 disabled:opacity-40">
             Cancel
           </button>
-          <button type="button" disabled={!canSave} onClick={() => void save()}
+          <button type="button" disabled={!canSave} onClick={() => guard.confirmSubmit(() => void save(), {
+            title:        `Save this ${editing.label.toLowerCase()}?`,
+            description:  `${editing.where}: ${iso ? formatDateTime(iso) : ''}. Your reason is kept with the time.`,
+            confirmLabel: 'Save',
+          })}
             className="flex-1 py-2 rounded-lg text-sm font-bold disabled:opacity-40"
             style={{ background: 'rgba(77,249,237,0.12)', border: '1px solid rgba(77,249,237,0.30)', color: CYAN }}>
             {busy ? 'Saving…' : 'Save'}
@@ -571,5 +582,6 @@ function EditStopTime({ bookingId, editing, onClose, onSaved }: {
         </div>
       </div>
     </div>
+    </>
   )
 }

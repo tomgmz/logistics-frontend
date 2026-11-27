@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useFormGuard } from '@/lib/hooks/useFormGuard'
 import { Loader2, Send } from 'lucide-react'
 import authApi from '@/lib/api/auth.api'
 import { useAuthStore } from '@/lib/store/auth.store'
@@ -57,9 +58,20 @@ export default function TicketRequestForm({ onCancel, onDone }: {
       .catch(() => setBookings([]))
   }, [user])
 
-  async function submit() {
+  // Anything typed: Cancel asks first, and Submit asks once more (user 2026-11-27).
+  const guard = useFormGuard(category !== 'other' || !!bookingId || !!subject.trim() || !!details.trim(), { zClassName: 'z-[200]' })
+
+  function requestSubmit() {
     setTried(true)
     if (errors.subject || errors.details) return
+    guard.confirmSubmit(() => void submit(), {
+      title:        'Submit this ticket?',
+      description:  'Our team will reply by email.',
+      confirmLabel: 'Submit ticket',
+    })
+  }
+
+  async function submit() {
     setSending(true)
     setError(null)
     try {
@@ -78,7 +90,8 @@ export default function TicketRequestForm({ onCancel, onDone }: {
   const label = 'text-[13px] font-bold text-white/60'
 
   return (
-    <form onSubmit={(e) => { e.preventDefault(); void submit() }} className="flex min-h-0 flex-1 flex-col">
+    <form onSubmit={(e) => { e.preventDefault(); requestSubmit() }} className="flex min-h-0 flex-1 flex-col">
+      {guard.modal}
       <div className="min-h-0 flex-1 space-y-3.5 overflow-y-auto px-4 py-4">
         <p className="text-[14px] leading-snug text-white/50">
           For something that needs a formal record, like a complaint, a claim or damaged goods. Our team replies by
@@ -115,7 +128,7 @@ export default function TicketRequestForm({ onCancel, onDone }: {
         {error && <p role="alert" className="rounded-lg border border-[#F62626]/30 bg-[#F62626]/[0.06] px-3 py-2 text-[13px] text-[#F62626]">{error}</p>}
       </div>
       <div className="flex shrink-0 justify-end gap-2 border-t border-white/[0.07] px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-        <button type="button" onClick={onCancel} disabled={sending}
+        <button type="button" onClick={() => guard.requestClose(onCancel)} disabled={sending}
           className="rounded-lg border border-white/10 px-3.5 py-2 text-[14px] text-white/70 hover:bg-white/5">Cancel</button>
         <button type="submit" disabled={sending}
           className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--color-cyan)] px-3.5 py-2 text-[14px] font-bold text-[#0a0a0a] disabled:opacity-50">

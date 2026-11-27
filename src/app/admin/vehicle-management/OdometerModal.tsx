@@ -9,6 +9,7 @@ import { adminRecordOdometer, adminUploadFleetPhoto } from '@/lib/services/admin
 import { useRecordLock } from '@/lib/hooks/useRecordLock'
 import RecordLockBanner from '@/components/ui/RecordLockBanner'
 import ReusableModal from '@/components/layout/ReusableModal'
+import { useFormGuard } from '@/lib/hooks/useFormGuard'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { OdometerInput, PhotoField, parseKm, fmtKm } from './maintenance-ui'
@@ -87,9 +88,13 @@ export default function OdometerModal({
   }
 
   const reading = parseKm(km)
+  // Closing with a reading or photo entered asks first (user 2026-11-27).
+  const guard = useFormGuard(!!km.trim() || !!photo)
+  const requestClose = () => { if (!busy) guard.requestClose(onClose) }
 
   return (
     <>
+      {guard.modal}
       <AnimatePresence>
         {truck && (
           <motion.div
@@ -97,7 +102,7 @@ export default function OdometerModal({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={() => { if (!busy) onClose() }}
+            onClick={requestClose}
           >
             <motion.div
               initial={{ y: 12, opacity: 0 }}
@@ -118,7 +123,7 @@ export default function OdometerModal({
                     <p className="text-[11px] text-white/45 font-mono truncate">{truck.plate_number}</p>
                   </div>
                 </div>
-                <button type="button" onClick={onClose} disabled={busy} className="p-2 rounded-lg hover:bg-white/5 text-white/50" aria-label="Close">
+                <button type="button" onClick={requestClose} disabled={busy} className="p-2 rounded-lg hover:bg-white/5 text-white/50" aria-label="Close">
                   <X size={18} />
                 </button>
               </div>
@@ -143,7 +148,7 @@ export default function OdometerModal({
               </div>
 
               <div className="shrink-0 bg-[var(--color-surface)] flex justify-end gap-2 px-4 py-3 border-t border-white/[0.07]">
-                <button type="button" onClick={onClose} disabled={busy} className="px-4 py-2 rounded-lg border border-white/15 text-sm text-white/80 hover:bg-white/5">
+                <button type="button" onClick={requestClose} disabled={busy} className="px-4 py-2 rounded-lg border border-white/15 text-sm text-white/80 hover:bg-white/5">
                   Cancel
                 </button>
                 <button

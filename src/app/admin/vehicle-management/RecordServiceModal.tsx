@@ -9,6 +9,7 @@ import { adminRecordTruckService, adminUploadFleetPhoto } from '@/lib/services/a
 import { useRecordLock } from '@/lib/hooks/useRecordLock'
 import RecordLockBanner from '@/components/ui/RecordLockBanner'
 import ReusableModal from '@/components/layout/ReusableModal'
+import { useFormGuard } from '@/lib/hooks/useFormGuard'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { OdometerInput, PhotoField, parseKm, fmtKm, fmtDay, phToday, inputCls } from './maintenance-ui'
@@ -100,9 +101,17 @@ export default function RecordServiceModal({
 
   const everyKm     = truck?.service_interval_km
   const everyMonths = truck?.service_interval_months
+  // Closing after typing anything asks first (user 2026-11-27). The date and
+  // odometer open prefilled, so they count only once changed.
+  const dirty = date !== phToday()
+    || km !== (truck?.odometer_km != null ? String(truck.odometer_km) : '')
+    || !!work.trim() || !!workshop.trim() || !!receipt
+  const guard = useFormGuard(dirty)
+  const requestClose = () => { if (!busy) guard.requestClose(onClose) }
 
   return (
     <>
+      {guard.modal}
       <AnimatePresence>
         {truck && (
           <motion.div
@@ -110,7 +119,7 @@ export default function RecordServiceModal({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={() => { if (!busy) onClose() }}
+            onClick={requestClose}
           >
             <motion.div
               initial={{ y: 12, opacity: 0 }}
@@ -134,7 +143,7 @@ export default function RecordServiceModal({
                     </p>
                   </div>
                 </div>
-                <button type="button" onClick={onClose} disabled={busy} className="p-2 rounded-lg hover:bg-white/5 text-white/50" aria-label="Close">
+                <button type="button" onClick={requestClose} disabled={busy} className="p-2 rounded-lg hover:bg-white/5 text-white/50" aria-label="Close">
                   <X size={18} />
                 </button>
               </div>
@@ -180,7 +189,7 @@ export default function RecordServiceModal({
               </div>
 
               <div className="shrink-0 bg-[var(--color-surface)] flex justify-end gap-2 px-4 py-3 border-t border-white/[0.07]">
-                <button type="button" onClick={onClose} disabled={busy} className="px-4 py-2 rounded-lg border border-white/15 text-sm text-white/80 hover:bg-white/5">
+                <button type="button" onClick={requestClose} disabled={busy} className="px-4 py-2 rounded-lg border border-white/15 text-sm text-white/80 hover:bg-white/5">
                   Cancel
                 </button>
                 <button

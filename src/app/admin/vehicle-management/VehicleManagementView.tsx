@@ -66,6 +66,7 @@ import {
   inputCls,
 } from './maintenance-ui'
 import { useRecordLock, useRecordLocks } from '@/lib/hooks/useRecordLock'
+import { useFormGuard } from '@/lib/hooks/useFormGuard'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import RecordLockBanner, { RecordLockBadge } from '@/components/ui/RecordLockBanner'
 import { type RowAction } from '@/components/ui/RowActionMenu'
@@ -693,6 +694,10 @@ export default function VehicleManagementView({ archive }: {
     setFormError(null)
     setShowErrors(false)
   }
+  // Closing the vehicle form with changes asks first (user 2026-11-27).
+  const formDirty = !!modalMode && (!formsEqual(form, originalForm) || !!createOdoPhoto || pairOnCreate)
+  const formGuard = useFormGuard(formDirty)
+  const requestCloseModal = () => formGuard.requestClose(closeModal)
 
   /**
    * Every problem in the form, by field (shown under that field). Pure, so after
@@ -1283,6 +1288,8 @@ export default function VehicleManagementView({ archive }: {
         onConfirm={confirmModalProps?.onConfirm}
       />
 
+      {formGuard.modal}
+
       {/* Create / Edit vehicle modal */}
       <AnimatePresence>
         {modalMode && (
@@ -1291,7 +1298,7 @@ export default function VehicleManagementView({ archive }: {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={closeModal}
+            onClick={requestCloseModal}
           >
             <motion.div
               initial={{ y: 12, opacity: 0 }}
@@ -1308,7 +1315,7 @@ export default function VehicleManagementView({ archive }: {
                 </h2>
                 <button
                   type="button"
-                  onClick={closeModal}
+                  onClick={requestCloseModal}
                   className="p-2 rounded-lg hover:bg-white/5 text-white/50"
                   aria-label="Close"
                 >
@@ -1714,7 +1721,7 @@ export default function VehicleManagementView({ archive }: {
                 <div className="flex gap-2 ml-auto">
                   <button
                     type="button"
-                    onClick={closeModal}
+                    onClick={requestCloseModal}
                     className="px-4 py-2 rounded-lg border border-white/15 text-sm text-white/80 hover:bg-white/5"
                   >
                     Cancel

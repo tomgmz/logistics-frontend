@@ -20,7 +20,7 @@ import { getApiErrorMessage } from '@/lib/api-error'
 import { appToast } from '@/lib/toast'
 
 import StaffTransactionDetail from '@/components/transactions/StaffTransactionDetail'
-import { PANEL_BG } from '@/app/admin/booking-management/BookingDetailParts'
+import { NextCardJumper, PANEL_BG } from '@/app/admin/booking-management/BookingDetailParts'
 import BookingStatusTag from '@/components/transactions/BookingStatusTag'
 import {
   formatDate, getCompanyName, getDropoffs,
@@ -206,6 +206,8 @@ export default function TransactionHistoryView() {
       .catch(() => {})
   }, { debounceMs: 1500 })
 
+  /** The detail panel's scroll area, for the "next card ⌄" cue. */
+  const panelScrollRef = useRef<HTMLDivElement>(null)
   const openedDeepLink = useRef<string | null>(null)
   const openDeepLink = useCallback((id: string | null) => {
     if (!id || openedDeepLink.current === id) return
@@ -447,7 +449,8 @@ export default function TransactionHistoryView() {
                     </button>
                   </div>
                 </div>
-                <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 pt-[18px] pb-6">
+                {/* pb-24 keeps the last card clear of the "next card ⌄" cue. */}
+                <div ref={panelScrollRef} className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 pt-[18px] pb-24">
                   {/* Nothing shows until every section has its first answer
                       (user 2026-11-14), so the panel doesn't fill in piece by piece. */}
                   <PanelReadyGate key={selected.booking_id as string} fallback={<PanelSpinner />} className="space-y-[18px]">
@@ -456,6 +459,9 @@ export default function TransactionHistoryView() {
                     <StaffTransactionDetail key={selected.booking_id as string} booking={selected} />
                   </PanelReadyGate>
                 </div>
+                {/* "Next card ⌄": jumps card by card down the panel, as in
+                    Booking Management. The cards carry data-jump names. */}
+                <NextCardJumper key={selected.booking_id as string} scrollRef={panelScrollRef} />
               </motion.aside>
             </>
           )}

@@ -1,7 +1,7 @@
 'use client'
 
 import { ReactNode, useEffect } from 'react'
-import { CalendarRange, Files, History, Truck, LayoutDashboard } from 'lucide-react'
+import { CalendarRange, Files, History, Truck, LayoutDashboard, ShieldCheck } from 'lucide-react'
 import { archiveNavItem } from '@/components/archive/archiveNav'
 import ReusableDashboardShell from '@/components/layout/ReusableDashboardShell'
 import { useAuthStore } from '@/lib/store/auth.store'
@@ -30,6 +30,12 @@ export default function GeneralManagerLayout({ children }: { children: ReactNode
     return <div className="min-h-dvh bg-[#0a0a0a]" />
   }
 
-  return <ReusableDashboardShell navItems={NAV_ITEMS}>{children}</ReusableDashboardShell>
+  // Standing in for a departed IT Administrator (2026-11-27): the IT
+  // Administrator pages, one link away, until the new one sets their password.
+  const navItems = user.it_standin
+    ? [...NAV_ITEMS, { href: '/it_admin/dashboard', label: 'IT Administrator (stand-in)', icon: <ShieldCheck size={20} /> }]
+    : NAV_ITEMS
+
+  return <ReusableDashboardShell navItems={navItems}>{children}</ReusableDashboardShell>
 }
 

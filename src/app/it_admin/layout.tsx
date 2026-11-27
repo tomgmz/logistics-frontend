@@ -17,22 +17,24 @@ const NAV_ITEMS = [
   archiveNavItem('it_admin'),
 ]
 
-// The Company Administrator standing in for a departed IT Administrator
-// (2026-11-06) uses these same pages, with a way back to their own portal.
+// The General Manager standing in for a departed IT Administrator
+// (2026-11-27; a named Company Administrator before) uses these same pages,
+// with a way back to their own portal.
 const STANDIN_NAV_ITEMS = [
   ...NAV_ITEMS,
-  { href: '/admin/dashboard', label: 'Back to Company Administrator', icon: <ArrowLeft size={20} /> },
+  { href: '/general_manager/dashboard', label: 'Back to General Manager', icon: <ArrowLeft size={20} /> },
 ]
+const STANDIN_ROLE = 'general_manager'
 
 export default function ItAdminLayout({ children }: { children: ReactNode }) {
   const user = useAuthStore((s) => s.user)
   const hasHydrated = useAuthStore((s) => s.hasHydrated)
   const router = useRouter()
   const setUser = useAuthStore((s) => s.setUser)
-  // A Company Administrator who became the stand-in after signing in (e.g.
-  // tapping the "you are now standing in" notice) has a stale profile: re-read
-  // it once before deciding, instead of bouncing them back to /admin.
-  const needsRecheck = hasHydrated && user?.role === 'admin' && !user.it_standin
+  // A General Manager who became the stand-in after signing in (e.g. tapping
+  // the "you are now standing in" notice) has a stale profile: re-read it once
+  // before deciding, instead of bouncing them back to their portal.
+  const needsRecheck = hasHydrated && user?.role === STANDIN_ROLE && !user.it_standin
   const [recheckDone, setRecheckDone] = useState(false)
   const rechecked = !needsRecheck || recheckDone
   useEffect(() => {
@@ -40,15 +42,15 @@ export default function ItAdminLayout({ children }: { children: ReactNode }) {
     getMe().then((me) => setUser(me)).catch(() => {}).finally(() => setRecheckDone(true))
   }, [needsRecheck, recheckDone, setUser])
 
-  const isStandin = user?.role === 'admin' && !!user.it_standin
+  const isStandin = user?.role === STANDIN_ROLE && !!user.it_standin
   const allowed   = user?.role === 'it_admin' || isStandin
 
   useEffect(() => {
     if (!hasHydrated || !rechecked) return
     if (!user) { goHomeSignedOut(); return }
-    // A Company Administrator who is not (or no longer) the stand-in goes back
-    // to their own portal rather than being signed out.
-    if (user.role === 'admin' && !user.it_standin) { router.replace('/admin/dashboard'); return }
+    // A General Manager who is not (or no longer) the stand-in goes back to
+    // their own portal rather than being signed out.
+    if (user.role === STANDIN_ROLE && !user.it_standin) { router.replace('/general_manager/dashboard'); return }
     if (!allowed) goHomeSignedOut()
   }, [hasHydrated, rechecked, user, allowed, router])
 

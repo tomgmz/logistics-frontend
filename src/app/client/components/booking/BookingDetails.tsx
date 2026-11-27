@@ -604,6 +604,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
 
   // Correcting a rejected booking: nothing to resubmit until something changed.
   const resubmitBaseline = useBookingStore((s) => s.resubmit?.baseline ?? null)
+  const resubmitMode     = useBookingStore((s) => s.resubmit?.mode ?? 'resubmit')
   const pickupLat        = useBookingStore((s) => s.pickupLat)
   const pickupLng        = useBookingStore((s) => s.pickupLng)
   const dropoffCoords    = useBookingStore((s) => s.dropoffCoords)
@@ -1557,7 +1558,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
                   </div>
                   <button type="button" onClick={() => setPendingRemove({
                     title: 'Remove File?',
-                    description: `"${documentName(url)}" will be removed from this booking when you resubmit.`,
+                    description: `"${documentName(url)}" will be removed from this booking when you ${resubmitMode === 'edit' ? 'save your changes' : 'resubmit'}.`,
                     run: () => removeExistingDocument(url),
                   })}
                     className="hover:text-red-400 transition-colors cursor-pointer shrink-0">
@@ -1669,7 +1670,7 @@ export default function StepBookingDetails({ onNext, onBack, files, onFilesChang
           {onBack && <WizBtn onClick={onBack} variant="back">BACK</WizBtn>}
           {unchanged ? (
             <p className="ff-sc booking-text text-xs text-white/50 text-right">
-              Change the booking details to address the rejection before resubmitting.
+              {resubmitMode === 'edit' ? 'Change a booking detail first; nothing has changed yet.' : 'Change the booking details to address the rejection before resubmitting.'}
             </p>
           ) : stillNeeded.length > 0 && (
             <p className="ff-sc booking-text min-w-0 flex-1 text-xs text-white/50 text-right" aria-live="polite">

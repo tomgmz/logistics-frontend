@@ -13,7 +13,6 @@ import {
   LayoutDashboard,
   TriangleAlert,
   Ticket,
-  ShieldCheck,
 } from 'lucide-react'
 import { archiveNavItem } from '@/components/archive/archiveNav'
 import ReusableDashboardShell from '@/components/layout/ReusableDashboardShell'
@@ -100,11 +99,8 @@ export default function AdminShell({ children }: AdminShellProps) {
     return <div className="min-h-dvh bg-[#0a0a0a]" />
   }
 
-  // Standing in for a departed IT Administrator (2026-11-06): the IT
-  // Administrator pages, one link away, until the new one sets their password.
-  const navItems = user.it_standin
-    ? [...adminNavItems, { href: '/it_admin/dashboard', label: 'IT Administrator (stand-in)', icon: <ShieldCheck size={20} /> }]
-    : adminNavItems
+  // The IT Administrator stand-in is the General Manager since 2026-11-27.
+  const navItems = adminNavItems
 
   return (
     <ReusableDashboardShell navItems={navItems}>

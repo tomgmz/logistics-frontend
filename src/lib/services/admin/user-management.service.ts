@@ -206,10 +206,10 @@ export const itAdminService = {
   deactivate: (id: string) => patch<AdminUser>(`${B}/it-admins/${id}/deactivate`),
   restore:    (id: string) => post<AdminUser>(`${B}/it-admins/${id}/restore`, {}),
 
-  /** The signed-in IT Admin's place in a handover. */
+  /** The signed-in IT Admin's (or the General Manager's) place in a handover. */
   handoverStatus: () => get<ITAdminHandoverStatus>(`${B}/it-admins/handover`),
   /** Start the 30-day render; with `successor`, also add them now. */
-  startHandover: (p: { reason: string; standin_id: string; successor?: ITAdminSuccessorPayload | null }) =>
+  startHandover: (p: { reason: string; successor?: ITAdminSuccessorPayload | null }) =>
     post<unknown>(`${B}/it-admins/handover/start`, p),
   /** Add the replacement later (an account with an emailed temporary password). */
   addSuccessor: (p: ITAdminSuccessorPayload) => post<AdminUser>(`${B}/it-admins/handover/successor`, p),
@@ -217,15 +217,12 @@ export const itAdminService = {
   resendSuccessor: () => post<unknown>(`${B}/it-admins/handover/successor/resend`, {}),
   /** Archive the unconfirmed replacement so a different one can be added. */
   replaceSuccessor: () => del(`${B}/it-admins/handover/successor`),
-  /** Stop the handover before anyone confirmed; the caller keeps the role. */
+  /** Stop the handover before anyone confirmed; the IT Administrator keeps the role. */
   cancelHandover: () => post<unknown>(`${B}/it-admins/handover/cancel`, {}),
-  /** Active Company Administrators who can be named stand-in (2026-11-06). */
-  standinCandidates: () => get<StandinCandidate[]>(`${B}/it-admins/handover/standin-candidates`),
-  /** Change the Company Administrator who takes over after the 30 days (required, never cleared). */
-  setStandin: async (standinId: string) => {
-    const { data } = await proxyApi.put<ApiResponse<unknown>>(`${B}/it-admins/handover/standin`, { standin_id: standinId })
-    return data.data
-  },
+  /** General Manager: ask to take over an IT Administrator who can't be reached (3-day wait they can cancel). */
+  startTakeover: (reason: string) => post<unknown>(`${B}/it-admins/handover/takeover`, { reason }),
+  /** General Manager: no IT Administrator on record at all, add one. */
+  addToEmptySeat: (p: ITAdminSuccessorPayload) => post<AdminUser>(`${B}/it-admins/handover/empty-seat`, p),
 }
 
 export interface StandinCandidate {
@@ -237,7 +234,14 @@ export type ITAdminSuccessorPayload = Omit<CreateITAdminPayload, 'created_by'>
 
 export interface ITAdminHandoverStatus {
   render_days: number
-  /** 'outgoing' = the resigning IT Admin; 'standin' = the Company Administrator who took over. */
+  /** How long the IT Administrator has to cancel an emergency takeover. */
+  emergency_wait_days?: number
+  /** General Manager with nothing open: the IT Administrator on record, or null when the seat is empty. */
+  seat?: {
+    user_id: string; email: string; first_name: string | null; last_name: string | null
+    status: string; last_login_at: string | null
+  } | null
+  /** 'outgoing' = the resigning IT Admin; 'standin' = the General Manager, who handles it whenever the IT Administrator is not there (2026-11-27). */
   viewer?: 'outgoing' | 'standin' | null
   /** The caller's handover in progress, or null while they simply hold the role. */
   handover: {
@@ -252,10 +256,12 @@ export interface ITAdminHandoverStatus {
       user_id: string; email: string; first_name: string | null; last_name: string | null
       temp_password_expires_at: string | null
     } | null
-    /** Company Administrator who takes over if nobody confirms by render_due_at (2026-11-06). */
+    /** The General Manager, who takes over if nobody confirms by render_due_at (2026-11-27). */
     standin?: StandinCandidate | null
     /** True once the stand-in has taken over (the outgoing IT Admin is archived then). */
     standin_active?: boolean
+    /** Started by the General Manager because the IT Administrator could not be reached (2026-11-27). */
+    emergency?: boolean
   } | null
 }
 

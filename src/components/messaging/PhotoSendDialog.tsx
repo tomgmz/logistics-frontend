@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useFormGuard } from '@/lib/hooks/useFormGuard'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { MapPin, ImageIcon, Loader2, X } from 'lucide-react'
@@ -68,11 +69,16 @@ function PhotoSendPanel({ file, onCancel, onSend }: {
 
   useEffect(() => () => URL.revokeObjectURL(preview), [preview])
 
+  // This pop-up is itself the check before sending (preview, then Send). A
+  // typed message is asked about before it is thrown away (user 2026-11-27).
+  const guard = useFormGuard(!!caption.trim())
+  const requestCancel = () => { if (!busy) guard.requestClose(onCancel) }
+
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !busy) onCancel() }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !guard.asking) requestCancel() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [busy, onCancel])
+  })
 
   const send = async () => {
     if (busy) return
@@ -113,10 +119,12 @@ function PhotoSendPanel({ file, onCancel, onSend }: {
   )
 
   return (
+        <>
+        {guard.modal}
         <motion.div
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
           className="ff-darker fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4"
-          onClick={e => { if (e.target === e.currentTarget && !busy) onCancel() }}
+          onClick={e => { if (e.target === e.currentTarget) requestCancel() }}
           role="dialog" aria-modal="true" aria-labelledby="photo-send-title"
         >
           <motion.div
@@ -126,7 +134,7 @@ function PhotoSendPanel({ file, onCancel, onSend }: {
           >
             <div className="flex shrink-0 items-center justify-between">
               <h3 id="photo-send-title" className="ff-body text-sm font-semibold text-white">Send a photo</h3>
-              <button type="button" onClick={onCancel} disabled={busy} aria-label="Close"
+              <button type="button" onClick={requestCancel} disabled={busy} aria-label="Close"
                 className="p-1 rounded-lg hover:bg-white/5 text-white/40 hover:text-white/70 transition-colors">
                 <X size={14} />
               </button>
@@ -160,7 +168,7 @@ function PhotoSendPanel({ file, onCancel, onSend }: {
             </div>
 
             <div className="shrink-0 bg-[var(--color-bg)] flex gap-2">
-              <button type="button" onClick={onCancel} disabled={busy}
+              <button type="button" onClick={requestCancel} disabled={busy}
                 className="flex-1 py-2 rounded-xl border border-white/10 ff-body text-sm text-white/70 hover:text-white transition-colors disabled:opacity-50">
                 Cancel
               </button>
@@ -172,5 +180,6 @@ function PhotoSendPanel({ file, onCancel, onSend }: {
             </div>
           </motion.div>
         </motion.div>
+        </>
   )
 }

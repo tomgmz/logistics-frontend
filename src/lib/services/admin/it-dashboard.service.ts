@@ -152,7 +152,7 @@ export interface ItDashboardSummary {
     dormant:         number
     dormant_days:    number
     it_admin:        StaffAccount | null
-    /** Company Administrator standing in for a departed IT Administrator (2026-11-06). */
+    /** The General Manager standing in for a departed IT Administrator (2026-11-27). */
     it_standin?:     StaffAccount | null
     last_handover:   { at: string; description: string } | null
     administrators:  StaffAccount[]

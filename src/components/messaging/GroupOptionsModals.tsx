@@ -12,6 +12,7 @@ import type { Group, GroupMember } from '@/app/types/messaging/messaging.types'
 import { cachedFetch } from '@/lib/query/useApiQuery'
 import SearchClearButton from '@/components/ui/SearchClearButton'
 import { Tip } from '@/components/ui/tooltip'
+import { useFormGuard } from '@/lib/hooks/useFormGuard'
 
 export type GroupOptionsView = 'members' | 'add' | 'rename' | 'requests'
 
@@ -207,6 +208,15 @@ function AddMembersModal({ group, isCreator, onClose, onDone }: {
     return next
   })
 
+  // People ticked: closing asks first; adding asks once more (user 2026-11-27).
+  const guard = useFormGuard(selected.size > 0)
+  const requestClose = () => guard.requestClose(onClose)
+  const requestSave = () => guard.confirmSubmit(() => void save(), {
+    title:        isCreator ? `Add ${selected.size} ${selected.size === 1 ? 'person' : 'people'} to the group?` : 'Send this request?',
+    description:  isCreator ? 'They will see the group and its messages.' : 'The group creator will approve or decline it.',
+    confirmLabel: isCreator ? 'Add' : 'Send request',
+  })
+
   const save = async () => {
     if (!selected.size || saving) return
     setSaving(true)
@@ -222,7 +232,8 @@ function AddMembersModal({ group, isCreator, onClose, onDone }: {
   }
 
   return (
-    <ModalFrame title={isCreator ? 'Add People' : 'Ask to Add People'} icon={<UserPlus size={15} className="text-[var(--color-cyan)]/70" />} onClose={onClose}>
+    <ModalFrame title={isCreator ? 'Add People' : 'Ask to Add People'} icon={<UserPlus size={15} className="text-[var(--color-cyan)]/70" />} onClose={requestClose}>
+      {guard.modal}
       {!isCreator && (
         <p className="px-4 pt-3 ff-body text-[11px] text-white/45">
           The group creator approves who joins. They will see your request in the chat.
@@ -264,7 +275,7 @@ function AddMembersModal({ group, isCreator, onClose, onDone }: {
       {error && <p className="px-4 pb-2 ff-body text-xs text-red-400">{error}</p>}
 
       <div className="px-3 py-3 border-t border-white/[0.06] shrink-0">
-        <button type="button" onClick={save} disabled={!selected.size || saving} className={PRIMARY_CLASS}>
+        <button type="button" onClick={requestSave} disabled={!selected.size || saving} className={PRIMARY_CLASS}>
           {saving ? <Loader2 size={14} className="animate-spin" /> : <UserPlus size={14} />}
           {saving
             ? (isCreator ? 'Adding…' : 'Sending…')
@@ -282,6 +293,16 @@ function RenameModal({ group, onClose, onDone }: {
   const [saving, setSaving] = useState(false)
   const [error,  setError]  = useState<string | null>(null)
   const unchanged = name.trim() === group.name.trim()
+  // A new name typed: closing asks first; saving asks once more (user 2026-11-27).
+  const guard = useFormGuard(!unchanged)
+  const requestSave = () => {
+    if (!name.trim() || unchanged || saving) return
+    guard.confirmSubmit(() => void save(), {
+      title:        `Rename the group to "${name.trim()}"?`,
+      description:  'Everyone in the group sees the new name.',
+      confirmLabel: 'Rename',
+    })
+  }
 
   const save = async () => {
     if (!name.trim() || unchanged || saving) return
@@ -297,16 +318,17 @@ function RenameModal({ group, onClose, onDone }: {
   }
 
   return (
-    <ModalFrame title="Edit Group Name" icon={<Pencil size={15} className="text-[var(--color-cyan)]/70" />} onClose={onClose}>
+    <ModalFrame title="Edit Group Name" icon={<Pencil size={15} className="text-[var(--color-cyan)]/70" />} onClose={() => guard.requestClose(onClose)}>
+      {guard.modal}
       <div className="px-3 pt-3 pb-2">
         <input type="text" value={name} autoFocus maxLength={100}
           onChange={e => setName(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') void save() }}
+          onKeyDown={e => { if (e.key === 'Enter') requestSave() }}
           placeholder="Group name…" className={INPUT_CLASS} />
       </div>
       {error && <p className="px-4 pb-2 ff-body text-xs text-red-400">{error}</p>}
       <div className="px-3 py-3 border-t border-white/[0.06]">
-        <button type="button" onClick={save} disabled={!name.trim() || unchanged || saving} className={PRIMARY_CLASS}>
+        <button type="button" onClick={requestSave} disabled={!name.trim() || unchanged || saving} className={PRIMARY_CLASS}>
           {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
           {saving ? 'Saving…' : 'Save name'}
         </button>

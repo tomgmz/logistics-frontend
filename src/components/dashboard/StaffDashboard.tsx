@@ -1,5 +1,6 @@
 'use client'
 
+import ItAdminHandoverPanel from '@/components/admin/ItAdminHandoverPanel'
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import {
@@ -383,6 +384,9 @@ export default function StaffDashboard({ role }: { role: StaffRole }) {
   return (
     <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-[#0a0a0a] text-white px-4 py-5 lg:px-8 lg:py-6">
       <div className="flex w-full flex-col gap-5 lg:gap-6">
+        {/* The General Manager handles the IT Administrator handover whenever the
+            IT Administrator is not there (2026-11-27). Shows only while one is open. */}
+        {role === 'general_manager' && <ItAdminHandoverPanel forGm />}
         {error && (
           <div className="rounded-xl border border-[#f62626]/30 bg-[#f62626]/10 px-4 py-2.5 text-sm text-[#f62626]">{error}</div>
         )}

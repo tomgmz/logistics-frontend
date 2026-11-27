@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useFormGuard } from '@/lib/hooks/useFormGuard'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Search, X } from 'lucide-react'
 
@@ -51,6 +52,12 @@ export default function NewTicketModal({ open, onClose, onCreated }: {
   const [busy,          setBusy]          = useState(false)
   useBodyScrollLock(open)
 
+  // Anything entered: closing asks first; opening the ticket (it emails the
+  // client) asks once more (user 2026-11-27).
+  const dirty = !!client || !!bookingId || category !== 'delivery' || !!subject.trim() || !!message.trim()
+  const guard = useFormGuard(dirty)
+  const requestClose = () => { if (!busy) guard.requestClose(onClose) }
+
   // Fresh form every time it opens.
   useEffect(() => {
     if (!open) return
@@ -64,10 +71,10 @@ export default function NewTicketModal({ open, onClose, onCreated }: {
 
   useEffect(() => {
     if (!open) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !busy) onClose() }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !guard.asking) requestClose() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [open, busy, onClose])
+  })
 
   // Debounced client search; empty lists the first clients alphabetically.
   useEffect(() => {
@@ -121,6 +128,8 @@ export default function NewTicketModal({ open, onClose, onCreated }: {
   }
 
   return (
+    <>
+    {guard.modal}
     <AnimatePresence>
       {open && (
         <motion.div
@@ -128,7 +137,7 @@ export default function NewTicketModal({ open, onClose, onCreated }: {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          onClick={() => { if (!busy) onClose() }}
+          onClick={requestClose}
         >
           <motion.div
             initial={{ y: 16, opacity: 0 }}
@@ -148,7 +157,7 @@ export default function NewTicketModal({ open, onClose, onCreated }: {
                   For a client who called, emailed or came in. It is emailed to them, and you answer in that thread.
                 </p>
               </div>
-              <button type="button" disabled={busy} onClick={onClose} className="p-2 rounded-lg text-white/50 shrink-0 [@media(hover:hover)]:hover:bg-white/5" aria-label="Close">
+              <button type="button" disabled={busy} onClick={requestClose} className="p-2 rounded-lg text-white/50 shrink-0 [@media(hover:hover)]:hover:bg-white/5" aria-label="Close">
                 <X size={18} />
               </button>
             </div>
@@ -272,7 +281,7 @@ export default function NewTicketModal({ open, onClose, onCreated }: {
               <button
                 type="button"
                 disabled={busy}
-                onClick={onClose}
+                onClick={requestClose}
                 className="flex-1 py-2.5 rounded-xl text-sm font-bold border border-white/10 text-white/50 disabled:opacity-40"
               >
                 Cancel
@@ -280,7 +289,11 @@ export default function NewTicketModal({ open, onClose, onCreated }: {
               <button
                 type="button"
                 disabled={!canSubmit}
-                onClick={() => void submit()}
+                onClick={() => guard.confirmSubmit(() => void submit(), {
+                  title:        'Open this ticket?',
+                  description:  `It is emailed to ${client?.company_name ?? 'the client'} straight away.`,
+                  confirmLabel: 'Open ticket',
+                })}
                 className="flex-1 py-2.5 rounded-xl text-sm font-bold text-[#0a0a0a] disabled:opacity-40"
                 style={{ background: 'var(--color-cyan)' }}
               >
@@ -291,5 +304,6 @@ export default function NewTicketModal({ open, onClose, onCreated }: {
         </motion.div>
       )}
     </AnimatePresence>
+    </>
   )
 }
