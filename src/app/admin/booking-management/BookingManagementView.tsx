@@ -75,6 +75,7 @@ import DriverPicker, { type DriverPickerOption } from './DriverPicker'
 import CompletionPanel from '@/components/transactions/CompletionPanel'
 import { BookingHistorySection } from '@/components/transactions/HistoryActivities'
 import DeliveryStopsCard from './DeliveryStopsCard'
+import UploadDocumentModal from '@/components/documents/UploadDocumentModal'
 import { formatPlateNumber, plateError } from '@/lib/validation/plate'
 import { resubmissionsOf } from '@/components/transactions/ResubmittedBadge'
 import { MAX_RESUBMISSIONS } from '@/lib/booking-resubmit'
@@ -1220,6 +1221,8 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
   // The "Choose vehicle and driver" pop-up is open. Closed on a successful
   // assign; cancelling it puts back what is on the booking.
   const [assignEditMode, setAssignEditMode] = useState(false)
+  // A drop-off's "Upload Proof of Delivery" (Proof missing): which drop-off.
+  const [proofUploadFor, setProofUploadFor] = useState<string | null>(null)
   // Bumped to remount TripPlanner when the booking changed under us.
   const [plannerTick, setPlannerTick]       = useState(0)
 
@@ -2548,6 +2551,23 @@ export default function BookingManagementView({ roleView = 'admin' }: BookingMan
                           stops={sortedStops}
                           pickupProofUrl={d?.pickup_proof_photo_url ?? null}
                           pickupProofAt={d?.pickup_proof_at ?? null}
+                          onUploadProof={setProofUploadFor}
+                          canUploadProof={canEdit}
+                        />
+                        <UploadDocumentModal
+                          open={!!proofUploadFor}
+                          initialTarget="booking"
+                          initialBooking={{
+                            booking_id:       detail.booking_id,
+                            reference_number: detail.reference_number ?? null,
+                            status:           detail.status ?? '',
+                            schedule_date:    detail.schedule_date ?? null,
+                            company_name:     detail.clients?.company_name ?? null,
+                          }}
+                          initialDocType="proof_of_delivery"
+                          initialDestinationId={proofUploadFor}
+                          onClose={() => setProofUploadFor(null)}
+                          onUploaded={() => setProofUploadFor(null)}
                         />
                       </section>
 

@@ -211,7 +211,7 @@ export default function OfficeProgressPanel({ bookingId, status, fleetReturned, 
             </p>
           </div>
         </div>
-        <InfoTip text="Use only when the driver can't (phone stolen, lost or dead). No photo or location is recorded; your reason is kept on the stop and in the audit log." />
+        <InfoTip text="Use only when the driver can't (phone stolen, lost or dead). No photo or location is recorded; your reason is kept on the stop and in the audit log. A drop-off done here shows Proof missing until a Proof of Delivery is uploaded for it." />
       </div>
 
       <p className="text-sm font-bold" style={{ color: unlocked ? '#ffffff' : MUTED }}>Complete a driver activity time stamp?</p>
@@ -320,7 +320,10 @@ export default function OfficeProgressPanel({ bookingId, status, fleetReturned, 
         open={!!step}
         tone="approve"
         title="Confirm for the driver?"
-        description={step ? `${step.label}. This is recorded as done by the office, not the driver.` : ''}
+        description={step
+          ? `${step.label}. This is recorded as done by the office, not the driver.` +
+            (step.kind === 'stop' ? ' No photo is recorded, so the drop-off shows Proof missing until you upload the signed delivery receipt as its Proof of Delivery.' : '')
+          : ''}
         remarksLabel="Reason"
         remarksPlaceholder="e.g. Driver's phone was stolen; the client confirmed receipt by phone."
         confirmLabel={busy ? 'Saving…' : 'Confirm'}

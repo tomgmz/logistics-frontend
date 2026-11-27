@@ -1,4 +1,5 @@
 import proxyApi, { initCsrf } from '@/lib/api/auth.api'
+import type { DropoffProof } from '@/app/types/documents.types'
 
 interface ApiResponse<T> {
   status: string
@@ -91,6 +92,9 @@ export const tripService = {
    * planner.
    */
   getTrips: (bookingId: string) => get<Trip[]>(`${B}/${bookingId}/trips`),
+
+  /** Each drop-off's proof state ("Proof missing" / "Proof in review"), for the stop card. */
+  getDropoffProof: (bookingId: string) => get<DropoffProof[]>(`${B}/${bookingId}/dropoff-proof`),
 
   /**
    * Replace the runs not loaded yet.

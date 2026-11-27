@@ -6,11 +6,11 @@ import {
   DOCUMENT_SOURCE_LABELS,
   REVIEW_STATUS_LABELS,
   type BookingOption,
-  type ClientOption,
   type DocumentFilters,
   type DocumentFolder,
   type DocumentFolderLevel,
   type DocumentPage,
+  type DropoffProof,
   type LibraryDocument,
   type StaffDocumentType,
   type VehicleOption,
@@ -90,9 +90,9 @@ export async function searchBookingsForUpload(search: string): Promise<BookingOp
   return data?.data ?? []
 }
 
-/** The client picker for uploading a contract. */
-export async function searchClientsForUpload(search: string): Promise<ClientOption[]> {
-  const { data } = await proxyApi.get<{ data: ClientOption[] }>(`${B}/clients`, { params: { search } })
+/** A booking's drop-offs and their proof state, for a Proof of Delivery's Drop-off choice. */
+export async function fetchBookingDropoffs(bookingId: string): Promise<DropoffProof[]> {
+  const { data } = await proxyApi.get<{ data: DropoffProof[] }>(`${B}/bookings/${encodeURIComponent(bookingId)}/dropoffs`)
   return data?.data ?? []
 }
 
@@ -108,35 +108,31 @@ export async function fetchOtherLabels(target: 'booking' | 'vehicle' = 'booking'
   return data?.data ?? []
 }
 
-/** A booking upload (Proof of Delivery, Other + its type), a client's contract, or a vehicle's paperwork. */
+/** A booking upload (Proof of Delivery, Other + its type) or a vehicle's paperwork. Saved at once, no review. */
 export async function uploadDocuments(input: {
   bookingId?:   string | null
-  clientId?:    string | null
   truckId?:     string | null
+  /** The drop-off a Proof of Delivery proves. */
+  destinationId?: string | null
   documentType: StaffDocumentType
   otherLabel?:  string | null
   notes:        string
   files:        File[]
-}): Promise<{ document_ids: string[]; needs_review?: boolean }> {
+}): Promise<{ document_ids: string[] }> {
   await initCsrf()
   const form = new FormData()
   if (input.bookingId) form.append('booking_id', input.bookingId)
-  if (input.clientId)  form.append('client_id', input.clientId)
   if (input.truckId)   form.append('truck_id', input.truckId)
+  if (input.destinationId && input.documentType === 'proof_of_delivery') form.append('destination_id', input.destinationId)
   form.append('document_type', input.documentType)
   if (input.documentType === 'other' && input.otherLabel?.trim()) form.append('other_label', input.otherLabel.trim())
   if (input.notes.trim()) form.append('notes', input.notes.trim())
   input.files.forEach((f) => form.append('documents', f))
 
-  const { data } = await proxyApi.post<{ data: { document_ids: string[]; needs_review?: boolean } }>(B, form, {
+  const { data } = await proxyApi.post<{ data: { document_ids: string[] } }>(B, form, {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
   return data.data
-}
-
-export async function reviewDocument(documentId: string, decision: 'approved' | 'rejected', reason?: string): Promise<void> {
-  await initCsrf()
-  await proxyApi.patch(`${B}/${documentId}/review`, { decision, reason: reason?.trim() || null })
 }
 
 export async function archiveDocument(documentId: string): Promise<void> {

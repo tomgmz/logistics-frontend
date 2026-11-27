@@ -8,14 +8,19 @@
  *
  * The pickup is per run: a booking split into trips loads at the same pickup
  * once per run, so the card shows the run in progress (or the next one to load).
+ *
+ * A drop-off recorded without a photo (the office's "Complete for the driver")
+ * shows "Proof missing" until a Proof of Delivery is uploaded for it (2026-11-27).
  */
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 
 import { tripService, type Trip } from '@/lib/services/admin/trip.service'
+import type { DropoffProof } from '@/app/types/documents.types'
 import { cachedFetch } from '@/lib/query/useApiQuery'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { usePanelSection } from '@/components/ui/PanelReady'
+import { writeAccess } from '@/components/layout/ModuleAccess'
 import { FileViewButton, ProtectedImg } from '@/components/ui/FileViewer'
 import { formatPhDateTime } from '@/lib/office-hours'
 import { PALETTE } from '@/lib/palette'
@@ -91,7 +96,37 @@ function PointBox({ address, bright, statuses, current, right, note, children }:
   )
 }
 
-export default function DeliveryStopsCard({ bookingId, status, origin, stops, pickupProofUrl, pickupProofAt, trips: givenTrips, pickupNote }: {
+/** Shown under a delivered drop-off with no photo, by its proof state. */
+function MissingProof({ state, onUpload, canUpload }: {
+  state: DropoffProof['proof_state'] | undefined
+  onUpload?: () => void
+  canUpload: boolean
+}) {
+  if (state === 'missing') {
+    return (
+      <div className="rounded-[8px] border px-3 py-2.5 flex flex-col gap-2" style={{ borderColor: PALETTE.red, background: '#2a0606' }}>
+        <div className="flex flex-wrap items-center gap-2">
+          <Tag color={PALETTE.red}>Proof missing</Tag>
+        </div>
+        <p className="text-xs font-bold text-white/80 leading-snug">
+          Recorded without a photo. Upload the signed delivery receipt as a Proof of Delivery for this drop-off;
+          the client sees it as soon as it is uploaded.
+        </p>
+        {onUpload && (
+          <button type="button" onClick={onUpload} {...writeAccess(canUpload)}
+            className="self-start min-h-[40px] rounded-[8px] border px-3 text-sm font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{ borderColor: PALETTE.cyan, color: PALETTE.cyan }}>
+            Upload Proof of Delivery
+          </button>
+        )}
+      </div>
+    )
+  }
+  if (state === null) return <p className="text-xs font-bold text-white/50">No photo; a Proof of Delivery is on file.</p>
+  return <p className="text-xs font-bold text-white/30">No proof photo on file.</p>
+}
+
+export default function DeliveryStopsCard({ bookingId, status, origin, stops, pickupProofUrl, pickupProofAt, trips: givenTrips, pickupNote, onUploadProof, canUploadProof = true }: {
   bookingId: string
   /** Normalised booking status. */
   status:    string
@@ -105,6 +140,10 @@ export default function DeliveryStopsCard({ bookingId, status, origin, stops, pi
   trips?: Array<Pick<Trip, 'trip_number' | 'status' | 'pickup_proof_photo_url' | 'pickup_proof_at'>> | null
   /** Orange words on the pick-up point's tag row ("Delayed · 1 hr 20 min"). */
   pickupNote?: string | null
+  /** Opens the upload for a drop-off's Proof of Delivery; no button without it. */
+  onUploadProof?: (destinationId: string) => void
+  /** False for Read Only: the button shows disabled. */
+  canUploadProof?: boolean
 }) {
   const wantTrips = HAS_TRIPS.includes(status) && givenTrips === undefined
   const [fetched, setTrips] = useState<Trip[] | null>(null)
@@ -123,6 +162,20 @@ export default function DeliveryStopsCard({ bookingId, status, origin, stops, pi
     if (!wantTrips) return
     tripService.getTrips(bookingId).then(setTrips).catch(() => {})
   }, { enabled: wantTrips, debounceMs: 1000 })
+
+  // Proof state of drop-offs delivered without a photo. A role that can't read
+  // it (403) just sees "No proof photo on file", as before.
+  const wantProof = stops.some((s) => s.status === 'delivered' && !s.proof_photo_url)
+    || (trips ?? []).some((t) => t.status === 'completed' || t.status === 'in_transit')
+  const [proof, setProof] = useState<Map<string, DropoffProof['proof_state']> | null>(null)
+  const loadProof = useCallback(() => {
+    tripService.getDropoffProof(bookingId)
+      .then((rows) => setProof(new Map((rows ?? []).map((r) => [r.destination_id, r.proof_state]))))
+      .catch(() => setProof(new Map()))
+  }, [bookingId])
+  useEffect(() => { if (wantProof) loadProof() }, [wantProof, loadProof, status])
+  useLiveTable(['live:documents', 'live:bookings'], () => { if (wantProof) loadProof() }, { enabled: wantProof, debounceMs: 1000 })
+  usePanelSection(wantProof && proof === null)
 
   const runs = [...(trips ?? [])].filter((t) => t.status !== 'cancelled').sort((a, b) => a.trip_number - b.trip_number)
   // The run in progress, else the next one to load, else the last one.
@@ -177,9 +230,17 @@ export default function DeliveryStopsCard({ bookingId, status, origin, stops, pi
                 statuses={DROP_STATUSES}
                 current={s.status}
               >
-                {s.proof_photo_url
-                  ? <ProofRow url={s.proof_photo_url} at={s.proof_at ?? s.delivered_at} label="Proof of delivery" />
-                  : s.status === 'delivered' && <p className="text-xs font-bold text-white/30">No proof photo on file.</p>}
+                {s.proof_photo_url && (
+                  <ProofRow url={s.proof_photo_url} at={s.proof_at ?? s.delivered_at} label="Proof of delivery" />
+                )}
+                {/* A later visit can lack a photo even when the bay shows one. */}
+                {(proof?.get(s.destination_id) || (!s.proof_photo_url && s.status === 'delivered')) && (
+                  <MissingProof
+                    state={proof?.get(s.destination_id)}
+                    canUpload={canUploadProof}
+                    onUpload={onUploadProof ? () => onUploadProof(s.destination_id) : undefined}
+                  />
+                )}
               </PointBox>
             </li>
           ))}

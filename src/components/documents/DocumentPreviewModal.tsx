@@ -26,11 +26,9 @@ import { Tip } from '@/components/ui/tooltip'
  * `tone` is the outline and text colour.
  */
 export const PREVIEW_ACTION_CLASS =
-  'font-[family-name:var(--font-alegreya-sc)] h-9 3xl:h-10 min-w-0 rounded-lg border bg-transparent px-3 text-sm 3xl:text-base font-bold transition-colors disabled:opacity-40 [@media(hover:hover)]:enabled:hover:bg-white/[0.04]'
+  'font-[family-name:var(--font-alegreya-sc)] h-9 3xl:h-10 w-full min-w-0 rounded-lg border bg-transparent px-3 text-sm 3xl:text-base font-bold transition-colors disabled:opacity-40 [@media(hover:hover)]:enabled:hover:bg-white/[0.04]'
 export const PREVIEW_TONE = {
   archive: { color: '#ffea00', borderColor: '#ffea00' },
-  reject:  { color: '#f62626', borderColor: '#f62626' },
-  approve: { color: '#4df9ed', borderColor: '#4df9ed' },
   neutral: { color: '#c4c4c4', borderColor: '#818181' },
 } as const
 
@@ -46,7 +44,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 
 /**
  * One document: a large preview beside everything known about it. The caller
- * passes whatever actions the viewer's tier allows (review, archive), built
+ * passes whatever actions the viewer's tier allows (archive or restore), built
  * with PREVIEW_ACTION_CLASS / PREVIEW_TONE so they sit in one equal row.
  */
 export default function DocumentPreviewModal({

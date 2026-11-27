@@ -8,7 +8,7 @@ import { useFormGuard } from '@/lib/hooks/useFormGuard'
 
 import AccountTypePicker from '@/components/admin/AccountTypePicker'
 
-import { fetchOtherLabels, searchBookingsForUpload, searchClientsForUpload, searchVehiclesForUpload, uploadDocuments } from '@/lib/services/admin/documents.service'
+import { fetchBookingDropoffs, fetchOtherLabels, searchBookingsForUpload, searchVehiclesForUpload, uploadDocuments } from '@/lib/services/admin/documents.service'
 import {
   BOOKING_DOCUMENT_TYPES,
   DOCUMENT_TYPE_LABELS,
@@ -16,8 +16,7 @@ import {
   VEHICLE_DOCUMENT_TYPES,
   fileSizeLabel,
   type BookingOption,
-  type ClientOption,
-  needsReview,
+  type DropoffProof,
   type StaffDocumentType,
   type UploadTarget,
   type VehicleOption,
@@ -28,7 +27,6 @@ import { cachedFetch } from '@/lib/query/useApiQuery'
 import { formatDate } from '@/app/utils/timeFormat'
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock'
 import Dropdown from '@/components/ui/Dropdown'
-import Combobox from '@/components/ui/Combobox'
 import SearchClearButton from '@/components/ui/SearchClearButton'
 import { FieldError, errorBorder } from '@/components/ui/FieldError'
 import { mainStatusLabel } from '@/components/transactions/BookingStatusTag'
@@ -41,13 +39,11 @@ const ACCEPT_EXT = new Set(ACCEPT.split(',').map((e) => e.slice(1)))
 
 const TYPES_FOR: Record<UploadTarget, readonly StaffDocumentType[]> = {
   booking: BOOKING_DOCUMENT_TYPES,
-  client:  ['contract'],
   vehicle: VEHICLE_DOCUMENT_TYPES,
 }
 
-/** Step 1's three choices (Figma "modal upload document", 2026-11-25). */
+/** Step 1's choices (Figma "modal upload document", 2026-11-25; Client removed with Contract 2026-11-27). */
 const TARGETS: { id: UploadTarget; title: string; sub: string }[] = [
-  { id: 'client',  title: 'Client',  sub: 'Paperwork for a client company' },
   { id: 'booking', title: 'Booking', sub: 'Documents for a specific delivery' },
   // Vendor vehicles are typed in per booking, not kept as trucks, so only our
   // own trucks can be picked here.
@@ -55,7 +51,6 @@ const TARGETS: { id: UploadTarget; title: string; sub: string }[] = [
 ]
 
 const NOTES_HINT: Record<UploadTarget, string> = {
-  client:  'e.g. Signed service agreement for 2026, renewed after the rate review.',
   booking: 'e.g. Signed document returned by the driver for drop-off 1; stamped by the receiving bay.',
   vehicle: 'e.g. Renewed registration; the previous copy has expired.',
 }
@@ -75,10 +70,11 @@ function Muted({ children }: { children: ReactNode }) {
 
 /**
  * Staff upload, in two steps (Figma 2026-11-25): first what the document is
- * for (Client, Booking or Vehicle), then the form for it. A Contract goes on a
- * client; Proof of Delivery and Other on a booking; Vehicle Registration,
- * Insurance and Other on a vehicle. Other takes a typed-in type, suggested
- * from earlier ones on the same kind of target.
+ * for (Booking or Vehicle), then the form for it. Proof of Delivery and Other
+ * go on a booking; Vehicle Registration, Insurance and Other on a vehicle.
+ * Other takes a typed-in type, suggested from earlier ones on the same kind of
+ * target. Nothing waits for review (user 2026-11-27): a Proof of Delivery
+ * reaches the client at once, so Upload asks the uploader to check it first.
  *
  * `initialTarget` skips the first step (the page knows the folder it is in);
  * `vehicleOnly` (the Fleet Manager) always goes straight to Vehicle.
@@ -87,8 +83,9 @@ export default function UploadDocumentModal({
   open,
   initialTarget = null,
   initialBooking,
-  initialClient,
   initialTruck,
+  initialDocType,
+  initialDestinationId,
   vehicleOnly = false,
   onClose,
   onUploaded,
@@ -97,10 +94,12 @@ export default function UploadDocumentModal({
   initialTarget?:  UploadTarget | null
   /** Pre-selects the booking when the library is already focused on one. */
   initialBooking?: BookingOption | null
-  /** Pre-selects the client inside a client's folder. */
-  initialClient?:  ClientOption | null
   /** Pre-selects the vehicle inside a vehicle's folder. */
   initialTruck?:   VehicleOption | null
+  /** Pre-picks the type (a drop-off's "Upload Proof of Delivery" button). */
+  initialDocType?: StaffDocumentType | null
+  /** Pre-picks the drop-off a Proof of Delivery proves. */
+  initialDestinationId?: string | null
   vehicleOnly?:    boolean
   onClose:         () => void
   onUploaded:      () => void
@@ -115,12 +114,12 @@ export default function UploadDocumentModal({
   const [query,    setQuery]    = useState('')
   const [options,  setOptions]  = useState<BookingOption[]>([])
   const [searching, setSearching] = useState(false)
-  const [client,        setClient]        = useState<ClientOption | null>(null)
-  const [clientOptions, setClientOptions] = useState<ClientOption[]>([])
-  const [clientsLoading, setClientsLoading] = useState(false)
   const [otherLabel,    setOtherLabel]    = useState('')
   const [labelHints,    setLabelHints]    = useState<string[]>([])
   const [docType,  setDocType]  = useState<StaffDocumentType | ''>('')
+  // Proof of Delivery: which drop-off it proves ('' = not one drop-off).
+  const [dropoffs,    setDropoffs]    = useState<DropoffProof[]>([])
+  const [dropoffId,   setDropoffId]   = useState('')
   const [notes,    setNotes]    = useState('')
   const [files,    setFiles]    = useState<File[]>([])
   const [dragging, setDragging] = useState(false)
@@ -128,6 +127,8 @@ export default function UploadDocumentModal({
   const [showErrors, setShowErrors] = useState(false)
   // Asks first (user 2026-11-25): closing with something chosen or typed, and taking a file off.
   const [confirmClose,  setConfirmClose]  = useState(false)
+  // Proof of Delivery: its own confirmation, naming the booking and drop-off.
+  const [confirmPod,    setConfirmPod]    = useState(false)
   const [pendingRemove, setPendingRemove] = useState<File | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const hasInput = files.length > 0 || notes.trim().length > 0 || otherLabel.trim().length > 0
@@ -141,7 +142,7 @@ export default function UploadDocumentModal({
   // Upload asks once more before it saves (user 2026-11-27); closing already asks.
   const submitGuard = useFormGuard(hasInput)
 
-  /** A type is picked for you only when the target has just one (a client's Contract). */
+  /** A type is picked for you only when the target has just one. */
   const defaultType = (t: UploadTarget): StaffDocumentType | '' => (TYPES_FOR[t].length === 1 ? TYPES_FOR[t][0] : '')
 
   // Fresh form every time it opens.
@@ -152,15 +153,16 @@ export default function UploadDocumentModal({
     setAskedTarget(t === null)
     setBooking(initialBooking ?? null)
     setQuery('')
-    setClient(initialClient ?? null)
     setTruck(initialTruck ?? null)
     setTruckQuery('')
     setOtherLabel('')
-    setDocType(t ? defaultType(t) : '')
+    setDocType(initialDocType && t && TYPES_FOR[t].includes(initialDocType) ? initialDocType : t ? defaultType(t) : '')
+    setDropoffs([])
+    setDropoffId(initialDestinationId ?? '')
     setNotes('')
     setFiles([])
     setShowErrors(false)
-  }, [open, initialTarget, initialBooking, initialClient, initialTruck, vehicleOnly])
+  }, [open, initialTarget, initialBooking, initialTruck, initialDocType, initialDestinationId, vehicleOnly])
 
   function chooseTarget(t: UploadTarget) {
     setTarget(t)
@@ -168,7 +170,6 @@ export default function UploadDocumentModal({
     setShowErrors(false)
   }
 
-  const isClient  = target === 'client'
   const isVehicle = target === 'vehicle'
   const isBooking = target === 'booking'
 
@@ -200,17 +201,28 @@ export default function UploadDocumentModal({
     return () => { cancelled = true; window.clearTimeout(t) }
   }, [open, isBooking, booking, query])
 
-  // The Client dropdown: every client, read once per opening.
+  // Proof of Delivery on a booking: its drop-offs, so the file can name the one
+  // it proves (that clears the drop-off's "Proof missing"). With
+  // nothing chosen yet, the only drop-off still missing proof is picked.
+  const bookingId = isBooking ? booking?.booking_id ?? null : null
+  const wantDropoffs = open && docType === 'proof_of_delivery' && !!bookingId
   useEffect(() => {
-    if (!open || !isClient) return
+    if (!wantDropoffs || !bookingId) { setDropoffs([]); return }
     let cancelled = false
-    setClientsLoading(true)
-    searchClientsForUpload('')
-      .then((rows) => { if (!cancelled) setClientOptions(rows) })
-      .catch(() => { if (!cancelled) setClientOptions([]) })
-      .finally(() => { if (!cancelled) setClientsLoading(false) })
+    fetchBookingDropoffs(bookingId)
+      .then((rows) => {
+        if (cancelled) return
+        setDropoffs(rows)
+        setDropoffId((cur) => {
+          if (cur && rows.some((r) => r.destination_id === cur)) return cur
+          if (rows.length === 1) return rows[0].destination_id
+          const missing = rows.filter((r) => r.proof_state === 'missing')
+          return missing.length === 1 ? missing[0].destination_id : ''
+        })
+      })
+      .catch(() => { if (!cancelled) setDropoffs([]) })
     return () => { cancelled = true }
-  }, [open, isClient])
+  }, [wantDropoffs, bookingId])
 
   // Types typed for Other before on the same kind of target, read when Other is chosen.
   useEffect(() => {
@@ -251,10 +263,11 @@ export default function UploadDocumentModal({
     })
   }
 
+  const podDropoff = dropoffs.find((d) => d.destination_id === dropoffId) ?? null
+
   // Each check shows under its own field once Upload is pressed.
   const errors = {
-    target:  isClient && !client ? 'Choose the client.'
-      : isBooking && !booking ? 'Choose the booking.'
+    target:  isBooking && !booking ? 'Choose the booking.'
       : isVehicle && !truck ? 'Choose the vehicle.'
       : null,
     docType: !docType ? 'Choose the document type.' : null,
@@ -269,25 +282,21 @@ export default function UploadDocumentModal({
     if (!valid || !docType) { setShowErrors(true); return }
     setBusy(true)
     try {
-      const { document_ids, needs_review } = await uploadDocuments({
+      const { document_ids } = await uploadDocuments({
         bookingId:    isBooking ? booking?.booking_id : null,
-        clientId:     isClient ? client?.client_id : null,
         truckId:      isVehicle ? truck?.truck_id : null,
+        destinationId: isBooking && docType === 'proof_of_delivery' && dropoffId ? dropoffId : null,
         documentType: docType,
         otherLabel:   docType === 'other' ? otherLabel : null,
         notes,
         files,
       })
       const n = `${document_ids.length} document${document_ids.length === 1 ? '' : 's'}`
-      // An older backend does not send needs_review; fall back to the type.
-      const after = (needs_review ?? needsReview(docType)) ? ' Awaiting review.' : ''
       appToast.success(
-        isClient
-          ? `${n} added to the documents of ${client?.company_name ?? 'the client'}.${after}`
-          : isVehicle
-          ? `${n} added to ${truck?.plate_number ?? 'the vehicle'}.${after}`
-          : `${n} attached to ${booking?.reference_number ?? 'the booking'}.${after}`,
-        { action: 'document-upload', entityId: isClient ? client?.client_id : isVehicle ? truck?.truck_id : booking?.booking_id },
+        isVehicle
+          ? `${n} added to ${truck?.plate_number ?? 'the vehicle'}.`
+          : `${n} attached to ${booking?.reference_number ?? 'the booking'}.`,
+        { action: 'document-upload', entityId: isVehicle ? truck?.truck_id : booking?.booking_id },
       )
       onUploaded()
       onClose()
@@ -357,32 +366,6 @@ export default function UploadDocumentModal({
               <>
                 {/* Step 2: the form. */}
                 <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">
-                  {/* Client: a dropdown of every client. */}
-                  {isClient && (
-                    <div>
-                      <label htmlFor="doc-client" className={LABEL}>Client<Required /></label>
-                      <Combobox
-                        id="doc-client"
-                        value={client?.client_id ?? ''}
-                        disabled={busy || clientsLoading}
-                        searchPlaceholder="Search client…"
-                        emptyText="No clients match."
-                        onChange={(e) => setClient(clientOptions.find((o) => o.client_id === e.target.value) ?? null)}
-                        className={`${FIELD} h-10 ${errorBorder(shown.target)}`}
-                      >
-                        <option value="" disabled>{clientsLoading ? 'Loading clients…' : 'Select client'}</option>
-                        {/* The pre-picked client stays listed even before the list arrives. */}
-                        {client && !clientOptions.some((o) => o.client_id === client.client_id) && (
-                          <option value={client.client_id}>{client.company_name ?? 'Unnamed client'}</option>
-                        )}
-                        {clientOptions.map((o) => (
-                          <option key={o.client_id} value={o.client_id}>{o.company_name ?? 'Unnamed client'}</option>
-                        ))}
-                      </Combobox>
-                      <FieldError>{shown.target}</FieldError>
-                    </div>
-                  )}
-
                   {/* Booking: a search box over a short list. */}
                   {isBooking && (
                     <div>
@@ -393,7 +376,7 @@ export default function UploadDocumentModal({
                           sub={[booking.company_name ?? 'Unknown client', booking.schedule_date && formatDate(booking.schedule_date)].filter(Boolean).join(' · ')}
                           right={mainStatusLabel(booking.status)}
                           busy={busy}
-                          onChange={() => setBooking(null)}
+                          onChange={() => { setBooking(null); setDropoffId('') }}
                         />
                       ) : (
                         <PickerList
@@ -461,7 +444,7 @@ export default function UploadDocumentModal({
                     <Dropdown
                       id="doc-type"
                       value={docType}
-                      disabled={busy || TYPES_FOR[target].length === 1}
+                      disabled={busy}
                       onChange={(e) => setDocType(e.target.value as StaffDocumentType)}
                       className={`${FIELD} h-10 ${errorBorder(shown.docType)}`}
                     >
@@ -471,12 +454,36 @@ export default function UploadDocumentModal({
                       ))}
                     </Dropdown>
                     <FieldError>{shown.docType}</FieldError>
-                    {docType && (
+                    {docType === 'proof_of_delivery' && (
                       <p className="ff-regular mt-1.5 text-xs text-[#818181]">
-                        {needsReview(docType) ? 'Another reviewer has to approve it before it counts.' : 'This type needs no review.'}
+                        The client sees it in their booking as soon as it is uploaded.
                       </p>
                     )}
                   </div>
+
+                  {/* Proof of Delivery: the drop-off it proves */}
+                  {isBooking && docType === 'proof_of_delivery' && booking && dropoffs.length > 1 && (
+                    <div>
+                      <label htmlFor="doc-dropoff" className={LABEL}>Drop-off<Muted>(the one this proves)</Muted></label>
+                      <Dropdown
+                        id="doc-dropoff"
+                        value={dropoffId}
+                        disabled={busy}
+                        onChange={(e) => setDropoffId(e.target.value)}
+                        className={`${FIELD} h-10`}
+                      >
+                        <option value="">Not for one drop-off</option>
+                        {dropoffs.map((d) => (
+                          <option key={d.destination_id} value={d.destination_id}>
+                            {`Drop-off ${d.sequence_order}${d.proof_state === 'missing' ? ' (proof missing)' : ''} · ${d.address}`}
+                          </option>
+                        ))}
+                      </Dropdown>
+                      <p className="ff-regular mt-1.5 text-xs text-[#818181]">
+                        It clears that drop-off&apos;s Proof missing mark.
+                      </p>
+                    </div>
+                  )}
 
                   {/* Other: what kind of document */}
                   {docType === 'other' && (
@@ -597,9 +604,12 @@ export default function UploadDocumentModal({
                     disabled={busy}
                     onClick={() => {
                       if (!valid || !docType) { setShowErrors(true); return }
+                      // Proof of Delivery goes to the client at once, with no second
+                      // check: always ask, naming the booking and the drop-off.
+                      if (docType === 'proof_of_delivery') { setConfirmPod(true); return }
                       submitGuard.confirmSubmit(() => void submit(), {
-                        title:        `Upload ${files.length} ${files.length === 1 ? 'file' : 'files'} as ${DOCUMENT_TYPE_LABELS[docType]}?`,
-                        description:  needsReview(docType) ? 'Another reviewer has to approve it before it counts.' : 'It is saved as approved; this type needs no review.',
+                        title:        `Upload ${files.length} ${files.length === 1 ? 'file' : 'files'} as ${documentWords(docType, otherLabel)}?`,
+                        description:  'It is saved at once.',
                         confirmLabel: 'Upload',
                       })
                     }}
@@ -630,6 +640,20 @@ export default function UploadDocumentModal({
 
     {submitGuard.modal}
     <ReusableModal
+      open={confirmPod}
+      title={`Upload Proof of Delivery for ${booking?.reference_number ?? 'this booking'}?`}
+      description={
+        `The client sees ${files.length === 1 ? 'this file' : `these ${files.length} files`} in their booking right away; nobody checks it after you. ` +
+        (podDropoff
+          ? `Make sure it is the signed delivery receipt for drop-off ${podDropoff.sequence_order} (${podDropoff.address}) of this booking.`
+          : 'Make sure it is the signed delivery receipt for this booking.')
+      }
+      confirmLabel="Yes, Upload"
+      cancelLabel="Check Again"
+      onConfirm={() => { setConfirmPod(false); void submit() }}
+      onCancel={() => setConfirmPod(false)}
+    />
+    <ReusableModal
       open={confirmClose}
       title="Discard this upload?"
       description="The files and notes you added haven't been uploaded. If you close, they will be lost."
@@ -640,6 +664,11 @@ export default function UploadDocumentModal({
     />
     </>
   )
+}
+
+/** "Proof of Delivery", or Other with the type typed in. */
+function documentWords(type: StaffDocumentType, otherLabel: string): string {
+  return type === 'other' && otherLabel.trim() ? `Other (${otherLabel.trim()})` : DOCUMENT_TYPE_LABELS[type]
 }
 
 /** The picked booking or vehicle, with Change to pick another. */

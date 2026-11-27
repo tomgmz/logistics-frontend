@@ -5,7 +5,7 @@ import Pagination from '@/components/ui/Pagination'
 import { Fragment, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import {
-  Eye, Download, ExternalLink, CheckCircle2, XCircle, Archive,
+  Eye, Download, ExternalLink, Archive,
   ArchiveRestore, FileSearch, LayoutGrid, List, MapPinOff, ChevronRight,
   FolderOpen, File as FileIcon,
 } from 'lucide-react'
@@ -19,7 +19,6 @@ import {
   fetchFolders,
   fetchFoldersPage,
   restoreDocument,
-  reviewDocument,
   type DocumentFolderRow,
 } from '@/lib/services/admin/documents.service'
 import {
@@ -35,18 +34,16 @@ import {
   type DocumentFolder,
   type LibraryDocument,
   type LibraryDocumentType,
-  type ReviewStatus,
   type UploadTarget,
 } from '@/app/types/documents.types'
 import DocumentPreviewModal, { PREVIEW_ACTION_CLASS, PREVIEW_TONE } from '@/components/documents/DocumentPreviewModal'
 import UploadDocumentModal from '@/components/documents/UploadDocumentModal'
 import { DocStatusText, RowIconTile } from '@/components/documents/DocumentVisuals'
-import ReusableModal, { RemarksModal } from '@/components/layout/ReusableModal'
+import ReusableModal from '@/components/layout/ReusableModal'
 import RowActionMenu, { type RowAction } from '@/components/ui/RowActionMenu'
 import { useModuleAccess } from '@/components/layout/ModuleAccess'
 import { useLiveTable } from '@/lib/hooks/useLiveTable'
 import { useSignedLinkRefresh, withFreshLinks } from '@/lib/hooks/useSignedLinkRefresh'
-import { useAuthStore } from '@/lib/store/auth.store'
 import { formatDate, formatTime } from '@/app/utils/timeFormat'
 import { appToast } from '@/lib/toast'
 import { getApiErrorMessage } from '@/lib/api-error'
@@ -72,23 +69,21 @@ import { Tip } from '@/components/ui/tooltip'
  * Manager portals, laid out as folders (Figma docs/figma/document_management,
  * 2026-11-25):
  *
- *   Documents ▸ <client>                       two folders: Bookings, Documents
- *   Documents ▸ <client> ▸ Bookings ▸ <booking> a booking's files
- *   Documents ▸ <client> ▸ Documents           the client's own paperwork (contracts)
+ *   Documents ▸ <client>                       the client's bookings
+ *   Documents ▸ <client> ▸ <booking>            a booking's files
  *   Documents ▸ Fleet ▸ <plate>                 a vehicle's papers, odometer photos, service receipts
- *   Documents ▸ Awaiting review                 every staff upload still to be reviewed
  *
- * The folder is in the URL (?client= [&section=bookings|documents] /
- * ?booking= / ?fleet=1 / ?vehicle= / ?review=1), so Back works and a booking's
+ * The folder is in the URL (?client= / ?booking= / ?fleet=1 / ?vehicle=), so
+ * Back works and a booking's
  * link opens its folder directly. Searching from the top or a client finds
  * bookings by reference; typing a full reference opens that booking, Enter
  * opens the first match.
  *
  * Most files are evidence recorded by another flow (the client's attachments,
  * the driver's proof photos, the fleet's odometer photos and service receipts):
- * viewable and downloadable, never editable. Paperwork staff attach here goes
- * through review when it is a Contract or Proof of Delivery: someone other than
- * the uploader approves or rejects it. Vehicle papers and Other count at once.
+ * viewable and downloadable, never editable. Paperwork staff attach here counts
+ * at once (user 2026-11-27: no review step and no Contract type; the uploader
+ * confirms a Proof of Delivery before it goes to the client).
  *
  * `fleetOnly` (the Fleet Manager's portal, 2026-11-08) starts at Fleet and
  * never shows clients or bookings. The server enforces the same scope on
@@ -103,24 +98,15 @@ const VIEW_KEY  = 'documents.view'
 
 type ViewMode = 'table' | 'grid'
 
-/** Inside a client: its two folders (no section), or one of them. */
-type ClientSection = 'bookings' | 'documents'
-
 type Nav =
   | { level: 'root'; only?: 'clients' }
-  | { level: 'client';  clientId: string; section?: ClientSection }
+  | { level: 'client';  clientId: string }
   | { level: 'booking'; bookingId: string }
   | { level: 'fleet' }
   | { level: 'vehicle'; truckId: string }
-  | { level: 'review' }
   /** Every archived document, across all folders: the only place they are listed (2026-11-08). */
   | { level: 'archived' }
 
-const REVIEW_OPTIONS: FilterOption[] = [
-  { value: 'pending',  label: 'Awaiting Review' },
-  { value: 'approved', label: 'Approved' },
-  { value: 'rejected', label: 'Rejected' },
-]
 const SORT_OPTIONS: FilterOption[] = [
   { value: 'desc', label: 'Newest first' },
   { value: 'asc',  label: 'Oldest first' },
@@ -150,22 +136,16 @@ function navFrom(p: URLSearchParams): Nav {
   const booking = p.get('booking')
   const vehicle = p.get('vehicle')
   const client  = p.get('client')
-  // The Contract folder was removed 2026-11-18: an old ?contract= link opens
-  // the client's Documents folder, where its contracts are listed.
+  // Old links: ?contract= (Contract folder, removed 2026-11-18) and
+  // &section= (the client's Bookings / Documents folders, removed 2026-11-27)
+  // open the client's bookings; ?review=1 (Awaiting review, removed
+  // 2026-11-27) opens the top.
   const contract = p.get('contract')
-  const section  = p.get('section')
   if (booking) return { level: 'booking', bookingId: booking }
-  if (contract) return { level: 'client', clientId: contract, section: 'documents' }
+  if (contract) return { level: 'client', clientId: contract }
   if (vehicle) return { level: 'vehicle', truckId: vehicle }
-  if (p.get('review') === '1') return { level: 'review' }
   if (p.get('archived') === '1') return { level: 'archived' }
-  if (client) {
-    return {
-      level: 'client', clientId: client,
-      // "No client on record" has bookings only.
-      section: section === 'bookings' ? 'bookings' : section === 'documents' && client !== 'none' ? 'documents' : undefined,
-    }
-  }
+  if (client) return { level: 'client', clientId: client }
   if (p.get('fleet') === '1') return { level: 'fleet' }
   return p.get('show') === 'clients' ? { level: 'root', only: 'clients' } : { level: 'root' }
 }
@@ -173,11 +153,10 @@ function navFrom(p: URLSearchParams): Nav {
 function navQuery(n: Nav): string {
   switch (n.level) {
     case 'root':    return n.only === 'clients' ? '?show=clients' : ''
-    case 'client':  return `?client=${encodeURIComponent(n.clientId)}${n.section ? `&section=${n.section}` : ''}`
+    case 'client':  return `?client=${encodeURIComponent(n.clientId)}`
     case 'booking': return `?booking=${encodeURIComponent(n.bookingId)}`
     case 'fleet':   return '?fleet=1'
     case 'vehicle': return `?vehicle=${encodeURIComponent(n.truckId)}`
-    case 'review':  return '?review=1'
     case 'archived': return '?archived=1'
   }
 }
@@ -185,12 +164,6 @@ function navQuery(n: Nav): string {
 const pick = (v: FilterValues, field: string) => v.find((r) => r.field === field && r.op === 'is')?.value
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString()} ${n === 1 ? one : many}`
-
-/** Awaiting review: the count in yellow, or "---". */
-function PendingCount({ n }: { n: number }) {
-  if (n <= 0) return NONE
-  return <span className="tabular-nums text-[#ffea00]">{n.toLocaleString()}</span>
-}
 
 /** A file's icon tile: the photo itself when it is one, else a grey file icon. */
 function FileTile({ doc }: { doc: LibraryDocument }) {
@@ -238,8 +211,7 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
   const router       = useRouter()
   const searchParams = useSearchParams()
   const portal       = pathname?.split('/')[1] ?? 'admin'
-  const myId         = useAuthStore((s) => s.user?.user_id)
-  const { canCreate, canEdit, canDelete, canExport } = useModuleAccess()
+  const { canCreate, canDelete, canExport } = useModuleAccess()
 
   // The top of the library: Fleet for the Fleet Manager, else every folder.
   const home: Nav = useMemo(() => (fleetOnly ? { level: 'fleet' } : { level: 'root' }), [fleetOnly])
@@ -250,11 +222,9 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
     // an old ?archived=1 link opens the top of the library.
     if (n.level === 'archived') return home
     // A client/booking link opened by the Fleet Manager lands on Fleet instead.
-    return fleetOnly && n.level !== 'fleet' && n.level !== 'vehicle' && n.level !== 'review' ? home : n
+    return fleetOnly && n.level !== 'fleet' && n.level !== 'vehicle' ? home : n
   }, [searchParams, fleetOnly, home, archive])
-  const clientDocs     = nav.level === 'client' && nav.section === 'documents'
-  const clientSections = nav.level === 'client' && !nav.section
-  const isFiles = nav.level === 'booking' || nav.level === 'vehicle' || nav.level === 'review' || nav.level === 'archived' || clientDocs
+  const isFiles = nav.level === 'booking' || nav.level === 'vehicle' || nav.level === 'archived'
   // From the Archive module, a folder opens in Document Management itself.
   const libraryPath = archive ? `/${portal}/document-management` : pathname
   const go      = useCallback((n: Nav) => router.push(`${libraryPath}${navQuery(n)}`), [router, libraryPath])
@@ -297,9 +267,6 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
 
   // ── Folder rows (root / a client's bookings / fleet) ─────────────────────
   const tablePageSize = useTablePageSize()
-  // A client's two folders are fixed rows; searching there lists its matching
-  // bookings instead.
-  const showSections = clientSections && !search
   // One server page of folders (10 rows on phones, 20 from tablet up). From
   // the top, searching finds clients and, across every client, bookings; the
   // Fleet folder comes last when not searching.
@@ -310,50 +277,12 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
       ? fetchFoldersPage('bookings', { ...q, client_id: nav.clientId, search })
       : fetchFoldersPage('vehicles', { ...q, search }),
     `${navKey}|${search}`,
-    { enabled: !isFiles && !showSections, errorMessage: 'Could not load folders. Please try again.', cacheKey: 'document-folders' },
+    { enabled: !isFiles, errorMessage: 'Could not load folders. Please try again.', cacheKey: 'document-folders' },
   )
   const folders       = folderTable.rows as DocumentFolderRow[]
   const folderLoading = folderTable.loading
   const folderError   = folderTable.error
   const loadFolders   = folderTable.reload
-
-  // ── A client's two folders: Bookings (its bookings' files) and Documents
-  // (its own paperwork, e.g. contracts), each with its own counts.
-  type SectionTotals = { files: number; pending: number; last: string | null }
-  const [sections, setSections] = useState<{ bookings: SectionTotals; documents: SectionTotals } | null>(null)
-  const [sectionsError, setSectionsError] = useState<string | null>(null)
-  const sectionClient = clientSections ? nav.clientId : null
-  const sectionReq = useRef(0)
-  const loadSections = useCallback(async (quiet = false) => {
-    const id = ++sectionReq.current
-    if (!sectionClient) return
-    if (!quiet) { setSections(null); setSectionsError(null) }
-    try {
-      const [bookings, docs] = await Promise.all([
-        fetchFolders('bookings', { client_id: sectionClient }),
-        sectionClient === 'none'
-          ? Promise.resolve(null)
-          : fetchDocuments({ group: 'client', client_id: sectionClient, archived: 'hide', sort: 'desc' }, 1, 1),
-      ])
-      if (id !== sectionReq.current) return
-      setSections({
-        bookings: {
-          files:   bookings.reduce((n, b) => n + b.file_count, 0),
-          pending: bookings.reduce((n, b) => n + b.pending_review, 0),
-          last:    bookings.reduce<string | null>((m, b) => (b.last_upload && (!m || b.last_upload > m) ? b.last_upload : m), null),
-        },
-        documents: {
-          files:   docs?.counts.total ?? 0,
-          pending: docs?.counts.pending_review ?? 0,
-          last:    docs?.data[0]?.uploaded_at ?? null,
-        },
-      })
-      setSectionsError(null)
-    } catch (e) {
-      if (id === sectionReq.current && !quiet) setSectionsError(getApiErrorMessage(e, 'Could not load folders. Please try again.'))
-    }
-  }, [sectionClient])
-  useEffect(() => { void loadSections() }, [loadSections])
 
   // Typing a full booking reference opens that booking.
   const bookingMatches = useMemo(
@@ -366,7 +295,7 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
     if (hit?.id) go({ level: 'booking', bookingId: hit.id })
   }, [search, bookingMatches, go])
 
-  // ── File rows (a booking, a vehicle, a client's documents, or the review list) ──
+  // ── File rows (a booking, a vehicle, or the archived list) ──
   const [docs,    setDocs]    = useState<LibraryDocument[]>([])
   const [total,   setTotal]   = useState(0)
   const [counts,  setCounts]  = useState<DocumentCounts>({ total: 0, pending_review: 0, by_type: {} })
@@ -374,7 +303,6 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
   const [error,   setError]   = useState<string | null>(null)
 
   const [types,     setTypes]     = useState<LibraryDocumentType[]>([])
-  const [review,    setReview]    = useState<ReviewStatus | ''>('')
   const [dateRange, setDateRange] = useState<DateRange | null>(null)
   const [sort,      setSort]      = useState<'desc' | 'asc'>('desc')
   const [page,      setPage]      = useState(1)
@@ -383,8 +311,6 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
 
   const [previewKey, setPreviewKey] = useState<string | null>(null)
   const [uploadOpen, setUploadOpen] = useState(false)
-  const [approveOf,  setApproveOf]  = useState<LibraryDocument | null>(null)
-  const [rejectOf,   setRejectOf]   = useState<LibraryDocument | null>(null)
   const [archiveOf,  setArchiveOf]  = useState<LibraryDocument | null>(null)
   const [busy,       setBusy]       = useState(false)
   const [exporting,  setExporting]  = useState(false)
@@ -394,7 +320,7 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
 
   // A new folder starts with no file filters.
   useEffect(() => {
-    setTypes([]); setReview(''); setDateRange(null); setSort('desc')
+    setTypes([]); setDateRange(null); setSort('desc')
     setSelected(new Map())
   }, [navKey])
 
@@ -415,17 +341,15 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
   const filters: DocumentFilters = useMemo(() => ({
     search:        search || undefined,
     types:         types.length ? types : undefined,
-    review_status: nav.level === 'review' ? 'pending' : (review || undefined),
     booking_id:    nav.level === 'booking' ? nav.bookingId : undefined,
     truck_id:      nav.level === 'vehicle' ? nav.truckId : undefined,
-    client_id:     nav.level === 'client' && nav.section === 'documents' ? nav.clientId : undefined,
-    group:         nav.level === 'vehicle' ? 'fleet' : nav.level === 'client' && nav.section === 'documents' ? 'client' : undefined,
+    group:         nav.level === 'vehicle' ? 'fleet' : undefined,
     date_from:     dateRange?.from,
     date_to:       dateRange?.to,
     // Archived documents are listed in the Archive module only.
     archived:      nav.level === 'archived' ? 'only' : 'hide',
     sort,
-  }), [search, types, review, nav, dateRange, sort])
+  }), [search, types, nav, dateRange, sort])
 
   // Any filter change goes back to the first page.
   const filterKey = JSON.stringify(filters)
@@ -464,9 +388,8 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
   const reloadAll = useCallback((quiet = false) => {
     void loadTop()
     if (isFiles) void load(quiet)
-    else if (showSections) void loadSections(quiet)
     else void loadFolders(quiet)
-  }, [loadTop, load, loadFolders, loadSections, isFiles, showSections])
+  }, [loadTop, load, loadFolders, isFiles])
 
   // Real time: every file source signals live:documents (staff uploads, the
   // client's attachments, pickup and stop proof photos, odometer photos and
@@ -485,7 +408,7 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
 
   const previewDoc = useMemo(() => docs.find((d) => d.doc_key === previewKey) ?? null, [docs, previewKey])
 
-  // A re-read (review, archive, fresh links) updates the ticked copies too, so
+  // A re-read (archive, fresh links) updates the ticked copies too, so
   // the download never carries a stale status.
   useEffect(() => {
     setSelected((prev) => {
@@ -525,26 +448,20 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
       : `/${portal}/booking-management${bookingQuery({ booking_id: d.booking_id, reference_number: d.reference_number })}`
 
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE))
-  const hasFileFilters = !!(search || types.length || review || dateRange || sort !== 'desc')
+  const hasFileFilters = !!(search || types.length || dateRange || sort !== 'desc')
 
   function resetFilters() {
     setSearchInput(''); setSearch('')
-    setTypes([]); setReview(''); setDateRange(null); setSort('desc')
+    setTypes([]); setDateRange(null); setSort('desc')
   }
 
   // ── Actions ────────────────────────────────────────────────────────────
-
-  const isOwn = (d: LibraryDocument) => !!myId && d.uploaded_by === myId
-  const canReview = (d: LibraryDocument) =>
-    canEdit && !!d.document_id && d.review_status === 'pending' && !d.archived_at
 
   async function run(label: string, d: LibraryDocument, fn: () => Promise<void>, done: string) {
     setBusy(true)
     try {
       await fn()
       appToast.success(done, { action: `document-${label}`, entityId: d.document_id ?? undefined })
-      setApproveOf(null)
-      setRejectOf(null)
       setArchiveOf(null)
       reloadAll(true)
     } catch (e) {
@@ -591,15 +508,8 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
     const href = bookingHref(d)
     if (href) actions.push({ label: 'Open Booking', icon: <ExternalLink size={13} />, onSelect: () => router.push(href) })
 
-    if (canReview(d)) {
-      const own = isOwn(d)
-      const title = own ? 'You uploaded this — another reviewer has to approve it' : undefined
-      actions.push(
-        { label: 'Approve', icon: <CheckCircle2 size={13} />, tone: 'accent', separated: true, disabled: own, title, onSelect: () => setApproveOf(d) },
-        { label: 'Reject', icon: <XCircle size={13} />, disabled: own, title, onSelect: () => setRejectOf(d) },
-      )
-    }
-    if (canDelete && d.document_id) {
+    // A contract stays archived (no folder lists contracts since 2026-11-27).
+    if (canDelete && d.document_id && !(d.archived_at && d.doc_type === 'contract')) {
       actions.push(d.archived_at
         ? { label: 'Restore', icon: <ArchiveRestore size={13} />, separated: true, onSelect: () => void run('restore', d, () => restoreDocument(d.document_id!), 'Document restored.') }
         : { label: 'Archive', icon: <Archive size={13} />, tone: 'warning', separated: true, onSelect: () => setArchiveOf(d) })
@@ -607,10 +517,9 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
     return actions
   }
 
-  // The preview's buttons (Figma): Archive (yellow), Reject (red), Approve
-  // (cyan), outlined, equal width in one row; Archive alone fills the row.
-  const ownHint = 'You uploaded this — another reviewer has to approve it'
-  const previewActions = previewDoc && (canReview(previewDoc) || (canDelete && previewDoc.document_id)) ? (
+  // The preview's button (Figma): Archive (yellow) or Restore, full width.
+  const previewActions = previewDoc && canDelete && previewDoc.document_id
+    && !(previewDoc.archived_at && previewDoc.doc_type === 'contract') ? (
     <>
       {canDelete && previewDoc.document_id && (
         previewDoc.archived_at ? (
@@ -629,28 +538,6 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
           </button>
         )
       )}
-      {canReview(previewDoc) && (
-        <>
-          <Tip label={isOwn(previewDoc) ? ownHint : undefined}><button
-            type="button"
-            disabled={busy || isOwn(previewDoc)}
-            onClick={() => setRejectOf(previewDoc)}
-            className={PREVIEW_ACTION_CLASS}
-            style={PREVIEW_TONE.reject}
-          >
-            Reject
-          </button></Tip>
-          <Tip label={isOwn(previewDoc) ? ownHint : undefined}><button
-            type="button"
-            disabled={busy || isOwn(previewDoc)}
-            onClick={() => setApproveOf(previewDoc)}
-            className={PREVIEW_ACTION_CLASS}
-            style={PREVIEW_TONE.approve}
-          >
-            Approve
-          </button></Tip>
-        </>
-      )}
     </>
   ) : null
 
@@ -659,8 +546,6 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
   const clientName = (id: string | null | undefined) =>
     id === 'none' ? 'No client on record' : clients.find((c) => c.id === id)?.name ?? 'Client'
   const plateOf = (id: string) => vehicles.find((v) => v.id === id)?.name ?? 'Vehicle'
-  const pendingTotal = [...clients, ...vehicles].reduce((n, c) => n + c.pending_review, 0)
-  const atHome = nav.level === home.level && (nav.level !== 'root' || !('only' in nav && nav.only))
 
   // Clients and Fleet each get their own crumb (user 2026-11-25: the Clients
   // tab reads "Documents › Clients", like "Documents › Fleet").
@@ -670,15 +555,12 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
     crumbs.push({ label: 'Clients' })
   } else if (nav.level === 'client') {
     crumbs.push({ label: 'Clients', to: CLIENTS_NAV })
-    crumbs.push({ label: clientName(nav.clientId), to: { level: 'client', clientId: nav.clientId } })
-    if (nav.section === 'bookings')  crumbs.push({ label: 'Bookings' })
-    if (nav.section === 'documents') crumbs.push({ label: 'Documents' })
+    crumbs.push({ label: clientName(nav.clientId) })
   } else if (nav.level === 'booking') {
     const cid = bookingInfo ? (bookingInfo.client_id ?? 'none') : null
     if (cid) {
       crumbs.push({ label: 'Clients', to: CLIENTS_NAV })
       crumbs.push({ label: clientName(cid), to: { level: 'client', clientId: cid } })
-      crumbs.push({ label: 'Bookings', to: { level: 'client', clientId: cid, section: 'bookings' } })
     }
     crumbs.push({ label: bookingInfo?.name ?? 'Booking' })
   } else if (nav.level === 'fleet') {
@@ -687,8 +569,6 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
   } else if (nav.level === 'vehicle') {
     if (!fleetOnly) crumbs.push({ label: 'Fleet', to: { level: 'fleet' } })
     crumbs.push({ label: plateOf(nav.truckId) })
-  } else if (nav.level === 'review') {
-    crumbs.push({ label: 'Awaiting review' })
   } else if (nav.level === 'archived') {
     crumbs.push({ label: 'Archived' })
   }
@@ -709,11 +589,10 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
     .map((t) => ({ value: t, label: `${DOCUMENT_TYPE_LABELS[t]} (${counts.by_type[t] ?? 0})` }))
 
   // The file table's third column: the booking a vehicle's file belongs to,
-  // or (across folders) the booking or plate. Not inside one booking or a
-  // client's own documents.
+  // or (across folders) the booking or plate. Not inside one booking.
   const refColumn: 'booking' | 'both' | null =
     nav.level === 'vehicle' ? 'booking'
-      : nav.level === 'review' || nav.level === 'archived' ? 'both'
+      : nav.level === 'archived' ? 'both'
       : null
 
   const topTab: 'all' | 'clients' | 'fleet' | 'archived' | null =
@@ -723,33 +602,27 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
       : null
   const archivedView = nav.level === 'archived'
 
-  // Where an upload goes from here: this booking, vehicle or client's
-  // documents; anywhere else the form first asks what the document is for.
+  // Where an upload goes from here: this booking or vehicle (a client's
+  // folder holds bookings); anywhere else the form first asks.
   const uploadTarget: UploadTarget | null =
     fleetOnly || nav.level === 'fleet' || nav.level === 'vehicle' ? 'vehicle'
-      : nav.level === 'booking' ? 'booking'
-      : clientDocs ? 'client'
-      : nav.level === 'client' && nav.section === 'bookings' ? 'booking'
+      : nav.level === 'booking' || nav.level === 'client' ? 'booking'
       : null
 
   const searchPlaceholder =
     nav.level === 'root' ? 'Search client or booking'
-      : nav.level === 'client' && !clientDocs ? 'Search booking'
+      : nav.level === 'client' ? 'Search booking'
       : nav.level === 'fleet' ? 'Search plate'
       : nav.level === 'vehicle' ? 'Search file, booking or uploader'
-      : clientDocs ? 'Search file or uploader'
       : 'Search file, booking, client, plate or uploader'
 
   // ── Render ─────────────────────────────────────────────────────────────
 
   const emptyTitle = hasFileFilters ? undefined
-    : nav.level === 'review' ? 'Nothing waiting for review'
     : archivedView ? 'No archived documents'
     : 'No documents in this folder yet'
   const emptyMessage = hasFileFilters ? 'No documents match your search or filters.'
-    : nav.level === 'review' ? 'Uploads waiting for another reviewer appear here.'
     : archivedView ? 'Archived documents appear here.'
-    : clientDocs ? 'Contracts and other paperwork for this client appear here.'
     : 'Files uploaded or recorded for this folder appear here.'
 
   return (
@@ -798,13 +671,8 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
         <TableCard.Root className="flex flex-col flex-[1_0_auto] lg:flex-1 lg:min-h-0">
           <FilterBar
             layout="split"
-            trailing={(atHome && pendingTotal > 0) || (isFiles && canExport) || (canCreate && !archivedView) ? (
+            trailing={(isFiles && canExport) || (canCreate && !archivedView) ? (
               <>
-                {atHome && pendingTotal > 0 && (
-                  <Button size="toolbar" color="tool" onClick={() => go({ level: 'review' })}>
-                    Awaiting review ({pendingTotal})
-                  </Button>
-                )}
                 {isFiles && canExport && selected.size > 0 && (
                   <span className="ff-regular self-center whitespace-nowrap text-sm text-[#c4c4c4]">
                     {selected.size.toLocaleString()} selected ·{' '}
@@ -856,17 +724,14 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
             dateRange={isFiles ? { value: dateRange, onChange: setDateRange } : undefined}
             fields={isFiles ? [
               { key: 'type',     label: 'Type',     options: typeOptions },
-              ...(nav.level === 'review' ? [] : [{ key: 'review', label: 'Review', single: true, options: REVIEW_OPTIONS }]),
               { key: 'sort',     label: 'Order',    single: true, options: SORT_OPTIONS },
             ] : []}
             values={[
               ...types.map((t) => ({ field: 'type', op: 'is' as const, value: t })),
-              ...(review ? [{ field: 'review', op: 'is' as const, value: review }] : []),
               ...(sort !== 'desc' ? [{ field: 'sort', op: 'is' as const, value: sort }] : []),
             ]}
             onChange={(v) => {
               setTypes(v.filter((r) => r.field === 'type' && r.op === 'is').map((r) => r.value as LibraryDocumentType))
-              setReview((pick(v, 'review') ?? '') as ReviewStatus | '')
               setSort(pick(v, 'sort') === 'asc' ? 'asc' : 'desc')
             }}
             actions={
@@ -1046,47 +911,6 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
                 <Pagination page={page} totalPages={pages} total={total} pageSize={PAGE_SIZE} onPageChange={setPage} />
               )}
             </>
-          ) : showSections ? (
-            // A client's two folders (Figma "client [files]").
-            !sections && !sectionsError ? (
-              <Spinner label="Loading folders…" />
-            ) : sectionsError ? (
-              <ErrorState message={sectionsError} onRetry={() => void loadSections()} />
-            ) : (
-              <div className="flex flex-col overflow-x-auto lg:overflow-auto flex-[1_0_auto] lg:flex-1 lg:min-h-0">
-                <table className="data-table min-w-[620px]">
-                  <thead className="sticky top-0 z-10">
-                    <tr>
-                      <th>Name</th>
-                      <th>Files</th>
-                      <th>Awaiting Review</th>
-                      <th>Last Upload</th>
-                      <th className={CHEVRON_TD}><span className="sr-only">Open</span></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(nav.level === 'client' ? (['bookings', 'documents'] as const).filter((s) => s === 'bookings' || nav.clientId !== 'none') : []).map((s) => {
-                      const t = sections![s]
-                      const to: Nav = { level: 'client', clientId: nav.level === 'client' ? nav.clientId : 'none', section: s }
-                      return (
-                        <FolderTr key={s} onOpen={() => go(to)}>
-                          <td>
-                            <div className="flex min-w-0 items-center gap-3">
-                              <RowIconTile><FolderOpen className="size-5" strokeWidth={1.5} /></RowIconTile>
-                              <p className="t-name uppercase">{s === 'bookings' ? 'Bookings' : 'Documents'}</p>
-                            </div>
-                          </td>
-                          <td className="tabular-nums font-normal">{plural(t.files, 'file')}</td>
-                          <td><PendingCount n={t.pending} /></td>
-                          <td className="whitespace-nowrap font-normal">{t.last ? formatDate(t.last) : NONE}</td>
-                          <td className={CHEVRON_TD}><ChevronRight size={20} className="ml-auto text-[#4df9ed]" /></td>
-                        </FolderTr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )
           ) : (
             <>
               {folderLoading ? (
@@ -1150,7 +974,6 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
                           <th>Name</th>
                           <th>{nav.level === 'root' ? 'Contents' : 'Status'}</th>
                           <th>Files</th>
-                          <th>Awaiting Review</th>
                           <th>Last Upload</th>
                           <th className={CHEVRON_TD}><span className="sr-only">Open</span></th>
                         </tr>
@@ -1185,7 +1008,6 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
                                   : plural(r.booking_count, 'booking')}
                               </td>
                               <td className="tabular-nums font-normal">{plural(r.file_count, 'file')}</td>
-                              <td><PendingCount n={r.pending_review} /></td>
                               <td className="whitespace-nowrap font-normal">{r.last_upload ? formatDate(r.last_upload) : NONE}</td>
                               <td className={CHEVRON_TD}><ChevronRight size={20} className="ml-auto text-[#4df9ed]" /></td>
                             </FolderTr>
@@ -1231,10 +1053,6 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
           schedule_date:    bookingInfo.schedule_date,
           company_name:     bookingInfo.company_name,
         } : null}
-        // Inside a client's folder, its paperwork goes to that client.
-        initialClient={nav.level === 'client' && nav.clientId !== 'none'
-          ? { client_id: nav.clientId, company_name: clientName(nav.clientId) }
-          : null}
         // Inside a vehicle's folder the upload goes to that vehicle.
         initialTruck={nav.level === 'vehicle'
           ? { truck_id: nav.truckId, plate_number: plateOf(nav.truckId), description: null }
@@ -1242,33 +1060,6 @@ function DocumentLibrary({ fleetOnly, archive }: { fleetOnly: boolean; archive?:
         vehicleOnly={fleetOnly}
         onClose={() => setUploadOpen(false)}
         onUploaded={() => reloadAll(true)}
-      />
-
-      <ReusableModal
-        open={!!approveOf}
-        title="Approve document?"
-        description={approveOf
-          ? `Approve "${approveOf.file_name}" as the ${documentTypeLabel(approveOf).toLowerCase()} for ${approveOf.reference_number ?? approveOf.company_name ?? approveOf.plate_number ?? 'this booking'}.`
-          : undefined}
-        confirmLabel={busy ? 'Saving…' : 'Approve'}
-        cancelLabel="Cancel"
-        disableBackdropClose={busy}
-        onCancel={() => { if (!busy) setApproveOf(null) }}
-        onConfirm={() => { if (approveOf) void run('approve', approveOf, () => reviewDocument(approveOf.document_id!, 'approved'), 'Document approved.') }}
-      />
-
-      <RemarksModal
-        open={!!rejectOf}
-        title="Reject document?"
-        description="Say what is wrong so the uploader can replace it. The reason stays on the document."
-        remarksLabel="Reason"
-        remarksPlaceholder="e.g. Receipt is not stamped by the receiving bay; stop 2 quantities are unreadable."
-        confirmLabel={busy ? 'Saving…' : 'Reject'}
-        cancelLabel="Cancel"
-        busy={busy}
-        disableBackdropClose={busy}
-        onCancel={() => { if (!busy) setRejectOf(null) }}
-        onConfirm={(reason) => { if (rejectOf) void run('reject', rejectOf, () => reviewDocument(rejectOf.document_id!, 'rejected', reason), 'Document rejected.') }}
       />
 
       <ReusableModal

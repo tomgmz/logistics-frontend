@@ -88,19 +88,20 @@ function reviewStyle(status: ReviewStatus) {
 
 /**
  * A file's status as plain coloured capitals (Figma document_management,
- * 2026-11-25): Awaiting Review yellow, Approved green, Rejected red, Recorded
- * (evidence from another flow, nothing to review) green, Archived grey.
+ * 2026-11-25): Uploaded (staff paperwork; no review step since 2026-11-27)
+ * green, Recorded (evidence from another flow) green, Archived grey. A file
+ * rejected under the old review still reads Rejected in red.
  */
 export function docStatusOf(doc: Pick<LibraryDocument, 'archived_at' | 'review_status'>): { label: string; color: string; hint?: string } {
   if (doc.archived_at) return { label: 'Archived', color: '#818181' }
-  if (!doc.review_status) return { label: 'Recorded', color: '#3af626', hint: 'Recorded by the delivery or fleet flow; no review needed' }
-  const color = reviewStyle(doc.review_status).color
-  return { label: REVIEW_STATUS_LABELS[doc.review_status], color }
+  if (!doc.review_status) return { label: 'Recorded', color: '#3af626', hint: 'Recorded by the delivery or fleet flow' }
+  if (doc.review_status === 'rejected') return { label: REVIEW_STATUS_LABELS.rejected, color: reviewStyle('rejected').color, hint: 'Rejected under the old review step' }
+  return { label: 'Uploaded', color: reviewStyle('approved').color }
 }
 
 export function DocStatusText({ doc, className = '' }: { doc: LibraryDocument; className?: string }) {
   const s = docStatusOf(doc)
-  const hint = s.hint ?? (doc.review_status === 'approved' && !doc.reviewed_by_name ? 'This type needs no review' : undefined)
+  const hint = s.hint
   const text = (
     <span className={`whitespace-nowrap font-[family-name:var(--font-darker)] font-bold uppercase ${className}`} style={{ color: s.color }}>
       {s.label}
@@ -118,28 +119,3 @@ export function RowIconTile({ children }: { children: ReactNode }) {
   )
 }
 
-export function ReviewStatusBadge({ doc }: { doc: LibraryDocument }) {
-  if (doc.archived_at) {
-    return (
-      <span className="inline-flex text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border text-white/50 border-white/15 bg-white/5">
-        Archived
-      </span>
-    )
-  }
-  if (!doc.review_status) {
-    return <Tip label="Recorded by the delivery or fleet flow; no review needed"><span className="text-[11px] text-white/35">Recorded</span></Tip>
-  }
-  const st = reviewStyle(doc.review_status)
-  const badge = (
-    <span
-      className="inline-flex text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border whitespace-nowrap"
-      style={{ color: st.color, borderColor: st.border, background: st.bg }}
-    >
-      {REVIEW_STATUS_LABELS[doc.review_status]}
-    </span>
-  )
-  // Vehicle papers and Other are approved on upload, so nobody reviewed them.
-  return doc.review_status === 'approved' && !doc.reviewed_by_name
-    ? <Tip label="This type needs no review">{badge}</Tip>
-    : badge
-}

@@ -75,6 +75,7 @@ const ACTIONABLE_TYPES = new Set([
   "booking.driver_call_reminder",
   "booking.late_start_driver",
   "booking.late_start_staff",
+  "booking.proof_missing_staff",
   "driver.emergency",
   "driver.report",
   "driver.license_expiring_staff",
@@ -194,6 +195,7 @@ const VALUE_LABELS: Record<string, Record<string, string>> = {
     driver_call_reminder:  "Call time in 1 hour",
     late_start_driver:     "Your delivery has not started",
     late_start_staff:      "Delivery not started",
+    proof_missing_staff:   "Proof of delivery missing",
   },
   window: {
     day_before: "Day before dispatch",

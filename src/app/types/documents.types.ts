@@ -3,12 +3,12 @@
  *
  * Derived documents (client attachments, driver proof photos, fleet photos and
  * receipts) are read-only evidence from other flows. Only staff documents —
- * paperwork attached from this page — can be reviewed or archived.
+ * paperwork attached from this page — can be archived.
  */
 
 /**
- * Staff paperwork, in the order the upload form lists it. A Contract belongs
- * to a client (its Contract folder), never a booking, and is staff only.
+ * Staff paperwork types. Contract is no longer uploaded (user 2026-11-27) and
+ * stays only so older, archived contract files still read as "Contract".
  * Proof of Delivery and Other go on a booking; Other carries the type the
  * uploader typed in and is staff only.
  */
@@ -27,17 +27,8 @@ export const BOOKING_DOCUMENT_TYPES = ['proof_of_delivery', 'other'] as const sa
 /** What can be picked when uploading to a vehicle (its Fleet folder). */
 export const VEHICLE_DOCUMENT_TYPES = ['vehicle_registration', 'vehicle_insurance', 'other'] as const satisfies readonly StaffDocumentType[]
 
-/**
- * Same list as the backend's REVIEWED_DOCUMENT_TYPES: only these wait for a
- * second person. Vehicle papers and Other are approved on upload.
- */
-export const REVIEWED_DOCUMENT_TYPES = ['contract', 'proof_of_delivery'] as const satisfies readonly StaffDocumentType[]
-export function needsReview(type: StaffDocumentType): boolean {
-  return (REVIEWED_DOCUMENT_TYPES as readonly string[]).includes(type)
-}
-
-/** Where an upload is filed. */
-export type UploadTarget = 'booking' | 'client' | 'vehicle'
+/** Where an upload is filed. No review step: an upload counts at once (user 2026-11-27). */
+export type UploadTarget = 'booking' | 'vehicle'
 
 export interface VehicleOption {
   truck_id:     string
@@ -205,6 +196,21 @@ export interface BookingOption {
   status:           string
   schedule_date:    string | null
   company_name:     string | null
+}
+
+/**
+ * One drop-off of a booking and its proof (2026-11-27). "missing": recorded
+ * delivered without a photo and no Proof of Delivery uploaded for it yet;
+ * null: nothing owed.
+ */
+export type DropoffProofState = 'missing' | null
+
+export interface DropoffProof {
+  destination_id: string
+  sequence_order: number
+  address:        string
+  status:         string
+  proof_state:    DropoffProofState
 }
 
 export type PreviewKind = 'image' | 'pdf' | 'other'
